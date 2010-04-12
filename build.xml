@@ -102,7 +102,7 @@
         <include name="${bcel.path}"/>
       </fileset>
     </copy>
-    <copy file="README.markdown"      tofile="${install.path}/README"/>
+    <copy file="README.markdown" tofile="${install.path}/README"/>
     <copy file="${jar.name}"     tofile="${install.path}/onion.jar"/>
   	<copy file="${lib-jar.name}" tofile="${install.path}/onion-library.jar"/>
     <copy file="${bcel.path}"    tofile="${install.path}/lib/bcel.jar"/>

@@ -24,11 +24,11 @@ public class CommandLineParser {
   }
   
   public ParseResult parse(String[] cmdline){
-    Map noArgOpts = new HashMap();
-    Map opts = new HashMap();
-    List args = new ArrayList();
-    List lackedOptNames = new ArrayList();
-    List invalidOptNames = new ArrayList();
+    Map<String, Object> noArgOpts = new HashMap<String, Object>();
+    Map<String, String> opts = new HashMap<String, String>();
+    List<String> args = new ArrayList<String>();
+    List<String> lackedOptNames = new ArrayList<String>();
+    List<String> invalidOptNames = new ArrayList<String>();
     {
       int i;
       for(i = 0; i < cmdline.length && cmdline[i].startsWith("-");) {
@@ -57,8 +57,8 @@ public class CommandLineParser {
       return new ParseSuccess(noArgOpts, opts, args);
     }else{
       return new ParseFailure(
-        (String[])lackedOptNames.toArray(new String[0]), 
-        (String[])invalidOptNames.toArray(new String[0]));
+        lackedOptNames.toArray(new String[0]), 
+        invalidOptNames.toArray(new String[0]));
     }
   }
   

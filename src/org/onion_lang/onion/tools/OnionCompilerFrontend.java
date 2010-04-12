@@ -186,7 +186,7 @@ public class OnionCompilerFrontend {
   }
 
   private String checkEncoding(String encoding) {
-    if(encoding == null) return System.getProperty("file.encoding");
+    if(encoding == null) return DEFAULT_ENCODING;
     try {
       "".getBytes(encoding);
       return encoding;

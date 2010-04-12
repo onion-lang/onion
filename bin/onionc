@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# This variable represents the directory in which Onion is installed.
+# ONION_HOME=
+
+# This variable represents the directory in which J2SE is installed. 
+# JAVA_HOME= 
+
+if [ $JAVA_HOME/ = / ]
+then
+  echo Please set the environment variable JAVA_HOME.
+  exit
+fi
+
+if [ $ONION_HOME/ = / ]
+then
+  echo Please set the environment variable ONION_HOME.
+  exit
+fi
+
+$JAVA_HOME/bin/java -jar $ONION_HOME/onion.jar $@

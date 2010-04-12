@@ -1,0 +1,1011 @@
+/* ************************************************************** *
+ *                                                                *
+ * Copyright (c) 2005, Kota Mizushima, All rights reserved.       *
+ *                                                                *
+ *                                                                *
+ * This software is distributed under the modified BSD License.   *
+ * ************************************************************** */
+
+options {
+  STATIC = false;
+}
+
+PARSER_BEGIN(JavaccOnionParser)
+package org.onion_lang.onion.parser;
+import java.util.*;
+import org.onion_lang.onion.lang.syntax.*;
+
+public class JavaccOnionParser implements OnionParser {
+  private static final Expression[] EMPTY_EXPS = new Expression[0];
+  private static final Statement[] EMPTY_STMTS = new Statement[0];
+  private static final Argument[] EMPTY_ARGS = new Argument[0];
+
+  private int mset; // used for semantic lookahead
+
+  public void setLocation(AstNode node, Token token) {
+    node.setLocation(new Location(token.beginLine, token.beginColumn));
+  }
+
+  public void setLocation(AstNode node1, AstNode node2) {
+    node1.setLocation(node2.getLocation());
+  }
+
+  private boolean no(int m, int mset) {
+    return (m & mset) == 0;
+  }
+
+  private boolean la(String s) {
+  	Token t = getToken(1);
+  	return t != null && t.image.equals(s);
+  }
+
+  /*
+   * convenience method to create a Location
+   */
+  private static Location p(Token t) {
+    return new Location(t.beginLine, t.beginColumn);
+  }
+
+  /*
+   * convenience method to create a Location
+   */
+  private static Location p(int line, int column) {
+    return new Location(line, column);
+  }
+
+  /*
+   * convenience method to get image of a Token
+   */
+  private static String c(Token t) {
+    return t.image;
+  }
+
+  /*
+   * converience method to create a List
+   */
+  private static List list() {
+    return new ArrayList();
+  }
+
+  /*
+   * converience method to create substring
+   */
+  private static String sub(String s, int sindex, int eindex) {
+    return s.substring(sindex, eindex);
+  }
+
+  /*
+   * Returns a String which last character of s is omitted.
+   */
+  private static String chop(String s) {
+  	return s.substring(0, s.length() - 1);
+  }
+
+  /*
+   * Returns a String which first and last character of s is omitted.
+   */
+  private static String chopEdge(String s) {
+    return s.substring(1, s.length() - 1);
+  }
+
+  private static char unescapeChar(char c) {
+    switch(c){
+    case 'n' : return '\n';
+    case 't' : return '\t';
+    case 'b' : return '\b';
+    case 'r' : return '\r';
+    case 'f' : return '\f';
+    case '\\': return '\\';
+    case '\'': return '\'';
+    case '"' : return '"';
+    default  : return c;
+    }
+  }
+
+  private static String unescape(String s) {
+  	StringBuffer b = new StringBuffer();
+  	int len = s.length();
+  	for(int i = 0; i < len; i++){
+      char c = s.charAt(i);
+      if(c != '\\'){
+        b.append(c);
+        continue;
+      }
+      i++;
+      b.append(unescapeChar(s.charAt(i)));
+  	}
+  	return new String(b);
+  }
+}
+PARSER_END(JavaccOnionParser)
+
+SKIP:
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+| "\r\n"
+}
+
+
+
+/*
+ * COMMENTS
+ */
+SPECIAL_TOKEN:
+{
+  <MULTI_LINE_COMMENT: "/*" (~["*"])*  "*" ("*" | (~["*", "/"] (~["*"])* "*"))* "/">
+| <LINE_COMMENT:       "//" (~["\r", "\n"])*>
+| <SHELL_COMMENT:      "#!" (~["\r", "\n"])*>
+}
+
+/*
+ * KEYWORDS
+ */
+TOKEN:
+{
+  <K_ABSTRACT:     "abstract"     >
+| <K_AND:          "and"          >
+| <K_BOOLEAN:      "boolean"      >
+| <K_BREAK:        "break"        >
+| <K_BYTE:         "byte"         >
+| <K_CASE:         "case"         >
+| <K_CHAR:         "char"         >
+| <K_CLASS:        "class"        >
+| <K_COND:         "cond"         >
+| <K_CONST:        "const"        >
+| <K_CONTINUE:     "continue"     >
+| <K_DEF:          "def"          >
+| <K_DOUBLE:       "double"       >
+| <K_ELSE:         "else"         >
+| <K_ELSE_LABEL:   "else:"        >
+| <K_FALSE:        "false"        >
+| <K_FIN:          "fin"          >
+| <K_FINAL:        "final"        >
+| <K_FLOAT:        "float"        >
+| <K_FOR:          "for"          >
+| <K_FOREACH:      "foreach"      >
+| <K_FORWARD:      "forward"      >
+| <K_GOTO:         "goto"         >
+| <K_IF:           "if"           >
+| <K_IMPORT:       "import"       >
+| <K_INHERITED:    "inherited"    >
+| <K_INT:          "int"          >
+| <K_INTERFACE:    "interface"    >
+| <K_INTERNAL:     "internal"     >
+| <K_IS:           "is"           >
+| <K_LONG:         "long"         >
+| <K_MODULE:       "module"       >
+| <K_NEW:          "new"          >
+| <K_NULL:         "null"         >
+| <K_OR:           "or"           >
+| <K_OTHER:        "other"        >
+| <K_OVERRIDE:     "override"     >
+| <K_PRIVATE:      "private"      >
+| <K_PROTECTED:    "protected"    >
+| <K_PUBLIC:       "public"       >
+| <K_REC:          "rec"          >
+| <K_RETURN:       "return"       >
+| <K_SELECT:       "select"       >
+| <K_SELF:         "self"         >
+| <K_SHORT:        "short"        >
+| <K_STATIC:       "static"       >
+| <K_SUPER:        "super"        >
+| <K_SYNCHRONIZED: "synchronized" >
+| <K_THROW:        "throw"        >
+| <K_THROWS:       "throws"       >
+| <K_TRUE:         "true"         >
+| <K_TRY:          "try"          >
+| <K_VAR:          "var"          >
+| <K_VOID:         "void"         >
+| <K_VOLATILE:     "volatile"     >
+| <K_WHEN:         "when"         >
+| <K_WHILE:        "while"        >
+}
+
+/*
+ * OPERATORS
+ */
+TOKEN : {
+  <PLUS:           "+"            >
+| <MINUS:          "-"            >
+| <STAR:           "*"            >
+| <SLASH:          "/"            >
+| <PERC:           "%"            >
+| <DOLLAR:         "$"            >
+| <LT:             "<"            >
+| <GT:             ">"            >
+| <ARROW:          "->"           >
+| <SUBTYPE:        "<:"           >
+| <NOT:            "!"            >
+| <AMP:            "&"            >
+| <AND:            "&&"           >
+| <BAR:            "|"            >
+| <OR:             "||"           >
+| <EOR:            "^"            >
+| <BN:             "~"            >
+| <L2S:            "<<"           >
+| <R2S:            ">>"           >
+| <R3S:            ">>>"          >
+| <ASSIGN:         "="            >
+| <EQ:             "=="           >
+| <NOTEQ:          "!="           >
+| <REFEQ:          "==="          >
+| <REFNOTEQ:       "!=="          >
+| <ADDEQ:          "+="           >
+| <SUBEQ:          "-="           >
+| <MULEQ:          "*="           >
+| <DIVEQ:          "/="           >
+| <MODEQ:          "%="           >
+| <PLUSPLUS:       "++"           >
+| <MINUSMINUS:     "--"           >
+| <COLON:          ":"            >
+| <SEMI:           ";"            >
+| <COLON2:         "::"           >
+| <SHARP:          "#"            >
+| <DOT:            "."            >
+| <LBRACE:         "{"            >
+| <RBRACE:         "}"            >
+| <BACK_QUOTE:     "`"            >
+| <LPAREN:         "("            >
+| <RPAREN:         ")"            >
+| <COMMA:          ","            >
+| <LBRACKET:       "["            >
+| <RBRACKET:       "]"            >
+| <QUESTION:       "?"            >
+| <ELVIS:          "?:"           >
+}
+
+/*
+ * LITERALS
+ */
+TOKEN:
+{
+  <INTEGER:
+    <DECIMAL_LITERAL> (["L"])?
+  | <HEX_LITERAL> (["L"])?
+  | <OCTAL_LITERAL> (["L"])?
+  >
+| <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])* >
+| <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
+| <#OCTAL_LITERAL: "0" (["0"-"7"])* >
+| <FLOAT:
+    (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["F", "D"])?
+  | "." (["0"-"9"])+ (<EXPONENT>)? (["F","D"])?
+  | (["0"-"9"])+ <EXPONENT> (["F","D"])?
+  | (["0"-"9"])+ (<EXPONENT>)? ["F","D"]
+  >
+| <#EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
+| <CHARACTER:
+    "'"
+    ( (~["'","\\","\n","\r"])
+    | ("\\"
+        ( ["n","t","b","r","f","\\","'","\""]
+        | ["0"-"7"] ( ["0"-"7"] )?
+        | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+        )
+      )
+    )
+    "'"
+  >
+| <STRING:
+    "\""
+    ( (~["\"","\\","\n","\r"])
+    | ("\\"
+        ( ["n","t","b","r","f","\\","'","\""]
+        | ["0"-"7"] ( ["0"-"7"] )?
+        | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+        )
+      )
+    )*
+    "\""
+  >
+| <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
+| <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
+| <FID:      "@" <ID>                                                    >
+}
+
+/*
+ * ERROR TOKEN
+ */
+TOKEN:{
+  <ERROR: ~[]>
+}
+
+CompilationUnit unit() :{
+  ModuleDeclaration mod = null; ImportListDeclaration imp = null;
+  TopLevelElement top; List tops = list();
+}{
+  [mod=module_decl()]
+  [imp=import_decl()]
+  (top=top_level() {tops.add(top);})+ <EOF> {
+    return new CompilationUnit(
+      p(1, 1), mod, imp, (TopLevelElement[])tops.toArray(new TopLevelElement[0])
+    );
+  }
+}
+
+ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new StringBuffer();}{
+  t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append(t2.image);})* ";" {
+    return new ModuleDeclaration(p(t1), new String(sb));
+  }
+}
+
+ImportListDeclaration import_decl() :{
+  Token t = null, n;
+  StringBuffer sb;
+  String s = null;
+  ImportListDeclaration imports = new ImportListDeclaration();
+}{
+  t="import" "{"
+    ( {sb = new StringBuffer();}
+      ( LOOKAHEAD(2)
+        (n=<ID> {s = n.image;} "=" n=<ID> {sb.append(n.image);} ("." n=<ID> {sb.append("."); sb.append(n.image);})+ ";")
+      | ((LOOKAHEAD(2) n=<ID> "." {sb.append(n.image); sb.append(".");})+ (n=<ID> | n="*") ";" {
+           s = n.image; sb.append(s);
+         }
+        )
+      ){
+        imports.add(s, new String(sb));
+      }
+    )*
+  "}"{
+    setLocation(imports, t);
+    return imports;
+  }
+}
+
+TopLevelElement top_level():{int mset = 0; TopLevelElement top;}{
+( LOOKAHEAD(2)
+  top=stmt()
+| [mset=modifiers()]
+  ( top=type_decl(mset)
+  | top=fun_decl(mset)
+  | top=var_decl(mset)
+  )
+) {return top;}
+}
+
+GlobalVariableDeclaration var_decl(int modifiers) : {
+  Token t1, t2;
+  TypeSpec ty = null;
+  Expression e = null;
+}{
+  t1="var" t2=<FID> [":" ty=type()] ["=" e=expression()] ";" {
+    return new GlobalVariableDeclaration(
+      p(t1), modifiers, t2.image.substring(1), ty, e
+    );
+  }
+}
+
+FunctionDeclaration fun_decl(int modifiers) : {
+  Token t1, t2;
+  Argument[] args = EMPTY_ARGS;
+  TypeSpec ty = null;
+  BlockStatement b = null;
+}{
+  t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";") {
+    return new FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
+  }
+}
+
+TypeDeclaration type_decl(int modifiers) :{TypeDeclaration ty;}{
+  (ty=interface_decl(modifiers) | ty=class_decl(modifiers)) {return ty;}
+}
+
+BlockStatement block():{Token t; Statement[] stmts = EMPTY_STMTS; BlockStatement s;}{
+  t="{" [stmts=stmts()] "}" {return new BlockStatement(p(t), stmts);}
+}
+
+Statement[] stmts():{ Statement s; List stmts = new ArrayList(); }{
+  (s=stmt() { stmts.add(s); })+ {return (Statement[])stmts.toArray(new Statement[0]);}
+}
+
+int modifiers():{ mset = 0; Token t = null, last = null; }{
+  ( t = "final"        { mset = Modifier.FINAL; }
+  | t = "internal"     { mset = Modifier.INTERNAL; }
+  | t = "volatile"     { mset = Modifier.VOLATILE; }
+  | t = "abstract"     { mset = Modifier.ABSTRACT; }
+  | t = "synchronized" { mset = Modifier.SYNCHRONIZED; }
+  | t = "static"       { mset = Modifier.STATIC; }
+  | t = "inherited"    { mset = Modifier.INHERITED; }
+  )
+  ( LOOKAHEAD(1,{no(Modifier.FINAL, mset)})        t = "final"        { mset |= Modifier.FINAL; }
+  | LOOKAHEAD(1,{no(Modifier.INTERNAL, mset)})     t = "internal"     { mset |= Modifier.INTERNAL; }
+  | LOOKAHEAD(1,{no(Modifier.VOLATILE, mset)})     t = "volatile"     { mset |= Modifier.VOLATILE; }
+  | LOOKAHEAD(1,{no(Modifier.ABSTRACT, mset)})     t = "abstract"     { mset |= Modifier.ABSTRACT; }
+  | LOOKAHEAD(1,{no(Modifier.SYNCHRONIZED, mset)}) t = "synchronized" { mset |= Modifier.SYNCHRONIZED; }
+  | LOOKAHEAD(1,{no(Modifier.STATIC, mset)})      t = "static"       { mset |= Modifier.STATIC; }
+  | LOOKAHEAD(1,{no(Modifier.INHERITED, mset)})    t = "inherited"    { mset |= Modifier.INHERITED; }
+  )* {return mset;}
+}
+
+AccessSection default_section() : {
+  AccessSection sec = AccessSection.DEFAULT();
+  MemberDeclaration m; int mset; Location location;
+}{
+  {mset = 0;}
+  ([mset=modifiers()] m=member_decl() {
+     m.setModifier(mset); sec.add(m); setLocation(sec, m);
+   }
+  )
+  {mset = 0;}
+  ([mset=modifiers()] m=member_decl() {
+     m.setModifier(mset); sec.add(m);
+   }
+  )* {return sec;}
+}
+
+AccessSection access_section() :{Token t; AccessSection sec; int mset; MemberDeclaration m;}{
+  (t="public"    {sec = AccessSection.PUBLIC();}
+  |t="protected" {sec = AccessSection.PROTECTED();}
+  |t="private"   {sec = AccessSection.PRIVATE();}
+  ) ":"
+  {mset = 0;}
+  ([mset=modifiers()] m=member_decl() {m.setModifier(mset); sec.add(m);})* {
+    setLocation(sec, t);
+    return sec;
+  }
+}
+
+MemberDeclaration member_decl() :{MemberDeclaration m;}{
+  m=field_decl()         {return m;}
+| m=method_decl()              {return m;}
+| m=delegate_decl()    {return m;}
+| m=constructor_decl()   {return m;}
+}
+
+ClassDeclaration class_decl(int modifiers) : {
+  Token t1, t2;
+  TypeSpec ty1=null, ty2;
+  AccessSection sec1 = null, sec2;
+  List ty2s = new ArrayList();
+  List sec2s = new ArrayList();
+  ClassDeclaration c;
+}{
+  t1="class" t2=<ID> [":" ty1=class_type()]
+  ["<:" ty2=class_type() {ty2s.add(ty2);} ("," ty2=class_type() {ty2s.add(ty2);})*] "{"
+    [sec1=default_section()]
+    (sec2=access_section() {sec2s.add(sec2);})*
+  "}" {
+    c = new ClassDeclaration(
+      modifiers, t2.image, ty1,
+      (TypeSpec[])ty2s.toArray(new TypeSpec[0]),
+      sec1,
+      (AccessSection[])sec2s.toArray(new AccessSection[0]));
+    setLocation(c, t1);
+    return c;
+  }
+}
+
+InterfaceDeclaration interface_decl(int modifiers) : {
+  Token beginning, name;
+  Token start;
+  TypeSpec superType;
+  InterfaceMethodDeclaration signature;
+  List superTypes = new ArrayList();
+  List signatures = new ArrayList();
+  InterfaceDeclaration declaration;
+}{
+  start = "interface" name = <ID>
+  [ "<:"
+    superType = class_type() { superTypes.add(superType); }
+    ("," superType = class_type() { superTypes.add(superType); })*
+  ] "{"
+    (signature = interface_method_decl() { signatures.add(signature); })*
+  "}" {
+    declaration = new InterfaceDeclaration(
+      modifiers,
+      name.image,
+      (TypeSpec[])superTypes.toArray(new TypeSpec[0]),
+      (InterfaceMethodDeclaration[])signatures.toArray(
+        new InterfaceMethodDeclaration[0]
+      )
+    );
+    setLocation(declaration, start);
+    return declaration;
+  }
+}
+
+ConstructorDeclaration constructor_decl() : {
+  Token t;
+  Argument[] args = EMPTY_ARGS;
+  Expression[] params = EMPTY_EXPS;
+  BlockStatement stmts;
+}{
+  t = "new" ["(" args = args() ")"] [":" "(" params = expressions() ")"] stmts = block() {
+    return new ConstructorDeclaration(p(t), args, params, stmts);
+  }
+}
+
+MethodDeclaration method_decl() : {
+  Token t;
+  Argument[] args = EMPTY_ARGS;
+  TypeSpec ty = null;
+  BlockStatement b = null;
+  MethodDeclaration declaration;
+}{
+  ["def"] t=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";" ) {
+    return new MethodDeclaration(p(t), t.image, args, ty, b);
+  }
+}
+
+InterfaceMethodDeclaration interface_method_decl() : {
+  Token n;
+  Argument[] args = EMPTY_ARGS;
+  TypeSpec ty = null;
+}{
+  n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {
+    return new InterfaceMethodDeclaration(p(n), n.image, args, ty);
+  }
+}
+
+RawTypeNode basic_type() : {
+  Token t; RawTypeNode component;
+}{
+( t="byte"
+| t="short"
+| t="char"
+| t="int"
+| t="long"
+| t="float"
+| t="double"
+| t="boolean"
+) {return new RawTypeNode(p(t), t.image, RawTypeNode.BASIC);}
+}
+
+RawTypeNode class_type_component() : {Token n;}{
+  n=<FQCN> {return new RawTypeNode(p(n), n.image.substring(2, n.image.length() - 1), RawTypeNode.QUALIFIED);}
+| n=<ID>   {return new RawTypeNode(p(n), n.image, RawTypeNode.NOT_QUALIFIED);}
+}
+
+RawTypeNode raw_type() :{RawTypeNode c;}{
+  (c = basic_type() | c = class_type_component()) {return c;}
+}
+
+TypeSpec void_type() :{Token t; RawTypeNode c;}{
+  t="void" {
+    c = new RawTypeNode(p(t), t.image, RawTypeNode.BASIC);
+    return new TypeSpec(c, 0, new TypeSpec[0]);
+  }
+}
+
+TypeSpec class_type() :{RawTypeNode c; TypeSpec r;}{
+  c = class_type_component() {
+    r = new TypeSpec(c, 0, new TypeSpec[0]);
+    setLocation(r, c);
+    return r;
+  }
+}
+
+TypeSpec type() : {
+  RawTypeNode c; int d = 0; List args = list(); 
+  TypeSpec arg, r;
+}{
+  c = raw_type()
+  [LOOKAHEAD(2)
+    "<" arg=type() {args.add(arg);} ("," arg=type() {args.add(arg);})* ">"
+  ] (LOOKAHEAD(2) "[" "]" {d++;})* {
+    r = new TypeSpec(
+      c, d, (TypeSpec[])args.toArray(new TypeSpec[0])
+    );
+    setLocation(r, c);
+    return r;
+  }
+}
+
+TypeSpec return_type() :{TypeSpec type;}{
+  (type = void_type() | type = type()) {return type;}
+}
+
+Argument argument() :{Token t; TypeSpec type;}{
+  t=<ID> ":" type = type() {return new Argument(p(t), t.image, type);}
+}
+
+Argument[] args() :{List as = list(); Argument a;}{
+  [a = argument() {as.add(a);} ("," a = argument() {as.add(a);})*] {
+    return (Argument[])as.toArray(new Argument[0]);
+  }
+}
+
+DelegationDeclaration delegate_decl() : {
+  Token start;
+  Token name;
+  TypeSpec type = null, targetType = null;
+  Expression initializer = null;
+  DelegationDeclaration declaration;
+}{
+  start = "forward" name = <FID> [":" type = type()]
+  ["=" initializer = expression()] ";" {
+    declaration =
+      new DelegationDeclaration(name.image.substring(1), type, initializer);
+    setLocation(declaration, start);
+    declaration.setModifier(declaration.getModifier());
+    return declaration;
+  }
+}
+
+FieldDeclaration field_decl():{
+  Token name;
+  TypeSpec type = null;
+  Expression initializer = null;
+  FieldDeclaration declaration;
+}{
+  name = <FID> ":" [type = type()]
+  ["=" initializer = expression()] ";" {
+    declaration = new FieldDeclaration(name.image.substring(1), type, initializer);
+    setLocation(declaration, name);
+    return declaration;
+  }
+}
+
+Statement stmt():{Statement st;}{
+  LOOKAHEAD(2)
+  st=local_var_stmt()         {return st;}
+| st=if_stmt()                {return st;}
+| st=while_stmt()             {return st;}
+| st=for_stmt()               {return st;}
+| st=select_stmt()            {return st;}
+| st=cond_stmt()              {return st;}
+| st=block()                  {return st;}
+| st=try_stmt()               {return st;}
+| st=throw_stmt()             {return st;}
+| st=break_stmt()             {return st;}
+| st=continue_stmt()          {return st;}
+| st=return_stmt()            {return st;}
+| st=exp_stmt()               {return st;}
+| st=empty_stmt()             {return st;}
+| st=synchronized_stmt()      {return st;}
+| st=foreach_stmt()           {return st;}
+}
+
+LocalVariableDeclaration local_var_stmt() :{Token t; TypeSpec ty; Expression e = null;}{
+  t=<ID> ":" ty=type() ["=" e=expression()] ";" {
+    return new LocalVariableDeclaration(p(t), t.image, ty, e);
+  }
+}
+
+BreakStatement break_stmt() :{Token t; BreakStatement st;}{
+  t="break" ";" {return new BreakStatement(p(t));}
+}
+
+ContinueStatement continue_stmt() :{Token t; ContinueStatement st;}{
+  t="continue" ";" {return new ContinueStatement(p(t));}
+}
+
+ThrowStatement throw_stmt() :{Token t;Expression e;}{
+  t="throw" e=expression() ";" {return new ThrowStatement(p(t), e);}
+}
+
+TryStatement try_stmt() :{
+  Token t; Argument a; BlockStatement b1, b2, b3 = null; List as = list(), bs = list();
+}{
+  t="try"  b1=block() ("rec" a=argument() b2=block() {as.add(a); bs.add(b2);})*
+  ["fin" b3=block()] {
+    return new TryStatement(
+      p(t),
+      b1,
+      (BlockStatement[])bs.toArray(new BlockStatement[0]),
+      (Argument[])as.toArray(new Argument[0]),
+      b3
+    );
+  }
+}
+
+ExpressionStatement exp_stmt() :{Expression e;}{
+  e=expression() ";" {return new ExpressionStatement(e.getLocation(), e);}
+}
+
+EmptyStatement empty_stmt() :{Token t; EmptyStatement s;}{
+  t = ";" { return new EmptyStatement(p(t)); }
+}
+
+IfStatement if_stmt() :{Token t; Expression e; BlockStatement b1, b2 = null;}{
+  t="if" e=expression() b1=block() [LOOKAHEAD(2) "else" b2=block()] {
+    return new IfStatement(p(t), e, b1, b2);
+  }
+}
+
+CondStatement cond_stmt() : {
+  Token t;
+  List exprs = new ArrayList(), thens = new ArrayList();
+  Expression cond;
+  BlockStatement thenBlock, elseBlock = null;
+  CondStatement statement;
+}{
+  t = "cond" "{"
+    (
+      cond = expression() { exprs.add(cond); }
+      thenBlock = block() { thens.add(thenBlock); }
+    )+
+    ["else" elseBlock = block()]
+  "}" {
+    statement =
+      new CondStatement(
+        (Expression[])exprs.toArray(new Expression[0]),
+        (BlockStatement[])thens.toArray(new BlockStatement[0]),
+        elseBlock);
+    setLocation(statement, t);
+    return statement;
+  }
+}
+
+CaseBranch case_branch() : {
+  Token t;
+  Expression expression;
+  Statement[] block;
+  List expressions = new ArrayList();
+  CaseBranch branch;
+}{
+  t="case" expression=expression() {expressions.add(expression);}
+  ("," expression=expression() {expressions.add(expression);})* ":"
+  block=stmts() {
+    branch = new CaseBranch(
+      (Expression[])expressions.toArray(new Expression[0]),
+      new BlockStatement(block[0].getLocation(), block)
+    );
+    setLocation(branch, t);
+    return branch;
+  }
+}
+
+SelectStatement select_stmt() :{
+  Token t;
+  Expression e;
+  CaseBranch branch;
+  List branches = new ArrayList();
+  BlockStatement elseBlock = null;
+  SelectStatement statement;
+}{
+  t="select" e=expression() "{"
+    (branch=case_branch() {branches.add(branch);})*
+    ["else:" elseBlock = block()]
+  "}" {
+    statement = new SelectStatement(
+      e, (CaseBranch[])branches.toArray(new CaseBranch[0]), elseBlock
+    );
+    setLocation(statement, t);
+    return statement;
+  }
+}
+
+ReturnStatement return_stmt() :{Token t; Expression e = null;}{
+  t="return" [e=expression()] ";" {return new ReturnStatement(p(t), e);}
+}
+
+SynchronizedStatement synchronized_stmt() :{Token t; Expression e = null; BlockStatement b;}{
+  t="synchronized" [e=expression()] b=block() {return new SynchronizedStatement(p(t), e, b);}
+}
+
+WhileStatement while_stmt() :{Token t; Expression e; BlockStatement b;}{
+  t="while" e=expression() b=block() {return new WhileStatement(p(t), e, b);}
+}
+
+ForeachStatement foreach_stmt() :{Token t; Argument a; Expression e; BlockStatement b;}{
+  t="foreach" a=argument() (LOOKAHEAD({la("in")}) <ID>) e=expression() b=block() {
+    return new ForeachStatement(p(t), a, e, b);
+  }
+}
+
+ForStatement for_stmt() :{
+  Token t; Statement st; Expression e1 = null, e2 = null; BlockStatement b;
+}{
+  t = "for" (LOOKAHEAD(2) st=local_var_stmt() | st=exp_stmt() | st=empty_stmt())
+  [e1=expression()] ";" [e2=expression()] b=block() {
+  	return new ForStatement(p(t), st, e1, e2, b);
+  }
+}
+
+Expression expression() :{Expression e;}{
+  e = assignable() { return e; }
+}
+
+Expression assignable() :{ Token t; Expression a, b; }{
+  a=logical_or()
+  [ ( t="="  b=assignable() {a = new Assignment(a, b);}
+    | t="+=" b=assignable() {a = new AdditionAssignment(a, b);}
+    | t="-=" b=assignable() {a = new SubtractionAssignment(a, b);}
+    | t="*=" b=assignable() {a = new MultiplicationAssignment(a, b);}
+    | t="/=" b=assignable() {a = new DivisionAssignment(a, b);}
+    | t="%=" b=assignable() {a = new ModuloAssignment(a, b);}
+    ){ setLocation(a, t); }
+  ]{return a;}
+}
+
+Expression logical_or() :{ Token t; Expression a, b; }{
+  a=logical_and()
+  (t="||" b=logical_and() {a = new LogicalOr(a, b); setLocation(a, t);}
+  |t="?:" b=logical_and() {a = new Elvis(a, b); setLocation(a, t);})*
+  { return a; }
+}
+
+Expression logical_and() :{ Token t; Expression a, b; }{
+  a=bit_or() (t="&&" b=bit_or() {a = new LogicalAnd(a, b); setLocation(a, t);})* {
+    return a;
+  }
+}
+
+Expression bit_or() :{ Token t; Expression a, b; }{
+  a=xor() (t="|" b=xor() {a = new BitOr(a, b); setLocation(a, t);})* {
+    return a;
+  }
+}
+
+Expression xor() :{Token t; Expression a, b;}{
+  a = bit_and() (t="^" b=bit_and() {a = new XOR(a, b); setLocation(a, t);})* {
+    return a;
+  }
+}
+
+Expression bit_and() :{ Token t; Expression a, b; }{
+  a = equal() (t = "&" b = equal(){ a = new BitAnd(a, b); setLocation(a, t); })* {
+    return a;
+  }
+}
+
+Expression equal() :{ Token t; Expression a, b; }{
+  a=comparative()
+  ( ( t="===" b=comparative() {a= new ReferenceEqual(a, b);}
+    | t="!==" b=comparative() {a= new ReferenceNotEqual(a, b);}
+    | t="=="  b=comparative() {a= new Equal(a, b);}
+    | t="!="  b=comparative() {a= new NotEqual(a, b);}
+    ){setLocation(a, t);}
+  )* {return a;}
+}
+
+Expression comparative() : {
+  Token t;
+  Expression a, b;
+  TypeSpec type;
+}{
+  a=bit_shift()
+  (
+    ( t="<=" b=bit_shift() {a = new LessOrEqual(a, b);}
+    | t=">=" b=bit_shift() {a = new GreaterOrEqual(a, b);}
+    | t="<"  b=bit_shift() {a = new LessThan(a, b);}
+    | t=">"  b=bit_shift() {a = new GreaterThan(a, b);}
+    | t="is" type = type() {a = new IsInstance(a, type);}
+    ) {setLocation(a, t);}
+  )* {return a;}
+}
+
+Expression bit_shift() :{Token t; Expression e1, e2;}{
+  e1=additive()
+( t="<<" e2=additive()  {e1 = new MathLeftShift(p(t), e1, e2);}
+| t=">>" e2=additive()  {e1 = new MathRightShift(p(t), e1, e2);}
+| t=">>>"e2=additive()  {e1 = new LogicalRightShift(p(t), e1, e2);}
+)* { return e1; }
+}
+
+Expression additive() :{Token t; Expression e1, e2;}{
+  e1=unary_prefix()
+( t="+" e2=unary_prefix() {e1 = new Addition(e1, e2); setLocation(e1, t);}
+| t="-" e2=unary_prefix() {e1 = new Subtraction(e1, e2); setLocation(e1, t);}
+)* {return e1;}
+}
+
+Expression unary_prefix() :{Token t; Expression e;}{
+( t="+" e=unary_prefix() {e = new Posit(p(t), e, c(t));}
+| t="-" e=unary_prefix() {e = new Negate(p(t), e, c(t));}
+| t="!" e=unary_prefix() {e = new Not(p(t), e, c(t));}
+| e=multitive()
+) {return e;}
+}
+
+Expression multitive() :{Token t; Expression e1, e2;}{
+  e1=primary_suffix()
+( t="*" e2=primary_suffix()             {e1 = new Multiplication(p(t), e1, e2);}
+| t="/" e2=primary_suffix()             {e1 = new Division(p(t), e1, e2);}
+| t="%" e2=primary_suffix()             {e1 = new Modulo(p(t), e1, e2);}
+)* {return e1;}
+}
+
+Expression primary_suffix() : {
+  Expression e, a;
+  Expression[] as = null;
+  TypeSpec type;
+  Token t, n;
+}{
+  e=primary()
+( t="[" a=expression() "]"              {e = new Indexing(e, a); setLocation(e, t);}
+| LOOKAHEAD(3)
+  t="." n=<ID> "(" as=expressions() ")" {e = new MethodCall(e, c(n), as); setLocation(e, t);}
+| t="." n=<ID>                          {e = new FieldOrMethodRef(e, c(n)); setLocation(e, t);}
+| t="$" type=type()                     {e = new Cast(e, type); setLocation(e, t);}
+| t="++"                                {e = new PostIncrement(e); setLocation(e, t); }
+| t="--"                                {e = new PostDecrement(e); setLocation(e, t); }
+)* {return e;}
+}
+
+Expression primary() : {
+  Token n = null, t; TypeSpec ty = null; Expression e; Expression[] exps = EMPTY_EXPS;
+  Argument[] args = EMPTY_ARGS; BlockStatement stmts;
+}{
+  t=<FID>                               {return new SelfFieldReference(p(t), c(t).substring(1));}
+| t="super" "." n=<ID>
+  ["(" exps=expressions() ")"]          {return new SuperMethodCall(p(t), c(n), exps);}
+| LOOKAHEAD(4)
+  ty=class_type() t="::" n=<ID>
+  "(" exps=expressions()  ")"           {return new StaticMethodCall(p(t), ty, c(n), exps);}
+| LOOKAHEAD(2)
+  ty=class_type() t="::" n=<ID>         {return new StaticIDExpression(p(t), ty, c(n));}
+| LOOKAHEAD(2)
+  t=<ID> "(" exps=expressions() ")"     {return new SelfMethodCall(p(t), c(t), exps);}
+| t=<ID>                                {return new Id(p(t), c(t));}
+| t="[" exps=expressions() "]"          {return new ListLiteral(p(t), exps);}
+| t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"]
+  stmts=block()                         {
+    String mname;
+    if(ty == null) {
+      ty = new TypeSpec(
+        new RawTypeNode(p(t), "onion.Function" + args.length, RawTypeNode.QUALIFIED),
+        0,
+        new TypeSpec[0]
+      );
+      mname = "call";      
+    }else {
+      mname = n.image;
+    }
+    return new ClosureExpression(p(t), ty, mname, args, null, stmts);
+  }
+| t="new" ty=type()
+  ( "[" (exps=expressions()) "]"        {return new NewArray(p(t), ty, exps);}
+  | ["(" (exps=expressions()) ")"]      {return new NewObject(p(t), ty, exps);}
+  )
+| t="self"                              {return new CurrentInstance(p(t));}
+| e=integer_literal()                   {return e;}
+| e=float_literal()                     {return e;}
+| e=char_literal()                      {return e;}
+| e=string_literal()                    {return e;}
+| e=boolean_literal()                   {return e;}
+| e=null_literal()                      {return e;}
+| "(" e=expression() ")"                {return e;}
+}
+
+Expression[] expressions() :{List args = list(); Expression arg;}{
+  [arg=expression() {args.add(arg);} ("," arg=expression() {args.add(arg);})*] {
+    return (Expression[])args.toArray(new Expression[0]);
+  }
+}
+
+Literal null_literal() :{Token t;}{
+  t="null" {return new NullLiteral(p(t));}
+}
+
+Literal integer_literal() :{Token t; String s;}{
+  t=<INTEGER> {
+    s = t.image;
+    if(s.endsWith("L")){
+      return new LongLiteral(p(t), Long.parseLong(chop(s)));
+    }else{
+      return new IntegerLiteral(p(t), Integer.parseInt(s));
+    }
+  }
+}
+
+Literal float_literal() :{Token t; String s;}{
+  t=<FLOAT> {
+  	s = t.image;
+    if(s.endsWith("F")){
+      return new FloatLiteral(p(t), Float.parseFloat(chop(s)));
+    }else if(s.endsWith("D")){
+      return new DoubleLiteral(p(t), Double.parseDouble(chop(s)));
+    }else{
+      return new DoubleLiteral(p(t), Double.parseDouble(s));
+    }
+  }
+}
+
+Literal boolean_literal() :{Token t;}{
+  t="true"  {return new BooleanLiteral(p(t), true);}
+| t="false" {return new BooleanLiteral(p(t), false);}
+}
+
+Literal string_literal() :{Token t;}{
+  t=<STRING> {return new StringLiteral(p(t), unescape(chopEdge(t.image)));}
+}
+
+Literal char_literal() :{Token t;}{
+  t=<CHARACTER> {return new CharacterLiteral(p(t), unescape(chopEdge(t.image)).charAt(0));}
+}

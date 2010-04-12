@@ -1,0 +1,23 @@
+reader = new BufferedReader(new InputStreamReader(System::in));
+
+try {
+  random = (Math::random() * 10)$int;
+  System::out.println(random);
+  cond {
+    random < 3 {
+      throw new IOException;
+    }
+    random < 6 {
+      throw new RuntimeException;
+    }
+    else {
+      throw new Exception;
+    }
+  }
+}rec e: IOException {
+  System::out.println("IOException!");
+}rec e: RuntimeException {
+  System::out.println("RuntimeException!");
+}rec e: Exception {
+  System::out.println("Exception!");
+}

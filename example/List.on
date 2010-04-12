@@ -1,0 +1,10 @@
+list = [];
+
+list << "a";
+list << "b";
+list << "c";
+list << "d";
+
+for i = 0; i < list.size; i = i + 1 {
+  System::out.println(list[i]);
+}

@@ -1,0 +1,22 @@
+import {
+	java.util.List;
+	java.util.ArrayList;
+}
+
+class Delegation <: List {
+	forward @n :List;
+public:
+	new {
+		@n = new ArrayList;
+	}
+	static main(args: String[]){
+		list = new Delegation;
+		list << "a";
+		list << "b";
+		list << "c";
+		list << "d";
+		for i = 0; i < list.size; i = i + 1 {
+			System::out.println(list[i]);
+		}
+	}
+}

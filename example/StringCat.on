@@ -1,0 +1,4 @@
+list = ["a", "b", "c", "d", "e", "f", "g"];
+for i = 0; i < list.size; i = i + 1 {
+  System::out.println("list[" + i + "] = " + list[i]);
+}

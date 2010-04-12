@@ -1,0 +1,48 @@
+import {
+  java.io.*;
+  java.beans.*;
+}
+
+class ExampleBean <: Serializable {
+  @name :String;
+  @value :int;
+  
+public:
+  new {
+  }
+  
+  new(name :String, value :int){
+    @name = name;
+    @value = value;
+  }
+  
+  getName :String { 
+  	return @name; 
+  }
+  
+  setName(name :String) { 
+  	@name = name; 
+  }
+  
+  setValue(value :int) {
+  	@value = value;
+  }
+  
+  getValue :int {
+  	return @value;
+  }
+  
+  toString :String {
+  	return "ExampleBean(name = " + @name + ", value = " + @value + ")";
+  }
+}
+
+out = new ByteArrayOutputStream;
+
+encoder = new XMLEncoder(out);
+encoder.writeObject(new ExampleBean("HogeBean", 100));
+encoder.close;
+
+decoder = new XMLDecoder(new ByteArrayInputStream(out.toByteArray()));
+bean :ExampleBean = decoder.readObject;
+System::out.println(bean);

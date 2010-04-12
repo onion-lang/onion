@@ -1,0 +1,22 @@
+interface LineFilter {
+  filter(line :String) :String;
+}
+
+def filterLines(filter :LineFilter) :String {
+  reader = new BufferedReader(new InputStreamReader(System::in));
+  buffer = new StringBuffer;
+  while (line = reader.readLine) != null {
+    buffer.append(filter.filter(line));
+  }
+  return new String(buffer);
+}
+
+i = 1;
+
+lines = filterLines(#LineFilter.filter(line :String){
+  line = i + ":" + line;
+  i = i + 1;
+  return line + System::getProperty("line.separator");
+});
+
+System::out.println(lines);

@@ -1,0 +1,9 @@
+import{
+	IR = java.io.InputStreamReader;
+	BR = java.io.BufferedReader;
+}
+
+input = new BR(new IR(System::in));
+while (line = input.readLine) != null {
+	System::out.println(line);
+}

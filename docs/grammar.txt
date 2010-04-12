@@ -1,0 +1,82 @@
+Onionの文法のEBNF風の記述です。
+
+block_comment  ::= '/*' ([^*])*  '*' ('*' | ([^*/] ([^*])* '*'))* '/'
+line_comment   ::= '//' ([^\r\n])*
+shell_comment  ::= '#!' ([^\r\n])*
+
+compile_unit   ::= module? import? (
+                     'class' | 'interface' | 'statement' | 'function' | 'global_var'
+                   )+
+module         ::= 'module' id (. id)* ;
+import         ::= 'import' { (id (. id)+ ; | id = id (. id)+ ;)* }
+                
+access         ::= 'public' | 'protected' | 'private'
+modifier       ::= 'final' | 'internal' | 'volatile' | 'synchronized' | 'static' | 'inherited'
+
+type           ::= primitive | id | '#<' id (. id)* '>' | type ('[]')+
+primitive      ::= 'byte' | 'short' | 'char' | 'int' | 'long' | 'float' | 'double' | 'boolean' | 'void'
+
+class          ::= modifier* 'class' id ('extends' type)? ('<:' type (, type)*)? {
+                     (field | method | constructor)*
+                     (access : (field | method | constructor)*)*
+                   }
+interface      ::= modifier* 'interface' id ('<:' type (, type)*)? {
+                     (id ('(' (var_decl (, var_decl)*)? ')')? (: type)? ;)*
+                   }
+                    
+field          ::= modifier* ('forward')? field_id : type [= expr] ;
+method         ::= ['def'] modifier* id ( '(' (arg_list)? ')' )? (: type)? (; | block)
+constructor    ::= modifier* new ( '(' (arg_list)? ')' )? (: '(' [expr_list] ')' )? block
+function       ::= modifier* def id ( '(' (arg_list)? ')' )? (: type)? block
+global_var     ::= modifier* var id : type (= expr)? ;
+
+statement      ::= 'if' expr block [else block]
+                 | 'cond' { (expr block)+ [else block] }
+                 | 'select' expr { (case expr_list block)* [else block] } 
+                 | 'while' expr block 
+                 | 'for' (var_decl | expr_stmt) expr ; [expr] block
+                 | 'foreach' var_decl 'in' expr block
+                 | 'synchronized' expr block
+                 | 'try' block ('rec' id : type block)* 'fin' block
+                 | 'break' ;
+                 | 'continue' ;
+                 | 'return' [expr] ; 
+                 | 'throw' expr ;
+                 | { statement* } 
+                 | ;
+                 | expr ;
+                 | var_decl
+                 | id : type (= expr)? ;
+
+arg_list       ::= id : type (, id : type)*
+                                    
+expr           ::= expr binary_op expr 
+                 | expr assign_op expr 
+                 | unary_op expr 
+                 | expr ( . id ( '(' (expr_list)? ')' )? )* 
+                 | new type '[' expr_list ']'
+                 | new type ( '(' (expr_list)? ')' )?
+                 | type :: id ( '(' (expr_list)? ')' )? 
+                 | expr ('[' expr ']')* 
+                 | '(' expr ')' 
+                 | id  ( '(' (expr_list)? ')' )? 
+                 | expr 'is' type 
+                 | expr $ type
+                 | # type . id ( '(' [arg_list] ')' )? block
+                 | '[' (expr_list)? ']'
+                 | 'self' 
+                 | 'true'
+                 | 'false'
+                 | 'null'
+                 | <integer_literal>
+                 | <float_literal
+                 | <character_literal
+                 | <string_literal
+                 | <list_literal
+                 
+expr_list      ::= expr (, expr)*
+unary_op       ::= ! | - | + | ~
+binary_op      ::= + | - | * | / | % | << || >> | >>> | ^ | & | '|' | < | > | <= | >= | == | != | === | !== | '||' | &&
+assign_op      ::= = | += | -= | *= | /= | %=
+id             ::= ([a-z] | [A-Z] | _) ([a-z] | [A-Z] | [0-9] | _)*
+field_id       ::= @ id

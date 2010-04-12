@@ -1,0 +1,99 @@
+import{
+	javax.swing.*;
+	java.awt.*;
+	java.awt.event.*;	
+}
+
+class Calculator : JFrame <: ActionListener {
+	@text			:JTextField;
+	@left			:long;
+	@right		:long;
+	@operator	:String;
+	@isError	:boolean;
+public:
+	setValue(value : long) { @text.setText(Long::toString(value)); }
+	setValue(value : String) { @text.setText(value); }
+	actionPerformed(event : ActionEvent) {
+		label = event.source$JButton.label;
+		try{
+			if @isError && !(label == "C") {
+				return;
+			}
+			input = Long::parseLong(label);
+			if @operator != null {
+				@right = @right * 10 + input;
+				setValue(@right);
+			}else{
+				@left = @left * 10 + input;
+				setValue(@left);
+			}
+		}rec e :NumberFormatException{
+			if label == "C" {
+				@left = 0;
+				@right = 0;
+				@operator	= null;
+				@text.setText(Long::toString(0));
+				@isError = false;
+			}else{
+				if @operator != null {
+					if @operator == "/" {
+						if @right == 0L{
+							setValue("0‚ÅŠ„‚é‚±‚Æ‚Í‚Å‚«‚Ü‚¹‚ñB");
+							@left = 0L;
+							@right = 0L;
+							@isError = true;
+						}else{
+							@left = @left / @right; 
+						}
+						setValue(@left);
+					}else{
+						select @operator {
+						case "+": @left = @left + @right;
+						case "-": @left = @left - @right;
+						case "*": @left = @left * @right;
+						case "/":  @left = @left / @right;
+						}
+						setValue(@left);
+					}
+				}
+				@operator = label;
+				@right = 0;
+			}
+		}
+	}
+
+	new:("ŠÈˆÕ“d‘ì") {
+		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE);
+		setSize(800, 600);
+		@text		= new JTextField;
+		@text.setHorizontalAlignment(JTextField::RIGHT);
+		pane		= getContentPane();
+		north		= new JPanel;
+		north.setLayout(new BorderLayout);
+		north.add(@text, BorderLayout::NORTH);
+		center	= new JPanel;
+		center.setLayout(new GridLayout(4, 5, 4, 3));
+		center.setFont(new Font(null, Font::PLAIN, 8));
+		labels	= [
+			"7", "8", "9", "C",
+			"4", "5", "6", "*",
+			"1", "2", "3", "-",
+			"0", "=", "/", "+"
+		];
+		foreach label:String in labels {
+			button = new JButton(label$String);
+			button.addActionListener(self);
+			button.setPreferredSize(new Dimension(42, 28));
+			center.add(button);				
+		}
+		pane.add(north, BorderLayout::NORTH);
+		pane.add(center, BorderLayout::CENTER);
+	}
+
+	static main(args :String[]){
+		UIManager::setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
+		frame = new Calculator;
+		frame.pack;
+		frame.setVisible(true);
+	}
+}

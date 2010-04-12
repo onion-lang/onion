@@ -1,0 +1,12 @@
+random :int = Math::random() * 10;
+
+select random {
+case 0, 1, 2, 3:
+  System::out.println("[0-3]");
+case 4, 5, 6:
+  System::out.println("[4-6]");
+case 7, 8, 9:
+  System::out.println("[7-9]");
+else:
+  System::out.println("10");
+}

@@ -1,0 +1,10 @@
+
+strings = new ArrayList;
+
+strings << "Foo";
+strings << "Bar";
+strings << "Hoge";
+
+foreach object :String in strings {
+  System::out.println(object.toLowerCase);
+}

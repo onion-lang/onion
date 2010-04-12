@@ -1,0 +1,6 @@
+class HelloWorld2{
+public:
+  static main(args :String[]){
+    System::out.println("Hello, world!");
+  }
+}

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="onion" default="compile" basedir=".">
+  <property environment="env" />
+  <property name="src" value="src" />
+  <property name="src.parser" value="src.parser" />
+  <property name="src.test" value="src.test" />
+  <property name="bin" value="bin" />
+  <property name="grammar" value="grammar" />
+  <property name="docs" value="docs" />
+  <property name="build" value="build" />
+  <property name="build.lib" value="build.lib" />
+  <property name="parser.output" value="${src.parser}/org/onion_lang/onion/parser" />
+  <property name="example" value="example" />
+  <property name="resources" value="resources" />
+  <property name="jar.name"  value="onion.jar" />
+  <property name="lib-jar.name" value="onion-library.jar" />
+  <property name="lib" value="lib" />
+  <property name="dist-src" value="onion-${version}-src" />
+  <property name="dist-bin" value="onion-${version}" />
+  <property file="build.properties" />
+
+  <path id="lib">
+    <pathelement path="${bcel.path}" />
+    <pathelement path="${junit.path}" />
+  </path>
+
+  <fileset id="shared" dir=".">
+    <include name="${bin}/**" />
+    <include name="${docs}/**" />
+    <include name="${example}/**" />
+    <include name="INSTALL.txt" />
+    <include name="INSTALL.txt.ja" />
+    <include name="README" />
+    <include name="README.ja" />
+    <include name="LICENSE" />
+  </fileset>
+
+  <target name="grammar">
+    <mkdir dir="${parser.output}" />
+    <javacc
+    	target="${grammar}/JavaccOnionParser.jj"
+    	unicodeinput="true"
+      javaunicodeescape="true"
+    	outputdirectory="${parser.output}"
+      javacchome="${javacc.home}"/>
+  </target>
+
+  <target name="compile" depends="grammar">
+    <mkdir dir="${build}" />
+  	<mkdir dir="${build.lib}" />
+    <javac srcdir="${src}:${src.parser}" destdir="${build}" source="1.5" debug="true">
+      <classpath>
+        <path refid="lib" />
+      </classpath>
+    </javac>
+    <copy todir="${build}/resources">
+      <fileset dir="resources" />
+    </copy>
+  </target>
+
+  <target name="jar" depends="compile">
+    <jar destfile="onion.jar" basedir="${build}" manifest="resources/Manifest.mf"/>
+    <jar destfile="onion-library.jar" basedir="${build.lib}"/>
+  </target>
+	
+  <target name="test" depends="compile">
+  	<javac srcdir="${src.test}" destdir="${build}" source="1.5" debug="true">
+      <classpath location="${junit.path}"/>
+  	</javac>
+  	<!-- mkdir dir="${report.test}"/-->
+  	<junit haltonfailure="yes">
+  	  <classpath>
+  	  	<pathelement path="${build}"/>
+  	  </classpath>
+      <formatter type="plain" usefile="false"/>
+      <batchtest fork="yes">
+        <fileset dir="${src.test}">
+          <include name="**/Test*.java"/>
+          <exclude name="**/AllTests.java"/>
+        </fileset>
+      </batchtest>
+  	</junit>
+    <filelist></filelist>
+  </target>
+
+  <target name="install" depends="jar">
+    <copy todir="${install.path}/bin">
+      <fileset dir="bin" />
+    </copy>
+    <copy todir="${install.path}/example">
+      <fileset dir="${example}" />
+    </copy>
+    <copy todir="${install.path}/docs">
+      <fileset dir="${docs}" />
+    </copy>
+    <copy todir="${install.path}">
+      <fileset dir=".">
+        <include name="Readme.txt"/>
+        <include name="${jar.name}"/>
+        <include name="${lib-jar.name}"/>
+        <include name="${bcel.path}"/>
+      </fileset>
+    </copy>
+    <copy file="Readme.txt"      tofile="${install.path}/Readme.txt"/>
+    <copy file="${jar.name}"     tofile="${install.path}/onion.jar"/>
+  	<copy file="${lib-jar.name}" tofile="${install.path}/onion-library.jar"/>
+    <copy file="${bcel.path}"    tofile="${install.path}/lib/bcel.jar"/>
+  </target>
+
+  <target name="dist-src">
+    <mkdir dir="${dist-src}" />
+    <copy todir="${dist-src}">
+      <fileset refid="shared" />
+      <fileset dir=".">
+        <include name="${src}/**" />
+        <include name="${src.test}/**" />
+        <include name="${grammar}/**" />
+        <include name="${resources}/**" />
+        <include name="build.xml" />
+        <include name="build.properties" />
+      </fileset>
+    </copy>
+    <fixcrlf srcdir="${dist-src}/bin" includes="onion,onionc" eol="lf" />
+    <zip
+    	destfile="${dist-src}.zip" basedir="."
+    	defaultexcludes="yes" compress="true">
+      <include name="${dist-src}/**" />
+    </zip>
+    <delete dir="${dist-src}" />
+  </target>
+
+  <target name="dist-bin" depends="jar">
+    <mkdir dir="${dist-bin}" />
+    <copy todir="${dist-bin}">
+      <fileset refid="shared" />
+      <fileset dir=".">
+        <include name="onion.jar" />
+      </fileset>
+    </copy>
+    <copy tofile="${dist-bin}/lib/bcel.jar" file="${bcel.path}" />
+    <zip
+    	destfile="${dist-bin}.zip" basedir="."
+    	defaultexcludes="yes" compress="yes">
+      <include name="${dist-bin}/**" />
+    </zip>
+    <delete dir="${dist-bin}" />
+  </target>
+
+  <target name="dist" depends="clean,dist-src,dist-bin" />
+
+  <target name="clean">
+    <delete file="onion.jar" />
+    <delete dir="${build}" />
+  	<delete dir="${build.lib}" />
+    <delete includeemptydirs="true">
+      <fileset dir="${src.parser}">
+        <include name="**/*"/>
+      </fileset>
+    </delete>
+  </target>
+</project>

@@ -1,0 +1,24 @@
+def input(prompt :String, reader :BufferedReader) :String {
+  System::out.print(prompt);
+  return reader.readLine;
+}
+
+def fact(n :int) :int {
+  if n < 2 { return 1; }
+  else { return n * fact(n - 1); }
+}
+
+reader = new BufferedReader(new InputStreamReader(System::in));
+
+while (line = input("ŠKæ‚ğ‹‚ß‚½‚¢”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B> ", reader)) != null {
+  try {
+    number = Integer::parseInt(line);
+    if(number < 0){
+      System::out.println("³‚Ì®”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B");
+    }else{
+      System::out.println("fact(" + number + ") = " + fact(number));
+    }
+  }rec e :NumberFormatException {
+    System::out.println("®”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B");
+  }
+}

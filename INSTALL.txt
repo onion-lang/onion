@@ -1,0 +1,93 @@
+* Binary distribution
+
+  onion/
+    README
+    README.ja
+    INSTALL.txt
+    INSTALL.txt.ja
+    LICENSE.txt
+    bin/
+      onion 
+      onion.bat
+      onionc
+      onionc.bat
+    document/ 
+    lib/
+      LICENSE
+      bcel5.1.jar
+    example/
+    onion.jar
+
+* Source distribution
+
+  onion/
+    README
+    README.ja
+    INSTALL.txt
+    INSTALL.txt.ja
+    LICENSE.txt
+    bin/
+      onion 
+      onion.bat
+      onionc
+      onionc.bat
+    document/ 
+    lib/
+      bcel/
+        LICENSE
+        bcel5.1.jar
+    lib/
+      javcc-4.0/
+        LICENSE
+	javacc.jar
+    lib/
+      junit/
+        LICENSE
+	junit.jar
+    example/
+    onion.jar
+
+* Installation instructions (from binary distribution)
+
+  1) Copy the directory extracted from the binary distribution to a directory.
+
+  2) Set environment variable ONION_HOME to Onion installaion directory.
+     Set environnmnt variable JAVA_HOME to Java SE installation directory.
+    
+  3) Add bin directory to environment variable PATH.
+    
+* Installation instructions (from source distribution)
+
+  * Requirement:
+    * J2SDK 5.0 or later
+    * Apache Ant 1.5 or later
+    * JavaCC 3.0 or later
+    * BCEL 5.1 or later
+
+      J2SE http://java.sun.com/j2se/
+      Apache Ant http://ant.apache.org/
+      JavaCC https://javacc.dev.java.net/
+      BCEL‚Ì http://jakarta.apache.org/bcel/
+
+  1) In shell, move the current directory to the directory
+     extracted from source distribution.
+
+  2) Edit build.properties:
+
+       javacc.home = JavaCC installation directory
+       bcel.path = path of BCEL jar file
+       install.path = installation directory
+
+     Note that pathes must be absolute pathes.
+
+  3) In shell, type
+
+       > ant install
+        
+     .  Source-codes will be built and Onion will be installed
+     in the directory specified by install.path.
+     
+  4) Set environment variable ONION_HOME to Onion installaion directory.
+     Set environnmnt variable JAVA_HOME to Java SE installation directory.
+    
+  5) Add bin directory to environment variable PATH.

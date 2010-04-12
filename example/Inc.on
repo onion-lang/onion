@@ -1,0 +1,5 @@
+list = ["A", "B", "C", "D", "E"];
+for i = 0; i < list.size; i++ {
+  System::out.println(list[i]);
+}
+

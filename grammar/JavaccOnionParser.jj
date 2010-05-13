@@ -11,7 +11,7 @@ options {
 }
 
 PARSER_BEGIN(JavaccOnionParser)
-package org.onion_lang.onion.parser;
+package onion.compiler.parser;
 import java.util.*;
 import onion.lang.syntax.*;
 

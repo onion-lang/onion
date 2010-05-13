@@ -10,7 +10,7 @@
   <property name="docs" value="docs" />
   <property name="build" value="build" />
   <property name="build.lib" value="build.lib" />
-  <property name="parser.output" value="${src.parser}/org/onion_lang/onion/parser" />
+  <property name="parser.output" value="${src.parser}/onion/compiler/parser" />
   <property name="example" value="example" />
   <property name="resources" value="resources" />
   <property name="jar.name"  value="onion.jar" />

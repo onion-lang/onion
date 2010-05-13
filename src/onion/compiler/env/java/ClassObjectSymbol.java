@@ -21,9 +21,9 @@ import onion.lang.core.type.ConstructorSymbol;
 import onion.lang.core.type.FieldSymbol;
 import onion.lang.core.type.MethodSymbol;
 import onion.lang.core.type.TypeRef;
+import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;
-import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**
  * @author Kota Mizushima

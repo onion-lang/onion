@@ -13,11 +13,11 @@ import java.util.List;
 import onion.compiler.OnionTypeBridge;
 import onion.compiler.env.*;
 import onion.lang.core.type.*;
+import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.*;
 import org.apache.bcel.generic.Type;
-import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**
  * @author Kota Mizushima

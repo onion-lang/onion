@@ -15,8 +15,8 @@ import onion.compiler.error.CompilationException;
 import onion.compiler.error.CompileError;
 import onion.compiler.pass.*;
 import onion.compiler.util.*;
+import onion.lang.syntax.Location;
 
-import org.onion_lang.onion.lang.syntax.Location;
 
 /**
  * @author Kota Mizushima

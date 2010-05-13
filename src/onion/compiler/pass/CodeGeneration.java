@@ -14,11 +14,11 @@ import onion.compiler.env.*;
 import onion.compiler.util.*;
 import onion.lang.core.*;
 import onion.lang.core.type.*;
+import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.generic.*;
-import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**
  * @author Kota Mizushima Date: 2005/04/10

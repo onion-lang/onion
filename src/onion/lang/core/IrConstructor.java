@@ -9,8 +9,8 @@ package onion.lang.core;
 
 import onion.compiler.env.LocalFrame;
 import onion.lang.core.type.*;
+import onion.lang.syntax.Modifier;
 
-import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**
  * @author Kota Mizushima

@@ -8,9 +8,9 @@
 package onion.compiler.env;
 
 import onion.lang.core.type.*;
+import onion.lang.syntax.RawTypeNode;
+import onion.lang.syntax.TypeSpec;
 
-import org.onion_lang.onion.lang.syntax.RawTypeNode;
-import org.onion_lang.onion.lang.syntax.TypeSpec;
 
 /**
  * @author Kota Mizushima

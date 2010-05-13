@@ -13,8 +13,8 @@ import java.util.List;
 
 import onion.compiler.util.Messages;
 import onion.lang.core.type.*;
+import onion.lang.syntax.Location;
 
-import org.onion_lang.onion.lang.syntax.Location;
 
 /**
  * @author Kota Mizushima

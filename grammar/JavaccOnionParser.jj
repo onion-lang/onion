@@ -13,7 +13,7 @@ options {
 PARSER_BEGIN(JavaccOnionParser)
 package org.onion_lang.onion.parser;
 import java.util.*;
-import org.onion_lang.onion.lang.syntax.*;
+import onion.lang.syntax.*;
 
 public class JavaccOnionParser implements OnionParser {
   private static final Expression[] EMPTY_EXPS = new Expression[0];

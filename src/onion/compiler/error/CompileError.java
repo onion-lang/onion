@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.error;
 
-import org.onion_lang.onion.lang.syntax.Location;
+import onion.lang.syntax.Location;
 
 /**
  * @author Kota Mizushima

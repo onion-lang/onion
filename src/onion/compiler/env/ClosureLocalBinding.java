@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import org.onion_lang.onion.lang.core.type.TypeRef;
+import onion.lang.core.type.TypeRef;
 
 /**
  * @author Kota Mizushima

@@ -15,14 +15,14 @@ import java.util.List;
 
 import onion.compiler.OnionTypeBridge;
 import onion.compiler.env.ClassTable;
+import onion.lang.core.type.AbstractClassSymbol;
+import onion.lang.core.type.ClassSymbol;
+import onion.lang.core.type.ConstructorSymbol;
+import onion.lang.core.type.FieldSymbol;
+import onion.lang.core.type.MethodSymbol;
+import onion.lang.core.type.TypeRef;
 
 import org.apache.bcel.Constants;
-import org.onion_lang.onion.lang.core.type.AbstractClassSymbol;
-import org.onion_lang.onion.lang.core.type.ClassSymbol;
-import org.onion_lang.onion.lang.core.type.ConstructorSymbol;
-import org.onion_lang.onion.lang.core.type.FieldSymbol;
-import org.onion_lang.onion.lang.core.type.MethodSymbol;
-import org.onion_lang.onion.lang.core.type.TypeRef;
 import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**

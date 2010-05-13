@@ -10,8 +10,9 @@ package onion.compiler;
 import java.util.HashMap;
 import java.util.Map;
 
+import onion.lang.core.type.*;
+
 import org.apache.bcel.generic.*;
-import org.onion_lang.onion.lang.core.type.*;
 
 /**
  * @author Kota Mizushima

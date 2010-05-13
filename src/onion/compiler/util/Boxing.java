@@ -8,10 +8,10 @@
 package onion.compiler.util;
 
 import onion.compiler.env.ClassTable;
+import onion.lang.core.IrExpression;
+import onion.lang.core.IrNew;
+import onion.lang.core.type.*;
 
-import org.onion_lang.onion.lang.core.IrExpression;
-import org.onion_lang.onion.lang.core.IrNew;
-import org.onion_lang.onion.lang.core.type.*;
 
 /**
  * @author Kota Mizushima

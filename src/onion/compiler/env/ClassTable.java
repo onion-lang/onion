@@ -13,10 +13,10 @@ import onion.compiler.env.java.ClassFileSymbol;
 import onion.compiler.env.java.ClassFileTable;
 import onion.compiler.env.java.ClassObjectSymbol;
 import onion.compiler.util.Strings;
+import onion.lang.core.IrClass;
+import onion.lang.core.type.*;
 
 import org.apache.bcel.classfile.JavaClass;
-import org.onion_lang.onion.lang.core.IrClass;
-import org.onion_lang.onion.lang.core.type.*;
 
 /**
  * @author Kota Mizushima

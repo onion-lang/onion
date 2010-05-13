@@ -7,7 +7,8 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import org.onion_lang.onion.lang.core.type.*;
+import onion.lang.core.type.*;
+
 import org.onion_lang.onion.lang.syntax.RawTypeNode;
 import org.onion_lang.onion.lang.syntax.TypeSpec;
 

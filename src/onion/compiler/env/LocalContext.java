@@ -8,9 +8,9 @@
 package onion.compiler.env;
 
 import onion.compiler.util.SymbolGenerator;
+import onion.lang.core.IrConstructor;
+import onion.lang.core.type.*;
 
-import org.onion_lang.onion.lang.core.IrConstructor;
-import org.onion_lang.onion.lang.core.type.*;
 
 /**
  * @author Kota Mizushima

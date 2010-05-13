@@ -9,7 +9,7 @@ package onion.compiler.env;
 
 import java.util.*;
 
-import org.onion_lang.onion.lang.core.type.TypeRef;
+import onion.lang.core.type.TypeRef;
 
 
 /**

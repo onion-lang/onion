@@ -10,7 +10,7 @@ package onion.compiler.util;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.onion_lang.onion.lang.core.type.*;
+import onion.lang.core.type.*;
 
 /**
  * @author Kota Mizushima

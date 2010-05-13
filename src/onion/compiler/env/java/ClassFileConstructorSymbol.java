@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.env.java;
 
-import org.onion_lang.onion.lang.core.type.*;
+import onion.lang.core.type.*;
 
 /**
  * @author Kota Mizushima

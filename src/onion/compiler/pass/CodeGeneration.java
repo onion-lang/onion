@@ -12,12 +12,12 @@ import java.util.*;
 import onion.compiler.*;
 import onion.compiler.env.*;
 import onion.compiler.util.*;
+import onion.lang.core.*;
+import onion.lang.core.type.*;
 
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.generic.*;
-import org.onion_lang.onion.lang.core.*;
-import org.onion_lang.onion.lang.core.type.*;
 import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**

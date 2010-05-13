@@ -11,14 +11,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import onion.compiler.env.ClassTable;
+import onion.lang.core.type.BasicTypeRef;
+import onion.lang.core.type.ClassSymbol;
+import onion.lang.core.type.TypeRef;
 
 import org.apache.bcel.generic.ArrayType;
 import org.apache.bcel.generic.BasicType;
 import org.apache.bcel.generic.ObjectType;
 import org.apache.bcel.generic.Type;
-import org.onion_lang.onion.lang.core.type.BasicTypeRef;
-import org.onion_lang.onion.lang.core.type.ClassSymbol;
-import org.onion_lang.onion.lang.core.type.TypeRef;
 
 /**
  * @author Kota Mizushima

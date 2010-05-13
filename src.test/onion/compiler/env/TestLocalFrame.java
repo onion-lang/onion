@@ -11,8 +11,8 @@ import onion.compiler.env.ClosureLocalBinding;
 import onion.compiler.env.LocalBinding;
 import onion.compiler.env.LocalFrame;
 import onion.compiler.env.LocalScope;
+import onion.lang.core.type.BasicTypeRef;
 
-import org.onion_lang.onion.lang.core.type.BasicTypeRef;
 
 import junit.framework.TestCase;
 

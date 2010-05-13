@@ -10,7 +10,7 @@ package onion.compiler;
 import java.io.IOException;
 import java.io.Reader;
 
-import org.onion_lang.onion.compiler.util.Inputs;
+import onion.compiler.util.Inputs;
 
 public class FileInputSource implements InputSource {
   private Reader reader;

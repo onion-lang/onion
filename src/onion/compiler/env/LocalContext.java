@@ -7,7 +7,8 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import org.onion_lang.onion.compiler.util.SymbolGenerator;
+import onion.compiler.util.SymbolGenerator;
+
 import org.onion_lang.onion.lang.core.IrConstructor;
 import org.onion_lang.onion.lang.core.type.*;
 

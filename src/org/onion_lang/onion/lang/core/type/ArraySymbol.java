@@ -8,8 +8,8 @@
 package org.onion_lang.onion.lang.core.type;
 
 import onion.compiler.env.*;
+import onion.compiler.util.Strings;
 
-import org.onion_lang.onion.compiler.util.Strings;
 
 /**
  * @author Kota Mizushima

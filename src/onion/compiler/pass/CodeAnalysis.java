@@ -26,11 +26,11 @@ import onion.compiler.env.StaticImportList;
 import onion.compiler.error.CompilationException;
 import onion.compiler.error.CompileError;
 import onion.compiler.error.SemanticErrorReporter;
+import onion.compiler.util.Boxing;
+import onion.compiler.util.Classes;
+import onion.compiler.util.Paths;
+import onion.compiler.util.Systems;
 
-import org.onion_lang.onion.compiler.util.Boxing;
-import org.onion_lang.onion.compiler.util.Classes;
-import org.onion_lang.onion.compiler.util.Paths;
-import org.onion_lang.onion.compiler.util.Systems;
 import org.onion_lang.onion.lang.core.IrArrayLength;
 import org.onion_lang.onion.lang.core.IrArrayRef;
 import org.onion_lang.onion.lang.core.IrArraySet;

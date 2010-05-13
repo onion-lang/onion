@@ -14,8 +14,8 @@ import java.text.MessageFormat;
 import onion.compiler.error.CompilationException;
 import onion.compiler.error.CompileError;
 import onion.compiler.pass.*;
+import onion.compiler.util.*;
 
-import org.onion_lang.onion.compiler.util.*;
 import org.onion_lang.onion.lang.syntax.Location;
 
 /**

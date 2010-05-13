@@ -11,7 +11,8 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.onion_lang.onion.compiler.util.Messages;
+import onion.compiler.util.Messages;
+
 import org.onion_lang.onion.lang.core.type.*;
 import org.onion_lang.onion.lang.syntax.Location;
 

@@ -8,11 +8,8 @@
 package onion.compiler.env;
 
 import java.util.*;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 
-import org.onion_lang.onion.compiler.util.Systems;
+import onion.compiler.util.Systems;
 
 /**
  * a Local variable table.

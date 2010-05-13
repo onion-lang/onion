@@ -4,6 +4,7 @@
 	<classpathentry kind="src" path="src.test"/>
 	<classpathentry kind="src" path="src.parser"/>
 	<classpathentry kind="src" output="build.lib" path="src.lib"/>
+	<classpathentry kind="con" path="ch.epfl.lamp.sdt.launching.SCALA_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/bcel/bcel.jar"/>
 	<classpathentry kind="lib" path="lib/junit/junit.jar"/>

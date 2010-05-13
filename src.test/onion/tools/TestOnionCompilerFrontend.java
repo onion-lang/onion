@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.tools;
+package onion.tools;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -14,8 +14,8 @@ import java.net.URL;
 import java.net.URLClassLoader;
 
 import onion.compiler.util.*;
+import onion.tools.OnionCompilerFrontend;
 
-import org.onion_lang.onion.tools.OnionCompilerFrontend;
 
 import junit.framework.TestCase;
 

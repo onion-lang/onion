@@ -21,6 +21,6 @@ echo Please set the environment variable ONION_HOME
 goto END
 
 :START
-%JAVA_HOME%\bin\java -classpath %CLASSPATH%;%ONION_HOME%\onion.jar;%ONION_HOME%\lib\bcel.jar;%ONION_HOME%\onion-library.jar org.onion_lang.onion.tools.ScriptRunner %*
+%JAVA_HOME%\bin\java -classpath %CLASSPATH%;%ONION_HOME%\onion.jar;%ONION_HOME%\lib\bcel.jar;%ONION_HOME%\onion-library.jar onion.tools.ScriptRunner %*
 
 :END

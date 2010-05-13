@@ -1,2 +1,2 @@
-Main-Class: org.onion_lang.onion.tools.OnionCompilerFrontend
+Main-Class: onion.tools.OnionCompilerFrontend
 Class-Path: lib/bcel.jar:onion-library.jar

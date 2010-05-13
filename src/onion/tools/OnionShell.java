@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.tools;
+package onion.tools;
 
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;

@@ -5,16 +5,16 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.tools.option;
+package onion.tools.option;
 
 import java.util.List;
 import java.util.Map;
 
-import org.onion_lang.onion.tools.option.CommandLineParser;
-import org.onion_lang.onion.tools.option.OptionConf;
-import org.onion_lang.onion.tools.option.ParseFailure;
-import org.onion_lang.onion.tools.option.ParseResult;
-import org.onion_lang.onion.tools.option.ParseSuccess;
+import onion.tools.option.CommandLineParser;
+import onion.tools.option.OptionConf;
+import onion.tools.option.ParseFailure;
+import onion.tools.option.ParseResult;
+import onion.tools.option.ParseSuccess;
 
 import junit.framework.TestCase;
 

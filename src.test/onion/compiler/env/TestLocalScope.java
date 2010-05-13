@@ -5,12 +5,13 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.env;
+package onion.compiler.env;
 
 import java.util.Set;
 
-import org.onion_lang.onion.compiler.env.LocalBinding;
-import org.onion_lang.onion.compiler.env.LocalScope;
+import onion.compiler.env.LocalBinding;
+import onion.compiler.env.LocalScope;
+
 import org.onion_lang.onion.lang.core.type.BasicTypeRef;
 
 import junit.framework.TestCase;

@@ -7,7 +7,8 @@
  * ************************************************************** */
 package org.onion_lang.onion.lang.core;
 
-import org.onion_lang.onion.compiler.env.LocalFrame;
+import onion.compiler.env.LocalFrame;
+
 import org.onion_lang.onion.lang.core.type.*;
 
 /**

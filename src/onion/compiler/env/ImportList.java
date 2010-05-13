@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.env;
+package onion.compiler.env;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,22 +15,22 @@ import java.util.List;
  * @author Kota Mizushima
  * 
  */
-public class StaticImportList {
+public class ImportList {  
   private List items = new ArrayList();
 
-  public StaticImportList(){
+  public ImportList(){
   }
   
-  public void add(StaticImportItem item){
+  public void add(ImportItem item){
     items.add(item);
   }
   
-  public String get(int index){
-    return (String)items.get(index);
+  public ImportItem get(int index){
+    return (ImportItem)items.get(index);
   }
   
-  public StaticImportItem[] getItems(){
-    return (StaticImportItem[])items.toArray(new StaticImportItem[0]);
+  public ImportItem[] getItems(){
+    return (ImportItem[])items.toArray(new ImportItem[0]);
   }
   
   public int size(){

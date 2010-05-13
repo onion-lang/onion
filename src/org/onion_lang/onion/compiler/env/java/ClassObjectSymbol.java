@@ -14,9 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import onion.compiler.OnionTypeBridge;
+import onion.compiler.env.ClassTable;
 
 import org.apache.bcel.Constants;
-import org.onion_lang.onion.compiler.env.ClassTable;
 import org.onion_lang.onion.lang.core.type.AbstractClassSymbol;
 import org.onion_lang.onion.lang.core.type.ClassSymbol;
 import org.onion_lang.onion.lang.core.type.ConstructorSymbol;

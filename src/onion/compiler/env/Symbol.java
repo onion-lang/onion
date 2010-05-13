@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.env;
+package onion.compiler.env;
 
 import java.util.HashMap;
 import java.util.Map;

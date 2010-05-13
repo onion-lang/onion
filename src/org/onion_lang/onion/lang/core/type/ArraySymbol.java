@@ -7,7 +7,8 @@
  * ************************************************************** */
 package org.onion_lang.onion.lang.core.type;
 
-import org.onion_lang.onion.compiler.env.*;
+import onion.compiler.env.*;
+
 import org.onion_lang.onion.compiler.util.Strings;
 
 /**

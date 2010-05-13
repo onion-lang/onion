@@ -7,7 +7,8 @@
  * ************************************************************** */
 package org.onion_lang.onion.compiler.util;
 
-import org.onion_lang.onion.compiler.env.ClassTable;
+import onion.compiler.env.ClassTable;
+
 import org.onion_lang.onion.lang.core.IrExpression;
 import org.onion_lang.onion.lang.core.IrNew;
 import org.onion_lang.onion.lang.core.type.*;

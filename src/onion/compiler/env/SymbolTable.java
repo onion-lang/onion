@@ -5,28 +5,27 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.env;
+package onion.compiler.env;
 
-import org.onion_lang.onion.lang.core.type.TypeRef;
+import java.util.HashMap;
+import java.util.Map;
 
-
-/**
- * @author Kota Mizushima
- */
-public class LocalBinding{  
-  private final int index;  
-  private final TypeRef type;
+public class SymbolTable {
+  private Map table;
   
-  public LocalBinding(int index, TypeRef type){
-    this.index	= index;
-    this.type = type;
+  public SymbolTable() {
+    this.table = new HashMap();
   }
-
-  public int getIndex() {
-    return index;
+  
+  public void put(Symbol key, Object value) {
+    table.put(key, value);
   }
-
-  public TypeRef getType() {
-    return type;
+  
+  public Object get(Symbol key) {
+    return table.get(key);
+  }
+  
+  public boolean containsKey(Symbol key) {
+    return table.containsKey(key);
   }
 }

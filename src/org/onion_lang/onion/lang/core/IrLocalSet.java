@@ -7,7 +7,8 @@
  * ************************************************************** */
 package org.onion_lang.onion.lang.core;
 
-import org.onion_lang.onion.compiler.env.ClosureLocalBinding;
+import onion.compiler.env.ClosureLocalBinding;
+
 import org.onion_lang.onion.lang.core.type.TypeRef;
 
 /**

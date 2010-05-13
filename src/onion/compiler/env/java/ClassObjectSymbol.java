@@ -5,27 +5,33 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.env.java;
+package onion.compiler.env.java;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
 import onion.compiler.OnionTypeBridge;
-import onion.compiler.env.*;
+import onion.compiler.env.ClassTable;
 
 import org.apache.bcel.Constants;
-import org.apache.bcel.classfile.*;
-import org.apache.bcel.generic.Type;
-import org.onion_lang.onion.lang.core.type.*;
+import org.onion_lang.onion.lang.core.type.AbstractClassSymbol;
+import org.onion_lang.onion.lang.core.type.ClassSymbol;
+import org.onion_lang.onion.lang.core.type.ConstructorSymbol;
+import org.onion_lang.onion.lang.core.type.FieldSymbol;
+import org.onion_lang.onion.lang.core.type.MethodSymbol;
+import org.onion_lang.onion.lang.core.type.TypeRef;
 import org.onion_lang.onion.lang.syntax.Modifier;
 
 /**
  * @author Kota Mizushima
- * Date: 2005/06/22
+ * Date: 2006/1/10
  */
-public class ClassFileSymbol extends AbstractClassSymbol implements Constants{
+public class ClassObjectSymbol extends AbstractClassSymbol implements Constants{
   private static final String CONSTRUCTOR_NAME = "<init>";
-  private JavaClass javaClass;
+  private Class klass;
   private ClassTable table;  
   private int modifier;
   private MethodSymbol[] methods;
@@ -33,15 +39,15 @@ public class ClassFileSymbol extends AbstractClassSymbol implements Constants{
   private ConstructorSymbol[] constructors;  
   private OnionTypeBridge bridge;
   
-  public ClassFileSymbol(JavaClass javaClass, ClassTable table) {
-    this.javaClass = javaClass;
+  public ClassObjectSymbol(Class klass, ClassTable table) {
+    this.klass = klass;
     this.table = table;
     this.bridge = new OnionTypeBridge(table);
-    this.modifier = toOnionModifier(javaClass.getModifiers());
+    this.modifier = toOnionModifier(klass.getModifiers());
   }
 
   public boolean isInterface() {
-    return (javaClass.getModifiers() & Constants.ACC_INTERFACE) != 0;
+    return (klass.getModifiers() & java.lang.reflect.Modifier.INTERFACE) != 0;
   }
 
   public int getModifier() {
@@ -49,56 +55,56 @@ public class ClassFileSymbol extends AbstractClassSymbol implements Constants{
   }
   
   public String getName() {
-    return javaClass.getClassName();
+    return klass.getName();
   }
 
   public ClassSymbol getSuperClass() {
-    ClassSymbol superClass = table.load(javaClass.getSuperclassName());
-    if(superClass == this){
-      return null;
-    }
+    Class superKlass = klass.getSuperclass();
+    if(superKlass == null) return table.rootClass();
+    ClassSymbol superClass = table.load(superKlass.getName());
+    if(superClass == this) return null;
     return superClass;
   }
 
   public ClassSymbol[] getInterfaces() {
-    String[] interfaceNames = javaClass.getInterfaceNames();
-    ClassSymbol[] interfaces = new ClassSymbol[interfaceNames.length];
+    Class[] interfaces = klass.getInterfaces();
+    ClassSymbol[] interfaceSyms = new ClassSymbol[interfaces.length];
     for(int i = 0; i < interfaces.length; i++){
-      interfaces[i] = table.load(interfaceNames[i]);
+      interfaceSyms[i] = table.load(interfaces[i].getName());
     }
-    return interfaces;
+    return interfaceSyms;
   }
   
   public MethodSymbol[] getMethods() {
     if(methods == null){
-      setMethods(javaClass.getMethods());
+      setMethods(klass.getMethods());
     }
     return (MethodSymbol[]) methods.clone();
   }
   
   public FieldSymbol[] getFields() {
     if(fields == null){
-      setFields(javaClass.getFields());
+      setFields(klass.getFields());
     }
     return (FieldSymbol[]) fields.clone();
   }
   
   public ConstructorSymbol[] getConstructors() {
     if(constructors == null){
-      setConstructors(javaClass.getMethods());
+      setConstructors(klass.getConstructors());
     }
     return (ConstructorSymbol[]) constructors.clone();
   }
 
   private static int toOnionModifier(int src){
     int modifier = 0;
-    modifier |= (isOn(src, ACC_PRIVATE) ? Modifier.PRIVATE : modifier);
-    modifier |= (isOn(src, ACC_PROTECTED) ? Modifier.PROTECTED : modifier);
-    modifier |= (isOn(src, ACC_PUBLIC) ? Modifier.PUBLIC : modifier);
-    modifier |= (isOn(src, ACC_STATIC) ? Modifier.STATIC : modifier);
-    modifier |= (isOn(src, ACC_SYNCHRONIZED) ? Modifier.SYNCHRONIZED : modifier);
-    modifier |= (isOn(src, ACC_ABSTRACT) ? Modifier.ABSTRACT : modifier);
-    modifier |= (isOn(src, ACC_FINAL) ? Modifier.FINAL : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.PRIVATE) ? Modifier.PRIVATE : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.PROTECTED) ? Modifier.PROTECTED : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.PUBLIC) ? Modifier.PUBLIC : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.STATIC) ? Modifier.STATIC : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.SYNCHRONIZED) ? Modifier.SYNCHRONIZED : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.ABSTRACT) ? Modifier.ABSTRACT : modifier);
+    modifier |= (isOn(src, java.lang.reflect.Modifier.FINAL) ? Modifier.FINAL : modifier);
     return modifier;
   }
   
@@ -124,19 +130,16 @@ public class ClassFileSymbol extends AbstractClassSymbol implements Constants{
     this.fields = symbols;
   }
   
-  private void setConstructors(Method[] methods){
+  private void setConstructors(Constructor[] methods){
     List symbols = new ArrayList();
     for(int i = 0; i < methods.length; i++){
-      if(methods[i].getName().equals(CONSTRUCTOR_NAME)){
-        symbols.add(convertConstructor(methods[i]));
-      }
+      symbols.add(convertConstructor(methods[i]));
     }
-    this.constructors = 
-      (ConstructorSymbol[]) symbols.toArray(new ConstructorSymbol[0]);
+    this.constructors = (ConstructorSymbol[]) symbols.toArray(new ConstructorSymbol[0]);
   }
   
   private MethodSymbol convertMethod(Method method){
-    Type[] arguments = method.getArgumentTypes();
+    Class[] arguments = method.getParameterTypes();
     TypeRef[] argumentSymbols = new TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentSymbols[i] = bridge.toOnionType(arguments[i]);
@@ -154,14 +157,14 @@ public class ClassFileSymbol extends AbstractClassSymbol implements Constants{
       this, field.getName(), symbol);
   }
   
-  private ConstructorSymbol convertConstructor(Method method){
-    Type[] arguments = method.getArgumentTypes();
+  private ConstructorSymbol convertConstructor(Constructor constructor){
+    Class[] arguments = constructor.getParameterTypes();
     TypeRef[] argumentSymbols = new TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentSymbols[i] = bridge.toOnionType(arguments[i]);
     }
     return new ClassFileConstructorSymbol(
-      toOnionModifier(method.getModifiers()),
-      this, method.getName(), argumentSymbols);
+      toOnionModifier(constructor.getModifiers()),
+      this, "<init>", argumentSymbols);
   }
 }

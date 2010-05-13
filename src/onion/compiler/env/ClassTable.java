@@ -9,10 +9,11 @@ package onion.compiler.env;
 
 import java.util.*;
 
+import onion.compiler.env.java.ClassFileSymbol;
+import onion.compiler.env.java.ClassFileTable;
+import onion.compiler.env.java.ClassObjectSymbol;
+
 import org.apache.bcel.classfile.JavaClass;
-import org.onion_lang.onion.compiler.env.java.ClassFileSymbol;
-import org.onion_lang.onion.compiler.env.java.ClassFileTable;
-import org.onion_lang.onion.compiler.env.java.ClassObjectSymbol;
 import org.onion_lang.onion.compiler.util.Strings;
 import org.onion_lang.onion.lang.core.IrClass;
 import org.onion_lang.onion.lang.core.type.*;

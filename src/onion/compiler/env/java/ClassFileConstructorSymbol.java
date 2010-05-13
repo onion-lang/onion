@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.env.java;
+package onion.compiler.env.java;
 
 import org.onion_lang.onion.lang.core.type.*;
 
@@ -13,21 +13,22 @@ import org.onion_lang.onion.lang.core.type.*;
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileFieldSymbol implements FieldSymbol {
+public class ClassFileConstructorSymbol implements ConstructorSymbol {
   private int modifier;
-  private ClassSymbol classType;
+  private ClassSymbol classType; 
   private String name;
-  private TypeRef type;
+  private TypeRef[] args;
 
-  public ClassFileFieldSymbol(
-    int modifier, ClassSymbol classType, String name, TypeRef type) {
+  public ClassFileConstructorSymbol(
+    int modifier, ClassSymbol classType, String name, TypeRef[] args
+  ) {
     this.modifier = modifier;
     this.classType = classType;
     this.name = name;
-    this.type = type;
+    this.args = (TypeRef[]) args.clone();
   }
-
-  public int getModifier() {
+  
+  public int getModifier(){
     return modifier;
   }
 
@@ -39,7 +40,7 @@ public class ClassFileFieldSymbol implements FieldSymbol {
     return name;
   }
 
-  public TypeRef getType() {
-    return type;
+  public TypeRef[] getArgs() {
+    return args;
   }
 }

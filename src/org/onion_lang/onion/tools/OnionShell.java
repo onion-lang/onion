@@ -19,8 +19,8 @@ import onion.compiler.InputSource;
 import onion.compiler.OnionClassLoader;
 import onion.compiler.OnionCompiler;
 import onion.compiler.StreamInputSource;
+import onion.compiler.error.ScriptException;
 
-import org.onion_lang.onion.compiler.error.ScriptException;
 
 
 public class OnionShell {

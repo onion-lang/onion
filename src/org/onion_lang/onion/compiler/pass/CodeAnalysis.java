@@ -23,10 +23,10 @@ import onion.compiler.env.LocalFrame;
 import onion.compiler.env.NameResolution;
 import onion.compiler.env.StaticImportItem;
 import onion.compiler.env.StaticImportList;
+import onion.compiler.error.CompilationException;
+import onion.compiler.error.CompileError;
+import onion.compiler.error.SemanticErrorReporter;
 
-import org.onion_lang.onion.compiler.error.CompilationException;
-import org.onion_lang.onion.compiler.error.CompileError;
-import org.onion_lang.onion.compiler.error.SemanticErrorReporter;
 import org.onion_lang.onion.compiler.util.Boxing;
 import org.onion_lang.onion.compiler.util.Classes;
 import org.onion_lang.onion.compiler.util.Paths;

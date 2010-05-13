@@ -14,9 +14,9 @@ import java.util.List;
 
 import onion.compiler.CompilerConfig;
 import onion.compiler.InputSource;
+import onion.compiler.error.CompilationException;
+import onion.compiler.error.CompileError;
 
-import org.onion_lang.onion.compiler.error.CompilationException;
-import org.onion_lang.onion.compiler.error.CompileError;
 import org.onion_lang.onion.compiler.util.*;
 import org.onion_lang.onion.lang.syntax.CompilationUnit;
 import org.onion_lang.onion.lang.syntax.Location;

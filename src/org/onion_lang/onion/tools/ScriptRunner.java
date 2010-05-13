@@ -15,8 +15,8 @@ import java.util.Map;
 import java.net.MalformedURLException;
 
 import onion.compiler.*;
+import onion.compiler.error.ScriptException;
 
-import org.onion_lang.onion.compiler.error.ScriptException;
 import org.onion_lang.onion.compiler.util.Messages;
 import org.onion_lang.onion.compiler.util.Systems;
 import org.onion_lang.onion.tools.option.CommandLineParser;

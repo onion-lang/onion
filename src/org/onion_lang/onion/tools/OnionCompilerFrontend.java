@@ -21,8 +21,8 @@ import java.util.Map;
 import onion.compiler.CompiledClass;
 import onion.compiler.CompilerConfig;
 import onion.compiler.OnionCompiler;
+import onion.compiler.error.ScriptException;
 
-import org.onion_lang.onion.compiler.error.ScriptException;
 import org.onion_lang.onion.compiler.util.Messages;
 import org.onion_lang.onion.compiler.util.Systems;
 import org.onion_lang.onion.tools.option.CommandLineParser;

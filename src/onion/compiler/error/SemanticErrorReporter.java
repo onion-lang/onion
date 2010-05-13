@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler.error;
+package onion.compiler.error;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;

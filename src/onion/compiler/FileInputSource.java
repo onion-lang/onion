@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package org.onion_lang.onion.compiler;
+package onion.compiler;
 
 import java.io.IOException;
 import java.io.Reader;

@@ -12,8 +12,9 @@ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.onion_lang.onion.compiler.CompilerConfig;
-import org.onion_lang.onion.compiler.InputSource;
+import onion.compiler.CompilerConfig;
+import onion.compiler.InputSource;
+
 import org.onion_lang.onion.compiler.error.CompilationException;
 import org.onion_lang.onion.compiler.error.CompileError;
 import org.onion_lang.onion.compiler.util.*;

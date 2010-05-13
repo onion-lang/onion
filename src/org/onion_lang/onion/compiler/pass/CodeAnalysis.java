@@ -11,9 +11,10 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
 
-import org.onion_lang.onion.compiler.CompilerConfig;
-import org.onion_lang.onion.compiler.Option;
-import org.onion_lang.onion.compiler.Pair;
+import onion.compiler.CompilerConfig;
+import onion.compiler.Option;
+import onion.compiler.Pair;
+
 import org.onion_lang.onion.compiler.env.ClassTable;
 import org.onion_lang.onion.compiler.env.ClosureLocalBinding;
 import org.onion_lang.onion.compiler.env.ImportItem;

@@ -1,4 +1,4 @@
-package org.onion_lang.onion.compiler;
+package onion.compiler;
 
 /**
  * ML-like option type.

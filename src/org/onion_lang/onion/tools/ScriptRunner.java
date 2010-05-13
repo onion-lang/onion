@@ -14,7 +14,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.net.MalformedURLException;
 
-import org.onion_lang.onion.compiler.*;
+import onion.compiler.*;
+
 import org.onion_lang.onion.compiler.error.ScriptException;
 import org.onion_lang.onion.compiler.util.Messages;
 import org.onion_lang.onion.compiler.util.Systems;

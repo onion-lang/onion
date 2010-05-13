@@ -18,9 +18,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.onion_lang.onion.compiler.CompiledClass;
-import org.onion_lang.onion.compiler.CompilerConfig;
-import org.onion_lang.onion.compiler.OnionCompiler;
+import onion.compiler.CompiledClass;
+import onion.compiler.CompilerConfig;
+import onion.compiler.OnionCompiler;
+
 import org.onion_lang.onion.compiler.error.ScriptException;
 import org.onion_lang.onion.compiler.util.Messages;
 import org.onion_lang.onion.compiler.util.Systems;

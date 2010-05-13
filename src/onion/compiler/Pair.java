@@ -1,4 +1,4 @@
-package org.onion_lang.onion.compiler;
+package onion.compiler;
 
 public final class Pair<A, B> {
   public final A _1;

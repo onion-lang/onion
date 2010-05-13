@@ -1,4 +1,4 @@
-package org.onion_lang.onion.compiler.pass;
+package onion.compiler.pass;
 
 import java.util.ArrayList;
 import java.util.Arrays;

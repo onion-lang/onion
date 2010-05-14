@@ -1,4 +1,4 @@
 package onion.lang.syntax
 
-abstract sealed class ASTNode(val pos: Position)
+abstract sealed class ASTElement(val pos: Position)
 case class Position(line: Int, column: Int)

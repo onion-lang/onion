@@ -96,7 +96,6 @@ import onion.lang.syntax.Addition;
 import onion.lang.syntax.AdditionAssignment;
 import onion.lang.syntax.Argument;
 import onion.lang.syntax.Assignment;
-import onion.lang.syntax.Ast;
 import onion.lang.syntax.AstNode;
 import onion.lang.syntax.BinaryExpression;
 import onion.lang.syntax.BitAnd;
@@ -208,7 +207,6 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
   private int access;
   
   public String topClass(){
-    Ast.Node n = null;
     ModuleDeclaration module = unit.getModuleDeclaration();
     String moduleName = module != null ? module.getName() : null;
     return createName(moduleName, Paths.cutExtension(unit.getSourceFileName()) + "Main");

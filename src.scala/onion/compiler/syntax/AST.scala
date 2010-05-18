@@ -95,4 +95,17 @@ object AST {
   abstract sealed class Statement extends Toplevel
   case class BlockStatement(pos: Position, elements: List[Statement]) extends Statement
   case class BreakStatement(pos: Position) extends Statement
+  case class CondStatement(pos: Position, clauses: List[(Expression, BlockStatement)], elseBlock: Option[BlockStatement]) extends Statement
+  case class ContinueStatement(pos: Position) extends Statement
+  case class EmptyStatement(pos: Position) extends Statement
+  case class ForeachStatement(pos: Position, arg: Argument, collection: Expression, statement: BlockStatement) extends Statement
+  case class ForStatement(pos: Position, init: Statement, condition: Expression, update: Expression, block: BlockStatement) extends Statement
+  case class IfStatement(pos: Position, condition: Expression, thenBlock: BlockStatement, elseBlock: BlockStatement) extends Statement
+  case class LocalVariableDeclaration(pos: Position, name: String, typeRef: TypeNode, init: Expression) extends Statement
+  case class ReturnStatement(pos: Position) extends Statement
+  case class SelectStatement(pos: Position, condition: Expression, cases: List[(List[Expression], BlockStatement)]) extends Statement
+  case class SynchronizedStatement(pos: Position, condition: Expression, block: BlockStatement) extends Statement
+  case class ThrowStatement(pos: Position, target: Expression) extends Statement
+  case class TryStatement(pos: Position, tryBlock: BlockStatement, recClauses: List[(Argument, BlockStatement)], finBlock: Option[BlockStatement]) extends Statement
+  case class WhileStatement(pos: Position, condition: Expression, block: BlockStatement) extends Statement
 }  

@@ -93,4 +93,6 @@ object AST {
   case class XOR(pos: Position, left: Expression, right: Expression) extends BinaryExpression("^")  
   
   abstract sealed class Statement extends Toplevel
+  case class BlockStatement(pos: Position, elements: List[Statement]) extends Statement
+  case class BreakStatement(pos: Position) extends Statement
 }  

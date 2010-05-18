@@ -1,10 +1,12 @@
 package onion.lang.syntax
 
-abstract sealed class ASTElement(val pos: Position)
-case class ASTCompilationUnit(
-  pos: Position, sourceFile: String = "<generated>", module: ModuleDeclaration,
-  imports: ASTImportClause, toplevels: List[ASTToplevel])
-case class ASTModuleDeclaration(pos: Position, name: String)
-case class ASTImportClause(pos: Position, mapping: List[(String, String)])
-abstract sealed class ASTToplevel(pos: Position)
-case class Position(line: Int, column: Int)
+object AST {
+  abstract sealed class Node{ def pos: Position }
+  case class CompilationUnit(
+    pos: Position, sourceFile: String = "<generated>", module: ModuleDeclaration,
+    imports: ImportClause, toplevels: List[Toplevel]) extends Node
+  case class ModuleDeclaration(pos: Position, name: String) extends Node
+  case class ImportClause(pos: Position, mapping: List[(String, String)]) extends Node
+  abstract sealed class Toplevel(pos: Position) extends Node
+  case class Position(line: Int, column: Int)
+}  

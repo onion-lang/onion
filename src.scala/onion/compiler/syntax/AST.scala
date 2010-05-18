@@ -1,4 +1,4 @@
-package onion.lang.syntax
+package onion.compiler.syntax
 
 object AST {
   abstract sealed class TypeDescriptor
@@ -25,13 +25,13 @@ object AST {
     imports: ImportClause, toplevels: List[Toplevel]) extends Node
   case class ModuleDeclaration(pos: Position, name: String) extends Node
   case class ImportClause(pos: Position, mapping: List[(String, String)]) extends Node
-  abstract sealed class Toplevel(pos: Position) extends Node
+  abstract sealed class Toplevel extends Node
   abstract sealed class Expression extends Node
-  abstract sealed class BinaryExpression(symbol: String) extends Node {
+  abstract sealed class BinaryExpression(symbol: String) extends Expression {
     def left: Expression
     def right: Expression
   }
-  abstract sealed class UnaryExpression(symbol: String) extends Node {
+  abstract sealed class UnaryExpression(symbol: String) extends Expression {
     def target: Expression
   }
   case class Addition(pos: Position, left: Expression, right: Expression) extends BinaryExpression("+")
@@ -91,4 +91,6 @@ object AST {
   case class SubtractionAssignment(pos: Position, left: Expression, right: Expression) extends BinaryExpression("-=")
   case class SuperMethodCall(pos: Position, name: String, args: List[Expression]) extends Expression
   case class XOR(pos: Position, left: Expression, right: Expression) extends BinaryExpression("^")  
+  
+  abstract sealed class Statement extends Toplevel
 }  

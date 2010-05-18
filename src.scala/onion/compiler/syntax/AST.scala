@@ -42,7 +42,7 @@ object AST {
   case class BooleanLiteral(pos: Position, value: Boolean) extends Expression
   case class Cast(pos: Position, src: Expression, to: TypeNode) extends Expression
   case class CharacterLiteral(pos: Position, value: Char) extends Expression
-  case class ClosureExpression(pos: Position, typeRef: TypeNode, args: Argument, returns: TypeNode) extends Expression
+  case class ClosureExpression(pos: Position, typeRef: TypeNode, args: Argument, returns: TypeNode, body: BlockStatement) extends Expression
   case class CurrentInstance(pos: Position) extends Expression
   case class Division(pos: Position, left: Expression, right: Expression) extends BinaryExpression("/")
   case class DivisionAssignment(pos: Position, left: Expression, right: Expression) extends BinaryExpression("/=")
@@ -55,7 +55,7 @@ object AST {
   case class Id(pos: Position, name: String) extends Expression
   case class Indexing(pos: Position, left: Expression, right: Expression) extends BinaryExpression("[]")
   case class IntegerLiteral(pos: Position, value: Int) extends Expression
-  case class IsInstance(pos: Position, typeRef: TypeNode) extends Expression
+  case class IsInstance(pos: Position, target: Expression, typeRef: TypeNode) extends Expression
   case class LessOrEqual(pos: Position, left: Expression, right: Expression) extends BinaryExpression("<=")
   case class LessThan(pos: Position, left: Expression, right: Expression) extends BinaryExpression("<")  
   case class ListLiteral(pos: Position, elements: List[Expression]) extends Expression
@@ -80,8 +80,8 @@ object AST {
   case class Posit(pos: Position, target: Expression) extends UnaryExpression("+")
   case class PostDecrement(pos: Position, target: Expression) extends UnaryExpression("--")
   case class PostIncrement(pos: Position, target: Expression) extends UnaryExpression("++")
-  case class ReferenceEqual(pos: Position, target: Expression) extends UnaryExpression("===")
-  case class ReferenceNotEqual(pos: Position, target: Expression) extends UnaryExpression("!==")
+  case class ReferenceEqual(pos: Position, left: Expression, right: Expression) extends BinaryExpression("===")
+  case class ReferenceNotEqual(pos: Position, left: Expression, right: Expression) extends BinaryExpression("!==")
   case class UnqualifiedFieldReference(pos: Position, name: String) extends Expression
   case class UnqualifiedMethodCall(pos: Position, name: String, args: Expression) extends Expression
   case class StaticIDExpression(pos: Position, typeRef: TypeNode, name: String) extends Expression
@@ -99,11 +99,11 @@ object AST {
   case class ContinueStatement(pos: Position) extends Statement
   case class EmptyStatement(pos: Position) extends Statement
   case class ForeachStatement(pos: Position, arg: Argument, collection: Expression, statement: BlockStatement) extends Statement
-  case class ForStatement(pos: Position, init: Statement, condition: Expression, update: Expression, block: BlockStatement) extends Statement
-  case class IfStatement(pos: Position, condition: Expression, thenBlock: BlockStatement, elseBlock: BlockStatement) extends Statement
-  case class LocalVariableDeclaration(pos: Position, name: String, typeRef: TypeNode, init: Expression) extends Statement
+  case class ForStatement(pos: Position, init: Option[Statement], condition: Option[Expression], update: Option[Expression], block: BlockStatement) extends Statement
+  case class IfStatement(pos: Position, condition: Expression, thenBlock: BlockStatement, elseBlock: Option[BlockStatement]) extends Statement
+  case class LocalVariableDeclaration(pos: Position, name: String, typeRef: Option[TypeNode], init: Expression) extends Statement
   case class ReturnStatement(pos: Position) extends Statement
-  case class SelectStatement(pos: Position, condition: Expression, cases: List[(List[Expression], BlockStatement)]) extends Statement
+  case class SelectStatement(pos: Position, condition: Expression, cases: List[(List[Expression], BlockStatement)], elseBlock: Option[BlockStatement]) extends Statement
   case class SynchronizedStatement(pos: Position, condition: Expression, block: BlockStatement) extends Statement
   case class ThrowStatement(pos: Position, target: Expression) extends Statement
   case class TryStatement(pos: Position, tryBlock: BlockStatement, recClauses: List[(Argument, BlockStatement)], finBlock: Option[BlockStatement]) extends Statement

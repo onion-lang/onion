@@ -51,8 +51,8 @@
 
   1) Copy the directory extracted from the binary distribution to a directory.
 
-  2) Set environment variable ONION_HOME to Onion installaion directory.
-     Set environnmnt variable JAVA_HOME to Java SE installation directory.
+  2) Set environment variable ONION_HOME to Onion installation directory.
+     Set environment variable JAVA_HOME to Java SE installation directory.
     
   3) Add bin directory to environment variable PATH.
     
@@ -78,7 +78,7 @@
        bcel.path = path of BCEL jar file
        install.path = installation directory
 
-     Note that pathes must be absolute pathes.
+     Note that paths must be absolute paths.
 
   3) In shell, type
 
@@ -87,7 +87,7 @@
      .  Source-codes will be built and Onion will be installed
      in the directory specified by install.path.
      
-  4) Set environment variable ONION_HOME to Onion installaion directory.
-     Set environnmnt variable JAVA_HOME to Java SE installation directory.
+  4) Set environment variable ONION_HOME to Onion installation directory.
+     Set environment variable JAVA_HOME to Java SE installation directory.
     
   5) Add bin directory to environment variable PATH.

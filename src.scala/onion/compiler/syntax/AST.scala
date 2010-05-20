@@ -98,6 +98,7 @@ object AST {
   case class CondStatement(pos: Position, clauses: List[(Expression, BlockStatement)], elseBlock: Option[BlockStatement]) extends Statement
   case class ContinueStatement(pos: Position) extends Statement
   case class EmptyStatement(pos: Position) extends Statement
+  case class ExpressionStatement(pos: Position, body: Expression) extends Statement
   case class ForeachStatement(pos: Position, arg: Argument, collection: Expression, statement: BlockStatement) extends Statement
   case class ForStatement(pos: Position, init: Option[Statement], condition: Option[Expression], update: Option[Expression], block: BlockStatement) extends Statement
   case class IfStatement(pos: Position, condition: Expression, thenBlock: BlockStatement, elseBlock: Option[BlockStatement]) extends Statement

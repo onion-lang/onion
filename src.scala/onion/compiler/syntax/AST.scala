@@ -1,6 +1,20 @@
 package onion.compiler.syntax
 
 object AST {
+  object Modifiers {
+    final val INTERNAL = 1
+    final val SYNCHRONIZED = 2
+    final val FINAL = 4
+    final val ABSTRACT = 8
+    final val VOLATILE = 16
+    final val STATIC = 32
+    final val INHERITED = 64
+    final val PUBLIC = 128
+    final val PROTECTED = 256
+    final val PRIVATE = 512
+    final val FORWARDED = 1024
+    def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0      
+  }
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor
   case class ReferenceType(name: String, qualified: Boolean) extends TypeDescriptor
@@ -109,4 +123,17 @@ object AST {
   case class ThrowStatement(pos: Position, target: Expression) extends Statement
   case class TryStatement(pos: Position, tryBlock: BlockStatement, recClauses: List[(Argument, BlockStatement)], finBlock: Option[BlockStatement]) extends Statement
   case class WhileStatement(pos: Position, condition: Expression, block: BlockStatement) extends Statement
-}  
+  
+  case class FunctionDeclaration(pos: Position, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockStatement) extends Toplevel
+  case class GlobalVariableDeclaration(pos: Position, modifiers: Int, name: String, typeRef: TypeNode, init: Option[Expression]) extends Toplevel
+  
+  abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String } 
+  case class MethodDeclaration(pos: Position, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockStatement) extends MemberDeclaration
+  case class FieldDeclaration(pos: Position, modifiers: Int, name: String, typeRef: TypeNode, init: Option[Expression]) extends MemberDeclaration
+  case class ConstructorDeclaration(pos: Position, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockStatement) extends MemberDeclaration { val name = "new" }
+  
+  case class AccessSection(pos: Position, modifiers: Int, members: List[MemberDeclaration]) extends Node
+  abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
+  case class ClassDeclaration(pos: Position, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: AccessSection, sections: List[AccessSection]) extends TypeDeclaration
+  case class InterfaceDeclaration(pos: Position, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) extends TypeDeclaration
+}

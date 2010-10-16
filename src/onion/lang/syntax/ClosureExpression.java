@@ -10,7 +10,7 @@ package onion.lang.syntax;
 import onion.lang.syntax.visitor.ASTVisitor;
 
 /**
- * クロージャを表現する構文木のノード
+ * AST node class which represents `closure`.
  * @author Kota Mizushima
  * Date: 2005/04/10
  */

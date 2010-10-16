@@ -34,7 +34,7 @@ public class OnionClassLoader extends URLClassLoader {
   private static URL[] getURLs(String[] classPath) throws MalformedURLException {
     URL[] urls = new URL[classPath.length];
     for(int i = 0; i < classPath.length; i++) {
-      urls[i] = new File(classPath[i]).toURL();
+      urls[i] = new File(classPath[i]).toURI().toURL();
     }
     return urls;
   }

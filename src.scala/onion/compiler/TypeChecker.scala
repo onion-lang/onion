@@ -1,5 +1,8 @@
 package onion.compiler
 
+import error.SemanticErrorReporter
+import onion.lang.core.IrClass
+
 /**
  * Created by IntelliJ IDEA.
  * User: Mizushima
@@ -8,7 +11,10 @@ package onion.compiler
  * To change this template use File | Settings | File Templates.
  */
 
-object TypeChecker {
-  def typeCheck(unit: AST.CompilationUnit) {
+class TypeChecker(config: CompilerConfig) {
+  private[this] val reporter = new SemanticErrorReporter(config.getMaxErrorReports)
+
+  def process(units: Array[AST.CompilationUnit]): Array[IrClass] = {
+    null
   }
 }

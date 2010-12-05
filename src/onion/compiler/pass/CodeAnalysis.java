@@ -12,7 +12,7 @@ import java.util.Stack;
 import java.util.TreeSet;
 
 import onion.compiler.CompilerConfig;
-import onion.compiler.Option;
+import onion.compiler.IxCode;
 import onion.compiler.Pair;
 import onion.compiler.env.ClassTable;
 import onion.compiler.env.ClosureLocalBinding;
@@ -30,67 +30,6 @@ import onion.compiler.util.Boxing;
 import onion.compiler.util.Classes;
 import onion.compiler.util.Paths;
 import onion.compiler.util.Systems;
-import onion.lang.core.IrArrayLength;
-import onion.lang.core.IrArrayRef;
-import onion.lang.core.IrArraySet;
-import onion.lang.core.IrBegin;
-import onion.lang.core.IrBinExp;
-import onion.lang.core.IrBlock;
-import onion.lang.core.IrBool;
-import onion.lang.core.IrBreak;
-import onion.lang.core.IrCall;
-import onion.lang.core.IrCallStatic;
-import onion.lang.core.IrCallSuper;
-import onion.lang.core.IrCast;
-import onion.lang.core.IrChar;
-import onion.lang.core.IrClass;
-import onion.lang.core.IrClosure;
-import onion.lang.core.IrConstructor;
-import onion.lang.core.IrContinue;
-import onion.lang.core.IrDouble;
-import onion.lang.core.IrExpStmt;
-import onion.lang.core.IrExpression;
-import onion.lang.core.IrField;
-import onion.lang.core.IrFieldRef;
-import onion.lang.core.IrFieldSet;
-import onion.lang.core.IrFloat;
-import onion.lang.core.IrIf;
-import onion.lang.core.IrInstanceOf;
-import onion.lang.core.IrInt;
-import onion.lang.core.IrList;
-import onion.lang.core.IrLocalRef;
-import onion.lang.core.IrLocalSet;
-import onion.lang.core.IrLong;
-import onion.lang.core.IrLoop;
-import onion.lang.core.IrMethod;
-import onion.lang.core.IrNOP;
-import onion.lang.core.IrNew;
-import onion.lang.core.IrNewArray;
-import onion.lang.core.IrNode;
-import onion.lang.core.IrNull;
-import onion.lang.core.IrReturn;
-import onion.lang.core.IrStatement;
-import onion.lang.core.IrStaticFieldRef;
-import onion.lang.core.IrString;
-import onion.lang.core.IrSuper;
-import onion.lang.core.IrSynchronized;
-import onion.lang.core.IrThis;
-import onion.lang.core.IrThrow;
-import onion.lang.core.IrTry;
-import onion.lang.core.IrUnaryExp;
-import onion.lang.core.type.ArraySymbol;
-import onion.lang.core.type.BasicTypeRef;
-import onion.lang.core.type.ClassSymbol;
-import onion.lang.core.type.ConstructorSymbol;
-import onion.lang.core.type.ConstructorSymbolComparator;
-import onion.lang.core.type.FieldSymbol;
-import onion.lang.core.type.FieldSymbolComparator;
-import onion.lang.core.type.MemberSymbol;
-import onion.lang.core.type.MethodSymbol;
-import onion.lang.core.type.MethodSymbolComparator;
-import onion.lang.core.type.ObjectTypeRef;
-import onion.lang.core.type.TypeRef;
-import onion.lang.core.type.TypeRules;
 import onion.lang.syntax.AccessSection;
 import onion.lang.syntax.Addition;
 import onion.lang.syntax.AdditionAssignment;
@@ -202,7 +141,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
   private CompilationUnit unit;
   private StaticImportList staticImport;
   private ImportList currentImport;
-  private IrClass contextClass;
+  private IxCode.IrClass contextClass;
   private NameResolution solver;
   private int access;
   
@@ -249,11 +188,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     return staticImport;
   }
 
-  public void setContextClass(IrClass contextClass){
+  public void setContextClass(IxCode.IrClass contextClass){
     this.contextClass = contextClass;
   }
   
-  public IrClass getContextClass(){
+  public IxCode.IrClass getContextClass(){
     return contextClass;
   }
   
@@ -266,17 +205,17 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
   }
 //---------------------------------------------------------------------------//
   
-  public void put(AstNode astNode, IrNode kernelNode){
+  public void put(AstNode astNode, IxCode.IrNode kernelNode){
     ast2irt.put(astNode, kernelNode);
     irt2ast.put(kernelNode, astNode);
   }
   
-  public AstNode lookupAST(IrNode kernelNode){
+  public AstNode lookupAST(IxCode.IrNode kernelNode){
     return (AstNode) irt2ast.get(kernelNode);
   }
   
-  public IrNode lookupKernelNode(AstNode astNode){
-    return (IrNode) ast2irt.get(astNode);
+  public IxCode.IrNode lookupKernelNode(AstNode astNode){
+    return (IxCode.IrNode) ast2irt.get(astNode);
   }
   
   public void addSolver(String className, NameResolution solver) {
@@ -305,15 +244,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
 //----------------------------------------------------------------------------// 
 //----------------------------------------------------------------------------//
 
-  public TypeRef resolve(TypeSpec type, NameResolution resolver) {
-    TypeRef resolvedType = (TypeRef) resolver.resolve(type);
+  public IxCode.TypeRef resolve(TypeSpec type, NameResolution resolver) {
+    IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.resolve(type);
     if(resolvedType == null){
       report(CLASS_NOT_FOUND, type, new Object[]{type.getComponentName()});      
     }
     return resolvedType;
   }
   
-  public TypeRef resolve(TypeSpec type) {
+  public IxCode.TypeRef resolve(TypeSpec type) {
     return resolve(type, getSolver());
   }
 
@@ -322,45 +261,45 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     reporter.report(error, node.getLocation(), items);
   }
 
-  public static TypeRef promoteNumericTypes(TypeRef left,  TypeRef right) {
+  public static IxCode.TypeRef promoteNumericTypes(IxCode.TypeRef left,  IxCode.TypeRef right) {
     if(!numeric(left) || !numeric(right)) return null;
-    if(left == BasicTypeRef.DOUBLE || right == BasicTypeRef.DOUBLE){
-      return BasicTypeRef.DOUBLE;
+    if(left == IxCode.BasicTypeRef.DOUBLE || right == IxCode.BasicTypeRef.DOUBLE){
+      return IxCode.BasicTypeRef.DOUBLE;
     }
-    if(left == BasicTypeRef.FLOAT || right == BasicTypeRef.FLOAT){
-      return BasicTypeRef.FLOAT;
+    if(left == IxCode.BasicTypeRef.FLOAT || right == IxCode.BasicTypeRef.FLOAT){
+      return IxCode.BasicTypeRef.FLOAT;
     }
-    if(left == BasicTypeRef.LONG || right == BasicTypeRef.LONG){
-      return BasicTypeRef.LONG;
+    if(left == IxCode.BasicTypeRef.LONG || right == IxCode.BasicTypeRef.LONG){
+      return IxCode.BasicTypeRef.LONG;
     }
-    return BasicTypeRef.INT;
+    return IxCode.BasicTypeRef.INT;
   }
   
-  public static boolean hasNumericType(IrExpression expression) {
+  public static boolean hasNumericType(IxCode.IrExpression expression) {
     return numeric(expression.type());
   }
   
-  private static boolean numeric(TypeRef symbol) {
+  private static boolean numeric(IxCode.TypeRef symbol) {
     return 
     (symbol.isBasicType()) &&
-    ( symbol == BasicTypeRef.BYTE || symbol == BasicTypeRef.SHORT ||
-      symbol == BasicTypeRef.INT || symbol == BasicTypeRef.LONG ||
-      symbol == BasicTypeRef.FLOAT || symbol == BasicTypeRef.DOUBLE);
+    ( symbol == IxCode.BasicTypeRef.BYTE || symbol == IxCode.BasicTypeRef.SHORT ||
+      symbol == IxCode.BasicTypeRef.INT || symbol == IxCode.BasicTypeRef.LONG ||
+      symbol == IxCode.BasicTypeRef.FLOAT || symbol == IxCode.BasicTypeRef.DOUBLE);
   }
   
-  public ClassSymbol load(String name) {
+  public IxCode.ClassSymbol load(String name) {
     return table.load(name);
   }
   
-  public ClassSymbol loadTopClass() {
+  public IxCode.ClassSymbol loadTopClass() {
     return table.load(topClass());
   }
   
-  public ArraySymbol loadArray(TypeRef type, int dimension) {
+  public IxCode.ArraySymbol loadArray(IxCode.TypeRef type, int dimension) {
     return table.loadArray(type, dimension);
   }
   
-  public ClassSymbol rootClass() {
+  public IxCode.ClassSymbol rootClass() {
     return table.rootClass();
   }
   
@@ -368,7 +307,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     return reporter.getProblems();
   }
   
-  public IrClass[] getSourceClasses() {
+  public IxCode.IrClass[] getSourceClasses() {
     return table.getSourceClasses();
   }
   
@@ -411,7 +350,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       ClassTable table = getTable();
       if(count > 0){
-        IrClass node = IrClass.newClass(0, topClass(), table.rootClass(), new ClassSymbol[0]);
+        IxCode.IrClass node = IxCode.IrClass.newClass(0, topClass(), table.rootClass(), new IxCode.ClassSymbol[0]);
         node.setSourceFile(Paths.getName(unit.getSourceFileName()));
         node.setResolutionComplete(true);
         table.addSourceClass(node);
@@ -423,7 +362,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(ClassDeclaration ast, String context) {
       String module = context;
-      IrClass node = IrClass.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
+      IxCode.IrClass node = IxCode.IrClass.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
       node.setSourceFile(Paths.getName(getUnit().getSourceFileName()));
       if(getTable().lookup(node.getName()) != null){
         report(DUPLICATE_CLASS,  ast, new Object[]{node.getName()});
@@ -438,7 +377,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(InterfaceDeclaration ast, String context) {
       String module = context;
-      IrClass node = IrClass.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
+      IxCode.IrClass node = IxCode.IrClass.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
       node.setSourceFile(Paths.getName(getUnit().getSourceFileName()));
       ClassTable table = getTable();
       if(table.lookup(node.getName()) != null){
@@ -475,7 +414,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(ClassDeclaration ast, Void context) {
       countConstructor = 0;
-      IrClass node = (IrClass) lookupKernelNode(ast);
+      IxCode.IrClass node = (IxCode.IrClass) lookupKernelNode(ast);
       setContextClass(node);
       setSolver(findSolver(node.getName()));
       constructTypeHierarchy(node, new ArrayList());
@@ -496,7 +435,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
       
     public Object visit(InterfaceDeclaration ast, Void context) {
-      IrClass node = (IrClass) lookupKernelNode(ast);
+      IxCode.IrClass node = (IxCode.IrClass) lookupKernelNode(ast);
       setContextClass(node);
       setSolver(findSolver(node.getName()));
       constructTypeHierarchy(node, new ArrayList());
@@ -511,16 +450,16 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(DelegationDeclaration ast, Void context) {
-      TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;  
-      if(!(type.isObjectType() && ((ObjectTypeRef)type).isInterface())){
+      if(!(type.isObjectType() && ((IxCode.ObjectTypeRef)type).isInterface())){
         report(INTERFACE_REQUIRED, ast.getType(), new Object[]{type});
         return null;
       }
-      IrClass contextClass = getContextClass();
+      IxCode.IrClass contextClass = getContextClass();
       int modifier = ast.getModifier() | getAccess() | Modifier.FORWARDED;
       String name = ast.getName();
-      IrField node = new IrField(modifier, contextClass, name, type);
+      IxCode.IrField node = new IxCode.IrField(modifier, contextClass, name, type);
       put(ast, node);
       contextClass.addField(node);
       return null;
@@ -528,53 +467,53 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(ConstructorDeclaration ast, Void context) {
       countConstructor++;
-      TypeRef[] args = acceptTypes(ast.getArguments());
-      IrClass contextClass = getContextClass();
+      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.IrClass contextClass = getContextClass();
       if(args == null) return null;
       int modifier = ast.getModifier() | getAccess();
-      IrConstructor node = new IrConstructor(modifier, contextClass, args, null, null);
+      IxCode.IrConstructor node = new IxCode.IrConstructor(modifier, contextClass, args, null, null);
       put(ast, node);
       contextClass.addConstructor(node);
       return null;
     }
 
     public Object visit(MethodDeclaration ast, Void context) {
-      TypeRef[] args = acceptTypes(ast.getArguments());
-      TypeRef returnType;
+      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
         returnType = resolve(ast.getReturnType());
       }else{
-        returnType = BasicTypeRef.VOID;
+        returnType = IxCode.BasicTypeRef.VOID;
       }
       if(args == null || returnType == null) return null;
       
-      IrClass contextClass = getContextClass();
+      IxCode.IrClass contextClass = getContextClass();
       int modifier = ast.getModifier() | getAccess();
       if(ast.getBlock() == null) modifier |= Modifier.ABSTRACT;
       String name = ast.getName();    
-      IrMethod node = new IrMethod(modifier, contextClass, name, args, returnType, null);     
+      IxCode.IrMethod node = new IxCode.IrMethod(modifier, contextClass, name, args, returnType, null);
       put(ast, node);
       contextClass.addMethod(node);
       return null;
     }
     
     public Object visit(FieldDeclaration ast, Void context) {
-      TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;
-      IrClass contextClass = getContextClass();
+      IxCode.IrClass contextClass = getContextClass();
       int modifier = ast.getModifier() | getAccess();
       String name = ast.getName();    
-      IrField node = new IrField(modifier, contextClass, name, type);
+      IxCode.IrField node = new IxCode.IrField(modifier, contextClass, name, type);
       put(ast, node);
       contextClass.addField(node);
       return node;
     }
     
-    private TypeRef[] acceptTypes(Argument[] ast){
-      TypeRef[] types = new TypeRef[ast.length];
+    private IxCode.TypeRef[] acceptTypes(Argument[] ast){
+      IxCode.TypeRef[] types = new IxCode.TypeRef[ast.length];
       boolean success = true;
       for (int i = 0; i < ast.length; i++) {
-        types[i] = (TypeRef) accept(ast[i]);
+        types[i] = (IxCode.TypeRef) accept(ast[i]);
         if(types[i] == null) success = false;
       }
       if(success){
@@ -585,69 +524,69 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(Argument ast, Void context){
-      TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = resolve(ast.getType());
       return type;
     }
     
-    private IrField createFieldNode(FieldDeclaration ast){
-      TypeRef type = resolve(ast.getType());
+    private IxCode.IrField createFieldNode(FieldDeclaration ast){
+      IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;
-      IrField node = new IrField(
+      IxCode.IrField node = new IxCode.IrField(
         ast.getModifier() | getAccess(), getContextClass(), 
         ast.getName(), type);
       return node;
     }
       
     public Object visit(InterfaceMethodDeclaration ast, Void context) {
-      TypeRef[] args = acceptTypes(ast.getArguments());
-      TypeRef returnType;
+      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
         returnType = resolve(ast.getReturnType());
       }else{
-        returnType = BasicTypeRef.VOID;
+        returnType = IxCode.BasicTypeRef.VOID;
       }
       if(args == null || returnType == null) return null;
       
       int modifier = Modifier.PUBLIC | Modifier.ABSTRACT;
-      IrClass classType = getContextClass();
+      IxCode.IrClass classType = getContextClass();
       String name = ast.getName();    
-      IrMethod node = 
-        new IrMethod(modifier, classType, name, args, returnType, null);
+      IxCode.IrMethod node =
+        new IxCode.IrMethod(modifier, classType, name, args, returnType, null);
       put(ast, node);
       classType.addMethod(node);
       return null;
     }
     
     public Object visit(FunctionDeclaration ast, Void context) {
-      TypeRef[] args = acceptTypes(ast.getArguments());
-      TypeRef returnType;
+      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
         returnType = resolve(ast.getReturnType());
       }else{
-        returnType = BasicTypeRef.VOID;
+        returnType = IxCode.BasicTypeRef.VOID;
       }
       if(args == null || returnType == null) return null;
       
-      IrClass classType = (IrClass) loadTopClass();
+      IxCode.IrClass classType = (IxCode.IrClass) loadTopClass();
       int modifier = ast.getModifier() | Modifier.PUBLIC;
       String name = ast.getName();
       
-      IrMethod node = 
-        new IrMethod(modifier, classType, name, args, returnType, null);
+      IxCode.IrMethod node =
+        new IxCode.IrMethod(modifier, classType, name, args, returnType, null);
       put(ast, node);
       classType.addMethod(node);
       return null;
     }
     
     public Object visit(GlobalVariableDeclaration ast, Void context) {
-      TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;
       
       int modifier = ast.getModifier() | Modifier.PUBLIC;
-      IrClass classType = (IrClass)loadTopClass();
+      IxCode.IrClass classType = (IxCode.IrClass)loadTopClass();
       String name = ast.getName();
       
-      IrField node = new IrField(modifier, classType, name, type);
+      IxCode.IrField node = new IxCode.IrField(modifier, classType, name, type);
       put(ast, node);
       classType.addField(node);
       return null;
@@ -664,11 +603,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return null;
     }
     
-    public boolean hasCyclicity(IrClass start){
+    public boolean hasCyclicity(IxCode.IrClass start){
       return hasCylicitySub(start, new HashSet());
     }
     
-    private boolean hasCylicitySub(ClassSymbol symbol, HashSet visit){
+    private boolean hasCylicitySub(IxCode.ClassSymbol symbol, HashSet visit){
       if(symbol == null) return false;
       if(visit.contains(symbol)){
         return true;      
@@ -677,7 +616,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(hasCylicitySub(symbol.getSuperClass(), (HashSet)visit.clone())){
         return true;      
       }
-      ClassSymbol[] interfaces = symbol.getInterfaces();
+      IxCode.ClassSymbol[] interfaces = symbol.getInterfaces();
       for (int i = 0; i < interfaces.length; i++) {
         if(hasCylicitySub(interfaces[i], (HashSet)visit.clone())){
           return true;        
@@ -686,13 +625,13 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return false;
     }
   
-    private void constructTypeHierarchy(ClassSymbol symbol, List visit) {
+    private void constructTypeHierarchy(IxCode.ClassSymbol symbol, List visit) {
       if(symbol == null || visit.indexOf(symbol) >= 0) return;
       visit.add(symbol);
-      if(symbol instanceof IrClass){
-        IrClass node = (IrClass) symbol;
+      if(symbol instanceof IxCode.IrClass){
+        IxCode.IrClass node = (IxCode.IrClass) symbol;
         if(node.isResolutionComplete()) return;
-        ClassSymbol superClass = null;
+        IxCode.ClassSymbol superClass = null;
         List interfaces = new ArrayList();
         NameResolution resolver = findSolver(node.getName());
         if(node.isInterface()){
@@ -700,7 +639,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           superClass = rootClass();
           TypeSpec[] typeSpecifiers = ast.getInterfaces();
           for(int i = 0; i < typeSpecifiers.length; i++){
-            ClassSymbol superType = validateSuperType(typeSpecifiers[i], true, resolver);
+            IxCode.ClassSymbol superType = validateSuperType(typeSpecifiers[i], true, resolver);
             if(superType != null){
               interfaces.add(superType);
             }
@@ -711,7 +650,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
             validateSuperType(ast.getSuperClass(), false, resolver);
           TypeSpec[] typeSpecifiers = ast.getInterfaces();
           for(int i = 0; i < typeSpecifiers.length; i++){
-            ClassSymbol superType = validateSuperType(typeSpecifiers[i], true, resolver);
+            IxCode.ClassSymbol superType = validateSuperType(typeSpecifiers[i], true, resolver);
             if(superType != null){
               interfaces.add(superType);
             }
@@ -719,36 +658,36 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
         constructTypeHierarchy(superClass, visit);
         for(Iterator i = interfaces.iterator(); i.hasNext();){
-          ClassSymbol superType = (ClassSymbol) i.next();
+          IxCode.ClassSymbol superType = (IxCode.ClassSymbol) i.next();
           constructTypeHierarchy(superType, visit);
         }
         node.setSuperClass(superClass);
-        node.setInterfaces((ClassSymbol[]) interfaces.toArray(new ClassSymbol[0]));
+        node.setInterfaces((IxCode.ClassSymbol[]) interfaces.toArray(new IxCode.ClassSymbol[0]));
         node.setResolutionComplete(true);
       }else{
         constructTypeHierarchy(symbol.getSuperClass(), visit);
-        ClassSymbol[] interfaces = symbol.getInterfaces();
+        IxCode.ClassSymbol[] interfaces = symbol.getInterfaces();
         for(int i = 0; i < interfaces.length; i++){
           constructTypeHierarchy(interfaces[i], visit);
         }
       }
     }
     
-    private ClassSymbol validateSuperType(
+    private IxCode.ClassSymbol validateSuperType(
       TypeSpec ast, boolean shouldInterface, NameResolution resolver){
       
-      ClassSymbol symbol = null;
+      IxCode.ClassSymbol symbol = null;
       if(ast == null){
         symbol = getTable().rootClass();
       }else{
-        symbol = (ClassSymbol) resolve(ast, resolver);
+        symbol = (IxCode.ClassSymbol) resolve(ast, resolver);
       }
       if(symbol == null) return null;
       boolean isInterface = symbol.isInterface();
       if(((!isInterface) && shouldInterface) || (isInterface && (!shouldInterface))){
         AstNode astNode = null;
-        if(symbol instanceof IrClass){
-          astNode = lookupAST((IrClass)symbol);
+        if(symbol instanceof IxCode.IrClass){
+          astNode = lookupAST((IxCode.IrClass)symbol);
         }
         report(ILLEGAL_INHERITANCE, astNode, new Object[]{symbol.getName()});
       }
@@ -768,11 +707,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     private Set functions;
     
     public DuplicationChecker() {
-      this.methods      = new TreeSet(new MethodSymbolComparator());
-      this.fields       = new TreeSet(new FieldSymbolComparator());
-      this.constructors = new TreeSet(new ConstructorSymbolComparator());
-      this.variables    = new TreeSet(new FieldSymbolComparator());
-      this.functions    = new TreeSet(new MethodSymbolComparator());
+      this.methods      = new TreeSet(new IxCode.MethodSymbolComparator());
+      this.fields       = new TreeSet(new IxCode.FieldSymbolComparator());
+      this.constructors = new TreeSet(new IxCode.ConstructorSymbolComparator());
+      this.variables    = new TreeSet(new IxCode.FieldSymbolComparator());
+      this.functions    = new TreeSet(new IxCode.MethodSymbolComparator());
     }
     
     public void process(CompilationUnit unit){
@@ -787,7 +726,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(ClassDeclaration ast, Void context) {
-      IrClass node = (IrClass) lookupKernelNode(ast);
+      IxCode.IrClass node = (IxCode.IrClass) lookupKernelNode(ast);
       if(node == null) return null;
       methods.clear();
       fields.clear();
@@ -806,21 +745,21 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     private void generateMethods(){
-      Set generated = new TreeSet(new MethodSymbolComparator());
-      Set methodSet = new TreeSet(new MethodSymbolComparator());
+      Set generated = new TreeSet(new IxCode.MethodSymbolComparator());
+      Set methodSet = new TreeSet(new IxCode.MethodSymbolComparator());
       for(Iterator i = fields.iterator(); i.hasNext();){
-        IrField node = (IrField)i.next();
+        IxCode.IrField node = (IxCode.IrField)i.next();
         if(Modifier.isForwarded(node.getModifier())){
           generateDelegationMethods(node ,generated, methodSet);
         }
       }
     }
     
-    private void generateDelegationMethods(IrField node, Set generated, Set methodSet){    
-      ClassSymbol type = (ClassSymbol) node.getType();
+    private void generateDelegationMethods(IxCode.IrField node, Set generated, Set methodSet){
+      IxCode.ClassSymbol type = (IxCode.ClassSymbol) node.getType();
       Set src = Classes.getInterfaceMethods(type);
       for (Iterator i = src.iterator(); i.hasNext();) {
-        MethodSymbol method = (MethodSymbol) i.next();
+        IxCode.MethodSymbol method = (IxCode.MethodSymbol) i.next();
         if(methodSet.contains(method)) continue;
         if(generated.contains(method)){
           report(
@@ -830,30 +769,30 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
             });
           continue;
         }
-        IrMethod generatedMethod = createEmptyMethod(node, method);
+        IxCode.IrMethod generatedMethod = createEmptyMethod(node, method);
         generated.add(generatedMethod);
         getContextClass().addMethod(generatedMethod);
       }
     }
     
-    private IrMethod createEmptyMethod(FieldSymbol field, MethodSymbol method){
-      IrExpression target;
-      target = new IrFieldRef(new IrThis(getContextClass()), field);
-      TypeRef[] args = method.getArguments();
-      IrExpression[] params = new IrExpression[args.length];
+    private IxCode.IrMethod createEmptyMethod(IxCode.FieldSymbol field, IxCode.MethodSymbol method){
+      IxCode.IrExpression target;
+      target = new IxCode.IrFieldRef(new IxCode.IrThis(getContextClass()), field);
+      IxCode.TypeRef[] args = method.getArguments();
+      IxCode.IrExpression[] params = new IxCode.IrExpression[args.length];
       LocalFrame frame = new LocalFrame(null);
       for(int i = 0; i < params.length; i++){
         int index = frame.addEntry("arg" + i, args[i]);
-        params[i] = new IrLocalRef(new ClosureLocalBinding(0, index, args[i]));
+        params[i] = new IxCode.IrLocalRef(new ClosureLocalBinding(0, index, args[i]));
       }
-      target = new IrCall(target, method, params);
-      IrBlock statement;
-      if(method.getReturnType() != BasicTypeRef.VOID){
-        statement = new IrBlock(new IrReturn(target));
+      target = new IxCode.IrCall(target, method, params);
+      IxCode.IrBlock statement;
+      if(method.getReturnType() != IxCode.BasicTypeRef.VOID){
+        statement = new IxCode.IrBlock(new IxCode.IrReturn(target));
       }else{
-        statement = new IrBlock(new IrExpStmt(target), new IrReturn(null));
+        statement = new IxCode.IrBlock(new IxCode.IrExpStmt(target), new IxCode.IrReturn(null));
       }
-      IrMethod node = new IrMethod(
+      IxCode.IrMethod node = new IxCode.IrMethod(
         Modifier.PUBLIC, getContextClass(), method.getName(),
         method.getArguments(), method.getReturnType(), statement
       );
@@ -862,7 +801,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
       
     public Object visit(InterfaceDeclaration ast, Void context) {
-      IrClass node = (IrClass) lookupKernelNode(ast);
+      IxCode.IrClass node = (IxCode.IrClass) lookupKernelNode(ast);
       if(node == null) return null;
       methods.clear();
       fields.clear();
@@ -877,11 +816,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(ConstructorDeclaration ast, Void context) {
-      IrConstructor node = (IrConstructor) lookupKernelNode(ast);
+      IxCode.IrConstructor node = (IxCode.IrConstructor) lookupKernelNode(ast);
       if(node == null) return null;
       if(constructors.contains(node)){
-        ClassSymbol classType = node.getClassType();
-        TypeRef[] args = node.getArgs();
+        IxCode.ClassSymbol classType = node.getClassType();
+        IxCode.TypeRef[] args = node.getArgs();
         report(DUPLICATE_CONSTRUCTOR, ast, new Object[]{classType, args});
       }else{
         constructors.add(node);
@@ -890,10 +829,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(DelegationDeclaration ast, Void context) {
-      IrField node = (IrField) lookupKernelNode(ast);    
+      IxCode.IrField node = (IxCode.IrField) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        ClassSymbol classType = node.getClassType();
+        IxCode.ClassSymbol classType = node.getClassType();
         String name = node.getName();
         report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
       }else{
@@ -903,12 +842,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(MethodDeclaration ast, Void context) {
-      IrMethod node = (IrMethod) lookupKernelNode(ast);
+      IxCode.IrMethod node = (IxCode.IrMethod) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        ClassSymbol classType = node.getClassType();
+        IxCode.ClassSymbol classType = node.getClassType();
         String name = node.getName();
-        TypeRef[] args = node.getArguments();
+        IxCode.TypeRef[] args = node.getArguments();
         report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
       }else{
         methods.add(node);
@@ -917,10 +856,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(FieldDeclaration ast, Void context) {
-      IrField node = (IrField) lookupKernelNode(ast);
+      IxCode.IrField node = (IxCode.IrField) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        ClassSymbol classType = node.getClassType();
+        IxCode.ClassSymbol classType = node.getClassType();
         String name = node.getName();
         report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
       }else{
@@ -930,12 +869,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(InterfaceMethodDeclaration ast, Void context) {
-      IrMethod node = (IrMethod) lookupKernelNode(ast);
+      IxCode.IrMethod node = (IxCode.IrMethod) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        ClassSymbol classType = node.getClassType();
+        IxCode.ClassSymbol classType = node.getClassType();
         String name = node.getName();
-        TypeRef[] args = node.getArguments();
+        IxCode.TypeRef[] args = node.getArguments();
         report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
       }else{
         methods.add(node);
@@ -944,11 +883,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(FunctionDeclaration ast, Void context) {
-      IrMethod node = (IrMethod) lookupKernelNode(ast);
+      IxCode.IrMethod node = (IxCode.IrMethod) lookupKernelNode(ast);
       if(node == null) return null;
       if(functions.contains(node)){
         String name = node.getName();
-        TypeRef[] args = node.getArguments();
+        IxCode.TypeRef[] args = node.getArguments();
         report(DUPLICATE_FUNCTION, ast, new Object[]{name, args});
       }else{
         functions.add(node);
@@ -957,7 +896,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(GlobalVariableDeclaration ast, Void context) {
-      IrField node = (IrField) lookupKernelNode(ast);
+      IxCode.IrField node = (IxCode.IrField) lookupKernelNode(ast);
       if(node == null) return null;
       if(variables.contains(node)){
         String name = node.getName();
@@ -983,7 +922,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
   }
   
   private class TypeChecker extends ASTVisitor<LocalContext> 
-  implements IrBinExp.Constants, IrUnaryExp.Constants {
+  implements IxCode.IrBinExp.Constants, IxCode.IrUnaryExp.Constants {
     public TypeChecker(){
     }
     
@@ -999,12 +938,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       List statements = new ArrayList();
       String className = topClass();
       setSolver(findSolver(className));
-      IrClass klass = (IrClass) loadTopClass();
-      ArraySymbol argsType = loadArray(load("java.lang.String"), 1);
+      IxCode.IrClass klass = (IxCode.IrClass) loadTopClass();
+      IxCode.ArraySymbol argsType = loadArray(load("java.lang.String"), 1);
       
-      IrMethod method = new IrMethod(
+      IxCode.IrMethod method = new IxCode.IrMethod(
         Modifier.PUBLIC, klass, 
-        "start", new TypeRef[]{argsType}, BasicTypeRef.VOID, null
+        "start", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID, null
       );
       context.addEntry("args", argsType);
       for(int i = 0; i < toplevels.length; i++){
@@ -1014,7 +953,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
         if(element instanceof Statement){
           context.setMethod(method);
-          IrStatement statement = (IrStatement) accept(toplevels[i], context);
+          IxCode.IrStatement statement = (IxCode.IrStatement) accept(toplevels[i], context);
           statements.add(statement);
         }else{
           accept(toplevels[i], null);
@@ -1022,41 +961,41 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }    
       
       if(klass != null){
-        statements.add(new IrReturn(null));
-        method.setBlock(new IrBlock(statements));
+        statements.add(new IxCode.IrReturn(null));
+        method.setBlock(new IxCode.IrBlock(statements));
         method.setFrame(context.getContextFrame());
         klass.addMethod(method);      
-        klass.addMethod(mainMethod(klass, method, "main", new TypeRef[]{argsType}, BasicTypeRef.VOID));
+        klass.addMethod(mainMethod(klass, method, "main", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID));
       }
       return null;
     }
     
-    private IrMethod mainMethod(ClassSymbol top, MethodSymbol ref, String name, TypeRef[] args, TypeRef ret) {
-      IrMethod method = new IrMethod(
+    private IxCode.IrMethod mainMethod(IxCode.ClassSymbol top, IxCode.MethodSymbol ref, String name, IxCode.TypeRef[] args, IxCode.TypeRef ret) {
+      IxCode.IrMethod method = new IxCode.IrMethod(
         Modifier.STATIC | Modifier.PUBLIC, top, name, args, ret, null);
       LocalFrame frame = new LocalFrame(null);
-      IrExpression[] params = new IrExpression[args.length];
+      IxCode.IrExpression[] params = new IxCode.IrExpression[args.length];
       for(int i = 0; i < args.length; i++){
         int index = frame.addEntry("args" + i, args[i]);
-        params[i] = new IrLocalRef(0, index, args[i]);
+        params[i] = new IxCode.IrLocalRef(0, index, args[i]);
       }
       method.setFrame(frame);
-      ConstructorSymbol c = top.findConstructor(new IrExpression[0])[0];
-      IrExpression exp = new IrNew(c, new IrExpression[0]);
-      exp = new IrCall(exp, ref, params);
-      IrBlock block = new IrBlock(new IrExpStmt(exp));
-      block = addReturnNode(block, BasicTypeRef.VOID);
+      IxCode.ConstructorSymbol c = top.findConstructor(new IxCode.IrExpression[0])[0];
+      IxCode.IrExpression exp = new IxCode.IrNew(c, new IxCode.IrExpression[0]);
+      exp = new IxCode.IrCall(exp, ref, params);
+      IxCode.IrBlock block = new IxCode.IrBlock(new IxCode.IrExpStmt(exp));
+      block = addReturnNode(block, IxCode.BasicTypeRef.VOID);
       method.setBlock(block);
       return method;
     }
     
     public Object visit(InterfaceDeclaration ast, LocalContext context) {
-      setContextClass((IrClass) lookupKernelNode(ast));
+      setContextClass((IxCode.IrClass) lookupKernelNode(ast));
       return null;
     }
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
-      setContextClass((IrClass) lookupKernelNode(ast));
+      setContextClass((IxCode.IrClass) lookupKernelNode(ast));
       setSolver(findSolver(getContextClass().getName()));
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
@@ -1074,14 +1013,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
   //------------------------- binary expressions ----------------------------------//
     public Object visit(Addition ast, LocalContext context) {
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       if(left.isBasicType() && right.isBasicType()){
         return checkNumExp(ADD, ast, left, right, context);
       }
       if(left.isBasicType()){
-        if(left.type() == BasicTypeRef.VOID){
+        if(left.type() == IxCode.BasicTypeRef.VOID){
           report(IS_NOT_BOXABLE_TYPE, ast.getLeft(), new Object[]{left.type()});
           return null;
         }else{
@@ -1089,47 +1028,47 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
       }
       if(right.isBasicType()){
-        if(right.type() == BasicTypeRef.VOID){
+        if(right.type() == IxCode.BasicTypeRef.VOID){
           report(IS_NOT_BOXABLE_TYPE, ast.getRight(), new Object[]{right.type()});
           return null;
         }else{
           right = Boxing.boxing(getTable(), right);
         }
       }
-      MethodSymbol toString;
-      toString = findMethod(ast.getLeft(), (ObjectTypeRef)left.type(), "toString");
-      left = new IrCall(left, toString, new IrExpression[0]);
-      toString = findMethod(ast.getRight(), (ObjectTypeRef)right.type(), "toString");
-      right = new IrCall(right, toString, new IrExpression[0]);
-      MethodSymbol concat =
-        findMethod(ast, (ObjectTypeRef)left.type(), "concat", new IrExpression[]{right});
-      return new IrCall(left, concat, new IrExpression[]{right});
+      IxCode.MethodSymbol toString;
+      toString = findMethod(ast.getLeft(), (IxCode.ObjectTypeRef)left.type(), "toString");
+      left = new IxCode.IrCall(left, toString, new IxCode.IrExpression[0]);
+      toString = findMethod(ast.getRight(), (IxCode.ObjectTypeRef)right.type(), "toString");
+      right = new IxCode.IrCall(right, toString, new IxCode.IrExpression[0]);
+      IxCode.MethodSymbol concat =
+        findMethod(ast, (IxCode.ObjectTypeRef)left.type(), "concat", new IxCode.IrExpression[]{right});
+      return new IxCode.IrCall(left, concat, new IxCode.IrExpression[]{right});
     }
     
     public Object visit(PostIncrement node, LocalContext context) {
       LocalContext local = (LocalContext)context;
       Expression operand = node.getTarget();
-      IrExpression irOperand = typeCheck(operand, context);
+      IxCode.IrExpression irOperand = typeCheck(operand, context);
       if(irOperand == null) return null;
       if((!irOperand.isBasicType()) || !hasNumericType(irOperand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new TypeRef[]{irOperand.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{irOperand.type()}});
         return null;
       }
       int varIndex = local.addEntry(local.newName(), irOperand.type());
-      IrExpression result = null;
-      if(irOperand instanceof IrLocalRef){
-        IrLocalRef ref = (IrLocalRef)irOperand;
-        result = new IrBegin(
-          new IrLocalSet(0, varIndex, irOperand.type(), irOperand),
-          new IrLocalSet(
+      IxCode.IrExpression result = null;
+      if(irOperand instanceof IxCode.IrLocalRef){
+        IxCode.IrLocalRef ref = (IxCode.IrLocalRef)irOperand;
+        result = new IxCode.IrBegin(
+          new IxCode.IrLocalSet(0, varIndex, irOperand.type(), irOperand),
+          new IxCode.IrLocalSet(
             ref.frame(), ref.index(), ref.type(),
-            new IrBinExp(
+            new IxCode.IrBinExp(
               ADD, irOperand.type(), 
-              new IrLocalRef(0, varIndex, irOperand.type()), 
-              new IrInt(1)
+              new IxCode.IrLocalRef(0, varIndex, irOperand.type()),
+              new IxCode.IrInt(1)
             )
           ),
-          new IrLocalRef(0, varIndex, irOperand.type())
+          new IxCode.IrLocalRef(0, varIndex, irOperand.type())
         );
       }else{
         report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
@@ -1140,27 +1079,27 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     public Object visit(PostDecrement node, LocalContext context) {
       LocalContext local = (LocalContext)context;
       Expression operand = node.getTarget();
-      IrExpression irOperand = typeCheck(operand, context);
+      IxCode.IrExpression irOperand = typeCheck(operand, context);
       if(irOperand == null) return null;
       if((!irOperand.isBasicType()) || !hasNumericType(irOperand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new TypeRef[]{irOperand.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{irOperand.type()}});
         return null;
       }
       int varIndex = local.addEntry(local.newName(), irOperand.type());
-      IrExpression result = null;
-      if(irOperand instanceof IrLocalRef){
-        IrLocalRef ref = (IrLocalRef)irOperand;
-        result = new IrBegin(
-          new IrLocalSet(0, varIndex, irOperand.type(), irOperand),
-          new IrLocalSet(
+      IxCode.IrExpression result = null;
+      if(irOperand instanceof IxCode.IrLocalRef){
+        IxCode.IrLocalRef ref = (IxCode.IrLocalRef)irOperand;
+        result = new IxCode.IrBegin(
+          new IxCode.IrLocalSet(0, varIndex, irOperand.type(), irOperand),
+          new IxCode.IrLocalSet(
             ref.frame(), ref.index(), ref.type(),
-            new IrBinExp(
+            new IxCode.IrBinExp(
               SUBTRACT, irOperand.type(), 
-              new IrLocalRef(0, varIndex, irOperand.type()), 
-              new IrInt(1)
+              new IxCode.IrLocalRef(0, varIndex, irOperand.type()),
+              new IxCode.IrInt(1)
             )
           ),
-          new IrLocalRef(0, varIndex, irOperand.type())
+          new IxCode.IrLocalRef(0, varIndex, irOperand.type())
         );
       }else{
         report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
@@ -1170,41 +1109,41 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     @Override
     public Object visit(Elvis ast, LocalContext context) {
-      IrExpression l = typeCheck(ast.getLeft(), context);
-      IrExpression r = typeCheck(ast.getRight(), context);
-      if(l.isBasicType() || r.isBasicType() || !TypeRules.isAssignable(l.type(), r.type())) {
+      IxCode.IrExpression l = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression r = typeCheck(ast.getRight(), context);
+      if(l.isBasicType() || r.isBasicType() || !IxCode.TypeRules.isAssignable(l.type(), r.type())) {
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{l.type(), r.type()}});       
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{l.type(), r.type()}});
         return null;
       }
-      return new IrBinExp(ELVIS, l.type(), l, r);
+      return new IxCode.IrBinExp(ELVIS, l.type(), l, r);
     }
     
     public Object visit(Subtraction ast, LocalContext context) {
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       return checkNumExp(SUBTRACT, ast, left, right, context);
     }
     
     public Object visit(Multiplication ast, LocalContext context) {
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       return checkNumExp(MULTIPLY,  ast, left, right, context);
     }
     
     public Object visit(Division ast, LocalContext context) {
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       return checkNumExp(DIVIDE, ast, left, right, context);
     }
     
     public Object visit(Modulo ast, LocalContext context) {
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       return checkNumExp(MOD, ast, left, right, context);
     }
@@ -1230,46 +1169,46 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(LessOrEqual ast, LocalContext context) {
-      IrExpression[] ops = processComparableExpression(ast, context);
+      IxCode.IrExpression[] ops = processComparableExpression(ast, context);
       if(ops == null){
         return null;
       }
-      return new IrBinExp(LESS_OR_EQUAL, BasicTypeRef.BOOLEAN, ops[0], ops[1]);
+      return new IxCode.IrBinExp(LESS_OR_EQUAL, IxCode.BasicTypeRef.BOOLEAN, ops[0], ops[1]);
     }
     
     public Object visit(LessThan ast, LocalContext context) {
-      IrExpression[] ops = processComparableExpression(ast, context);
+      IxCode.IrExpression[] ops = processComparableExpression(ast, context);
       if(ops == null) return null;
-      return new IrBinExp(
-        LESS_THAN, BasicTypeRef.BOOLEAN, ops[0], ops[1]);
+      return new IxCode.IrBinExp(
+        LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ops[0], ops[1]);
     }
     
     public Object visit(GreaterOrEqual ast, LocalContext context) {
-      IrExpression[] ops = processComparableExpression(ast, context);
+      IxCode.IrExpression[] ops = processComparableExpression(ast, context);
       if(ops == null) return null;    
-      return new IrBinExp(
-        GREATER_OR_EQUAL, BasicTypeRef.BOOLEAN, ops[0], ops[1]);
+      return new IxCode.IrBinExp(
+        GREATER_OR_EQUAL, IxCode.BasicTypeRef.BOOLEAN, ops[0], ops[1]);
     }
     
     public Object visit(GreaterThan ast, LocalContext context) {
-      IrExpression[] ops = processComparableExpression(ast, context);
+      IxCode.IrExpression[] ops = processComparableExpression(ast, context);
       if(ops == null) return null;
-      return new IrBinExp(
-        GREATER_THAN, BasicTypeRef.BOOLEAN, ops[0], ops[1]);
+      return new IxCode.IrBinExp(
+        GREATER_THAN, IxCode.BasicTypeRef.BOOLEAN, ops[0], ops[1]);
     }
     
     public Object visit(LogicalAnd ast, LocalContext context) {
-      IrExpression[] ops = processLogicalExpression(ast, context);
+      IxCode.IrExpression[] ops = processLogicalExpression(ast, context);
       if(ops == null) return null;
-      return new IrBinExp(
-        LOGICAL_AND, BasicTypeRef.BOOLEAN, ops[0], ops[1]);
+      return new IxCode.IrBinExp(
+        LOGICAL_AND, IxCode.BasicTypeRef.BOOLEAN, ops[0], ops[1]);
     }
     
     public Object visit(LogicalOr ast, LocalContext context) {
-      IrExpression[] ops = processLogicalExpression(ast, context);
+      IxCode.IrExpression[] ops = processLogicalExpression(ast, context);
       if(ops == null) return null;
-      return new IrBinExp(
-        LOGICAL_OR, BasicTypeRef.BOOLEAN, ops[0], ops[1]);
+      return new IxCode.IrBinExp(
+        LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, ops[0], ops[1]);
     }
     
     public Object visit(LogicalRightShift ast, LocalContext context) {
@@ -1292,224 +1231,224 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return checkBitExp(BIT_AND, expression, context);
     }
     
-    IrExpression[] processLogicalExpression(BinaryExpression ast, LocalContext context){
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+    IxCode.IrExpression[] processLogicalExpression(BinaryExpression ast, LocalContext context){
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      TypeRef leftType = left.type(), rightType = right.type();
-      if((leftType != BasicTypeRef.BOOLEAN) || (rightType != BasicTypeRef.BOOLEAN)){
+      IxCode.TypeRef leftType = left.type(), rightType = right.type();
+      if((leftType != IxCode.BasicTypeRef.BOOLEAN) || (rightType != IxCode.BasicTypeRef.BOOLEAN)){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{left.type(), right.type()}});
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
         return null;
       }
-      return new IrExpression[]{left, right};
+      return new IxCode.IrExpression[]{left, right};
     }
     
-    IrExpression processShiftExpression(
+    IxCode.IrExpression processShiftExpression(
       int kind, BinaryExpression ast, LocalContext context){
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       if(!left.type().isBasicType()){
-        IrExpression[] params = new IrExpression[]{right};
-        Pair<Boolean, MethodSymbol> result = tryFindMethod(ast, (ObjectTypeRef)left.type(), "add", params);
+        IxCode.IrExpression[] params = new IxCode.IrExpression[]{right};
+        Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)left.type(), "add", params);
         if(result._2 == null){
           report(METHOD_NOT_FOUND, ast, new Object[]{left.type(), "add", types(params)});
           return null;
         }
-        return new IrCall(left, result._2, params);
+        return new IxCode.IrCall(left, result._2, params);
       }
       if(!right.type().isBasicType()){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{left.type(), right.type()}});
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
         return null;
       }
-      BasicTypeRef leftType = (BasicTypeRef)left.type();
-      BasicTypeRef rightType = (BasicTypeRef)right.type();
+      IxCode.BasicTypeRef leftType = (IxCode.BasicTypeRef)left.type();
+      IxCode.BasicTypeRef rightType = (IxCode.BasicTypeRef)right.type();
       if((!leftType.isInteger()) || (!rightType.isInteger())){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{left.type(), right.type()}});
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
         return null;
       }
-      TypeRef leftResultType = promoteInteger(leftType);
+      IxCode.TypeRef leftResultType = promoteInteger(leftType);
       if(leftResultType != leftType){
-        left = new IrCast(left, leftResultType);
+        left = new IxCode.IrCast(left, leftResultType);
       }
-      if(rightType != BasicTypeRef.INT){
-        right = new IrCast(right, BasicTypeRef.INT);
+      if(rightType != IxCode.BasicTypeRef.INT){
+        right = new IxCode.IrCast(right, IxCode.BasicTypeRef.INT);
       }
-      return new IrBinExp(kind, BasicTypeRef.BOOLEAN, left, right);
+      return new IxCode.IrBinExp(kind, IxCode.BasicTypeRef.BOOLEAN, left, right);
     }
     
-    TypeRef promoteInteger(TypeRef type){
-      if(type == BasicTypeRef.BYTE || type == BasicTypeRef.SHORT ||
-         type == BasicTypeRef.CHAR || type == BasicTypeRef.INT){
-        return BasicTypeRef.INT;
+    IxCode.TypeRef promoteInteger(IxCode.TypeRef type){
+      if(type == IxCode.BasicTypeRef.BYTE || type == IxCode.BasicTypeRef.SHORT ||
+         type == IxCode.BasicTypeRef.CHAR || type == IxCode.BasicTypeRef.INT){
+        return IxCode.BasicTypeRef.INT;
       }
-      if(type == BasicTypeRef.LONG){
-        return BasicTypeRef.LONG;
+      if(type == IxCode.BasicTypeRef.LONG){
+        return IxCode.BasicTypeRef.LONG;
       }
       return null;
     }  
       
-    IrExpression checkBitExp(int kind, BinaryExpression ast, LocalContext context){
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+    IxCode.IrExpression checkBitExp(int kind, BinaryExpression ast, LocalContext context){
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       if((!left.isBasicType()) || (!right.isBasicType())){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{left.type(), right.type()}});
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
         return null;
       }
-      BasicTypeRef leftType = (BasicTypeRef)left.type();
-      BasicTypeRef rightType = (BasicTypeRef)right.type();
-      TypeRef resultType = null;
+      IxCode.BasicTypeRef leftType = (IxCode.BasicTypeRef)left.type();
+      IxCode.BasicTypeRef rightType = (IxCode.BasicTypeRef)right.type();
+      IxCode.TypeRef resultType = null;
       if(leftType.isInteger() && rightType.isInteger()){
         resultType = promote(leftType, rightType);    
       }else if(leftType.isBoolean() && rightType.isBoolean()){
-        resultType = BasicTypeRef.BOOLEAN;
+        resultType = IxCode.BasicTypeRef.BOOLEAN;
       }else{
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new TypeRef[]{leftType, rightType}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}});
         return null;
       }
       if(left.type() != resultType){
-        left = new IrCast(left, resultType);
+        left = new IxCode.IrCast(left, resultType);
       }
       if(right.type() != resultType){
-        right = new IrCast(right, resultType);
+        right = new IxCode.IrCast(right, resultType);
       }
-      return new IrBinExp(kind, resultType, left, right);
+      return new IxCode.IrBinExp(kind, resultType, left, right);
     }
     
-    IrExpression checkNumExp(int kind, BinaryExpression ast, IrExpression left, IrExpression right, LocalContext context) {
+    IxCode.IrExpression checkNumExp(int kind, BinaryExpression ast, IxCode.IrExpression left, IxCode.IrExpression right, LocalContext context) {
       if((!hasNumericType(left)) || (!hasNumericType(right))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
         return null;
       }
-      TypeRef resultType = promote(left.type(), right.type());
+      IxCode.TypeRef resultType = promote(left.type(), right.type());
       if(left.type() != resultType){
-        left = new IrCast(left, resultType);
+        left = new IxCode.IrCast(left, resultType);
       }
       if(right.type() != resultType){
-        right = new IrCast(right, resultType);
+        right = new IxCode.IrCast(right, resultType);
       }
-      return new IrBinExp(kind, resultType, left, right);
+      return new IxCode.IrBinExp(kind, resultType, left, right);
     }
     
-    IrExpression checkRefEqualsExp(int kind, BinaryExpression ast, LocalContext context){
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+    IxCode.IrExpression checkRefEqualsExp(int kind, BinaryExpression ast, LocalContext context){
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      TypeRef leftType = left.type();
-      TypeRef rightType = right.type();
+      IxCode.TypeRef leftType = left.type();
+      IxCode.TypeRef rightType = right.type();
       if(
         (left.isBasicType() && (!right.isBasicType())) ||
         ((!left.isBasicType()) && (right.isBasicType()))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new TypeRef[]{leftType, rightType}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}});
         return null;
       }
       if(left.isBasicType() && right.isBasicType()){
         if(hasNumericType(left) && hasNumericType(right)){
-          TypeRef resultType = promote(leftType, rightType);
+          IxCode.TypeRef resultType = promote(leftType, rightType);
           if(resultType != left.type()){
-            left = new IrCast(left, resultType);
+            left = new IxCode.IrCast(left, resultType);
           }
           if(resultType != right.type()){
-            right = new IrCast(right, resultType);
+            right = new IxCode.IrCast(right, resultType);
           }
-        }else if(leftType != BasicTypeRef.BOOLEAN || rightType != BasicTypeRef.BOOLEAN){
-          report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new TypeRef[]{leftType, rightType}});
+        }else if(leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN){
+          report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}});
           return null;
         }
       }
-      return new IrBinExp(kind, BasicTypeRef.BOOLEAN, left, right);
+      return new IxCode.IrBinExp(kind, IxCode.BasicTypeRef.BOOLEAN, left, right);
     }
     
-    IrExpression checkEqualExp(int kind, BinaryExpression ast, LocalContext context){
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+    IxCode.IrExpression checkEqualExp(int kind, BinaryExpression ast, LocalContext context){
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      TypeRef leftType = left.type(), rightType = right.type();
+      IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if(
         (left.isBasicType() && (!right.isBasicType())) ||
         ((!left.isBasicType()) && (right.isBasicType()))
       ){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{leftType, rightType}}
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}}
         );
         return null;
       }
       if(left.isBasicType() && right.isBasicType()){      
         if(hasNumericType(left) && hasNumericType(right)){
-          TypeRef resultType = promote(leftType, rightType);
+          IxCode.TypeRef resultType = promote(leftType, rightType);
           if(resultType != left.type()){
-            left = new IrCast(left, resultType);
+            left = new IxCode.IrCast(left, resultType);
           }
           if(resultType != right.type()){
-            right = new IrCast(right, resultType);
+            right = new IxCode.IrCast(right, resultType);
           }
-        }else if(leftType != BasicTypeRef.BOOLEAN || rightType != BasicTypeRef.BOOLEAN){
+        }else if(leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN){
           report(
             INCOMPATIBLE_OPERAND_TYPE, ast,
-            new Object[]{ast.getSymbol(), new TypeRef[]{leftType, rightType}}
+            new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}}
           );
           return null;
         }
       }else if(left.isReferenceType() && right.isReferenceType()){
         return createEquals(kind, left, right);
       }
-      return new IrBinExp(kind, BasicTypeRef.BOOLEAN, left, right);
+      return new IxCode.IrBinExp(kind, IxCode.BasicTypeRef.BOOLEAN, left, right);
     }
     
-    IrExpression createEquals(int kind, IrExpression left, IrExpression right){
-      right = new IrCast(right, rootClass());
-      IrExpression[] params = {right};
-      ObjectTypeRef target = (ObjectTypeRef) left.type();
-      MethodSymbol[] methods = target.findMethod("equals", params);
-      IrExpression node = new IrCall(left, methods[0], params);
-      if(kind == IrBinExp.Constants.NOT_EQUAL){
-        node = new IrUnaryExp(NOT, BasicTypeRef.BOOLEAN, node);
+    IxCode.IrExpression createEquals(int kind, IxCode.IrExpression left, IxCode.IrExpression right){
+      right = new IxCode.IrCast(right, rootClass());
+      IxCode.IrExpression[] params = {right};
+      IxCode.ObjectTypeRef target = (IxCode.ObjectTypeRef) left.type();
+      IxCode.MethodSymbol[] methods = target.findMethod("equals", params);
+      IxCode.IrExpression node = new IxCode.IrCall(left, methods[0], params);
+      if(kind == IxCode.IrBinExp.Constants.NOT_EQUAL){
+        node = new IxCode.IrUnaryExp(NOT, IxCode.BasicTypeRef.BOOLEAN, node);
       }
       return node;
     }
     
-    IrExpression[] processComparableExpression(BinaryExpression ast, LocalContext context) {
-      IrExpression left = typeCheck(ast.getLeft(), context);
-      IrExpression right = typeCheck(ast.getRight(), context);
+    IxCode.IrExpression[] processComparableExpression(BinaryExpression ast, LocalContext context) {
+      IxCode.IrExpression left = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      TypeRef leftType = left.type(), rightType = right.type();
+      IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if((!numeric(left.type())) || (!numeric(right.type()))){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new TypeRef[]{left.type(), right.type()}});
+          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
         return null;
       }
-      TypeRef resultType = promote(leftType, rightType);
+      IxCode.TypeRef resultType = promote(leftType, rightType);
       if(leftType != resultType){
-        left = new IrCast(left, resultType);
+        left = new IxCode.IrCast(left, resultType);
       }
       if(rightType != resultType){
-        right = new IrCast(right, resultType);
+        right = new IxCode.IrCast(right, resultType);
       }
-      return new IrExpression[]{left, right};
+      return new IxCode.IrExpression[]{left, right};
     }
   //-------------------------------------------------------------------------------//  
   //------------------------- literals --------------------------------------------//
     public Object visit(FloatLiteral ast, LocalContext context) {
-      return new IrFloat(ast.getValue());
+      return new IxCode.IrFloat(ast.getValue());
     }
     
     public Object visit(SuperMethodCall ast, LocalContext context) {
-      IrExpression[] params;    
+      IxCode.IrExpression[] params;
       params = typeCheckExps(ast.getParams(), context);
       if(params == null) return null;
-      ClassSymbol contextClass = getContextClass();
-      Pair<Boolean, MethodSymbol> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
+      IxCode.ClassSymbol contextClass = getContextClass();
+      Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
       if(result._2 == null){
         if(result._1){
           report(
@@ -1518,85 +1457,85 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
         return null;
       }
-      return new IrCallSuper(new IrThis(contextClass), result._2, params);
+      return new IxCode.IrCallSuper(new IxCode.IrThis(contextClass), result._2, params);
     }
     
     public Object visit(DoubleLiteral ast, LocalContext context) {
-      return new IrDouble(ast.getValue());
+      return new IxCode.IrDouble(ast.getValue());
     }
     
     public Object visit(IntegerLiteral node, LocalContext context) {
-      return new IrInt(node.getValue());
+      return new IxCode.IrInt(node.getValue());
     }
     
     public Object visit(CharacterLiteral node, LocalContext context) {
-      return new IrChar(node.getValue());
+      return new IxCode.IrChar(node.getValue());
     }
     
     public Object visit(LongLiteral ast, LocalContext context) {
-      return new IrLong(ast.getValue());
+      return new IxCode.IrLong(ast.getValue());
     }
     
     public Object visit(BooleanLiteral ast, LocalContext context) {
-      return new IrBool(ast.getValue());
+      return new IxCode.IrBool(ast.getValue());
     }
     
     public Object visit(ListLiteral ast, LocalContext context) {
-      IrExpression[] elements = new IrExpression[ast.size()];
+      IxCode.IrExpression[] elements = new IxCode.IrExpression[ast.size()];
       for(int i = 0; i < ast.size(); i++){
         elements[i] = typeCheck(ast.getExpression(i), context);
       }
-      IrList node = new IrList(elements, load("java.util.List"));
+      IxCode.IrList node = new IxCode.IrList(elements, load("java.util.List"));
       return node;
     }
     
     public Object visit(StringLiteral ast, LocalContext context) {
-      return new IrString(ast.getValue(), load("java.lang.String"));
+      return new IxCode.IrString(ast.getValue(), load("java.lang.String"));
     }  
     
     public Object visit(NullLiteral ast, LocalContext context) {
-      return new IrNull();
+      return new IxCode.IrNull();
     }
   //-----------------------------------------------------------------------------//
     
   //---------------------------- unary expressions ------------------------------//
     public Object visit(Posit ast, LocalContext context) {
-      IrExpression node = typeCheck(ast.getTarget(), context);
+      IxCode.IrExpression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
       if(!hasNumericType(node)){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast, 
-          new Object[]{"+", new TypeRef[]{node.type()}});
+          new Object[]{"+", new IxCode.TypeRef[]{node.type()}});
         return null;
       }
-      node = new IrUnaryExp(PLUS, node.type(), node);
+      node = new IxCode.IrUnaryExp(PLUS, node.type(), node);
       return node;
     }
     
     public Object visit(Negate ast, LocalContext context) {
-      IrExpression node = typeCheck(ast.getTarget(), context);
+      IxCode.IrExpression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
       if(!hasNumericType(node)){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{"-", new TypeRef[]{node.type()}}
+          new Object[]{"-", new IxCode.TypeRef[]{node.type()}}
         );
         return null;
       }
-      node = new IrUnaryExp(MINUS, node.type(), node);
+      node = new IxCode.IrUnaryExp(MINUS, node.type(), node);
       return node;
     }
     
     public Object visit(Not ast, LocalContext context) {
-      IrExpression node = typeCheck(ast.getTarget(), context);
+      IxCode.IrExpression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
-      if(node.type() != BasicTypeRef.BOOLEAN){
+      if(node.type() != IxCode.BasicTypeRef.BOOLEAN){
         report(
           INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{"!", new TypeRef[]{node.type()}});
+          new Object[]{"!", new IxCode.TypeRef[]{node.type()}});
         return null;
       }
-      node = new IrUnaryExp(NOT, BasicTypeRef.BOOLEAN, node);
+      node = new IxCode.IrUnaryExp(NOT, IxCode.BasicTypeRef.BOOLEAN, node);
       return node;
     }
   //-----------------------------------------------------------------------------//
@@ -1616,14 +1555,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return null;
     }
     
-    private IrExpression processLocalAssign(Assignment ast, LocalContext context){
-      IrExpression value = typeCheck(ast.getRight(), context);
+    private IxCode.IrExpression processLocalAssign(Assignment ast, LocalContext context){
+      IxCode.IrExpression value = typeCheck(ast.getRight(), context);
       if(value == null) return null;
       Id id = (Id) ast.getLeft();
       LocalContext local = ((LocalContext)context);
       ClosureLocalBinding bind = local.lookup(id.getName());
       int frame, index;
-      TypeRef leftType, rightType = value.type();
+      IxCode.TypeRef leftType, rightType = value.type();
       if(bind != null){
         frame = bind.getFrame();
         index = bind.getIndex();
@@ -1639,15 +1578,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       value = processAssignable(ast.getRight(), leftType, value);
       if(value == null) return null;
-      return new IrLocalSet(frame, index, leftType, value);
+      return new IxCode.IrLocalSet(frame, index, leftType, value);
     }
     
     private Object processSelfFieldAssign(Assignment ast, LocalContext context){
-      IrExpression value = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression value = typeCheck(ast.getRight(), context);
       if(value == null) return null;
       SelfFieldReference ref = (SelfFieldReference) ast.getLeft();
       LocalContext local = context;
-      ClassSymbol selfClass;
+      IxCode.ClassSymbol selfClass;
       if(local.isGlobal()){
         selfClass = loadTopClass();
       }else {
@@ -1657,7 +1596,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           selfClass = local.getConstructor().getClassType();
         }
       }
-      FieldSymbol field = findField(selfClass, ref.getName());
+      IxCode.FieldSymbol field = findField(selfClass, ref.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ref, new Object[]{selfClass, ref.getName()});
         return null;
@@ -1670,14 +1609,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       value = processAssignable(ast.getRight(), field.getType(), value);
       if(value == null) return null;
-      return new IrFieldSet(new IrThis(selfClass), field, value);
+      return new IxCode.IrFieldSet(new IxCode.IrThis(selfClass), field, value);
     }
     
     Object processArrayAssign(Assignment ast, LocalContext context){
-      IrExpression value = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression value = typeCheck(ast.getRight(), context);
       Indexing indexing = (Indexing) ast.getLeft();
-      IrExpression target = typeCheck(indexing.getLeft(), context);
-      IrExpression index = typeCheck(indexing.getRight(), context);
+      IxCode.IrExpression target = typeCheck(indexing.getLeft(), context);
+      IxCode.IrExpression index = typeCheck(indexing.getRight(), context);
       if(value == null || target == null || index == null) return null;
       if(target.isBasicType()){
         report(
@@ -1686,62 +1625,62 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         return null;
       }
       if(target.isArrayType()){
-        ArraySymbol targetType = ((ArraySymbol)target.type());
-        if(!(index.isBasicType() && ((BasicTypeRef)index.type()).isInteger())){
+        IxCode.ArraySymbol targetType = ((IxCode.ArraySymbol)target.type());
+        if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
           report(
             INCOMPATIBLE_TYPE, 
-            indexing.getRight(), new Object[]{BasicTypeRef.INT, index.type()});
+            indexing.getRight(), new Object[]{IxCode.BasicTypeRef.INT, index.type()});
           return null;
         }
-        TypeRef base = targetType.getBase();
+        IxCode.TypeRef base = targetType.getBase();
         value = processAssignable(ast.getRight(), base, value);
         if(value == null) return null;
-        return new IrArraySet(target, index, value);      
+        return new IxCode.IrArraySet(target, index, value);
       }
-      IrExpression[] params;
-      params = new IrExpression[]{index, value};
-      Pair<Boolean, MethodSymbol> result = tryFindMethod(ast, (ObjectTypeRef)target.type(), "set", new IrExpression[]{index, value});
+      IxCode.IrExpression[] params;
+      params = new IxCode.IrExpression[]{index, value};
+      Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "set", new IxCode.IrExpression[]{index, value});
       if(result._2 == null){
         report(
           METHOD_NOT_FOUND, ast, 
           new Object[]{target.type(), "set", types(params)});
         return null;
       }
-      return new IrCall(target, result._2, params);
+      return new IxCode.IrCall(target, result._2, params);
     }
     
     Object processFieldOrMethodAssign(Assignment ast, LocalContext context){
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
       return null;
     }
     
     public Object visit(AdditionAssignment ast, LocalContext context) {
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
       return null;
     }
     
     public Object visit(SubtractionAssignment ast, LocalContext context) {
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
       return null;
     }
     
     public Object visit(MultiplicationAssignment ast, LocalContext context) {
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);    
       return null;
     }
     
     public Object visit(DivisionAssignment ast, LocalContext context) {
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
       return null;
     }
     
     public Object visit(ModuloAssignment ast, LocalContext context) {
-      IrExpression right = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression right = typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
       return null;
     }
@@ -1755,12 +1694,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         report(VARIABLE_NOT_FOUND, ast, new Object[]{ast.getName()});
         return null;
       }
-      return new IrLocalRef(bind);
+      return new IxCode.IrLocalRef(bind);
     }
     
-    MethodSymbol findMethod(AstNode ast, ObjectTypeRef type, String name) {
-      IrExpression[] params = new IrExpression[0];
-      MethodSymbol[] methods = type.findMethod(name, params);    
+    IxCode.MethodSymbol findMethod(AstNode ast, IxCode.ObjectTypeRef type, String name) {
+      IxCode.IrExpression[] params = new IxCode.IrExpression[0];
+      IxCode.MethodSymbol[] methods = type.findMethod(name, params);
       if(methods.length == 0){
         report(
           METHOD_NOT_FOUND, ast, 
@@ -1770,21 +1709,21 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return methods[0];
     }
     
-    MethodSymbol findMethod(
-      AstNode ast, ObjectTypeRef type, String name, IrExpression[] params
+    IxCode.MethodSymbol findMethod(
+      AstNode ast, IxCode.ObjectTypeRef type, String name, IxCode.IrExpression[] params
     ) {
-      MethodSymbol[] methods = type.findMethod(name, params);
+      IxCode.MethodSymbol[] methods = type.findMethod(name, params);
       return methods[0];
     }
     
     public Object visit(CurrentInstance ast, LocalContext context) {
       LocalContext local = context;
       if(local.isStatic()) return null;
-      ClassSymbol selfClass = getContextClass();
-      return new IrThis(selfClass);
+      IxCode.ClassSymbol selfClass = getContextClass();
+      return new IxCode.IrThis(selfClass);
     }
     
-    boolean hasSamePackage(ClassSymbol a, ClassSymbol b) {
+    boolean hasSamePackage(IxCode.ClassSymbol a, IxCode.ClassSymbol b) {
       String name1 = a.getName();
       String name2 = b.getName();
       int index;
@@ -1803,7 +1742,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return name1.equals(name2);
     }
     
-    boolean isAccessible(ClassSymbol target, ClassSymbol context) {
+    boolean isAccessible(IxCode.ClassSymbol target, IxCode.ClassSymbol context) {
       if(hasSamePackage(target, context)){
         return true;
       }else{
@@ -1815,11 +1754,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
     }
     
-    boolean isAccessible(MemberSymbol member, ClassSymbol context) {
-      ClassSymbol targetType = member.getClassType();
+    boolean isAccessible(IxCode.MemberSymbol member, IxCode.ClassSymbol context) {
+      IxCode.ClassSymbol targetType = member.getClassType();
       if(targetType == context) return true;
       int modifier = member.getModifier();
-      if(TypeRules.isSuperType(targetType, context)){
+      if(IxCode.TypeRules.isSuperType(targetType, context)){
         if(Modifier.isProtected(modifier) || Modifier.isPublic(modifier)){
           return true;
         }else{
@@ -1834,17 +1773,17 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
     }
     
-    private FieldSymbol findField(ObjectTypeRef target, String name) {
+    private IxCode.FieldSymbol findField(IxCode.ObjectTypeRef target, String name) {
       if(target == null) return null;
-      FieldSymbol[] fields = target.getFields();
+      IxCode.FieldSymbol[] fields = target.getFields();
       for (int i = 0; i < fields.length; i++) {
         if(fields[i].getName().equals(name)){
           return fields[i];
         }
       }
-      FieldSymbol field = findField(target.getSuperClass(), name);
+      IxCode.FieldSymbol field = findField(target.getSuperClass(), name);
       if(field != null) return field;
-      ClassSymbol[] interfaces = target.getInterfaces();
+      IxCode.ClassSymbol[] interfaces = target.getInterfaces();
       for(int i = 0; i < interfaces.length; i++){
         field = findField(interfaces[i], name);
         if(field != null) return field;
@@ -1853,18 +1792,18 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     private boolean checkAccessible(
-      AstNode ast, ObjectTypeRef target, ClassSymbol context
+      AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassSymbol context
     ) {
       if(target.isArrayType()){
-        TypeRef component = ((ArraySymbol)target).getComponent();
+        IxCode.TypeRef component = ((IxCode.ArraySymbol)target).getComponent();
         if(!component.isBasicType()){
-          if(!isAccessible((ClassSymbol)component, getContextClass())){
+          if(!isAccessible((IxCode.ClassSymbol)component, getContextClass())){
             report(CLASS_NOT_ACCESSIBLE, ast, new Object[]{target, context});
             return false;
           }
         }
       }else{
-        if(!isAccessible((ClassSymbol)target, context)){
+        if(!isAccessible((IxCode.ClassSymbol)target, context)){
           report(CLASS_NOT_ACCESSIBLE, ast, new Object[]{target, context});
           return false;
         }
@@ -1873,52 +1812,52 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(FieldOrMethodRef ast, LocalContext context) {
-      IrClass contextClass = getContextClass();
-      IrExpression target = typeCheck(ast.getTarget(), context);
+      IxCode.IrClass contextClass = getContextClass();
+      IxCode.IrExpression target = typeCheck(ast.getTarget(), context);
       if(target == null) return null;
       if(target.type().isBasicType() || target.type().isNullType()){
         report(
           INCOMPATIBLE_TYPE, ast.getTarget(),
-          new TypeRef[]{rootClass(), target.type()});
+          new IxCode.TypeRef[]{rootClass(), target.type()});
         return null;
       }
-      ObjectTypeRef targetType = (ObjectTypeRef) target.type();
+      IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
       if(!checkAccessible(ast, targetType, contextClass)) return null;
       String name = ast.getName();
       if(target.type().isArrayType()){
         if(name.equals("length") || name.equals("size")){
-          return new IrArrayLength(target);
+          return new IxCode.IrArrayLength(target);
         }else{
           return null;
         }
       }
-      FieldSymbol field = findField(targetType, name);
+      IxCode.FieldSymbol field = findField(targetType, name);
       if(field != null && isAccessible(field, getContextClass())){
-        return new IrFieldRef(target, field);
+        return new IxCode.IrFieldRef(target, field);
       }
-      Pair<Boolean, MethodSymbol> result;
+      Pair<Boolean, IxCode.MethodSymbol> result;
       boolean continuable;
       
-      result = tryFindMethod(ast, targetType, name, new IrExpression[0]);
+      result = tryFindMethod(ast, targetType, name, new IxCode.IrExpression[0]);
       if(result._2 != null){
-        return new IrCall(target, result._2, new IrExpression[0]);
+        return new IxCode.IrCall(target, result._2, new IxCode.IrExpression[0]);
       }
       continuable = result._1;
       if(!continuable) return null;
       
       String getterName;
       getterName = getter(name);
-      result = tryFindMethod(ast, targetType, getterName, new IrExpression[0]);
+      result = tryFindMethod(ast, targetType, getterName, new IxCode.IrExpression[0]);
       if(result._2 != null){
-        return new IrCall(target, result._2, new IrExpression[0]);
+        return new IxCode.IrCall(target, result._2, new IxCode.IrExpression[0]);
       }
       continuable = result._1;
       if(!continuable) return null;
       
       getterName = getterBoolean(name);
-      result = tryFindMethod(ast, targetType, getterName, new IrExpression[0]);
+      result = tryFindMethod(ast, targetType, getterName, new IxCode.IrExpression[0]);
       if(result._2 != null){
-        return new IrCall(target, result._2, new IrExpression[0]);
+        return new IxCode.IrCall(target, result._2, new IxCode.IrExpression[0]);
       }
       
       if(field == null){
@@ -1931,10 +1870,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return null;
     }
     
-    private Pair<Boolean, MethodSymbol> tryFindMethod(
-      AstNode ast, ObjectTypeRef target, String name, IrExpression[] params
+    private Pair<Boolean, IxCode.MethodSymbol> tryFindMethod(
+      AstNode ast, IxCode.ObjectTypeRef target, String name, IxCode.IrExpression[] params
     ) {
-      MethodSymbol[] methods;
+      IxCode.MethodSymbol[] methods;
       methods = target.findMethod(name, params);
       if(methods.length > 0){
         if(methods.length > 1){
@@ -1985,30 +1924,30 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         report(DUPLICATE_LOCAL_VARIABLE, ast, new Object[]{name});
         return null;
       }
-      TypeRef type = resolve(ast.getType(), getSolver());
+      IxCode.TypeRef type = resolve(ast.getType(), getSolver());
       if(type == null) return null;
       local.addEntry(name, type);
       return type;
     }
     
     public Object visit(NewArray ast, LocalContext context) {
-      TypeRef type = resolve(ast.getType(), getSolver());
-      IrExpression[] parameters = typeCheckExps(ast.getArguments(), context);
+      IxCode.TypeRef type = resolve(ast.getType(), getSolver());
+      IxCode.IrExpression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(type == null || parameters == null) return null;
-      ArraySymbol resultType = loadArray(type, parameters.length);
-      return new IrNewArray(resultType, parameters);
+      IxCode.ArraySymbol resultType = loadArray(type, parameters.length);
+      return new IxCode.IrNewArray(resultType, parameters);
     }
       
     public Object visit(Cast ast, LocalContext context) {
-      IrExpression node = typeCheck(ast.getTarget(), context);
+      IxCode.IrExpression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
-      TypeRef conversion = resolve(ast.getType(), getSolver());
+      IxCode.TypeRef conversion = resolve(ast.getType(), getSolver());
       if(conversion == null) return null;
-      node = new IrCast(node, conversion);
+      node = new IxCode.IrCast(node, conversion);
       return node;
     }
     
-    public boolean equals(TypeRef[] types1, TypeRef[] types2) {
+    public boolean equals(IxCode.TypeRef[] types1, IxCode.TypeRef[] types2) {
       if(types1.length != types2.length) return false;
       for(int i = 0; i < types1.length; i++){
         if(types1[i] != types2[i]) return false;
@@ -2018,15 +1957,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(ClosureExpression ast, LocalContext context) {
       LocalContext local = ((LocalContext)context);
-      ClassSymbol type = (ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
       Argument[] args = ast.getArguments();
-      TypeRef[] argTypes = new TypeRef[args.length];
+      IxCode.TypeRef[] argTypes = new IxCode.TypeRef[args.length];
       String name = ast.getName();
       try {
         local.openFrame();
         boolean error = false;
         for(int i = 0; i < args.length; i++){
-          argTypes[i] = (TypeRef)accept(args[i], context);
+          argTypes[i] = (IxCode.TypeRef)accept(args[i], context);
           if(argTypes[i] == null){
             error = true;
           }
@@ -2037,10 +1976,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           return null;
         }
         if(error) return null;
-        MethodSymbol[] methods = type.getMethods();
-        MethodSymbol method = null;
+        IxCode.MethodSymbol[] methods = type.getMethods();
+        IxCode.MethodSymbol method = null;
         for(int i = 0; i < methods.length; i++){
-          TypeRef[] types = methods[i].getArguments();
+          IxCode.TypeRef[] types = methods[i].getArguments();
           if(name.equals(methods[i].getName()) && equals(argTypes, types)){
             method = methods[i];
             break;
@@ -2052,9 +1991,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
         local.setMethod(method);
         local.getContextFrame().getParent().setAllClosed(true);
-        IrStatement block = translate(ast.getBlock(), context);
+        IxCode.IrStatement block = translate(ast.getBlock(), context);
         block = addReturnNode(block, method.getReturnType());
-        IrClosure node = new IrClosure(type, method, block);
+        IxCode.IrClosure node = new IxCode.IrClosure(type, method, block);
         node.setFrame(local.getContextFrame());
         return node;
       }finally{
@@ -2063,16 +2002,16 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(Indexing ast, LocalContext context) {
-      IrExpression target = typeCheck(ast.getLeft(), context);
-      IrExpression index = typeCheck(ast.getRight(), context);
+      IxCode.IrExpression target = typeCheck(ast.getLeft(), context);
+      IxCode.IrExpression index = typeCheck(ast.getRight(), context);
       if(target == null || index == null) return null;
       if(target.isArrayType()){
-        if(!(index.isBasicType() && ((BasicTypeRef)index.type()).isInteger())){
+        if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
           report(
-            INCOMPATIBLE_TYPE, ast, new Object[]{BasicTypeRef.INT, index.type()});
+            INCOMPATIBLE_TYPE, ast, new Object[]{IxCode.BasicTypeRef.INT, index.type()});
           return null;
         }
-        return new IrArrayRef(target, index);
+        return new IxCode.IrArrayRef(target, index);
       }    
       if(target.isBasicType()){
         report(
@@ -2081,32 +2020,32 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         return null;
       }
       if(target.isArrayType()){
-        if(!(index.isBasicType() && ((BasicTypeRef)index.type()).isInteger())){
+        if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
           report(
             INCOMPATIBLE_TYPE, 
-            ast.getRight(), new Object[]{BasicTypeRef.INT, index.type()}
+            ast.getRight(), new Object[]{IxCode.BasicTypeRef.INT, index.type()}
           );
           return null;
         }
-        return new IrArrayRef(target, index);
+        return new IxCode.IrArrayRef(target, index);
       }    
-      IrExpression[] params = {index};
-      Pair<Boolean, MethodSymbol> result = tryFindMethod(ast, (ObjectTypeRef)target.type(), "get", new IrExpression[]{index});
+      IxCode.IrExpression[] params = {index};
+      Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "get", new IxCode.IrExpression[]{index});
       if(result._2 == null){
         report(
           METHOD_NOT_FOUND, ast, 
           new Object[]{target.type(), "get", types(params)});
         return null;
       }
-      return new IrCall(target, result._2, params);    
+      return new IxCode.IrCall(target, result._2, params);
     }
     
     public Object visit(SelfFieldReference ast, LocalContext context) {
       LocalContext local = context;
-      ClassSymbol selfClass = null;
+      IxCode.ClassSymbol selfClass = null;
       if(local.isStatic()) return null;
       selfClass = getContextClass();
-      FieldSymbol field = findField(selfClass, ast.getName());
+      IxCode.FieldSymbol field = findField(selfClass, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, new Object[]{selfClass, ast.getName()});
         return null;
@@ -2117,14 +2056,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           new Object[]{field.getClassType(), ast.getName(), selfClass});
         return null;
       }    
-      return new IrFieldRef(new IrThis(selfClass), field);
+      return new IxCode.IrFieldRef(new IxCode.IrThis(selfClass), field);
     }
     
     public Object visit(NewObject ast, LocalContext context) {
-      ClassSymbol type = (ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
-      IrExpression[] parameters = typeCheckExps(ast.getArguments(), context);
+      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.IrExpression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(parameters == null || type == null) return null;
-      ConstructorSymbol[] constructors = type.findConstructor(parameters);
+      IxCode.ConstructorSymbol[] constructors = type.findConstructor(parameters);
       if(constructors.length == 0){
         report(CONSTRUCTOR_NOT_FOUND, ast, new Object[]{type, types(parameters)});
         return null;
@@ -2144,18 +2083,18 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           });
         return null;
       }
-      return new IrNew(constructors[0], parameters);
+      return new IxCode.IrNew(constructors[0], parameters);
     }
         
     public Object visit(IsInstance ast, LocalContext context) {
-      IrExpression target = typeCheck(ast.getTarget(), context);
-      TypeRef checkType = resolve(ast.getType(), getSolver());
+      IxCode.IrExpression target = typeCheck(ast.getTarget(), context);
+      IxCode.TypeRef checkType = resolve(ast.getType(), getSolver());
       if(target == null || checkType == null) return null;
-      return new IrInstanceOf(target, checkType);      
+      return new IxCode.IrInstanceOf(target, checkType);
     }
     
-    private TypeRef[] types(IrExpression[] parameters){
-      TypeRef[] types = new TypeRef[parameters.length];
+    private IxCode.TypeRef[] types(IxCode.IrExpression[] parameters){
+      IxCode.TypeRef[] types = new IxCode.TypeRef[parameters.length];
       for(int i = 0; i < types.length; i++){
         types[i] = parameters[i].type();
       }
@@ -2163,11 +2102,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(SelfMethodCall ast, LocalContext context) {
-      IrExpression[] params = typeCheckExps(ast.getArguments(), context);
+      IxCode.IrExpression[] params = typeCheckExps(ast.getArguments(), context);
       if(params == null) return null;
-      IrClass targetType = getContextClass();
+      IxCode.IrClass targetType = getContextClass();
       String name = ast.getName();
-      MethodSymbol[] methods = targetType.findMethod(ast.getName(), params);
+      IxCode.MethodSymbol[] methods = targetType.findMethod(ast.getName(), params);
       
       if(methods.length == 0){
         report(
@@ -2198,29 +2137,29 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       params = convert(methods[0].getArguments(), params);
       
       if((methods[0].getModifier() & Modifier.STATIC) != 0){
-        return new IrCallStatic(targetType, methods[0], params);
+        return new IxCode.IrCallStatic(targetType, methods[0], params);
       }else {
-        return new IrCall(new IrThis(targetType), methods[0], params);
+        return new IxCode.IrCall(new IxCode.IrThis(targetType), methods[0], params);
       }
     }
     
-    private IrExpression[] convert(TypeRef[] arguments, IrExpression[] params){
+    private IxCode.IrExpression[] convert(IxCode.TypeRef[] arguments, IxCode.IrExpression[] params){
       for(int i = 0; i < params.length; i++){
         if(arguments[i] != params[i].type()){
-          params[i] = new IrCast(params[i], arguments[i]);
+          params[i] = new IxCode.IrCast(params[i], arguments[i]);
         }
       }
       return params;
     }
     
     public Object visit(MethodCall ast, LocalContext context) {
-      IrExpression target = typeCheck(ast.getTarget(), context);
+      IxCode.IrExpression target = typeCheck(ast.getTarget(), context);
       if(target == null) return null;
-      IrExpression[] params = typeCheckExps(ast.getArguments(), context);
+      IxCode.IrExpression[] params = typeCheckExps(ast.getArguments(), context);
       if(params == null) return null;
-      ObjectTypeRef targetType = (ObjectTypeRef) target.type();
+      IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
       final String name = ast.getName();
-      MethodSymbol[] methods = targetType.findMethod(name, params);
+      IxCode.MethodSymbol[] methods = targetType.findMethod(name, params);
       
       if(methods.length == 0){
         report(
@@ -2249,26 +2188,26 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         return null;
       }    
       params = convert(methods[0].getArguments(), params);
-      return new IrCall(target, methods[0], params);
+      return new IxCode.IrCall(target, methods[0], params);
     }
     
     public Object visit(StaticIDExpression ast, LocalContext context) {
-      ClassSymbol type = (ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
       if(type == null) return null;
-      FieldSymbol field = findField(type, ast.getName());
+      IxCode.FieldSymbol field = findField(type, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, new Object[]{type, ast.getName()});
         return null;
       }
-      return new IrStaticFieldRef(type, field);
+      return new IxCode.IrStaticFieldRef(type, field);
     }
     
     public Object visit(StaticMethodCall ast, LocalContext context) {
-      ClassSymbol type = (ClassSymbol) CodeAnalysis.this.resolve(ast.getTarget());
-      IrExpression[] params = typeCheckExps(ast.getArgs(), context);
+      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getTarget());
+      IxCode.IrExpression[] params = typeCheckExps(ast.getArgs(), context);
       if(type == null) return null;
       if(params == null) return null;
-      MethodSymbol[] methods = type.findMethod(ast.getName(), params);
+      IxCode.MethodSymbol[] methods = type.findMethod(ast.getName(), params);
       
       if(methods.length == 0){
         report(
@@ -2287,10 +2226,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       
       params = convert(methods[0].getArguments(), params);
-      return new IrCallStatic(type, methods[0], params);
+      return new IxCode.IrCallStatic(type, methods[0], params);
     }
       
-    private String[] typeNames(TypeRef[] types) {
+    private String[] typeNames(IxCode.TypeRef[] types) {
       String[] names = new String[types.length];
       for(int i = 0; i < names.length; i++){
         names[i] = types[i].getName();
@@ -2298,8 +2237,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return names;
     }
     
-    private IrExpression[] typeCheckExps(Expression[] ast, LocalContext context){
-      IrExpression[] expressions = new IrExpression[ast.length];
+    private IxCode.IrExpression[] typeCheckExps(Expression[] ast, LocalContext context){
+      IxCode.IrExpression[] expressions = new IxCode.IrExpression[ast.length];
       boolean success = true;
       for(int i = 0; i < ast.length; i++){
         expressions[i] = typeCheck(ast[i], context);
@@ -2321,11 +2260,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       LocalContext local = context;
       try {
         local.openScope();
-        IrExpression collection = typeCheck(collectionAST, context);
+        IxCode.IrExpression collection = typeCheck(collectionAST, context);
         Argument arg = ast.getDeclaration();
         accept(arg, context);
         ClosureLocalBinding bind = local.lookupOnlyCurrentScope(arg.getName());
-        IrStatement block = translate(ast.getStatement(), context);
+        IxCode.IrStatement block = translate(ast.getStatement(), context);
         
         if(collection.isBasicType()){
           report(
@@ -2335,74 +2274,74 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
         ClosureLocalBinding bind2 = new ClosureLocalBinding(
           0, local.addEntry(local.newName(), collection.type()), collection.type());
-        IrStatement init = 
-          new IrExpStmt(new IrLocalSet(bind2, collection));
+        IxCode.IrStatement init =
+          new IxCode.IrExpStmt(new IxCode.IrLocalSet(bind2, collection));
         if(collection.isArrayType()){
           ClosureLocalBinding bind3 = new ClosureLocalBinding(
-            0, local.addEntry(local.newName(), BasicTypeRef.INT), BasicTypeRef.INT
+            0, local.addEntry(local.newName(), IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT
           );
-          init = new IrBlock(init, new IrExpStmt(new IrLocalSet(bind3, new IrInt(0))));
-          block = new IrLoop(
-            new IrBinExp(
-              LESS_THAN, BasicTypeRef.BOOLEAN,
+          init = new IxCode.IrBlock(init, new IxCode.IrExpStmt(new IxCode.IrLocalSet(bind3, new IxCode.IrInt(0))));
+          block = new IxCode.IrLoop(
+            new IxCode.IrBinExp(
+              LESS_THAN, IxCode.BasicTypeRef.BOOLEAN,
               ref(bind3),
-              new IrArrayLength(ref(bind2))
+              new IxCode.IrArrayLength(ref(bind2))
             ),
-            new IrBlock(
+            new IxCode.IrBlock(
               assign(bind, indexref(bind2, ref(bind3))),
               block,
               assign(
                 bind3, 
-                new IrBinExp(ADD, BasicTypeRef.INT, ref(bind3), new IrInt(1))
+                new IxCode.IrBinExp(ADD, IxCode.BasicTypeRef.INT, ref(bind3), new IxCode.IrInt(1))
               )
             )
           );
-          return new IrBlock(init, block);
+          return new IxCode.IrBlock(init, block);
         }else{
-          ObjectTypeRef iterator = load("java.util.Iterator");
+          IxCode.ObjectTypeRef iterator = load("java.util.Iterator");
           ClosureLocalBinding bind3 = new ClosureLocalBinding(
             0, local.addEntry(local.newName(), iterator), iterator
           );
-          MethodSymbol mIterator, mNext, mHasNext;
-          mIterator = findMethod(collectionAST, (ObjectTypeRef) collection.type(), "iterator");
+          IxCode.MethodSymbol mIterator, mNext, mHasNext;
+          mIterator = findMethod(collectionAST, (IxCode.ObjectTypeRef) collection.type(), "iterator");
           mNext = findMethod(ast.getCollection(), iterator, "next");
           mHasNext = findMethod(ast.getCollection(), iterator, "hasNext");
-          init = new IrBlock(
+          init = new IxCode.IrBlock(
             init,
-            assign(bind3, new IrCall(ref(bind2), mIterator, new IrExpression[0]))
+            assign(bind3, new IxCode.IrCall(ref(bind2), mIterator, new IxCode.IrExpression[0]))
           );
-          IrExpression callNext = new IrCall(
-            ref(bind3), mNext, new IrExpression[0]
+          IxCode.IrExpression callNext = new IxCode.IrCall(
+            ref(bind3), mNext, new IxCode.IrExpression[0]
           );
           if(bind.getType() != rootClass()){
-            callNext = new IrCast(callNext, bind.getType());
+            callNext = new IxCode.IrCast(callNext, bind.getType());
           }
-          block = new IrLoop(
-            new IrCall(ref(bind3), mHasNext, new IrExpression[0]),
-            new IrBlock(assign(bind, callNext), block)
+          block = new IxCode.IrLoop(
+            new IxCode.IrCall(ref(bind3), mHasNext, new IxCode.IrExpression[0]),
+            new IxCode.IrBlock(assign(bind, callNext), block)
           );
-          return new IrBlock(init, block);
+          return new IxCode.IrBlock(init, block);
         }
       }finally{
         local.closeScope();
       }
     }
     
-    private IrExpression indexref(ClosureLocalBinding bind, IrExpression value) {
-      return new IrArrayRef(new IrLocalRef(bind), value);
+    private IxCode.IrExpression indexref(ClosureLocalBinding bind, IxCode.IrExpression value) {
+      return new IxCode.IrArrayRef(new IxCode.IrLocalRef(bind), value);
     }
     
-    private IrStatement assign(ClosureLocalBinding bind, IrExpression value) {
-      return new IrExpStmt(new IrLocalSet(bind, value));
+    private IxCode.IrStatement assign(ClosureLocalBinding bind, IxCode.IrExpression value) {
+      return new IxCode.IrExpStmt(new IxCode.IrLocalSet(bind, value));
     }
     
-    private IrExpression ref(ClosureLocalBinding bind) {
-      return new IrLocalRef(bind);
+    private IxCode.IrExpression ref(ClosureLocalBinding bind) {
+      return new IxCode.IrLocalRef(bind);
     }
     
     public Object visit(ExpressionStatement ast, LocalContext context) {
-      IrExpression expression = typeCheck(ast.getExpression(), context);
-      return new IrExpStmt(expression);
+      IxCode.IrExpression expression = typeCheck(ast.getExpression(), context);
+      return new IxCode.IrExpStmt(expression);
     }
     
     public Object visit(CondStatement node, LocalContext context) {
@@ -2416,27 +2355,27 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         for(int i = 0; i < size; i++){        
           Expression expr = node.getCondition(i);
           Statement  stmt = node.getBlock(i);
-          IrExpression texpr = typeCheck(expr, context);
-          if(texpr != null && texpr.type() != BasicTypeRef.BOOLEAN){
-            TypeRef expect = BasicTypeRef.BOOLEAN;
-            TypeRef actual = texpr.type();
+          IxCode.IrExpression texpr = typeCheck(expr, context);
+          if(texpr != null && texpr.type() != IxCode.BasicTypeRef.BOOLEAN){
+            IxCode.TypeRef expect = IxCode.BasicTypeRef.BOOLEAN;
+            IxCode.TypeRef actual = texpr.type();
             report(INCOMPATIBLE_TYPE, expr, new Object[]{expect, actual});
           }
           exprs.push(texpr);
-          IrStatement tstmt = translate(stmt, context);
+          IxCode.IrStatement tstmt = translate(stmt, context);
           stmts.push(tstmt);
         }
         
         Statement elseStmt = node.getElseBlock();
-        IrStatement result = null;
+        IxCode.IrStatement result = null;
         if(elseStmt != null){
           result = translate(elseStmt, context);
         }
         
         for(int i = 0; i < size; i++){
-          IrExpression expr = (IrExpression)exprs.pop();
-          IrStatement  stmt = (IrStatement)stmts.pop();
-          result = new IrIf(expr, stmt, result);
+          IxCode.IrExpression expr = (IxCode.IrExpression)exprs.pop();
+          IxCode.IrStatement stmt = (IxCode.IrStatement)stmts.pop();
+          result = new IxCode.IrIf(expr, stmt, result);
         }
         
         return result;
@@ -2450,35 +2389,35 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       try{
         local.openScope();
         
-        IrStatement init = null;
+        IxCode.IrStatement init = null;
         if(ast.getInit() != null){
           init = translate(ast.getInit(), context);
         }else{
-          init = new IrNOP();
+          init = new IxCode.IrNOP();
         }
-        IrExpression condition;
+        IxCode.IrExpression condition;
         Expression astCondition = ast.getCondition();
         if(astCondition != null){
           condition = typeCheck(ast.getCondition(), context);
-          TypeRef expected = BasicTypeRef.BOOLEAN;
+          IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
           if(condition != null && condition.type() != expected){
-            TypeRef appeared = condition.type();
+            IxCode.TypeRef appeared = condition.type();
             report(INCOMPATIBLE_TYPE, astCondition, new Object[]{expected, appeared});
           }
         }else{
-          condition = new IrBool(true);
+          condition = new IxCode.IrBool(true);
         }
-        IrExpression update = null;
+        IxCode.IrExpression update = null;
         if(ast.getUpdate() != null){
           update = typeCheck(ast.getUpdate(), context);
         }
-        IrStatement loop = translate(
+        IxCode.IrStatement loop = translate(
           ast.getBlock(), context);
         if(update != null){
-          loop = new IrBlock(loop, new IrExpStmt(update));
+          loop = new IxCode.IrBlock(loop, new IxCode.IrExpStmt(update));
         }
-        IrStatement result = new IrLoop(condition, loop);
-        result = new IrBlock(init, result);
+        IxCode.IrStatement result = new IxCode.IrLoop(condition, loop);
+        result = new IxCode.IrBlock(init, result);
         return result;
       }finally{
         local.closeScope();
@@ -2487,14 +2426,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(BlockStatement ast, LocalContext context) {
       Statement[] astStatements = ast.getStatements();
-      IrStatement[] statements = new IrStatement[astStatements.length];
+      IxCode.IrStatement[] statements = new IxCode.IrStatement[astStatements.length];
       LocalContext local = context;
       try{
         local.openScope();
         for(int i = 0; i < astStatements.length; i++){
           statements[i] = translate(astStatements[i], context);
         }
-        return new IrBlock(statements);
+        return new IxCode.IrBlock(statements);
       }finally{
         local.closeScope();
       }
@@ -2505,14 +2444,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       try{
         local.openScope();
         
-        IrExpression condition = typeCheck(ast.getCondition(), context);
-        TypeRef expected = BasicTypeRef.BOOLEAN;
+        IxCode.IrExpression condition = typeCheck(ast.getCondition(), context);
+        IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
         if(condition != null && condition.type() != expected){
           report(INCOMPATIBLE_TYPE, ast.getCondition(), new Object[]{expected, condition.type()});
         }
-        IrStatement thenBlock = translate(ast.getThenBlock(), context);
-        IrStatement elseBlock = ast.getElseBlock() == null ? null : translate(ast.getElseBlock(), context);
-        return new IrIf(condition, thenBlock, elseBlock);
+        IxCode.IrStatement thenBlock = translate(ast.getThenBlock(), context);
+        IxCode.IrStatement elseBlock = ast.getElseBlock() == null ? null : translate(ast.getElseBlock(), context);
+        return new IxCode.IrIf(condition, thenBlock, elseBlock);
       }finally{     
         local.closeScope();
       }
@@ -2523,48 +2462,48 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       try{
         local.openScope();
         
-        IrExpression condition = typeCheck(ast.getCondition(), context);
-        TypeRef expected = BasicTypeRef.BOOLEAN;
+        IxCode.IrExpression condition = typeCheck(ast.getCondition(), context);
+        IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
         if(condition != null && condition.type() != expected){
-          TypeRef actual = condition.type();
+          IxCode.TypeRef actual = condition.type();
           report(INCOMPATIBLE_TYPE, ast, new Object[]{expected, actual});
         }
-        IrStatement thenBlock = translate(ast.getBlock(), context);
-        return new IrLoop(condition, thenBlock);
+        IxCode.IrStatement thenBlock = translate(ast.getBlock(), context);
+        return new IxCode.IrLoop(condition, thenBlock);
       }finally{
         local.closeScope();
       }     
     }
     
     public Object visit(ReturnStatement ast, LocalContext context) {
-      TypeRef returnType = ((LocalContext)context).getReturnType();
+      IxCode.TypeRef returnType = ((LocalContext)context).getReturnType();
       if(ast.getExpression() == null){
-        TypeRef expected = BasicTypeRef.VOID;
+        IxCode.TypeRef expected = IxCode.BasicTypeRef.VOID;
         if(returnType != expected){
           report(CANNOT_RETURN_VALUE, ast, new Object[0]);
         }
-        return new IrReturn(null);
+        return new IxCode.IrReturn(null);
       }else{
-        IrExpression returned = typeCheck(ast.getExpression(), context);
-        if(returned == null) return new IrReturn(null);
-        if(returned.type() == BasicTypeRef.VOID){
+        IxCode.IrExpression returned = typeCheck(ast.getExpression(), context);
+        if(returned == null) return new IxCode.IrReturn(null);
+        if(returned.type() == IxCode.BasicTypeRef.VOID){
           report(CANNOT_RETURN_VALUE, ast, new Object[0]);
         }else {
           returned = processAssignable(ast.getExpression(), returnType, returned);
-          if(returned == null) return new IrReturn(null);
+          if(returned == null) return new IxCode.IrReturn(null);
         }
-        return new IrReturn(returned);
+        return new IxCode.IrReturn(returned);
       }
     }
     
-    IrExpression processAssignable(AstNode ast, TypeRef a, IrExpression b){
+    IxCode.IrExpression processAssignable(AstNode ast, IxCode.TypeRef a, IxCode.IrExpression b){
       if(b == null) return null;
       if(a == b.type()) return b;
-      if(!TypeRules.isAssignable(a, b.type())){
+      if(!IxCode.TypeRules.isAssignable(a, b.type())){
         report(INCOMPATIBLE_TYPE, ast, new Object[]{ a, b.type() });
         return null;
       }
-      b = new IrCast(b, a);
+      b = new IxCode.IrCast(b, a);
       return b;
     }
     
@@ -2572,24 +2511,24 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       LocalContext local = context;
       try{
         local.openScope();
-        IrExpression condition = typeCheck(ast.getCondition(), context);
+        IxCode.IrExpression condition = typeCheck(ast.getCondition(), context);
         if(condition == null){
-          return new IrNOP();
+          return new IxCode.IrNOP();
         }
         String name = local.newName();
         int index = local.addEntry(name, condition.type());
-        IrStatement statement;
+        IxCode.IrStatement statement;
         if(ast.getCases().length == 0){
           if(ast.getElseBlock() != null){
             statement = translate(ast.getElseBlock(), context);
           }else{
-            statement = new IrNOP();
+            statement = new IxCode.IrNOP();
           }
         }else{
           statement = processCases(ast, condition, name, context);
         }
-        IrBlock block = new IrBlock(
-          new IrExpStmt(new IrLocalSet(0, index, condition.type(), condition)),
+        IxCode.IrBlock block = new IxCode.IrBlock(
+          new IxCode.IrExpStmt(new IxCode.IrLocalSet(0, index, condition.type(), condition)),
           statement
         );
         return block;
@@ -2598,8 +2537,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
     }
     
-    IrStatement processCases(
-      SelectStatement ast, IrExpression cond, String var, LocalContext context
+    IxCode.IrStatement processCases(
+      SelectStatement ast, IxCode.IrExpression cond, String var, LocalContext context
     ) {
       CaseBranch[] cases = ast.getCases();
       List nodes = new ArrayList();
@@ -2610,24 +2549,24 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         nodes.add(processNodes(astExpressions, cond.type(), bind, context));
         thens.add(translate(cases[i].getBlock(), context));
       }
-      IrStatement statement;
+      IxCode.IrStatement statement;
       if(ast.getElseBlock() != null){
         statement = translate(ast.getElseBlock(), context);
       }else{
         statement = null;
       }
       for(int i = cases.length - 1; i >= 0; i--){
-        IrExpression value = (IrExpression) nodes.get(i);
-        IrStatement then = (IrStatement) thens.get(i);
-        statement = new IrIf(value, then, statement);
+        IxCode.IrExpression value = (IxCode.IrExpression) nodes.get(i);
+        IxCode.IrStatement then = (IxCode.IrStatement) thens.get(i);
+        statement = new IxCode.IrIf(value, then, statement);
       }
       return statement;
     }
     
-    IrExpression processNodes(
-      Expression[] asts, TypeRef type, ClosureLocalBinding bind, LocalContext context
+    IxCode.IrExpression processNodes(
+      Expression[] asts, IxCode.TypeRef type, ClosureLocalBinding bind, LocalContext context
     ) {
-      IrExpression[] nodes = new IrExpression[asts.length];
+      IxCode.IrExpression[] nodes = new IxCode.IrExpression[asts.length];
       boolean error = false;
       for(int i = 0; i < asts.length; i++){
         nodes[i] = typeCheck(asts[i], context);
@@ -2635,29 +2574,29 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           error = true;
           continue;
         }
-        if(!TypeRules.isAssignable(type, nodes[i].type())){
-          report(INCOMPATIBLE_TYPE, asts[i], new TypeRef[]{type, nodes[i].type()});
+        if(!IxCode.TypeRules.isAssignable(type, nodes[i].type())){
+          report(INCOMPATIBLE_TYPE, asts[i], new IxCode.TypeRef[]{type, nodes[i].type()});
           error = true;
           continue;
         }
         if(nodes[i].isBasicType() && nodes[i].type() != type){
-          nodes[i] = new IrCast(nodes[i], type);
+          nodes[i] = new IxCode.IrCast(nodes[i], type);
         }
         if(nodes[i].isReferenceType() && nodes[i].type() != rootClass()){
-          nodes[i] = new IrCast(nodes[i], rootClass());
+          nodes[i] = new IxCode.IrCast(nodes[i], rootClass());
         }
       }
       if(!error){
-        IrExpression node;
+        IxCode.IrExpression node;
         if(nodes[0].isReferenceType()){
-          node = createEquals(IrBinExp.Constants.EQUAL, new IrLocalRef(bind), nodes[0]);
+          node = createEquals(IxCode.IrBinExp.Constants.EQUAL, new IxCode.IrLocalRef(bind), nodes[0]);
         }else{
-          node = new IrBinExp(EQUAL, BasicTypeRef.BOOLEAN, new IrLocalRef(bind), nodes[0]);
+          node = new IxCode.IrBinExp(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.IrLocalRef(bind), nodes[0]);
         }
         for(int i = 1; i < nodes.length; i++){
-          node = new IrBinExp(
-            LOGICAL_OR, BasicTypeRef.BOOLEAN, node,
-            new IrBinExp(EQUAL, BasicTypeRef.BOOLEAN, new IrLocalRef(bind), nodes[i])
+          node = new IxCode.IrBinExp(
+            LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, node,
+            new IxCode.IrBinExp(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.IrLocalRef(bind), nodes[i])
           );
         }
         return node;
@@ -2667,18 +2606,18 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(ThrowStatement ast, LocalContext context) {
-      IrExpression expression = typeCheck(ast.getExpression(), context);
+      IxCode.IrExpression expression = typeCheck(ast.getExpression(), context);
       if(expression != null){
-        TypeRef expected = load("java.lang.Throwable");
-        TypeRef detected = expression.type();
-        if(!TypeRules.isSuperType(expected, detected)){
+        IxCode.TypeRef expected = load("java.lang.Throwable");
+        IxCode.TypeRef detected = expression.type();
+        if(!IxCode.TypeRules.isSuperType(expected, detected)){
           report(
             INCOMPATIBLE_TYPE, ast.getExpression(), 
             new Object[]{ expected, detected}
           );
         }
       }
-      return new IrThrow(expression);
+      return new IxCode.IrThrow(expression);
     }
     
     public Object visit(LocalVariableDeclaration ast, LocalContext context) {
@@ -2690,91 +2629,91 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         report(
           DUPLICATE_LOCAL_VARIABLE, ast,
           new Object[]{ast.getName()});
-        return new IrNOP();
+        return new IxCode.IrNOP();
       }
-      TypeRef leftType = CodeAnalysis.this.resolve(ast.getType());
-      if(leftType == null) return new IrNOP();
+      IxCode.TypeRef leftType = CodeAnalysis.this.resolve(ast.getType());
+      if(leftType == null) return new IxCode.IrNOP();
       int index = localContext.addEntry(ast.getName(), leftType);
-      IrLocalSet node;
+      IxCode.IrLocalSet node;
       if(initializer != null){
-        IrExpression valueNode = typeCheck(initializer, context);
-        if(valueNode == null) return new IrNOP();
+        IxCode.IrExpression valueNode = typeCheck(initializer, context);
+        if(valueNode == null) return new IxCode.IrNOP();
         valueNode = processAssignable(initializer, leftType, valueNode);
-        if(valueNode == null) return new IrNOP();
-        node = new IrLocalSet(0, index, leftType, valueNode);
+        if(valueNode == null) return new IxCode.IrNOP();
+        node = new IxCode.IrLocalSet(0, index, leftType, valueNode);
       }else{
-        node = new IrLocalSet(0, index, leftType, defaultValue(leftType));
+        node = new IxCode.IrLocalSet(0, index, leftType, defaultValue(leftType));
       }
-      return new IrExpStmt(node);
+      return new IxCode.IrExpStmt(node);
     }
     
-    public IrExpression defaultValue(TypeRef type) {
-      return IrExpression.defaultValue(type);
+    public IxCode.IrExpression defaultValue(IxCode.TypeRef type) {
+      return IxCode.IrExpression.defaultValue(type);
     }
     
     public Object visit(EmptyStatement ast, LocalContext context) {
-      return new IrNOP();
+      return new IxCode.IrNOP();
     }
     
     public Object visit(TryStatement ast, LocalContext context) {
       LocalContext local = context;   
-      IrStatement tryStatement = translate(ast.getTryBlock(), context);
+      IxCode.IrStatement tryStatement = translate(ast.getTryBlock(), context);
       ClosureLocalBinding[] binds = new ClosureLocalBinding[ast.getArguments().length];
-      IrStatement[] catchBlocks = new IrStatement[ast.getArguments().length];
+      IxCode.IrStatement[] catchBlocks = new IxCode.IrStatement[ast.getArguments().length];
       for(int i = 0; i < ast.getArguments().length; i++){
         local.openScope();
-        TypeRef arg = (TypeRef)accept(ast.getArguments()[i], context);
-        TypeRef expected = load("java.lang.Throwable");
-        if(!TypeRules.isSuperType(expected, arg)){
+        IxCode.TypeRef arg = (IxCode.TypeRef)accept(ast.getArguments()[i], context);
+        IxCode.TypeRef expected = load("java.lang.Throwable");
+        if(!IxCode.TypeRules.isSuperType(expected, arg)){
           report(INCOMPATIBLE_TYPE, ast.getArguments()[i], new Object[]{expected, arg});
         }
         binds[i] = local.lookupOnlyCurrentScope(ast.getArguments()[i].getName());
         catchBlocks[i] = translate(ast.getRecBlocks()[i], context);
         local.closeScope();
       }
-      return new IrTry(tryStatement, binds, catchBlocks);
+      return new IxCode.IrTry(tryStatement, binds, catchBlocks);
     }
     
     public Object visit(SynchronizedStatement ast, LocalContext context) {
-      IrExpression lock = typeCheck(ast.getTarget(), context);
-      IrStatement block = translate(ast.getBlock(), context);
+      IxCode.IrExpression lock = typeCheck(ast.getTarget(), context);
+      IxCode.IrStatement block = translate(ast.getBlock(), context);
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
-      return new IrSynchronized(lock, block);
+      return new IxCode.IrSynchronized(lock, block);
     }
     
     public Object visit(BreakStatement ast, LocalContext context) {
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
-      return new IrBreak();
+      return new IxCode.IrBreak();
     }
     
     public Object visit(ContinueStatement ast, LocalContext context) {
       report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
-      return new IrContinue();
+      return new IxCode.IrContinue();
     }
   //-------------------------------------------------------------------------//
     
   //----------------------------- members ----------------------------------------//  
     public Object visit(FunctionDeclaration ast, LocalContext context) {
-      IrMethod function = (IrMethod) lookupKernelNode(ast);
+      IxCode.IrMethod function = (IxCode.IrMethod) lookupKernelNode(ast);
       if(function == null) return null;
       LocalContext local = new LocalContext();
       if(Modifier.isStatic(function.getModifier())){
         local.setStatic(true);
       }
       local.setMethod(function);
-      TypeRef[] arguments = function.getArguments();
+      IxCode.TypeRef[] arguments = function.getArguments();
       for(int i = 0; i < arguments.length; i++){
         local.addEntry(ast.getArguments()[i].getName(), arguments[i]);
       }
-      IrBlock block = (IrBlock) accept(ast.getBlock(), local);
+      IxCode.IrBlock block = (IxCode.IrBlock) accept(ast.getBlock(), local);
       block = addReturnNode(block, function.getReturnType());
       function.setBlock(block);
       function.setFrame(local.getContextFrame());
       return null;
     }
     
-    public IrBlock addReturnNode(IrStatement node, TypeRef returnType) {
-      return new IrBlock(node, new IrReturn(defaultValue(returnType)));
+    public IxCode.IrBlock addReturnNode(IxCode.IrStatement node, IxCode.TypeRef returnType) {
+      return new IxCode.IrBlock(node, new IxCode.IrReturn(defaultValue(returnType)));
     }
     
     public Object visit(GlobalVariableDeclaration ast, LocalContext context) {
@@ -2794,7 +2733,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(MethodDeclaration ast, LocalContext context) {
-      IrMethod method = (IrMethod) lookupKernelNode(ast);
+      IxCode.IrMethod method = (IxCode.IrMethod) lookupKernelNode(ast);
       if(method == null) return null;
       if(ast.getBlock() == null) return null;
       LocalContext local = new LocalContext();
@@ -2802,11 +2741,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         local.setStatic(true);
       }
       local.setMethod(method);
-      TypeRef[] arguments = method.getArguments();
+      IxCode.TypeRef[] arguments = method.getArguments();
       for(int i = 0; i < arguments.length; i++){
         local.addEntry(ast.getArguments()[i].getName(), arguments[i]);
       }    
-      IrBlock block = (IrBlock) accept(ast.getBlock(), local);
+      IxCode.IrBlock block = (IxCode.IrBlock) accept(ast.getBlock(), local);
       block = addReturnNode(block, method.getReturnType());
       method.setBlock(block);
       method.setFrame(local.getContextFrame());
@@ -2814,19 +2753,19 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(ConstructorDeclaration ast, LocalContext context) {
-      IrConstructor constructor = (IrConstructor) lookupKernelNode(ast);
+      IxCode.IrConstructor constructor = (IxCode.IrConstructor) lookupKernelNode(ast);
       if(constructor == null) return null;
       LocalContext local = new LocalContext();
       local.setConstructor(constructor);
-      TypeRef[] args = constructor.getArgs();
+      IxCode.TypeRef[] args = constructor.getArgs();
       for(int i = 0; i < args.length; i++){
         local.addEntry(ast.getArguments()[i].getName(), args[i]);
       }
-      IrExpression[] params = typeCheckExps(ast.getInitializers(), local);
-      IrBlock block = (IrBlock) accept(ast.getBody(), local);
-      IrClass currentClass = getContextClass();
-      ClassSymbol superClass = currentClass.getSuperClass();
-      ConstructorSymbol[] matched = superClass.findConstructor(params);
+      IxCode.IrExpression[] params = typeCheckExps(ast.getInitializers(), local);
+      IxCode.IrBlock block = (IxCode.IrBlock) accept(ast.getBody(), local);
+      IxCode.IrClass currentClass = getContextClass();
+      IxCode.ClassSymbol superClass = currentClass.getSuperClass();
+      IxCode.ConstructorSymbol[] matched = superClass.findConstructor(params);
       if(matched.length == 0){
         report(CONSTRUCTOR_NOT_FOUND, ast, new Object[]{superClass, types(params)});
         return null;
@@ -2840,11 +2779,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           });
         return null;
       }
-      IrSuper init = new IrSuper(
+      IxCode.IrSuper init = new IxCode.IrSuper(
         superClass, matched[0].getArgs(), params
       );
       constructor.setSuperInitializer(init);
-      block = addReturnNode(block, BasicTypeRef.VOID);
+      block = addReturnNode(block, IxCode.BasicTypeRef.VOID);
       constructor.setBlock(block);
       constructor.setFrame(local.getContextFrame());
       return null;
@@ -2852,51 +2791,51 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
   //----------------------------------------------------------------------------// 
   //----------------------------------------------------------------------------//
   
-    public TypeRef resolve(TypeSpec type, NameResolution resolver) {
-      TypeRef resolvedType = (TypeRef) resolver.resolve(type);
+    public IxCode.TypeRef resolve(TypeSpec type, NameResolution resolver) {
+      IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.resolve(type);
       if(resolvedType == null){
         report(CLASS_NOT_FOUND, type, new Object[]{type.getComponentName()});      
       }
       return resolvedType;
     }
     
-    TypeRef promote(TypeRef left,  TypeRef right) {
+    IxCode.TypeRef promote(IxCode.TypeRef left,  IxCode.TypeRef right) {
       if(!numeric(left) || !numeric(right)) return null;
-      if(left == BasicTypeRef.DOUBLE || right == BasicTypeRef.DOUBLE){
-        return BasicTypeRef.DOUBLE;
+      if(left == IxCode.BasicTypeRef.DOUBLE || right == IxCode.BasicTypeRef.DOUBLE){
+        return IxCode.BasicTypeRef.DOUBLE;
       }
-      if(left == BasicTypeRef.FLOAT || right == BasicTypeRef.FLOAT){
-        return BasicTypeRef.FLOAT;
+      if(left == IxCode.BasicTypeRef.FLOAT || right == IxCode.BasicTypeRef.FLOAT){
+        return IxCode.BasicTypeRef.FLOAT;
       }
-      if(left == BasicTypeRef.LONG || right == BasicTypeRef.LONG){
-        return BasicTypeRef.LONG;
+      if(left == IxCode.BasicTypeRef.LONG || right == IxCode.BasicTypeRef.LONG){
+        return IxCode.BasicTypeRef.LONG;
       }
-      return BasicTypeRef.INT;
+      return IxCode.BasicTypeRef.INT;
     }
     
-    boolean hasNumericType(IrExpression expression){
+    boolean hasNumericType(IxCode.IrExpression expression){
       return numeric(expression.type());
     }
     
-    boolean numeric(TypeRef symbol){
+    boolean numeric(IxCode.TypeRef symbol){
       return 
       (symbol.isBasicType()) &&
-      (symbol == BasicTypeRef.BYTE   || 
-       symbol == BasicTypeRef.SHORT  ||
-       symbol == BasicTypeRef.CHAR   || 
-       symbol == BasicTypeRef.INT    || 
-       symbol == BasicTypeRef.LONG   || 
-       symbol == BasicTypeRef.FLOAT  ||
-       symbol == BasicTypeRef.DOUBLE
+      (symbol == IxCode.BasicTypeRef.BYTE   ||
+       symbol == IxCode.BasicTypeRef.SHORT  ||
+       symbol == IxCode.BasicTypeRef.CHAR   ||
+       symbol == IxCode.BasicTypeRef.INT    ||
+       symbol == IxCode.BasicTypeRef.LONG   ||
+       symbol == IxCode.BasicTypeRef.FLOAT  ||
+       symbol == IxCode.BasicTypeRef.DOUBLE
       );
     }
     
-    IrExpression typeCheck(Expression expression, LocalContext context){
-      return (IrExpression) expression.accept(this, context);
+    IxCode.IrExpression typeCheck(Expression expression, LocalContext context){
+      return (IxCode.IrExpression) expression.accept(this, context);
     }
       
-    IrStatement translate(Statement statement, LocalContext context){
-      return (IrStatement) statement.accept(this, context);
+    IxCode.IrStatement translate(Statement statement, LocalContext context){
+      return (IxCode.IrStatement) statement.accept(this, context);
     }
   }
   
@@ -2909,7 +2848,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     this.reporter = new SemanticErrorReporter(this.conf.getMaxErrorReports()); 
   }
   
-  public IrClass[] process(CompilationUnit[] units){
+  public IxCode.IrClass[] process(CompilationUnit[] units){
     ClassTableBuilder builder = new ClassTableBuilder();
     for(int i = 0; i < units.length; i++){
       builder.process(units[i]);

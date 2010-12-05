@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import onion.lang.core.type.TypeRef;
+import onion.compiler.IxCode;
 
 /**
  * @author Kota Mizushima
@@ -16,7 +16,7 @@ import onion.lang.core.type.TypeRef;
 public class ClosureLocalBinding extends LocalBinding {
   private int frame;
   
-  public ClosureLocalBinding(int frame, int index, TypeRef type) {
+  public ClosureLocalBinding(int frame, int index, IxCode.TypeRef type) {
     super(index, type);
     this.frame = frame;
   }

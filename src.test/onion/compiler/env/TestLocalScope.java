@@ -9,9 +9,7 @@ package onion.compiler.env;
 
 import java.util.Set;
 
-import onion.compiler.env.LocalBinding;
-import onion.compiler.env.LocalScope;
-import onion.lang.core.type.BasicTypeRef;
+import onion.compiler.IxCode;
 
 
 import junit.framework.TestCase;
@@ -33,10 +31,10 @@ public class TestLocalScope extends TestCase {
   protected void setUp() throws Exception {
     scope = new LocalScope(null);
     bindings = new LocalBinding[]{
-      new LocalBinding(0, BasicTypeRef.INT),
-      new LocalBinding(1, BasicTypeRef.DOUBLE),
-      new LocalBinding(2, BasicTypeRef.LONG),
-      new LocalBinding(3, BasicTypeRef.DOUBLE)
+      new LocalBinding(0, IxCode.BasicTypeRef.INT),
+      new LocalBinding(1, IxCode.BasicTypeRef.DOUBLE),
+      new LocalBinding(2, IxCode.BasicTypeRef.LONG),
+      new LocalBinding(3, IxCode.BasicTypeRef.DOUBLE)
     };
     names = new String[]{"hoge", "foo", "bar", "hogehoge"};
     names2 = new String[]{"a", "b", "c", "d"};

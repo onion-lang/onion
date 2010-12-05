@@ -10,8 +10,6 @@ package onion.compiler;
 import java.util.HashMap;
 import java.util.Map;
 
-import onion.lang.core.type.*;
-
 import org.apache.bcel.generic.*;
 
 /**
@@ -20,29 +18,29 @@ import org.apache.bcel.generic.*;
  */
 public class VMTypeBridge {
   private static Map basicTypeTable = new HashMap(){{
-    put(BasicTypeRef.BYTE,			BasicType.BYTE);
-    put(BasicTypeRef.SHORT,		BasicType.SHORT);
-    put(BasicTypeRef.CHAR,			BasicType.CHAR);
-    put(BasicTypeRef.INT,			BasicType.INT);
-    put(BasicTypeRef.LONG, 		BasicType.LONG);
-    put(BasicTypeRef.FLOAT,		BasicType.FLOAT);
-    put(BasicTypeRef.DOUBLE, 	BasicType.DOUBLE);
-    put(BasicTypeRef.BOOLEAN,	BasicType.BOOLEAN);
-    put(BasicTypeRef.VOID,			BasicType.VOID);
+    put(IxCode.BasicTypeRef.BYTE,			BasicType.BYTE);
+    put(IxCode.BasicTypeRef.SHORT,		BasicType.SHORT);
+    put(IxCode.BasicTypeRef.CHAR,			BasicType.CHAR);
+    put(IxCode.BasicTypeRef.INT,			BasicType.INT);
+    put(IxCode.BasicTypeRef.LONG, 		BasicType.LONG);
+    put(IxCode.BasicTypeRef.FLOAT,		BasicType.FLOAT);
+    put(IxCode.BasicTypeRef.DOUBLE, 	BasicType.DOUBLE);
+    put(IxCode.BasicTypeRef.BOOLEAN,	BasicType.BOOLEAN);
+    put(IxCode.BasicTypeRef.VOID,			BasicType.VOID);
   }};
   
   public VMTypeBridge() {
   }
 
-  public Type toVMType(TypeRef type){
+  public Type toVMType(IxCode.TypeRef type){
     if(type.isBasicType()){
       return (BasicType) basicTypeTable.get(type);
     }else if(type.isArrayType()){
-      ArraySymbol arrayType = (ArraySymbol)type;
+      IxCode.ArraySymbol arrayType = (IxCode.ArraySymbol)type;
       return new ArrayType(
         toVMType(arrayType.getComponent()), arrayType.getDimension());
     }else if(type.isClassType()){
-      return new ObjectType(((ClassSymbol)type).getName());
+      return new ObjectType(((IxCode.ClassSymbol)type).getName());
     }else{
       return Type.NULL;
     }

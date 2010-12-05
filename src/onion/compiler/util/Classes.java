@@ -10,7 +10,7 @@ package onion.compiler.util;
 import java.util.Set;
 import java.util.TreeSet;
 
-import onion.lang.core.type.*;
+import onion.compiler.IxCode;
 
 /**
  * @author Kota Mizushima
@@ -20,18 +20,18 @@ public class Classes {
   private Classes() {
   }
 
-  public static Set getInterfaceMethods(ClassSymbol type){
-    Set methods =  new TreeSet(new MethodSymbolComparator());
+  public static Set getInterfaceMethods(IxCode.ClassSymbol type){
+    Set methods =  new TreeSet(new IxCode.MethodSymbolComparator());
     collectInterfaceMethods(type, methods);
     return methods;
   }
   
-  private static void collectInterfaceMethods(ClassSymbol type, Set set){
-    MethodSymbol[] methods = type.getMethods();
+  private static void collectInterfaceMethods(IxCode.ClassSymbol type, Set set){
+    IxCode.MethodSymbol[] methods = type.getMethods();
     for(int i = 0; i < methods.length; i++){
       set.add(methods[i]);
     }
-    ClassSymbol[] interfaces = type.getInterfaces();
+    IxCode.ClassSymbol[] interfaces = type.getInterfaces();
     for(int i = 0 ; i < interfaces.length; i++){
       collectInterfaceMethods(interfaces[i], set);
     }

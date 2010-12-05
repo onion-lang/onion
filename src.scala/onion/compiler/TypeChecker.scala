@@ -2,6 +2,7 @@ package onion.compiler
 
 import error.SemanticErrorReporter
 import onion.lang.core.IrClass
+import onion.compiler.IxCode.{IrClass, IrClass}
 
 /**
  * Created by IntelliJ IDEA.

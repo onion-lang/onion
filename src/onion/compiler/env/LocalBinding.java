@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import onion.lang.core.type.TypeRef;
+import onion.compiler.IxCode;
 
 
 /**
@@ -15,9 +15,9 @@ import onion.lang.core.type.TypeRef;
  */
 public class LocalBinding{  
   private final int index;  
-  private final TypeRef type;
+  private final IxCode.TypeRef type;
   
-  public LocalBinding(int index, TypeRef type){
+  public LocalBinding(int index, IxCode.TypeRef type){
     this.index	= index;
     this.type = type;
   }
@@ -26,7 +26,7 @@ public class LocalBinding{
     return index;
   }
 
-  public TypeRef getType() {
+  public IxCode.TypeRef getType() {
     return type;
   }
 }

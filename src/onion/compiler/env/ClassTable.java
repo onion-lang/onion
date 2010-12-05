@@ -9,12 +9,11 @@ package onion.compiler.env;
 
 import java.util.*;
 
+import onion.compiler.IxCode;
 import onion.compiler.env.java.ClassFileSymbol;
 import onion.compiler.env.java.ClassFileTable;
 import onion.compiler.env.java.ClassObjectSymbol;
 import onion.compiler.util.Strings;
-import onion.lang.core.IrClass;
-import onion.lang.core.type.*;
 
 import org.apache.bcel.classfile.JavaClass;
 
@@ -23,40 +22,40 @@ import org.apache.bcel.classfile.JavaClass;
  * Date: 2005/06/22
  */
 public class ClassTable {
-  private List<IrClass> sourceClasses;
-  private Map<String, IrClass> sourceClassMap;
-  private Map<String, ClassSymbol> classFileMap;
-  private Map<String, ArraySymbol> arrayMap;
+  private List<IxCode.IrClass> sourceClasses;
+  private Map<String, IxCode.IrClass> sourceClassMap;
+  private Map<String, IxCode.ClassSymbol> classFileMap;
+  private Map<String, IxCode.ArraySymbol> arrayMap;
   private ClassFileTable table;
   
   public ClassTable(String classPath) {
-    sourceClasses  = new ArrayList<IrClass>();
-    sourceClassMap = new HashMap<String, IrClass>();
-    classFileMap   = new HashMap<String, ClassSymbol>();
-    arrayMap       = new HashMap<String, ArraySymbol>();
+    sourceClasses  = new ArrayList<IxCode.IrClass>();
+    sourceClassMap = new HashMap<String, IxCode.IrClass>();
+    classFileMap   = new HashMap<String, IxCode.ClassSymbol>();
+    arrayMap       = new HashMap<String, IxCode.ArraySymbol>();
     table          = new ClassFileTable(classPath);
   }
   
-  public void addSourceClass(IrClass node){
+  public void addSourceClass(IxCode.IrClass node){
     sourceClasses.add(node);
     sourceClassMap.put(node.getName(), node);
   }
   
-  public IrClass[] getSourceClasses(){
-    return (IrClass[])sourceClasses.toArray(new IrClass[0]);
+  public IxCode.IrClass[] getSourceClasses(){
+    return (IxCode.IrClass[])sourceClasses.toArray(new IxCode.IrClass[0]);
   }
   
-  public ArraySymbol loadArray(TypeRef component, int dimension){
+  public IxCode.ArraySymbol loadArray(IxCode.TypeRef component, int dimension){
     String arrayName = Strings.repeat("[", dimension) + component.getName();
-    ArraySymbol array = (ArraySymbol) arrayMap.get(arrayName);
+    IxCode.ArraySymbol array = (IxCode.ArraySymbol) arrayMap.get(arrayName);
     if(array != null) return array;
-    array = new ArraySymbol(component, dimension, this);
+    array = new IxCode.ArraySymbol(component, dimension, this);
     arrayMap.put(arrayName, array);
     return array;
   }
   
-  public ClassSymbol load(String className){
-    ClassSymbol clazz = lookup(className);
+  public IxCode.ClassSymbol load(String className){
+    IxCode.ClassSymbol clazz = lookup(className);
     if(clazz == null){
       JavaClass javaClass = table.load(className);
       if(javaClass != null){
@@ -75,16 +74,16 @@ public class ClassTable {
     return clazz;
   }
   
-  public ClassSymbol rootClass(){
+  public IxCode.ClassSymbol rootClass(){
     return load("java.lang.Object");
   }
   
-  public ClassSymbol lookup(String className){
-    ClassSymbol symbol = (ClassSymbol) sourceClassMap.get(className);
-    return (symbol != null) ? symbol : (ClassSymbol) classFileMap.get(className);
+  public IxCode.ClassSymbol lookup(String className){
+    IxCode.ClassSymbol symbol = (IxCode.ClassSymbol) sourceClassMap.get(className);
+    return (symbol != null) ? symbol : (IxCode.ClassSymbol) classFileMap.get(className);
   }
   
-  private void addClassFileSymbol(ClassSymbol symbol){
+  private void addClassFileSymbol(IxCode.ClassSymbol symbol){
     classFileMap.put(symbol.getName(), symbol);
   }
 }

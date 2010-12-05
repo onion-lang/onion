@@ -7,20 +7,20 @@
  * ************************************************************** */
 package onion.compiler.env.java;
 
-import onion.lang.core.type.*;
+import onion.compiler.IxCode;
 
 /**
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileFieldSymbol implements FieldSymbol {
+public class ClassFileFieldSymbol implements IxCode.FieldSymbol {
   private int modifier;
-  private ClassSymbol classType;
+  private IxCode.ClassSymbol classType;
   private String name;
-  private TypeRef type;
+  private IxCode.TypeRef type;
 
   public ClassFileFieldSymbol(
-    int modifier, ClassSymbol classType, String name, TypeRef type) {
+    int modifier, IxCode.ClassSymbol classType, String name, IxCode.TypeRef type) {
     this.modifier = modifier;
     this.classType = classType;
     this.name = name;
@@ -31,7 +31,7 @@ public class ClassFileFieldSymbol implements FieldSymbol {
     return modifier;
   }
 
-  public ClassSymbol getClassType() {
+  public IxCode.ClassSymbol getClassType() {
     return classType;
   }
 
@@ -39,7 +39,7 @@ public class ClassFileFieldSymbol implements FieldSymbol {
     return name;
   }
 
-  public TypeRef getType() {
+  public IxCode.TypeRef getType() {
     return type;
   }
 }

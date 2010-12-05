@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import onion.lang.core.type.*;
+import onion.compiler.IxCode;
 import onion.lang.syntax.RawTypeNode;
 import onion.lang.syntax.TypeSpec;
 
@@ -25,8 +25,8 @@ public class NameResolution {
     this.table = table;
   }
     
-  public TypeRef resolve(TypeSpec specifier) {
-    TypeRef componentType = resolveMain(specifier.getComponent());
+  public IxCode.TypeRef resolve(TypeSpec specifier) {
+    IxCode.TypeRef componentType = resolveMain(specifier.getComponent());
     if(specifier.getDimension() > 0){
       return table.loadArray(componentType, specifier.getDimension());
     }else{
@@ -34,18 +34,18 @@ public class NameResolution {
     }
   }
     
-  private TypeRef resolveMain(RawTypeNode component) {
+  private IxCode.TypeRef resolveMain(RawTypeNode component) {
     String name = component.name();
     if(component.getKind() == RawTypeNode.BASIC){
-      if(name.equals("char")) return BasicTypeRef.CHAR;
-      if(name.equals("byte")) return BasicTypeRef.BYTE;
-      if(name.equals("short")) return BasicTypeRef.SHORT;
-      if(name.equals("int")) return BasicTypeRef.INT;
-      if(name.equals("long")) return BasicTypeRef.LONG;
-      if(name.equals("float")) return BasicTypeRef.FLOAT;
-      if(name.equals("double")) return BasicTypeRef.DOUBLE;
-      if(name.equals("boolean")) return BasicTypeRef.BOOLEAN;
-      return BasicTypeRef.VOID;
+      if(name.equals("char")) return IxCode.BasicTypeRef.CHAR;
+      if(name.equals("byte")) return IxCode.BasicTypeRef.BYTE;
+      if(name.equals("short")) return IxCode.BasicTypeRef.SHORT;
+      if(name.equals("int")) return IxCode.BasicTypeRef.INT;
+      if(name.equals("long")) return IxCode.BasicTypeRef.LONG;
+      if(name.equals("float")) return IxCode.BasicTypeRef.FLOAT;
+      if(name.equals("double")) return IxCode.BasicTypeRef.DOUBLE;
+      if(name.equals("boolean")) return IxCode.BasicTypeRef.BOOLEAN;
+      return IxCode.BasicTypeRef.VOID;
     }else if(component.getKind() == RawTypeNode.NOT_QUALIFIED){
       return forSName(name);
     }else{
@@ -53,15 +53,15 @@ public class NameResolution {
     }
   }
   
-  private ClassSymbol forQName(String qualifiedName) {
+  private IxCode.ClassSymbol forQName(String qualifiedName) {
     return table.load(qualifiedName);
   }
   
-  private ClassSymbol forSName(String simpleName) {
+  private IxCode.ClassSymbol forSName(String simpleName) {
     for(int i = 0; i < imports.size(); i++){
       String qualifiedName = imports.get(i).match(simpleName);
       if(qualifiedName != null){
-        ClassSymbol resolvedSymbol = forQName(qualifiedName);
+        IxCode.ClassSymbol resolvedSymbol = forQName(qualifiedName);
         if(resolvedSymbol != null) return resolvedSymbol;
       }
     }

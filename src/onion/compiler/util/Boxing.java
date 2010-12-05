@@ -7,10 +7,8 @@
  * ************************************************************** */
 package onion.compiler.util;
 
+import onion.compiler.IxCode;
 import onion.compiler.env.ClassTable;
-import onion.lang.core.IrExpression;
-import onion.lang.core.IrNew;
-import onion.lang.core.type.*;
 
 
 /**
@@ -19,20 +17,20 @@ import onion.lang.core.type.*;
  */
 public class Boxing {
   private static final Object[][] TABLE = {
-    {BasicTypeRef.BOOLEAN, "java.lang.Boolean"   },
-    {BasicTypeRef.BYTE,    "java.lang.Byte"      },
-    {BasicTypeRef.SHORT,   "java.lang.Short"     },
-    {BasicTypeRef.CHAR,    "java.lang.Character" },
-    {BasicTypeRef.INT,     "java.lang.Integer"   },
-    {BasicTypeRef.LONG,    "java.lang.Long"      },
-    {BasicTypeRef.FLOAT,   "java.lang.Float"     },
-    {BasicTypeRef.DOUBLE,  "java.lang.Double"    },
+    {IxCode.BasicTypeRef.BOOLEAN, "java.lang.Boolean"   },
+    {IxCode.BasicTypeRef.BYTE,    "java.lang.Byte"      },
+    {IxCode.BasicTypeRef.SHORT,   "java.lang.Short"     },
+    {IxCode.BasicTypeRef.CHAR,    "java.lang.Character" },
+    {IxCode.BasicTypeRef.INT,     "java.lang.Integer"   },
+    {IxCode.BasicTypeRef.LONG,    "java.lang.Long"      },
+    {IxCode.BasicTypeRef.FLOAT,   "java.lang.Float"     },
+    {IxCode.BasicTypeRef.DOUBLE,  "java.lang.Double"    },
   };
   
   private Boxing() {
   }
   
-  private static ClassSymbol boxedType(ClassTable table, BasicTypeRef type){
+  private static IxCode.ClassSymbol boxedType(ClassTable table, IxCode.BasicTypeRef type){
     for(int i  = 0; i < TABLE.length; i++){
       if(TABLE[i][0] == type){
         return table.load(((String)TABLE[i][1]));
@@ -41,17 +39,17 @@ public class Boxing {
     throw new RuntimeException("");
   }
   
-  public static IrExpression boxing(ClassTable table, IrExpression node){
-    TypeRef type = node.type();
-    if((!type.isBasicType()) || type == BasicTypeRef.VOID){
+  public static IxCode.IrExpression boxing(ClassTable table, IxCode.IrExpression node){
+    IxCode.TypeRef type = node.type();
+    if((!type.isBasicType()) || type == IxCode.BasicTypeRef.VOID){
       throw new IllegalArgumentException("node type must be boxable type");
     }
-    ClassSymbol boxedType = boxedType(table, (BasicTypeRef)type);
-    ConstructorSymbol[] cs = boxedType.getConstructors();
+    IxCode.ClassSymbol boxedType = boxedType(table, (IxCode.BasicTypeRef)type);
+    IxCode.ConstructorSymbol[] cs = boxedType.getConstructors();
     for(int i = 0; i < cs.length; i++){
-      TypeRef[] args = cs[i].getArgs();
+      IxCode.TypeRef[] args = cs[i].getArgs();
       if(args.length == 1 && args[i] == type){
-        return new IrNew(cs[i], new IrExpression[]{node});
+        return new IxCode.IrNew(cs[i], new IxCode.IrExpression[]{node});
       }
     }
     throw new RuntimeException("couldn't find matched constructor");

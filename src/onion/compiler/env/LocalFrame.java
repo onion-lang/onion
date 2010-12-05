@@ -9,7 +9,7 @@ package onion.compiler.env;
 
 import java.util.*;
 
-import onion.lang.core.type.TypeRef;
+import onion.compiler.IxCode;
 
 
 /**
@@ -77,7 +77,7 @@ public class LocalFrame {
     return binds;
   }
   
-  public int addEntry(String name, TypeRef type){
+  public int addEntry(String name, IxCode.TypeRef type){
     LocalBinding bind = scope.get(name);    
     //if name is already registered, it returns -1 which means failure.
     if(bind != null) return -1;

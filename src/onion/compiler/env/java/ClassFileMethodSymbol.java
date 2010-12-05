@@ -7,26 +7,26 @@
  * ************************************************************** */
 package onion.compiler.env.java;
 
-import onion.lang.core.type.*;
+import onion.compiler.IxCode;
 
 /**
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileMethodSymbol implements MethodSymbol {
+public class ClassFileMethodSymbol implements IxCode.MethodSymbol {
   private int modifier;
-  private ClassSymbol classType;  
+  private IxCode.ClassSymbol classType;
   private String name;
-  private TypeRef[] arguments;
-  private TypeRef returnType;
+  private IxCode.TypeRef[] arguments;
+  private IxCode.TypeRef returnType;
 
   public ClassFileMethodSymbol(
-    int modifier, ClassSymbol classType, String name, 
-    TypeRef[] arguments, TypeRef returnType) {
+    int modifier, IxCode.ClassSymbol classType, String name,
+    IxCode.TypeRef[] arguments, IxCode.TypeRef returnType) {
     this.modifier = modifier;
     this.classType = classType;
     this.name = name;
-    this.arguments = (TypeRef[]) arguments.clone();
+    this.arguments = (IxCode.TypeRef[]) arguments.clone();
     this.returnType = returnType;
   }
   
@@ -34,7 +34,7 @@ public class ClassFileMethodSymbol implements MethodSymbol {
     return modifier;
   }
 
-  public ClassSymbol getClassType() {
+  public IxCode.ClassSymbol getClassType() {
     return classType;
   }
 
@@ -42,11 +42,11 @@ public class ClassFileMethodSymbol implements MethodSymbol {
     return name;
   }
 
-  public TypeRef[] getArguments() {
+  public IxCode.TypeRef[] getArguments() {
     return arguments;
   }
 
-  public TypeRef getReturnType() {
+  public IxCode.TypeRef getReturnType() {
     return returnType;
   }
 }

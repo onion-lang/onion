@@ -12,8 +12,6 @@ import java.util.*;
 import onion.compiler.*;
 import onion.compiler.env.*;
 import onion.compiler.util.*;
-import onion.lang.core.*;
-import onion.lang.core.type.*;
 import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;
@@ -23,7 +21,7 @@ import org.apache.bcel.generic.*;
 /**
  * @author Kota Mizushima Date: 2005/04/10
  */
-public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants {
+public class CodeGeneration implements IxCode.IrBinExp.Constants, IxCode.IrUnaryExp.Constants {
   private CompilerConfig config;
   private List compiledClasses = new ArrayList();
   private SymbolGenerator generator;
@@ -48,7 +46,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     this.bridge = new VMTypeBridge();
   }
 
-  public CompiledClass[] process(IrClass[] classes) {
+  public CompiledClass[] process(IxCode.IrClass[] classes) {
     compiledClasses.clear();
     String base = config.getOutputDirectory();
     base = base != null ? base : ".";
@@ -79,14 +77,14 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }
   }
   
-  private int classModifier(IrClass node){
+  private int classModifier(IxCode.IrClass node){
     int modifier = toJavaModifier(node.getModifier());
     modifier |= node.isInterface() ? Constants.ACC_INTERFACE : modifier;
     modifier |= (!Modifier.isInternal(modifier)) ? Constants.ACC_PUBLIC : modifier;
     return modifier;
   }
 
-  public void codeClass(IrClass node) {
+  public void codeClass(IxCode.IrClass node) {
     int modifier = classModifier(node);
     String className = node.getName();
     generator = new SymbolGenerator(className + CLOSURE_CLASS_SUFFIX);
@@ -94,22 +92,22 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     String[] interfaces = namesOf(node.getInterfaces());
     String file = node.getSourceFile();
     ClassGen gen = new ClassGen(className, superClass, file, modifier, interfaces);
-    ConstructorSymbol[] constructors = node.getConstructors();
+    IxCode.ConstructorSymbol[] constructors = node.getConstructors();
     for (int i = 0; i < constructors.length; i++) {
-      codeConstructor(gen, ((IrConstructor) constructors[i]));
+      codeConstructor(gen, ((IxCode.IrConstructor) constructors[i]));
     }
-    MethodSymbol[] methods = node.getMethods();
+    IxCode.MethodSymbol[] methods = node.getMethods();
     for (int i = 0; i < methods.length; i++) {
-      codeMethod(gen, ((IrMethod) methods[i]));
+      codeMethod(gen, ((IxCode.IrMethod) methods[i]));
     }
-    FieldSymbol[] fields = node.getFields();
+    IxCode.FieldSymbol[] fields = node.getFields();
     for (int i = 0; i < fields.length; i++) {
-      codeField(gen, ((IrField) fields[i]));
+      codeField(gen, ((IxCode.IrField) fields[i]));
     }
     compiledClasses.add(gen.getJavaClass());
   }
   
-  public InstructionHandle codeExpressions(IrExpression[] nodes, CodeProxy code){
+  public InstructionHandle codeExpressions(IxCode.IrExpression[] nodes, CodeProxy code){
     InstructionHandle start;
     if(nodes.length > 0){
       start = codeExpression(nodes[0], code);
@@ -122,7 +120,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public void codeConstructor(ClassGen gen, IrConstructor node) {
+  public void codeConstructor(ClassGen gen, IxCode.IrConstructor node) {
     CodeProxy code = new CodeProxy(gen.getConstantPool());
     LocalFrame frame = node.getFrame();
     code.setFrame(frame);
@@ -145,7 +143,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
       code.setIndexTable(indexTableFor(1, frame));
     }
     code.setMethod(method);
-    IrSuper init = node.getSuperInitializer();
+    IxCode.IrSuper init = node.getSuperInitializer();
     classType = (ObjectType) typeOf(init.getClassType());
     arguments = typesOf(init.getArguments());    
     code.append(InstructionConstants.ALOAD_0);
@@ -154,11 +152,11 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     codeBlock(node.getBlock(), code);
     method.setMaxLocals();
     method.setMaxStack();
-    code.appendReturn(typeOf(BasicTypeRef.VOID));
+    code.appendReturn(typeOf(IxCode.BasicTypeRef.VOID));
     gen.addMethod(method.getMethod());
   }
 
-  public void codeMethod(ClassGen gen, IrMethod node) {
+  public void codeMethod(ClassGen gen, IxCode.IrMethod node) {
     CodeProxy code = new CodeProxy(gen.getConstantPool());
     LocalFrame frame = node.getFrame();
     code.setFrame(frame);
@@ -230,9 +228,9 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }
   }
 
-  private void implementsMethods(ClassGen gen, MethodSymbol[] methods){
+  private void implementsMethods(ClassGen gen, IxCode.MethodSymbol[] methods){
     for(int i = 0; i < methods.length; i++){
-      MethodSymbol method = methods[i];
+      IxCode.MethodSymbol method = methods[i];
       Type returnType = typeOf(method.getReturnType());
       String name = method.getName();
       Type[] args = typesOf(method.getArguments());
@@ -249,8 +247,8 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }
   }
   
-  public InstructionHandle codeClosure(IrClosure node, CodeProxy code){
-    ClassSymbol classType = node.getClassType();
+  public InstructionHandle codeClosure(IxCode.IrClosure node, CodeProxy code){
+    IxCode.ClassSymbol classType = node.getClassType();
     String closureName = generator.generate();
     Type[] arguments = typesOf(node.getArguments());
     ClassGen gen = new ClassGen(
@@ -260,7 +258,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     Set methods = Classes.getInterfaceMethods(classType);
     methods.remove(node.getMethod());
     implementsMethods(
-      gen, (MethodSymbol[]) methods.toArray(new MethodSymbol[0]));
+      gen, (IxCode.MethodSymbol[]) methods.toArray(new IxCode.MethodSymbol[0]));
     
     LocalFrame frame = node.getFrame();
     int depth = frame.depth();
@@ -320,13 +318,13 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return arguments;
   }
   
-  private InstructionHandle codeList(IrList node, CodeProxy code){
+  private InstructionHandle codeList(IxCode.IrList node, CodeProxy code){
     ObjectType listType = (ObjectType) typeOf(node.type());
     InstructionHandle start = code.appendNew("java.util.ArrayList");
     code.appendDup(1);
     code.appendCallConstructor(
       new ObjectType("java.util.ArrayList"), new Type[0]);
-    IrExpression[] elements = node.getElements();
+    IxCode.IrExpression[] elements = node.getElements();
     for(int i = 0; i < elements.length; i++){
       code.appendDup(1);
       codeExpression(elements[i], code);
@@ -338,10 +336,10 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public InstructionHandle codeSuperCall(IrCallSuper node, CodeProxy code){
+  public InstructionHandle codeSuperCall(IxCode.IrCallSuper node, CodeProxy code){
     InstructionHandle start = codeExpression(node.getTarget(), code);
     codeExpressions(node.getParams(), code);
-    MethodSymbol method = node.getMethod();
+    IxCode.MethodSymbol method = node.getMethod();
     code.appendInvoke(
       method.getClassType().getName(),
       method.getName(),
@@ -382,14 +380,14 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return constructor;
   }
   
-  public void codeField(ClassGen gen, IrField node) {
+  public void codeField(ClassGen gen, IxCode.IrField node) {
     FieldGen field = new FieldGen(
       toJavaModifier(node.getModifier()), 
       typeOf(node.getType()), node.getName(), gen.getConstantPool());
     gen.addField(field.getField());
   }
 
-  public InstructionHandle codeBlock(IrBlock node, CodeProxy code) {
+  public InstructionHandle codeBlock(IxCode.IrBlock node, CodeProxy code) {
     InstructionHandle start;
     if(node.getStatements().length > 0){
       start = codeStatement(node.getStatements()[0], code);
@@ -402,10 +400,10 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeExpressionStatement(IrExpStmt node, CodeProxy code) {
+  public InstructionHandle codeExpressionStatement(IxCode.IrExpStmt node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.expression, code);
-    TypeRef type = node.expression.type();
-    if (type != BasicTypeRef.VOID) {
+    IxCode.TypeRef type = node.expression.type();
+    if (type != IxCode.BasicTypeRef.VOID) {
       if (isWideType(type)) {
         code.append(InstructionConstants.POP2);
       } else {
@@ -415,33 +413,33 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeStatement(IrStatement node, CodeProxy code) {
+  public InstructionHandle codeStatement(IxCode.IrStatement node, CodeProxy code) {
     InstructionHandle start;
-    if (node instanceof IrBlock) {
-      start = codeBlock((IrBlock) node, code);
-    } else if (node instanceof IrExpStmt) {
-      start = codeExpressionStatement((IrExpStmt) node, code);
-    } else if (node instanceof IrIf) {
-      start = codeIf((IrIf) node, code);
-    } else if (node instanceof IrLoop) {
-      start = codeLoop((IrLoop) node, code);
-    } else if (node instanceof IrNOP) {
-      start = codeEmpty((IrNOP) node, code);
-    } else if (node instanceof IrReturn) {
-      start = codeReturn((IrReturn) node, code);
-    } else if (node instanceof IrSynchronized) {
-      start = codeSynchronized((IrSynchronized) node, code);
-    } else if (node instanceof IrThrow) {
-      start = codeThrowNode((IrThrow)node, code);
-    } else if (node instanceof IrTry){
-      start = codeTry((IrTry)node, code);
+    if (node instanceof IxCode.IrBlock) {
+      start = codeBlock((IxCode.IrBlock) node, code);
+    } else if (node instanceof IxCode.IrExpStmt) {
+      start = codeExpressionStatement((IxCode.IrExpStmt) node, code);
+    } else if (node instanceof IxCode.IrIf) {
+      start = codeIf((IxCode.IrIf) node, code);
+    } else if (node instanceof IxCode.IrLoop) {
+      start = codeLoop((IxCode.IrLoop) node, code);
+    } else if (node instanceof IxCode.IrNOP) {
+      start = codeEmpty((IxCode.IrNOP) node, code);
+    } else if (node instanceof IxCode.IrReturn) {
+      start = codeReturn((IxCode.IrReturn) node, code);
+    } else if (node instanceof IxCode.IrSynchronized) {
+      start = codeSynchronized((IxCode.IrSynchronized) node, code);
+    } else if (node instanceof IxCode.IrThrow) {
+      start = codeThrowNode((IxCode.IrThrow)node, code);
+    } else if (node instanceof IxCode.IrTry){
+      start = codeTry((IxCode.IrTry)node, code);
     } else {
       start = code.append(InstructionConstants.NOP);
     }
     return start;
   }
 
-  public InstructionHandle codeReturn(IrReturn node, CodeProxy code) {
+  public InstructionHandle codeReturn(IxCode.IrReturn node, CodeProxy code) {
     InstructionHandle start;
     if (node.expression != null) {
       start = codeExpression(node.expression, code);
@@ -453,17 +451,17 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeSynchronized(IrSynchronized node, CodeProxy code) {
+  public InstructionHandle codeSynchronized(IxCode.IrSynchronized node, CodeProxy code) {
     return null;
   }
   
-  public InstructionHandle codeThrowNode(IrThrow node, CodeProxy code){
+  public InstructionHandle codeThrowNode(IxCode.IrThrow node, CodeProxy code){
     InstructionHandle start = codeExpression(node.expression, code);
     code.append(InstructionConstants.ATHROW);
     return start;
   }
   
-  public InstructionHandle codeTry(IrTry node, CodeProxy code){
+  public InstructionHandle codeTry(IxCode.IrTry node, CodeProxy code){
     InstructionHandle start = codeStatement(node.tryStatement, code);    
     BranchHandle to = code.append(new GOTO(null));
     int length = node.catchTypes.length;
@@ -485,11 +483,11 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeEmpty(IrNOP node, CodeProxy code) {
+  public InstructionHandle codeEmpty(IxCode.IrNOP node, CodeProxy code) {
     return code.append(InstructionConstants.NOP);
   }
 
-  public InstructionHandle codeIf(IrIf node, CodeProxy code) {
+  public InstructionHandle codeIf(IxCode.IrIf node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getCondition(), code);
     BranchHandle toThen = code.append(new IFNE(null));
     if (node.getElseStatement() != null) {
@@ -501,7 +499,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeLoop(IrLoop node, CodeProxy code) {
+  public InstructionHandle codeLoop(IxCode.IrLoop node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.condition, code);
     BranchHandle branch = code.append(new IFEQ(null));
     codeStatement(node.stmt, code);
@@ -523,11 +521,11 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return modifier;
   }
 
-  private String nameOf(ClassSymbol symbol) {
+  private String nameOf(IxCode.ClassSymbol symbol) {
     return symbol.getName();
   }
 
-  private String[] namesOf(ClassSymbol[] symbols) {
+  private String[] namesOf(IxCode.ClassSymbol[] symbols) {
     String[] names = new String[symbols.length];
     for (int i = 0; i < names.length; i++) {
       names[i] = nameOf(symbols[i]);
@@ -536,82 +534,82 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
   }
 
   public InstructionHandle codeExpression(
-    IrExpression node, CodeProxy code) {
+    IxCode.IrExpression node, CodeProxy code) {
     InstructionHandle start;
-    if (node instanceof IrBinExp) {
-      start = codeBinaryExpression((IrBinExp) node, code);
-    } else if(node instanceof IrUnaryExp) {
-      start = codeUnaryExpression((IrUnaryExp) node, code);
-    } else if(node instanceof IrBegin) {
-      start = codeBegin((IrBegin) node, code);
-    } else if(node instanceof IrLocalSet) {
-      start = codeLocalAssign((IrLocalSet) node, code);
-    } else if(node instanceof IrLocalRef) {
-      start = codeLocalRef((IrLocalRef) node, code);
-    } else if(node instanceof IrStaticFieldRef) {
-      start = codeStaticFieldRef((IrStaticFieldRef) node, code);
-    } else if(node instanceof IrFieldRef) {
-      start = codeFieldRef((IrFieldRef) node, code);
-    } else if(node instanceof IrFieldSet) {
-      start = codeFieldAssign((IrFieldSet) node, code);
-    } else if(node instanceof IrCall) {
-      start = codeMethodCall((IrCall) node, code);
-    } else if(node instanceof IrArrayRef){
-      start = codeArrayRef((IrArrayRef)node, code);
-    } else if(node instanceof IrArrayLength){
-      start = codeArrayLengthNode((IrArrayLength)node, code);
-    } else if(node instanceof IrArraySet){
-      start = codeArrayAssignment((IrArraySet)node, code);
-    } else if(node instanceof IrNew){
-      start = codeNew((IrNew)node, code);
-    } else if(node instanceof IrNewArray){
-      start = codeNewArray((IrNewArray)node, code);
-    } else if(node instanceof IrArrayRef){
-      start = codeArrayRef((IrArrayRef)node, code);
-    } else if(node instanceof IrCallStatic){
-      start = codeStaticMethodCall((IrCallStatic)node, code);
-    } else if(node instanceof IrChar){
-      start = codeChar((IrChar)node, code);
-    } else if(node instanceof IrString) {
-      start = codeString((IrString) node, code);
-    } else if(node instanceof IrInt) {
-      start = codeInteger((IrInt)node, code);
-    } else if(node instanceof IrLong){
-      start = codeLong((IrLong)node, code);
-  	} else if(node instanceof IrFloat) {
-  	  start = codeFloat((IrFloat)node ,code);
-  	} else if(node instanceof IrDouble) {
-  	  start = codeDouble((IrDouble)node, code);
-  	} else if(node instanceof IrBool) {
-  	  start = codeBoolean((IrBool)node, code);
-  	} else if(node instanceof IrNull) {
-  	  start = codeNull((IrNull)node, code);
-  	} else if(node instanceof IrCast) {
-  	  start = codeCast((IrCast)node, code);
-  	} else if(node instanceof IrThis) {
-  	  start = codeSelf((IrThis)node, code);
-  	} else if(node instanceof IrInstanceOf){
-  	  start = codeIsInstance((IrInstanceOf)node, code);
-  	} else if(node instanceof IrClosure){
-  	  start = codeClosure((IrClosure)node, code);
-  	} else if(node instanceof IrList){
-  	  start = codeList((IrList)node, code);
-  	} else if(node instanceof IrCallSuper){
-  	  start = codeSuperCall((IrCallSuper)node, code);
+    if (node instanceof IxCode.IrBinExp) {
+      start = codeBinaryExpression((IxCode.IrBinExp) node, code);
+    } else if(node instanceof IxCode.IrUnaryExp) {
+      start = codeUnaryExpression((IxCode.IrUnaryExp) node, code);
+    } else if(node instanceof IxCode.IrBegin) {
+      start = codeBegin((IxCode.IrBegin) node, code);
+    } else if(node instanceof IxCode.IrLocalSet) {
+      start = codeLocalAssign((IxCode.IrLocalSet) node, code);
+    } else if(node instanceof IxCode.IrLocalRef) {
+      start = codeLocalRef((IxCode.IrLocalRef) node, code);
+    } else if(node instanceof IxCode.IrStaticFieldRef) {
+      start = codeStaticFieldRef((IxCode.IrStaticFieldRef) node, code);
+    } else if(node instanceof IxCode.IrFieldRef) {
+      start = codeFieldRef((IxCode.IrFieldRef) node, code);
+    } else if(node instanceof IxCode.IrFieldSet) {
+      start = codeFieldAssign((IxCode.IrFieldSet) node, code);
+    } else if(node instanceof IxCode.IrCall) {
+      start = codeMethodCall((IxCode.IrCall) node, code);
+    } else if(node instanceof IxCode.IrArrayRef){
+      start = codeArrayRef((IxCode.IrArrayRef)node, code);
+    } else if(node instanceof IxCode.IrArrayLength){
+      start = codeArrayLengthNode((IxCode.IrArrayLength)node, code);
+    } else if(node instanceof IxCode.IrArraySet){
+      start = codeArrayAssignment((IxCode.IrArraySet)node, code);
+    } else if(node instanceof IxCode.IrNew){
+      start = codeNew((IxCode.IrNew)node, code);
+    } else if(node instanceof IxCode.IrNewArray){
+      start = codeNewArray((IxCode.IrNewArray)node, code);
+    } else if(node instanceof IxCode.IrArrayRef){
+      start = codeArrayRef((IxCode.IrArrayRef)node, code);
+    } else if(node instanceof IxCode.IrCallStatic){
+      start = codeStaticMethodCall((IxCode.IrCallStatic)node, code);
+    } else if(node instanceof IxCode.IrChar){
+      start = codeChar((IxCode.IrChar)node, code);
+    } else if(node instanceof IxCode.IrString) {
+      start = codeString((IxCode.IrString) node, code);
+    } else if(node instanceof IxCode.IrInt) {
+      start = codeInteger((IxCode.IrInt)node, code);
+    } else if(node instanceof IxCode.IrLong){
+      start = codeLong((IxCode.IrLong)node, code);
+  	} else if(node instanceof IxCode.IrFloat) {
+  	  start = codeFloat((IxCode.IrFloat)node ,code);
+  	} else if(node instanceof IxCode.IrDouble) {
+  	  start = codeDouble((IxCode.IrDouble)node, code);
+  	} else if(node instanceof IxCode.IrBool) {
+  	  start = codeBoolean((IxCode.IrBool)node, code);
+  	} else if(node instanceof IxCode.IrNull) {
+  	  start = codeNull((IxCode.IrNull)node, code);
+  	} else if(node instanceof IxCode.IrCast) {
+  	  start = codeCast((IxCode.IrCast)node, code);
+  	} else if(node instanceof IxCode.IrThis) {
+  	  start = codeSelf((IxCode.IrThis)node, code);
+  	} else if(node instanceof IxCode.IrInstanceOf){
+  	  start = codeIsInstance((IxCode.IrInstanceOf)node, code);
+  	} else if(node instanceof IxCode.IrClosure){
+  	  start = codeClosure((IxCode.IrClosure)node, code);
+  	} else if(node instanceof IxCode.IrList){
+  	  start = codeList((IxCode.IrList)node, code);
+  	} else if(node instanceof IxCode.IrCallSuper){
+  	  start = codeSuperCall((IxCode.IrCallSuper)node, code);
   	} else {
   	  throw new RuntimeException();
     }
     return start;
   }
   
-  public InstructionHandle codeBegin(IrBegin node, CodeProxy code) {
+  public InstructionHandle codeBegin(IxCode.IrBegin node, CodeProxy code) {
     InstructionHandle start;
-    IrExpression[] expressions = node.getExpressions();
+    IxCode.IrExpression[] expressions = node.getExpressions();
     if(expressions.length > 0){
       start = codeExpression(expressions[0], code);
       for (int i = 1; i < expressions.length; i++) {
-        TypeRef type = expressions[i - 1].type();
-        if (type != BasicTypeRef.VOID) {
+        IxCode.TypeRef type = expressions[i - 1].type();
+        if (type != IxCode.BasicTypeRef.VOID) {
           if (isWideType(type)) {
             code.append(InstructionConstants.POP2);
           } else {
@@ -626,7 +624,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeLocalAssign(IrLocalSet node, CodeProxy code) {
+  public InstructionHandle codeLocalAssign(IxCode.IrLocalSet node, CodeProxy code) {
     InstructionHandle start = null;
     Type type = typeOf(node.type());
     if(node.getFrame() == 0 && !code.getFrame().isClosed()){
@@ -670,7 +668,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
   
 
 
-  public InstructionHandle codeLocalRef(IrLocalRef node, CodeProxy code) {
+  public InstructionHandle codeLocalRef(IxCode.IrLocalRef node, CodeProxy code) {
     InstructionHandle start = null;
     Type type = typeOf(node.type());
     if(node.frame() == 0 && !code.getFrame().isClosed()){
@@ -700,19 +698,19 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeStaticFieldRef(IrStaticFieldRef node, CodeProxy code) {
+  public InstructionHandle codeStaticFieldRef(IxCode.IrStaticFieldRef node, CodeProxy code) {
     String classType = node.field.getClassType().getName();
     String name = node.field.getName();
     Type type = typeOf(node.type());
     return code.appendGetStatic(classType, name, type);
   }
 
-  public InstructionHandle codeMethodCall(IrCall node, CodeProxy code) {
+  public InstructionHandle codeMethodCall(IxCode.IrCall node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.target, code);
     for (int i = 0; i < node.parameters.length; i++) {
       codeExpression(node.parameters[i], code);
     }    
-    ObjectTypeRef classType = (ObjectTypeRef) node.target.type();
+    IxCode.ObjectTypeRef classType = (IxCode.ObjectTypeRef) node.target.type();
     short kind;
     if(classType.isInterface()){
       kind = Constants.INVOKEINTERFACE;
@@ -727,23 +725,23 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public InstructionHandle codeArrayRef(IrArrayRef node, CodeProxy code){
-    ArraySymbol targetType = (ArraySymbol)node.getObject().type();
+  public InstructionHandle codeArrayRef(IxCode.IrArrayRef node, CodeProxy code){
+    IxCode.ArraySymbol targetType = (IxCode.ArraySymbol)node.getObject().type();
     InstructionHandle start = codeExpression(node.getObject(), code);
     codeExpression(node.getIndex(), code);
     code.appendArrayLoad(typeOf(targetType.getBase()));
     return start;
   }
   
-  public InstructionHandle codeArrayLengthNode(IrArrayLength node, CodeProxy code){
+  public InstructionHandle codeArrayLengthNode(IxCode.IrArrayLength node, CodeProxy code){
     InstructionHandle start = codeExpression(node.getTarget(), code);
     code.append(InstructionConstants.ARRAYLENGTH);
     return start;
   }
   
   public InstructionHandle codeArrayAssignment(
-    IrArraySet node, CodeProxy code){
-    ArraySymbol targetType = (ArraySymbol)node.getObject().type();
+    IxCode.IrArraySet node, CodeProxy code){
+    IxCode.ArraySymbol targetType = (IxCode.ArraySymbol)node.getObject().type();
     InstructionHandle start = codeExpression(node.getObject(), code);
     code.appendDup(1);
     codeExpression(node.getIndex(), code);
@@ -752,8 +750,8 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public InstructionHandle codeNew(IrNew node, CodeProxy code) {
-    ClassSymbol type = node.constructor.getClassType();
+  public InstructionHandle codeNew(IxCode.IrNew node, CodeProxy code) {
+    IxCode.ClassSymbol type = node.constructor.getClassType();
     InstructionHandle start = code.appendNew((ObjectType)typeOf(type));
     code.append(InstructionConstants.DUP);
     for (int i = 0; i < node.parameters.length; i++) {
@@ -766,15 +764,15 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public InstructionHandle codeNewArray(IrNewArray node, CodeProxy code){
+  public InstructionHandle codeNewArray(IxCode.IrNewArray node, CodeProxy code){
     InstructionHandle start = codeExpressions(node.parameters, code);
-    ArraySymbol type = node.arrayType;
+    IxCode.ArraySymbol type = node.arrayType;
     code.appendNewArray(typeOf(type.getComponent()), (short)node.parameters.length);
     return start;
   }
   
   public InstructionHandle codeStaticMethodCall(
-    IrCallStatic node, CodeProxy code
+    IxCode.IrCallStatic node, CodeProxy code
   ){
     InstructionHandle start;
     if(node.parameters.length > 0){
@@ -795,7 +793,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
   }
 
   public InstructionHandle codeBinaryExpression(
-    IrBinExp node, CodeProxy code
+    IxCode.IrBinExp node, CodeProxy code
   ){
     if(node.getKind() == LOGICAL_AND){
       return codeLogicalAnd(node, code);
@@ -804,8 +802,8 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }else if(node.getKind() == ELVIS){
       return codeElvis(node, code);
     }
-    IrExpression left = node.getLeft();
-    IrExpression right = node.getRight();
+    IxCode.IrExpression left = node.getLeft();
+    IxCode.IrExpression right = node.getRight();
     InstructionHandle start = codeExpression(left, code);
     codeExpression(right, code);
     switch (node.getKind()) {
@@ -831,37 +829,37 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public void bitShiftR2(CodeProxy code, TypeRef type){
-    if(type == BasicTypeRef.INT){
+  public void bitShiftR2(CodeProxy code, IxCode.TypeRef type){
+    if(type == IxCode.BasicTypeRef.INT){
       code.append(InstructionConstants.ISHR);
-    }else if(type == BasicTypeRef.LONG){
+    }else if(type == IxCode.BasicTypeRef.LONG){
       code.append(InstructionConstants.LSHR);
     }else{
       throw new RuntimeException();
     }
   }
   
-  public void bitShiftL2(CodeProxy code, TypeRef type){
-    if(type == BasicTypeRef.INT){
+  public void bitShiftL2(CodeProxy code, IxCode.TypeRef type){
+    if(type == IxCode.BasicTypeRef.INT){
       code.append(InstructionConstants.ISHL);
-    }else if(type == BasicTypeRef.LONG){
+    }else if(type == IxCode.BasicTypeRef.LONG){
       code.append(InstructionConstants.LSHL);
     }else{
       throw new RuntimeException();
     }
   }
   
-  public void bitShiftR3(CodeProxy code, TypeRef type){
-    if(type == BasicTypeRef.INT){
+  public void bitShiftR3(CodeProxy code, IxCode.TypeRef type){
+    if(type == IxCode.BasicTypeRef.INT){
       code.append(InstructionConstants.IUSHR);
-    }else if(type == BasicTypeRef.LONG){
+    }else if(type == IxCode.BasicTypeRef.LONG){
       code.append(InstructionConstants.LUSHR);
     }else{
       throw new RuntimeException();
     }
   }
   
-  public InstructionHandle codeLogicalAnd(IrBinExp node, CodeProxy code) {
+  public InstructionHandle codeLogicalAnd(IxCode.IrBinExp node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getLeft(), code);
     BranchHandle b1 = null, b2 = null, b3 = null;
     
@@ -877,7 +875,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
 
-  public InstructionHandle codeLogicalOr(IrBinExp node, CodeProxy code) {
+  public InstructionHandle codeLogicalOr(IxCode.IrBinExp node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getLeft(), code);
     BranchHandle b1 = null, b2 = null, b3 = null;
     b1 = code.append(new IFNE(null));
@@ -892,7 +890,7 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public InstructionHandle codeElvis(IrBinExp node, CodeProxy code) {
+  public InstructionHandle codeElvis(IxCode.IrBinExp node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getLeft(), code);
     code.appendDup(1);
     code.appendNull(typeOf(node.type()));
@@ -904,48 +902,48 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  public void bitAnd(CodeProxy code, TypeRef type) {
-    if (type == BasicTypeRef.INT || type == BasicTypeRef.BOOLEAN) {
+  public void bitAnd(CodeProxy code, IxCode.TypeRef type) {
+    if (type == IxCode.BasicTypeRef.INT || type == IxCode.BasicTypeRef.BOOLEAN) {
       code.append(new IAND());
-    } else if(type == BasicTypeRef.LONG) {
+    } else if(type == IxCode.BasicTypeRef.LONG) {
       code.append(new LAND());
     } else {
       throw new RuntimeException();
     }
   }
   
-  public void bitOr(CodeProxy code, TypeRef type) {
-    if(type == BasicTypeRef.INT || type == BasicTypeRef.BOOLEAN) {
+  public void bitOr(CodeProxy code, IxCode.TypeRef type) {
+    if(type == IxCode.BasicTypeRef.INT || type == IxCode.BasicTypeRef.BOOLEAN) {
       code.append(new IOR());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LOR());
     } else {
       throw new RuntimeException();
     }
   }
   
-  public void xor(CodeProxy code, TypeRef type) {
-    if(type == BasicTypeRef.INT || type == BasicTypeRef.BOOLEAN) {
+  public void xor(CodeProxy code, IxCode.TypeRef type) {
+    if(type == IxCode.BasicTypeRef.INT || type == IxCode.BasicTypeRef.BOOLEAN) {
       code.append(new IXOR());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LXOR());
     } else {
       throw new RuntimeException();
     }
   }
 
-  public void eq(CodeProxy code, TypeRef type) {
+  public void eq(CodeProxy code, IxCode.TypeRef type) {
     BranchHandle b1 = null;
-    if(type == BasicTypeRef.INT || type == BasicTypeRef.CHAR ||
-       type == BasicTypeRef.BOOLEAN) {
+    if(type == IxCode.BasicTypeRef.INT || type == IxCode.BasicTypeRef.CHAR ||
+       type == IxCode.BasicTypeRef.BOOLEAN) {
       b1 = code.append(new IF_ICMPEQ(null));
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LCMP());
       b1 = code.append(new IFEQ(null));
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FCMPL());
       b1 = code.append(new IFEQ(null));
-    } else if (type == BasicTypeRef.DOUBLE) {
+    } else if (type == IxCode.BasicTypeRef.DOUBLE) {
       code.append(new DCMPL());
       b1 = code.append(new IFEQ(null));
     } else {
@@ -954,18 +952,18 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     processBranch(code, b1);
   }
   
-  public void noteq(CodeProxy code, TypeRef type) {
+  public void noteq(CodeProxy code, IxCode.TypeRef type) {
     BranchHandle b1 = null;
-    if(type == BasicTypeRef.INT || type == BasicTypeRef.CHAR ||
-       type == BasicTypeRef.BOOLEAN) {
+    if(type == IxCode.BasicTypeRef.INT || type == IxCode.BasicTypeRef.CHAR ||
+       type == IxCode.BasicTypeRef.BOOLEAN) {
       b1 = code.append(new IF_ICMPNE(null));
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LCMP());
       b1 = code.append(new IFNE(null));
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FCMPL());
       b1 = code.append(new IFNE(null));
-    } else if (type == BasicTypeRef.DOUBLE) {
+    } else if (type == IxCode.BasicTypeRef.DOUBLE) {
       code.append(new DCMPL());
       b1 = code.append(new IFNE(null));
     } else {
@@ -974,17 +972,17 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     processBranch(code, b1);
   }
   
-  public void gt(CodeProxy code, TypeRef type) {
+  public void gt(CodeProxy code, IxCode.TypeRef type) {
     BranchHandle b1 = null;
-    if (type == BasicTypeRef.INT){
+    if (type == IxCode.BasicTypeRef.INT){
       b1 = code.append(new IF_ICMPGT(null));
-    } else if (type == BasicTypeRef.LONG){
+    } else if (type == IxCode.BasicTypeRef.LONG){
       code.append(new LCMP());
       b1 = code.append(new IFGT(null));
-    } else if (type == BasicTypeRef.FLOAT){
+    } else if (type == IxCode.BasicTypeRef.FLOAT){
       code.append(new FCMPL());
       b1 = code.append(new IFGT(null));
-    } else if (type == BasicTypeRef.DOUBLE){
+    } else if (type == IxCode.BasicTypeRef.DOUBLE){
       code.append(new DCMPL());
       b1 = code.append(new IFGT(null));
     } else {
@@ -993,17 +991,17 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     processBranch(code, b1);
   }
   
-  public void gte(CodeProxy code, TypeRef type) {
+  public void gte(CodeProxy code, IxCode.TypeRef type) {
     BranchHandle comparation = null;
-    if(type == BasicTypeRef.INT) {
+    if(type == IxCode.BasicTypeRef.INT) {
       comparation = code.append(new IF_ICMPGE(null));
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LCMP());
       comparation = code.append(new IFGE(null));
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FCMPL());
       comparation = code.append(new IFGE(null));
-    } else if (type == BasicTypeRef.DOUBLE) {
+    } else if (type == IxCode.BasicTypeRef.DOUBLE) {
       code.append(new DCMPL());
       comparation = code.append(new IFGE(null));
     } else {
@@ -1012,17 +1010,17 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     processBranch(code, comparation);
   }
 
-  public void lte(CodeProxy code, TypeRef type) {
+  public void lte(CodeProxy code, IxCode.TypeRef type) {
     BranchHandle b1 = null;
-    if (type == BasicTypeRef.INT) {
+    if (type == IxCode.BasicTypeRef.INT) {
       b1 = code.append(new IF_ICMPLE(null));
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LCMP());
       b1 = code.append(new IFLT(null));
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FCMPL());
       b1 = code.append(new IFLE(null));
-    } else if (type == BasicTypeRef.DOUBLE) {
+    } else if (type == IxCode.BasicTypeRef.DOUBLE) {
       code.append(new DCMPL());
       b1 = code.append(new IFLE(null));
     } else {
@@ -1032,17 +1030,17 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
   }
 
   
-  public void lt(CodeProxy code, TypeRef type) {
+  public void lt(CodeProxy code, IxCode.TypeRef type) {
     BranchHandle comparation = null;
-    if(type == BasicTypeRef.INT) {
+    if(type == IxCode.BasicTypeRef.INT) {
       comparation = code.append(new IF_ICMPLT(null));
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LCMP());
       comparation = code.append(new IFLT(null));
-    } else if (type == BasicTypeRef.FLOAT){
+    } else if (type == IxCode.BasicTypeRef.FLOAT){
       code.append(new FCMPL());
       comparation = code.append(new IFLT(null));
-    } else if (type == BasicTypeRef.DOUBLE) {
+    } else if (type == IxCode.BasicTypeRef.DOUBLE) {
       code.append(new DCMPL());
       comparation = code.append(new IFLT(null));
     } else {
@@ -1059,42 +1057,42 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     b2.setTarget(code.append(InstructionConstants.NOP));
   }
   
-  public InstructionHandle codeChar(IrChar node, CodeProxy code) {
+  public InstructionHandle codeChar(IxCode.IrChar node, CodeProxy code) {
     return code.appendConstant(new Character(node.getValue()));
   }
 
-  public InstructionHandle codeString(IrString node, CodeProxy code) {
+  public InstructionHandle codeString(IxCode.IrString node, CodeProxy code) {
     return code.appendConstant(node.getValue());
   }
   
-  public InstructionHandle codeInteger(IrInt node, CodeProxy code){
+  public InstructionHandle codeInteger(IxCode.IrInt node, CodeProxy code){
     return code.appendConstant(new Integer(node.getValue()));
   }
   
-  public InstructionHandle codeLong(IrLong node, CodeProxy code){
+  public InstructionHandle codeLong(IxCode.IrLong node, CodeProxy code){
     return code.appendConstant(new Long(node.getValue()));
   }
   
-  public InstructionHandle codeFloat(IrFloat node, CodeProxy code){
+  public InstructionHandle codeFloat(IxCode.IrFloat node, CodeProxy code){
     return code.appendConstant(new Float(node.getValue()));
   }
   
-  public InstructionHandle codeDouble(IrDouble node, CodeProxy code){
+  public InstructionHandle codeDouble(IxCode.IrDouble node, CodeProxy code){
     return code.appendConstant(new Double(node.getValue()));
   }
   
-  public InstructionHandle codeBoolean(IrBool node, CodeProxy code){
+  public InstructionHandle codeBoolean(IxCode.IrBool node, CodeProxy code){
     return code.appendConstant(Boolean.valueOf(node.getValue()));
   }
   
-  public InstructionHandle codeNull(IrNull node, CodeProxy code){
+  public InstructionHandle codeNull(IxCode.IrNull node, CodeProxy code){
     return code.append(InstructionConstants.ACONST_NULL);
   }
   
   public InstructionHandle codeUnaryExpression(
-    IrUnaryExp node, CodeProxy code) {
+    IxCode.IrUnaryExp node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getOperand(), code);
-    TypeRef type = node.getOperand().type();
+    IxCode.TypeRef type = node.getOperand().type();
     switch(node.getKind()){
     	case PLUS: plus(code, type); break;
     	case MINUS: minus(code, type); break;
@@ -1105,31 +1103,31 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return start;
   }
   
-  private void plus(CodeProxy code, TypeRef type){
+  private void plus(CodeProxy code, IxCode.TypeRef type){
     if(
-     type != BasicTypeRef.INT && type != BasicTypeRef.LONG &&
-     type != BasicTypeRef.FLOAT && type != BasicTypeRef.DOUBLE){
+     type != IxCode.BasicTypeRef.INT && type != IxCode.BasicTypeRef.LONG &&
+     type != IxCode.BasicTypeRef.FLOAT && type != IxCode.BasicTypeRef.DOUBLE){
       throw new RuntimeException();
     }
     /*nothing to do*/
   }
 
-  private void minus(CodeProxy code, TypeRef type){
-    if(type == BasicTypeRef.INT){
+  private void minus(CodeProxy code, IxCode.TypeRef type){
+    if(type == IxCode.BasicTypeRef.INT){
       code.append(InstructionConstants.INEG);
-    }else if(type == BasicTypeRef.LONG){
+    }else if(type == IxCode.BasicTypeRef.LONG){
       code.append(InstructionConstants.LNEG);
-    }else if(type == BasicTypeRef.FLOAT){
+    }else if(type == IxCode.BasicTypeRef.FLOAT){
       code.append(InstructionConstants.FNEG);
-    }else if(type == BasicTypeRef.DOUBLE){
+    }else if(type == IxCode.BasicTypeRef.DOUBLE){
       code.append(InstructionConstants.DNEG);
     }else{
       throw new RuntimeException();
     }
   }
 
-  private void not(CodeProxy code, TypeRef type){
-    if(type == BasicTypeRef.BOOLEAN){
+  private void not(CodeProxy code, IxCode.TypeRef type){
+    if(type == IxCode.BasicTypeRef.BOOLEAN){
       BranchHandle b1 = code.append(new IFNE(null));
       BranchHandle b2;
       code.append(new ICONST(1));
@@ -1141,11 +1139,11 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }
   }
 
-  private void bitNot(CodeProxy code, TypeRef type){
-    if(type == BasicTypeRef.INT){
+  private void bitNot(CodeProxy code, IxCode.TypeRef type){
+    if(type == IxCode.BasicTypeRef.INT){
       code.append(new ICONST(-1));
       code.append(new IXOR());
-    }else if(type == BasicTypeRef.LONG){
+    }else if(type == IxCode.BasicTypeRef.LONG){
       code.append(new LCONST(-1));
       code.append(new LXOR());
     }else{
@@ -1153,31 +1151,31 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }
   }
 
-  public InstructionHandle codeCast(IrCast node, CodeProxy code) {
-    IrExpression target = node.getTarget();
+  public InstructionHandle codeCast(IxCode.IrCast node, CodeProxy code) {
+    IxCode.IrExpression target = node.getTarget();
     InstructionHandle start = codeExpression(target, code);
     code.appendCast(typeOf(target.type()), typeOf(node.getConversion()));
     return start;
   }
   
-  public InstructionHandle codeIsInstance(IrInstanceOf node, CodeProxy code){
+  public InstructionHandle codeIsInstance(IxCode.IrInstanceOf node, CodeProxy code){
     InstructionHandle start = codeExpression(node.target, code);
     code.appendInstanceOf((ReferenceType)typeOf(node.getCheckType()));
     return start;
   }
   
-  public InstructionHandle codeSelf(IrThis node, CodeProxy code){
+  public InstructionHandle codeSelf(IxCode.IrThis node, CodeProxy code){
     return code.append(InstructionConstants.ALOAD_0);
   }
 
-  public InstructionHandle codeFieldRef(IrFieldRef node, CodeProxy code) {
+  public InstructionHandle codeFieldRef(IxCode.IrFieldRef node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.target, code);
-    ClassSymbol symbol = (ClassSymbol) node.target.type();
+    IxCode.ClassSymbol symbol = (IxCode.ClassSymbol) node.target.type();
     code.appendGetField(symbol.getName(), node.field.getName(), typeOf(node.type()));
     return start;
   }
 
-  public InstructionHandle codeFieldAssign(IrFieldSet node, CodeProxy code) {
+  public InstructionHandle codeFieldAssign(IxCode.IrFieldSet node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getObject(), code);    
     codeExpression(node.getValue(), code);
     if(isWideType(node.getValue().type())){
@@ -1185,72 +1183,72 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     }else{
       code.append(InstructionConstants.DUP_X1);
     }
-    ClassSymbol symbol = (ClassSymbol) node.getObject().type();
+    IxCode.ClassSymbol symbol = (IxCode.ClassSymbol) node.getObject().type();
     code.appendPutField(symbol.getName(), node.getField().getName(), typeOf(node.type()));
     return start;
   }
 
-  private void add(CodeProxy code, TypeRef type) {
-    if (type == BasicTypeRef.INT) {
+  private void add(CodeProxy code, IxCode.TypeRef type) {
+    if (type == IxCode.BasicTypeRef.INT) {
       code.append(new IADD());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LADD());
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FADD());
     } else {
       code.append(new DADD());
     }
   }
 
-  private void sub(CodeProxy code, TypeRef type) {
-    if (type == BasicTypeRef.INT) {
+  private void sub(CodeProxy code, IxCode.TypeRef type) {
+    if (type == IxCode.BasicTypeRef.INT) {
       code.append(new ISUB());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LSUB());
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FSUB());
     } else {
       code.append(new DSUB());
     }
   }
   
-  private void mul(CodeProxy code, TypeRef type) {
-    if (type == BasicTypeRef.INT) {
+  private void mul(CodeProxy code, IxCode.TypeRef type) {
+    if (type == IxCode.BasicTypeRef.INT) {
       code.append(new IMUL());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LMUL());
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FMUL());
     } else {
       code.append(new DMUL());
     }
   }
 
-  private void div(CodeProxy code, TypeRef type) {
-    if (type == BasicTypeRef.INT) {
+  private void div(CodeProxy code, IxCode.TypeRef type) {
+    if (type == IxCode.BasicTypeRef.INT) {
       code.append(new IDIV());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LDIV());
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FDIV());
     } else {
       code.append(new DDIV());
     }
   }
 
-  private void mod(CodeProxy code, TypeRef type) {
-    if (type == BasicTypeRef.INT) {
+  private void mod(CodeProxy code, IxCode.TypeRef type) {
+    if (type == IxCode.BasicTypeRef.INT) {
       code.append(new IREM());
-    } else if (type == BasicTypeRef.LONG) {
+    } else if (type == IxCode.BasicTypeRef.LONG) {
       code.append(new LREM());
-    } else if (type == BasicTypeRef.FLOAT) {
+    } else if (type == IxCode.BasicTypeRef.FLOAT) {
       code.append(new FREM());
     } else {
       code.append(new DREM());
     }
   }
   
-  private int frameObjectIndex(int origin, TypeRef[] arguments){
+  private int frameObjectIndex(int origin, IxCode.TypeRef[] arguments){
     int maxIndex = origin;
     for(int i = 0; i < arguments.length; i++) {
       if (isWideType(arguments[i])) {
@@ -1288,17 +1286,17 @@ public class CodeGeneration implements IrBinExp.Constants, IrUnaryExp.Constants 
     return indexTable;
   }
 
-  private boolean isWideType(TypeRef symbol) {
-    if (symbol == BasicTypeRef.DOUBLE || symbol == BasicTypeRef.LONG)
+  private boolean isWideType(IxCode.TypeRef symbol) {
+    if (symbol == IxCode.BasicTypeRef.DOUBLE || symbol == IxCode.BasicTypeRef.LONG)
       return true;
     return false;
   }
 
-  private Type typeOf(TypeRef type) {
+  private Type typeOf(IxCode.TypeRef type) {
     return bridge.toVMType(type);
   }
 
-  private Type[] typesOf(TypeRef[] types) {
+  private Type[] typesOf(IxCode.TypeRef[] types) {
     Type[] destinationTypes = new Type[types.length];
     for (int i = 0; i < destinationTypes.length; i++) {
       destinationTypes[i] = bridge.toVMType(types[i]);

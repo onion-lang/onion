@@ -7,11 +7,7 @@
  * ************************************************************** */
 package onion.compiler.env;
 
-import onion.compiler.env.ClosureLocalBinding;
-import onion.compiler.env.LocalBinding;
-import onion.compiler.env.LocalFrame;
-import onion.compiler.env.LocalScope;
-import onion.lang.core.type.BasicTypeRef;
+import onion.compiler.IxCode;
 
 
 import junit.framework.TestCase;
@@ -58,19 +54,19 @@ public class TestLocalFrame extends TestCase {
   }
 
   public void testEntries() {
-    frame.addEntry("foo", BasicTypeRef.BOOLEAN);
-    frame.addEntry("bar", BasicTypeRef.BYTE);
-    frame.addEntry("baz", BasicTypeRef.INT);
+    frame.addEntry("foo", IxCode.BasicTypeRef.BOOLEAN);
+    frame.addEntry("bar", IxCode.BasicTypeRef.BYTE);
+    frame.addEntry("baz", IxCode.BasicTypeRef.INT);
     LocalBinding[] binds = frame.entries();
   }
 
   public void testAddAndLookup() {
     assertNull(frame.lookup("foo"));
-    int index = frame.addEntry("foo", BasicTypeRef.BOOLEAN);
+    int index = frame.addEntry("foo", IxCode.BasicTypeRef.BOOLEAN);
     ClosureLocalBinding bind, bind2;
     bind = frame.lookupOnlyCurrentScope("foo");
     assertEquals(bind.getIndex(), index);
-    assertEquals(bind.getType(), BasicTypeRef.BOOLEAN);
+    assertEquals(bind.getType(), IxCode.BasicTypeRef.BOOLEAN);
     bind2 = frame.lookup("foo");
     assertEquals(bind, bind2);
   }

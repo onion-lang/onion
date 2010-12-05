@@ -7,9 +7,8 @@
  * ************************************************************** */
 package onion.compiler.env;
 
+import onion.compiler.IxCode;
 import onion.compiler.util.SymbolGenerator;
-import onion.lang.core.IrConstructor;
-import onion.lang.core.type.*;
 
 
 /**
@@ -21,8 +20,8 @@ public class LocalContext {
   private boolean isGlobal;
   private boolean isMethod;
   private LocalFrame contextFrame;
-  private MethodSymbol method;
-  private IrConstructor constructor;
+  private IxCode.MethodSymbol method;
+  private IxCode.IrConstructor constructor;
   private SymbolGenerator generator;
 
   public LocalContext() {
@@ -50,28 +49,28 @@ public class LocalContext {
     return generator.generate();
   }
   
-  public TypeRef getReturnType(){
+  public IxCode.TypeRef getReturnType(){
     if(isMethod){
       return method.getReturnType();
     }else{
-      return BasicTypeRef.VOID;
+      return IxCode.BasicTypeRef.VOID;
     }
   }
   
-  public MethodSymbol getMethod(){
+  public IxCode.MethodSymbol getMethod(){
     return method;
   }
   
-  public ConstructorSymbol getConstructor(){
+  public IxCode.ConstructorSymbol getConstructor(){
     return constructor;
   }
   
-  public void setMethod(MethodSymbol method) {
+  public void setMethod(IxCode.MethodSymbol method) {
     this.method = method;
     this.isMethod = true;
   }
   
-  public void setConstructor(IrConstructor constructor){
+  public void setConstructor(IxCode.IrConstructor constructor){
     this.constructor = constructor;
     this.isMethod = false;
   }
@@ -116,11 +115,11 @@ public class LocalContext {
     return contextFrame.lookupOnlyCurrentScope(name);
   }
   
-  public int addEntry(String name, TypeRef type) {
+  public int addEntry(String name, IxCode.TypeRef type) {
     return contextFrame.addEntry(name, type);
   }
   
-  public String addEntry(TypeRef type){
+  public String addEntry(IxCode.TypeRef type){
     String name = newName();
     contextFrame.addEntry(name, type);
     return name;

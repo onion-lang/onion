@@ -2,7 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" readonly="true" id="a729fbc9-220e-4bad-8bb4-382873c2021f" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/onion/compiler/OnionClassLoader.java" afterPath="$PROJECT_DIR$/src/onion/compiler/OnionClassLoader.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/onion/compiler/error/SemanticErrorReporter.java" afterPath="$PROJECT_DIR$/src/onion/compiler/error/SemanticErrorReporter.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src.test/onion/tools/TestOnionCompilerFrontend.java" afterPath="$PROJECT_DIR$/src.test/onion/tools/TestOnionCompilerFrontend.java" />
+      <change type="DELETED" beforePath="C:\Users\Mizushima\IdeaProjects\onion\.idea\workspace.xml" afterPath="" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/onion/compiler/error/ScriptException.java" afterPath="$PROJECT_DIR$/src/onion/compiler/error/ScriptException.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/onion/lang/syntax/ClosureExpression.java" afterPath="$PROJECT_DIR$/src/onion/lang/syntax/ClosureExpression.java" />
     </list>
     <ignored path="src.parser/onion/compiler/parser/" />
     <ignored path="onion.iws" />
@@ -360,7 +365,7 @@
     <supportedVersion>125</supportedVersion>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1378" height="744" extended-state="0" />
+    <frame x="-8" y="-8" width="1378" height="744" extended-state="1" />
     <editor active="true" />
     <layout>
       <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32857144" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />

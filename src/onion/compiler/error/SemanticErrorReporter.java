@@ -80,7 +80,7 @@ public class SemanticErrorReporter {
   }
   
   private String format(String string, String[] args){
-    return MessageFormat.format(string, args);
+    return MessageFormat.format(string, (Object[])args);
   }
   
   private String message(String property){

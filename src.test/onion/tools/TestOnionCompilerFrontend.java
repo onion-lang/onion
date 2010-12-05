@@ -75,7 +75,7 @@ public class TestOnionCompilerFrontend extends TestCase {
     assertEquals(result, 0);
     File testDirectory = new File(TEST_DIRECTORY);
     File[] files = testDirectory.listFiles(dstFilter);
-    ClassLoader loader = new URLClassLoader(new URL[]{testDirectory.toURL()});
+    ClassLoader loader = new URLClassLoader(new URL[]{testDirectory.toURI().toURL()});
     for(int i = 0; i < files.length; i++){
       Class.forName(Paths.cutExtension(files[i].getName()), true, loader);
     }

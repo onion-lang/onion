@@ -8,8 +8,8 @@
 package onion.compiler.error;
 
 /**
- * This class represents an exception while script is runningÅD
- * 
+ * This class represents an exception while script is running.
+ *
  * @author Kota Mizushima
  * Date: 2005/09/15
  */

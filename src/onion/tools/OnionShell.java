@@ -13,13 +13,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 
-import onion.compiler.CompiledClass;
-import onion.compiler.CompilerConfig;
-import onion.compiler.InputSource;
-import onion.compiler.OnionClassLoader;
-import onion.compiler.OnionCompiler;
-import onion.compiler.StreamInputSource;
-import onion.compiler.error.ScriptException;
+import onion.compiler.*;
+import onion.compiler.ScriptException;
 
 
 

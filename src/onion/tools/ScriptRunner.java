@@ -8,14 +8,10 @@
 package onion.tools;
 
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
-import java.net.MalformedURLException;
 
 import onion.compiler.*;
-import onion.compiler.error.ScriptException;
+import onion.compiler.ScriptException;
 import onion.compiler.util.Messages;
 import onion.compiler.util.Systems;
 import onion.tools.option.CommandLineParser;

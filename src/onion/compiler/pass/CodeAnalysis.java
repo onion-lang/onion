@@ -11,9 +11,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
 
-import onion.compiler.CompilerConfig;
-import onion.compiler.IxCode;
-import onion.compiler.Pair;
+import onion.compiler.*;
 import onion.compiler.env.ClassTable;
 import onion.compiler.env.ClosureLocalBinding;
 import onion.compiler.env.ImportItem;
@@ -23,9 +21,7 @@ import onion.compiler.env.LocalFrame;
 import onion.compiler.env.NameResolution;
 import onion.compiler.env.StaticImportItem;
 import onion.compiler.env.StaticImportList;
-import onion.compiler.error.CompilationException;
-import onion.compiler.error.CompileError;
-import onion.compiler.error.SemanticErrorReporter;
+import onion.compiler.CompilationException;
 import onion.compiler.util.Boxing;
 import onion.compiler.util.Classes;
 import onion.compiler.util.Paths;
@@ -2832,7 +2828,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     this.irt2ast  = new HashMap();
     this.ast2irt  = new HashMap();
     this.solvers  = new HashMap();
-    this.reporter = new SemanticErrorReporter(this.conf.getMaxErrorReports()); 
+    this.reporter = new SemanticErrorReporter(this.conf.getMaxErrorReports());
   }
   
   public IxCode.ClassDefinition[] process(CompilationUnit[] units){

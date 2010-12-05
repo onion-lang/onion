@@ -1,7 +1,5 @@
 package onion.compiler
 
-import error.SemanticErrorReporter
-
 /**
  * Created by IntelliJ IDEA.
  * User: Mizushima

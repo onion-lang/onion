@@ -11,8 +11,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import onion.compiler.error.CompilationException;
-import onion.compiler.error.CompileError;
 import onion.compiler.pass.*;
 import onion.compiler.util.*;
 import onion.lang.syntax.Location;

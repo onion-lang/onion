@@ -5,34 +5,25 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.error;
+package onion.compiler;
 
-import onion.lang.syntax.Location;
+import java.util.List;
 
 /**
  * @author Kota Mizushima
- * 
  */
-public class CompileError {
-  private String sourceFile;
-  private Location location;
-  private String message;
-  
-  public CompileError(String sourceFile, Location location, String message) {
-    this.sourceFile = sourceFile;
-    this.location = location;
-    this.message = message;
+public class CompilationException extends RuntimeException {    
+  private List problems;
+
+  public CompilationException(List problems) {
+    this.problems = problems;
   }
   
-  public String getSourceFile() {
-    return sourceFile;
+  public CompileError get(int index) {
+    return (CompileError)problems.get(index);
   }
   
-  public Location getLocation() {
-    return location;
-  }
-  
-  public String getMessage() {
-    return message;
+  public int size() {
+    return problems.size();
   }
 }

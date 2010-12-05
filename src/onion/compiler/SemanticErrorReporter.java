@@ -5,13 +5,12 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.error;
+package onion.compiler;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import onion.compiler.IxCode;
 import onion.compiler.util.Messages;
 import onion.lang.syntax.Location;
 

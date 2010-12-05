@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.error;
+package onion.compiler;
 
 /**
  * This class represents an exception while script is running.

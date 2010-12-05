@@ -1,4 +1,4 @@
-package onion.compiler.syntax
+package onion.compiler
 
 object AST {
   val M_INTERNAL = 1

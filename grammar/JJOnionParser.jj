@@ -11,15 +11,15 @@ options {
 
 PARSER_BEGIN(JJOnionParser)
 package onion.compiler.parser;
+import onion.compiler.AST;
 import onion.compiler.util.*;
-import onion.compiler.syntax.*;
 import onion.lang.syntax.OnionParser;
 import scala.Tuple2;
 import scala.collection.immutable.*;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.Buffer;
 import scala.Option;
-import static onion.compiler.syntax.AST.append;
+import static onion.compiler.AST.append;
 
 public class JJOnionParser implements OnionParser {
   private int mset; // used for semantic lookahead

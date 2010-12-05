@@ -1,0 +1,888 @@
+/* ************************************************************** *
+*                                                                *
+* Copyright (c) 2005, Kota Mizushima, All rights reserved.       *
+*                                                                *
+*                                                                *
+* This software is distributed under the modified BSD License.   *
+* ************************************************************** */
+options {
+  STATIC = false;
+}
+
+PARSER_BEGIN(JJOnionParser)
+package onion.compiler.parser;
+import onion.compiler.util.*;
+import onion.compiler.syntax.*;
+import onion.lang.syntax.OnionParser;
+import scala.Tuple2;
+import scala.collection.immutable.*;
+import scala.collection.mutable.ArrayBuffer;
+import scala.collection.mutable.Buffer;
+import scala.Option;
+import static onion.compiler.syntax.AST.append;
+
+public class JJOnionParser implements OnionParser {
+  private int mset; // used for semantic lookahead
+
+  private boolean no(int m, int mset) {
+    return (m & mset) == 0;
+  }
+
+  private boolean la(String s) {
+    Token t = getToken(1);
+    return t != null && t.image.equals(s);
+  }
+
+  /*
+   * workaround for Scala types beging used from Java
+   */
+  private static <A> List<A> toList(Buffer<A> buffer) {
+    return (List<A>)buffer.toList();
+  }
+
+  /*
+   * convenience method to create a Location
+   */
+  private static AST.Position p(Token t) {
+    return new AST.Position(t.beginLine, t.beginColumn);
+  }
+
+  /*
+   * convenience method to create a Location
+   */
+  private static AST.Position p(int line, int column) {
+    return new AST.Position(line, column);
+  }
+
+  /*
+   * convenience method to get image of a Token
+   */
+  private static String c(Token t) {
+    return t.image;
+  }
+
+  /*
+   * converience method to create substring
+   */
+  private static String sub(String s, int sindex, int eindex) {
+    return s.substring(sindex, eindex);
+  }
+
+  /*
+   * Returns a String which last character of s is omitted.
+   */
+  private static String chop(String s) {
+    return s.substring(0, s.length() - 1);
+  }
+
+  /*
+   * Returns a String which first and last character of s is omitted.
+   */
+  private static String chopEdge(String s) {
+    return s.substring(1, s.length() - 1);
+  }
+
+  private static char unescapeChar(char c) {
+    switch(c){
+    case 'n' : return '\n';
+    case 't' : return '\t';
+    case 'b' : return '\b';
+    case 'r' : return '\r';
+    case 'f' : return '\f';
+    case '\\': return '\\';
+    case '\'': return '\'';
+    case '"' : return '"';
+    default  : return c;
+    }
+  }
+
+  private static String unescape(String s) {
+    StringBuffer b = new StringBuffer();
+    int len = s.length();
+    for(int i = 0; i < len; i++){
+      char c = s.charAt(i);
+      if(c != '\\'){
+        b.append(c);
+        continue;
+      }
+      i++;
+      b.append(unescapeChar(s.charAt(i)));
+    }
+    return new String(b);
+  }
+}
+PARSER_END(JJOnionParser)
+
+SKIP:
+{
+" "
+| "\t"
+| "\n"
+| "\r"
+| "\r\n"
+}
+
+
+
+/*
+* COMMENTS
+*/
+SPECIAL_TOKEN:
+{
+<MULTI_LINE_COMMENT: "/*" (~["*"])*  "*" ("*" | (~["*", "/"] (~["*"])* "*"))* "/">
+| <LINE_COMMENT:       "//" (~["\r", "\n"])*>
+| <SHELL_COMMENT:      "#!" (~["\r", "\n"])*>
+}
+
+/*
+* KEYWORDS
+*/
+TOKEN:
+{
+  <K_ABSTRACT:     "abstract"     >
+| <K_AND:          "and"          >
+| <K_BOOLEAN:      "boolean"      >
+| <K_BREAK:        "break"        >
+| <K_BYTE:         "byte"         >
+| <K_CASE:         "case"         >
+| <K_CHAR:         "char"         >
+| <K_CLASS:        "class"        >
+| <K_BRANCH:       "branch"       >
+| <K_CONST:        "const"        >
+| <K_CONTINUE:     "continue"     >
+| <K_DEF:          "def"          >
+| <K_DOUBLE:       "double"       >
+| <K_ELSE:         "else"         >
+| <K_ELSE_LABEL:   "else:"        >
+| <K_FALSE:        "false"        >
+| <K_FINALLY:      "finally"      >
+| <K_FINAL:        "final"        >
+| <K_FLOAT:        "float"        >
+| <K_FOR:          "for"          >
+| <K_FOREACH:      "foreach"      >
+| <K_FORWARD:      "forward"      >
+| <K_GOTO:         "goto"         >
+| <K_IF:           "if"           >
+| <K_IMPORT:       "import"       >
+| <K_INHERITED:    "inherited"    >
+| <K_INT:          "int"          >
+| <K_INTERFACE:    "interface"    >
+| <K_INTERNAL:     "internal"     >
+| <K_IS:           "is"           >
+| <K_LONG:         "long"         >
+| <K_MODULE:       "module"       >
+| <K_NEW:          "new"          >
+| <K_NULL:         "null"         >
+| <K_OR:           "or"           >
+| <K_OTHER:        "other"        >
+| <K_OVERRIDE:     "override"     >
+| <K_PRIVATE:      "private"      >
+| <K_PROTECTED:    "protected"    >
+| <K_PUBLIC:       "public"       >
+| <K_CATCH:        "catch"        >
+| <K_RETURN:       "return"       >
+| <K_SELECT:       "select"       >
+| <K_SELF:         "self"         >
+| <K_SHORT:        "short"        >
+| <K_STATIC:       "static"       >
+| <K_SUPER:        "super"        >
+| <K_SYNCHRONIZED: "synchronized" >
+| <K_THROW:        "throw"        >
+| <K_THROWS:       "throws"       >
+| <K_TRUE:         "true"         >
+| <K_TRY:          "try"          >
+| <K_VAR:          "var"          >
+| <K_VOID:         "void"         >
+| <K_VOLATILE:     "volatile"     >
+| <K_WHEN:         "when"         >
+| <K_WHILE:        "while"        >
+}
+
+/*
+* OPERATORS
+*/
+TOKEN : {
+  <PLUS:           "+"            >
+| <MINUS:          "-"            >
+| <STAR:           "*"            >
+| <SLASH:          "/"            >
+| <PERC:           "%"            >
+| <DOLLAR:         "$"            >
+| <LT:             "<"            >
+| <GT:             ">"            >
+| <ARROW:          "->"           >
+| <ARROW2:         "=>"           >
+| <SUBTYPE:        "<:"           >
+| <NOT:            "!"            >
+| <AMP:            "&"            >
+| <AND:            "&&"           >
+| <BAR:            "|"            >
+| <OR:             "||"           >
+| <EOR:            "^"            >
+| <BN:             "~"            >
+| <L2S:            "<<"           >
+| <R2S:            ">>"           >
+| <R3S:            ">>>"          >
+| <ASSIGN:         "="            >
+| <EQ:             "=="           >
+| <NOTEQ:          "!="           >
+| <REFEQ:          "==="          >
+| <REFNOTEQ:       "!=="          >
+| <ADDEQ:          "+="           >
+| <SUBEQ:          "-="           >
+| <MULEQ:          "*="           >
+| <DIVEQ:          "/="           >
+| <MODEQ:          "%="           >
+| <PLUSPLUS:       "++"           >
+| <MINUSMINUS:     "--"           >
+| <COLON:          ":"            >
+| <SEMI:           ";"            >
+| <COLON2:         "::"           >
+| <SHARP:          "#"            >
+| <DOT:            "."            >
+| <LBRACE:         "{"            >
+| <RBRACE:         "}"            >
+| <BACK_QUOTE:     "`"            >
+| <LPAREN:         "("            >
+| <RPAREN:         ")"            >
+| <COMMA:          ","            >
+| <LBRACKET:       "["            >
+| <RBRACKET:       "]"            >
+| <QUESTION:       "?"            >
+| <ELVIS:          "?:"           >
+}
+
+/*
+ * LITERALS
+ */
+TOKEN:
+{
+  <INTEGER:
+    <DECIMAL_LITERAL> (["L"])?
+  | <HEX_LITERAL> (["L"])?
+  | <OCTAL_LITERAL> (["L"])?
+  >
+| <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])* >
+| <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
+| <#OCTAL_LITERAL: "0" (["0"-"7"])* >
+| <FLOAT:
+    (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["F", "D"])?
+  | "." (["0"-"9"])+ (<EXPONENT>)? (["F","D"])?
+  | (["0"-"9"])+ <EXPONENT> (["F","D"])?
+  | (["0"-"9"])+ (<EXPONENT>)? ["F","D"]
+  >
+| <#EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
+| <CHARACTER:
+    "'"
+    ( (~["'","\\","\n","\r"])
+    | ("\\"
+        ( ["n","t","b","r","f","\\","'","\""]
+        | ["0"-"7"] ( ["0"-"7"] )?
+        | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+        )
+      )
+    )
+    "'"
+  >
+| <STRING:
+    "\""
+    ( (~["\"","\\","\n","\r"])
+    | ("\\"
+        ( ["n","t","b","r","f","\\","'","\""]
+        | ["0"-"7"] ( ["0"-"7"] )?
+        | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+        )
+      )
+    )*
+    "\""
+  >
+| <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
+| <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
+| <FID:      "@" <ID>                                                    >
+}
+
+/*
+ * ERROR TOKEN
+ */
+TOKEN:{
+  <ERROR: ~[]>
+}
+
+AST.CompilationUnit unit() :{
+  AST.ModuleDeclaration module = null; AST.ImportClause imports = null;
+  AST.Toplevel top = null;  ArrayBuffer<AST.Toplevel> tops = new ArrayBuffer<AST.Toplevel>();
+}{
+  [module=module_decl()]
+  [imports=import_decl()]
+  (top=top_level() {append(tops, top);})+ <EOF> {
+    return new AST.CompilationUnit(p(1, 1),  null, module, imports, toList(tops));
+  }
+}
+
+AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new StringBuffer();}{
+  t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append(t2.image);})* ";" {
+    return new AST.ModuleDeclaration(p(t1), new String(sb));
+  }
+}
+
+AST.ImportClause import_decl() :{
+  Token t = null, n;
+  StringBuffer sb;
+  String s = null;
+  ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
+}{
+  t="import" "{"
+    ( {sb = new StringBuffer();}
+      ( LOOKAHEAD(2)
+        (n=<ID> {s = n.image;} "=" n=<ID> {sb.append(n.image);} ("." n=<ID> {sb.append("."); sb.append(n.image);})+ ";")
+      | ((LOOKAHEAD(2) n=<ID> "." {sb.append(n.image); sb.append(".");})+ (n=<ID> | n="*") ";" {
+           s = n.image; sb.append(s);
+         }
+        )
+      ){ append(imports, new Tuple2<String, String>(s, new String(sb))); }
+    )*
+  "}"{ return new AST.ImportClause(p(t), toList(imports)); }
+}
+
+AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
+( LOOKAHEAD(2)
+  top=stmt()
+| [mset=modifiers()]
+  ( top=type_decl(mset)
+  | top=fun_decl(mset)
+  | top=var_decl(mset)
+  )
+) {return top;}
+}
+
+AST.GlobalVariableDeclaration var_decl(int modifiers) : {
+  Token t1, t2;
+  AST.TypeNode ty = null;
+  AST.Expression e = null;
+}{
+  t1="var" t2=<FID> [":" ty=type()] ["=" e=expression()] ";" {
+    return new AST.GlobalVariableDeclaration(
+      p(t1), modifiers, t2.image.substring(1), ty, e
+    );
+  }
+}
+
+AST.FunctionDeclaration fun_decl(int modifiers) : {
+  Token t1, t2;
+  List<AST.Argument> args = SLists.nil();
+  AST.TypeNode ty = null;
+  AST.BlockStatement b = null;
+}{
+  t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";") {
+    return new AST.FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
+  }
+}
+
+AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
+  (ty=interface_decl(modifiers) | ty=class_decl(modifiers)) {return ty;}
+}
+
+AST.BlockStatement block():{Token t; List<AST.Statement> stmts = SLists.nil(); AST.BlockStatement s;}{
+  t="{" [stmts=stmts()] "}" {return new AST.BlockStatement(p(t), stmts);}
+}
+
+List<AST.Statement> stmts():{ AST.Statement s; ArrayBuffer<AST.Statement> stmts = new ArrayBuffer<AST.Statement>(); }{
+  (s=stmt() { append(stmts, s); })+ {return toList(stmts);}
+}
+
+int modifiers():{ mset = 0; Token t = null, last = null; }{
+  ( t = "final"        {mset = AST.M_FINAL();}
+  | t = "internal"     {mset = AST.M_INTERNAL();}
+  | t = "volatile"     {mset = AST.M_VOLATILE();}
+  | t = "abstract"     {mset = AST.M_ABSTRACT();}
+  | t = "synchronized" {mset = AST.M_SYNCHRONIZED();}
+  | t = "static"       {mset = AST.M_STATIC();}
+  | t = "inherited"    {mset = AST.M_INHERITED();}
+  )
+  ( LOOKAHEAD(1,{no(AST.M_FINAL(), mset)})        t = "final"        { mset |= AST.M_FINAL(); }
+  | LOOKAHEAD(1,{no(AST.M_INTERNAL(), mset)})     t = "internal"     { mset |= AST.M_INTERNAL(); }
+  | LOOKAHEAD(1,{no(AST.M_VOLATILE(), mset)})     t = "volatile"     { mset |= AST.M_VOLATILE(); }
+  | LOOKAHEAD(1,{no(AST.M_ABSTRACT(), mset)})     t = "abstract"     { mset |= AST.M_ABSTRACT(); }
+  | LOOKAHEAD(1,{no(AST.M_SYNCHRONIZED(), mset)}) t = "synchronized" { mset |= AST.M_SYNCHRONIZED(); }
+  | LOOKAHEAD(1,{no(AST.M_STATIC(), mset)})       t = "static"       { mset |= AST.M_STATIC(); }
+  | LOOKAHEAD(1,{no(AST.M_INHERITED(), mset)})    t = "inherited"    { mset |= AST.M_INHERITED(); }
+  )* {return mset;}
+}
+
+AST.AccessSection default_section() : {
+  ArrayBuffer<AST.MemberDeclaration> members = new ArrayBuffer<AST.MemberDeclaration>();
+  AST.MemberDeclaration m; int mset; AST.Position pos;
+}{
+  {mset = 0;}
+  ([mset=modifiers()] m=member_decl(mset) {
+     append(members, m); pos = m.pos();
+   }
+  )
+  {mset = 0;}
+  ([mset=modifiers()] m=member_decl(mset) {append(members, m);})*
+  {return new AST.AccessSection(pos, AST.M_PRIVATE(), toList(members));}
+}
+
+AST.AccessSection access_section() :{
+  ArrayBuffer<AST.MemberDeclaration> members = new ArrayBuffer<AST.MemberDeclaration>();
+  Token t; int mset; AST.MemberDeclaration m;
+  int sectionType = 0;
+}{
+  (t="public"    {sectionType = AST.M_PUBLIC();}
+  |t="protected" {sectionType = AST.M_PROTECTED();}
+  |t="private"   {sectionType = AST.M_PRIVATE();}
+  ) ":"
+  {mset = 0;}
+  ([mset=modifiers()] m=member_decl(mset) {append(members, m);})*
+  {return new AST.AccessSection(p(t), sectionType, toList(members));}
+}
+
+AST.MemberDeclaration member_decl(int mset) :{AST.MemberDeclaration m;}{
+  m=field_decl(mset)         {return m;}
+| m=method_decl(mset)        {return m;}
+| m=delegate_decl(mset)      {return m;}
+| m=constructor_decl(mset)   {return m;}
+}
+
+AST.ClassDeclaration class_decl(int mset) : {
+  Token t1, t2; AST.TypeNode ty1 = null, ty2 = null;
+  AST.AccessSection sec1 = null, sec2 = null;
+  ArrayBuffer<AST.TypeNode> ty2s = new ArrayBuffer<AST.TypeNode>();
+  ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
+}{
+  t1="class" t2=<ID> [":" ty1=class_type()]
+  ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{"
+    [sec1=default_section()]
+    (sec2=access_section() {append(sec2s, sec2);})*
+  "}" {
+    return new AST.ClassDeclaration(
+      p(t1), mset, t2.image, ty1, toList(ty2s), sec1, toList(sec2s)
+    );
+  }
+}
+
+AST.InterfaceDeclaration interface_decl(int mset) : {
+  Token start, name;
+  AST.TypeNode superType;
+  AST.MethodDeclaration signature;
+  ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
+  ArrayBuffer<AST.MethodDeclaration> signatures = new ArrayBuffer<AST.MethodDeclaration>();
+}{
+  start = "interface" name = <ID>
+  [ "<:"
+    superType = class_type() {append(superTypes, superType);}
+    ("," superType = class_type() {append(superTypes, superType);})*
+  ] "{"
+    (signature = interface_method_decl() {append(signatures, signature); })*
+  "}" {
+    return new AST.InterfaceDeclaration(
+      p(start), mset, name.image, toList(superTypes), toList(signatures)
+    );
+  }
+}
+
+AST.ConstructorDeclaration constructor_decl(int mset) : {
+  Token t;
+  List<AST.Argument> args = SLists.nil();
+  List<AST.Expression> params = SLists.nil();
+  AST.BlockStatement block;
+}{
+  t = "new" ["(" args = args() ")"] [":" "(" params = expressions() ")"] block = block() {
+    return new AST.ConstructorDeclaration(p(t), mset, args, params, block);
+  }
+}
+
+AST.MethodDeclaration method_decl(int mset) : {
+  Token t;
+  List<AST.Argument> args = SLists.nil();
+  AST.TypeNode ty = null;
+  AST.BlockStatement b = null;
+}{
+  ["def"] t=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";" ) {
+    return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
+  }
+}
+
+AST.MethodDeclaration interface_method_decl() : {
+  Token n;
+  List<AST.Argument> args = SLists.nil();
+  AST.TypeNode ty  = null;
+}{
+  n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {
+    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), n.image, args, ty, null);
+  }
+}
+
+AST.TypeNode basic_type() : {
+  Token t = null; AST.PrimitiveTypeKind kind = null;
+}{
+( t="byte"     {kind = AST.K_BYTE();}
+| t="short"    {kind = AST.K_SHORT();}
+| t="char"     {kind = AST.K_CHAR();}
+| t="int"      {kind = AST.K_INT();}
+| t="long"     {kind = AST.K_LONG();}
+| t="float"    {kind = AST.K_FLOAT();}
+| t="double"   {kind = AST.K_DOUBLE();}
+| t="boolean"  {kind = AST.K_BOOLEAN();}
+) {return new AST.TypeNode(p(t), new AST.PrimitiveType(kind));}
+}
+
+AST.TypeNode class_type() : {Token n;}{
+  n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true));}
+| n=<ID>   {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, false));}
+}
+
+AST.TypeNode raw_type() :{AST.TypeNode c;}{
+  (c = basic_type() | c = class_type()) {return c;}
+}
+
+AST.TypeNode void_type() :{Token t;}{
+  t="void" {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()));}
+}
+
+AST.TypeNode type() : {
+  int d = 0; ArrayBuffer<AST.TypeDescriptor> args = new ArrayBuffer<AST.TypeDescriptor>();
+  AST.TypeNode arg, c;
+}{
+  c=raw_type()
+  [LOOKAHEAD(2) "<" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* ">" ]
+  (LOOKAHEAD(2) "[" "]" {d++;})* {
+    AST.TypeDescriptor desc = args.size() > 0 ? new AST.ParameterizedType(c.desc(), toList(args)) : c.desc();
+    for(int i = 0; i < d; i++) {
+      desc = new AST.ArrayType(desc);
+    }
+    return new AST.TypeNode(c.pos(), desc);
+  }
+}
+
+AST.TypeNode return_type() :{AST.TypeNode type;}{
+  (type = void_type() | type = type()) {return type;}
+}
+
+AST.Argument argument() :{Token t; AST.TypeNode type;}{
+  t=<ID> ":" type = type() {return new AST.Argument(p(t), t.image, type);}
+}
+
+List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{
+  [a = argument() {append(as, a);} ("," a = argument() {append(as, a);})*] {return toList(as);}
+}
+
+AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
+  Token start, name;
+  AST.TypeNode type = null;
+  AST.Expression init = null;
+}{
+  start="forward" name=<FID> [":" type = type()]
+  ["=" init=expression()] ";" {
+    return new AST.DelegatedFieldDeclaration(p(start), modifiers, name.image.substring(1), type, init);
+  }
+}
+
+AST.FieldDeclaration field_decl(int modifiers):{
+  Token name;
+  AST.TypeNode type = null;
+  AST.Expression init = null;
+}{
+  name=<FID> ":" [type=type()]
+  ["=" init=expression()] ";" {
+    return new AST.FieldDeclaration(p(name), modifiers, name.image.substring(1), type, init);
+  }
+}
+
+AST.Statement stmt():{AST.Statement st;}{
+  LOOKAHEAD(2)
+  st=local_var_stmt()         {return st;}
+| st=if_stmt()                {return st;}
+| st=while_stmt()             {return st;}
+| st=for_stmt()               {return st;}
+| st=select_stmt()            {return st;}
+| st=branch_stmt()            {return st;}
+| st=block()                  {return st;}
+| st=try_stmt()               {return st;}
+| st=throw_stmt()             {return st;}
+| st=break_stmt()             {return st;}
+| st=continue_stmt()          {return st;}
+| st=return_stmt()            {return st;}
+| st=exp_stmt()               {return st;}
+| st=empty_stmt()             {return st;}
+| st=synchronized_stmt()      {return st;}
+| st=foreach_stmt()           {return st;}
+}
+
+AST.LocalVariableDeclaration local_var_stmt() :{Token t; AST.TypeNode ty; AST.Expression e = null;}{
+  t=<ID> ":" ty=type() ["=" e=expression()] ";" {
+    return new AST.LocalVariableDeclaration(p(t), t.image, ty, e);
+  }
+}
+
+AST.BreakStatement break_stmt() :{Token t;}{
+  t="break" ";" {return new AST.BreakStatement(p(t));}
+}
+
+AST.ContinueStatement continue_stmt() :{Token t; AST.ContinueStatement st;}{
+  t="continue" ";" {return new AST.ContinueStatement(p(t));}
+}
+
+AST.ThrowStatement throw_stmt() :{Token t; AST.Expression e;}{
+  t="throw" e=expression() ";" {return new AST.ThrowStatement(p(t), e);}
+}
+
+AST.TryStatement try_stmt() :{
+  Token t; AST.Argument a; AST.BlockStatement b1, b2, b3 = null;
+  ArrayBuffer<Tuple2<AST.Argument,AST.BlockStatement>> as = new ArrayBuffer<Tuple2<AST.Argument, AST.BlockStatement>>();
+}{
+  t="try"  b1=block() ("catch" a=argument() b2=block() {append(as, new Tuple2<AST.Argument, AST.BlockStatement>(a, b2));})*
+  ["finally" b3=block()] {return new AST.TryStatement(p(t), b1, toList(as), b3);}
+}
+
+AST.ExpressionStatement exp_stmt() :{AST.Expression e;}{
+  e=expression() ";" {return new AST.ExpressionStatement(e.pos(), e);}
+}
+
+AST.EmptyStatement empty_stmt() :{Token t;}{
+  t=";" {return new AST.EmptyStatement(p(t));}
+}
+
+AST.IfStatement if_stmt() :{Token t; AST.Expression e; AST.BlockStatement b1, b2 = null;}{
+  t="if" e=expression() b1=block() [LOOKAHEAD(2) "else" b2=block()] {return new AST.IfStatement(p(t), e, b1, b2);}
+}
+
+AST.BranchStatement branch_stmt() : {
+  Token t; AST.Expression e;
+  ArrayBuffer<Tuple2<AST.Expression, AST.BlockStatement>> es = new ArrayBuffer<Tuple2<AST.Expression, AST.BlockStatement>>();
+  List<AST.Statement> ss = null; AST.BlockStatement elseBlock = null;
+}{
+  t="branch" "{"
+    (("case" e=expression() "=>" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.pos(), ss)));})+
+    ["else" elseBlock=block()]
+  "}" { return new AST.BranchStatement(p(t), toList(es), elseBlock); }
+}
+
+AST.SelectStatement select_stmt() :{
+  Token t1, t2; AST.Expression e1, e2;
+  ArrayBuffer<AST.Expression> es = new ArrayBuffer<AST.Expression>();
+  List<AST.Statement> ss = null;
+  ArrayBuffer<Tuple2<List<AST.Expression>, AST.BlockStatement>> branches = new ArrayBuffer<Tuple2<List<AST.Expression>, AST.BlockStatement>>();
+  AST.BlockStatement elseBlock = null ;
+}{
+  t1="select" e1=expression() "{"
+    ((t2="case" e2=expression() {append(es, e2);} ("," e2=expression() {append(es, e2);})* ":" ss=stmts()) {
+      append(branches, new Tuple2<List<AST.Expression>, AST.BlockStatement>(toList(es), new AST.BlockStatement(p(t2), ss)));
+    })*
+    [t2="else:" [ss=stmts()] { elseBlock = new AST.BlockStatement(p(t2), ss); }]    
+  "}" {
+    return new AST.SelectStatement(p(t1), e1, toList(branches), elseBlock);
+  }
+}
+
+AST.ReturnStatement return_stmt() :{Token t; AST.Expression e = null;}{
+  t="return" [e=expression()] ";" {return new AST.ReturnStatement(p(t), e);}
+}
+
+AST.SynchronizedStatement synchronized_stmt() :{Token t; AST.Expression e = null; AST.BlockStatement b;}{
+  t="synchronized" [e=expression()] b=block() {return new AST.SynchronizedStatement(p(t), e, b);}
+}
+
+AST.WhileStatement while_stmt() :{Token t; AST.Expression e; AST.BlockStatement b;}{
+  t="while" e=expression() b=block() {return new AST.WhileStatement(p(t), e, b);}
+}
+
+AST.ForeachStatement foreach_stmt() :{Token t; AST.Argument a; AST.Expression e; AST.BlockStatement b;}{
+  t="foreach" a=argument() (LOOKAHEAD({la("in")}) <ID>) e=expression() b=block() {
+    return new AST.ForeachStatement(p(t), a, e, b);
+  }
+}
+
+AST.ForStatement for_stmt() :{Token t; AST.Statement s; AST.Expression e1 = null, e2 = null; AST.BlockStatement b;}{
+  t="for" (LOOKAHEAD(2) s=local_var_stmt() | s=exp_stmt() | s=empty_stmt())
+  [e1=expression()] ";" [e2=expression()] b=block() {
+  	return new AST.ForStatement(p(t), s, e1, e2, b);
+  }
+}
+
+AST.Expression expression() :{AST.Expression e;}{
+  e = assignable() { return e; }
+}
+
+AST.Expression assignable() :{Token t; AST.Expression a, b; }{
+  a=logical_or()
+  [ ( t="="  b=assignable() {a = new AST.Assignment(p(t), a, b);}
+    | t="+=" b=assignable() {a = new AST.AdditionAssignment(p(t), a, b);}
+    | t="-=" b=assignable() {a = new AST.SubtractionAssignment(p(t), a, b);}
+    | t="*=" b=assignable() {a = new AST.MultiplicationAssignment(p(t), a, b);}
+    | t="/=" b=assignable() {a = new AST.DivisionAssignment(p(t), a, b);}
+    | t="%=" b=assignable() {a = new AST.ModuloAssignment(p(t), a, b);}
+    )
+  ]{return a;}
+}
+
+AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
+  a=logical_and()
+  ( t="||" b=logical_and() {a = new AST.LogicalOr(p(t), a, b);}
+  | t="?:" b=logical_and() {a = new AST.Elvis(p(t), a, b);})*
+  { return a; }
+}
+
+AST.Expression logical_and() :{Token t; AST.Expression a, b; }{
+  a=bit_or() (t="&&" b=bit_or() {a = new AST.LogicalAnd(p(t), a, b);})* {return a;}
+}
+
+AST.Expression bit_or() :{Token t; AST.Expression a, b; }{
+  a=xor() (t="|" b=xor() {a = new AST.BitOr(p(t), a, b);})* {return a;}
+}
+
+AST.Expression xor() :{Token t; AST.Expression a, b;}{
+  a = bit_and() (t="^" b=bit_and() {a = new AST.XOR(p(t), a, b);})* {return a;}
+}
+
+AST.Expression bit_and() :{Token t; AST.Expression a, b; }{
+  a=equal() (t = "&" b=equal() {a = new AST.BitAnd(p(t), a, b);})* {return a;}
+}
+
+AST.Expression equal() :{ Token t; AST.Expression a, b; }{
+  a=comparative()
+  ( ( t="===" b=comparative() {a= new AST.ReferenceEqual(p(t), a, b);}
+    | t="!==" b=comparative() {a= new AST.ReferenceNotEqual(p(t), a, b);}
+    | t="=="  b=comparative() {a= new AST.Equal(p(t), a, b);}
+    | t="!="  b=comparative() {a= new AST.NotEqual(p(t), a, b);}
+    )
+  )* {return a;}
+}
+
+AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
+  a=bit_shift()
+  ( ( t="<=" b=bit_shift() {a = new AST.LessOrEqual(p(t), a, b);}
+    | t=">=" b=bit_shift() {a = new AST.GreaterOrEqual(p(t), a, b);}
+    | t="<"  b=bit_shift() {a = new AST.LessThan(p(t), a, b);}
+    | t=">"  b=bit_shift() {a = new AST.GreaterThan(p(t), a, b);}
+    | t="is" type = type() {a = new AST.IsInstance(p(t), a, type);}
+    ) 
+  )* {return a;}
+}
+
+AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
+  e1=additive()
+( t="<<" e2=additive()    {e1 = new AST.MathLeftShift(p(t), e1, e2);}
+| t=">>" e2=additive()    {e1 = new AST.MathRightShift(p(t), e1, e2);}
+| t=">>>"e2=additive()    {e1 = new AST.LogicalRightShift(p(t), e1, e2);}
+)* { return e1; }
+}
+
+AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
+  e1=unary_prefix()
+( t="+" e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
+| t="-" e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
+)* {return e1;}
+}
+
+AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
+( t="+" e=unary_prefix() {e = new AST.Posit(p(t), e);}
+| t="-" e=unary_prefix() {e = new AST.Negate(p(t), e);}
+| t="!" e=unary_prefix() {e = new AST.Not(p(t), e);}
+| e=multitive()
+) {return e;}
+}
+
+AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
+  e1=primary_suffix()
+( t="*" e2=primary_suffix()  {e1 = new AST.Multiplication(p(t), e1, e2);}
+| t="/" e2=primary_suffix()  {e1 = new AST.Division(p(t), e1, e2);}
+| t="%" e2=primary_suffix()  {e1 = new AST.Modulo(p(t), e1, e2);}
+)* {return e1;}
+}
+
+AST.Expression primary_suffix() : {
+  Token t, n; AST.Expression e, a; List<AST.Expression> args = null;
+  AST.TypeNode type;
+}{
+  e=primary()
+( t="[" a=expression() "]"                             {e = new AST.Indexing(p(t), e, a);}
+| LOOKAHEAD(3) t="." n=<ID> "(" args=expressions() ")" {e = new AST.MethodCall(p(t), e, c(n), args);}
+| t="." n=<ID>                                         {e = new AST.MemberSelection(p(t), e, c(n));}
+| t="$" type=type()                                    {e = new AST.Cast(p(t), e, type);}
+| t="++"                                               {e = new AST.PostIncrement(p(t), e);}
+| t="--"                                               {e = new AST.PostDecrement(p(t), e);}
+)* {return e;}
+}
+
+AST.Expression primary() : {
+  Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
+  List<AST.Expression> es = null; List<AST.Argument> args = null; AST.BlockStatement body;
+}{
+  t=<FID>                                                                 {return new AST.MemberSelection(p(t), null, c(t).substring(1));}
+| t="super" "." n=<ID> ["(" es=expressions() ")"]                         {return new AST.SuperMethodCall(p(t), c(n), es);}
+| LOOKAHEAD(4) ty=class_type() t="::" n=<ID> "(" es=expressions()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
+| LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                              {return new AST.StaticMemberSelection(p(t), ty, c(n));}
+| LOOKAHEAD(2) t=<ID> "(" es=expressions() ")"                            {return new AST.MethodCall(p(t), null, c(t), es);}
+| t=<ID>                                                                  {return new AST.Id(p(t), c(t));}
+| t="[" es=expressions() "]"                                              {return new AST.ListLiteral(p(t), es);}
+| t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
+    String mname;
+    if(ty == null) {
+      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true));
+      mname = "call";      
+    }else {
+      mname = n.image;
+    }
+    return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
+  }
+| t="new" ty=type() (
+    "[" (es=expressions()) "]"                                            {return new AST.NewArray(p(t), ty, es);}
+  | ["(" (es=expressions()) ")"]                                          {return new AST.NewObject(p(t), ty, es);}
+  )
+| t="self"                                                                {return new AST.CurrentInstance(p(t));}
+| e=integer_literal()                                                     {return e;}
+| e=float_literal()                                                       {return e;}
+| e=char_literal()                                                        {return e;}
+| e=string_literal()                                                      {return e;}
+| e=boolean_literal()                                                     {return e;}
+| e=null_literal()                                                        {return e;}
+| "(" e=expression() ")"                                                  {return e;}
+}
+
+List<AST.Expression> expressions() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
+  [arg=expression() {append(args, arg);} ("," arg=expression() {append(args, arg);})*] {
+    return toList(args);
+  }
+}
+
+AST.Expression null_literal() :{Token t;}{
+  t="null" {return new AST.NullLiteral(p(t));}
+}
+
+AST.Expression integer_literal() :{Token t; String s;}{
+  t=<INTEGER> {
+    s = t.image;
+    if(s.endsWith("L")){
+      return new AST.LongLiteral(p(t), Long.parseLong(chop(s)));
+    }else{
+      return new AST.IntegerLiteral(p(t), Integer.parseInt(s));
+    }
+  }
+}
+
+AST.Expression float_literal() :{Token t; String s;}{
+  t=<FLOAT> {
+  	s = t.image;
+    if(s.endsWith("F")){
+      return new AST.FloatLiteral(p(t), Float.parseFloat(chop(s)));
+    }else if(s.endsWith("D")){
+      return new AST.DoubleLiteral(p(t), Double.parseDouble(chop(s)));
+    }else{
+      return new AST.DoubleLiteral(p(t), Double.parseDouble(s));
+    }
+  }
+}
+
+AST.Expression boolean_literal() :{Token t;}{
+  t="true"  {return new AST.BooleanLiteral(p(t), true);}
+| t="false" {return new AST.BooleanLiteral(p(t), false);}
+}
+
+AST.StringLiteral string_literal() :{Token t;}{
+  t=<STRING> {return new AST.StringLiteral(p(t), unescape(chopEdge(t.image)));}
+}
+
+AST.CharacterLiteral char_literal() :{Token t;}{
+  t=<CHARACTER> {return new AST.CharacterLiteral(p(t), unescape(chopEdge(t.image)).charAt(0));}
+}

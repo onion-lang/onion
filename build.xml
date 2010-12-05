@@ -39,10 +39,16 @@
   <target name="grammar">
     <mkdir dir="${parser.output}" />
     <javacc
-    	target="${grammar}/JavaccOnionParser.jj"
-    	unicodeinput="true"
+      target="${grammar}/JavaccOnionParser.jj"
+      unicodeinput="true"
       javaunicodeescape="true"
-    	outputdirectory="${parser.output}"
+      outputdirectory="${parser.output}"
+      javacchome="${javacc.home}"/>
+    <javacc
+      target="${grammar}/JJOnionParser.jj"
+      unicodeinput="true"
+      javaunicodeescape="true"
+      outputdirectory="${parser.output}"
       javacchome="${javacc.home}"/>
   </target>
 

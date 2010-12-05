@@ -3,8 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" readonly="true" id="a729fbc9-220e-4bad-8bb4-382873c2021f" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MOVED" beforePath="C:\Users\Mizushima\IdeaProjects\onion\src.scala\onion\compiler\syntax\AST.scala" afterPath="$PROJECT_DIR$/src.scala/onion/compiler/AST.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/grammar/JJOnionParser.jj" afterPath="$PROJECT_DIR$/grammar/JJOnionParser.jj" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src.scala/onion/compiler/TypeChecker.scala" />
     </list>
     <ignored path="src.parser/onion/compiler/parser/" />
     <ignored path="onion.iws" />
@@ -74,10 +73,19 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="JJOnionParser.java" pinned="false" current="true" current-in-tab="true">
+      <file leaf-file-name="JJOnionParser.java" pinned="false" current="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src.parser/onion/compiler/parser/JJOnionParser.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="27" column="54" selection-start="829" selection-end="829" vertical-scroll-proportion="0.10526316">
+            <state line="24" column="0" selection-start="710" selection-end="710" vertical-scroll-proportion="0.0">
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="TypeChecker.scala" pinned="false" current="true" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src.scala/onion/compiler/TypeChecker.scala">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="12" column="0" selection-start="250" selection-end="250" vertical-scroll-proportion="0.6">
               <folding />
             </state>
           </provider>
@@ -119,6 +127,11 @@
   </component>
   <component name="Git.Settings">
     <option name="GIT_EXECUTABLE" value="C:\development\Git\bin\git.exe" />
+    <option name="PREVIOUS_COMMIT_AUTHORS">
+      <array>
+        <option value="kmizu &lt;mizukota@gmail.com&gt;" />
+      </array>
+    </option>
     <option name="CHECKOUT_INCLUDE_TAGS" value="false" />
     <option name="LINE_SEPARATORS_CONVERSION" value="NONE" />
   </component>
@@ -134,8 +147,8 @@
         <option value="$PROJECT_DIR$/src/onion/compiler/util/Ex.java" />
         <option value="$PROJECT_DIR$/src.scala/onion/compiler/syntax/AST.scala" />
         <option value="$PROJECT_DIR$/build.xml" />
-        <option value="$PROJECT_DIR$/src.scala/onion/compiler/TypeChecker.scala" />
         <option value="$PROJECT_DIR$/grammar/JJOnionParser.jj" />
+        <option value="$PROJECT_DIR$/src.scala/onion/compiler/TypeChecker.scala" />
       </list>
     </option>
   </component>
@@ -212,18 +225,8 @@
               <option name="myItemId" value="src.scala" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
-          </PATH>
-          <PATH>
             <PATH_ELEMENT>
-              <option name="myItemId" value="onion" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="onion" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="grammar" />
+              <option name="myItemId" value="compiler" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -431,7 +434,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1378" height="744" extended-state="0" />
-    <editor active="true" />
+    <editor active="false" />
     <layout>
       <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32857144" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
@@ -444,7 +447,7 @@
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.31711027" sideWeight="0.65254235" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.31711027" sideWeight="0.65254235" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Dependency Viewer" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
@@ -466,7 +469,7 @@
     <option name="ENABLE_BACKGROUND_PROCESSES" value="false" />
     <option name="CHANGED_ON_SERVER_INTERVAL" value="60" />
     <option name="FORCE_NON_EMPTY_COMMENT" value="false" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update workspace.xml" />
+    <option name="LAST_COMMIT_MESSAGE" value="Move AST object from package onion.compiler.syntax to package onion.compiler" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
     <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="false" />
     <option name="CHECK_FILES_UP_TO_DATE_BEFORE_COMMIT" value="false" />
@@ -482,6 +485,7 @@
     <MESSAGE value="Import as an IDEA project." />
     <MESSAGE value="Rewrite Onion's parser to create AST objects defined in Scala." />
     <MESSAGE value="Update workspace.xml" />
+    <MESSAGE value="Move AST object from package onion.compiler.syntax to package onion.compiler" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
@@ -583,7 +587,14 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src.parser/onion/compiler/parser/JJOnionParser.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="27" column="54" selection-start="829" selection-end="829" vertical-scroll-proportion="0.10526316">
+        <state line="24" column="0" selection-start="710" selection-end="710" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src.scala/onion/compiler/TypeChecker.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="12" column="0" selection-start="250" selection-end="250" vertical-scroll-proportion="0.6">
           <folding />
         </state>
       </provider>

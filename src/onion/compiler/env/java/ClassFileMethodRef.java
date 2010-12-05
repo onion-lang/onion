@@ -30,23 +30,23 @@ public class ClassFileMethodRef implements IxCode.MethodRef {
     this.returnType = returnType;
   }
   
-  public int getModifier(){
+  public int modifier(){
     return modifier;
   }
 
-  public IxCode.ClassTypeRef getClassType() {
+  public IxCode.ClassTypeRef affiliation() {
     return classType;
   }
 
-  public String getName() {
+  public String name() {
     return name;
   }
 
-  public IxCode.TypeRef[] getArguments() {
+  public IxCode.TypeRef[] arguments() {
     return arguments;
   }
 
-  public IxCode.TypeRef getReturnType() {
+  public IxCode.TypeRef returnType() {
     return returnType;
   }
 }

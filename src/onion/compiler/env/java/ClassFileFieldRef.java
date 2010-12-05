@@ -27,15 +27,15 @@ public class ClassFileFieldRef implements IxCode.FieldRef {
     this.type = type;
   }
 
-  public int getModifier() {
+  public int modifier() {
     return modifier;
   }
 
-  public IxCode.ClassTypeRef getClassType() {
+  public IxCode.ClassTypeRef affiliation() {
     return classType;
   }
 
-  public String getName() {
+  public String name() {
     return name;
   }
 

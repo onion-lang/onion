@@ -128,8 +128,8 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     for (int i = 0; i < args.length; i++) {
       args[i] = "arg" + i;
     }
-    ObjectType classType = (ObjectType) typeOf(node.getClassType());
-    int modifier = toJavaModifier(node.getModifier());
+    ObjectType classType = (ObjectType) typeOf(node.affiliation());
+    int modifier = toJavaModifier(node.modifier());
     Type[] arguments = typesOf(node.getArgs());
     MethodGen method = new MethodGen(
       modifier, Type.VOID, arguments, args, "<init>",
@@ -161,32 +161,32 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     LocalFrame frame = node.getFrame();
     code.setFrame(frame);
     
-    int modifier = toJavaModifier(node.getModifier());
-    Type returned = typeOf(node.getReturnType());
-    Type[] arguments = typesOf(node.getArguments());
+    int modifier = toJavaModifier(node.modifier());
+    Type returned = typeOf(node.returnType());
+    Type[] arguments = typesOf(node.arguments());
     String[] argNames = names(arguments.length);
-    String name = node.getName();
-    String className = node.getClassType().getName();
+    String name = node.name();
+    String className = node.affiliation().getName();
     MethodGen method = new MethodGen(
       modifier, returned, arguments, argNames, name, className,
       code.getCode(), gen.getConstantPool());
     code.setMethod(method);
-    if (!Modifier.isAbstract(node.getModifier())) {   
+    if (!Modifier.isAbstract(node.modifier())) {
       if(frame.isClosed()){
         int origin;
-        if(Modifier.isStatic(node.getModifier())){
+        if(Modifier.isStatic(node.modifier())){
           code.setFrameObjectIndex(
-            frameObjectIndex(0, node.getArguments()));
+            frameObjectIndex(0, node.arguments()));
           origin = 0;
         }else{
           code.setFrameObjectIndex(
-            frameObjectIndex(1, node.getArguments()));
+            frameObjectIndex(1, node.arguments()));
           origin = 1;
         }
         code.setIndexTable(indexTableFor(frame));
         appendInitialCode(code, frame, arguments, origin);
       }else{
-        if (Modifier.isStatic(node.getModifier())) {
+        if (Modifier.isStatic(node.modifier())) {
           code.setIndexTable(indexTableFor(0, frame));
         } else {
           code.setIndexTable(indexTableFor(1, frame));
@@ -231,9 +231,9 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   private void implementsMethods(ClassGen gen, IxCode.MethodRef[] methods){
     for(int i = 0; i < methods.length; i++){
       IxCode.MethodRef method = methods[i];
-      Type returnType = typeOf(method.getReturnType());
-      String name = method.getName();
-      Type[] args = typesOf(method.getArguments());
+      Type returnType = typeOf(method.returnType());
+      String name = method.name();
+      Type[] args = typesOf(method.arguments());
       String[] argNames = names(args.length);
       CodeProxy code = new CodeProxy(gen.getConstantPool());
       MethodGen mgen = new MethodGen(
@@ -341,10 +341,10 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     codeExpressions(node.getParams(), code);
     IxCode.MethodRef method = node.getMethod();
     code.appendInvoke(
-      method.getClassType().getName(),
-      method.getName(),
-      typeOf(method.getReturnType()),
-      typesOf(method.getArguments()),
+      method.affiliation().getName(),
+      method.name(),
+      typeOf(method.returnType()),
+      typesOf(method.arguments()),
       Constants.INVOKESPECIAL);
     return start;
   }
@@ -382,8 +382,8 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   
   public void codeField(ClassGen gen, IxCode.FieldDefinition node) {
     FieldGen field = new FieldGen(
-      toJavaModifier(node.getModifier()), 
-      typeOf(node.getType()), node.getName(), gen.getConstantPool());
+      toJavaModifier(node.modifier()),
+      typeOf(node.getType()), node.name(), gen.getConstantPool());
     gen.addField(field.getField());
   }
 
@@ -699,8 +699,8 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
 
   public InstructionHandle codeStaticFieldRef(IxCode.StaticFieldRef node, CodeProxy code) {
-    String classType = node.field.getClassType().getName();
-    String name = node.field.getName();
+    String classType = node.field.affiliation().getName();
+    String name = node.field.name();
     Type type = typeOf(node.type());
     return code.appendGetStatic(classType, name, type);
   }
@@ -718,9 +718,9 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
       kind = Constants.INVOKEVIRTUAL;
     }
     String className = classType.getName();
-    String name = node.method.getName();
+    String name = node.method.name();
     Type ret = typeOf(node.type());
-    Type[] args = typesOf(node.method.getArguments());
+    Type[] args = typesOf(node.method.arguments());
     code.appendInvoke(className, name, ret, args, kind);
     return start;
   }
@@ -751,7 +751,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
   
   public InstructionHandle codeNew(IxCode.NewObject node, CodeProxy code) {
-    IxCode.ClassTypeRef type = node.constructor.getClassType();
+    IxCode.ClassTypeRef type = node.constructor.affiliation();
     InstructionHandle start = code.appendNew((ObjectType)typeOf(type));
     code.append(InstructionConstants.DUP);
     for (int i = 0; i < node.parameters.length; i++) {
@@ -784,9 +784,9 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
       start = code.append(InstructionConstants.NOP);
     }
     String className = node.target.getName();
-    String name = node.method.getName();
+    String name = node.method.name();
     Type returnType = typeOf(node.type());
-    Type[] arguments = typesOf(node.method.getArguments());
+    Type[] arguments = typesOf(node.method.arguments());
     short kind = Constants.INVOKESTATIC;
     code.appendInvoke(className, name, returnType, arguments, kind);
     return start;
@@ -1171,7 +1171,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   public InstructionHandle codeFieldRef(IxCode.RefField node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.target, code);
     IxCode.ClassTypeRef symbol = (IxCode.ClassTypeRef) node.target.type();
-    code.appendGetField(symbol.getName(), node.field.getName(), typeOf(node.type()));
+    code.appendGetField(symbol.getName(), node.field.name(), typeOf(node.type()));
     return start;
   }
 
@@ -1184,7 +1184,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
       code.append(InstructionConstants.DUP_X1);
     }
     IxCode.ClassTypeRef symbol = (IxCode.ClassTypeRef) node.getObject().type();
-    code.appendPutField(symbol.getName(), node.getField().getName(), typeOf(node.type()));
+    code.appendPutField(symbol.getName(), node.getField().name(), typeOf(node.type()));
     return start;
   }
 

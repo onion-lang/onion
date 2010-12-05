@@ -28,15 +28,15 @@ public class ClassFileConstructorRef implements IxCode.ConstructorRef {
     this.args = (IxCode.TypeRef[]) args.clone();
   }
   
-  public int getModifier(){
+  public int modifier(){
     return modifier;
   }
 
-  public IxCode.ClassTypeRef getClassType() {
+  public IxCode.ClassTypeRef affiliation() {
     return classType;
   }
 
-  public String getName() {
+  public String name() {
     return name;
   }
 

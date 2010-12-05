@@ -732,7 +732,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       Set methodSet = new TreeSet(new IxCode.MethodRefComparator());
       for(Iterator i = fields.iterator(); i.hasNext();){
         IxCode.FieldDefinition node = (IxCode.FieldDefinition)i.next();
-        if(Modifier.isForwarded(node.getModifier())){
+        if(Modifier.isForwarded(node.modifier())){
           generateDelegationMethods(node ,generated, methodSet);
         }
       }
@@ -748,7 +748,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           report(
             DUPLICATE_GENERATED_METHOD, lookupAST(node),
             new Object[]{
-              method.getClassType(), method.getName(), method.getArguments()
+              method.affiliation(), method.name(), method.arguments()
             });
           continue;
         }
@@ -761,7 +761,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     private IxCode.MethodDefinition createEmptyMethod(IxCode.FieldRef field, IxCode.MethodRef method){
       IxCode.Expression target;
       target = new IxCode.RefField(new IxCode.This(getContextClass()), field);
-      IxCode.TypeRef[] args = method.getArguments();
+      IxCode.TypeRef[] args = method.arguments();
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       LocalFrame frame = new LocalFrame(null);
       for(int i = 0; i < params.length; i++){
@@ -770,14 +770,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       target = new IxCode.Call(target, method, params);
       IxCode.StatementBlock statement;
-      if(method.getReturnType() != IxCode.BasicTypeRef.VOID){
+      if(method.returnType() != IxCode.BasicTypeRef.VOID){
         statement = new IxCode.StatementBlock(new IxCode.Return(target));
       }else{
         statement = new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null));
       }
       IxCode.MethodDefinition node = new IxCode.MethodDefinition(
-        Modifier.PUBLIC, getContextClass(), method.getName(),
-        method.getArguments(), method.getReturnType(), statement
+        Modifier.PUBLIC, getContextClass(), method.name(),
+        method.arguments(), method.returnType(), statement
       );
       node.setFrame(frame);
       return node;
@@ -802,7 +802,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.ConstructorDefinition node = (IxCode.ConstructorDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(constructors.contains(node)){
-        IxCode.ClassTypeRef classType = node.getClassType();
+        IxCode.ClassTypeRef classType = node.affiliation();
         IxCode.TypeRef[] args = node.getArgs();
         report(DUPLICATE_CONSTRUCTOR, ast, new Object[]{classType, args});
       }else{
@@ -815,8 +815,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        IxCode.ClassTypeRef classType = node.getClassType();
-        String name = node.getName();
+        IxCode.ClassTypeRef classType = node.affiliation();
+        String name = node.name();
         report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
       }else{
         fields.add(node);
@@ -828,9 +828,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        IxCode.ClassTypeRef classType = node.getClassType();
-        String name = node.getName();
-        IxCode.TypeRef[] args = node.getArguments();
+        IxCode.ClassTypeRef classType = node.affiliation();
+        String name = node.name();
+        IxCode.TypeRef[] args = node.arguments();
         report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
       }else{
         methods.add(node);
@@ -842,8 +842,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        IxCode.ClassTypeRef classType = node.getClassType();
-        String name = node.getName();
+        IxCode.ClassTypeRef classType = node.affiliation();
+        String name = node.name();
         report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
       }else{
         fields.add(node);
@@ -855,9 +855,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        IxCode.ClassTypeRef classType = node.getClassType();
-        String name = node.getName();
-        IxCode.TypeRef[] args = node.getArguments();
+        IxCode.ClassTypeRef classType = node.affiliation();
+        String name = node.name();
+        IxCode.TypeRef[] args = node.arguments();
         report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
       }else{
         methods.add(node);
@@ -869,8 +869,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(functions.contains(node)){
-        String name = node.getName();
-        IxCode.TypeRef[] args = node.getArguments();
+        String name = node.name();
+        IxCode.TypeRef[] args = node.arguments();
         report(DUPLICATE_FUNCTION, ast, new Object[]{name, args});
       }else{
         functions.add(node);
@@ -882,7 +882,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(variables.contains(node)){
-        String name = node.getName();
+        String name = node.name();
         report(DUPLICATE_GLOBAL_VARIABLE, ast, new Object[]{name});      
       }else{
         variables.add(node);
@@ -1574,9 +1574,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         selfClass = loadTopClass();
       }else {
         if(local.getMethod() != null){
-          selfClass = local.getMethod().getClassType();
+          selfClass = local.getMethod().affiliation();
         }else{
-          selfClass = local.getConstructor().getClassType();
+          selfClass = local.getConstructor().affiliation();
         }
       }
       IxCode.FieldRef field = findField(selfClass, ref.getName());
@@ -1587,7 +1587,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(!isAccessible(field, selfClass)){
         report(
           FIELD_NOT_ACCESSIBLE, ast, 
-          new Object[]{field.getClassType(), field.getName(), selfClass});
+          new Object[]{field.affiliation(), field.name(), selfClass});
         return null;
       }
       value = processAssignable(ast.getRight(), field.getType(), value);
@@ -1738,9 +1738,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     boolean isAccessible(IxCode.MemberRef member, IxCode.ClassTypeRef context) {
-      IxCode.ClassTypeRef targetType = member.getClassType();
+      IxCode.ClassTypeRef targetType = member.affiliation();
       if(targetType == context) return true;
-      int modifier = member.getModifier();
+      int modifier = member.modifier();
       if(IxCode.TypeRules.isSuperType(targetType, context)){
         if(Modifier.isProtected(modifier) || Modifier.isPublic(modifier)){
           return true;
@@ -1760,7 +1760,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(target == null) return null;
       IxCode.FieldRef[] fields = target.getFields();
       for (int i = 0; i < fields.length; i++) {
-        if(fields[i].getName().equals(name)){
+        if(fields[i].name().equals(name)){
           return fields[i];
         }
       }
@@ -1864,10 +1864,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
             AMBIGUOUS_METHOD, ast,
             new Object[]{
               new Object[]{
-                methods[0].getClassType(), name, methods[0].getArguments()
+                methods[0].affiliation(), name, methods[0].arguments()
               },
               new Object[]{
-                methods[1].getClassType(), name, methods[1].getArguments()
+                methods[1].affiliation(), name, methods[1].arguments()
               }
             });
           return Pair.make(false, null);
@@ -1876,7 +1876,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           report(
             METHOD_NOT_ACCESSIBLE, ast,
             new Object[]{
-              methods[0].getClassType(), name, methods[0].getArguments(), 
+              methods[0].affiliation(), name, methods[0].arguments(),
               getContextClass()
             }
           );
@@ -1962,8 +1962,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.MethodRef[] methods = type.getMethods();
         IxCode.MethodRef method = null;
         for(int i = 0; i < methods.length; i++){
-          IxCode.TypeRef[] types = methods[i].getArguments();
-          if(name.equals(methods[i].getName()) && equals(argTypes, types)){
+          IxCode.TypeRef[] types = methods[i].arguments();
+          if(name.equals(methods[i].name()) && equals(argTypes, types)){
             method = methods[i];
             break;
           }
@@ -1975,7 +1975,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         local.setMethod(method);
         local.getContextFrame().getParent().setAllClosed(true);
         IxCode.ActionStatement block = translate(ast.getBlock(), context);
-        block = addReturnNode(block, method.getReturnType());
+        block = addReturnNode(block, method.returnType());
         IxCode.NewClosure node = new IxCode.NewClosure(type, method, block);
         node.setFrame(local.getContextFrame());
         return node;
@@ -2036,7 +2036,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(!isAccessible(field, selfClass)){
         report(
           FIELD_NOT_ACCESSIBLE, ast, 
-          new Object[]{field.getClassType(), ast.getName(), selfClass});
+          new Object[]{field.affiliation(), ast.getName(), selfClass});
         return null;
       }    
       return new IxCode.RefField(new IxCode.This(selfClass), field);
@@ -2056,11 +2056,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           AMBIGUOUS_CONSTRUCTOR, ast,
           new Object[]{
             new Object[]{
-              constructors[0].getClassType(), 
+              constructors[0].affiliation(),
               constructors[0].getArgs()
             },
             new Object[]{
-              constructors[1].getClassType(),
+              constructors[1].affiliation(),
               constructors[1].getArgs()
             }
           });
@@ -2103,10 +2103,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           AMBIGUOUS_METHOD, ast,
           new Object[]{
             new Object[]{
-              methods[0].getClassType(), name, methods[0].getArguments()
+              methods[0].affiliation(), name, methods[0].arguments()
             },
             new Object[]{
-              methods[1].getClassType(), name, methods[1].getArguments()
+              methods[1].affiliation(), name, methods[1].arguments()
             }
           });
         return null;
@@ -2117,9 +2117,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
        * ex. instance method call in the static context 
        */
       
-      params = convert(methods[0].getArguments(), params);
+      params = convert(methods[0].arguments(), params);
       
-      if((methods[0].getModifier() & Modifier.STATIC) != 0){
+      if((methods[0].modifier() & Modifier.STATIC) != 0){
         return new IxCode.CallStatic(targetType, methods[0], params);
       }else {
         return new IxCode.Call(new IxCode.This(targetType), methods[0], params);
@@ -2154,23 +2154,23 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           AMBIGUOUS_METHOD, ast,
           new Object[]{
             new Object[]{
-              methods[0].getClassType(), name, methods[0].getArguments()
+              methods[0].affiliation(), name, methods[0].arguments()
             },
             new Object[]{
-              methods[1].getClassType(), name, methods[1].getArguments()
+              methods[1].affiliation(), name, methods[1].arguments()
             }
           });
         return null;
       }    
-      if((methods[0].getModifier() & Modifier.STATIC) != 0){
+      if((methods[0].modifier() & Modifier.STATIC) != 0){
         report(
           ILLEGAL_METHOD_CALL, ast,
           new Object[]{
-            methods[0].getClassType(), name, methods[0].getArguments()
+            methods[0].affiliation(), name, methods[0].arguments()
           });
         return null;
       }    
-      params = convert(methods[0].getArguments(), params);
+      params = convert(methods[0].arguments(), params);
       return new IxCode.Call(target, methods[0], params);
     }
     
@@ -2203,12 +2203,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           AMBIGUOUS_METHOD, ast,
           new Object[]{
             ast.getName(),
-            typeNames(methods[0].getArguments()), typeNames(methods[1].getArguments())
+            typeNames(methods[0].arguments()), typeNames(methods[1].arguments())
           });
         return null;
       }
       
-      params = convert(methods[0].getArguments(), params);
+      params = convert(methods[0].arguments(), params);
       return new IxCode.CallStatic(type, methods[0], params);
     }
       
@@ -2680,16 +2680,16 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodDefinition function = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(function == null) return null;
       LocalContext local = new LocalContext();
-      if(Modifier.isStatic(function.getModifier())){
+      if(Modifier.isStatic(function.modifier())){
         local.setStatic(true);
       }
       local.setMethod(function);
-      IxCode.TypeRef[] arguments = function.getArguments();
+      IxCode.TypeRef[] arguments = function.arguments();
       for(int i = 0; i < arguments.length; i++){
         local.addEntry(ast.getArguments()[i].getName(), arguments[i]);
       }
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBlock(), local);
-      block = addReturnNode(block, function.getReturnType());
+      block = addReturnNode(block, function.returnType());
       function.setBlock(block);
       function.setFrame(local.getContextFrame());
       return null;
@@ -2720,16 +2720,16 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(method == null) return null;
       if(ast.getBlock() == null) return null;
       LocalContext local = new LocalContext();
-      if(Modifier.isStatic(method.getModifier())){
+      if(Modifier.isStatic(method.modifier())){
         local.setStatic(true);
       }
       local.setMethod(method);
-      IxCode.TypeRef[] arguments = method.getArguments();
+      IxCode.TypeRef[] arguments = method.arguments();
       for(int i = 0; i < arguments.length; i++){
         local.addEntry(ast.getArguments()[i].getName(), arguments[i]);
       }    
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBlock(), local);
-      block = addReturnNode(block, method.getReturnType());
+      block = addReturnNode(block, method.returnType());
       method.setBlock(block);
       method.setFrame(local.getContextFrame());
       return null;

@@ -289,7 +289,7 @@ public interface IxCode {
         this.parameters = parameters;
       }
 
-      public TypeRef type() { return method.getReturnType(); }
+      public TypeRef type() { return method.returnType(); }
     }
 
     /**
@@ -308,7 +308,7 @@ public interface IxCode {
         this.parameters = parameters;
       }
 
-      public TypeRef type() { return method.getReturnType(); }
+      public TypeRef type() { return method.returnType(); }
     }
 
     /**
@@ -327,7 +327,7 @@ public interface IxCode {
       }
 
       public TypeRef type() {
-        return method.getReturnType();
+        return method.returnType();
       }
 
       public Expression getTarget() {
@@ -554,7 +554,7 @@ public interface IxCode {
       }
 
       public int getModifier() {
-        return method.getModifier();
+        return method.modifier();
       }
 
       public ClassTypeRef getClassType() {
@@ -566,15 +566,15 @@ public interface IxCode {
       }
 
       public String getName() {
-        return method.getName();
+        return method.name();
       }
 
       public TypeRef[] getArguments() {
-        return method.getArguments();
+        return method.arguments();
       }
 
       public TypeRef getReturnType() {
-        return method.getReturnType();
+        return method.returnType();
       }
 
       public ActionStatement getBlock() {
@@ -625,7 +625,7 @@ public interface IxCode {
         return node;
       }
 
-      public String getName() {
+      public String name() {
         return "new";
       }
 
@@ -633,11 +633,11 @@ public interface IxCode {
         return arguments;
       }
 
-      public ClassTypeRef getClassType() {
+      public ClassTypeRef affiliation() {
         return classType;
       }
 
-      public int getModifier() {
+      public int modifier() {
         return modifier;
       }
 
@@ -763,15 +763,15 @@ public interface IxCode {
         this.type = type;
       }
 
-      public ClassTypeRef getClassType() {
+      public ClassTypeRef affiliation() {
         return classType;
       }
 
-      public int getModifier() {
+      public int modifier() {
         return modifier;
       }
 
-      public String getName() {
+      public String name() {
         return name;
       }
 
@@ -1074,23 +1074,23 @@ public interface IxCode {
         this.block = block;
       }
 
-      public int getModifier() {
+      public int modifier() {
         return modifier;
       }
 
-      public ClassTypeRef getClassType() {
+      public ClassTypeRef affiliation() {
         return classType;
       }
 
-      public String getName() {
+      public String name() {
         return name;
       }
 
-      public TypeRef[] getArguments() {
+      public TypeRef[] arguments() {
         return arguments;
       }
 
-      public TypeRef getReturnType(){
+      public TypeRef returnType(){
         return returnType;
       }
 
@@ -1132,7 +1132,7 @@ public interface IxCode {
         this.parameters = parameters;
       }
 
-      public TypeRef type() { return constructor.getClassType(); }
+      public TypeRef type() { return constructor.affiliation(); }
     }
 
     class NewArray extends Expression {
@@ -1656,7 +1656,7 @@ public interface IxCode {
      * Date: 2005/06/15
      */
     interface ConstructorRef extends MemberRef {
-      public ClassTypeRef getClassType();
+      public ClassTypeRef affiliation();
       public TypeRef[] getArgs();
     }
 
@@ -1701,7 +1701,7 @@ public interface IxCode {
         if(target == null) return null;
         FieldRef[] fields = target.getFields();
         for (int i = 0; i < fields.length; i++) {
-          if(fields[i].getName().equals(name)){
+          if(fields[i].name().equals(name)){
             return fields[i];
           }
         }
@@ -1721,8 +1721,8 @@ public interface IxCode {
      * Date: 2005/06/15
      */
     interface FieldRef extends MemberRef {
-      public int getModifier();
-      public ClassTypeRef getClassType();
+      public int modifier();
+      public ClassTypeRef affiliation();
       public TypeRef getType();
     }
 
@@ -1737,7 +1737,7 @@ public interface IxCode {
       public int compare(Object arg0, Object arg1) {
         FieldRef f1 = (FieldRef) arg0;
         FieldRef f2 = (FieldRef) arg1;
-        return f1.getName().compareTo(f2.getName());
+        return f1.name().compareTo(f2.name());
       }
     }
 
@@ -1746,9 +1746,9 @@ public interface IxCode {
      * Date: 2005/06/21
      */
     interface MemberRef {
-      int getModifier();
-      ClassTypeRef getClassType();
-      String getName();
+      int modifier();
+      ClassTypeRef affiliation();
+      String name();
     }
 
     /**
@@ -1760,8 +1760,8 @@ public interface IxCode {
         public int compare(Object method1, Object method2) {
           MethodRef m1 = (MethodRef)method1;
           MethodRef m2 = (MethodRef)method2;
-          TypeRef[] arg1 = m1.getArguments();
-          TypeRef[] arg2 = m2.getArguments();
+          TypeRef[] arg1 = m1.arguments();
+          TypeRef[] arg2 = m2.arguments();
           int length = arg1.length;
           if(isAllSuperType(arg2, arg1)) return -1;
           if(isAllSuperType(arg1, arg2)) return 1;
@@ -1802,7 +1802,7 @@ public interface IxCode {
         MethodRef[] ms = target.getMethods();
         for(int i = 0; i < ms.length; i++){
           MethodRef m = ms[i];
-          if(m.getName().equals(name) && matcher.matches(m.getArguments(), params)){
+          if(m.name().equals(name) && matcher.matches(m.arguments(), params)){
             methods.add(m);
           }
         }
@@ -1828,9 +1828,9 @@ public interface IxCode {
      * Date: 2005/06/15
      */
     interface MethodRef extends MemberRef {
-      public ClassTypeRef getClassType();
-      public TypeRef[] getArguments();
-      public TypeRef getReturnType();
+      public ClassTypeRef affiliation();
+      public TypeRef[] arguments();
+      public TypeRef returnType();
     }
 
     /**
@@ -1845,12 +1845,12 @@ public interface IxCode {
       public int compare(Object arg0, Object arg1) {
         MethodRef m1 = (MethodRef)arg0;
         MethodRef m2 = (MethodRef)arg1;
-        int result = m1.getName().compareTo(m2.getName());
+        int result = m1.name().compareTo(m2.name());
         if(result != 0){
           return result;
         }
-        TypeRef[] args1 = m1.getArguments();
-        TypeRef[] args2 = m2.getArguments();
+        TypeRef[] args1 = m1.arguments();
+        TypeRef[] args2 = m2.arguments();
         result = args1.length - args2.length;
         if(result != 0){
           return result;

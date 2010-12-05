@@ -51,7 +51,7 @@ public class LocalContext {
   
   public IxCode.TypeRef getReturnType(){
     if(isMethod){
-      return method.getReturnType();
+      return method.returnType();
     }else{
       return IxCode.BasicTypeRef.VOID;
     }

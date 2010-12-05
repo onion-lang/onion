@@ -20,18 +20,18 @@ public class Classes {
   private Classes() {
   }
 
-  public static Set getInterfaceMethods(IxCode.ClassSymbol type){
-    Set methods =  new TreeSet(new IxCode.MethodSymbolComparator());
+  public static Set getInterfaceMethods(IxCode.ClassTypeRef type){
+    Set methods =  new TreeSet(new IxCode.MethodRefComparator());
     collectInterfaceMethods(type, methods);
     return methods;
   }
   
-  private static void collectInterfaceMethods(IxCode.ClassSymbol type, Set set){
-    IxCode.MethodSymbol[] methods = type.getMethods();
+  private static void collectInterfaceMethods(IxCode.ClassTypeRef type, Set set){
+    IxCode.MethodRef[] methods = type.getMethods();
     for(int i = 0; i < methods.length; i++){
       set.add(methods[i]);
     }
-    IxCode.ClassSymbol[] interfaces = type.getInterfaces();
+    IxCode.ClassTypeRef[] interfaces = type.getInterfaces();
     for(int i = 0 ; i < interfaces.length; i++){
       collectInterfaceMethods(interfaces[i], set);
     }

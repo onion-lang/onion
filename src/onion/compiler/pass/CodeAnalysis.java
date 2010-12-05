@@ -274,19 +274,19 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       symbol == IxCode.BasicTypeRef.FLOAT || symbol == IxCode.BasicTypeRef.DOUBLE);
   }
   
-  public IxCode.ClassSymbol load(String name) {
+  public IxCode.ClassTypeRef load(String name) {
     return table.load(name);
   }
   
-  public IxCode.ClassSymbol loadTopClass() {
+  public IxCode.ClassTypeRef loadTopClass() {
     return table.load(topClass());
   }
   
-  public IxCode.ArraySymbol loadArray(IxCode.TypeRef type, int dimension) {
+  public IxCode.ArrayTypeRef loadArray(IxCode.TypeRef type, int dimension) {
     return table.loadArray(type, dimension);
   }
   
-  public IxCode.ClassSymbol rootClass() {
+  public IxCode.ClassTypeRef rootClass() {
     return table.rootClass();
   }
   
@@ -337,7 +337,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       ClassTable table = getTable();
       if(count > 0){
-        IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassSymbol[0]);
+        IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
         node.setSourceFile(Paths.getName(unit.getSourceFileName()));
         node.setResolutionComplete(true);
         table.addSourceClass(node);
@@ -594,7 +594,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return hasCylicitySub(start, new HashSet());
     }
     
-    private boolean hasCylicitySub(IxCode.ClassSymbol symbol, HashSet visit){
+    private boolean hasCylicitySub(IxCode.ClassTypeRef symbol, HashSet visit){
       if(symbol == null) return false;
       if(visit.contains(symbol)){
         return true;      
@@ -603,7 +603,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(hasCylicitySub(symbol.getSuperClass(), (HashSet)visit.clone())){
         return true;      
       }
-      IxCode.ClassSymbol[] interfaces = symbol.getInterfaces();
+      IxCode.ClassTypeRef[] interfaces = symbol.getInterfaces();
       for (int i = 0; i < interfaces.length; i++) {
         if(hasCylicitySub(interfaces[i], (HashSet)visit.clone())){
           return true;        
@@ -612,13 +612,13 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return false;
     }
   
-    private void constructTypeHierarchy(IxCode.ClassSymbol symbol, List visit) {
+    private void constructTypeHierarchy(IxCode.ClassTypeRef symbol, List visit) {
       if(symbol == null || visit.indexOf(symbol) >= 0) return;
       visit.add(symbol);
       if(symbol instanceof IxCode.ClassDefinition){
         IxCode.ClassDefinition node = (IxCode.ClassDefinition) symbol;
         if(node.isResolutionComplete()) return;
-        IxCode.ClassSymbol superClass = null;
+        IxCode.ClassTypeRef superClass = null;
         List interfaces = new ArrayList();
         NameResolution resolver = findSolver(node.getName());
         if(node.isInterface()){
@@ -626,7 +626,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           superClass = rootClass();
           TypeSpec[] typeSpecifiers = ast.getInterfaces();
           for(int i = 0; i < typeSpecifiers.length; i++){
-            IxCode.ClassSymbol superType = validateSuperType(typeSpecifiers[i], true, resolver);
+            IxCode.ClassTypeRef superType = validateSuperType(typeSpecifiers[i], true, resolver);
             if(superType != null){
               interfaces.add(superType);
             }
@@ -637,7 +637,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
             validateSuperType(ast.getSuperClass(), false, resolver);
           TypeSpec[] typeSpecifiers = ast.getInterfaces();
           for(int i = 0; i < typeSpecifiers.length; i++){
-            IxCode.ClassSymbol superType = validateSuperType(typeSpecifiers[i], true, resolver);
+            IxCode.ClassTypeRef superType = validateSuperType(typeSpecifiers[i], true, resolver);
             if(superType != null){
               interfaces.add(superType);
             }
@@ -645,29 +645,29 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }
         constructTypeHierarchy(superClass, visit);
         for(Iterator i = interfaces.iterator(); i.hasNext();){
-          IxCode.ClassSymbol superType = (IxCode.ClassSymbol) i.next();
+          IxCode.ClassTypeRef superType = (IxCode.ClassTypeRef) i.next();
           constructTypeHierarchy(superType, visit);
         }
         node.setSuperClass(superClass);
-        node.setInterfaces((IxCode.ClassSymbol[]) interfaces.toArray(new IxCode.ClassSymbol[0]));
+        node.setInterfaces((IxCode.ClassTypeRef[]) interfaces.toArray(new IxCode.ClassTypeRef[0]));
         node.setResolutionComplete(true);
       }else{
         constructTypeHierarchy(symbol.getSuperClass(), visit);
-        IxCode.ClassSymbol[] interfaces = symbol.getInterfaces();
+        IxCode.ClassTypeRef[] interfaces = symbol.getInterfaces();
         for(int i = 0; i < interfaces.length; i++){
           constructTypeHierarchy(interfaces[i], visit);
         }
       }
     }
     
-    private IxCode.ClassSymbol validateSuperType(
+    private IxCode.ClassTypeRef validateSuperType(
       TypeSpec ast, boolean shouldInterface, NameResolution resolver){
       
-      IxCode.ClassSymbol symbol = null;
+      IxCode.ClassTypeRef symbol = null;
       if(ast == null){
         symbol = getTable().rootClass();
       }else{
-        symbol = (IxCode.ClassSymbol) resolve(ast, resolver);
+        symbol = (IxCode.ClassTypeRef) resolve(ast, resolver);
       }
       if(symbol == null) return null;
       boolean isInterface = symbol.isInterface();
@@ -694,11 +694,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     private Set functions;
     
     public DuplicationChecker() {
-      this.methods      = new TreeSet(new IxCode.MethodSymbolComparator());
-      this.fields       = new TreeSet(new IxCode.FieldSymbolComparator());
-      this.constructors = new TreeSet(new IxCode.ConstructorSymbolComparator());
-      this.variables    = new TreeSet(new IxCode.FieldSymbolComparator());
-      this.functions    = new TreeSet(new IxCode.MethodSymbolComparator());
+      this.methods      = new TreeSet(new IxCode.MethodRefComparator());
+      this.fields       = new TreeSet(new IxCode.FieldRefComparator());
+      this.constructors = new TreeSet(new IxCode.ConstructorRefComparator());
+      this.variables    = new TreeSet(new IxCode.FieldRefComparator());
+      this.functions    = new TreeSet(new IxCode.MethodRefComparator());
     }
     
     public void process(CompilationUnit unit){
@@ -732,8 +732,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     private void generateMethods(){
-      Set generated = new TreeSet(new IxCode.MethodSymbolComparator());
-      Set methodSet = new TreeSet(new IxCode.MethodSymbolComparator());
+      Set generated = new TreeSet(new IxCode.MethodRefComparator());
+      Set methodSet = new TreeSet(new IxCode.MethodRefComparator());
       for(Iterator i = fields.iterator(); i.hasNext();){
         IxCode.FieldDefinition node = (IxCode.FieldDefinition)i.next();
         if(Modifier.isForwarded(node.getModifier())){
@@ -743,10 +743,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     private void generateDelegationMethods(IxCode.FieldDefinition node, Set generated, Set methodSet){
-      IxCode.ClassSymbol type = (IxCode.ClassSymbol) node.getType();
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) node.getType();
       Set src = Classes.getInterfaceMethods(type);
       for (Iterator i = src.iterator(); i.hasNext();) {
-        IxCode.MethodSymbol method = (IxCode.MethodSymbol) i.next();
+        IxCode.MethodRef method = (IxCode.MethodRef) i.next();
         if(methodSet.contains(method)) continue;
         if(generated.contains(method)){
           report(
@@ -762,15 +762,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
     }
     
-    private IxCode.MethodDefinition createEmptyMethod(IxCode.FieldSymbol field, IxCode.MethodSymbol method){
+    private IxCode.MethodDefinition createEmptyMethod(IxCode.FieldRef field, IxCode.MethodRef method){
       IxCode.Expression target;
-      target = new IxCode.FieldRef(new IxCode.This(getContextClass()), field);
+      target = new IxCode.RefField(new IxCode.This(getContextClass()), field);
       IxCode.TypeRef[] args = method.getArguments();
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       LocalFrame frame = new LocalFrame(null);
       for(int i = 0; i < params.length; i++){
         int index = frame.addEntry("arg" + i, args[i]);
-        params[i] = new IxCode.LocalRef(new ClosureLocalBinding(0, index, args[i]));
+        params[i] = new IxCode.RefLocal(new ClosureLocalBinding(0, index, args[i]));
       }
       target = new IxCode.Call(target, method, params);
       IxCode.StatementBlock statement;
@@ -806,7 +806,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.ConstructorDefinition node = (IxCode.ConstructorDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(constructors.contains(node)){
-        IxCode.ClassSymbol classType = node.getClassType();
+        IxCode.ClassTypeRef classType = node.getClassType();
         IxCode.TypeRef[] args = node.getArgs();
         report(DUPLICATE_CONSTRUCTOR, ast, new Object[]{classType, args});
       }else{
@@ -819,7 +819,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        IxCode.ClassSymbol classType = node.getClassType();
+        IxCode.ClassTypeRef classType = node.getClassType();
         String name = node.getName();
         report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
       }else{
@@ -832,7 +832,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        IxCode.ClassSymbol classType = node.getClassType();
+        IxCode.ClassTypeRef classType = node.getClassType();
         String name = node.getName();
         IxCode.TypeRef[] args = node.getArguments();
         report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
@@ -846,7 +846,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        IxCode.ClassSymbol classType = node.getClassType();
+        IxCode.ClassTypeRef classType = node.getClassType();
         String name = node.getName();
         report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
       }else{
@@ -859,7 +859,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        IxCode.ClassSymbol classType = node.getClassType();
+        IxCode.ClassTypeRef classType = node.getClassType();
         String name = node.getName();
         IxCode.TypeRef[] args = node.getArguments();
         report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
@@ -926,7 +926,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       String className = topClass();
       setSolver(findSolver(className));
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
-      IxCode.ArraySymbol argsType = loadArray(load("java.lang.String"), 1);
+      IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);
       
       IxCode.MethodDefinition method = new IxCode.MethodDefinition(
         Modifier.PUBLIC, klass, 
@@ -957,17 +957,17 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return null;
     }
     
-    private IxCode.MethodDefinition mainMethod(IxCode.ClassSymbol top, IxCode.MethodSymbol ref, String name, IxCode.TypeRef[] args, IxCode.TypeRef ret) {
+    private IxCode.MethodDefinition mainMethod(IxCode.ClassTypeRef top, IxCode.MethodRef ref, String name, IxCode.TypeRef[] args, IxCode.TypeRef ret) {
       IxCode.MethodDefinition method = new IxCode.MethodDefinition(
         Modifier.STATIC | Modifier.PUBLIC, top, name, args, ret, null);
       LocalFrame frame = new LocalFrame(null);
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       for(int i = 0; i < args.length; i++){
         int index = frame.addEntry("args" + i, args[i]);
-        params[i] = new IxCode.LocalRef(0, index, args[i]);
+        params[i] = new IxCode.RefLocal(0, index, args[i]);
       }
       method.setFrame(frame);
-      IxCode.ConstructorSymbol c = top.findConstructor(new IxCode.Expression[0])[0];
+      IxCode.ConstructorRef c = top.findConstructor(new IxCode.Expression[0])[0];
       IxCode.Expression exp = new IxCode.NewObject(c, new IxCode.Expression[0]);
       exp = new IxCode.Call(exp, ref, params);
       IxCode.StatementBlock block = new IxCode.StatementBlock(new IxCode.ExpressionStatement(exp));
@@ -1022,12 +1022,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           right = Boxing.boxing(getTable(), right);
         }
       }
-      IxCode.MethodSymbol toString;
+      IxCode.MethodRef toString;
       toString = findMethod(ast.getLeft(), (IxCode.ObjectTypeRef)left.type(), "toString");
       left = new IxCode.Call(left, toString, new IxCode.Expression[0]);
       toString = findMethod(ast.getRight(), (IxCode.ObjectTypeRef)right.type(), "toString");
       right = new IxCode.Call(right, toString, new IxCode.Expression[0]);
-      IxCode.MethodSymbol concat =
+      IxCode.MethodRef concat =
         findMethod(ast, (IxCode.ObjectTypeRef)left.type(), "concat", new IxCode.Expression[]{right});
       return new IxCode.Call(left, concat, new IxCode.Expression[]{right});
     }
@@ -1043,19 +1043,19 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       int varIndex = local.addEntry(local.newName(), irOperand.type());
       IxCode.Expression result = null;
-      if(irOperand instanceof IxCode.LocalRef){
-        IxCode.LocalRef ref = (IxCode.LocalRef)irOperand;
+      if(irOperand instanceof IxCode.RefLocal){
+        IxCode.RefLocal ref = (IxCode.RefLocal)irOperand;
         result = new IxCode.Begin(
-          new IxCode.LocalSet(0, varIndex, irOperand.type(), irOperand),
-          new IxCode.LocalSet(
+          new IxCode.SetLocal(0, varIndex, irOperand.type(), irOperand),
+          new IxCode.SetLocal(
             ref.frame(), ref.index(), ref.type(),
             new IxCode.BinaryExpression(
               ADD, irOperand.type(), 
-              new IxCode.LocalRef(0, varIndex, irOperand.type()),
+              new IxCode.RefLocal(0, varIndex, irOperand.type()),
               new IxCode.IntLiteral(1)
             )
           ),
-          new IxCode.LocalRef(0, varIndex, irOperand.type())
+          new IxCode.RefLocal(0, varIndex, irOperand.type())
         );
       }else{
         report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
@@ -1074,19 +1074,19 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       int varIndex = local.addEntry(local.newName(), irOperand.type());
       IxCode.Expression result = null;
-      if(irOperand instanceof IxCode.LocalRef){
-        IxCode.LocalRef ref = (IxCode.LocalRef)irOperand;
+      if(irOperand instanceof IxCode.RefLocal){
+        IxCode.RefLocal ref = (IxCode.RefLocal)irOperand;
         result = new IxCode.Begin(
-          new IxCode.LocalSet(0, varIndex, irOperand.type(), irOperand),
-          new IxCode.LocalSet(
+          new IxCode.SetLocal(0, varIndex, irOperand.type(), irOperand),
+          new IxCode.SetLocal(
             ref.frame(), ref.index(), ref.type(),
             new IxCode.BinaryExpression(
               SUBTRACT, irOperand.type(), 
-              new IxCode.LocalRef(0, varIndex, irOperand.type()),
+              new IxCode.RefLocal(0, varIndex, irOperand.type()),
               new IxCode.IntLiteral(1)
             )
           ),
-          new IxCode.LocalRef(0, varIndex, irOperand.type())
+          new IxCode.RefLocal(0, varIndex, irOperand.type())
         );
       }else{
         report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
@@ -1239,7 +1239,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(left == null || right == null) return null;
       if(!left.type().isBasicType()){
         IxCode.Expression[] params = new IxCode.Expression[]{right};
-        Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)left.type(), "add", params);
+        Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)left.type(), "add", params);
         if(result._2 == null){
           report(METHOD_NOT_FOUND, ast, new Object[]{left.type(), "add", types(params)});
           return null;
@@ -1396,7 +1396,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       right = new IxCode.AsInstanceOf(right, rootClass());
       IxCode.Expression[] params = {right};
       IxCode.ObjectTypeRef target = (IxCode.ObjectTypeRef) left.type();
-      IxCode.MethodSymbol[] methods = target.findMethod("equals", params);
+      IxCode.MethodRef[] methods = target.findMethod("equals", params);
       IxCode.Expression node = new IxCode.Call(left, methods[0], params);
       if(kind == IxCode.BinaryExpression.Constants.NOT_EQUAL){
         node = new IxCode.UnaryExpression(NOT, IxCode.BasicTypeRef.BOOLEAN, node);
@@ -1434,8 +1434,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression[] params;
       params = typeCheckExps(ast.getParams(), context);
       if(params == null) return null;
-      IxCode.ClassSymbol contextClass = getContextClass();
-      Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
+      IxCode.ClassTypeRef contextClass = getContextClass();
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
       if(result._2 == null){
         if(result._1){
           report(
@@ -1565,7 +1565,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       value = processAssignable(ast.getRight(), leftType, value);
       if(value == null) return null;
-      return new IxCode.LocalSet(frame, index, leftType, value);
+      return new IxCode.SetLocal(frame, index, leftType, value);
     }
     
     private Object processSelfFieldAssign(Assignment ast, LocalContext context){
@@ -1573,7 +1573,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(value == null) return null;
       SelfFieldReference ref = (SelfFieldReference) ast.getLeft();
       LocalContext local = context;
-      IxCode.ClassSymbol selfClass;
+      IxCode.ClassTypeRef selfClass;
       if(local.isGlobal()){
         selfClass = loadTopClass();
       }else {
@@ -1583,7 +1583,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           selfClass = local.getConstructor().getClassType();
         }
       }
-      IxCode.FieldSymbol field = findField(selfClass, ref.getName());
+      IxCode.FieldRef field = findField(selfClass, ref.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ref, new Object[]{selfClass, ref.getName()});
         return null;
@@ -1596,7 +1596,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       value = processAssignable(ast.getRight(), field.getType(), value);
       if(value == null) return null;
-      return new IxCode.FieldSet(new IxCode.This(selfClass), field, value);
+      return new IxCode.SetField(new IxCode.This(selfClass), field, value);
     }
     
     Object processArrayAssign(Assignment ast, LocalContext context){
@@ -1612,7 +1612,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         return null;
       }
       if(target.isArrayType()){
-        IxCode.ArraySymbol targetType = ((IxCode.ArraySymbol)target.type());
+        IxCode.ArrayTypeRef targetType = ((IxCode.ArrayTypeRef)target.type());
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
           report(
             INCOMPATIBLE_TYPE, 
@@ -1626,7 +1626,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       IxCode.Expression[] params;
       params = new IxCode.Expression[]{index, value};
-      Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "set", new IxCode.Expression[]{index, value});
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "set", new IxCode.Expression[]{index, value});
       if(result._2 == null){
         report(
           METHOD_NOT_FOUND, ast, 
@@ -1681,12 +1681,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         report(VARIABLE_NOT_FOUND, ast, new Object[]{ast.getName()});
         return null;
       }
-      return new IxCode.LocalRef(bind);
+      return new IxCode.RefLocal(bind);
     }
     
-    IxCode.MethodSymbol findMethod(AstNode ast, IxCode.ObjectTypeRef type, String name) {
+    IxCode.MethodRef findMethod(AstNode ast, IxCode.ObjectTypeRef type, String name) {
       IxCode.Expression[] params = new IxCode.Expression[0];
-      IxCode.MethodSymbol[] methods = type.findMethod(name, params);
+      IxCode.MethodRef[] methods = type.findMethod(name, params);
       if(methods.length == 0){
         report(
           METHOD_NOT_FOUND, ast, 
@@ -1696,21 +1696,21 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return methods[0];
     }
     
-    IxCode.MethodSymbol findMethod(
+    IxCode.MethodRef findMethod(
       AstNode ast, IxCode.ObjectTypeRef type, String name, IxCode.Expression[] params
     ) {
-      IxCode.MethodSymbol[] methods = type.findMethod(name, params);
+      IxCode.MethodRef[] methods = type.findMethod(name, params);
       return methods[0];
     }
     
     public Object visit(CurrentInstance ast, LocalContext context) {
       LocalContext local = context;
       if(local.isStatic()) return null;
-      IxCode.ClassSymbol selfClass = getContextClass();
+      IxCode.ClassTypeRef selfClass = getContextClass();
       return new IxCode.This(selfClass);
     }
     
-    boolean hasSamePackage(IxCode.ClassSymbol a, IxCode.ClassSymbol b) {
+    boolean hasSamePackage(IxCode.ClassTypeRef a, IxCode.ClassTypeRef b) {
       String name1 = a.getName();
       String name2 = b.getName();
       int index;
@@ -1729,7 +1729,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return name1.equals(name2);
     }
     
-    boolean isAccessible(IxCode.ClassSymbol target, IxCode.ClassSymbol context) {
+    boolean isAccessible(IxCode.ClassTypeRef target, IxCode.ClassTypeRef context) {
       if(hasSamePackage(target, context)){
         return true;
       }else{
@@ -1741,8 +1741,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
     }
     
-    boolean isAccessible(IxCode.MemberSymbol member, IxCode.ClassSymbol context) {
-      IxCode.ClassSymbol targetType = member.getClassType();
+    boolean isAccessible(IxCode.MemberRef member, IxCode.ClassTypeRef context) {
+      IxCode.ClassTypeRef targetType = member.getClassType();
       if(targetType == context) return true;
       int modifier = member.getModifier();
       if(IxCode.TypeRules.isSuperType(targetType, context)){
@@ -1760,17 +1760,17 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
     }
     
-    private IxCode.FieldSymbol findField(IxCode.ObjectTypeRef target, String name) {
+    private IxCode.FieldRef findField(IxCode.ObjectTypeRef target, String name) {
       if(target == null) return null;
-      IxCode.FieldSymbol[] fields = target.getFields();
+      IxCode.FieldRef[] fields = target.getFields();
       for (int i = 0; i < fields.length; i++) {
         if(fields[i].getName().equals(name)){
           return fields[i];
         }
       }
-      IxCode.FieldSymbol field = findField(target.getSuperClass(), name);
+      IxCode.FieldRef field = findField(target.getSuperClass(), name);
       if(field != null) return field;
-      IxCode.ClassSymbol[] interfaces = target.getInterfaces();
+      IxCode.ClassTypeRef[] interfaces = target.getInterfaces();
       for(int i = 0; i < interfaces.length; i++){
         field = findField(interfaces[i], name);
         if(field != null) return field;
@@ -1779,18 +1779,18 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     private boolean checkAccessible(
-      AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassSymbol context
+      AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassTypeRef context
     ) {
       if(target.isArrayType()){
-        IxCode.TypeRef component = ((IxCode.ArraySymbol)target).getComponent();
+        IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).getComponent();
         if(!component.isBasicType()){
-          if(!isAccessible((IxCode.ClassSymbol)component, getContextClass())){
+          if(!isAccessible((IxCode.ClassTypeRef)component, getContextClass())){
             report(CLASS_NOT_ACCESSIBLE, ast, new Object[]{target, context});
             return false;
           }
         }
       }else{
-        if(!isAccessible((IxCode.ClassSymbol)target, context)){
+        if(!isAccessible((IxCode.ClassTypeRef)target, context)){
           report(CLASS_NOT_ACCESSIBLE, ast, new Object[]{target, context});
           return false;
         }
@@ -1818,11 +1818,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           return null;
         }
       }
-      IxCode.FieldSymbol field = findField(targetType, name);
+      IxCode.FieldRef field = findField(targetType, name);
       if(field != null && isAccessible(field, getContextClass())){
-        return new IxCode.FieldRef(target, field);
+        return new IxCode.RefField(target, field);
       }
-      Pair<Boolean, IxCode.MethodSymbol> result;
+      Pair<Boolean, IxCode.MethodRef> result;
       boolean continuable;
       
       result = tryFindMethod(ast, targetType, name, new IxCode.Expression[0]);
@@ -1857,10 +1857,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return null;
     }
     
-    private Pair<Boolean, IxCode.MethodSymbol> tryFindMethod(
+    private Pair<Boolean, IxCode.MethodRef> tryFindMethod(
       AstNode ast, IxCode.ObjectTypeRef target, String name, IxCode.Expression[] params
     ) {
-      IxCode.MethodSymbol[] methods;
+      IxCode.MethodRef[] methods;
       methods = target.findMethod(name, params);
       if(methods.length > 0){
         if(methods.length > 1){
@@ -1921,7 +1921,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.TypeRef type = resolve(ast.getType(), getSolver());
       IxCode.Expression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(type == null || parameters == null) return null;
-      IxCode.ArraySymbol resultType = loadArray(type, parameters.length);
+      IxCode.ArrayTypeRef resultType = loadArray(type, parameters.length);
       return new IxCode.NewArray(resultType, parameters);
     }
       
@@ -1944,7 +1944,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(ClosureExpression ast, LocalContext context) {
       LocalContext local = ((LocalContext)context);
-      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getType());
       Argument[] args = ast.getArguments();
       IxCode.TypeRef[] argTypes = new IxCode.TypeRef[args.length];
       String name = ast.getName();
@@ -1963,8 +1963,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           return null;
         }
         if(error) return null;
-        IxCode.MethodSymbol[] methods = type.getMethods();
-        IxCode.MethodSymbol method = null;
+        IxCode.MethodRef[] methods = type.getMethods();
+        IxCode.MethodRef method = null;
         for(int i = 0; i < methods.length; i++){
           IxCode.TypeRef[] types = methods[i].getArguments();
           if(name.equals(methods[i].getName()) && equals(argTypes, types)){
@@ -2017,7 +2017,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         return new IxCode.ArrayRef(target, index);
       }    
       IxCode.Expression[] params = {index};
-      Pair<Boolean, IxCode.MethodSymbol> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "get", new IxCode.Expression[]{index});
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "get", new IxCode.Expression[]{index});
       if(result._2 == null){
         report(
           METHOD_NOT_FOUND, ast, 
@@ -2029,10 +2029,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(SelfFieldReference ast, LocalContext context) {
       LocalContext local = context;
-      IxCode.ClassSymbol selfClass = null;
+      IxCode.ClassTypeRef selfClass = null;
       if(local.isStatic()) return null;
       selfClass = getContextClass();
-      IxCode.FieldSymbol field = findField(selfClass, ast.getName());
+      IxCode.FieldRef field = findField(selfClass, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, new Object[]{selfClass, ast.getName()});
         return null;
@@ -2043,14 +2043,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           new Object[]{field.getClassType(), ast.getName(), selfClass});
         return null;
       }    
-      return new IxCode.FieldRef(new IxCode.This(selfClass), field);
+      return new IxCode.RefField(new IxCode.This(selfClass), field);
     }
     
     public Object visit(onion.lang.syntax.NewObject ast, LocalContext context) {
-      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getType());
       IxCode.Expression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(parameters == null || type == null) return null;
-      IxCode.ConstructorSymbol[] constructors = type.findConstructor(parameters);
+      IxCode.ConstructorRef[] constructors = type.findConstructor(parameters);
       if(constructors.length == 0){
         report(CONSTRUCTOR_NOT_FOUND, ast, new Object[]{type, types(parameters)});
         return null;
@@ -2093,7 +2093,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(params == null) return null;
       IxCode.ClassDefinition targetType = getContextClass();
       String name = ast.getName();
-      IxCode.MethodSymbol[] methods = targetType.findMethod(ast.getName(), params);
+      IxCode.MethodRef[] methods = targetType.findMethod(ast.getName(), params);
       
       if(methods.length == 0){
         report(
@@ -2146,7 +2146,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(params == null) return null;
       IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
       final String name = ast.getName();
-      IxCode.MethodSymbol[] methods = targetType.findMethod(name, params);
+      IxCode.MethodRef[] methods = targetType.findMethod(name, params);
       
       if(methods.length == 0){
         report(
@@ -2179,9 +2179,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(StaticIDExpression ast, LocalContext context) {
-      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getType());
       if(type == null) return null;
-      IxCode.FieldSymbol field = findField(type, ast.getName());
+      IxCode.FieldRef field = findField(type, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, new Object[]{type, ast.getName()});
         return null;
@@ -2190,11 +2190,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     public Object visit(StaticMethodCall ast, LocalContext context) {
-      IxCode.ClassSymbol type = (IxCode.ClassSymbol) CodeAnalysis.this.resolve(ast.getTarget());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getTarget());
       IxCode.Expression[] params = typeCheckExps(ast.getArgs(), context);
       if(type == null) return null;
       if(params == null) return null;
-      IxCode.MethodSymbol[] methods = type.findMethod(ast.getName(), params);
+      IxCode.MethodRef[] methods = type.findMethod(ast.getName(), params);
       
       if(methods.length == 0){
         report(
@@ -2262,12 +2262,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         ClosureLocalBinding bind2 = new ClosureLocalBinding(
           0, local.addEntry(local.newName(), collection.type()), collection.type());
         IxCode.ActionStatement init =
-          new IxCode.ExpressionStatement(new IxCode.LocalSet(bind2, collection));
+          new IxCode.ExpressionStatement(new IxCode.SetLocal(bind2, collection));
         if(collection.isArrayType()){
           ClosureLocalBinding bind3 = new ClosureLocalBinding(
             0, local.addEntry(local.newName(), IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT
           );
-          init = new IxCode.StatementBlock(init, new IxCode.ExpressionStatement(new IxCode.LocalSet(bind3, new IxCode.IntLiteral(0))));
+          init = new IxCode.StatementBlock(init, new IxCode.ExpressionStatement(new IxCode.SetLocal(bind3, new IxCode.IntLiteral(0))));
           block = new IxCode.ConditionalLoop(
             new IxCode.BinaryExpression(
               LESS_THAN, IxCode.BasicTypeRef.BOOLEAN,
@@ -2289,7 +2289,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           ClosureLocalBinding bind3 = new ClosureLocalBinding(
             0, local.addEntry(local.newName(), iterator), iterator
           );
-          IxCode.MethodSymbol mIterator, mNext, mHasNext;
+          IxCode.MethodRef mIterator, mNext, mHasNext;
           mIterator = findMethod(collectionAST, (IxCode.ObjectTypeRef) collection.type(), "iterator");
           mNext = findMethod(ast.getCollection(), iterator, "next");
           mHasNext = findMethod(ast.getCollection(), iterator, "hasNext");
@@ -2315,15 +2315,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     private IxCode.Expression indexref(ClosureLocalBinding bind, IxCode.Expression value) {
-      return new IxCode.ArrayRef(new IxCode.LocalRef(bind), value);
+      return new IxCode.ArrayRef(new IxCode.RefLocal(bind), value);
     }
     
     private IxCode.ActionStatement assign(ClosureLocalBinding bind, IxCode.Expression value) {
-      return new IxCode.ExpressionStatement(new IxCode.LocalSet(bind, value));
+      return new IxCode.ExpressionStatement(new IxCode.SetLocal(bind, value));
     }
     
     private IxCode.Expression ref(ClosureLocalBinding bind) {
-      return new IxCode.LocalRef(bind);
+      return new IxCode.RefLocal(bind);
     }
     
     public Object visit(onion.lang.syntax.ExpressionStatement ast, LocalContext context) {
@@ -2515,7 +2515,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           statement = processCases(ast, condition, name, context);
         }
         IxCode.StatementBlock block = new IxCode.StatementBlock(
-          new IxCode.ExpressionStatement(new IxCode.LocalSet(0, index, condition.type(), condition)),
+          new IxCode.ExpressionStatement(new IxCode.SetLocal(0, index, condition.type(), condition)),
           statement
         );
         return block;
@@ -2576,14 +2576,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(!error){
         IxCode.Expression node;
         if(nodes[0].isReferenceType()){
-          node = createEquals(IxCode.BinaryExpression.Constants.EQUAL, new IxCode.LocalRef(bind), nodes[0]);
+          node = createEquals(IxCode.BinaryExpression.Constants.EQUAL, new IxCode.RefLocal(bind), nodes[0]);
         }else{
-          node = new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.LocalRef(bind), nodes[0]);
+          node = new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), nodes[0]);
         }
         for(int i = 1; i < nodes.length; i++){
           node = new IxCode.BinaryExpression(
             LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, node,
-            new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.LocalRef(bind), nodes[i])
+            new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), nodes[i])
           );
         }
         return node;
@@ -2621,15 +2621,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.TypeRef leftType = CodeAnalysis.this.resolve(ast.getType());
       if(leftType == null) return new IxCode.NOP();
       int index = localContext.addEntry(ast.getName(), leftType);
-      IxCode.LocalSet node;
+      IxCode.SetLocal node;
       if(initializer != null){
         IxCode.Expression valueNode = typeCheck(initializer, context);
         if(valueNode == null) return new IxCode.NOP();
         valueNode = processAssignable(initializer, leftType, valueNode);
         if(valueNode == null) return new IxCode.NOP();
-        node = new IxCode.LocalSet(0, index, leftType, valueNode);
+        node = new IxCode.SetLocal(0, index, leftType, valueNode);
       }else{
-        node = new IxCode.LocalSet(0, index, leftType, defaultValue(leftType));
+        node = new IxCode.SetLocal(0, index, leftType, defaultValue(leftType));
       }
       return new IxCode.ExpressionStatement(node);
     }
@@ -2751,8 +2751,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression[] params = typeCheckExps(ast.getInitializers(), local);
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBody(), local);
       IxCode.ClassDefinition currentClass = getContextClass();
-      IxCode.ClassSymbol superClass = currentClass.getSuperClass();
-      IxCode.ConstructorSymbol[] matched = superClass.findConstructor(params);
+      IxCode.ClassTypeRef superClass = currentClass.getSuperClass();
+      IxCode.ConstructorRef[] matched = superClass.findConstructor(params);
       if(matched.length == 0){
         report(CONSTRUCTOR_NOT_FOUND, ast, new Object[]{superClass, types(params)});
         return null;

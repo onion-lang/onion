@@ -23,17 +23,17 @@ import org.apache.bcel.generic.Type;
  * @author Kota Mizushima
  * Date: 2005/06/22
  */
-public class ClassFileSymbol extends IxCode.AbstractClassSymbol implements Constants{
+public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Constants{
   private static final String CONSTRUCTOR_NAME = "<init>";
   private JavaClass javaClass;
   private ClassTable table;  
   private int modifier;
-  private IxCode.MethodSymbol[] methods;
-  private IxCode.FieldSymbol[] fields;
-  private IxCode.ConstructorSymbol[] constructors;
+  private IxCode.MethodRef[] methods;
+  private IxCode.FieldRef[] fields;
+  private IxCode.ConstructorRef[] constructors;
   private OnionTypeBridge bridge;
   
-  public ClassFileSymbol(JavaClass javaClass, ClassTable table) {
+  public ClassFileTypeRef(JavaClass javaClass, ClassTable table) {
     this.javaClass = javaClass;
     this.table = table;
     this.bridge = new OnionTypeBridge(table);
@@ -52,42 +52,42 @@ public class ClassFileSymbol extends IxCode.AbstractClassSymbol implements Const
     return javaClass.getClassName();
   }
 
-  public IxCode.ClassSymbol getSuperClass() {
-    IxCode.ClassSymbol superClass = table.load(javaClass.getSuperclassName());
+  public IxCode.ClassTypeRef getSuperClass() {
+    IxCode.ClassTypeRef superClass = table.load(javaClass.getSuperclassName());
     if(superClass == this){
       return null;
     }
     return superClass;
   }
 
-  public IxCode.ClassSymbol[] getInterfaces() {
+  public IxCode.ClassTypeRef[] getInterfaces() {
     String[] interfaceNames = javaClass.getInterfaceNames();
-    IxCode.ClassSymbol[] interfaces = new IxCode.ClassSymbol[interfaceNames.length];
+    IxCode.ClassTypeRef[] interfaces = new IxCode.ClassTypeRef[interfaceNames.length];
     for(int i = 0; i < interfaces.length; i++){
       interfaces[i] = table.load(interfaceNames[i]);
     }
     return interfaces;
   }
   
-  public IxCode.MethodSymbol[] getMethods() {
+  public IxCode.MethodRef[] getMethods() {
     if(methods == null){
       setMethods(javaClass.getMethods());
     }
-    return (IxCode.MethodSymbol[]) methods.clone();
+    return (IxCode.MethodRef[]) methods.clone();
   }
   
-  public IxCode.FieldSymbol[] getFields() {
+  public IxCode.FieldRef[] getFields() {
     if(fields == null){
       setFields(javaClass.getFields());
     }
-    return (IxCode.FieldSymbol[]) fields.clone();
+    return (IxCode.FieldRef[]) fields.clone();
   }
   
-  public IxCode.ConstructorSymbol[] getConstructors() {
+  public IxCode.ConstructorRef[] getConstructors() {
     if(constructors == null){
       setConstructors(javaClass.getMethods());
     }
-    return (IxCode.ConstructorSymbol[]) constructors.clone();
+    return (IxCode.ConstructorRef[]) constructors.clone();
   }
 
   private static int toOnionModifier(int src){
@@ -113,15 +113,15 @@ public class ClassFileSymbol extends IxCode.AbstractClassSymbol implements Const
         symbols.add(convertMethod(methods[i]));
       }
     }
-    this.methods = (IxCode.MethodSymbol[])symbols.toArray(new IxCode.MethodSymbol[0]);
+    this.methods = (IxCode.MethodRef[])symbols.toArray(new IxCode.MethodRef[0]);
   }
   
   private void setFields(Field[] fields){
-    IxCode.FieldSymbol[] symbols = new IxCode.FieldSymbol[fields.length];
+    IxCode.FieldRef[] refs = new IxCode.FieldRef[fields.length];
     for(int i = 0; i < fields.length; i++){
-      symbols[i] = convertField(fields[i]);
+      refs[i] = convertField(fields[i]);
     }
-    this.fields = symbols;
+    this.fields = refs;
   }
   
   private void setConstructors(Method[] methods){
@@ -132,35 +132,35 @@ public class ClassFileSymbol extends IxCode.AbstractClassSymbol implements Const
       }
     }
     this.constructors = 
-      (IxCode.ConstructorSymbol[]) symbols.toArray(new IxCode.ConstructorSymbol[0]);
+      (IxCode.ConstructorRef[]) symbols.toArray(new IxCode.ConstructorRef[0]);
   }
   
-  private IxCode.MethodSymbol convertMethod(Method method){
+  private IxCode.MethodRef convertMethod(Method method){
     Type[] arguments = method.getArgumentTypes();
     IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentSymbols[i] = bridge.toOnionType(arguments[i]);
     }
     IxCode.TypeRef returnSymbol = bridge.toOnionType(method.getReturnType());
-    return new ClassFileMethodSymbol(
+    return new ClassFileMethodRef(
       toOnionModifier(method.getModifiers()),
       this, method.getName(), argumentSymbols, returnSymbol);
   }
   
-  private IxCode.FieldSymbol convertField(Field field){
+  private IxCode.FieldRef convertField(Field field){
     IxCode.TypeRef symbol = bridge.toOnionType(field.getType());
-    return new ClassFileFieldSymbol(
+    return new ClassFileFieldRef(
       toOnionModifier(field.getModifiers()), 
       this, field.getName(), symbol);
   }
   
-  private IxCode.ConstructorSymbol convertConstructor(Method method){
+  private IxCode.ConstructorRef convertConstructor(Method method){
     Type[] arguments = method.getArgumentTypes();
     IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentSymbols[i] = bridge.toOnionType(arguments[i]);
     }
-    return new ClassFileConstructorSymbol(
+    return new ClassFileConstructorRef(
       toOnionModifier(method.getModifiers()),
       this, method.getName(), argumentSymbols);
   }

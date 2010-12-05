@@ -20,7 +20,7 @@ public class LocalContext {
   private boolean isGlobal;
   private boolean isMethod;
   private LocalFrame contextFrame;
-  private IxCode.MethodSymbol method;
+  private IxCode.MethodRef method;
   private IxCode.ConstructorDefinition constructor;
   private SymbolGenerator generator;
 
@@ -57,15 +57,15 @@ public class LocalContext {
     }
   }
   
-  public IxCode.MethodSymbol getMethod(){
+  public IxCode.MethodRef getMethod(){
     return method;
   }
   
-  public IxCode.ConstructorSymbol getConstructor(){
+  public IxCode.ConstructorRef getConstructor(){
     return constructor;
   }
   
-  public void setMethod(IxCode.MethodSymbol method) {
+  public void setMethod(IxCode.MethodRef method) {
     this.method = method;
     this.isMethod = true;
   }

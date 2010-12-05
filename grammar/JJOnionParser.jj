@@ -369,7 +369,7 @@ AST.GlobalVariableDeclaration var_decl(int modifiers) : {
 
 AST.FunctionDeclaration fun_decl(int modifiers) : {
   Token t1, t2;
-  List<AST.Argument> args = SLists.nil();
+  List<AST.Argument> args = null;
   AST.TypeNode ty = null;
   AST.BlockStatement b = null;
 }{
@@ -382,7 +382,7 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
   (ty=interface_decl(modifiers) | ty=class_decl(modifiers)) {return ty;}
 }
 
-AST.BlockStatement block():{Token t; List<AST.Statement> stmts = SLists.nil(); AST.BlockStatement s;}{
+AST.BlockStatement block():{Token t; List<AST.Statement> stmts = null; AST.BlockStatement s;}{
   t="{" [stmts=stmts()] "}" {return new AST.BlockStatement(p(t), stmts);}
 }
 
@@ -483,8 +483,8 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
 
 AST.ConstructorDeclaration constructor_decl(int mset) : {
   Token t;
-  List<AST.Argument> args = SLists.nil();
-  List<AST.Expression> params = SLists.nil();
+  List<AST.Argument> args = null;
+  List<AST.Expression> params = null;
   AST.BlockStatement block;
 }{
   t = "new" ["(" args = args() ")"] [":" "(" params = expressions() ")"] block = block() {
@@ -494,7 +494,7 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
 
 AST.MethodDeclaration method_decl(int mset) : {
   Token t;
-  List<AST.Argument> args = SLists.nil();
+  List<AST.Argument> args = null;
   AST.TypeNode ty = null;
   AST.BlockStatement b = null;
 }{
@@ -505,7 +505,7 @@ AST.MethodDeclaration method_decl(int mset) : {
 
 AST.MethodDeclaration interface_method_decl() : {
   Token n;
-  List<AST.Argument> args = SLists.nil();
+  List<AST.Argument> args = null;
   AST.TypeNode ty  = null;
 }{
   n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {

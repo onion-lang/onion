@@ -92,15 +92,15 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     String[] interfaces = namesOf(node.getInterfaces());
     String file = node.getSourceFile();
     ClassGen gen = new ClassGen(className, superClass, file, modifier, interfaces);
-    IxCode.ConstructorSymbol[] constructors = node.getConstructors();
+    IxCode.ConstructorRef[] constructors = node.getConstructors();
     for (int i = 0; i < constructors.length; i++) {
       codeConstructor(gen, ((IxCode.ConstructorDefinition) constructors[i]));
     }
-    IxCode.MethodSymbol[] methods = node.getMethods();
+    IxCode.MethodRef[] methods = node.getMethods();
     for (int i = 0; i < methods.length; i++) {
       codeMethod(gen, ((IxCode.MethodDefinition) methods[i]));
     }
-    IxCode.FieldSymbol[] fields = node.getFields();
+    IxCode.FieldRef[] fields = node.getFields();
     for (int i = 0; i < fields.length; i++) {
       codeField(gen, ((IxCode.FieldDefinition) fields[i]));
     }
@@ -228,9 +228,9 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     }
   }
 
-  private void implementsMethods(ClassGen gen, IxCode.MethodSymbol[] methods){
+  private void implementsMethods(ClassGen gen, IxCode.MethodRef[] methods){
     for(int i = 0; i < methods.length; i++){
-      IxCode.MethodSymbol method = methods[i];
+      IxCode.MethodRef method = methods[i];
       Type returnType = typeOf(method.getReturnType());
       String name = method.getName();
       Type[] args = typesOf(method.getArguments());
@@ -248,7 +248,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
   
   public InstructionHandle codeClosure(IxCode.NewClosure node, CodeProxy code){
-    IxCode.ClassSymbol classType = node.getClassType();
+    IxCode.ClassTypeRef classType = node.getClassType();
     String closureName = generator.generate();
     Type[] arguments = typesOf(node.getArguments());
     ClassGen gen = new ClassGen(
@@ -258,7 +258,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     Set methods = Classes.getInterfaceMethods(classType);
     methods.remove(node.getMethod());
     implementsMethods(
-      gen, (IxCode.MethodSymbol[]) methods.toArray(new IxCode.MethodSymbol[0]));
+      gen, (IxCode.MethodRef[]) methods.toArray(new IxCode.MethodRef[0]));
     
     LocalFrame frame = node.getFrame();
     int depth = frame.depth();
@@ -339,7 +339,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   public InstructionHandle codeSuperCall(IxCode.CallSuper node, CodeProxy code){
     InstructionHandle start = codeExpression(node.getTarget(), code);
     codeExpressions(node.getParams(), code);
-    IxCode.MethodSymbol method = node.getMethod();
+    IxCode.MethodRef method = node.getMethod();
     code.appendInvoke(
       method.getClassType().getName(),
       method.getName(),
@@ -521,11 +521,11 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     return modifier;
   }
 
-  private String nameOf(IxCode.ClassSymbol symbol) {
+  private String nameOf(IxCode.ClassTypeRef symbol) {
     return symbol.getName();
   }
 
-  private String[] namesOf(IxCode.ClassSymbol[] symbols) {
+  private String[] namesOf(IxCode.ClassTypeRef[] symbols) {
     String[] names = new String[symbols.length];
     for (int i = 0; i < names.length; i++) {
       names[i] = nameOf(symbols[i]);
@@ -542,16 +542,16 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
       start = codeUnaryExpression((IxCode.UnaryExpression) node, code);
     } else if(node instanceof IxCode.Begin) {
       start = codeBegin((IxCode.Begin) node, code);
-    } else if(node instanceof IxCode.LocalSet) {
-      start = codeLocalAssign((IxCode.LocalSet) node, code);
-    } else if(node instanceof IxCode.LocalRef) {
-      start = codeLocalRef((IxCode.LocalRef) node, code);
+    } else if(node instanceof IxCode.SetLocal) {
+      start = codeLocalAssign((IxCode.SetLocal) node, code);
+    } else if(node instanceof IxCode.RefLocal) {
+      start = codeLocalRef((IxCode.RefLocal) node, code);
     } else if(node instanceof IxCode.StaticFieldRef) {
       start = codeStaticFieldRef((IxCode.StaticFieldRef) node, code);
-    } else if(node instanceof IxCode.FieldRef) {
-      start = codeFieldRef((IxCode.FieldRef) node, code);
-    } else if(node instanceof IxCode.FieldSet) {
-      start = codeFieldAssign((IxCode.FieldSet) node, code);
+    } else if(node instanceof IxCode.RefField) {
+      start = codeFieldRef((IxCode.RefField) node, code);
+    } else if(node instanceof IxCode.SetField) {
+      start = codeFieldAssign((IxCode.SetField) node, code);
     } else if(node instanceof IxCode.Call) {
       start = codeMethodCall((IxCode.Call) node, code);
     } else if(node instanceof IxCode.ArrayRef){
@@ -624,7 +624,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     return start;
   }
 
-  public InstructionHandle codeLocalAssign(IxCode.LocalSet node, CodeProxy code) {
+  public InstructionHandle codeLocalAssign(IxCode.SetLocal node, CodeProxy code) {
     InstructionHandle start = null;
     Type type = typeOf(node.type());
     if(node.getFrame() == 0 && !code.getFrame().isClosed()){
@@ -668,7 +668,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   
 
 
-  public InstructionHandle codeLocalRef(IxCode.LocalRef node, CodeProxy code) {
+  public InstructionHandle codeLocalRef(IxCode.RefLocal node, CodeProxy code) {
     InstructionHandle start = null;
     Type type = typeOf(node.type());
     if(node.frame() == 0 && !code.getFrame().isClosed()){
@@ -726,7 +726,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
   
   public InstructionHandle codeArrayRef(IxCode.ArrayRef node, CodeProxy code){
-    IxCode.ArraySymbol targetType = (IxCode.ArraySymbol)node.getObject().type();
+    IxCode.ArrayTypeRef targetType = (IxCode.ArrayTypeRef)node.getObject().type();
     InstructionHandle start = codeExpression(node.getObject(), code);
     codeExpression(node.getIndex(), code);
     code.appendArrayLoad(typeOf(targetType.getBase()));
@@ -741,7 +741,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   
   public InstructionHandle codeArrayAssignment(
     IxCode.ArraySet node, CodeProxy code){
-    IxCode.ArraySymbol targetType = (IxCode.ArraySymbol)node.getObject().type();
+    IxCode.ArrayTypeRef targetType = (IxCode.ArrayTypeRef)node.getObject().type();
     InstructionHandle start = codeExpression(node.getObject(), code);
     code.appendDup(1);
     codeExpression(node.getIndex(), code);
@@ -751,7 +751,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
   
   public InstructionHandle codeNew(IxCode.NewObject node, CodeProxy code) {
-    IxCode.ClassSymbol type = node.constructor.getClassType();
+    IxCode.ClassTypeRef type = node.constructor.getClassType();
     InstructionHandle start = code.appendNew((ObjectType)typeOf(type));
     code.append(InstructionConstants.DUP);
     for (int i = 0; i < node.parameters.length; i++) {
@@ -766,7 +766,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   
   public InstructionHandle codeNewArray(IxCode.NewArray node, CodeProxy code){
     InstructionHandle start = codeExpressions(node.parameters, code);
-    IxCode.ArraySymbol type = node.arrayType;
+    IxCode.ArrayTypeRef type = node.arrayType;
     code.appendNewArray(typeOf(type.getComponent()), (short)node.parameters.length);
     return start;
   }
@@ -1168,14 +1168,14 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     return code.append(InstructionConstants.ALOAD_0);
   }
 
-  public InstructionHandle codeFieldRef(IxCode.FieldRef node, CodeProxy code) {
+  public InstructionHandle codeFieldRef(IxCode.RefField node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.target, code);
-    IxCode.ClassSymbol symbol = (IxCode.ClassSymbol) node.target.type();
+    IxCode.ClassTypeRef symbol = (IxCode.ClassTypeRef) node.target.type();
     code.appendGetField(symbol.getName(), node.field.getName(), typeOf(node.type()));
     return start;
   }
 
-  public InstructionHandle codeFieldAssign(IxCode.FieldSet node, CodeProxy code) {
+  public InstructionHandle codeFieldAssign(IxCode.SetField node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getObject(), code);    
     codeExpression(node.getValue(), code);
     if(isWideType(node.getValue().type())){
@@ -1183,7 +1183,7 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     }else{
       code.append(InstructionConstants.DUP_X1);
     }
-    IxCode.ClassSymbol symbol = (IxCode.ClassSymbol) node.getObject().type();
+    IxCode.ClassTypeRef symbol = (IxCode.ClassTypeRef) node.getObject().type();
     code.appendPutField(symbol.getName(), node.getField().getName(), typeOf(node.type()));
     return start;
   }

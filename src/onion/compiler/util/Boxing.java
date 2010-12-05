@@ -30,7 +30,7 @@ public class Boxing {
   private Boxing() {
   }
   
-  private static IxCode.ClassSymbol boxedType(ClassTable table, IxCode.BasicTypeRef type){
+  private static IxCode.ClassTypeRef boxedType(ClassTable table, IxCode.BasicTypeRef type){
     for(int i  = 0; i < TABLE.length; i++){
       if(TABLE[i][0] == type){
         return table.load(((String)TABLE[i][1]));
@@ -44,8 +44,8 @@ public class Boxing {
     if((!type.isBasicType()) || type == IxCode.BasicTypeRef.VOID){
       throw new IllegalArgumentException("node type must be boxable type");
     }
-    IxCode.ClassSymbol boxedType = boxedType(table, (IxCode.BasicTypeRef)type);
-    IxCode.ConstructorSymbol[] cs = boxedType.getConstructors();
+    IxCode.ClassTypeRef boxedType = boxedType(table, (IxCode.BasicTypeRef)type);
+    IxCode.ConstructorRef[] cs = boxedType.getConstructors();
     for(int i = 0; i < cs.length; i++){
       IxCode.TypeRef[] args = cs[i].getArgs();
       if(args.length == 1 && args[i] == type){

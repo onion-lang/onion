@@ -239,7 +239,7 @@ public class SemanticErrorReporter {
         ((IxCode.ObjectTypeRef)items[0]).getName(),
         (String)items[1],
         names(((IxCode.TypeRef[])items[2])),
-        ((IxCode.ClassSymbol)items[3]).getName()));
+        ((IxCode.ClassTypeRef)items[3]).getName()));
   }
   
   private void reportFieldNotAccessible(
@@ -248,9 +248,9 @@ public class SemanticErrorReporter {
       position, 
       format(
         message("error.semantic.fieldNotAccessible"), 
-        ((IxCode.ClassSymbol)items[0]).getName(),
+        ((IxCode.ClassTypeRef)items[0]).getName(),
         (String)items[1],
-        ((IxCode.ClassSymbol)items[2]).getName()));
+        ((IxCode.ClassTypeRef)items[2]).getName()));
   }
   
   private void reportClassNotAccessible(
@@ -259,8 +259,8 @@ public class SemanticErrorReporter {
       position, 
       format(
         message("error.semantic.classNotAccessible"), 
-        ((IxCode.ClassSymbol)items[0]).getName(),
-        ((IxCode.ClassSymbol)items[1]).getName()));
+        ((IxCode.ClassTypeRef)items[0]).getName(),
+        ((IxCode.ClassTypeRef)items[1]).getName()));
   }
   
   private void reportCyclicInheritance(

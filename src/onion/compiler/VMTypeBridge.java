@@ -36,11 +36,11 @@ public class VMTypeBridge {
     if(type.isBasicType()){
       return (BasicType) basicTypeTable.get(type);
     }else if(type.isArrayType()){
-      IxCode.ArraySymbol arrayType = (IxCode.ArraySymbol)type;
+      IxCode.ArrayTypeRef arrayType = (IxCode.ArrayTypeRef)type;
       return new ArrayType(
         toVMType(arrayType.getComponent()), arrayType.getDimension());
     }else if(type.isClassType()){
-      return new ObjectType(((IxCode.ClassSymbol)type).getName());
+      return new ObjectType(((IxCode.ClassTypeRef)type).getName());
     }else{
       return Type.NULL;
     }

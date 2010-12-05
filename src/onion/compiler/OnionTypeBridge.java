@@ -56,7 +56,7 @@ public class OnionTypeBridge {
     IxCode.TypeRef returnType = (IxCode.TypeRef) c2t.get(klass);
     if(returnType != null) return returnType;
     if(!klass.isArray()){
-      IxCode.ClassSymbol symbol = table.load(klass.getName());
+      IxCode.ClassTypeRef symbol = table.load(klass.getName());
       if(symbol != null){
         return symbol;
       }else{
@@ -82,7 +82,7 @@ public class OnionTypeBridge {
     if(returnType != null) return returnType;
     if(type instanceof ObjectType){
       ObjectType objType = (ObjectType)type;
-      IxCode.ClassSymbol symbol = table.load(objType.getClassName());
+      IxCode.ClassTypeRef symbol = table.load(objType.getClassName());
       if(symbol != null){
         return symbol;
       }else{

@@ -53,15 +53,15 @@ public class NameResolution {
     }
   }
   
-  private IxCode.ClassSymbol forQName(String qualifiedName) {
+  private IxCode.ClassTypeRef forQName(String qualifiedName) {
     return table.load(qualifiedName);
   }
   
-  private IxCode.ClassSymbol forSName(String simpleName) {
+  private IxCode.ClassTypeRef forSName(String simpleName) {
     for(int i = 0; i < imports.size(); i++){
       String qualifiedName = imports.get(i).match(simpleName);
       if(qualifiedName != null){
-        IxCode.ClassSymbol resolvedSymbol = forQName(qualifiedName);
+        IxCode.ClassTypeRef resolvedSymbol = forQName(qualifiedName);
         if(resolvedSymbol != null) return resolvedSymbol;
       }
     }

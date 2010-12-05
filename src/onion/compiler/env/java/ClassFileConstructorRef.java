@@ -13,28 +13,26 @@ import onion.compiler.IxCode;
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileMethodSymbol implements IxCode.MethodSymbol {
+public class ClassFileConstructorRef implements IxCode.ConstructorRef {
   private int modifier;
-  private IxCode.ClassSymbol classType;
+  private IxCode.ClassTypeRef classType;
   private String name;
-  private IxCode.TypeRef[] arguments;
-  private IxCode.TypeRef returnType;
+  private IxCode.TypeRef[] args;
 
-  public ClassFileMethodSymbol(
-    int modifier, IxCode.ClassSymbol classType, String name,
-    IxCode.TypeRef[] arguments, IxCode.TypeRef returnType) {
+  public ClassFileConstructorRef(
+    int modifier, IxCode.ClassTypeRef classType, String name, IxCode.TypeRef[] args
+  ) {
     this.modifier = modifier;
     this.classType = classType;
     this.name = name;
-    this.arguments = (IxCode.TypeRef[]) arguments.clone();
-    this.returnType = returnType;
+    this.args = (IxCode.TypeRef[]) args.clone();
   }
   
   public int getModifier(){
     return modifier;
   }
 
-  public IxCode.ClassSymbol getClassType() {
+  public IxCode.ClassTypeRef getClassType() {
     return classType;
   }
 
@@ -42,11 +40,7 @@ public class ClassFileMethodSymbol implements IxCode.MethodSymbol {
     return name;
   }
 
-  public IxCode.TypeRef[] getArguments() {
-    return arguments;
-  }
-
-  public IxCode.TypeRef getReturnType() {
-    return returnType;
+  public IxCode.TypeRef[] getArgs() {
+    return args;
   }
 }

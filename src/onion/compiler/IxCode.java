@@ -57,7 +57,7 @@ public interface IxCode {
       }
 
       public TypeRef type(){
-        return ((ArraySymbol)object.type()).getBase();
+        return ((ArrayTypeRef)object.type()).getBase();
       }
     }
 
@@ -279,11 +279,11 @@ public interface IxCode {
      */
     class Call extends Expression {
       public final Expression target;
-      public final MethodSymbol method;
+      public final MethodRef method;
       public final Expression[] parameters;
 
       public Call(
-        Expression target, MethodSymbol method, Expression[] parameters) {
+        Expression target, MethodRef method, Expression[] parameters) {
         this.target = target;
         this.method = method;
         this.parameters = parameters;
@@ -298,11 +298,11 @@ public interface IxCode {
      */
     class CallStatic extends Expression {
       public ObjectTypeRef target;
-      public MethodSymbol method;
+      public MethodRef method;
       public Expression[] parameters;
 
       public CallStatic(
-        ObjectTypeRef target, MethodSymbol method, Expression[] parameters) {
+        ObjectTypeRef target, MethodRef method, Expression[] parameters) {
         this.target = target;
         this.method = method;
         this.parameters = parameters;
@@ -317,10 +317,10 @@ public interface IxCode {
      */
     class CallSuper extends Expression {
       private final Expression target;
-      private final MethodSymbol method;
+      private final MethodRef method;
       private final Expression[] params;
 
-      public CallSuper(Expression target, MethodSymbol method, Expression[] params) {
+      public CallSuper(Expression target, MethodRef method, Expression[] params) {
         this.target = target;
         this.method = method;
         this.params = params;
@@ -334,7 +334,7 @@ public interface IxCode {
         return target;
       }
 
-      public MethodSymbol getMethod() {
+      public MethodRef getMethod() {
         return method;
       }
 
@@ -394,12 +394,12 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class ClassDefinition extends AbstractClassSymbol implements Node {
+    class ClassDefinition extends AbstractClassTypeRef implements Node {
       private boolean isInterface;
       private int modifier;
       private String name;
-      private ClassSymbol superClass;
-      private ClassSymbol[] interfaces;
+      private ClassTypeRef superClass;
+      private ClassTypeRef[] interfaces;
       private List fields = new ArrayList();
       private List methods = new ArrayList();
       private List constructors = new ArrayList();
@@ -415,7 +415,7 @@ public interface IxCode {
        * @param superClass super class
        * @param interfaces super interfaces
        */
-      public ClassDefinition(boolean isInterface, int modifier, String name, ClassSymbol superClass, ClassSymbol[] interfaces) {
+      public ClassDefinition(boolean isInterface, int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces) {
         this.isInterface = isInterface;
         this.modifier = modifier;
         this.name = name;
@@ -430,7 +430,7 @@ public interface IxCode {
        * @param interfaces
        * @return
        */
-      public static ClassDefinition newInterface(int modifier, String name, ClassSymbol[] interfaces){
+      public static ClassDefinition newInterface(int modifier, String name, ClassTypeRef[] interfaces){
         return new ClassDefinition(true, modifier, name, null, interfaces);
       }
 
@@ -442,7 +442,7 @@ public interface IxCode {
        * @param interfaces
        * @return
        */
-      public static ClassDefinition newClass(int modifier, String name, ClassSymbol superClass, ClassSymbol[] interfaces){
+      public static ClassDefinition newClass(int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces){
         return new ClassDefinition(false, modifier, name, superClass, interfaces);
       }
 
@@ -476,19 +476,19 @@ public interface IxCode {
         return name;
       }
 
-      public void setSuperClass(ClassSymbol superClass) {
+      public void setSuperClass(ClassTypeRef superClass) {
         this.superClass = superClass;
       }
 
-      public ClassSymbol getSuperClass() {
+      public ClassTypeRef getSuperClass() {
         return superClass;
       }
 
-      public void setInterfaces(ClassSymbol[] interfaces) {
+      public void setInterfaces(ClassTypeRef[] interfaces) {
         this.interfaces = interfaces;
       }
 
-      public ClassSymbol[] getInterfaces() {
+      public ClassTypeRef[] getInterfaces() {
         return interfaces;
       }
 
@@ -500,15 +500,15 @@ public interface IxCode {
         return isResolutionComplete;
       }
 
-      public void addMethod(MethodSymbol method) {
+      public void addMethod(MethodRef method) {
         methods.add(method);
       }
 
-      public void addField(FieldSymbol field) {
+      public void addField(FieldRef field) {
         fields.add(field);
       }
 
-      public void addConstructor(ConstructorSymbol constructor) {
+      public void addConstructor(ConstructorRef constructor) {
         constructors.add(constructor);
       }
 
@@ -516,16 +516,16 @@ public interface IxCode {
         constructors.add(ConstructorDefinition.newDefaultConstructor(this));
       }
 
-      public MethodSymbol[] getMethods() {
-        return ((MethodSymbol[])methods.toArray(new MethodSymbol[0]));
+      public MethodRef[] getMethods() {
+        return ((MethodRef[])methods.toArray(new MethodRef[0]));
       }
 
-      public FieldSymbol[] getFields() {
-        return ((FieldSymbol[])fields.toArray(new FieldSymbol[0]));
+      public FieldRef[] getFields() {
+        return ((FieldRef[])fields.toArray(new FieldRef[0]));
       }
 
-      public ConstructorSymbol[] getConstructors() {
-        return ((ConstructorSymbol[]) constructors.toArray(new ConstructorSymbol[0]));
+      public ConstructorRef[] getConstructors() {
+        return ((ConstructorRef[]) constructors.toArray(new ConstructorRef[0]));
       }
 
       public void setSourceFile(String sourceFile) {
@@ -542,12 +542,12 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     class NewClosure extends Expression {
-      private ClassSymbol type;
-      private MethodSymbol method;
+      private ClassTypeRef type;
+      private MethodRef method;
       private ActionStatement block;
       private LocalFrame frame;
 
-      public NewClosure(ClassSymbol type, MethodSymbol method, ActionStatement block) {
+      public NewClosure(ClassTypeRef type, MethodRef method, ActionStatement block) {
         this.type =  type;
         this.method = method;
         this.block = block;
@@ -557,11 +557,11 @@ public interface IxCode {
         return method.getModifier();
       }
 
-      public ClassSymbol getClassType() {
+      public ClassTypeRef getClassType() {
         return type;
       }
 
-      public MethodSymbol getMethod(){
+      public MethodRef getMethod(){
         return method;
       }
 
@@ -598,16 +598,16 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class ConstructorDefinition implements Node, ConstructorSymbol {
+    class ConstructorDefinition implements Node, ConstructorRef {
       private int modifier;
-      private ClassSymbol classType;
+      private ClassTypeRef classType;
       private TypeRef[] arguments;
       private StatementBlock block;
       private Super superInitializer;
       private LocalFrame frame;
 
       public ConstructorDefinition(
-        int modifier, ClassSymbol classType,
+        int modifier, ClassTypeRef classType,
         TypeRef[] arguments, StatementBlock block, Super superInitializer
       ) {
         this.modifier = modifier;
@@ -617,7 +617,7 @@ public interface IxCode {
         this.superInitializer = superInitializer;
       }
 
-      public static ConstructorDefinition newDefaultConstructor(ClassSymbol type) {
+      public static ConstructorDefinition newDefaultConstructor(ClassTypeRef type) {
         StatementBlock block = new StatementBlock(new Return(null));
         Super init = new Super(type.getSuperClass(), new TypeRef[0], new Expression[0]);
         ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
@@ -633,7 +633,7 @@ public interface IxCode {
         return arguments;
       }
 
-      public ClassSymbol getClassType() {
+      public ClassTypeRef getClassType() {
         return classType;
       }
 
@@ -748,22 +748,22 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class FieldDefinition implements Node, FieldSymbol {
+    class FieldDefinition implements Node, FieldRef {
 
       private int modifier;
-      private ClassSymbol classType;
+      private ClassTypeRef classType;
       private String name;
       private TypeRef type;
 
       public FieldDefinition(
-        int modifier, ClassSymbol classType, String name, TypeRef type) {
+        int modifier, ClassTypeRef classType, String name, TypeRef type) {
         this.modifier = modifier;
         this.classType = classType;
         this.name = name;
         this.type = type;
       }
 
-      public ClassSymbol getClassType() {
+      public ClassTypeRef getClassType() {
         return classType;
       }
 
@@ -785,11 +785,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class FieldRef extends Expression {
+    class RefField extends Expression {
       public Expression target;
-      public FieldSymbol field;
+      public FieldRef field;
 
-      public FieldRef(Expression target, FieldSymbol field) {
+      public RefField(Expression target, FieldRef field) {
         this.target = target;
         this.field = field;
       }
@@ -801,13 +801,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class FieldSet extends Expression {
+    class SetField extends Expression {
       private final Expression object;
-      private final FieldSymbol field;
+      private final FieldRef field;
       private final Expression value;
 
-      public FieldSet(
-        Expression target, FieldSymbol field, Expression value
+      public SetField(
+        Expression target, FieldRef field, Expression value
       ) {
         this.object = target;
         this.field = field;
@@ -818,7 +818,7 @@ public interface IxCode {
 
       public Expression getObject() { return object; }
 
-      public FieldSymbol getField() { return field; }
+      public FieldRef getField() { return field; }
 
       public Expression getValue() { return value; }
     }
@@ -934,18 +934,18 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class LocalRef extends Expression {
+    class RefLocal extends Expression {
       private int frame;
       private int index;
       private TypeRef type;
 
-      public LocalRef(ClosureLocalBinding bind) {
+      public RefLocal(ClosureLocalBinding bind) {
         this.frame = bind.getFrame();
         this.index = bind.getIndex();
         this.type = bind.getType();
       }
 
-      public LocalRef(int frame, int index, TypeRef type){
+      public RefLocal(int frame, int index, TypeRef type){
         this.frame = frame;
         this.index = index;
         this.type = type;
@@ -962,20 +962,20 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class LocalSet extends Expression {
+    class SetLocal extends Expression {
       private final int frame;
       private final int index;
       private final Expression value;
       private final TypeRef type;
 
-      public LocalSet(int frame, int index, TypeRef type, Expression value){
+      public SetLocal(int frame, int index, TypeRef type, Expression value){
         this.frame = frame;
         this.index = index;
         this.value = value;
         this.type = type;
       }
 
-      public LocalSet(ClosureLocalBinding bind, Expression value){
+      public SetLocal(ClosureLocalBinding bind, Expression value){
         this.frame = bind.getFrame();
         this.index = bind.getIndex();
         this.type = bind.getType();
@@ -1053,9 +1053,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class MethodDefinition implements Node, MethodSymbol {
+    class MethodDefinition implements Node, MethodRef {
       private int modifier;
-      private ClassSymbol classType;
+      private ClassTypeRef classType;
       private String name;
       private TypeRef[] arguments;
       private StatementBlock block;
@@ -1064,7 +1064,7 @@ public interface IxCode {
       private LocalFrame frame;
 
       public MethodDefinition(
-        int modifier, ClassSymbol classType, String name, TypeRef[] arguments,
+        int modifier, ClassTypeRef classType, String name, TypeRef[] arguments,
         TypeRef returnType, StatementBlock block){
         this.modifier = modifier;
         this.classType = classType;
@@ -1078,7 +1078,7 @@ public interface IxCode {
         return modifier;
       }
 
-      public ClassSymbol getClassType() {
+      public ClassTypeRef getClassType() {
         return classType;
       }
 
@@ -1124,10 +1124,10 @@ public interface IxCode {
      * Date: 2005/06/22
      */
     class NewObject extends Expression {
-      public final ConstructorSymbol constructor;
+      public final ConstructorRef constructor;
       public final Expression[] parameters;
 
-      public NewObject(ConstructorSymbol constructor, Expression[] parameters){
+      public NewObject(ConstructorRef constructor, Expression[] parameters){
         this.constructor = constructor;
         this.parameters = parameters;
       }
@@ -1136,10 +1136,10 @@ public interface IxCode {
     }
 
     class NewArray extends Expression {
-      public final ArraySymbol arrayType;
+      public final ArrayTypeRef arrayType;
       public final Expression[] parameters;
 
-      public NewArray(ArraySymbol arrayType, Expression[] parameters){
+      public NewArray(ArrayTypeRef arrayType, Expression[] parameters){
         this.arrayType = arrayType;
         this.parameters = parameters;
       }
@@ -1214,10 +1214,10 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     class StaticFieldRef extends Expression {
-      public ClassSymbol target;
-      public FieldSymbol field;
+      public ClassTypeRef target;
+      public FieldRef field;
 
-      public StaticFieldRef(ClassSymbol target, FieldSymbol field){
+      public StaticFieldRef(ClassTypeRef target, FieldRef field){
         this.target = target;
         this.field = field;
       }
@@ -1231,11 +1231,11 @@ public interface IxCode {
      */
     class StaticFieldSet extends Expression {
       public ObjectTypeRef target;
-      public FieldSymbol field;
+      public FieldRef field;
       public Expression value;
 
       public StaticFieldSet(
-        ObjectTypeRef target, FieldSymbol field, Expression value){
+        ObjectTypeRef target, FieldRef field, Expression value){
         this.target = target;
         this.field = field;
         this.value = value;
@@ -1267,18 +1267,18 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     class Super implements Node {
-      private ClassSymbol classType;
+      private ClassTypeRef classType;
       private TypeRef[] arguments;
       private Expression[] expressions;
 
       public Super(
-        ClassSymbol classType, TypeRef[] arguments, Expression[] expressions){
+        ClassTypeRef classType, TypeRef[] arguments, Expression[] expressions){
         this.classType = classType;
         this.arguments = arguments;
         this.expressions = expressions;
       }
 
-      public ClassSymbol getClassType() {
+      public ClassTypeRef getClassType() {
         return classType;
       }
 
@@ -1310,9 +1310,9 @@ public interface IxCode {
      * Date: 2005/06/17
      */
     class This extends Expression {
-      private ClassSymbol classType;
+      private ClassTypeRef classType;
 
-      public This(ClassSymbol classType){
+      public This(ClassTypeRef classType){
         this.classType = classType;
       }
 
@@ -1385,15 +1385,15 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/15
      */
-    abstract class AbstractClassSymbol extends AbstractObjectSymbol implements ClassSymbol {
-      private ConstructorFinder constructorFinder;
+    abstract class AbstractClassTypeRef extends AbstractObjectTypeRef implements ClassTypeRef {
+      private ConstructorRefFinder constructorRefFinder;
 
-      public AbstractClassSymbol() {
-        constructorFinder = new ConstructorFinder();
+      public AbstractClassTypeRef() {
+        constructorRefFinder = new ConstructorRefFinder();
       }
 
-      public ConstructorSymbol[] findConstructor(Expression[] params){
-        return constructorFinder.find(this, params);
+      public ConstructorRef[] findConstructor(Expression[] params){
+        return constructorRefFinder.find(this, params);
       }
 
       public boolean isClassType() {
@@ -1409,21 +1409,21 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/15
      */
-    abstract class AbstractObjectSymbol implements ObjectTypeRef {
-      private MethodFinder methodFinder;
-      private FieldFinder fieldFinder;
+    abstract class AbstractObjectTypeRef implements ObjectTypeRef {
+      private MethodRefFinder methodRefFinder;
+      private FieldRefFinder fieldRefFinder;
 
-      public AbstractObjectSymbol() {
-        methodFinder = new MethodFinder();
-        fieldFinder = new FieldFinder();
+      public AbstractObjectTypeRef() {
+        methodRefFinder = new MethodRefFinder();
+        fieldRefFinder = new FieldRefFinder();
       }
 
-      public FieldSymbol findField(String name) {
-        return fieldFinder.find(this, name);
+      public FieldRef findField(String name) {
+        return fieldRefFinder.find(this, name);
       }
 
-      public MethodSymbol[] findMethod(String name, Expression[] params) {
-        return methodFinder.find(this, name, params);
+      public MethodRef[] findMethod(String name, Expression[] params) {
+        return methodRefFinder.find(this, name, params);
       }
 
       public boolean isBasicType() {
@@ -1443,19 +1443,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class ArraySymbol extends AbstractObjectSymbol {
+    class ArrayTypeRef extends AbstractObjectTypeRef {
       private ClassTable table;
       private TypeRef component;
       private int dimension;
-      private ClassSymbol superClass;
-      private ClassSymbol[] interfaces;
+      private ClassTypeRef superClass;
+      private ClassTypeRef[] interfaces;
       private String name;
 
-      public ArraySymbol(TypeRef component, int dimension, ClassTable table){
+      public ArrayTypeRef(TypeRef component, int dimension, ClassTable table){
         this.component = component;
         this.dimension = dimension;
         this.superClass = table.load("java.lang.Object");
-        this.interfaces = new ClassSymbol[]{
+        this.interfaces = new ClassTypeRef[]{
           table.load("java.io.Serializable"),
           table.load("java.lang.Cloneable")
         };
@@ -1486,19 +1486,19 @@ public interface IxCode {
         return 0;
       }
 
-      public ClassSymbol getSuperClass() {
+      public ClassTypeRef getSuperClass() {
         return superClass;
       }
 
-      public ClassSymbol[] getInterfaces() {
+      public ClassTypeRef[] getInterfaces() {
         return interfaces;
       }
 
-      public MethodSymbol[] getMethods() {
+      public MethodRef[] getMethods() {
         return superClass.getMethods();
       }
 
-      public FieldSymbol[] getFields() {
+      public FieldRef[] getFields() {
         return superClass.getFields();
       }
 
@@ -1581,20 +1581,20 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface ClassSymbol extends ObjectTypeRef {
-      ConstructorSymbol[] getConstructors();
-      ConstructorSymbol[] findConstructor(Expression[] params);
+    interface ClassTypeRef extends ObjectTypeRef {
+      ConstructorRef[] getConstructors();
+      ConstructorRef[] findConstructor(Expression[] params);
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/30
      */
-    class ConstructorFinder {
+    class ConstructorRefFinder {
       private static Comparator sorter = new Comparator(){
         public int compare(Object constructor1, Object constructor2) {
-          ConstructorSymbol c1 = (ConstructorSymbol)constructor1;
-          ConstructorSymbol c2 = (ConstructorSymbol)constructor2;
+          ConstructorRef c1 = (ConstructorRef)constructor1;
+          ConstructorRef c2 = (ConstructorRef)constructor2;
           TypeRef[] arg1 = c1.getArgs();
           TypeRef[] arg2 = c2.getArgs();
           int length = arg1.length;
@@ -1606,36 +1606,36 @@ public interface IxCode {
 
       private ParameterMatcher matcher;
 
-      public ConstructorFinder() {
+      public ConstructorRefFinder() {
         this.matcher = new StandardParameterMatcher();
       }
 
-      public ConstructorSymbol[] find(ClassSymbol target, Expression[] args){
-        Set constructors = new TreeSet(new ConstructorSymbolComparator());
+      public ConstructorRef[] find(ClassTypeRef target, Expression[] args){
+        Set constructors = new TreeSet(new ConstructorRefComparator());
         find(constructors, target, args);
         List selected = new ArrayList();
         selected.addAll(constructors);
         Collections.sort(selected, sorter);
         if(selected.size() < 2){
-          return (ConstructorSymbol[]) selected.toArray(new ConstructorSymbol[0]);
+          return (ConstructorRef[]) selected.toArray(new ConstructorRef[0]);
         }
-        ConstructorSymbol constructor1 = (ConstructorSymbol) selected.get(0);
-        ConstructorSymbol constructor2 = (ConstructorSymbol) selected.get(1);
+        ConstructorRef constructor1 = (ConstructorRef) selected.get(0);
+        ConstructorRef constructor2 = (ConstructorRef) selected.get(1);
         if(isAmbiguous(constructor1, constructor2)){
-          return (ConstructorSymbol[]) selected.toArray(new ConstructorSymbol[0]);
+          return (ConstructorRef[]) selected.toArray(new ConstructorRef[0]);
         }
-        return new ConstructorSymbol[]{constructor1};
+        return new ConstructorRef[]{constructor1};
       }
 
-      private boolean isAmbiguous(ConstructorSymbol constructor1, ConstructorSymbol constructor2){
+      private boolean isAmbiguous(ConstructorRef constructor1, ConstructorRef constructor2){
         return sorter.compare(constructor1, constructor2) >= 0;
       }
 
-      private void find(Set constructors, ClassSymbol target, Expression[] arguments){
+      private void find(Set constructors, ClassTypeRef target, Expression[] arguments){
         if(target == null) return;
-        ConstructorSymbol[] cs = target.getConstructors();
+        ConstructorRef[] cs = target.getConstructors();
         for(int i = 0; i < cs.length; i++){
-          ConstructorSymbol c = cs[i];
+          ConstructorRef c = cs[i];
           if(matcher.matches(c.getArgs(), arguments)){
             constructors.add(c);
           }
@@ -1655,8 +1655,8 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/15
      */
-    interface ConstructorSymbol extends MemberSymbol {
-      public ClassSymbol getClassType();
+    interface ConstructorRef extends MemberRef {
+      public ClassTypeRef getClassType();
       public TypeRef[] getArgs();
     }
 
@@ -1664,14 +1664,14 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class ConstructorSymbolComparator implements Comparator {
+    class ConstructorRefComparator implements Comparator {
 
-      public ConstructorSymbolComparator() {
+      public ConstructorRefComparator() {
       }
 
       public int compare(Object arg0, Object arg1) {
-        ConstructorSymbol c1 = (ConstructorSymbol)arg0;
-        ConstructorSymbol c2 = (ConstructorSymbol)arg1;
+        ConstructorRef c1 = (ConstructorRef)arg0;
+        ConstructorRef c2 = (ConstructorRef)arg1;
         int result;
         TypeRef[] args1 = c1.getArgs();
         TypeRef[] args2 = c2.getArgs();
@@ -1692,22 +1692,22 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/15
      */
-    class FieldFinder {
+    class FieldRefFinder {
 
-      public FieldFinder() {
+      public FieldRefFinder() {
       }
 
-      public FieldSymbol find(ObjectTypeRef target, String name){
+      public FieldRef find(ObjectTypeRef target, String name){
         if(target == null) return null;
-        FieldSymbol[] fields = target.getFields();
+        FieldRef[] fields = target.getFields();
         for (int i = 0; i < fields.length; i++) {
           if(fields[i].getName().equals(name)){
             return fields[i];
           }
         }
-        FieldSymbol field = find(target.getSuperClass(), name);
+        FieldRef field = find(target.getSuperClass(), name);
         if(field != null) return field;
-        ClassSymbol[] interfaces = target.getInterfaces();
+        ClassTypeRef[] interfaces = target.getInterfaces();
         for(int i = 0; i < interfaces.length; i++){
           field = find(interfaces[i], name);
           if(field != null) return field;
@@ -1720,9 +1720,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/15
      */
-    interface FieldSymbol extends MemberSymbol {
+    interface FieldRef extends MemberRef {
       public int getModifier();
-      public ClassSymbol getClassType();
+      public ClassTypeRef getClassType();
       public TypeRef getType();
     }
 
@@ -1730,13 +1730,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class FieldSymbolComparator implements Comparator {
-      public FieldSymbolComparator() {
+    class FieldRefComparator implements Comparator {
+      public FieldRefComparator() {
       }
 
       public int compare(Object arg0, Object arg1) {
-        FieldSymbol f1 = (FieldSymbol) arg0;
-        FieldSymbol f2 = (FieldSymbol) arg1;
+        FieldRef f1 = (FieldRef) arg0;
+        FieldRef f2 = (FieldRef) arg1;
         return f1.getName().compareTo(f2.getName());
       }
     }
@@ -1745,9 +1745,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    interface MemberSymbol {
+    interface MemberRef {
       int getModifier();
-      ClassSymbol getClassType();
+      ClassTypeRef getClassType();
       String getName();
     }
 
@@ -1755,11 +1755,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/30
      */
-    class MethodFinder {
+    class MethodRefFinder {
       private static Comparator sorter = new Comparator(){
         public int compare(Object method1, Object method2) {
-          MethodSymbol m1 = (MethodSymbol)method1;
-          MethodSymbol m2 = (MethodSymbol)method2;
+          MethodRef m1 = (MethodRef)method1;
+          MethodRef m2 = (MethodRef)method2;
           TypeRef[] arg1 = m1.getArguments();
           TypeRef[] arg2 = m2.getArguments();
           int length = arg1.length;
@@ -1771,44 +1771,44 @@ public interface IxCode {
 
       private ParameterMatcher matcher;
 
-      public MethodFinder() {
+      public MethodRefFinder() {
         this.matcher = new StandardParameterMatcher();
       }
 
-      public MethodSymbol[] find(ObjectTypeRef target, String name, Expression[] arguments){
-        Set methods = new TreeSet(new MethodSymbolComparator());
+      public MethodRef[] find(ObjectTypeRef target, String name, Expression[] arguments){
+        Set methods = new TreeSet(new MethodRefComparator());
         find(methods, target, name, arguments);
         List selectedMethods = new ArrayList();
         selectedMethods.addAll(methods);
         Collections.sort(selectedMethods, sorter);
         if(selectedMethods.size() < 2){
-          return (MethodSymbol[]) selectedMethods.toArray(new MethodSymbol[0]);
+          return (MethodRef[]) selectedMethods.toArray(new MethodRef[0]);
         }
-        MethodSymbol method1 = (MethodSymbol) selectedMethods.get(0);
-        MethodSymbol method2 = (MethodSymbol) selectedMethods.get(1);
+        MethodRef method1 = (MethodRef) selectedMethods.get(0);
+        MethodRef method2 = (MethodRef) selectedMethods.get(1);
         if(isAmbiguous(method1, method2)){
-          return (MethodSymbol[]) selectedMethods.toArray(new MethodSymbol[0]);
+          return (MethodRef[]) selectedMethods.toArray(new MethodRef[0]);
         }
-        return new MethodSymbol[]{method1};
+        return new MethodRef[]{method1};
       }
 
-      public boolean isAmbiguous(MethodSymbol method1, MethodSymbol method2){
+      public boolean isAmbiguous(MethodRef method1, MethodRef method2){
         return sorter.compare(method1, method2) >= 0;
       }
 
       private void find(
         Set methods, ObjectTypeRef target, String name, Expression[] params){
         if(target == null) return;
-        MethodSymbol[] ms = target.getMethods();
+        MethodRef[] ms = target.getMethods();
         for(int i = 0; i < ms.length; i++){
-          MethodSymbol m = ms[i];
+          MethodRef m = ms[i];
           if(m.getName().equals(name) && matcher.matches(m.getArguments(), params)){
             methods.add(m);
           }
         }
-        ClassSymbol superClass = target.getSuperClass();
+        ClassTypeRef superClass = target.getSuperClass();
         find(methods, superClass, name, params);
-        ClassSymbol[] interfaces = target.getInterfaces();
+        ClassTypeRef[] interfaces = target.getInterfaces();
         for(int i = 0; i < interfaces.length; i++){
           find(methods, interfaces[i], name, params);
         }
@@ -1827,8 +1827,8 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/15
      */
-    interface MethodSymbol extends MemberSymbol {
-      public ClassSymbol getClassType();
+    interface MethodRef extends MemberRef {
+      public ClassTypeRef getClassType();
       public TypeRef[] getArguments();
       public TypeRef getReturnType();
     }
@@ -1837,14 +1837,14 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class MethodSymbolComparator implements Comparator {
+    class MethodRefComparator implements Comparator {
 
-      public MethodSymbolComparator() {
+      public MethodRefComparator() {
       }
 
       public int compare(Object arg0, Object arg1) {
-        MethodSymbol m1 = (MethodSymbol)arg0;
-        MethodSymbol m2 = (MethodSymbol)arg1;
+        MethodRef m1 = (MethodRef)arg0;
+        MethodRef m2 = (MethodRef)arg1;
         int result = m1.getName().compareTo(m2.getName());
         if(result != 0){
           return result;
@@ -1909,12 +1909,12 @@ public interface IxCode {
     interface ObjectTypeRef extends TypeRef {
       boolean isInterface();
       int getModifier();
-      ClassSymbol getSuperClass();
-      ClassSymbol[] getInterfaces();
-      MethodSymbol[] getMethods();
-      FieldSymbol[] getFields();
-      FieldSymbol findField(String name);
-      MethodSymbol[] findMethod(String name, Expression[] params);
+      ClassTypeRef getSuperClass();
+      ClassTypeRef[] getInterfaces();
+      MethodRef[] getMethods();
+      FieldRef[] getFields();
+      FieldRef findField(String name);
+      MethodRef[] findMethod(String name, Expression[] params);
     }
 
     /**
@@ -1991,10 +1991,10 @@ public interface IxCode {
 
         if(left.isClassType()){
           if(right.isClassType()){
-            return isSuperTypeForClass((ClassSymbol) left, (ClassSymbol) right);
+            return isSuperTypeForClass((ClassTypeRef) left, (ClassTypeRef) right);
           }
           if(right.isArrayType()){
-            return left == ((ArraySymbol) right).getSuperClass();
+            return left == ((ArrayTypeRef) right).getSuperClass();
           }
           if(right.isNullType()){
             return true;
@@ -2003,7 +2003,7 @@ public interface IxCode {
         }
         if(left.isArrayType()){
           if(right.isArrayType()){
-            return isSuperTypeForArray((ArraySymbol) left, (ArraySymbol) right);
+            return isSuperTypeForArray((ArrayTypeRef) left, (ArrayTypeRef) right);
           }
           if(right.isNullType()){
             return true;
@@ -2018,11 +2018,11 @@ public interface IxCode {
       }
 
       private static boolean isSuperTypeForArray(
-        ArraySymbol left, ArraySymbol right){
+        ArrayTypeRef left, ArrayTypeRef right){
         return isSuperType(left.getBase(), right.getBase());
       }
 
-      private static boolean isSuperTypeForClass(ClassSymbol left, ClassSymbol right){
+      private static boolean isSuperTypeForClass(ClassTypeRef left, ClassTypeRef right){
         if(right == null) return false;
         if(left == right) return true;
         if(isSuperTypeForClass(left, right.getSuperClass())) return true;

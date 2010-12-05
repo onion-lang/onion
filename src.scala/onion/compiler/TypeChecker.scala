@@ -2,7 +2,7 @@ package onion.compiler
 
 import error.SemanticErrorReporter
 import onion.lang.core.IrClass
-import onion.compiler.IxCode.{IrClass, IrClass}
+import onion.compiler.IxCode.{ClassDefinition, ClassDefinition}
 
 /**
  * Created by IntelliJ IDEA.
@@ -15,7 +15,7 @@ import onion.compiler.IxCode.{IrClass, IrClass}
 class TypeChecker(config: CompilerConfig) {
   private[this] val reporter = new SemanticErrorReporter(config.getMaxErrorReports)
 
-  def process(units: Array[AST.CompilationUnit]): Array[IrClass] = {
+  def process(units: Array[AST.CompilationUnit]): Array[ClassDefinition] = {
     null
   }
 }

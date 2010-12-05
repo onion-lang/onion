@@ -21,7 +21,7 @@ public class LocalContext {
   private boolean isMethod;
   private LocalFrame contextFrame;
   private IxCode.MethodSymbol method;
-  private IxCode.IrConstructor constructor;
+  private IxCode.ConstructorDefinition constructor;
   private SymbolGenerator generator;
 
   public LocalContext() {
@@ -70,7 +70,7 @@ public class LocalContext {
     this.isMethod = true;
   }
   
-  public void setConstructor(IxCode.IrConstructor constructor){
+  public void setConstructor(IxCode.ConstructorDefinition constructor){
     this.constructor = constructor;
     this.isMethod = false;
   }

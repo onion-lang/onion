@@ -22,27 +22,27 @@ import org.apache.bcel.classfile.JavaClass;
  * Date: 2005/06/22
  */
 public class ClassTable {
-  private List<IxCode.IrClass> sourceClasses;
-  private Map<String, IxCode.IrClass> sourceClassMap;
+  private List<IxCode.ClassDefinition> sourceClasses;
+  private Map<String, IxCode.ClassDefinition> sourceClassMap;
   private Map<String, IxCode.ClassSymbol> classFileMap;
   private Map<String, IxCode.ArraySymbol> arrayMap;
   private ClassFileTable table;
   
   public ClassTable(String classPath) {
-    sourceClasses  = new ArrayList<IxCode.IrClass>();
-    sourceClassMap = new HashMap<String, IxCode.IrClass>();
+    sourceClasses  = new ArrayList<IxCode.ClassDefinition>();
+    sourceClassMap = new HashMap<String, IxCode.ClassDefinition>();
     classFileMap   = new HashMap<String, IxCode.ClassSymbol>();
     arrayMap       = new HashMap<String, IxCode.ArraySymbol>();
     table          = new ClassFileTable(classPath);
   }
   
-  public void addSourceClass(IxCode.IrClass node){
+  public void addSourceClass(IxCode.ClassDefinition node){
     sourceClasses.add(node);
     sourceClassMap.put(node.getName(), node);
   }
   
-  public IxCode.IrClass[] getSourceClasses(){
-    return (IxCode.IrClass[])sourceClasses.toArray(new IxCode.IrClass[0]);
+  public IxCode.ClassDefinition[] getSourceClasses(){
+    return (IxCode.ClassDefinition[])sourceClasses.toArray(new IxCode.ClassDefinition[0]);
   }
   
   public IxCode.ArraySymbol loadArray(IxCode.TypeRef component, int dimension){

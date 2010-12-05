@@ -39,7 +39,7 @@ public class Boxing {
     throw new RuntimeException("");
   }
   
-  public static IxCode.IrExpression boxing(ClassTable table, IxCode.IrExpression node){
+  public static IxCode.Expression boxing(ClassTable table, IxCode.Expression node){
     IxCode.TypeRef type = node.type();
     if((!type.isBasicType()) || type == IxCode.BasicTypeRef.VOID){
       throw new IllegalArgumentException("node type must be boxable type");
@@ -49,7 +49,7 @@ public class Boxing {
     for(int i = 0; i < cs.length; i++){
       IxCode.TypeRef[] args = cs[i].getArgs();
       if(args.length == 1 && args[i] == type){
-        return new IxCode.IrNew(cs[i], new IxCode.IrExpression[]{node});
+        return new IxCode.NewObject(cs[i], new IxCode.Expression[]{node});
       }
     }
     throw new RuntimeException("couldn't find matched constructor");

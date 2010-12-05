@@ -20,14 +20,14 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/06
      */
-    class IrArrayLength extends IrExpression {
-      private final IrExpression target;
+    class ArrayLength extends Expression {
+      private final Expression target;
 
-      public IrArrayLength(IrExpression target) {
+      public ArrayLength(Expression target) {
         this.target = target;
       }
 
-      public IrExpression getTarget() {
+      public Expression getTarget() {
         return target;
       }
 
@@ -40,19 +40,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class IrArrayRef extends IrExpression {
-      private final IrExpression object, index;
+    class ArrayRef extends Expression {
+      private final Expression object, index;
 
-      public IrArrayRef(IrExpression target, IrExpression index) {
+      public ArrayRef(Expression target, Expression index) {
         this.object = target;
         this.index = index;
       }
 
-      public IrExpression getIndex() {
+      public Expression getIndex() {
         return index;
       }
 
-      public IrExpression getObject() {
+      public Expression getObject() {
         return object;
       }
 
@@ -65,26 +65,26 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class IrArraySet extends IrExpression {
-      private final IrExpression object, index, value;
+    class ArraySet extends Expression {
+      private final Expression object, index, value;
 
-      public IrArraySet(
-        IrExpression target, IrExpression index, IrExpression value
+      public ArraySet(
+        Expression target, Expression index, Expression value
       ) {
         this.object = target;
         this.index = index;
         this.value = value;
       }
 
-      public IrExpression getIndex() {
+      public Expression getIndex() {
         return index;
       }
 
-      public IrExpression getObject() {
+      public Expression getObject() {
         return object;
       }
 
-      public IrExpression getValue() {
+      public Expression getValue() {
         return value;
       }
 
@@ -97,30 +97,30 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrBegin extends IrExpression {
-      private final IrExpression[] expressions;
+    class Begin extends Expression {
+      private final Expression[] expressions;
 
-      public IrBegin(IrExpression[] expressions) {
+      public Begin(Expression[] expressions) {
         this.expressions = expressions;
       }
 
-      public IrBegin(List expressions) {
-        this((IrExpression[])expressions.toArray(new IrExpression[0]));
+      public Begin(List expressions) {
+        this((Expression[])expressions.toArray(new Expression[0]));
       }
 
-      public IrBegin(IrExpression expression) {
-        this(new IrExpression[]{expression});
+      public Begin(Expression expression) {
+        this(new Expression[]{expression});
       }
 
-      public IrBegin(IrExpression expression1, IrExpression expression2){
-        this(new IrExpression[]{expression1, expression2});
+      public Begin(Expression expression1, Expression expression2){
+        this(new Expression[]{expression1, expression2});
       }
 
-      public IrBegin(IrExpression expression1, IrExpression expression2, IrExpression expression3){
-        this(new IrExpression[]{expression1, expression2, expression3});
+      public Begin(Expression expression1, Expression expression2, Expression expression3){
+        this(new Expression[]{expression1, expression2, expression3});
       }
 
-      public IrExpression[] getExpressions() {
+      public Expression[] getExpressions() {
         return expressions;
       }
 
@@ -133,7 +133,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrBinExp extends IrExpression {
+    class BinaryExpression extends Expression {
       public interface Constants {
           int ADD = 0;
           int SUBTRACT = 1;
@@ -166,11 +166,11 @@ public interface IxCode {
       }
 
       private final int kind;
-      private final IrExpression left, right;
+      private final Expression left, right;
       private final TypeRef type;
 
-      public IrBinExp(
-        int kind, TypeRef type, IrExpression left, IrExpression right
+      public BinaryExpression(
+        int kind, TypeRef type, Expression left, Expression right
       ) {
         this.kind = kind;
         this.left = left;
@@ -178,11 +178,11 @@ public interface IxCode {
         this.type = type;
       }
 
-      public IrExpression getLeft(){
+      public Expression getLeft(){
         return left;
       }
 
-      public IrExpression getRight(){
+      public Expression getRight(){
         return right;
       }
 
@@ -197,30 +197,30 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrBlock implements IrStatement {
-      private final IrStatement[] statements;
+    class StatementBlock implements ActionStatement {
+      private final ActionStatement[] statements;
 
-      public IrBlock(IrStatement[] statements) {
+      public StatementBlock(ActionStatement[] statements) {
         this.statements = statements;
       }
 
-      public IrBlock(List statements) {
-        this((IrStatement[])statements.toArray(new IrStatement[0]));
+      public StatementBlock(List statements) {
+        this((ActionStatement[])statements.toArray(new ActionStatement[0]));
       }
 
-      public IrBlock(IrStatement statement) {
-        this(new IrStatement[]{statement});
+      public StatementBlock(ActionStatement statement) {
+        this(new ActionStatement[]{statement});
       }
 
-      public IrBlock(IrStatement statement1, IrStatement statement2){
-        this(new IrStatement[]{statement1, statement2});
+      public StatementBlock(ActionStatement statement1, ActionStatement statement2){
+        this(new ActionStatement[]{statement1, statement2});
       }
 
-      public IrBlock(IrStatement statement1, IrStatement statement2, IrStatement statement3){
-        this(new IrStatement[]{statement1, statement2, statement3});
+      public StatementBlock(ActionStatement statement1, ActionStatement statement2, ActionStatement statement3){
+        this(new ActionStatement[]{statement1, statement2, statement3});
       }
 
-      public IrStatement[] getStatements() {
+      public ActionStatement[] getStatements() {
         return statements;
       }
     }
@@ -229,10 +229,10 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrBool extends IrExpression {
+    class BoolLiteral extends Expression {
       private final boolean value;
 
-      public IrBool(boolean value){
+      public BoolLiteral(boolean value){
         this.value = value;
       }
 
@@ -249,18 +249,18 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrBreak implements IrStatement {
-      public IrBreak() {}
+    class Break implements ActionStatement {
+      public Break() {}
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrByte extends IrExpression {
+    class ByteLiteral extends Expression {
       private final byte value;
 
-      public IrByte(byte value) {
+      public ByteLiteral(byte value) {
         this.value = value;
       }
 
@@ -277,13 +277,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class IrCall extends IrExpression {
-      public final IrExpression target;
+    class Call extends Expression {
+      public final Expression target;
       public final MethodSymbol method;
-      public final IrExpression[] parameters;
+      public final Expression[] parameters;
 
-      public IrCall(
-        IrExpression target, MethodSymbol method, IrExpression[] parameters) {
+      public Call(
+        Expression target, MethodSymbol method, Expression[] parameters) {
         this.target = target;
         this.method = method;
         this.parameters = parameters;
@@ -296,13 +296,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class IrCallStatic extends IrExpression {
+    class CallStatic extends Expression {
       public ObjectTypeRef target;
       public MethodSymbol method;
-      public IrExpression[] parameters;
+      public Expression[] parameters;
 
-      public IrCallStatic(
-        ObjectTypeRef target, MethodSymbol method, IrExpression[] parameters) {
+      public CallStatic(
+        ObjectTypeRef target, MethodSymbol method, Expression[] parameters) {
         this.target = target;
         this.method = method;
         this.parameters = parameters;
@@ -315,12 +315,12 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class IrCallSuper extends IrExpression {
-      private final IrExpression target;
+    class CallSuper extends Expression {
+      private final Expression target;
       private final MethodSymbol method;
-      private final IrExpression[] params;
+      private final Expression[] params;
 
-      public IrCallSuper(IrExpression target, MethodSymbol method, IrExpression[] params) {
+      public CallSuper(Expression target, MethodSymbol method, Expression[] params) {
         this.target = target;
         this.method = method;
         this.params = params;
@@ -330,7 +330,7 @@ public interface IxCode {
         return method.getReturnType();
       }
 
-      public IrExpression getTarget() {
+      public Expression getTarget() {
         return target;
       }
 
@@ -338,7 +338,7 @@ public interface IxCode {
         return method;
       }
 
-      public IrExpression[] getParams() {
+      public Expression[] getParams() {
         return params;
       }
     }
@@ -347,11 +347,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrCast extends IrExpression {
-      private final IrExpression target;
+    class AsInstanceOf extends Expression {
+      private final Expression target;
       private final TypeRef conversion;
 
-      public IrCast(IrExpression target, TypeRef conversion) {
+      public AsInstanceOf(Expression target, TypeRef conversion) {
         this.target = target;
         this.conversion = conversion;
       }
@@ -360,7 +360,7 @@ public interface IxCode {
         return conversion;
       }
 
-      public IrExpression getTarget() {
+      public Expression getTarget() {
         return target;
       }
 
@@ -373,10 +373,10 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrChar extends IrExpression {
+    class CharacterLiteral extends Expression {
       private final char value;
 
-      public IrChar(char value) {
+      public CharacterLiteral(char value) {
         this.value = value;
       }
 
@@ -394,7 +394,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrClass extends AbstractClassSymbol implements IrNode {
+    class ClassDefinition extends AbstractClassSymbol implements Node {
       private boolean isInterface;
       private int modifier;
       private String name;
@@ -415,7 +415,7 @@ public interface IxCode {
        * @param superClass super class
        * @param interfaces super interfaces
        */
-      public IrClass(boolean isInterface, int modifier, String name, ClassSymbol superClass, ClassSymbol[] interfaces) {
+      public ClassDefinition(boolean isInterface, int modifier, String name, ClassSymbol superClass, ClassSymbol[] interfaces) {
         this.isInterface = isInterface;
         this.modifier = modifier;
         this.name = name;
@@ -430,8 +430,8 @@ public interface IxCode {
        * @param interfaces
        * @return
        */
-      public static IrClass newInterface(int modifier, String name, ClassSymbol[] interfaces){
-        return new IrClass(true, modifier, name, null, interfaces);
+      public static ClassDefinition newInterface(int modifier, String name, ClassSymbol[] interfaces){
+        return new ClassDefinition(true, modifier, name, null, interfaces);
       }
 
       /**
@@ -442,8 +442,8 @@ public interface IxCode {
        * @param interfaces
        * @return
        */
-      public static IrClass newClass(int modifier, String name, ClassSymbol superClass, ClassSymbol[] interfaces){
-        return new IrClass(false, modifier, name, superClass, interfaces);
+      public static ClassDefinition newClass(int modifier, String name, ClassSymbol superClass, ClassSymbol[] interfaces){
+        return new ClassDefinition(false, modifier, name, superClass, interfaces);
       }
 
       /**
@@ -452,8 +452,8 @@ public interface IxCode {
        * @param name
        * @return
        */
-      public static IrClass newClass(int modifier, String name) {
-        return new IrClass(false, modifier, name, null, null);
+      public static ClassDefinition newClass(int modifier, String name) {
+        return new ClassDefinition(false, modifier, name, null, null);
       }
 
       public boolean isInterface() {
@@ -513,7 +513,7 @@ public interface IxCode {
       }
 
       public void addDefaultConstructor() {
-        constructors.add(IrConstructor.newDefaultConstructor(this));
+        constructors.add(ConstructorDefinition.newDefaultConstructor(this));
       }
 
       public MethodSymbol[] getMethods() {
@@ -541,13 +541,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrClosure extends IrExpression {
+    class NewClosure extends Expression {
       private ClassSymbol type;
       private MethodSymbol method;
-      private IrStatement block;
+      private ActionStatement block;
       private LocalFrame frame;
 
-      public IrClosure(ClassSymbol type, MethodSymbol method, IrStatement block) {
+      public NewClosure(ClassSymbol type, MethodSymbol method, ActionStatement block) {
         this.type =  type;
         this.method = method;
         this.block = block;
@@ -577,7 +577,7 @@ public interface IxCode {
         return method.getReturnType();
       }
 
-      public IrStatement getBlock() {
+      public ActionStatement getBlock() {
         return block;
       }
 
@@ -598,17 +598,17 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrConstructor implements IrNode, ConstructorSymbol {
+    class ConstructorDefinition implements Node, ConstructorSymbol {
       private int modifier;
       private ClassSymbol classType;
       private TypeRef[] arguments;
-      private IrBlock block;
-      private IrSuper superInitializer;
+      private StatementBlock block;
+      private Super superInitializer;
       private LocalFrame frame;
 
-      public IrConstructor(
+      public ConstructorDefinition(
         int modifier, ClassSymbol classType,
-        TypeRef[] arguments, IrBlock block, IrSuper superInitializer
+        TypeRef[] arguments, StatementBlock block, Super superInitializer
       ) {
         this.modifier = modifier;
         this.classType = classType;
@@ -617,10 +617,10 @@ public interface IxCode {
         this.superInitializer = superInitializer;
       }
 
-      public static IrConstructor newDefaultConstructor(ClassSymbol type) {
-        IrBlock block = new IrBlock(new IrReturn(null));
-        IrSuper init = new IrSuper(type.getSuperClass(), new TypeRef[0], new IrExpression[0]);
-        IrConstructor node =  new IrConstructor(Modifier.PUBLIC, type, new TypeRef[0], block, init);
+      public static ConstructorDefinition newDefaultConstructor(ClassSymbol type) {
+        StatementBlock block = new StatementBlock(new Return(null));
+        Super init = new Super(type.getSuperClass(), new TypeRef[0], new Expression[0]);
+        ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
         node.setFrame(new LocalFrame(null));
         return node;
       }
@@ -641,19 +641,19 @@ public interface IxCode {
         return modifier;
       }
 
-      public IrSuper getSuperInitializer() {
+      public Super getSuperInitializer() {
         return superInitializer;
       }
 
-      public void setSuperInitializer(IrSuper superInitializer) {
+      public void setSuperInitializer(Super superInitializer) {
         this.superInitializer = superInitializer;
       }
 
-      public void setBlock(IrBlock block) {
+      public void setBlock(StatementBlock block) {
         this.block = block;
       }
 
-      public IrBlock getBlock() {
+      public StatementBlock getBlock() {
         return block;
       }
 
@@ -670,18 +670,18 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrContinue implements IrStatement {
-      public IrContinue(){}
+    class Continue implements ActionStatement {
+      public Continue(){}
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrDouble extends IrExpression {
+    class DoubleLiteral extends Expression {
       private final double value;
 
-      public IrDouble(double value) {
+      public DoubleLiteral(double value) {
         this.value = value;
       }
 
@@ -698,8 +698,8 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    abstract class IrExpression implements IrNode {
-      public IrExpression() {}
+    abstract class Expression implements Node {
+      public Expression() {}
 
       public abstract TypeRef type();
 
@@ -719,16 +719,16 @@ public interface IxCode {
 
       public boolean isReferenceType(){ return type().isObjectType(); }
 
-      public static IrExpression defaultValue(TypeRef type){
-        if(type == BasicTypeRef.CHAR) return new IrChar((char)0);
-        if(type == BasicTypeRef.BYTE)return new IrByte((byte)0);
-        if(type == BasicTypeRef.SHORT) return new IrShort((short)0);
-        if(type == BasicTypeRef.INT) return new IrInt(0);
-        if(type == BasicTypeRef.LONG) return new IrLong(0);
-        if(type == BasicTypeRef.FLOAT) return new IrFloat(0.0f);
-        if(type == BasicTypeRef.DOUBLE) return new IrDouble(0.0);
-        if(type == BasicTypeRef.BOOLEAN) return new IrBool(false);
-        if(type.isObjectType()) return new IrNull();
+      public static Expression defaultValue(TypeRef type){
+        if(type == BasicTypeRef.CHAR) return new CharacterLiteral((char)0);
+        if(type == BasicTypeRef.BYTE)return new ByteLiteral((byte)0);
+        if(type == BasicTypeRef.SHORT) return new ShortLiteral((short)0);
+        if(type == BasicTypeRef.INT) return new IntLiteral(0);
+        if(type == BasicTypeRef.LONG) return new LongLiteral(0);
+        if(type == BasicTypeRef.FLOAT) return new FloatLiteral(0.0f);
+        if(type == BasicTypeRef.DOUBLE) return new DoubleLiteral(0.0);
+        if(type == BasicTypeRef.BOOLEAN) return new BoolLiteral(false);
+        if(type.isObjectType()) return new NullLiteral();
         return null;
       }
     }
@@ -737,9 +737,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrExpStmt implements IrStatement {
-      public IrExpression expression;
-      public IrExpStmt(IrExpression expression){
+    class ExpressionStatement implements ActionStatement {
+      public Expression expression;
+      public ExpressionStatement(Expression expression){
         this.expression = expression;
       }
     }
@@ -748,14 +748,14 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrField implements IrNode, FieldSymbol {
+    class FieldDefinition implements Node, FieldSymbol {
 
       private int modifier;
       private ClassSymbol classType;
       private String name;
       private TypeRef type;
 
-      public IrField(
+      public FieldDefinition(
         int modifier, ClassSymbol classType, String name, TypeRef type) {
         this.modifier = modifier;
         this.classType = classType;
@@ -785,11 +785,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrFieldRef extends IrExpression {
-      public IrExpression target;
+    class FieldRef extends Expression {
+      public Expression target;
       public FieldSymbol field;
 
-      public IrFieldRef(IrExpression target, FieldSymbol field) {
+      public FieldRef(Expression target, FieldSymbol field) {
         this.target = target;
         this.field = field;
       }
@@ -801,13 +801,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrFieldSet extends IrExpression {
-      private final IrExpression object;
+    class FieldSet extends Expression {
+      private final Expression object;
       private final FieldSymbol field;
-      private final IrExpression value;
+      private final Expression value;
 
-      public IrFieldSet(
-        IrExpression target, FieldSymbol field, IrExpression value
+      public FieldSet(
+        Expression target, FieldSymbol field, Expression value
       ) {
         this.object = target;
         this.field = field;
@@ -816,21 +816,21 @@ public interface IxCode {
 
       public TypeRef type() { return field.getType(); }
 
-      public IrExpression getObject() { return object; }
+      public Expression getObject() { return object; }
 
       public FieldSymbol getField() { return field; }
 
-      public IrExpression getValue() { return value; }
+      public Expression getValue() { return value; }
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrFloat extends IrExpression {
+    class FloatLiteral extends Expression {
       private final float value;
 
-      public IrFloat(float value){
+      public FloatLiteral(float value){
         this.value = value;
       }
 
@@ -843,27 +843,27 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrIf implements IrStatement{
-      private final IrExpression condition;
-      private final IrStatement thenStatement, elseStatement;
+    class IfStatement implements ActionStatement {
+      private final Expression condition;
+      private final ActionStatement thenStatement, elseStatement;
 
-      public IrIf(
-        IrExpression condition,
-        IrStatement thenStatement, IrStatement elseStatement){
+      public IfStatement(
+        Expression condition,
+        ActionStatement thenStatement, ActionStatement elseStatement){
         this.condition = condition;
         this.thenStatement = thenStatement;
         this.elseStatement = elseStatement;
       }
 
-      public IrExpression getCondition() {
+      public Expression getCondition() {
         return condition;
       }
 
-      public IrStatement getThenStatement() {
+      public ActionStatement getThenStatement() {
         return thenStatement;
       }
 
-      public IrStatement getElseStatement() {
+      public ActionStatement getElseStatement() {
         return elseStatement;
       }
     }
@@ -872,11 +872,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrInstanceOf extends IrExpression {
-      public IrExpression target;
+    class InstanceOf extends Expression {
+      public Expression target;
       public TypeRef checked;
 
-      public IrInstanceOf(IrExpression target, TypeRef checked){
+      public InstanceOf(Expression target, TypeRef checked){
         this.target = target;
         this.checked = checked;
       }
@@ -885,7 +885,7 @@ public interface IxCode {
         return checked;
       }
 
-      public IrExpression getTarget() {
+      public Expression getTarget() {
         return target;
       }
 
@@ -896,9 +896,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrInt extends IrExpression {
+    class IntLiteral extends Expression {
       private int value;
-      public IrInt(int value){
+      public IntLiteral(int value){
         this.value = value;
       }
       public int getValue() {
@@ -912,16 +912,16 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class IrList extends IrExpression {
-      private final IrExpression[] elements;
+    class ListLiteral extends Expression {
+      private final Expression[] elements;
       private final TypeRef type;
 
-      public IrList(IrExpression[] elements, TypeRef type) {
+      public ListLiteral(Expression[] elements, TypeRef type) {
         this.elements = elements;
         this.type = type;
       }
 
-      public IrExpression[] getElements() {
+      public Expression[] getElements() {
         return elements;
       }
 
@@ -934,18 +934,18 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrLocalRef extends IrExpression {
+    class LocalRef extends Expression {
       private int frame;
       private int index;
       private TypeRef type;
 
-      public IrLocalRef(ClosureLocalBinding bind) {
+      public LocalRef(ClosureLocalBinding bind) {
         this.frame = bind.getFrame();
         this.index = bind.getIndex();
         this.type = bind.getType();
       }
 
-      public IrLocalRef(int frame, int index, TypeRef type){
+      public LocalRef(int frame, int index, TypeRef type){
         this.frame = frame;
         this.index = index;
         this.type = type;
@@ -962,20 +962,20 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrLocalSet extends IrExpression {
+    class LocalSet extends Expression {
       private final int frame;
       private final int index;
-      private final IrExpression value;
+      private final Expression value;
       private final TypeRef type;
 
-      public IrLocalSet(int frame, int index, TypeRef type, IrExpression value){
+      public LocalSet(int frame, int index, TypeRef type, Expression value){
         this.frame = frame;
         this.index = index;
         this.value = value;
         this.type = type;
       }
 
-      public IrLocalSet(ClosureLocalBinding bind, IrExpression value){
+      public LocalSet(ClosureLocalBinding bind, Expression value){
         this.frame = bind.getFrame();
         this.index = bind.getIndex();
         this.type = bind.getType();
@@ -990,7 +990,7 @@ public interface IxCode {
         return index;
       }
 
-      public IrExpression getValue() {
+      public Expression getValue() {
         return value;
       }
 
@@ -1001,10 +1001,10 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrLong extends IrExpression {
+    class LongLiteral extends Expression {
       private final long value;
 
-      public IrLong(long value){
+      public LongLiteral(long value){
         this.value = value;
       }
 
@@ -1017,11 +1017,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrLoop implements IrStatement {
-      public final IrExpression condition;
-      public final IrStatement stmt;
+    class ConditionalLoop implements ActionStatement {
+      public final Expression condition;
+      public final ActionStatement stmt;
 
-      public IrLoop(IrExpression condition, IrStatement stmt) {
+      public ConditionalLoop(Expression condition, ActionStatement stmt) {
         this.condition = condition;
         this.stmt = stmt;
       }
@@ -1031,11 +1031,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrMember implements IrNode{
+    class Member implements Node {
       private final int modifier;
       private final TypeRef classType;
 
-      public IrMember(int modifier, TypeRef classType){
+      public Member(int modifier, TypeRef classType){
         this.modifier = modifier;
         this.classType = classType;
       }
@@ -1053,19 +1053,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrMethod implements IrNode, MethodSymbol {
+    class MethodDefinition implements Node, MethodSymbol {
       private int modifier;
       private ClassSymbol classType;
       private String name;
       private TypeRef[] arguments;
-      private IrBlock block;
+      private StatementBlock block;
       private TypeRef returnType;
       private boolean closure;
       private LocalFrame frame;
 
-      public IrMethod(
+      public MethodDefinition(
         int modifier, ClassSymbol classType, String name, TypeRef[] arguments,
-        TypeRef returnType, IrBlock block){
+        TypeRef returnType, StatementBlock block){
         this.modifier = modifier;
         this.classType = classType;
         this.name = name;
@@ -1094,11 +1094,11 @@ public interface IxCode {
         return returnType;
       }
 
-      public IrBlock getBlock() {
+      public StatementBlock getBlock() {
         return block;
       }
 
-      public void setBlock(IrBlock block){
+      public void setBlock(StatementBlock block){
         this.block = block;
       }
 
@@ -1123,11 +1123,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class IrNew extends IrExpression {
+    class NewObject extends Expression {
       public final ConstructorSymbol constructor;
-      public final IrExpression[] parameters;
+      public final Expression[] parameters;
 
-      public IrNew(ConstructorSymbol constructor, IrExpression[] parameters){
+      public NewObject(ConstructorSymbol constructor, Expression[] parameters){
         this.constructor = constructor;
         this.parameters = parameters;
       }
@@ -1135,11 +1135,11 @@ public interface IxCode {
       public TypeRef type() { return constructor.getClassType(); }
     }
 
-    class IrNewArray extends IrExpression {
+    class NewArray extends Expression {
       public final ArraySymbol arrayType;
-      public final IrExpression[] parameters;
+      public final Expression[] parameters;
 
-      public IrNewArray(ArraySymbol arrayType, IrExpression[] parameters){
+      public NewArray(ArraySymbol arrayType, Expression[] parameters){
         this.arrayType = arrayType;
         this.parameters = parameters;
       }
@@ -1152,23 +1152,23 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface IrNode {
+    interface Node {
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrNOP implements IrStatement {
-      public IrNOP() {}
+    class NOP implements ActionStatement {
+      public NOP() {}
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrNull extends IrExpression {
-      public IrNull(){}
+    class NullLiteral extends Expression {
+      public NullLiteral(){}
 
       public TypeRef type() { return NullTypeRef.NULL; }
     }
@@ -1177,10 +1177,10 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrReturn implements IrStatement {
-      public final IrExpression expression;
+    class Return implements ActionStatement {
+      public final Expression expression;
 
-      public IrReturn(IrExpression expression) {
+      public Return(Expression expression) {
         this.expression = expression;
       }
     }
@@ -1189,9 +1189,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrShort extends IrExpression {
+    class ShortLiteral extends Expression {
       private short value;
-      public IrShort(short value){
+      public ShortLiteral(short value){
         this.value = value;
       }
       public short getValue() {
@@ -1205,7 +1205,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface IrStatement {
+    interface ActionStatement {
 
     }
 
@@ -1213,11 +1213,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrStaticFieldRef extends IrExpression {
+    class StaticFieldRef extends Expression {
       public ClassSymbol target;
       public FieldSymbol field;
 
-      public IrStaticFieldRef(ClassSymbol target, FieldSymbol field){
+      public StaticFieldRef(ClassSymbol target, FieldSymbol field){
         this.target = target;
         this.field = field;
       }
@@ -1229,13 +1229,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrStaticFieldSet extends IrExpression {
+    class StaticFieldSet extends Expression {
       public ObjectTypeRef target;
       public FieldSymbol field;
-      public IrExpression value;
+      public Expression value;
 
-      public IrStaticFieldSet(
-        ObjectTypeRef target, FieldSymbol field, IrExpression value){
+      public StaticFieldSet(
+        ObjectTypeRef target, FieldSymbol field, Expression value){
         this.target = target;
         this.field = field;
         this.value = value;
@@ -1248,11 +1248,11 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrString extends IrExpression {
+    class StringLiteral extends Expression {
       public String value;
       public TypeRef type;
 
-      public IrString(String value, TypeRef type){
+      public StringLiteral(String value, TypeRef type){
         this.value = value;
         this.type = type;
       }
@@ -1266,13 +1266,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrSuper implements IrNode {
+    class Super implements Node {
       private ClassSymbol classType;
       private TypeRef[] arguments;
-      private IrExpression[] expressions;
+      private Expression[] expressions;
 
-      public IrSuper(
-        ClassSymbol classType, TypeRef[] arguments, IrExpression[] expressions){
+      public Super(
+        ClassSymbol classType, TypeRef[] arguments, Expression[] expressions){
         this.classType = classType;
         this.arguments = arguments;
         this.expressions = expressions;
@@ -1286,7 +1286,7 @@ public interface IxCode {
         return arguments;
       }
 
-      public IrExpression[] getExpressions() {
+      public Expression[] getExpressions() {
         return expressions;
       }
 
@@ -1296,10 +1296,10 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrSynchronized implements IrStatement {
-      public IrExpression expression;
-      public IrStatement statement;
-      public IrSynchronized(IrExpression expression, IrStatement statement){
+    class Synchronized implements ActionStatement {
+      public Expression expression;
+      public ActionStatement statement;
+      public Synchronized(Expression expression, ActionStatement statement){
         this.expression = expression;
         this.statement = statement;
       }
@@ -1309,10 +1309,10 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrThis extends IrExpression {
+    class This extends Expression {
       private ClassSymbol classType;
 
-      public IrThis(ClassSymbol classType){
+      public This(ClassSymbol classType){
         this.classType = classType;
       }
 
@@ -1323,9 +1323,9 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrThrow implements IrStatement {
-      public IrExpression expression;
-      public IrThrow(IrExpression expression){
+    class Throw implements ActionStatement {
+      public Expression expression;
+      public Throw(Expression expression){
         this.expression = expression;
       }
     }
@@ -1334,13 +1334,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class IrTry implements IrStatement {
-      public IrStatement tryStatement;
+    class Try implements ActionStatement {
+      public ActionStatement tryStatement;
       public ClosureLocalBinding[] catchTypes;
-      public IrStatement[] catchStatements;
-      public IrTry(
-        IrStatement tryStatement, ClosureLocalBinding[] catchTypes,
-        IrStatement[] catchStatements){
+      public ActionStatement[] catchStatements;
+      public Try(
+        ActionStatement tryStatement, ClosureLocalBinding[] catchTypes,
+        ActionStatement[] catchStatements){
         this.tryStatement = tryStatement;
         this.catchTypes = catchTypes;
         this.catchStatements = catchStatements;
@@ -1351,7 +1351,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class IrUnaryExp extends IrExpression {
+    class UnaryExpression extends Expression {
       public interface Constants {
           int PLUS = 0;
           int MINUS = 1;
@@ -1360,11 +1360,11 @@ public interface IxCode {
       }
 
       private int kind;
-      private IrExpression operand;
+      private Expression operand;
       private TypeRef type;
 
-      public IrUnaryExp(
-        int kind, TypeRef type, IrExpression operand) {
+      public UnaryExpression(
+        int kind, TypeRef type, Expression operand) {
         this.kind = kind;
         this.operand = operand;
         this.type = type;
@@ -1374,7 +1374,7 @@ public interface IxCode {
         return kind;
       }
 
-      public IrExpression getOperand(){
+      public Expression getOperand(){
         return operand;
       }
 
@@ -1392,7 +1392,7 @@ public interface IxCode {
         constructorFinder = new ConstructorFinder();
       }
 
-      public ConstructorSymbol[] findConstructor(IrExpression[] params){
+      public ConstructorSymbol[] findConstructor(Expression[] params){
         return constructorFinder.find(this, params);
       }
 
@@ -1422,7 +1422,7 @@ public interface IxCode {
         return fieldFinder.find(this, name);
       }
 
-      public MethodSymbol[] findMethod(String name, IrExpression[] params) {
+      public MethodSymbol[] findMethod(String name, Expression[] params) {
         return methodFinder.find(this, name, params);
       }
 
@@ -1583,7 +1583,7 @@ public interface IxCode {
      */
     interface ClassSymbol extends ObjectTypeRef {
       ConstructorSymbol[] getConstructors();
-      ConstructorSymbol[] findConstructor(IrExpression[] params);
+      ConstructorSymbol[] findConstructor(Expression[] params);
     }
 
     /**
@@ -1610,7 +1610,7 @@ public interface IxCode {
         this.matcher = new StandardParameterMatcher();
       }
 
-      public ConstructorSymbol[] find(ClassSymbol target, IrExpression[] args){
+      public ConstructorSymbol[] find(ClassSymbol target, Expression[] args){
         Set constructors = new TreeSet(new ConstructorSymbolComparator());
         find(constructors, target, args);
         List selected = new ArrayList();
@@ -1631,7 +1631,7 @@ public interface IxCode {
         return sorter.compare(constructor1, constructor2) >= 0;
       }
 
-      private void find(Set constructors, ClassSymbol target, IrExpression[] arguments){
+      private void find(Set constructors, ClassSymbol target, Expression[] arguments){
         if(target == null) return;
         ConstructorSymbol[] cs = target.getConstructors();
         for(int i = 0; i < cs.length; i++){
@@ -1775,7 +1775,7 @@ public interface IxCode {
         this.matcher = new StandardParameterMatcher();
       }
 
-      public MethodSymbol[] find(ObjectTypeRef target, String name, IrExpression[] arguments){
+      public MethodSymbol[] find(ObjectTypeRef target, String name, Expression[] arguments){
         Set methods = new TreeSet(new MethodSymbolComparator());
         find(methods, target, name, arguments);
         List selectedMethods = new ArrayList();
@@ -1797,7 +1797,7 @@ public interface IxCode {
       }
 
       private void find(
-        Set methods, ObjectTypeRef target, String name, IrExpression[] params){
+        Set methods, ObjectTypeRef target, String name, Expression[] params){
         if(target == null) return;
         MethodSymbol[] ms = target.getMethods();
         for(int i = 0; i < ms.length; i++){
@@ -1914,7 +1914,7 @@ public interface IxCode {
       MethodSymbol[] getMethods();
       FieldSymbol[] getFields();
       FieldSymbol findField(String name);
-      MethodSymbol[] findMethod(String name, IrExpression[] params);
+      MethodSymbol[] findMethod(String name, Expression[] params);
     }
 
     /**
@@ -1922,7 +1922,7 @@ public interface IxCode {
      * Date: 2005/06/30
      */
     interface ParameterMatcher {
-      public boolean matches(TypeRef[] arguments, IrExpression[] parameters);
+      public boolean matches(TypeRef[] arguments, Expression[] parameters);
     }
 
     /**
@@ -1933,12 +1933,12 @@ public interface IxCode {
       public StandardParameterMatcher() {
       }
 
-      public boolean matches(TypeRef[] arguments, IrExpression[] parameters){
+      public boolean matches(TypeRef[] arguments, Expression[] parameters){
         return matchesSub(arguments, parameters);
       }
 
       private static boolean matchesSub(
-        TypeRef[] arguments, IrExpression[] parameters){
+        TypeRef[] arguments, Expression[] parameters){
         if(arguments.length != parameters.length) return false;
         TypeRef[] parameterTypes = new TypeRef[parameters.length];
         for(int i = 0; i < parameters.length; i++){

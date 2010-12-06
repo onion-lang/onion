@@ -1560,19 +1560,15 @@ public class CodeAnalysis {
     }
     
     IxCode.MethodRef findMethod(AstNode ast, IxCode.ObjectTypeRef type, String name) {
-      IxCode.Expression[] params = new IxCode.Expression[0];
+      return findMethod(ast, type, name, new IxCode.Expression[0]);
+    }
+    
+    IxCode.MethodRef findMethod(AstNode ast, IxCode.ObjectTypeRef type, String name, IxCode.Expression[] params) {
       IxCode.MethodRef[] methods = type.findMethod(name, params);
       if(methods.length == 0){
         report(METHOD_NOT_FOUND, ast,  type, name, types(params));
         return null;
       }
-      return methods[0];
-    }
-    
-    IxCode.MethodRef findMethod(
-      AstNode ast, IxCode.ObjectTypeRef type, String name, IxCode.Expression[] params
-    ) {
-      IxCode.MethodRef[] methods = type.findMethod(name, params);
       return methods[0];
     }
     

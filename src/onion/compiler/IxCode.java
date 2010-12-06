@@ -192,32 +192,26 @@ public interface IxCode {
       }
 
       private final int kind;
-      private final Expression left, right;
+      private final Expression lhs, rhs;
       private final TypeRef type;
 
-      public BinaryExpression(int kind, TypeRef type, Expression left, Expression right) {
-        this(null, kind, type, left, right);
+      public BinaryExpression(int kind, TypeRef type, Expression lhs, Expression rhs) {
+        this(null, kind, type, lhs, rhs);
       }
       
-      public BinaryExpression(Location location, int kind, TypeRef type, Expression left, Expression right) {
+      public BinaryExpression(Location location, int kind, TypeRef type, Expression lhs, Expression rhs) {
         super(location);
         this.kind = kind;
-        this.left = left;
-        this.right = right;
+        this.lhs = lhs;
+        this.rhs = rhs;
         this.type = type;
       }
 
-      public Expression getLeft(){
-        return left;
-      }
+      public Expression lhs(){ return lhs; }
 
-      public Expression getRight(){
-        return right;
-      }
+      public Expression rhs(){ return rhs; }
 
-      public int getKind(){
-        return kind;
-      }
+      public int kind(){ return kind; }
 
       public TypeRef type(){ return type; }
     }

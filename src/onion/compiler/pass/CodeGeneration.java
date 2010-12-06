@@ -795,18 +795,18 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   public InstructionHandle codeBinaryExpression(
     IxCode.BinaryExpression node, CodeProxy code
   ){
-    if(node.getKind() == LOGICAL_AND){
+    if(node.kind() == LOGICAL_AND){
       return codeLogicalAnd(node, code);
-    }else if(node.getKind() == LOGICAL_OR){
+    }else if(node.kind() == LOGICAL_OR){
       return codeLogicalOr(node, code);
-    }else if(node.getKind() == ELVIS){
+    }else if(node.kind() == ELVIS){
       return codeElvis(node, code);
     }
-    IxCode.Expression left = node.getLeft();
-    IxCode.Expression right = node.getRight();
+    IxCode.Expression left = node.lhs();
+    IxCode.Expression right = node.rhs();
     InstructionHandle start = codeExpression(left, code);
     codeExpression(right, code);
-    switch (node.getKind()) {
+    switch (node.kind()) {
       case ADD: add(code, left.type()); break;
       case SUBTRACT: sub(code, left.type()); break;
       case MULTIPLY: mul(code, left.type()); break;
@@ -860,11 +860,11 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
   
   public InstructionHandle codeLogicalAnd(IxCode.BinaryExpression node, CodeProxy code) {
-    InstructionHandle start = codeExpression(node.getLeft(), code);
+    InstructionHandle start = codeExpression(node.lhs(), code);
     BranchHandle b1 = null, b2 = null, b3 = null;
     
     b1 = code.append(new IFEQ(null));
-    codeExpression(node.getRight(), code);
+    codeExpression(node.rhs(), code);
     b2 = code.append(new IFEQ(null));
     code.append(InstructionConstants.ICONST_1);
     b3 = code.append(new GOTO(null));
@@ -876,10 +876,10 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
 
   public InstructionHandle codeLogicalOr(IxCode.BinaryExpression node, CodeProxy code) {
-    InstructionHandle start = codeExpression(node.getLeft(), code);
+    InstructionHandle start = codeExpression(node.lhs(), code);
     BranchHandle b1 = null, b2 = null, b3 = null;
     b1 = code.append(new IFNE(null));
-    codeExpression(node.getRight(), code);
+    codeExpression(node.rhs(), code);
     b2 = code.append(new IFNE(null));
     code.append(InstructionConstants.ICONST_0);
     b3 = code.append(new GOTO(null));
@@ -891,13 +891,13 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
   }
   
   public InstructionHandle codeElvis(IxCode.BinaryExpression node, CodeProxy code) {
-    InstructionHandle start = codeExpression(node.getLeft(), code);
+    InstructionHandle start = codeExpression(node.lhs(), code);
     code.appendDup(1);
     code.appendNull(typeOf(node.type()));
     BranchHandle b1 = code.append(new IF_ACMPEQ(null));
     BranchHandle b2 = code.append(new GOTO(null));
     b1.setTarget(code.appendPop(1));
-    codeExpression(node.getRight(), code);
+    codeExpression(node.rhs(), code);
     b2.setTarget(code.append(new NOP()));
     return start;
   }

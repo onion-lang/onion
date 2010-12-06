@@ -26,33 +26,33 @@ public class NameResolution {
   }
     
   public IxCode.TypeRef resolve(TypeSpec specifier) {
-    IxCode.TypeRef componentType = resolveMain(specifier.getComponent());
+    RawTypeNode component = specifier.getComponent();
+    String name = component.name();
+    IxCode.TypeRef resolvedType;
+    if(component.getKind() == RawTypeNode.BASIC){
+      resolvedType =
+        name.equals("char") ? IxCode.BasicTypeRef.CHAR :
+        name.equals("byte") ? IxCode.BasicTypeRef.BYTE :
+        name.equals("short") ? IxCode.BasicTypeRef.SHORT :
+        name.equals("int") ? IxCode.BasicTypeRef.INT :
+        name.equals("long") ? IxCode.BasicTypeRef.LONG :
+        name.equals("float") ? IxCode.BasicTypeRef.FLOAT :
+        name.equals("double") ? IxCode.BasicTypeRef.DOUBLE :
+        name.equals("boolean") ? IxCode.BasicTypeRef.BOOLEAN :
+                                  IxCode.BasicTypeRef.VOID;
+    }else if(component.getKind() == RawTypeNode.NOT_QUALIFIED){
+      resolvedType = forName(name, false);
+    }else{
+      resolvedType = forName(name, true);
+    }
+    IxCode.TypeRef componentType = resolvedType;
     if(specifier.getDimension() > 0){
       return table.loadArray(componentType, specifier.getDimension());
     }else{
       return componentType;
     }
   }
-    
-  private IxCode.TypeRef resolveMain(RawTypeNode component) {
-    String name = component.name();
-    if(component.getKind() == RawTypeNode.BASIC){
-      if(name.equals("char")) return IxCode.BasicTypeRef.CHAR;
-      if(name.equals("byte")) return IxCode.BasicTypeRef.BYTE;
-      if(name.equals("short")) return IxCode.BasicTypeRef.SHORT;
-      if(name.equals("int")) return IxCode.BasicTypeRef.INT;
-      if(name.equals("long")) return IxCode.BasicTypeRef.LONG;
-      if(name.equals("float")) return IxCode.BasicTypeRef.FLOAT;
-      if(name.equals("double")) return IxCode.BasicTypeRef.DOUBLE;
-      if(name.equals("boolean")) return IxCode.BasicTypeRef.BOOLEAN;
-      return IxCode.BasicTypeRef.VOID;
-    }else if(component.getKind() == RawTypeNode.NOT_QUALIFIED){
-      return forName(name, false);
-    }else{
-      return forName(name, true);
-    }
-  }
-  
+
   private IxCode.ClassTypeRef forName(String name, boolean qualified) {
     if(qualified) {
       return table.load(name);

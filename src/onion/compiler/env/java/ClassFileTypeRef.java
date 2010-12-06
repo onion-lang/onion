@@ -10,9 +10,7 @@ package onion.compiler.env.java;
 import java.util.ArrayList;
 import java.util.List;
 
-import onion.compiler.ClassTable;
-import onion.compiler.IxCode;
-import onion.compiler.OnionTypeBridge;
+import onion.compiler.*;
 import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;
@@ -28,9 +26,9 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
   private JavaClass javaClass;
   private ClassTable table;  
   private int modifier;
-  private IxCode.MethodRef[] methods;
-  private IxCode.FieldRef[] fields;
-  private IxCode.ConstructorRef[] constructors;
+  private MultiTable<IxCode.MethodRef> methods;
+  private OrderedTable<IxCode.FieldRef> fields;
+  private List<IxCode.ConstructorRef> constructors;
   private OnionTypeBridge bridge;
   
   public ClassFileTypeRef(JavaClass javaClass, ClassTable table) {
@@ -70,24 +68,51 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
   }
   
   public IxCode.MethodRef[] methods() {
-    if(methods == null){
-      setMethods(javaClass.getMethods());
-    }
-    return (IxCode.MethodRef[]) methods.clone();
+    requireMethodTable();
+    return methods.values().toArray(new IxCode.MethodRef[0]);
   }
-  
-  public IxCode.FieldRef[] fields() {
-    if(fields == null){
-      setFields(javaClass.getFields());
+
+  public IxCode.MethodRef[] methods(String name) {
+    requireMethodTable();
+    return methods.get(name).toArray(new IxCode.MethodRef[0]);
+  }
+
+  private void requireMethodTable() {
+    if(methods != null){
+      methods = new MultiTable<IxCode.MethodRef>();
+      for(Method method:javaClass.getMethods()){
+        if(!method.getName().equals(CONSTRUCTOR_NAME)) methods.add(translate(method));
+      }
     }
-    return (IxCode.FieldRef[]) fields.clone();
+  }
+
+  public IxCode.FieldRef[] fields() {
+    requireFieldTable();
+    return fields.values().toArray(new IxCode.FieldRef[0]);
+  }
+
+  public IxCode.FieldRef field(String name) {
+    requireFieldTable();
+    return fields.get(name);
+  }
+
+  private void requireFieldTable() {
+    if(fields == null){
+      fields = new OrderedTable<IxCode.FieldRef>();
+      for(Field field:javaClass.getFields()) {
+        fields.add(translate(field));
+      }
+    }
   }
   
   public IxCode.ConstructorRef[] constructors() {
     if(constructors == null){
-      setConstructors(javaClass.getMethods());
+      constructors = new ArrayList<IxCode.ConstructorRef>();
+      for(Method method:javaClass.getMethods()) {
+        constructors.add(translateConstructor(method));
+      }
     }
-    return (IxCode.ConstructorRef[]) constructors.clone();
+    return constructors.toArray(new IxCode.ConstructorRef[0]);
   }
 
   private static int toOnionModifier(int src){
@@ -106,36 +131,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     return (modifier & flag) != 0;
   }
   
-  private void setMethods(Method[] methods){
-    List symbols = new ArrayList();
-    for(int i = 0; i < methods.length; i++){
-      if(!methods[i].getName().equals(CONSTRUCTOR_NAME)){
-        symbols.add(convertMethod(methods[i]));
-      }
-    }
-    this.methods = (IxCode.MethodRef[])symbols.toArray(new IxCode.MethodRef[0]);
-  }
-  
-  private void setFields(Field[] fields){
-    IxCode.FieldRef[] refs = new IxCode.FieldRef[fields.length];
-    for(int i = 0; i < fields.length; i++){
-      refs[i] = convertField(fields[i]);
-    }
-    this.fields = refs;
-  }
-  
-  private void setConstructors(Method[] methods){
-    List symbols = new ArrayList();
-    for(int i = 0; i < methods.length; i++){
-      if(methods[i].getName().equals(CONSTRUCTOR_NAME)){
-        symbols.add(convertConstructor(methods[i]));
-      }
-    }
-    this.constructors = 
-      (IxCode.ConstructorRef[]) symbols.toArray(new IxCode.ConstructorRef[0]);
-  }
-  
-  private IxCode.MethodRef convertMethod(Method method){
+  private IxCode.MethodRef translate(Method method){
     Type[] arguments = method.getArgumentTypes();
     IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
@@ -147,14 +143,14 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
       this, method.getName(), argumentSymbols, returnSymbol);
   }
   
-  private IxCode.FieldRef convertField(Field field){
+  private IxCode.FieldRef translate(Field field){
     IxCode.TypeRef symbol = bridge.toOnionType(field.getType());
     return new ClassFileFieldRef(
       toOnionModifier(field.getModifiers()), 
       this, field.getName(), symbol);
   }
   
-  private IxCode.ConstructorRef convertConstructor(Method method){
+  private IxCode.ConstructorRef translateConstructor(Method method){
     Type[] arguments = method.getArgumentTypes();
     IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {

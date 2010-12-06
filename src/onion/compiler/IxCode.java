@@ -1695,8 +1695,16 @@ public interface IxCode {
         return superClass.methods();
       }
 
+      public MethodRef[] methods(String name) {
+        return superClass.methods(name);
+      }
+
       public FieldRef[] fields() {
         return superClass.fields();
+      }
+
+      public FieldRef field(String name) {
+        return superClass.field(name);
       }
 
       public String name() {
@@ -2087,8 +2095,9 @@ public interface IxCode {
       ClassTypeRef getSuperClass();
       ClassTypeRef[] getInterfaces();
       MethodRef[] methods();
+      MethodRef[] methods(String name);
       FieldRef[] fields();
-      FieldRef findField(String name);
+      FieldRef field(String name);
       MethodRef[] findMethod(String name, Expression[] params);
     }
 

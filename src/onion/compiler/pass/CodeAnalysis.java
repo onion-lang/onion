@@ -40,8 +40,8 @@ public class CodeAnalysis {
   private Map<String, NameResolution> solvers;
   
   private CompilationUnit unit;
-  private StaticImportList staticImport;
-  private ImportList currentImport;
+  private StaticImportList staticImportedList;
+  private ImportList importedList;
   private IxCode.ClassDefinition contextClass;
   private NameResolution solver;
   private int access;
@@ -136,10 +136,10 @@ public class CodeAnalysis {
     public ClassTableBuilder() {
     }
     
-    public void process(CompilationUnit unit){
-      CodeAnalysis.this.unit = unit;
-      ModuleDeclaration module = unit.getModuleDeclaration();
-      ImportListDeclaration imports = unit.getImportListDeclaration();
+    public void process(CompilationUnit compilationUnit){
+      unit = compilationUnit;
+      ModuleDeclaration module = compilationUnit.getModuleDeclaration();
+      ImportListDeclaration imports = compilationUnit.getImportListDeclaration();
       String moduleName = module != null ? module.getName() : null;
       ImportList list = new ImportList();
       list.add(new ImportItem("*", "java.lang.*"));
@@ -158,25 +158,23 @@ public class CodeAnalysis {
       staticList.add(new StaticImportItem("java.lang.System", true));
       staticList.add(new StaticImportItem("java.lang.Runtime", true));
       staticList.add(new StaticImportItem("java.lang.Math", true));
-
-      currentImport = list;
-      staticImport = staticList;
+      importedList = list;
+      staticImportedList = staticList;
       int count = 0;
-      for(TopLevelElement top:unit.getTopLevels()) {
+      for(TopLevelElement top:compilationUnit.getTopLevels()) {
         if(top instanceof TypeDeclaration){
           accept(top, moduleName);
         }else {
           count++;
         }
       }
-      ClassTable table = CodeAnalysis.this.table;
       if(count > 0){
         IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
-        node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
+        node.setSourceFile(Paths.nameOf(compilationUnit.getSourceFileName()));
         node.setResolutionComplete(true);
         table.classes().add(node);
         node.addDefaultConstructor();
-        put(unit, node);
+        put(compilationUnit, node);
         addSolver(node.name(), new NameResolution(list));
       }
     }
@@ -191,7 +189,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameResolution(currentImport));
+      addSolver(node.name(), new NameResolution(importedList));
       return null;    
     }
     
@@ -206,7 +204,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameResolution(currentImport) );
+      addSolver(node.name(), new NameResolution(importedList) );
       return null;
     }
     

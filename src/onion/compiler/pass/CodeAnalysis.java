@@ -28,6 +28,8 @@ import onion.compiler.util.Systems;
 import onion.lang.syntax.*;
 import onion.lang.syntax.visitor.ASTVisitor;
 import static onion.compiler.SemanticErrorReporter.Constants.*;
+import static onion.compiler.IxCode.BinaryExpression.Constants.*;
+import static onion.compiler.IxCode.UnaryExpression.Constants.*;
 
 public class CodeAnalysis {
   private SemanticErrorReporter reporter;
@@ -817,8 +819,7 @@ public class CodeAnalysis {
     }
   }
   
-  private class TypeChecker extends ASTVisitor<LocalContext> 
-  implements IxCode.BinaryExpression.Constants, IxCode.UnaryExpression.Constants {
+  private class TypeChecker extends ASTVisitor<LocalContext>  {
     public TypeChecker(){
     }
     

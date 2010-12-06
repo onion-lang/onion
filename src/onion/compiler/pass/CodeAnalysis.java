@@ -1635,7 +1635,7 @@ public class CodeAnalysis {
     
     private IxCode.FieldRef findField(IxCode.ObjectTypeRef target, String name) {
       if(target == null) return null;
-      IxCode.FieldRef[] fields = target.getFields();
+      IxCode.FieldRef[] fields = target.fields();
       for (int i = 0; i < fields.length; i++) {
         if(fields[i].name().equals(name)){
           return fields[i];
@@ -1817,7 +1817,7 @@ public class CodeAnalysis {
           return null;
         }
         if(error) return null;
-        IxCode.MethodRef[] methods = type.getMethods();
+        IxCode.MethodRef[] methods = type.methods();
         IxCode.MethodRef method = null;
         for(int i = 0; i < methods.length; i++){
           IxCode.TypeRef[] types = methods[i].arguments();

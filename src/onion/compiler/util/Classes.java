@@ -27,7 +27,7 @@ public class Classes {
   }
   
   private static void collectInterfaceMethods(IxCode.ClassTypeRef type, Set set){
-    IxCode.MethodRef[] methods = type.getMethods();
+    IxCode.MethodRef[] methods = type.methods();
     for(int i = 0; i < methods.length; i++){
       set.add(methods[i]);
     }

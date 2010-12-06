@@ -119,11 +119,11 @@ public class CodeGeneration  {
     for (int i = 0; i < constructors.length; i++) {
       codeConstructor(gen, ((IxCode.ConstructorDefinition) constructors[i]));
     }
-    IxCode.MethodRef[] methods = node.getMethods();
+    IxCode.MethodRef[] methods = node.methods();
     for (int i = 0; i < methods.length; i++) {
       codeMethod(gen, ((IxCode.MethodDefinition) methods[i]));
     }
-    IxCode.FieldRef[] fields = node.getFields();
+    IxCode.FieldRef[] fields = node.fields();
     for (int i = 0; i < fields.length; i++) {
       codeField(gen, ((IxCode.FieldDefinition) fields[i]));
     }

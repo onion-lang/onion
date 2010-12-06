@@ -69,14 +69,14 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     return interfaces;
   }
   
-  public IxCode.MethodRef[] getMethods() {
+  public IxCode.MethodRef[] methods() {
     if(methods == null){
       setMethods(javaClass.getMethods());
     }
     return (IxCode.MethodRef[]) methods.clone();
   }
   
-  public IxCode.FieldRef[] getFields() {
+  public IxCode.FieldRef[] fields() {
     if(fields == null){
       setFields(javaClass.getFields());
     }

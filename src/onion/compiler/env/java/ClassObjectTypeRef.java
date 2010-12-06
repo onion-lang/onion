@@ -70,14 +70,14 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
     return interfaceSyms;
   }
   
-  public IxCode.MethodRef[] getMethods() {
+  public IxCode.MethodRef[] methods() {
     if(methods == null){
       setMethods(klass.getMethods());
     }
     return (IxCode.MethodRef[]) methods.clone();
   }
   
-  public IxCode.FieldRef[] getFields() {
+  public IxCode.FieldRef[] fields() {
     if(fields == null){
       setFields(klass.getFields());
     }

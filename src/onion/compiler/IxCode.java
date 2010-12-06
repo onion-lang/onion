@@ -579,11 +579,11 @@ public interface IxCode {
       constructors.add(ConstructorDefinition.newDefaultConstructor(this));
     }
 
-    public MethodRef[] getMethods() {
+    public MethodRef[] methods() {
       return ((MethodRef[])methods.toArray(new MethodRef[0]));
     }
 
-    public FieldRef[] getFields() {
+    public FieldRef[] fields() {
       return ((FieldRef[])fields.toArray(new FieldRef[0]));
     }
 
@@ -1694,12 +1694,12 @@ public interface IxCode {
         return interfaces;
       }
 
-      public MethodRef[] getMethods() {
-        return superClass.getMethods();
+      public MethodRef[] methods() {
+        return superClass.methods();
       }
 
-      public FieldRef[] getFields() {
-        return superClass.getFields();
+      public FieldRef[] fields() {
+        return superClass.fields();
       }
 
       public String name() {
@@ -1899,7 +1899,7 @@ public interface IxCode {
 
       public FieldRef find(ObjectTypeRef target, String name){
         if(target == null) return null;
-        FieldRef[] fields = target.getFields();
+        FieldRef[] fields = target.fields();
         for (int i = 0; i < fields.length; i++) {
           if(fields[i].name().equals(name)){
             return fields[i];
@@ -1999,7 +1999,7 @@ public interface IxCode {
       private void find(
         Set methods, ObjectTypeRef target, String name, Expression[] params){
         if(target == null) return;
-        MethodRef[] ms = target.getMethods();
+        MethodRef[] ms = target.methods();
         for(int i = 0; i < ms.length; i++){
           MethodRef m = ms[i];
           if(m.name().equals(name) && matcher.matches(m.arguments(), params)){
@@ -2111,8 +2111,8 @@ public interface IxCode {
       int getModifier();
       ClassTypeRef getSuperClass();
       ClassTypeRef[] getInterfaces();
-      MethodRef[] getMethods();
-      FieldRef[] getFields();
+      MethodRef[] methods();
+      FieldRef[] fields();
       FieldRef findField(String name);
       MethodRef[] findMethod(String name, Expression[] params);
     }

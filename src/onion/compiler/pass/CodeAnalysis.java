@@ -2514,7 +2514,7 @@ public class CodeAnalysis {
     }
 
     public IxCode.TypeRef map(TypeSpec specifier) {
-      RawTypeNode component = specifier.getComponent();
+      RawTypeNode component = specifier.component();
       String name = component.name();
       IxCode.TypeRef mappedType;
       if(component.kind() == RawTypeNode.BASIC){
@@ -2533,8 +2533,8 @@ public class CodeAnalysis {
       }else{
         mappedType = forName(name, true);
       }
-      if(specifier.getDimension() > 0){
-        mappedType = table.loadArray(mappedType, specifier.getDimension());
+      if(specifier.dimension() > 0){
+        mappedType = table.loadArray(mappedType, specifier.dimension());
       }
       return mappedType;
     }

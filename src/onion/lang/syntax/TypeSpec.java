@@ -18,11 +18,8 @@ import onion.lang.syntax.visitor.ASTVisitor;
  * 
  */
 public class TypeSpec extends AstNode {
-  
-  private RawTypeNode component;
-  
+  private final RawTypeNode component;
   private final int dimension;
-  
   private final TypeSpec[] typeArguments;
   
   public TypeSpec(RawTypeNode component, int dimension, TypeSpec[] typeArguments) {
@@ -31,15 +28,11 @@ public class TypeSpec extends AstNode {
     this.typeArguments = typeArguments;
   }
   
-  public int getSizeOfTypeArguments(){
-    return typeArguments.length;
+  public TypeSpec[] typeArguments() {
+    return typeArguments;
   }
   
-  public TypeSpec getTypeArgument(int index){
-    return typeArguments[index];
-  }
-
-  public RawTypeNode getComponent() {
+  public RawTypeNode component() {
     return component;
   }
   
@@ -47,16 +40,15 @@ public class TypeSpec extends AstNode {
     return component.name();
   }
   
-  public int getComponentKind(){
+  public int componentKind(){
     return component.kind();
   }
   
-  public int getDimension() {
+  public int dimension() {
     return dimension;
   }
   
   public Object accept(ASTVisitor visitor, Object context) {
     return visitor.visit(this, context);
   }
-  
 }

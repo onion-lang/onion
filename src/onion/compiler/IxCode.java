@@ -17,6 +17,14 @@ import java.util.*;
  */
 public interface IxCode {
     /**
+     * This interface represents an internal representation node of onion program.
+     * @author Kota Mizushima
+     * Date: 2005/04/17
+     */
+    interface Node {
+    }
+
+    /**
      * @author Kota Mizushima
      * Date: 2005/07/06
      */
@@ -24,6 +32,11 @@ public interface IxCode {
       private final Expression target;
 
       public ArrayLength(Expression target) {
+        this(null, target);
+      }
+
+      public ArrayLength(Location location, Expression target) {
+        super(location);
         this.target = target;
       }
 
@@ -44,6 +57,11 @@ public interface IxCode {
       private final Expression object, index;
 
       public ArrayRef(Expression target, Expression index) {
+        this(null, target, index);
+      }
+
+      public ArrayRef(Location location, Expression target, Expression index) {
+        super(location);
         this.object = target;
         this.index = index;
       }
@@ -68,9 +86,12 @@ public interface IxCode {
     class ArraySet extends Expression {
       private final Expression object, index, value;
 
-      public ArraySet(
-        Expression target, Expression index, Expression value
-      ) {
+      public ArraySet(Expression target, Expression index, Expression value) {
+        this(null, target, index, value);
+      }
+
+      public ArraySet(Location location, Expression target, Expression index, Expression value) {
+        super(location);
         this.object = target;
         this.index = index;
         this.value = value;
@@ -101,6 +122,11 @@ public interface IxCode {
       private final Expression[] expressions;
 
       public Begin(Expression[] expressions) {
+        this(null, expressions);
+      }
+
+      public Begin(Location location, Expression[] expressions) {
+        super(location);
         this.expressions = expressions;
       }
 
@@ -169,9 +195,12 @@ public interface IxCode {
       private final Expression left, right;
       private final TypeRef type;
 
-      public BinaryExpression(
-        int kind, TypeRef type, Expression left, Expression right
-      ) {
+      public BinaryExpression(int kind, TypeRef type, Expression left, Expression right) {
+        this(null, kind, type, left, right);
+      }
+      
+      public BinaryExpression(Location location, int kind, TypeRef type, Expression left, Expression right) {
+        super(location);
         this.kind = kind;
         this.left = left;
         this.right = right;
@@ -197,11 +226,16 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class StatementBlock implements ActionStatement {
+    class StatementBlock extends ActionStatement {
       private final ActionStatement[] statements;
 
-      public StatementBlock(ActionStatement[] statements) {
+      public StatementBlock(Location location, ActionStatement[] statements) {
+        super(location);
         this.statements = statements;
+      }
+
+      public StatementBlock(ActionStatement[] statements) {
+        this(null, statements);
       }
 
       public StatementBlock(List statements) {
@@ -232,8 +266,13 @@ public interface IxCode {
     class BoolLiteral extends Expression {
       private final boolean value;
 
-      public BoolLiteral(boolean value){
+      public BoolLiteral(Location location, boolean value){
+        super(location);
         this.value = value;
+      }
+      
+      public BoolLiteral(boolean value) {
+        this(null, value);
       }
 
       public boolean getValue() {
@@ -249,8 +288,13 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Break implements ActionStatement {
-      public Break() {}
+    class Break extends ActionStatement {
+      public Break() {
+        this(null);
+      }
+      public Break(Location location) {
+        super(location);
+      }
     }
 
     /**
@@ -260,8 +304,13 @@ public interface IxCode {
     class ByteLiteral extends Expression {
       private final byte value;
 
-      public ByteLiteral(byte value) {
+      public ByteLiteral(Location location, byte value) {
+        super(location);
         this.value = value;
+      }
+
+      public ByteLiteral(byte value) {
+        this(null, value);
       }
 
       public byte getValue() {
@@ -282,11 +331,15 @@ public interface IxCode {
       public final MethodRef method;
       public final Expression[] parameters;
 
-      public Call(
-        Expression target, MethodRef method, Expression[] parameters) {
+      public Call(Location location, Expression target, MethodRef method, Expression[] parameters) {
+        super(location);
         this.target = target;
         this.method = method;
         this.parameters = parameters;
+      }
+
+      public Call(Expression target, MethodRef method, Expression[] parameters) {
+        this(null, target, method, parameters);
       }
 
       public TypeRef type() { return method.returnType(); }
@@ -301,11 +354,15 @@ public interface IxCode {
       public MethodRef method;
       public Expression[] parameters;
 
-      public CallStatic(
-        ObjectTypeRef target, MethodRef method, Expression[] parameters) {
+      public CallStatic(Location location, ObjectTypeRef target, MethodRef method, Expression[] parameters) {
+        super(location);
         this.target = target;
         this.method = method;
         this.parameters = parameters;
+      }
+
+      public CallStatic(ObjectTypeRef target, MethodRef method, Expression[] parameters) {
+        this(null, target, method, parameters);
       }
 
       public TypeRef type() { return method.returnType(); }
@@ -320,10 +377,15 @@ public interface IxCode {
       private final MethodRef method;
       private final Expression[] params;
 
-      public CallSuper(Expression target, MethodRef method, Expression[] params) {
+      public CallSuper(Location location, Expression target, MethodRef method, Expression[] params) {
+        super(location);
         this.target = target;
         this.method = method;
         this.params = params;
+      }
+
+      public CallSuper(Expression target, MethodRef method, Expression[] params) {
+        this(null, target, method, params);
       }
 
       public TypeRef type() {
@@ -343,199 +405,670 @@ public interface IxCode {
       }
     }
 
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class AsInstanceOf extends Expression {
+    private final Expression target;
+    private final TypeRef conversion;
+
+    public AsInstanceOf(Location location, Expression target, TypeRef conversion) {
+      super(location);
+      this.target = target;
+      this.conversion = conversion;
+    }
+
+    public AsInstanceOf(Expression target, TypeRef conversion) {
+      this(null, target, conversion);
+    }
+
+    public TypeRef getConversion() {
+      return conversion;
+    }
+
+    public Expression getTarget() {
+      return target;
+    }
+
+    public TypeRef type() {
+      return conversion;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/17
+   */
+  class CharacterLiteral extends Expression {
+    private final char value;
+
+    public CharacterLiteral(Location location, char value) {
+      super(location);
+      this.value = value;
+    }
+
+    public CharacterLiteral(char value) {
+      this(null, value);
+    }
+
+    public char getValue() {
+      return value;
+    }
+
+    public TypeRef type() {
+      return BasicTypeRef.CHAR;
+    }
+  }
+
+  /**
+   * This class represents class or interface definitions of internal language.
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class ClassDefinition extends AbstractClassTypeRef implements Node {
+    private boolean isInterface;
+    private int modifier;
+    private String name;
+    private ClassTypeRef superClass;
+    private ClassTypeRef[] interfaces;
+    private List fields = new ArrayList();
+    private List methods = new ArrayList();
+    private List constructors = new ArrayList();
+    private boolean isResolutionComplete;
+    private boolean hasCyclicity;
+    private String sourceFile;
+
     /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
+     *
+     * @param isInterface indicates whether this class is interface or class
+     * @param modifier class modifier
+     * @param name class name. it cannot be null
+     * @param superClass super class
+     * @param interfaces super interfaces
      */
-    class AsInstanceOf extends Expression {
-      private final Expression target;
-      private final TypeRef conversion;
-
-      public AsInstanceOf(Expression target, TypeRef conversion) {
-        this.target = target;
-        this.conversion = conversion;
-      }
-
-      public TypeRef getConversion() {
-        return conversion;
-      }
-
-      public Expression getTarget() {
-        return target;
-      }
-
-      public TypeRef type() {
-        return conversion;
-      }
+    public ClassDefinition(boolean isInterface, int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces) {
+      this.isInterface = isInterface;
+      this.modifier = modifier;
+      this.name = name;
+      this.superClass = superClass;
+      this.interfaces = interfaces;
     }
 
     /**
-     * @author Kota Mizushima
-     * Date: 2005/06/17
+     * This method creates interface definition.
+     * @param modifier
+     * @param name
+     * @param interfaces
+     * @return
      */
-    class CharacterLiteral extends Expression {
-      private final char value;
-
-      public CharacterLiteral(char value) {
-        this.value = value;
-      }
-
-      public char getValue() {
-        return value;
-      }
-
-      public TypeRef type() {
-        return BasicTypeRef.CHAR;
-      }
+    public static ClassDefinition newInterface(int modifier, String name, ClassTypeRef[] interfaces){
+      return new ClassDefinition(true, modifier, name, null, interfaces);
     }
 
     /**
-     * This class represents class or interface definitions of internal language.
-     * @author Kota Mizushima
-     * Date: 2005/04/17
+     * This method creates class definition.
+     * @param modifier
+     * @param name
+     * @param superClass
+     * @param interfaces
+     * @return
      */
-    class ClassDefinition extends AbstractClassTypeRef implements Node {
-      private boolean isInterface;
-      private int modifier;
-      private String name;
-      private ClassTypeRef superClass;
-      private ClassTypeRef[] interfaces;
-      private List fields = new ArrayList();
-      private List methods = new ArrayList();
-      private List constructors = new ArrayList();
-      private boolean isResolutionComplete;
-      private boolean hasCyclicity;
-      private String sourceFile;
-
-      /**
-       *
-       * @param isInterface indicates whether this class is interface or class
-       * @param modifier class modifier
-       * @param name class name. it cannot be null
-       * @param superClass super class
-       * @param interfaces super interfaces
-       */
-      public ClassDefinition(boolean isInterface, int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces) {
-        this.isInterface = isInterface;
-        this.modifier = modifier;
-        this.name = name;
-        this.superClass = superClass;
-        this.interfaces = interfaces;
-      }
-
-      /**
-       * This method creates interface definition.
-       * @param modifier
-       * @param name
-       * @param interfaces
-       * @return
-       */
-      public static ClassDefinition newInterface(int modifier, String name, ClassTypeRef[] interfaces){
-        return new ClassDefinition(true, modifier, name, null, interfaces);
-      }
-
-      /**
-       * This method creates class definition.
-       * @param modifier
-       * @param name
-       * @param superClass
-       * @param interfaces
-       * @return
-       */
-      public static ClassDefinition newClass(int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces){
-        return new ClassDefinition(false, modifier, name, superClass, interfaces);
-      }
-
-      /**
-       * This method creates class definition.
-       * @param modifier
-       * @param name
-       * @return
-       */
-      public static ClassDefinition newClass(int modifier, String name) {
-        return new ClassDefinition(false, modifier, name, null, null);
-      }
-
-      public boolean isInterface() {
-        return isInterface;
-      }
-
-      public int getModifier() {
-        return modifier;
-      }
-
-      public void setModifier(int modifier) {
-        this.modifier = modifier;
-      }
-
-      public void setName(String name) {
-        this.name = name;
-      }
-
-      public String getName() {
-        return name;
-      }
-
-      public void setSuperClass(ClassTypeRef superClass) {
-        this.superClass = superClass;
-      }
-
-      public ClassTypeRef getSuperClass() {
-        return superClass;
-      }
-
-      public void setInterfaces(ClassTypeRef[] interfaces) {
-        this.interfaces = interfaces;
-      }
-
-      public ClassTypeRef[] getInterfaces() {
-        return interfaces;
-      }
-
-      public void setResolutionComplete(boolean isInResolution) {
-        this.isResolutionComplete = isInResolution;
-      }
-
-      public boolean isResolutionComplete() {
-        return isResolutionComplete;
-      }
-
-      public void addMethod(MethodRef method) {
-        methods.add(method);
-      }
-
-      public void addField(FieldRef field) {
-        fields.add(field);
-      }
-
-      public void addConstructor(ConstructorRef constructor) {
-        constructors.add(constructor);
-      }
-
-      public void addDefaultConstructor() {
-        constructors.add(ConstructorDefinition.newDefaultConstructor(this));
-      }
-
-      public MethodRef[] getMethods() {
-        return ((MethodRef[])methods.toArray(new MethodRef[0]));
-      }
-
-      public FieldRef[] getFields() {
-        return ((FieldRef[])fields.toArray(new FieldRef[0]));
-      }
-
-      public ConstructorRef[] getConstructors() {
-        return ((ConstructorRef[]) constructors.toArray(new ConstructorRef[0]));
-      }
-
-      public void setSourceFile(String sourceFile) {
-        this.sourceFile = sourceFile;
-      }
-
-      public String getSourceFile(){
-        return sourceFile;
-      }
+    public static ClassDefinition newClass(int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces){
+      return new ClassDefinition(false, modifier, name, superClass, interfaces);
     }
+
+    /**
+     * This method creates class definition.
+     * @param modifier
+     * @param name
+     * @return
+     */
+    public static ClassDefinition newClass(int modifier, String name) {
+      return new ClassDefinition(false, modifier, name, null, null);
+    }
+
+    public boolean isInterface() {
+      return isInterface;
+    }
+
+    public int getModifier() {
+      return modifier;
+    }
+
+    public void setModifier(int modifier) {
+      this.modifier = modifier;
+    }
+
+    public void setName(String name) {
+      this.name = name;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public void setSuperClass(ClassTypeRef superClass) {
+      this.superClass = superClass;
+    }
+
+    public ClassTypeRef getSuperClass() {
+      return superClass;
+    }
+
+    public void setInterfaces(ClassTypeRef[] interfaces) {
+      this.interfaces = interfaces;
+    }
+
+    public ClassTypeRef[] getInterfaces() {
+      return interfaces;
+    }
+
+    public void setResolutionComplete(boolean isInResolution) {
+      this.isResolutionComplete = isInResolution;
+    }
+
+    public boolean isResolutionComplete() {
+      return isResolutionComplete;
+    }
+
+    public void addMethod(MethodRef method) {
+      methods.add(method);
+    }
+
+    public void addField(FieldRef field) {
+      fields.add(field);
+    }
+
+    public void addConstructor(ConstructorRef constructor) {
+      constructors.add(constructor);
+    }
+
+    public void addDefaultConstructor() {
+      constructors.add(ConstructorDefinition.newDefaultConstructor(this));
+    }
+
+    public MethodRef[] getMethods() {
+      return ((MethodRef[])methods.toArray(new MethodRef[0]));
+    }
+
+    public FieldRef[] getFields() {
+      return ((FieldRef[])fields.toArray(new FieldRef[0]));
+    }
+
+    public ConstructorRef[] getConstructors() {
+      return ((ConstructorRef[]) constructors.toArray(new ConstructorRef[0]));
+    }
+
+    public void setSourceFile(String sourceFile) {
+      this.sourceFile = sourceFile;
+    }
+
+    public String getSourceFile(){
+      return sourceFile;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class ConstructorDefinition implements Node, ConstructorRef {
+    private int modifier;
+    private ClassTypeRef classType;
+    private TypeRef[] arguments;
+    private StatementBlock block;
+    private Super superInitializer;
+    private LocalFrame frame;
+
+    public ConstructorDefinition(
+      int modifier, ClassTypeRef classType,
+      TypeRef[] arguments, StatementBlock block, Super superInitializer
+    ) {
+      this.modifier = modifier;
+      this.classType = classType;
+      this.arguments = arguments;
+      this.block = block;
+      this.superInitializer = superInitializer;
+    }
+
+    public static ConstructorDefinition newDefaultConstructor(ClassTypeRef type) {
+      StatementBlock block = new StatementBlock(new Return(null));
+      Super init = new Super(type.getSuperClass(), new TypeRef[0], new Expression[0]);
+      ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
+      node.setFrame(new LocalFrame(null));
+      return node;
+    }
+
+    public String name() {
+      return "new";
+    }
+
+    public TypeRef[] getArgs() {
+      return arguments;
+    }
+
+    public ClassTypeRef affiliation() {
+      return classType;
+    }
+
+    public int modifier() {
+      return modifier;
+    }
+
+    public Super getSuperInitializer() {
+      return superInitializer;
+    }
+
+    public void setSuperInitializer(Super superInitializer) {
+      this.superInitializer = superInitializer;
+    }
+
+    public void setBlock(StatementBlock block) {
+      this.block = block;
+    }
+
+    public StatementBlock getBlock() {
+      return block;
+    }
+
+    public void setFrame(LocalFrame frame) {
+      this.frame = frame;
+    }
+
+    public LocalFrame getFrame() {
+      return frame;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/17
+   */
+  class Continue extends ActionStatement {
+    public Continue(Location location){
+      super(location);
+    }
+    public Continue(){
+      this(null);
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/17
+   */
+  class DoubleLiteral extends Expression {
+    private final double value;
+
+    public DoubleLiteral(Location location, double value) {
+      super(location);
+      this.value = value;
+    }
+
+    public DoubleLiteral(double value) {
+      this(null, value);
+    }
+
+    public double getValue() {
+      return value;
+    }
+
+    public TypeRef type() {
+      return BasicTypeRef.DOUBLE;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  abstract class Expression implements Node {
+    private final Location location;
+    public Expression(Location location) {
+      this.location = location;
+    }
+
+    public abstract TypeRef type();
+
+    public Location location(){
+      return location;
+    }
+
+    public boolean isBasicType(){
+      return type().isBasicType();
+    }
+
+    public boolean isArrayType() {
+      return type().isArrayType();
+    }
+
+    public boolean isClassType() {
+      return type().isClassType();
+    }
+
+    public boolean isNullType() { return type().isNullType(); }
+
+    public boolean isReferenceType(){ return type().isObjectType(); }
+
+    public static Expression defaultValue(TypeRef type){
+      if(type == BasicTypeRef.CHAR) return new CharacterLiteral((char)0);
+      if(type == BasicTypeRef.BYTE)return new ByteLiteral((byte)0);
+      if(type == BasicTypeRef.SHORT) return new ShortLiteral((short)0);
+      if(type == BasicTypeRef.INT) return new IntLiteral(0);
+      if(type == BasicTypeRef.LONG) return new LongLiteral(0);
+      if(type == BasicTypeRef.FLOAT) return new FloatLiteral(0.0f);
+      if(type == BasicTypeRef.DOUBLE) return new DoubleLiteral(0.0);
+      if(type == BasicTypeRef.BOOLEAN) return new BoolLiteral(false);
+      if(type.isObjectType()) return new NullLiteral();
+      return null;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/17
+   */
+  class ExpressionStatement extends ActionStatement {
+    public final Expression expression;
+    public ExpressionStatement(Location location, Expression expression){
+      super(location);
+      this.expression = expression;
+    }
+    public ExpressionStatement(Expression expression){
+      this(null, expression);
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class FieldDefinition implements Node, FieldRef {
+
+    private int modifier;
+    private ClassTypeRef classType;
+    private String name;
+    private TypeRef type;
+
+    public FieldDefinition(
+      int modifier, ClassTypeRef classType, String name, TypeRef type) {
+      this.modifier = modifier;
+      this.classType = classType;
+      this.name = name;
+      this.type = type;
+    }
+
+    public ClassTypeRef affiliation() {
+      return classType;
+    }
+
+    public int modifier() {
+      return modifier;
+    }
+
+    public String name() {
+      return name;
+    }
+
+    public TypeRef getType() {
+      return type;
+    }
+
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class RefField extends Expression {
+    public Expression target;
+    public FieldRef field;
+
+    public RefField(Location location, Expression target, FieldRef field) {
+      super(location);
+      this.target = target;
+      this.field = field;
+    }
+
+    public RefField(Expression target, FieldRef field) {
+      this(null, target, field);
+    }
+
+    public TypeRef type() { return field.getType(); }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class SetField extends Expression {
+    private final Expression object;
+    private final FieldRef field;
+    private final Expression value;
+
+    public SetField(Location location, Expression target, FieldRef field, Expression value) {
+      super(location);
+      this.object = target;
+      this.field = field;
+      this.value = value;
+    }
+
+    public SetField(Expression target, FieldRef field, Expression value) {
+      this(null, target, field, value);
+    }
+
+    public TypeRef type() { return field.getType(); }
+
+    public Expression getObject() { return object; }
+
+    public FieldRef getField() { return field; }
+
+    public Expression getValue() { return value; }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/17
+   */
+  class FloatLiteral extends Expression {
+    private final float value;
+
+    public FloatLiteral(Location location, float value){
+      super(location);
+      this.value = value;
+    }
+
+    public FloatLiteral(float value){
+      this(null, value);
+    }
+
+    public float getValue() { return value; }
+
+    public TypeRef type() { return BasicTypeRef.FLOAT; }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class IfStatement extends ActionStatement {
+    private final Expression condition;
+    private final ActionStatement thenStatement, elseStatement;
+
+    public IfStatement(Location location, Expression condition, ActionStatement thenStatement, ActionStatement elseStatement){
+      super(location);
+      this.condition = condition;
+      this.thenStatement = thenStatement;
+      this.elseStatement = elseStatement;
+    }
+
+    public IfStatement(Expression condition, ActionStatement thenStatement, ActionStatement elseStatement){
+      this(null, condition, thenStatement, elseStatement);
+    }
+
+    public Expression getCondition() {
+      return condition;
+    }
+
+    public ActionStatement getThenStatement() {
+      return thenStatement;
+    }
+
+    public ActionStatement getElseStatement() {
+      return elseStatement;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class InstanceOf extends Expression {
+    public Expression target;
+    public TypeRef checked;
+
+    public InstanceOf(Location location, Expression target, TypeRef checked){
+      super(location);
+      this.target = target;
+      this.checked = checked;
+    }
+
+    public InstanceOf(Expression target, TypeRef checked) {
+      this(null, target, checked);
+    }
+
+    public TypeRef getCheckType() {
+      return checked;
+    }
+
+    public Expression getTarget() {
+      return target;
+    }
+
+    public TypeRef type() { return BasicTypeRef.BOOLEAN; }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/17
+   */
+  class IntLiteral extends Expression {
+    private int value;
+    public IntLiteral(Location location, int value){
+      super(location);
+      this.value = value;
+    }
+    public IntLiteral(int value){
+      this(null, value);
+    }
+    public int getValue() {
+      return value;
+    }
+
+    public TypeRef type() { return BasicTypeRef.INT; }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/21
+   */
+  class ListLiteral extends Expression {
+    private final Expression[] elements;
+    private final TypeRef type;
+
+    public ListLiteral(Location location, Expression[] elements, TypeRef type) {
+      super(location);
+      this.elements = elements;
+      this.type = type;
+    }
+
+    public ListLiteral(Expression[] elements, TypeRef type) {
+      this(null, elements, type);
+    }
+
+    public Expression[] getElements() {
+      return elements;
+    }
+
+    public TypeRef type() {
+      return type;
+    }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class RefLocal extends Expression {
+    private int frame;
+    private int index;
+    private TypeRef type;
+
+    public RefLocal(Location location, int frame, int index, TypeRef type){
+      super(location);
+      this.frame = frame;
+      this.index = index;
+      this.type = type;
+    }
+
+    public RefLocal(ClosureLocalBinding bind) {
+      this(null, bind.getFrame(), bind.getIndex(), bind.getType());
+    }
+
+    public RefLocal(int frame, int index, TypeRef type) {
+      this(null, frame, index, type);
+    }
+
+    public int frame(){ return frame; }
+
+    public int index(){ return index; }
+
+    public TypeRef type() { return type; }
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/04/17
+   */
+  class SetLocal extends Expression {
+    private final int frame;
+    private final int index;
+    private final Expression value;
+    private final TypeRef type;
+
+    public SetLocal(Location location, int frame, int index, TypeRef type, Expression value){
+      super(location);
+      this.frame = frame;
+      this.index = index;
+      this.type = type;
+      this.value = value;
+    }
+
+    public SetLocal(int frame, int index, TypeRef type, Expression value){
+      this(null, frame, index, type, value);
+    }
+
+    public SetLocal(ClosureLocalBinding bind, Expression value){
+      this(null, bind.getFrame(), bind.getIndex(), bind.getType(), value);
+    }
+
+    public int getFrame() {
+      return frame;
+    }
+
+    public int getIndex() {
+      return index;
+    }
+
+    public TypeRef type() {
+      return type;
+    }
+
+    public Expression getValue() {
+      return value;
+    }
+  }
 
     /**
      * @author Kota Mizushima
@@ -547,10 +1080,15 @@ public interface IxCode {
       private ActionStatement block;
       private LocalFrame frame;
 
-      public NewClosure(ClassTypeRef type, MethodRef method, ActionStatement block) {
+      public NewClosure(Location location, ClassTypeRef type, MethodRef method, ActionStatement block) {
+        super(location);
         this.type =  type;
         this.method = method;
         this.block = block;
+      }
+
+      public NewClosure(ClassTypeRef type, MethodRef method, ActionStatement block) {
+        this(null, type, method, block);
       }
 
       public int getModifier() {
@@ -596,416 +1134,18 @@ public interface IxCode {
 
     /**
      * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class ConstructorDefinition implements Node, ConstructorRef {
-      private int modifier;
-      private ClassTypeRef classType;
-      private TypeRef[] arguments;
-      private StatementBlock block;
-      private Super superInitializer;
-      private LocalFrame frame;
-
-      public ConstructorDefinition(
-        int modifier, ClassTypeRef classType,
-        TypeRef[] arguments, StatementBlock block, Super superInitializer
-      ) {
-        this.modifier = modifier;
-        this.classType = classType;
-        this.arguments = arguments;
-        this.block = block;
-        this.superInitializer = superInitializer;
-      }
-
-      public static ConstructorDefinition newDefaultConstructor(ClassTypeRef type) {
-        StatementBlock block = new StatementBlock(new Return(null));
-        Super init = new Super(type.getSuperClass(), new TypeRef[0], new Expression[0]);
-        ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
-        node.setFrame(new LocalFrame(null));
-        return node;
-      }
-
-      public String name() {
-        return "new";
-      }
-
-      public TypeRef[] getArgs() {
-        return arguments;
-      }
-
-      public ClassTypeRef affiliation() {
-        return classType;
-      }
-
-      public int modifier() {
-        return modifier;
-      }
-
-      public Super getSuperInitializer() {
-        return superInitializer;
-      }
-
-      public void setSuperInitializer(Super superInitializer) {
-        this.superInitializer = superInitializer;
-      }
-
-      public void setBlock(StatementBlock block) {
-        this.block = block;
-      }
-
-      public StatementBlock getBlock() {
-        return block;
-      }
-
-      public void setFrame(LocalFrame frame) {
-        this.frame = frame;
-      }
-
-      public LocalFrame getFrame() {
-        return frame;
-      }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/06/17
-     */
-    class Continue implements ActionStatement {
-      public Continue(){}
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/06/17
-     */
-    class DoubleLiteral extends Expression {
-      private final double value;
-
-      public DoubleLiteral(double value) {
-        this.value = value;
-      }
-
-      public double getValue() {
-        return value;
-      }
-
-      public TypeRef type() {
-        return BasicTypeRef.DOUBLE;
-      }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    abstract class Expression implements Node {
-      public Expression() {}
-
-      public abstract TypeRef type();
-
-      public boolean isBasicType(){
-        return type().isBasicType();
-      }
-
-      public boolean isArrayType() {
-        return type().isArrayType();
-      }
-
-      public boolean isClassType() {
-        return type().isClassType();
-      }
-
-      public boolean isNullType() { return type().isNullType(); }
-
-      public boolean isReferenceType(){ return type().isObjectType(); }
-
-      public static Expression defaultValue(TypeRef type){
-        if(type == BasicTypeRef.CHAR) return new CharacterLiteral((char)0);
-        if(type == BasicTypeRef.BYTE)return new ByteLiteral((byte)0);
-        if(type == BasicTypeRef.SHORT) return new ShortLiteral((short)0);
-        if(type == BasicTypeRef.INT) return new IntLiteral(0);
-        if(type == BasicTypeRef.LONG) return new LongLiteral(0);
-        if(type == BasicTypeRef.FLOAT) return new FloatLiteral(0.0f);
-        if(type == BasicTypeRef.DOUBLE) return new DoubleLiteral(0.0);
-        if(type == BasicTypeRef.BOOLEAN) return new BoolLiteral(false);
-        if(type.isObjectType()) return new NullLiteral();
-        return null;
-      }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/06/17
-     */
-    class ExpressionStatement implements ActionStatement {
-      public Expression expression;
-      public ExpressionStatement(Expression expression){
-        this.expression = expression;
-      }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class FieldDefinition implements Node, FieldRef {
-
-      private int modifier;
-      private ClassTypeRef classType;
-      private String name;
-      private TypeRef type;
-
-      public FieldDefinition(
-        int modifier, ClassTypeRef classType, String name, TypeRef type) {
-        this.modifier = modifier;
-        this.classType = classType;
-        this.name = name;
-        this.type = type;
-      }
-
-      public ClassTypeRef affiliation() {
-        return classType;
-      }
-
-      public int modifier() {
-        return modifier;
-      }
-
-      public String name() {
-        return name;
-      }
-
-      public TypeRef getType() {
-        return type;
-      }
-
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class RefField extends Expression {
-      public Expression target;
-      public FieldRef field;
-
-      public RefField(Expression target, FieldRef field) {
-        this.target = target;
-        this.field = field;
-      }
-
-      public TypeRef type() { return field.getType(); }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class SetField extends Expression {
-      private final Expression object;
-      private final FieldRef field;
-      private final Expression value;
-
-      public SetField(
-        Expression target, FieldRef field, Expression value
-      ) {
-        this.object = target;
-        this.field = field;
-        this.value = value;
-      }
-
-      public TypeRef type() { return field.getType(); }
-
-      public Expression getObject() { return object; }
-
-      public FieldRef getField() { return field; }
-
-      public Expression getValue() { return value; }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/06/17
-     */
-    class FloatLiteral extends Expression {
-      private final float value;
-
-      public FloatLiteral(float value){
-        this.value = value;
-      }
-
-      public float getValue() { return value; }
-
-      public TypeRef type() { return BasicTypeRef.FLOAT; }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class IfStatement implements ActionStatement {
-      private final Expression condition;
-      private final ActionStatement thenStatement, elseStatement;
-
-      public IfStatement(
-        Expression condition,
-        ActionStatement thenStatement, ActionStatement elseStatement){
-        this.condition = condition;
-        this.thenStatement = thenStatement;
-        this.elseStatement = elseStatement;
-      }
-
-      public Expression getCondition() {
-        return condition;
-      }
-
-      public ActionStatement getThenStatement() {
-        return thenStatement;
-      }
-
-      public ActionStatement getElseStatement() {
-        return elseStatement;
-      }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class InstanceOf extends Expression {
-      public Expression target;
-      public TypeRef checked;
-
-      public InstanceOf(Expression target, TypeRef checked){
-        this.target = target;
-        this.checked = checked;
-      }
-
-      public TypeRef getCheckType() {
-        return checked;
-      }
-
-      public Expression getTarget() {
-        return target;
-      }
-
-      public TypeRef type() { return BasicTypeRef.BOOLEAN; }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/06/17
-     */
-    class IntLiteral extends Expression {
-      private int value;
-      public IntLiteral(int value){
-        this.value = value;
-      }
-      public int getValue() {
-        return value;
-      }
-
-      public TypeRef type() { return BasicTypeRef.INT; }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/06/21
-     */
-    class ListLiteral extends Expression {
-      private final Expression[] elements;
-      private final TypeRef type;
-
-      public ListLiteral(Expression[] elements, TypeRef type) {
-        this.elements = elements;
-        this.type = type;
-      }
-
-      public Expression[] getElements() {
-        return elements;
-      }
-
-      public TypeRef type() {
-        return type;
-      }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class RefLocal extends Expression {
-      private int frame;
-      private int index;
-      private TypeRef type;
-
-      public RefLocal(ClosureLocalBinding bind) {
-        this.frame = bind.getFrame();
-        this.index = bind.getIndex();
-        this.type = bind.getType();
-      }
-
-      public RefLocal(int frame, int index, TypeRef type){
-        this.frame = frame;
-        this.index = index;
-        this.type = type;
-      }
-
-      public int frame(){ return frame; }
-
-      public int index(){ return index; }
-
-      public TypeRef type() { return type; }
-    }
-
-    /**
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    class SetLocal extends Expression {
-      private final int frame;
-      private final int index;
-      private final Expression value;
-      private final TypeRef type;
-
-      public SetLocal(int frame, int index, TypeRef type, Expression value){
-        this.frame = frame;
-        this.index = index;
-        this.value = value;
-        this.type = type;
-      }
-
-      public SetLocal(ClosureLocalBinding bind, Expression value){
-        this.frame = bind.getFrame();
-        this.index = bind.getIndex();
-        this.type = bind.getType();
-        this.value = value;
-      }
-
-      public int getFrame() {
-        return frame;
-      }
-
-      public int getIndex() {
-        return index;
-      }
-
-      public Expression getValue() {
-        return value;
-      }
-
-      public TypeRef type() { return type; }
-    }
-
-    /**
-     * @author Kota Mizushima
      * Date: 2005/06/17
      */
     class LongLiteral extends Expression {
       private final long value;
 
-      public LongLiteral(long value){
+      public LongLiteral(Location location, long value){
+        super(location);
         this.value = value;
+      }
+
+      public LongLiteral(long value){
+        this(null, value);
       }
 
       public long getValue() { return value; }
@@ -1017,13 +1157,17 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class ConditionalLoop implements ActionStatement {
+    class ConditionalLoop extends ActionStatement {
       public final Expression condition;
       public final ActionStatement stmt;
 
-      public ConditionalLoop(Expression condition, ActionStatement stmt) {
+      public ConditionalLoop(Location location, Expression condition, ActionStatement stmt) {
+        super(location);
         this.condition = condition;
         this.stmt = stmt;
+      }
+      public ConditionalLoop(Expression condition, ActionStatement stmt) {
+        this(null, condition, stmt);
       }
     }
 
@@ -1127,9 +1271,14 @@ public interface IxCode {
       public final ConstructorRef constructor;
       public final Expression[] parameters;
 
-      public NewObject(ConstructorRef constructor, Expression[] parameters){
+      public NewObject(Location location, ConstructorRef constructor, Expression[] parameters){
+        super(location);
         this.constructor = constructor;
         this.parameters = parameters;
+      }
+
+      public NewObject(ConstructorRef constructor, Expression[] parameters){
+        this(null, constructor, parameters);
       }
 
       public TypeRef type() { return constructor.affiliation(); }
@@ -1139,28 +1288,31 @@ public interface IxCode {
       public final ArrayTypeRef arrayType;
       public final Expression[] parameters;
 
-      public NewArray(ArrayTypeRef arrayType, Expression[] parameters){
+      public NewArray(Location location, ArrayTypeRef arrayType, Expression[] parameters){
+        super(location);
         this.arrayType = arrayType;
         this.parameters = parameters;
+      }
+
+      public NewArray(ArrayTypeRef arrayType, Expression[] parameters){
+        this(null, arrayType, parameters);
       }
 
       public TypeRef type() { return arrayType; }
     }
 
-    /**
-     * This interface represents an internal representation node of onion program.
-     * @author Kota Mizushima
-     * Date: 2005/04/17
-     */
-    interface Node {
-    }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class NOP implements ActionStatement {
-      public NOP() {}
+    class NOP extends ActionStatement {
+      public NOP(Location location) {
+        super(location);
+      }
+      public NOP() {
+        this(null);
+      }
     }
 
     /**
@@ -1168,7 +1320,13 @@ public interface IxCode {
      * Date: 2005/06/17
      */
     class NullLiteral extends Expression {
-      public NullLiteral(){}
+      public NullLiteral(Location location){
+        super(location);
+      }
+
+      public NullLiteral(){
+        super(null);
+      }
 
       public TypeRef type() { return NullTypeRef.NULL; }
     }
@@ -1177,12 +1335,18 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class Return implements ActionStatement {
+    class Return extends ActionStatement {
       public final Expression expression;
 
-      public Return(Expression expression) {
+      public Return(Location location, Expression expression) {
+        super(location);
         this.expression = expression;
       }
+
+      public Return(Expression expression) {
+        this(null, expression);
+      }
+
     }
 
     /**
@@ -1191,9 +1355,15 @@ public interface IxCode {
      */
     class ShortLiteral extends Expression {
       private short value;
-      public ShortLiteral(short value){
+      public ShortLiteral(Location location, short value) {
+        super(location);
         this.value = value;
       }
+      
+      public ShortLiteral(short value){
+        this(null, value);
+      }
+
       public short getValue() {
         return value;
       }
@@ -1205,8 +1375,14 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface ActionStatement {
-
+    abstract class ActionStatement {
+      private final Location location;
+      public ActionStatement(Location location) {
+        this.location = location;
+      }
+      public Location location() {
+        return location;
+      }
     }
 
     /**
@@ -1217,9 +1393,14 @@ public interface IxCode {
       public ClassTypeRef target;
       public FieldRef field;
 
-      public StaticFieldRef(ClassTypeRef target, FieldRef field){
+      public StaticFieldRef(Location location, ClassTypeRef target, FieldRef field){
+        super(location);
         this.target = target;
         this.field = field;
+      }
+
+      public StaticFieldRef(ClassTypeRef target, FieldRef field){
+        this(null, target, field);
       }
 
       public TypeRef type() { return field.getType(); }
@@ -1234,11 +1415,15 @@ public interface IxCode {
       public FieldRef field;
       public Expression value;
 
-      public StaticFieldSet(
-        ObjectTypeRef target, FieldRef field, Expression value){
+      public StaticFieldSet(Location location, ObjectTypeRef target, FieldRef field, Expression value){
+        super(location);
         this.target = target;
         this.field = field;
         this.value = value;
+      }
+
+      public StaticFieldSet(ObjectTypeRef target, FieldRef field, Expression value){
+        this(null, target, field, value);
       }
 
       public TypeRef type() { return field.getType(); }
@@ -1252,9 +1437,14 @@ public interface IxCode {
       public String value;
       public TypeRef type;
 
-      public StringLiteral(String value, TypeRef type){
+      public StringLiteral(Location location, String value, TypeRef type){
+        super(location);
         this.value = value;
         this.type = type;
+      }
+
+      public StringLiteral(String value, TypeRef type){
+        this(null, value, type);
       }
 
       public String getValue() { return value; }
@@ -1296,12 +1486,16 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Synchronized implements ActionStatement {
-      public Expression expression;
-      public ActionStatement statement;
-      public Synchronized(Expression expression, ActionStatement statement){
+    class Synchronized extends ActionStatement {
+      public final Expression expression;
+      public final ActionStatement statement;
+      public Synchronized(Location location, Expression expression, ActionStatement statement){
+        super(location);
         this.expression = expression;
         this.statement = statement;
+      }
+      public Synchronized(Expression expression, ActionStatement statement){
+        this(null, expression, statement);
       }
     }
 
@@ -1310,40 +1504,51 @@ public interface IxCode {
      * Date: 2005/06/17
      */
     class This extends Expression {
-      private ClassTypeRef classType;
+      private final ClassTypeRef type;
+
+      public This(Location location, ClassTypeRef type){
+        super(location);
+        this.type = type;
+      }
 
       public This(ClassTypeRef classType){
-        this.classType = classType;
+        this(null, classType);
       }
 
-      public TypeRef type() { return classType; }
+      public TypeRef type() { return type; }
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Throw implements ActionStatement {
-      public Expression expression;
-      public Throw(Expression expression){
+    class Throw extends ActionStatement {
+      public final Expression expression;
+      public Throw(Location location, Expression expression){
+        super(location);
         this.expression = expression;
       }
+      public Throw(Expression expression){
+        this(null, expression);
+      }
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Try implements ActionStatement {
+    class Try extends ActionStatement {
       public ActionStatement tryStatement;
       public ClosureLocalBinding[] catchTypes;
       public ActionStatement[] catchStatements;
-      public Try(
-        ActionStatement tryStatement, ClosureLocalBinding[] catchTypes,
-        ActionStatement[] catchStatements){
+      public Try(Location location, ActionStatement tryStatement, ClosureLocalBinding[] catchTypes, ActionStatement[] catchStatements){
+        super(location);
         this.tryStatement = tryStatement;
         this.catchTypes = catchTypes;
         this.catchStatements = catchStatements;
+      }
+      public Try(ActionStatement tryStatement, ClosureLocalBinding[] catchTypes, ActionStatement[] catchStatements){
+        this(null, tryStatement, catchTypes, catchStatements);
       }
     }
 
@@ -1359,15 +1564,19 @@ public interface IxCode {
           int BIT_NOT = 3;
       }
 
-      private int kind;
-      private Expression operand;
-      private TypeRef type;
+      private final int kind;
+      private final Expression operand;
+      private final TypeRef type;
 
-      public UnaryExpression(
-        int kind, TypeRef type, Expression operand) {
+      public UnaryExpression(Location location, int kind, TypeRef type, Expression operand) {
+        super(location);
         this.kind = kind;
         this.operand = operand;
         this.type = type;
+      }
+
+      public UnaryExpression(int kind, TypeRef type, Expression operand) {
+        this(null, kind, type, operand);
       }
 
       public int getKind(){

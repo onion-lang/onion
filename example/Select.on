@@ -1,4 +1,4 @@
-random :int = Math::random() * 10;
+random = (Math::random() * 10)$int;
 
 select random {
 case 0, 1, 2, 3:

@@ -37,13 +37,13 @@ public class CodeAnalysis {
   private ClassTable table;
   private Map<IxCode.Node, AstNode> irt2ast;
   private Map<AstNode, IxCode.Node> ast2irt;
-  private Map<String, NameResolution> solvers;
+  private Map<String, NameMapper> mappers;
   
   private CompilationUnit unit;
   private StaticImportList staticImportedList;
   private ImportList importedList;
   private IxCode.ClassDefinition definition;
-  private NameResolution solver;
+  private NameMapper mapper;
   private int access;
   
   public String topClass(){
@@ -67,12 +67,12 @@ public class CodeAnalysis {
     return ast2irt.get(astNode);
   }
   
-  public void addSolver(String className, NameResolution solver) {
-    solvers.put(className, solver);
+  public void addSolver(String className, NameMapper solver) {
+    mappers.put(className, solver);
   }
   
-  public NameResolution findSolver(String className){
-    return solvers.get(className);
+  public NameMapper findSolver(String className){
+    return mappers.get(className);
   }
   
   private String createName(String moduleName, String simpleName){
@@ -93,14 +93,14 @@ public class CodeAnalysis {
 //----------------------------------------------------------------------------// 
 //----------------------------------------------------------------------------//
 
-  public IxCode.TypeRef resolve(TypeSpec type, NameResolution resolver) {
-    IxCode.TypeRef resolvedType = resolver.resolve(type);
-    if(resolvedType == null) report(CLASS_NOT_FOUND, type, type.getComponentName());
-    return resolvedType;
+  public IxCode.TypeRef mapFrom(TypeSpec type, NameMapper mapper) {
+    IxCode.TypeRef mappedType = mapper.map(type);
+    if(mappedType == null) report(CLASS_NOT_FOUND, type, type.getComponentName());
+    return mappedType;
   }
   
-  public IxCode.TypeRef resolve(TypeSpec type) {
-    return resolve(type, solver);
+  public IxCode.TypeRef mapFrom(TypeSpec type) {
+    return mapFrom(type, mapper);
   }
 
   public void report(int error, AstNode node, Object... items) {
@@ -175,7 +175,7 @@ public class CodeAnalysis {
         table.classes().add(node);
         node.addDefaultConstructor();
         put(compilationUnit, node);
-        addSolver(node.name(), new NameResolution(list));
+        addSolver(node.name(), new NameMapper(list));
       }
     }
     
@@ -189,7 +189,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameResolution(importedList));
+      addSolver(node.name(), new NameMapper(importedList));
       return null;    
     }
     
@@ -204,7 +204,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameResolution(importedList) );
+      addSolver(node.name(), new NameMapper(importedList) );
       return null;
     }
     
@@ -222,7 +222,7 @@ public class CodeAnalysis {
     public void process(CompilationUnit compilationUnit){
       unit = compilationUnit;
       for(TopLevelElement top:compilationUnit.getTopLevels()){
-        solver = findSolver(topClass());
+        mapper = findSolver(topClass());
         accept(top);
       }
     }
@@ -230,7 +230,7 @@ public class CodeAnalysis {
     public Object visit(ClassDeclaration ast, Void context) {
       nconstructor = 0;
       definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      solver = findSolver(definition.name());
+      mapper = findSolver(definition.name());
       constructTypeHierarchy(definition, new ArrayList());
       if(hasCyclicity(definition)) report(CYCLIC_INHERITANCE, ast, definition.name());
       if(ast.getDefaultSection() != null){
@@ -246,7 +246,7 @@ public class CodeAnalysis {
       
     public Object visit(InterfaceDeclaration ast, Void context) {
       definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      solver = findSolver(definition.name());
+      mapper = findSolver(definition.name());
       constructTypeHierarchy(definition, new ArrayList());
       if(hasCyclicity(definition)){
         report(CYCLIC_INHERITANCE, ast, definition.name());
@@ -259,7 +259,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(DelegationDeclaration ast, Void context) {
-      IxCode.TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = mapFrom(ast.getType());
       if(type == null) return null;  
       if(!(type.isObjectType() && ((IxCode.ObjectTypeRef)type).isInterface())){
         report(INTERFACE_REQUIRED, ast.getType(), type);
@@ -288,7 +288,7 @@ public class CodeAnalysis {
       IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
-        returnType = resolve(ast.getReturnType());
+        returnType = mapFrom(ast.getReturnType());
       }else{
         returnType = IxCode.BasicTypeRef.VOID;
       }
@@ -304,7 +304,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(FieldDeclaration ast, Void context) {
-      IxCode.TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = mapFrom(ast.getType());
       if(type == null) return null;
       int modifier = ast.getModifier() | access;
       String name = ast.getName();    
@@ -329,12 +329,12 @@ public class CodeAnalysis {
     }
     
     public Object visit(Argument ast, Void context){
-      IxCode.TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = mapFrom(ast.getType());
       return type;
     }
     
     private IxCode.FieldDefinition createFieldNode(FieldDeclaration ast){
-      IxCode.TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = mapFrom(ast.getType());
       if(type == null) {
         return null;
       }else {
@@ -346,7 +346,7 @@ public class CodeAnalysis {
       IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
-        returnType = resolve(ast.getReturnType());
+        returnType = mapFrom(ast.getReturnType());
       }else{
         returnType = IxCode.BasicTypeRef.VOID;
       }
@@ -363,7 +363,7 @@ public class CodeAnalysis {
       IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
-        returnType = resolve(ast.getReturnType());
+        returnType = mapFrom(ast.getReturnType());
       }else{
         returnType = IxCode.BasicTypeRef.VOID;
       }
@@ -381,7 +381,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(GlobalVariableDeclaration ast, Void context) {
-      IxCode.TypeRef type = resolve(ast.getType());
+      IxCode.TypeRef type = mapFrom(ast.getType());
       if(type == null) return null;
       
       int modifier = ast.getModifier() | Modifier.PUBLIC;
@@ -435,7 +435,7 @@ public class CodeAnalysis {
         if(node.isResolutionComplete()) return;
         IxCode.ClassTypeRef superClass = null;
         List<IxCode.ClassTypeRef> interfaces = new ArrayList<IxCode.ClassTypeRef>();
-        NameResolution resolver = findSolver(node.name());
+        NameMapper resolver = findSolver(node.name());
         if(node.isInterface()){
           InterfaceDeclaration ast = (InterfaceDeclaration) lookupAST(node);
           superClass = rootClass();
@@ -469,13 +469,13 @@ public class CodeAnalysis {
     }
     
     private IxCode.ClassTypeRef validateSuperType(
-      TypeSpec ast, boolean shouldInterface, NameResolution resolver){
+      TypeSpec ast, boolean shouldInterface, NameMapper resolver){
       
       IxCode.ClassTypeRef symbol = null;
       if(ast == null){
         symbol = table.rootClass();
       }else{
-        symbol = (IxCode.ClassTypeRef) resolve(ast, resolver);
+        symbol = (IxCode.ClassTypeRef) mapFrom(ast, resolver);
       }
       if(symbol == null) return null;
       boolean isInterface = symbol.isInterface();
@@ -511,7 +511,7 @@ public class CodeAnalysis {
       functions.clear();
       TopLevelElement[] toplevels = unit.getTopLevels();    
       for(int i = 0; i < toplevels.length; i++){
-        CodeAnalysis.this.solver = findSolver(topClass());
+        CodeAnalysis.this.mapper = findSolver(topClass());
         accept(toplevels[i]);
       }
     }
@@ -523,7 +523,7 @@ public class CodeAnalysis {
       fields.clear();
       constructors.clear();
       definition = node;
-      solver = findSolver(node.name());
+      mapper = findSolver(node.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -595,7 +595,7 @@ public class CodeAnalysis {
       fields.clear();
       constructors.clear();
       CodeAnalysis.this.definition = node;
-      CodeAnalysis.this.solver = findSolver(node.name());
+      CodeAnalysis.this.mapper = findSolver(node.name());
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
         accept(members[i], context);
@@ -720,7 +720,7 @@ public class CodeAnalysis {
       LocalContext context = new LocalContext();
       List<IxCode.ActionStatement> statements = new ArrayList<IxCode.ActionStatement>();
       String className = topClass();
-      CodeAnalysis.this.solver = findSolver(topClass());
+      CodeAnalysis.this.mapper = findSolver(topClass());
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
       IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);
       IxCode.MethodDefinition method = new IxCode.MethodDefinition(Modifier.PUBLIC, klass,  "start", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID, null);
@@ -772,7 +772,7 @@ public class CodeAnalysis {
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
       CodeAnalysis.this.definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      CodeAnalysis.this.solver = findSolver(definition.name());
+      CodeAnalysis.this.mapper = findSolver(definition.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
       }
@@ -1655,14 +1655,14 @@ public class CodeAnalysis {
         report(DUPLICATE_LOCAL_VARIABLE, ast, name);
         return null;
       }
-      IxCode.TypeRef type = resolve(ast.getType(), solver);
+      IxCode.TypeRef type = resolve(ast.getType(), mapper);
       if(type == null) return null;
       context.add(name, type);
       return type;
     }
     
     public Object visit(onion.lang.syntax.NewArray ast, LocalContext context) {
-      IxCode.TypeRef type = resolve(ast.getType(), solver);
+      IxCode.TypeRef type = resolve(ast.getType(), mapper);
       IxCode.Expression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(type == null || parameters == null) return null;
       IxCode.ArrayTypeRef resultType = loadArray(type, parameters.length);
@@ -1672,7 +1672,7 @@ public class CodeAnalysis {
     public Object visit(Cast ast, LocalContext context) {
       IxCode.Expression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
-      IxCode.TypeRef conversion = resolve(ast.getType(), solver);
+      IxCode.TypeRef conversion = resolve(ast.getType(), mapper);
       if(conversion == null) return null;
       node = new IxCode.AsInstanceOf(node, conversion);
       return node;
@@ -1687,7 +1687,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(ClosureExpression ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getType());
       Argument[] args = ast.getArguments();
       IxCode.TypeRef[] argTypes = new IxCode.TypeRef[args.length];
       String name = ast.getName();
@@ -1782,7 +1782,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(onion.lang.syntax.NewObject ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getType());
       IxCode.Expression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(parameters == null || type == null) return null;
       IxCode.ConstructorRef[] constructors = type.findConstructor(parameters);
@@ -1799,7 +1799,7 @@ public class CodeAnalysis {
         
     public Object visit(IsInstance ast, LocalContext context) {
       IxCode.Expression target = typeCheck(ast.getTarget(), context);
-      IxCode.TypeRef checkType = resolve(ast.getType(), solver);
+      IxCode.TypeRef checkType = resolve(ast.getType(), mapper);
       if(target == null || checkType == null) return null;
       return new IxCode.InstanceOf(target, checkType);
     }
@@ -1870,7 +1870,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(StaticIDExpression ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getType());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getType());
       if(type == null) return null;
       IxCode.FieldRef field = findField(type, ast.getName());
       if(field == null){
@@ -1881,7 +1881,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(StaticMethodCall ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getTarget());
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getTarget());
       IxCode.Expression[] params = typeCheckExps(ast.getArgs(), context);
       if(type == null || params == null) {
         return null;
@@ -2267,7 +2267,7 @@ public class CodeAnalysis {
         report(DUPLICATE_LOCAL_VARIABLE, ast, ast.getName());
         return new IxCode.NOP();
       }
-      IxCode.TypeRef leftType = CodeAnalysis.this.resolve(ast.getType());
+      IxCode.TypeRef leftType = CodeAnalysis.this.mapFrom(ast.getType());
       if(leftType == null) return new IxCode.NOP();
       int index = context.add(ast.getName(), leftType);
       IxCode.SetLocal node;
@@ -2421,8 +2421,8 @@ public class CodeAnalysis {
   //----------------------------------------------------------------------------// 
   //----------------------------------------------------------------------------//
   
-    public IxCode.TypeRef resolve(TypeSpec type, NameResolution resolver) {
-      IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.resolve(type);
+    public IxCode.TypeRef resolve(TypeSpec type, NameMapper resolver) {
+      IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.map(type);
       if(resolvedType == null){
         report(CLASS_NOT_FOUND, type, type.getComponentName());
       }
@@ -2474,7 +2474,7 @@ public class CodeAnalysis {
     this.table    = new ClassTable(classpath(config.getClassPath()));
     this.irt2ast  = new HashMap<IxCode.Node, AstNode>();
     this.ast2irt  = new HashMap<AstNode, IxCode.Node>();
-    this.solvers  = new HashMap<String, NameResolution>();
+    this.mappers = new HashMap<String, NameMapper>();
     this.reporter = new SemanticErrorReporter(this.config.getMaxErrorReports());
   }
   
@@ -2506,19 +2506,19 @@ public class CodeAnalysis {
    * @author Kota Mizushima
    * Date: 2005/06/13
    */
-  public class NameResolution {
+  public class NameMapper {
     private ImportList imports;
 
-    public NameResolution(ImportList imports) {
+    public NameMapper(ImportList imports) {
       this.imports = imports;
     }
 
-    public IxCode.TypeRef resolve(TypeSpec specifier) {
+    public IxCode.TypeRef map(TypeSpec specifier) {
       RawTypeNode component = specifier.getComponent();
       String name = component.name();
-      IxCode.TypeRef resolvedType;
+      IxCode.TypeRef mappedType;
       if(component.kind() == RawTypeNode.BASIC){
-        resolvedType =
+        mappedType =
           name.equals("char") ? IxCode.BasicTypeRef.CHAR :
           name.equals("byte") ? IxCode.BasicTypeRef.BYTE :
           name.equals("short") ? IxCode.BasicTypeRef.SHORT :
@@ -2529,16 +2529,14 @@ public class CodeAnalysis {
           name.equals("boolean") ? IxCode.BasicTypeRef.BOOLEAN :
                                     IxCode.BasicTypeRef.VOID;
       }else if(component.kind() == RawTypeNode.NOT_QUALIFIED){
-        resolvedType = forName(name, false);
+        mappedType = forName(name, false);
       }else{
-        resolvedType = forName(name, true);
+        mappedType = forName(name, true);
       }
-      IxCode.TypeRef componentType = resolvedType;
       if(specifier.getDimension() > 0){
-        return table.loadArray(componentType, specifier.getDimension());
-      }else{
-        return componentType;
+        mappedType = table.loadArray(mappedType, specifier.getDimension());
       }
+      return mappedType;
     }
 
     private IxCode.ClassTypeRef forName(String name, boolean qualified) {

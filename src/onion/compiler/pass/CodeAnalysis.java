@@ -67,11 +67,11 @@ public class CodeAnalysis {
     return ast2irt.get(astNode);
   }
   
-  public void addSolver(String className, NameMapper solver) {
+  public void add(String className, NameMapper solver) {
     mappers.put(className, solver);
   }
   
-  public NameMapper findSolver(String className){
+  public NameMapper find(String className){
     return mappers.get(className);
   }
   
@@ -175,7 +175,7 @@ public class CodeAnalysis {
         table.classes().add(node);
         node.addDefaultConstructor();
         put(compilationUnit, node);
-        addSolver(node.name(), new NameMapper(list));
+        add(node.name(), new NameMapper(list));
       }
     }
     
@@ -189,7 +189,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameMapper(importedList));
+      add(node.name(), new NameMapper(importedList));
       return null;    
     }
     
@@ -204,7 +204,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameMapper(importedList) );
+      add(node.name(), new NameMapper(importedList) );
       return null;
     }
     
@@ -222,7 +222,7 @@ public class CodeAnalysis {
     public void process(CompilationUnit compilationUnit){
       unit = compilationUnit;
       for(TopLevelElement top:compilationUnit.getTopLevels()){
-        mapper = findSolver(topClass());
+        mapper = find(topClass());
         accept(top);
       }
     }
@@ -230,7 +230,7 @@ public class CodeAnalysis {
     public Object visit(ClassDeclaration ast, Void context) {
       nconstructor = 0;
       definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      mapper = findSolver(definition.name());
+      mapper = find(definition.name());
       constructTypeHierarchy(definition, new ArrayList());
       if(hasCyclicity(definition)) report(CYCLIC_INHERITANCE, ast, definition.name());
       if(ast.getDefaultSection() != null){
@@ -246,7 +246,7 @@ public class CodeAnalysis {
       
     public Object visit(InterfaceDeclaration ast, Void context) {
       definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      mapper = findSolver(definition.name());
+      mapper = find(definition.name());
       constructTypeHierarchy(definition, new ArrayList());
       if(hasCyclicity(definition)){
         report(CYCLIC_INHERITANCE, ast, definition.name());
@@ -435,7 +435,7 @@ public class CodeAnalysis {
         if(node.isResolutionComplete()) return;
         IxCode.ClassTypeRef superClass = null;
         List<IxCode.ClassTypeRef> interfaces = new ArrayList<IxCode.ClassTypeRef>();
-        NameMapper resolver = findSolver(node.name());
+        NameMapper resolver = find(node.name());
         if(node.isInterface()){
           InterfaceDeclaration ast = (InterfaceDeclaration) lookupAST(node);
           superClass = rootClass();
@@ -511,7 +511,7 @@ public class CodeAnalysis {
       functions.clear();
       TopLevelElement[] toplevels = unit.getTopLevels();    
       for(int i = 0; i < toplevels.length; i++){
-        CodeAnalysis.this.mapper = findSolver(topClass());
+        CodeAnalysis.this.mapper = find(topClass());
         accept(toplevels[i]);
       }
     }
@@ -523,7 +523,7 @@ public class CodeAnalysis {
       fields.clear();
       constructors.clear();
       definition = node;
-      mapper = findSolver(node.name());
+      mapper = find(node.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -595,7 +595,7 @@ public class CodeAnalysis {
       fields.clear();
       constructors.clear();
       CodeAnalysis.this.definition = node;
-      CodeAnalysis.this.mapper = findSolver(node.name());
+      CodeAnalysis.this.mapper = find(node.name());
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
         accept(members[i], context);
@@ -720,7 +720,7 @@ public class CodeAnalysis {
       LocalContext context = new LocalContext();
       List<IxCode.ActionStatement> statements = new ArrayList<IxCode.ActionStatement>();
       String className = topClass();
-      CodeAnalysis.this.mapper = findSolver(topClass());
+      CodeAnalysis.this.mapper = find(topClass());
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
       IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);
       IxCode.MethodDefinition method = new IxCode.MethodDefinition(Modifier.PUBLIC, klass,  "start", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID, null);
@@ -772,7 +772,7 @@ public class CodeAnalysis {
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
       CodeAnalysis.this.definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      CodeAnalysis.this.mapper = findSolver(definition.name());
+      CodeAnalysis.this.mapper = find(definition.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
       }

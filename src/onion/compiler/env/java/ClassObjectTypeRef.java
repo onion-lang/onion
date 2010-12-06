@@ -13,9 +13,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+import onion.compiler.ClassTable;
 import onion.compiler.IxCode;
 import onion.compiler.OnionTypeBridge;
-import onion.compiler.env.ClassTable;
 import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;
@@ -27,7 +27,7 @@ import org.apache.bcel.Constants;
 public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements Constants{
   private static final String CONSTRUCTOR_NAME = "<init>";
   private Class klass;
-  private ClassTable table;  
+  private ClassTable table;
   private int modifier;
   private IxCode.MethodRef[] methods;
   private IxCode.FieldRef[] fields;

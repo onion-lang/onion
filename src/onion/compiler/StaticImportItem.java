@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.env;
+package onion.compiler;
 
 /**
  * @author Kota Mizushima

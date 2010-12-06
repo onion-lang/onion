@@ -7,8 +7,8 @@
  * ************************************************************** */
 package onion.compiler.util;
 
+import onion.compiler.ClassTable;
 import onion.compiler.IxCode;
-import onion.compiler.env.ClassTable;
 
 
 /**

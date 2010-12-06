@@ -10,9 +10,9 @@ package onion.compiler.env.java;
 import java.util.ArrayList;
 import java.util.List;
 
+import onion.compiler.ClassTable;
 import onion.compiler.IxCode;
 import onion.compiler.OnionTypeBridge;
-import onion.compiler.env.*;
 import onion.lang.syntax.Modifier;
 
 import org.apache.bcel.Constants;

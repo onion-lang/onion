@@ -5,11 +5,9 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.env;
+package onion.compiler;
 
 import java.util.*;
-
-import onion.compiler.IxCode;
 
 
 /**

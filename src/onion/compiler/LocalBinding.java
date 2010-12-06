@@ -5,27 +5,28 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.env;
+package onion.compiler;
 
-import java.util.HashMap;
-import java.util.Map;
+import onion.compiler.IxCode;
 
-public class SymbolTable {
-  private Map table;
+
+/**
+ * @author Kota Mizushima
+ */
+public class LocalBinding{  
+  private final int index;  
+  private final IxCode.TypeRef type;
   
-  public SymbolTable() {
-    this.table = new HashMap();
+  public LocalBinding(int index, IxCode.TypeRef type){
+    this.index	= index;
+    this.type = type;
   }
-  
-  public void put(Symbol key, Object value) {
-    table.put(key, value);
+
+  public int getIndex() {
+    return index;
   }
-  
-  public Object get(Symbol key) {
-    return table.get(key);
-  }
-  
-  public boolean containsKey(Symbol key) {
-    return table.containsKey(key);
+
+  public IxCode.TypeRef getType() {
+    return type;
   }
 }

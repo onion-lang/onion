@@ -10,7 +10,6 @@ package onion.compiler.pass;
 import java.util.*;
 
 import onion.compiler.*;
-import onion.compiler.env.*;
 import onion.compiler.util.*;
 import onion.lang.syntax.Modifier;
 

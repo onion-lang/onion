@@ -10,8 +10,6 @@ package onion.compiler;
 import java.util.HashMap;
 import java.util.Map;
 
-import onion.compiler.env.ClassTable;
-
 import org.apache.bcel.generic.ArrayType;
 import org.apache.bcel.generic.BasicType;
 import org.apache.bcel.generic.ObjectType;

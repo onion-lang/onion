@@ -1,8 +1,5 @@
 package onion.compiler;
 
-import onion.compiler.env.ClassTable;
-import onion.compiler.env.ClosureLocalBinding;
-import onion.compiler.env.LocalFrame;
 import onion.compiler.util.Strings;
 import onion.lang.syntax.Modifier;
 

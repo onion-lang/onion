@@ -40,7 +40,7 @@ public class TestLocalFrame extends TestCase {
 
   public void testGetParent() {
     LocalFrame child = new LocalFrame(frame);
-    assertSame(child.getParent(), frame);
+    assertSame(child.parent(), frame);
   }
 
   public void testOpenAndCloseScope() {
@@ -52,15 +52,15 @@ public class TestLocalFrame extends TestCase {
   }
 
   public void testEntries() {
-    frame.addEntry("foo", IxCode.BasicTypeRef.BOOLEAN);
-    frame.addEntry("bar", IxCode.BasicTypeRef.BYTE);
-    frame.addEntry("baz", IxCode.BasicTypeRef.INT);
+    frame.add("foo", IxCode.BasicTypeRef.BOOLEAN);
+    frame.add("bar", IxCode.BasicTypeRef.BYTE);
+    frame.add("baz", IxCode.BasicTypeRef.INT);
     LocalBinding[] binds = frame.entries();
   }
 
   public void testAddAndLookup() {
     assertNull(frame.lookup("foo"));
-    int index = frame.addEntry("foo", IxCode.BasicTypeRef.BOOLEAN);
+    int index = frame.add("foo", IxCode.BasicTypeRef.BOOLEAN);
     ClosureLocalBinding bind, bind2;
     bind = frame.lookupOnlyCurrentScope("foo");
     assertEquals(bind.getIndex(), index);
@@ -75,13 +75,13 @@ public class TestLocalFrame extends TestCase {
     newFrame = frame;
     while(newFrame != null){
       assertFalse(newFrame.isClosed());
-      newFrame = newFrame.getParent();
+      newFrame = newFrame.parent();
     }
     newFrame = frame;
     newFrame.setAllClosed(true);
     while(newFrame != null){
       assertTrue(newFrame.isClosed());
-      newFrame = newFrame.getParent();
+      newFrame = newFrame.parent();
     }
   }
 

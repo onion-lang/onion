@@ -36,7 +36,7 @@ public class LocalFrame {
    * Gets the parent frame.
    * @return
    */
-  public LocalFrame getParent(){
+  public LocalFrame parent(){
     return parent;
   }
   
@@ -75,7 +75,7 @@ public class LocalFrame {
     return binds;
   }
   
-  public int addEntry(String name, IxCode.TypeRef type){
+  public int add(String name, IxCode.TypeRef type){
     LocalBinding bind = scope.get(name);    
     //if name is already registered, it returns -1 which means failure.
     if(bind != null) return -1;
@@ -116,7 +116,7 @@ public class LocalFrame {
     LocalFrame frame = this;
     while(frame != null){
       frame.setClosed(closed);
-      frame = frame.getParent();
+      frame = frame.parent();
     }
   }
   
@@ -133,7 +133,7 @@ public class LocalFrame {
     int depth = -1;
     while(frame != null){
       depth++;
-      frame = frame.getParent();
+      frame = frame.parent();
     }
     return depth;
   }

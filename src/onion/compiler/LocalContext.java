@@ -48,7 +48,7 @@ public class LocalContext {
     return generator.generate();
   }
   
-  public IxCode.TypeRef getReturnType(){
+  public IxCode.TypeRef returnType(){
     if(isMethod){
       return method.returnType();
     }else{
@@ -56,11 +56,11 @@ public class LocalContext {
     }
   }
   
-  public IxCode.MethodRef getMethod(){
+  public IxCode.MethodRef method(){
     return method;
   }
   
-  public IxCode.ConstructorRef getConstructor(){
+  public IxCode.ConstructorRef constructor(){
     return constructor;
   }
   
@@ -79,7 +79,7 @@ public class LocalContext {
   }
   
   public void closeFrame(){
-    contextFrame = contextFrame.getParent();
+    contextFrame = contextFrame.parent();
   }
   
   public int depth(){
@@ -114,13 +114,13 @@ public class LocalContext {
     return contextFrame.lookupOnlyCurrentScope(name);
   }
   
-  public int addEntry(String name, IxCode.TypeRef type) {
-    return contextFrame.addEntry(name, type);
+  public int add(String name, IxCode.TypeRef type) {
+    return contextFrame.add(name, type);
   }
   
-  public String addEntry(IxCode.TypeRef type){
+  public String add(IxCode.TypeRef type){
     String name = newName();
-    contextFrame.addEntry(name, type);
+    contextFrame.add(name, type);
     return name;
   }
 }

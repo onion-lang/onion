@@ -457,7 +457,7 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class ClassDefinition extends AbstractClassTypeRef implements Node {
+  class ClassDefinition extends AbstractClassTypeRef implements Node, Named {
     private boolean isInterface;
     private int modifier;
     private String name;

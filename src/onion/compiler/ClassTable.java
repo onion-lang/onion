@@ -9,7 +9,6 @@ package onion.compiler;
 
 import java.util.*;
 
-import onion.compiler.IxCode;
 import onion.compiler.env.java.ClassFileTypeRef;
 import onion.compiler.env.java.ClassFileTable;
 import onion.compiler.env.java.ClassObjectTypeRef;
@@ -22,20 +21,20 @@ import org.apache.bcel.classfile.JavaClass;
  * Date: 2005/06/22
  */
 public class ClassTable {
-  private LinkedHashMap<String, IxCode.ClassDefinition> classes;
+  private OrderedTable<IxCode.ClassDefinition> classes;
   private Map<String, IxCode.ClassTypeRef> classFiles;
   private Map<String, IxCode.ArrayTypeRef> arrayClasses;
   private ClassFileTable table;
   
   public ClassTable(String classPath) {
-    classes = new LinkedHashMap<String, IxCode.ClassDefinition>();
+    classes = new OrderedTable<IxCode.ClassDefinition>();
     classFiles = new HashMap<String, IxCode.ClassTypeRef>();
     arrayClasses = new HashMap<String, IxCode.ArrayTypeRef>();
     table = new ClassFileTable(classPath);
   }
   
   public void addSourceClass(IxCode.ClassDefinition node){
-    classes.put(node.name(), node);
+    classes.add(node);
   }
   
   public IxCode.ClassDefinition[] getSourceClasses(){
@@ -44,7 +43,7 @@ public class ClassTable {
   
   public IxCode.ArrayTypeRef loadArray(IxCode.TypeRef component, int dimension){
     String arrayName = Strings.repeat("[", dimension) + component.name();
-    IxCode.ArrayTypeRef array = (IxCode.ArrayTypeRef) arrayClasses.get(arrayName);
+    IxCode.ArrayTypeRef array = arrayClasses.get(arrayName);
     if(array != null) return array;
     array = new IxCode.ArrayTypeRef(component, dimension, this);
     arrayClasses.put(arrayName, array);

@@ -345,7 +345,7 @@ public class CodeAnalysis {
     
     public Object visit(ConstructorDeclaration ast, Void context) {
       countConstructor++;
-      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.ClassDefinition contextClass = getContextClass();
       if(args == null) return null;
       int modifier = ast.getModifier() | getAccess();
@@ -356,7 +356,7 @@ public class CodeAnalysis {
     }
 
     public Object visit(MethodDeclaration ast, Void context) {
-      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
         returnType = resolve(ast.getReturnType());
@@ -387,7 +387,7 @@ public class CodeAnalysis {
       return node;
     }
     
-    private IxCode.TypeRef[] acceptTypes(Argument[] ast){
+    private IxCode.TypeRef[] typesOf(Argument[] ast){
       IxCode.TypeRef[] types = new IxCode.TypeRef[ast.length];
       boolean success = true;
       for (int i = 0; i < ast.length; i++) {
@@ -416,7 +416,7 @@ public class CodeAnalysis {
     }
       
     public Object visit(InterfaceMethodDeclaration ast, Void context) {
-      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
         returnType = resolve(ast.getReturnType());
@@ -436,7 +436,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(FunctionDeclaration ast, Void context) {
-      IxCode.TypeRef[] args = acceptTypes(ast.getArguments());
+      IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.TypeRef returnType;
       if(ast.getReturnType() != null){
         returnType = resolve(ast.getReturnType());

@@ -47,11 +47,8 @@ public class OnionCompiler {
       CodeGeneration pass3 = new CodeGeneration(config);
       return pass3.process(pass2.process(pass1.process(srcs)));
     }catch(CompilationException ex){
-      int count = ex.size();
-      for(int i = 0; i < count; i++){
-        printError(ex.get(i));
-      }
-      System.err.println(Messages.get("error.count", new Integer(count)));
+      for(CompileError error:ex) printError(error);
+      System.err.println(Messages.get("error.count", ex.size()));
       return null;
     }
   }

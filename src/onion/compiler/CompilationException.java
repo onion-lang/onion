@@ -7,23 +7,30 @@
  * ************************************************************** */
 package onion.compiler;
 
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
  * @author Kota Mizushima
  */
-public class CompilationException extends RuntimeException {    
-  private List problems;
+public class CompilationException extends RuntimeException implements Iterable<CompileError> {
+  private List<CompileError> problems;
 
-  public CompilationException(List problems) {
+  public CompilationException(List<CompileError> problems) {
     this.problems = problems;
   }
-  
-  public CompileError get(int index) {
-    return (CompileError)problems.get(index);
+
+  public List<CompileError> problems() {
+    return Collections.unmodifiableList(problems);
   }
-  
+
   public int size() {
     return problems.size();
   }
+
+  public Iterator<CompileError> iterator() {
+    return problems.iterator();
+  }
 }
+

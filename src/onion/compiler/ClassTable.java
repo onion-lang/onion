@@ -33,12 +33,8 @@ public class ClassTable {
     table = new ClassFileTable(classPath);
   }
   
-  public void addSourceClass(IxCode.ClassDefinition node){
-    classes.add(node);
-  }
-  
-  public IxCode.ClassDefinition[] getSourceClasses(){
-    return classes.values().toArray(new IxCode.ClassDefinition[0]);
+  public OrderedTable<IxCode.ClassDefinition> classes() {
+    return classes;
   }
   
   public IxCode.ArrayTypeRef loadArray(IxCode.TypeRef component, int dimension){

@@ -189,7 +189,7 @@ public class CodeAnalysis {
   }
   
   public IxCode.ClassDefinition[] getSourceClasses() {
-    return table.getSourceClasses();
+    return table.classes().values().toArray(new IxCode.ClassDefinition[0]);
   }
   
   private class ClassTableBuilder extends ASTVisitor<String> {
@@ -235,7 +235,7 @@ public class CodeAnalysis {
         IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
         node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
         node.setResolutionComplete(true);
-        table.addSourceClass(node);
+        table.classes().add(node);
         node.addDefaultConstructor();
         put(unit, node);
         addSolver(node.name(), new NameResolution(list));
@@ -250,8 +250,7 @@ public class CodeAnalysis {
         report(DUPLICATE_CLASS,  ast, node.name());
         return null;
       }
-      ClassTable table = getTable();
-      getTable().addSourceClass(node);
+      table.classes().add(node);
       put(ast, node);
       addSolver(node.name(), new NameResolution(getImport()));
       return null;    
@@ -266,7 +265,7 @@ public class CodeAnalysis {
         report(DUPLICATE_CLASS,  ast, node.name());
         return null;
       }
-      table.addSourceClass(node);
+      table.classes().add(node);
       put(ast, node);
       addSolver(node.name(), new NameResolution(getImport()) );
       return null;

@@ -19,9 +19,8 @@
       <sourceFolder url="file://$MODULE_DIR$/src.lib" isTestSource="false" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="ch.epfl.lamp.sdt.launching.SCALA_CONTAINER" level="application" />
     <orderEntry type="inheritedJdk" />
-    <orderEntry type="module-library">
+    <orderEntry type="module-library" exported="">
       <library name="bcel.jar">
         <CLASSES>
           <root url="jar://$MODULE_DIR$/lib/bcel/bcel.jar!/" />
@@ -30,7 +29,7 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="module-library">
+    <orderEntry type="module-library" exported="">
       <library name="junit.jar">
         <CLASSES>
           <root url="jar://$MODULE_DIR$/lib/junit/junit.jar!/" />
@@ -39,7 +38,8 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="library" name="scala-library-2.8.0" level="application" />
+    <orderEntry type="library" exported="" name="scala-compiler-2.8.0" level="application" />
+    <orderEntry type="library" exported="" name="scala-library-2.8.0" level="application" />
   </component>
 </module>
 

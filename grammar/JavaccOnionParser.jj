@@ -14,6 +14,7 @@ PARSER_BEGIN(JavaccOnionParser)
 package onion.compiler.parser;
 import java.util.*;
 import onion.lang.syntax.*;
+import onion.compiler.Location;
 
 public class JavaccOnionParser implements OnionParser {
   private static final Expression[] EMPTY_EXPS = new Expression[0];

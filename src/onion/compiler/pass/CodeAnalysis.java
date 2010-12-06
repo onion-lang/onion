@@ -18,7 +18,6 @@ import onion.compiler.env.ImportItem;
 import onion.compiler.env.ImportList;
 import onion.compiler.env.LocalContext;
 import onion.compiler.env.LocalFrame;
-import onion.compiler.env.NameResolution;
 import onion.compiler.env.StaticImportItem;
 import onion.compiler.env.StaticImportList;
 import onion.compiler.CompilationException;
@@ -26,90 +25,7 @@ import onion.compiler.util.Boxing;
 import onion.compiler.util.Classes;
 import onion.compiler.util.Paths;
 import onion.compiler.util.Systems;
-import onion.lang.syntax.AccessSection;
-import onion.lang.syntax.Addition;
-import onion.lang.syntax.AdditionAssignment;
-import onion.lang.syntax.Argument;
-import onion.lang.syntax.Assignment;
-import onion.lang.syntax.AstNode;
-import onion.lang.syntax.BitAnd;
-import onion.lang.syntax.BitOr;
-import onion.lang.syntax.BlockStatement;
-import onion.lang.syntax.BooleanLiteral;
-import onion.lang.syntax.BreakStatement;
-import onion.lang.syntax.CaseBranch;
-import onion.lang.syntax.Cast;
-import onion.lang.syntax.ClassDeclaration;
-import onion.lang.syntax.ClosureExpression;
-import onion.lang.syntax.CompilationUnit;
-import onion.lang.syntax.CondStatement;
-import onion.lang.syntax.ConstructorDeclaration;
-import onion.lang.syntax.ContinueStatement;
-import onion.lang.syntax.CurrentInstance;
-import onion.lang.syntax.DelegationDeclaration;
-import onion.lang.syntax.Division;
-import onion.lang.syntax.DivisionAssignment;
-import onion.lang.syntax.Elvis;
-import onion.lang.syntax.EmptyStatement;
-import onion.lang.syntax.Equal;
-import onion.lang.syntax.FieldDeclaration;
-import onion.lang.syntax.FieldOrMethodRef;
-import onion.lang.syntax.ForStatement;
-import onion.lang.syntax.ForeachStatement;
-import onion.lang.syntax.FunctionDeclaration;
-import onion.lang.syntax.GlobalVariableDeclaration;
-import onion.lang.syntax.GreaterOrEqual;
-import onion.lang.syntax.GreaterThan;
-import onion.lang.syntax.Id;
-import onion.lang.syntax.ImportListDeclaration;
-import onion.lang.syntax.Indexing;
-import onion.lang.syntax.IntegerLiteral;
-import onion.lang.syntax.InterfaceDeclaration;
-import onion.lang.syntax.InterfaceMethodDeclaration;
-import onion.lang.syntax.IsInstance;
-import onion.lang.syntax.LessOrEqual;
-import onion.lang.syntax.LessThan;
-import onion.lang.syntax.LocalVariableDeclaration;
-import onion.lang.syntax.LogicalAnd;
-import onion.lang.syntax.LogicalOr;
-import onion.lang.syntax.LogicalRightShift;
-import onion.lang.syntax.MathLeftShift;
-import onion.lang.syntax.MathRightShift;
-import onion.lang.syntax.MemberDeclaration;
-import onion.lang.syntax.MethodCall;
-import onion.lang.syntax.MethodDeclaration;
-import onion.lang.syntax.Modifier;
-import onion.lang.syntax.ModuleDeclaration;
-import onion.lang.syntax.Modulo;
-import onion.lang.syntax.ModuloAssignment;
-import onion.lang.syntax.Multiplication;
-import onion.lang.syntax.MultiplicationAssignment;
-import onion.lang.syntax.Negate;
-import onion.lang.syntax.Not;
-import onion.lang.syntax.NotEqual;
-import onion.lang.syntax.Posit;
-import onion.lang.syntax.PostDecrement;
-import onion.lang.syntax.PostIncrement;
-import onion.lang.syntax.ReferenceEqual;
-import onion.lang.syntax.ReferenceNotEqual;
-import onion.lang.syntax.ReturnStatement;
-import onion.lang.syntax.SelectStatement;
-import onion.lang.syntax.SelfFieldReference;
-import onion.lang.syntax.SelfMethodCall;
-import onion.lang.syntax.Statement;
-import onion.lang.syntax.StaticIDExpression;
-import onion.lang.syntax.StaticMethodCall;
-import onion.lang.syntax.Subtraction;
-import onion.lang.syntax.SubtractionAssignment;
-import onion.lang.syntax.SuperMethodCall;
-import onion.lang.syntax.SynchronizedStatement;
-import onion.lang.syntax.ThrowStatement;
-import onion.lang.syntax.TopLevelElement;
-import onion.lang.syntax.TryStatement;
-import onion.lang.syntax.TypeDeclaration;
-import onion.lang.syntax.TypeSpec;
-import onion.lang.syntax.WhileStatement;
-import onion.lang.syntax.XOR;
+import onion.lang.syntax.*;
 import onion.lang.syntax.visitor.ASTVisitor;
 
 
@@ -2853,5 +2769,62 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       throw new CompilationException(Arrays.asList(problems));
     }
     return getSourceClasses();
+  }
+
+  /**
+   * @author Kota Mizushima
+   * Date: 2005/06/13
+   */
+  public static class NameResolution {
+    private ImportList imports;
+    private ClassTable table;
+
+    public NameResolution(ImportList imports, ClassTable table) {
+      this.imports = imports;
+      this.table = table;
+    }
+
+    public IxCode.TypeRef resolve(TypeSpec specifier) {
+      RawTypeNode component = specifier.getComponent();
+      String name = component.name();
+      IxCode.TypeRef resolvedType;
+      if(component.kind() == RawTypeNode.BASIC){
+        resolvedType =
+          name.equals("char") ? IxCode.BasicTypeRef.CHAR :
+          name.equals("byte") ? IxCode.BasicTypeRef.BYTE :
+          name.equals("short") ? IxCode.BasicTypeRef.SHORT :
+          name.equals("int") ? IxCode.BasicTypeRef.INT :
+          name.equals("long") ? IxCode.BasicTypeRef.LONG :
+          name.equals("float") ? IxCode.BasicTypeRef.FLOAT :
+          name.equals("double") ? IxCode.BasicTypeRef.DOUBLE :
+          name.equals("boolean") ? IxCode.BasicTypeRef.BOOLEAN :
+                                    IxCode.BasicTypeRef.VOID;
+      }else if(component.kind() == RawTypeNode.NOT_QUALIFIED){
+        resolvedType = forName(name, false);
+      }else{
+        resolvedType = forName(name, true);
+      }
+      IxCode.TypeRef componentType = resolvedType;
+      if(specifier.getDimension() > 0){
+        return table.loadArray(componentType, specifier.getDimension());
+      }else{
+        return componentType;
+      }
+    }
+
+    private IxCode.ClassTypeRef forName(String name, boolean qualified) {
+      if(qualified) {
+        return table.load(name);
+      }else {
+        for(int i = 0; i < imports.size(); i++){
+          String qualifiedName = imports.get(i).match(name);
+          if(qualifiedName != null){
+            IxCode.ClassTypeRef resolvedSymbol = forName(qualifiedName, true);
+            if(resolvedSymbol != null) return resolvedSymbol;
+          }
+        }
+        return null;
+      }
+    }
   }
 }

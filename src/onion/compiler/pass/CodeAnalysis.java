@@ -131,7 +131,7 @@ public class CodeAnalysis {
     return (moduleName != null ? moduleName + "." : "") + simpleName;
   }
     
-  private static String classpath(String[] classPaths){
+  private String classpath(String[] classPaths){
     StringBuffer path = new StringBuffer();
     if(classPaths.length > 0){
       path.append(classPaths[0]);
@@ -160,7 +160,7 @@ public class CodeAnalysis {
     reporter.report(error, node.getLocation(), items);
   }
 
-  private static boolean numeric(IxCode.TypeRef symbol) {
+  private boolean numeric(IxCode.TypeRef symbol) {
     return 
     (symbol.isBasicType()) &&
     ( symbol == IxCode.BasicTypeRef.BYTE || symbol == IxCode.BasicTypeRef.SHORT ||

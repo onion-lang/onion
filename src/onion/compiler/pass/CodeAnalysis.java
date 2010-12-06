@@ -1896,34 +1896,28 @@ public class CodeAnalysis {
       IxCode.Expression[] params = typeCheckExps(ast.getArguments(), context);
       if(params == null) return null;
       IxCode.ClassDefinition targetType = getContextClass();
-      String name = ast.getName();
       IxCode.MethodRef[] methods = targetType.findMethod(ast.getName(), params);
-      
       if(methods.length == 0){
-        report(METHOD_NOT_FOUND, ast,  targetType, name, types(params));
+        report(METHOD_NOT_FOUND, ast,  targetType, ast.getName(), types(params));
         return null;
-      }
-      
-      if(methods.length > 1){
-        report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
+      }else if(methods.length > 1){
+        report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), ast.getName(), methods[0].arguments()}, new Object[]{methods[1].affiliation(), ast.getName(), methods[1].arguments()});
         return null;
-      }
-      
-      /*
-       * TODO check illegal method call
-       * ex. instance method call in the static context 
-       */
-      
-      params = convert(methods[0].arguments(), params);
-      
-      if((methods[0].modifier() & Modifier.STATIC) != 0){
-        return new IxCode.CallStatic(targetType, methods[0], params);
       }else {
-        return new IxCode.Call(new IxCode.This(targetType), methods[0], params);
+        /*
+        * TODO check illegal method call
+        * ex. instance method call in the static context
+        */
+        params = doCastInsertion(methods[0].arguments(), params);
+        if((methods[0].modifier() & Modifier.STATIC) != 0){
+          return new IxCode.CallStatic(targetType, methods[0], params);
+        }else {
+          return new IxCode.Call(new IxCode.This(targetType), methods[0], params);
+        }
       }
     }
     
-    private IxCode.Expression[] convert(IxCode.TypeRef[] arguments, IxCode.Expression[] params){
+    private IxCode.Expression[] doCastInsertion(IxCode.TypeRef[] arguments, IxCode.Expression[] params){
       for(int i = 0; i < params.length; i++){
         if(arguments[i] != params[i].type()){
           params[i] = new IxCode.AsInstanceOf(params[i], arguments[i]);
@@ -1944,17 +1938,15 @@ public class CodeAnalysis {
       if(methods.length == 0){
         report(METHOD_NOT_FOUND, ast, targetType, name, types(params));
         return null;
-      }
-      if(methods.length > 1){
+      }else if(methods.length > 1){
         report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
         return null;
-      }    
-      if((methods[0].modifier() & Modifier.STATIC) != 0){
+      }else if((methods[0].modifier() & Modifier.STATIC) != 0){
         report(ILLEGAL_METHOD_CALL, ast,  methods[0].affiliation(), name, methods[0].arguments());
         return null;
-      }    
-      params = convert(methods[0].arguments(), params);
-      return new IxCode.Call(target, methods[0], params);
+      }else {
+        return new IxCode.Call(target, methods[0], doCastInsertion(methods[0].arguments(), params));
+      }
     }
     
     public Object visit(StaticIDExpression ast, LocalContext context) {
@@ -1971,21 +1963,20 @@ public class CodeAnalysis {
     public Object visit(StaticMethodCall ast, LocalContext context) {
       IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.resolve(ast.getTarget());
       IxCode.Expression[] params = typeCheckExps(ast.getArgs(), context);
-      if(type == null) return null;
-      if(params == null) return null;
-      IxCode.MethodRef[] methods = type.findMethod(ast.getName(), params);
-      
-      if(methods.length == 0){
-        report(METHOD_NOT_FOUND, ast,  type, ast.getName(), types(params));
+      if(type == null || params == null) {
         return null;
+      }else {
+        IxCode.MethodRef[] methods = type.findMethod(ast.getName(), params);
+        if(methods.length == 0){
+          report(METHOD_NOT_FOUND, ast,  type, ast.getName(), types(params));
+          return null;
+        }else if(methods.length > 1){
+          report(AMBIGUOUS_METHOD, ast,  ast.getName(), typeNames(methods[0].arguments()), typeNames(methods[1].arguments()));
+          return null;
+        }else {
+          return new IxCode.CallStatic(type, methods[0], doCastInsertion(methods[0].arguments(), params));
+        }
       }
-      if(methods.length > 1){
-        report(AMBIGUOUS_METHOD, ast,  ast.getName(), typeNames(methods[0].arguments()), typeNames(methods[1].arguments()));
-        return null;
-      }
-      
-      params = convert(methods[0].arguments(), params);
-      return new IxCode.CallStatic(type, methods[0], params);
     }
       
     private String[] typeNames(IxCode.TypeRef[] types) {

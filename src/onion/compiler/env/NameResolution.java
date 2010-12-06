@@ -47,24 +47,24 @@ public class NameResolution {
       if(name.equals("boolean")) return IxCode.BasicTypeRef.BOOLEAN;
       return IxCode.BasicTypeRef.VOID;
     }else if(component.getKind() == RawTypeNode.NOT_QUALIFIED){
-      return forSName(name);
+      return forName(name, false);
     }else{
-      return forQName(name);
+      return forName(name, true);
     }
   }
   
-  private IxCode.ClassTypeRef forQName(String qualifiedName) {
-    return table.load(qualifiedName);
-  }
-  
-  private IxCode.ClassTypeRef forSName(String simpleName) {
-    for(int i = 0; i < imports.size(); i++){
-      String qualifiedName = imports.get(i).match(simpleName);
-      if(qualifiedName != null){
-        IxCode.ClassTypeRef resolvedSymbol = forQName(qualifiedName);
-        if(resolvedSymbol != null) return resolvedSymbol;
+  private IxCode.ClassTypeRef forName(String name, boolean qualified) {
+    if(qualified) {
+      return table.load(name);
+    }else {
+      for(int i = 0; i < imports.size(); i++){
+        String qualifiedName = imports.get(i).match(name);
+        if(qualifiedName != null){
+          IxCode.ClassTypeRef resolvedSymbol = forName(qualifiedName, true);
+          if(resolvedSymbol != null) return resolvedSymbol;
+        }
       }
+      return null;
     }
-    return null;
   }
 }

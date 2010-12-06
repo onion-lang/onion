@@ -52,56 +52,7 @@ public class CodeAnalysis {
     return createName(moduleName, Paths.cutExtension(unit.getSourceFileName()) + "Main");
   }
 
-//---------------------------------------------------------------------------//
-
-  public void setSolver(NameResolution resolver){
-    this.solver = resolver;
-  }
-  
-  public NameResolution getSolver(){
-    return solver;
-  }
-  
-  public void setUnit(CompilationUnit unit){
-    this.unit = unit;
-  }
-  
-  public CompilationUnit getUnit(){
-    return unit;
-  }
-  
-  public void setImport(ImportList imports){
-    currentImport = imports;
-  }
-  
-  public ImportList getImport(){
-    return currentImport;
-  }
-  
-  public void setStaticImport(StaticImportList imports){
-    staticImport = imports;
-  }
-  
-  public StaticImportList getStaticImport(){
-    return staticImport;
-  }
-
-  public void setContextClass(IxCode.ClassDefinition contextClass){
-    this.contextClass = contextClass;
-  }
-  
-  public IxCode.ClassDefinition getContextClass(){
-    return contextClass;
-  }
-  
-  public void setAccess(int access){
-    this.access = access;
-  }
-  
-  public int getAccess(){
-    return access;
-  }
-//---------------------------------------------------------------------------//
+  //---------------------------------------------------------------------------//
   
   public void put(AstNode astNode, IxCode.Node kernelNode){
     ast2irt.put(astNode, kernelNode);
@@ -149,7 +100,7 @@ public class CodeAnalysis {
   }
   
   public IxCode.TypeRef resolve(TypeSpec type) {
-    return resolve(type, getSolver());
+    return resolve(type, solver);
   }
 
   public void report(int error, AstNode node, Object... items) {
@@ -194,7 +145,7 @@ public class CodeAnalysis {
     }
     
     public void process(CompilationUnit unit){
-      setUnit(unit);
+      CodeAnalysis.this.unit = unit;
       ModuleDeclaration module = unit.getModuleDeclaration();
       ImportListDeclaration imports = unit.getImportListDeclaration();
       String moduleName = module != null ? module.getName() : null;
@@ -215,14 +166,13 @@ public class CodeAnalysis {
       staticList.add(new StaticImportItem("java.lang.System", true));
       staticList.add(new StaticImportItem("java.lang.Runtime", true));
       staticList.add(new StaticImportItem("java.lang.Math", true));
-      
-      setImport(list);
-      setStaticImport(staticList);
-      TopLevelElement[] tops = unit.getTopLevels();
+
+      currentImport = list;
+      staticImport = staticList;
       int count = 0;
-      for(int i = 0; i < tops.length; i++){
-        if(tops[i] instanceof TypeDeclaration){
-          accept(tops[i], moduleName);
+      for(TopLevelElement top:unit.getTopLevels()) {
+        if(top instanceof TypeDeclaration){
+          accept(top, moduleName);
         }else {
           count++;
         }
@@ -242,21 +192,21 @@ public class CodeAnalysis {
     public Object visit(ClassDeclaration ast, String context) {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
-      node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
+      node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
       if(table.lookup(node.name()) != null){
         report(DUPLICATE_CLASS,  ast, node.name());
         return null;
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameResolution(getImport()));
+      addSolver(node.name(), new NameResolution(currentImport));
       return null;    
     }
     
     public Object visit(InterfaceDeclaration ast, String context) {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
-      node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
+      node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
       ClassTable table = CodeAnalysis.this.table;
       if(table.lookup(node.name()) != null){
         report(DUPLICATE_CLASS,  ast, node.name());
@@ -264,7 +214,7 @@ public class CodeAnalysis {
       }
       table.classes().add(node);
       put(ast, node);
-      addSolver(node.name(), new NameResolution(getImport()) );
+      addSolver(node.name(), new NameResolution(currentImport) );
       return null;
     }
     
@@ -280,10 +230,10 @@ public class CodeAnalysis {
     }
     
     public void process(CompilationUnit unit){
-      setUnit(unit);
-      TopLevelElement[] toplevels = unit.getTopLevels();    
-      for(int i = 0; i < toplevels.length; i++){      
-        setSolver(findSolver(topClass()));
+      CodeAnalysis.this.unit = unit;
+      TopLevelElement[] toplevels = unit.getTopLevels();
+      for(int i = 0; i < toplevels.length; i++){
+        CodeAnalysis.this.solver = findSolver(topClass());
         accept(toplevels[i]);
       }
     }
@@ -291,8 +241,8 @@ public class CodeAnalysis {
     public Object visit(ClassDeclaration ast, Void context) {
       countConstructor = 0;
       IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      setContextClass(node);
-      setSolver(findSolver(node.name()));
+      CodeAnalysis.this.contextClass = node;
+      CodeAnalysis.this.solver = findSolver(node.name());
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)) report(CYCLIC_INHERITANCE, ast, node.name());
       if(ast.getDefaultSection() != null){
@@ -310,8 +260,8 @@ public class CodeAnalysis {
       
     public Object visit(InterfaceDeclaration ast, Void context) {
       IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      setContextClass(node);
-      setSolver(findSolver(node.name()));
+      CodeAnalysis.this.contextClass = node;
+      CodeAnalysis.this.solver = findSolver(node.name());
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)){
         report(CYCLIC_INHERITANCE, ast, node.name());
@@ -330,8 +280,8 @@ public class CodeAnalysis {
         report(INTERFACE_REQUIRED, ast.getType(), type);
         return null;
       }
-      IxCode.ClassDefinition contextClass = getContextClass();
-      int modifier = ast.getModifier() | getAccess() | Modifier.FORWARDED;
+      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
+      int modifier = ast.getModifier() | access | Modifier.FORWARDED;
       String name = ast.getName();
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
       put(ast, node);
@@ -342,9 +292,9 @@ public class CodeAnalysis {
     public Object visit(ConstructorDeclaration ast, Void context) {
       countConstructor++;
       IxCode.TypeRef[] args = typesOf(ast.getArguments());
-      IxCode.ClassDefinition contextClass = getContextClass();
+      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       if(args == null) return null;
-      int modifier = ast.getModifier() | getAccess();
+      int modifier = ast.getModifier() | access;
       IxCode.ConstructorDefinition node = new IxCode.ConstructorDefinition(modifier, contextClass, args, null, null);
       put(ast, node);
       contextClass.add(node);
@@ -360,9 +310,9 @@ public class CodeAnalysis {
         returnType = IxCode.BasicTypeRef.VOID;
       }
       if(args == null || returnType == null) return null;
-      
-      IxCode.ClassDefinition contextClass = getContextClass();
-      int modifier = ast.getModifier() | getAccess();
+
+      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
+      int modifier = ast.getModifier() | access;
       if(ast.getBlock() == null) modifier |= Modifier.ABSTRACT;
       String name = ast.getName();    
       IxCode.MethodDefinition node = new IxCode.MethodDefinition(modifier, contextClass, name, args, returnType, null);
@@ -374,8 +324,8 @@ public class CodeAnalysis {
     public Object visit(FieldDeclaration ast, Void context) {
       IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;
-      IxCode.ClassDefinition contextClass = getContextClass();
-      int modifier = ast.getModifier() | getAccess();
+      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
+      int modifier = ast.getModifier() | access;
       String name = ast.getName();    
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
       put(ast, node);
@@ -406,7 +356,7 @@ public class CodeAnalysis {
       IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(
-        ast.getModifier() | getAccess(), getContextClass(), 
+        ast.getModifier() | access, contextClass,
         ast.getName(), type);
       return node;
     }
@@ -422,7 +372,7 @@ public class CodeAnalysis {
       if(args == null || returnType == null) return null;
       
       int modifier = Modifier.PUBLIC | Modifier.ABSTRACT;
-      IxCode.ClassDefinition classType = getContextClass();
+      IxCode.ClassDefinition classType = contextClass;
       String name = ast.getName();    
       IxCode.MethodDefinition node =
         new IxCode.MethodDefinition(modifier, classType, name, args, returnType, null);
@@ -468,8 +418,8 @@ public class CodeAnalysis {
       
     public Object visit(AccessSection section, Void context){
       if(section == null) return null;
-      
-      setAccess(section.getID());
+
+      CodeAnalysis.this.access = section.getID();
       MemberDeclaration[] members = section.getMembers();
       for(int i = 0; i < members.length; i++){
         accept(members[i], context);
@@ -578,12 +528,12 @@ public class CodeAnalysis {
     }
     
     public void process(CompilationUnit unit){
-      setUnit(unit);
+      CodeAnalysis.this.unit = unit;
       variables.clear();
       functions.clear();
       TopLevelElement[] toplevels = unit.getTopLevels();    
-      for(int i = 0; i < toplevels.length; i++){      
-        setSolver(findSolver(topClass()));
+      for(int i = 0; i < toplevels.length; i++){
+        CodeAnalysis.this.solver = findSolver(topClass());
         accept(toplevels[i]);
       }
     }
@@ -594,8 +544,8 @@ public class CodeAnalysis {
       methods.clear();
       fields.clear();
       constructors.clear();
-      setContextClass(node);
-      setSolver(findSolver(node.name()));
+      CodeAnalysis.this.contextClass = node;
+      CodeAnalysis.this.solver = findSolver(node.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -629,7 +579,7 @@ public class CodeAnalysis {
           }else {
             IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
             generated.add(generatedMethod);
-            getContextClass().add(generatedMethod);
+            contextClass.add(generatedMethod);
           }
         }
       }
@@ -637,7 +587,7 @@ public class CodeAnalysis {
     
     private IxCode.MethodDefinition createEmptyMethod(IxCode.FieldRef field, IxCode.MethodRef method){
       IxCode.Expression target;
-      target = new IxCode.RefField(new IxCode.This(getContextClass()), field);
+      target = new IxCode.RefField(new IxCode.This(contextClass), field);
       IxCode.TypeRef[] args = method.arguments();
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       LocalFrame frame = new LocalFrame(null);
@@ -653,7 +603,7 @@ public class CodeAnalysis {
         statement = new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null));
       }
       IxCode.MethodDefinition node = new IxCode.MethodDefinition(
-        Modifier.PUBLIC, getContextClass(), method.name(),
+        Modifier.PUBLIC, contextClass, method.name(),
         method.arguments(), method.returnType(), statement
       );
       node.setFrame(frame);
@@ -666,8 +616,8 @@ public class CodeAnalysis {
       methods.clear();
       fields.clear();
       constructors.clear();
-      setContextClass(node);
-      setSolver(findSolver(node.name()));
+      CodeAnalysis.this.contextClass = node;
+      CodeAnalysis.this.solver = findSolver(node.name());
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
         accept(members[i], context);
@@ -787,19 +737,19 @@ public class CodeAnalysis {
     
   //------------------------------ top level --------------------------------------//
     public Object visit(CompilationUnit unit, LocalContext object) {
-      setUnit(unit);
+      CodeAnalysis.this.unit = unit;
       TopLevelElement[] toplevels = unit.getTopLevels();
       LocalContext context = new LocalContext();
       List<IxCode.ActionStatement> statements = new ArrayList<IxCode.ActionStatement>();
       String className = topClass();
-      setSolver(findSolver(topClass()));
+      CodeAnalysis.this.solver = findSolver(topClass());
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
       IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);
       IxCode.MethodDefinition method = new IxCode.MethodDefinition(Modifier.PUBLIC, klass,  "start", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID, null);
       context.add("args", argsType);
       for(TopLevelElement element:toplevels) {
         if(!(element instanceof TypeDeclaration)){
-          setContextClass(klass);
+          CodeAnalysis.this.contextClass = klass;
         }
         if(element instanceof Statement){
           context.setMethod(method);
@@ -838,13 +788,13 @@ public class CodeAnalysis {
     }
     
     public Object visit(InterfaceDeclaration ast, LocalContext context) {
-      setContextClass((IxCode.ClassDefinition) lookupKernelNode(ast));
+      CodeAnalysis.this.contextClass = (IxCode.ClassDefinition) lookupKernelNode(ast);
       return null;
     }
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
-      setContextClass((IxCode.ClassDefinition) lookupKernelNode(ast));
-      setSolver(findSolver(getContextClass().name()));
+      CodeAnalysis.this.contextClass = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      CodeAnalysis.this.solver = findSolver(contextClass.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
       }
@@ -1300,7 +1250,7 @@ public class CodeAnalysis {
       IxCode.Expression[] params;
       params = typeCheckExps(ast.getParams(), context);
       if(params == null) return null;
-      IxCode.ClassTypeRef contextClass = getContextClass();
+      IxCode.ClassTypeRef contextClass = CodeAnalysis.this.contextClass;
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
       if(result._2 == null){
         if(result._1) report(METHOD_NOT_FOUND, ast, contextClass, ast.getName(), types(params));
@@ -1545,7 +1495,7 @@ public class CodeAnalysis {
       if(context.isStatic()) {
         return null;
       }else {
-        return new IxCode.This(getContextClass());
+        return new IxCode.This(contextClass);
       }
     }
     
@@ -1623,7 +1573,7 @@ public class CodeAnalysis {
       if(target.isArrayType()){
         IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).getComponent();
         if(!component.isBasicType()){
-          if(!isAccessible((IxCode.ClassTypeRef)component, getContextClass())){
+          if(!isAccessible((IxCode.ClassTypeRef)component, contextClass)){
             report(CLASS_NOT_ACCESSIBLE, ast, target, context);
             return false;
           }
@@ -1638,7 +1588,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(FieldOrMethodRef ast, LocalContext context) {
-      IxCode.ClassDefinition contextClass = getContextClass();
+      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       IxCode.Expression target = typeCheck(ast.getTarget(), context);
       if(target == null) return null;
       if(target.type().isBasicType() || target.type().isNullType()){
@@ -1656,7 +1606,7 @@ public class CodeAnalysis {
         }
       }
       IxCode.FieldRef field = findField(targetType, name);
-      if(field != null && isAccessible(field, getContextClass())){
+      if(field != null && isAccessible(field, CodeAnalysis.this.contextClass)){
         return new IxCode.RefField(target, field);
       }
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, targetType, name, new IxCode.Expression[0]);
@@ -1684,7 +1634,7 @@ public class CodeAnalysis {
       if(field == null){
         report(FIELD_NOT_FOUND, ast, targetType, ast.getName());
       }else{
-        report(FIELD_NOT_ACCESSIBLE, ast,  targetType, ast.getName(), getContextClass());
+        report(FIELD_NOT_ACCESSIBLE, ast,  targetType, ast.getName(), CodeAnalysis.this.contextClass);
       }
       return null;
     }
@@ -1699,8 +1649,8 @@ public class CodeAnalysis {
           report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
           return Pair.make(false, null);
         }
-        if(!isAccessible(methods[0], getContextClass())){
-          report(METHOD_NOT_ACCESSIBLE, ast, methods[0].affiliation(), name, methods[0].arguments(), getContextClass());
+        if(!isAccessible(methods[0], contextClass)){
+          report(METHOD_NOT_ACCESSIBLE, ast, methods[0].affiliation(), name, methods[0].arguments(), contextClass);
           return Pair.make(false, null);
         }
         return Pair.make(false, methods[0]);
@@ -1727,14 +1677,14 @@ public class CodeAnalysis {
         report(DUPLICATE_LOCAL_VARIABLE, ast, name);
         return null;
       }
-      IxCode.TypeRef type = resolve(ast.getType(), getSolver());
+      IxCode.TypeRef type = resolve(ast.getType(), solver);
       if(type == null) return null;
       context.add(name, type);
       return type;
     }
     
     public Object visit(onion.lang.syntax.NewArray ast, LocalContext context) {
-      IxCode.TypeRef type = resolve(ast.getType(), getSolver());
+      IxCode.TypeRef type = resolve(ast.getType(), solver);
       IxCode.Expression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(type == null || parameters == null) return null;
       IxCode.ArrayTypeRef resultType = loadArray(type, parameters.length);
@@ -1744,7 +1694,7 @@ public class CodeAnalysis {
     public Object visit(Cast ast, LocalContext context) {
       IxCode.Expression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
-      IxCode.TypeRef conversion = resolve(ast.getType(), getSolver());
+      IxCode.TypeRef conversion = resolve(ast.getType(), solver);
       if(conversion == null) return null;
       node = new IxCode.AsInstanceOf(node, conversion);
       return node;
@@ -1840,7 +1790,7 @@ public class CodeAnalysis {
     public Object visit(SelfFieldReference ast, LocalContext context) {
       IxCode.ClassTypeRef selfClass = null;
       if(context.isStatic()) return null;
-      selfClass = getContextClass();
+      selfClass = contextClass;
       IxCode.FieldRef field = findField(selfClass, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, selfClass, ast.getName());
@@ -1871,7 +1821,7 @@ public class CodeAnalysis {
         
     public Object visit(IsInstance ast, LocalContext context) {
       IxCode.Expression target = typeCheck(ast.getTarget(), context);
-      IxCode.TypeRef checkType = resolve(ast.getType(), getSolver());
+      IxCode.TypeRef checkType = resolve(ast.getType(), solver);
       if(target == null || checkType == null) return null;
       return new IxCode.InstanceOf(target, checkType);
     }
@@ -1887,7 +1837,7 @@ public class CodeAnalysis {
     public Object visit(SelfMethodCall ast, LocalContext context) {
       IxCode.Expression[] params = typeCheckExps(ast.getArguments(), context);
       if(params == null) return null;
-      IxCode.ClassDefinition targetType = getContextClass();
+      IxCode.ClassDefinition targetType = contextClass;
       IxCode.MethodRef[] methods = targetType.findMethod(ast.getName(), params);
       if(methods.length == 0){
         report(METHOD_NOT_FOUND, ast,  targetType, ast.getName(), types(params));
@@ -2470,7 +2420,7 @@ public class CodeAnalysis {
       }
       IxCode.Expression[] params = typeCheckExps(ast.getInitializers(), context);
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBody(), context);
-      IxCode.ClassDefinition currentClass = getContextClass();
+      IxCode.ClassDefinition currentClass = contextClass;
       IxCode.ClassTypeRef superClass = currentClass.getSuperClass();
       IxCode.ConstructorRef[] matched = superClass.findConstructor(params);
       if(matched.length == 0){

@@ -521,48 +521,41 @@ public class CodeAnalysis {
       return false;
     }
   
-    private void constructTypeHierarchy(IxCode.ClassTypeRef symbol, List visit) {
-      if(symbol == null || visit.indexOf(symbol) >= 0) return;
-      visit.add(symbol);
-      if(symbol instanceof IxCode.ClassDefinition){
-        IxCode.ClassDefinition node = (IxCode.ClassDefinition) symbol;
+    private void constructTypeHierarchy(IxCode.ClassTypeRef ref, List<IxCode.ClassTypeRef> visit) {
+      if(ref == null || visit.indexOf(ref) >= 0) return;
+      visit.add(ref);
+      if(ref instanceof IxCode.ClassDefinition){
+        IxCode.ClassDefinition node = (IxCode.ClassDefinition) ref;
         if(node.isResolutionComplete()) return;
         IxCode.ClassTypeRef superClass = null;
-        List interfaces = new ArrayList();
+        List<IxCode.ClassTypeRef> interfaces = new ArrayList<IxCode.ClassTypeRef>();
         NameResolution resolver = findSolver(node.name());
         if(node.isInterface()){
           InterfaceDeclaration ast = (InterfaceDeclaration) lookupAST(node);
           superClass = rootClass();
           TypeSpec[] typeSpecifiers = ast.getInterfaces();
-          for(int i = 0; i < typeSpecifiers.length; i++){
-            IxCode.ClassTypeRef superType = validateSuperType(typeSpecifiers[i], true, resolver);
-            if(superType != null){
-              interfaces.add(superType);
-            }
+          for(TypeSpec typeSpec:ast.getInterfaces()) {
+            IxCode.ClassTypeRef superType = validateSuperType(typeSpec, true, resolver);
+            if(superType != null) interfaces.add(superType);
           }
         }else{
           ClassDeclaration ast = (ClassDeclaration) lookupAST(node);
-          superClass = 
-            validateSuperType(ast.getSuperClass(), false, resolver);
-          TypeSpec[] typeSpecifiers = ast.getInterfaces();
-          for(int i = 0; i < typeSpecifiers.length; i++){
-            IxCode.ClassTypeRef superType = validateSuperType(typeSpecifiers[i], true, resolver);
-            if(superType != null){
-              interfaces.add(superType);
-            }
+          superClass = validateSuperType(ast.getSuperClass(), false, resolver);
+          for(TypeSpec typeSpec:ast.getInterfaces()) {
+            IxCode.ClassTypeRef superType = validateSuperType(typeSpec, true, resolver);
+            if(superType != null) interfaces.add(superType);
           }
         }
         constructTypeHierarchy(superClass, visit);
-        for(Iterator i = interfaces.iterator(); i.hasNext();){
-          IxCode.ClassTypeRef superType = (IxCode.ClassTypeRef) i.next();
+        for(IxCode.ClassTypeRef superType:interfaces) {
           constructTypeHierarchy(superType, visit);
         }
         node.setSuperClass(superClass);
-        node.setInterfaces((IxCode.ClassTypeRef[]) interfaces.toArray(new IxCode.ClassTypeRef[0]));
+        node.setInterfaces(interfaces.toArray(new IxCode.ClassTypeRef[0]));
         node.setResolutionComplete(true);
       }else{
-        constructTypeHierarchy(symbol.getSuperClass(), visit);
-        IxCode.ClassTypeRef[] interfaces = symbol.getInterfaces();
+        constructTypeHierarchy(ref.getSuperClass(), visit);
+        IxCode.ClassTypeRef[] interfaces = ref.getInterfaces();
         for(int i = 0; i < interfaces.length; i++){
           constructTypeHierarchy(interfaces[i], visit);
         }

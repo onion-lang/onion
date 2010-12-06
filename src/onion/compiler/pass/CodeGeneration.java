@@ -16,11 +16,12 @@ import onion.lang.syntax.Modifier;
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.generic.*;
-
+import static onion.compiler.IxCode.BinaryExpression.Constants.*;
+import static onion.compiler.IxCode.UnaryExpression.Constants.*;
 /**
  * @author Kota Mizushima Date: 2005/04/10
  */
-public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode.UnaryExpression.Constants {
+public class CodeGeneration  {
   private CompilerConfig config;
   private List compiledClasses = new ArrayList();
   private SymbolGenerator generator;

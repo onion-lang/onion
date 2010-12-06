@@ -35,9 +35,9 @@ public class CodeAnalysis {
   private SemanticErrorReporter reporter;
   private CompilerConfig config;
   private ClassTable table;
-  private Map irt2ast;
-  private Map ast2irt;
-  private Map solvers;
+  private Map<IxCode.Node, AstNode> irt2ast;
+  private Map<AstNode, IxCode.Node> ast2irt;
+  private Map<String, NameResolution> solvers;
   
   private CompilationUnit unit;
   private StaticImportList staticImport;
@@ -112,11 +112,11 @@ public class CodeAnalysis {
   }
   
   public AstNode lookupAST(IxCode.Node kernelNode){
-    return (AstNode) irt2ast.get(kernelNode);
+    return irt2ast.get(kernelNode);
   }
   
   public IxCode.Node lookupKernelNode(AstNode astNode){
-    return (IxCode.Node) ast2irt.get(astNode);
+    return ast2irt.get(astNode);
   }
   
   public void addSolver(String className, NameResolution solver) {
@@ -124,7 +124,7 @@ public class CodeAnalysis {
   }
   
   public NameResolution findSolver(String className){
-    return (NameResolution) solvers.get(className);
+    return solvers.get(className);
   }
   
   private String createName(String moduleName, String simpleName){
@@ -2569,9 +2569,9 @@ public class CodeAnalysis {
   public CodeAnalysis(CompilerConfig config) {
     this.config   = config;
     this.table    = new ClassTable(classpath(config.getClassPath()));
-    this.irt2ast  = new HashMap();
-    this.ast2irt  = new HashMap();
-    this.solvers  = new HashMap();
+    this.irt2ast  = new HashMap<IxCode.Node, AstNode>();
+    this.ast2irt  = new HashMap<AstNode, IxCode.Node>();
+    this.solvers  = new HashMap<String, NameResolution>();
     this.reporter = new SemanticErrorReporter(this.config.getMaxErrorReports());
   }
   

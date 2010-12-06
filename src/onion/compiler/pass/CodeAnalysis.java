@@ -226,9 +226,9 @@ public class CodeAnalysis {
       for(int i = 0; i < tops.length; i++){
         if(tops[i] instanceof TypeDeclaration){
           accept(tops[i], moduleName);
-          continue;
+        }else {
+          count++;
         }
-        count++;
       }
       ClassTable table = getTable();
       if(count > 0){
@@ -627,14 +627,15 @@ public class CodeAnalysis {
       Set src = Classes.getInterfaceMethods(type);
       for (Iterator i = src.iterator(); i.hasNext();) {
         IxCode.MethodRef method = (IxCode.MethodRef) i.next();
-        if(methodSet.contains(method)) continue;
-        if(generated.contains(method)){
-          report(DUPLICATE_GENERATED_METHOD, lookupAST(node), method.affiliation(), method.name(), method.arguments());
-          continue;
+        if(!methodSet.contains(method)) {
+          if(generated.contains(method)){
+            report(DUPLICATE_GENERATED_METHOD, lookupAST(node), method.affiliation(), method.name(), method.arguments());
+          }else {
+            IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
+            generated.add(generatedMethod);
+            getContextClass().addMethod(generatedMethod);
+          }
         }
-        IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
-        generated.add(generatedMethod);
-        getContextClass().addMethod(generatedMethod);
       }
     }
     
@@ -1785,14 +1786,7 @@ public class CodeAnalysis {
         }
         if(error) return null;
         IxCode.MethodRef[] methods = type.methods();
-        IxCode.MethodRef method = null;
-        for(int i = 0; i < methods.length; i++){
-          IxCode.TypeRef[] types = methods[i].arguments();
-          if(name.equals(methods[i].name()) && equals(argTypes, types)){
-            method = methods[i];
-            break;
-          }
-        }
+        IxCode.MethodRef method = matches(argTypes, name, methods);
         if(method == null){
           report(METHOD_NOT_FOUND, ast, type, name, argTypes);
           return null;
@@ -1808,7 +1802,17 @@ public class CodeAnalysis {
         context.closeFrame();
       }     
     }
-    
+
+    private IxCode.MethodRef matches(IxCode.TypeRef[] argTypes, String name, IxCode.MethodRef[] methods) {
+      for(int i = 0; i < methods.length; i++){
+        IxCode.TypeRef[] types = methods[i].arguments();
+        if(name.equals(methods[i].name()) && equals(argTypes, types)){
+          return methods[i];
+        }
+      }
+      return null;
+    }
+
     public Object visit(Indexing ast, LocalContext context) {
       IxCode.Expression target = typeCheck(ast.getLeft(), context);
       IxCode.Expression index = typeCheck(ast.getRight(), context);
@@ -2289,27 +2293,19 @@ public class CodeAnalysis {
       return statement;
     }
     
-    IxCode.Expression processNodes(
-      onion.lang.syntax.Expression[] asts, IxCode.TypeRef type, ClosureLocalBinding bind, LocalContext context
-    ) {
+    IxCode.Expression processNodes(Expression[] asts, IxCode.TypeRef type, ClosureLocalBinding bind, LocalContext context) {
       IxCode.Expression[] nodes = new IxCode.Expression[asts.length];
       boolean error = false;
       for(int i = 0; i < asts.length; i++){
         nodes[i] = typeCheck(asts[i], context);
         if(nodes[i] == null){
           error = true;
-          continue;
-        }
-        if(!IxCode.TypeRules.isAssignable(type, nodes[i].type())){
+        }else if(!IxCode.TypeRules.isAssignable(type, nodes[i].type())){
           report(INCOMPATIBLE_TYPE, asts[i], type, nodes[i].type());
           error = true;
-          continue;
-        }
-        if(nodes[i].isBasicType() && nodes[i].type() != type){
-          nodes[i] = new IxCode.AsInstanceOf(nodes[i], type);
-        }
-        if(nodes[i].isReferenceType() && nodes[i].type() != rootClass()){
-          nodes[i] = new IxCode.AsInstanceOf(nodes[i], rootClass());
+        }else {
+          if(nodes[i].isBasicType() && nodes[i].type() != type) nodes[i] = new IxCode.AsInstanceOf(nodes[i], type);
+          if(nodes[i].isReferenceType() && nodes[i].type() != rootClass()) nodes[i] = new IxCode.AsInstanceOf(nodes[i], rootClass());
         }
       }
       if(!error){

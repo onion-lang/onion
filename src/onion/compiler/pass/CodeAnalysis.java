@@ -862,14 +862,13 @@ public class CodeAnalysis {
         method.setBlock(new IxCode.StatementBlock(statements));
         method.setFrame(context.getContextFrame());
         klass.addMethod(method);      
-        klass.addMethod(mainMethod(klass, method, "main", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID));
+        klass.addMethod(createMain(klass, method, "main", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID));
       }
       return null;
     }
     
-    private IxCode.MethodDefinition mainMethod(IxCode.ClassTypeRef top, IxCode.MethodRef ref, String name, IxCode.TypeRef[] args, IxCode.TypeRef ret) {
-      IxCode.MethodDefinition method = new IxCode.MethodDefinition(
-        Modifier.STATIC | Modifier.PUBLIC, top, name, args, ret, null);
+    private IxCode.MethodDefinition createMain(IxCode.ClassTypeRef top, IxCode.MethodRef ref, String name, IxCode.TypeRef[] args, IxCode.TypeRef ret) {
+      IxCode.MethodDefinition method = new IxCode.MethodDefinition(Modifier.STATIC | Modifier.PUBLIC, top, name, args, ret, null);
       LocalFrame frame = new LocalFrame(null);
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       for(int i = 0; i < args.length; i++){
@@ -877,10 +876,10 @@ public class CodeAnalysis {
         params[i] = new IxCode.RefLocal(0, index, args[i]);
       }
       method.setFrame(frame);
-      IxCode.ConstructorRef c = top.findConstructor(new IxCode.Expression[0])[0];
-      IxCode.Expression exp = new IxCode.NewObject(c, new IxCode.Expression[0]);
-      exp = new IxCode.Call(exp, ref, params);
-      IxCode.StatementBlock block = new IxCode.StatementBlock(new IxCode.ExpressionStatement(exp));
+      IxCode.ConstructorRef cref = top.findConstructor(new IxCode.Expression[0])[0];
+      IxCode.StatementBlock block = new IxCode.StatementBlock(
+        new IxCode.ExpressionStatement(new IxCode.Call(new IxCode.NewObject(cref, new IxCode.Expression[0]), ref, params))
+      );
       block = addReturnNode(block, IxCode.BasicTypeRef.VOID);
       method.setBlock(block);
       return method;

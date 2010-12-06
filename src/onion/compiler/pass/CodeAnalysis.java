@@ -144,10 +144,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
 //----------------------------------------------------------------------------//
 
   public IxCode.TypeRef resolve(TypeSpec type, NameResolution resolver) {
-    IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.resolve(type);
-    if(resolvedType == null){
-      report(CLASS_NOT_FOUND, type, new Object[]{type.getComponentName()});      
-    }
+    IxCode.TypeRef resolvedType = resolver.resolve(type);
+    if(resolvedType == null) report(CLASS_NOT_FOUND, type, type.getComponentName());
     return resolvedType;
   }
   
@@ -155,7 +153,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     return resolve(type, getSolver());
   }
 
-  public void report(int error, AstNode node, Object[] items) {
+  public void report(int error, AstNode node, Object... items) {
     reporter.setSourceFile(unit.getSourceFileName());
     reporter.report(error, node.getLocation(), items);
   }
@@ -265,7 +263,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
       node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
       if(getTable().lookup(node.name()) != null){
-        report(DUPLICATE_CLASS,  ast, new Object[]{node.name()});
+        report(DUPLICATE_CLASS,  ast, node.name());
         return null;
       }
       ClassTable table = getTable();
@@ -281,7 +279,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
       ClassTable table = getTable();
       if(table.lookup(node.name()) != null){
-        report(DUPLICATE_CLASS,  ast, new Object[]{node.name()});
+        report(DUPLICATE_CLASS,  ast, node.name());
         return null;
       }
       table.addSourceClass(node);
@@ -919,7 +917,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       if(left.isBasicType()){
         if(left.type() == IxCode.BasicTypeRef.VOID){
-          report(IS_NOT_BOXABLE_TYPE, ast.getLeft(), new Object[]{left.type()});
+          report(IS_NOT_BOXABLE_TYPE, ast.getLeft(), left.type());
           return null;
         }else{
           left = Boxing.boxing(getTable(), left);
@@ -927,7 +925,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       if(right.isBasicType()){
         if(right.type() == IxCode.BasicTypeRef.VOID){
-          report(IS_NOT_BOXABLE_TYPE, ast.getRight(), new Object[]{right.type()});
+          report(IS_NOT_BOXABLE_TYPE, ast.getRight(), right.type());
           return null;
         }else{
           right = Boxing.boxing(getTable(), right);
@@ -947,7 +945,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression operand = typeCheck(node.getTarget(), local);
       if(operand == null) return null;
       if((!operand.isBasicType()) || !hasNumericType(operand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{operand.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.getSymbol(), new IxCode.TypeRef[]{operand.type()});
         return null;
       }
       IxCode.Expression result = null;
@@ -982,7 +980,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           )
         );
       }else {
-        report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
+        report(UNIMPLEMENTED_FEATURE, node);
       }
       return result;
     }
@@ -991,7 +989,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression operand = typeCheck(node.getTarget(), local);
       if(operand == null) return null;
       if((!operand.isBasicType()) || !hasNumericType(operand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{operand.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.getSymbol(), new IxCode.TypeRef[]{operand.type()});
         return null;
       }
       IxCode.Expression result = null;
@@ -1026,7 +1024,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           )
         );
       }else {
-        report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
+        report(UNIMPLEMENTED_FEATURE, node);
       }
       return result;
     }
@@ -1036,9 +1034,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression l = typeCheck(ast.getLeft(), context);
       IxCode.Expression r = typeCheck(ast.getRight(), context);
       if(l.isBasicType() || r.isBasicType() || !IxCode.TypeRules.isAssignable(l.type(), r.type())) {
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{l.type(), r.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{l.type(), r.type()});
         return null;
       }
       return new IxCode.BinaryExpression(ELVIS, l.type(), l, r);
@@ -1161,9 +1157,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if((leftType != IxCode.BasicTypeRef.BOOLEAN) || (rightType != IxCode.BasicTypeRef.BOOLEAN)){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       return new IxCode.Expression[]{left, right};
@@ -1178,23 +1172,19 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.Expression[] params = new IxCode.Expression[]{right};
         Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)left.type(), "add", params);
         if(result._2 == null){
-          report(METHOD_NOT_FOUND, ast, new Object[]{left.type(), "add", types(params)});
+          report(METHOD_NOT_FOUND, ast, left.type(), "add", types(params));
           return null;
         }
         return new IxCode.Call(left, result._2, params);
       }
       if(!right.type().isBasicType()){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.BasicTypeRef leftType = (IxCode.BasicTypeRef)left.type();
       IxCode.BasicTypeRef rightType = (IxCode.BasicTypeRef)right.type();
       if((!leftType.isInteger()) || (!rightType.isInteger())){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.TypeRef leftResultType = promoteInteger(leftType);
@@ -1223,9 +1213,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       if((!left.isBasicType()) || (!right.isBasicType())){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.BasicTypeRef leftType = (IxCode.BasicTypeRef)left.type();
@@ -1236,7 +1224,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }else if(leftType.isBoolean() && rightType.isBoolean()){
         resultType = IxCode.BasicTypeRef.BOOLEAN;
       }else{
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
         return null;
       }
       if(left.type() != resultType){
@@ -1250,7 +1238,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     IxCode.Expression checkNumExp(int kind, onion.lang.syntax.BinaryExpression ast, IxCode.Expression left, IxCode.Expression right, LocalContext context) {
       if((!hasNumericType(left)) || (!hasNumericType(right))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.TypeRef resultType = promote(left.type(), right.type());
@@ -1272,7 +1260,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(
         (left.isBasicType() && (!right.isBasicType())) ||
         ((!left.isBasicType()) && (right.isBasicType()))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
         return null;
       }
       if(left.isBasicType() && right.isBasicType()){
@@ -1285,7 +1273,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
             right = new IxCode.AsInstanceOf(right, resultType);
           }
         }else if(leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN){
-          report(INCOMPATIBLE_OPERAND_TYPE, ast, new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}});
+          report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
           return null;
         }
       }
@@ -1297,14 +1285,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type(), rightType = right.type();
-      if(
-        (left.isBasicType() && (!right.isBasicType())) ||
-        ((!left.isBasicType()) && (right.isBasicType()))
-      ){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}}
-        );
+      if((left.isBasicType() && (!right.isBasicType())) || ((!left.isBasicType()) && (right.isBasicType()))){
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
         return null;
       }
       if(left.isBasicType() && right.isBasicType()){      
@@ -1317,10 +1299,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
             right = new IxCode.AsInstanceOf(right, resultType);
           }
         }else if(leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN){
-          report(
-            INCOMPATIBLE_OPERAND_TYPE, ast,
-            new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType}}
-          );
+          report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
           return null;
         }
       }else if(left.isReferenceType() && right.isReferenceType()){
@@ -1347,9 +1326,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if((!numeric(left.type())) || (!numeric(right.type()))){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.TypeRef resultType = promote(leftType, rightType);
@@ -1374,11 +1351,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.ClassTypeRef contextClass = getContextClass();
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
       if(result._2 == null){
-        if(result._1){
-          report(
-            METHOD_NOT_FOUND, ast, 
-            new Object[]{contextClass, ast.getName(), types(params)});
-        }
+        if(result._1) report(METHOD_NOT_FOUND, ast, contextClass, ast.getName(), types(params));
         return null;
       }
       return new IxCode.CallSuper(new IxCode.This(contextClass), result._2, params);
@@ -1427,9 +1400,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
       if(!hasNumericType(node)){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast, 
-          new Object[]{"+", new IxCode.TypeRef[]{node.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast,  "+", new IxCode.TypeRef[]{node.type()});
         return null;
       }
       node = new IxCode.UnaryExpression(PLUS, node.type(), node);
@@ -1440,10 +1411,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
       if(!hasNumericType(node)){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{"-", new IxCode.TypeRef[]{node.type()}}
-        );
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, "-", new IxCode.TypeRef[]{node.type()});
         return null;
       }
       node = new IxCode.UnaryExpression(MINUS, node.type(), node);
@@ -1454,9 +1422,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
       if(node.type() != IxCode.BasicTypeRef.BOOLEAN){
-        report(
-          INCOMPATIBLE_OPERAND_TYPE, ast,
-          new Object[]{"!", new IxCode.TypeRef[]{node.type()}});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, "!", new IxCode.TypeRef[]{node.type()});
         return null;
       }
       node = new IxCode.UnaryExpression(NOT, IxCode.BasicTypeRef.BOOLEAN, node);
@@ -1522,13 +1488,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       IxCode.FieldRef field = findField(selfClass, ref.getName());
       if(field == null){
-        report(FIELD_NOT_FOUND, ref, new Object[]{selfClass, ref.getName()});
+        report(FIELD_NOT_FOUND, ref, selfClass, ref.getName());
         return null;
       }
       if(!isAccessible(field, selfClass)){
-        report(
-          FIELD_NOT_ACCESSIBLE, ast, 
-          new Object[]{field.affiliation(), field.name(), selfClass});
+        report(FIELD_NOT_ACCESSIBLE, ast, field.affiliation(), field.name(), selfClass);
         return null;
       }
       value = processAssignable(ast.getRight(), field.getType(), value);
@@ -1543,17 +1507,13 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression index = typeCheck(indexing.getRight(), context);
       if(value == null || target == null || index == null) return null;
       if(target.isBasicType()){
-        report(
-          INCOMPATIBLE_TYPE,
-          indexing.getLeft(), new Object[]{rootClass(), target.type()});
+        report(INCOMPATIBLE_TYPE, indexing.getLeft(), rootClass(), target.type());
         return null;
       }
       if(target.isArrayType()){
         IxCode.ArrayTypeRef targetType = ((IxCode.ArrayTypeRef)target.type());
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
-          report(
-            INCOMPATIBLE_TYPE, 
-            indexing.getRight(), new Object[]{IxCode.BasicTypeRef.INT, index.type()});
+          report(INCOMPATIBLE_TYPE,  indexing.getRight(), IxCode.BasicTypeRef.INT, index.type());
           return null;
         }
         IxCode.TypeRef base = targetType.getBase();
@@ -1565,9 +1525,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       params = new IxCode.Expression[]{index, value};
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "set", new IxCode.Expression[]{index, value});
       if(result._2 == null){
-        report(
-          METHOD_NOT_FOUND, ast, 
-          new Object[]{target.type(), "set", types(params)});
+        report(METHOD_NOT_FOUND, ast,  target.type(), "set", types(params));
         return null;
       }
       return new IxCode.Call(target, result._2, params);
@@ -1575,37 +1533,37 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     Object processFieldOrMethodAssign(Assignment ast, LocalContext context){
       IxCode.Expression right = typeCheck(ast.getRight(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(AdditionAssignment ast, LocalContext context) {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(SubtractionAssignment ast, LocalContext context) {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(MultiplicationAssignment ast, LocalContext context) {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);    
+      report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(DivisionAssignment ast, LocalContext context) {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(ModuloAssignment ast, LocalContext context) {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
   //-----------------------------------------------------------------------------//
@@ -1615,7 +1573,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       LocalContext local = context;
       ClosureLocalBinding bind = local.lookup(ast.getName());
       if(bind == null){
-        report(VARIABLE_NOT_FOUND, ast, new Object[]{ast.getName()});
+        report(VARIABLE_NOT_FOUND, ast, ast.getName());
         return null;
       }
       return new IxCode.RefLocal(bind);
@@ -1625,9 +1583,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression[] params = new IxCode.Expression[0];
       IxCode.MethodRef[] methods = type.findMethod(name, params);
       if(methods.length == 0){
-        report(
-          METHOD_NOT_FOUND, ast, 
-          new Object[]{type, name, types(params)});
+        report(METHOD_NOT_FOUND, ast,  type, name, types(params));
         return null;
       }
       return methods[0];
@@ -1722,13 +1678,13 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).getComponent();
         if(!component.isBasicType()){
           if(!isAccessible((IxCode.ClassTypeRef)component, getContextClass())){
-            report(CLASS_NOT_ACCESSIBLE, ast, new Object[]{target, context});
+            report(CLASS_NOT_ACCESSIBLE, ast, target, context);
             return false;
           }
         }
       }else{
         if(!isAccessible((IxCode.ClassTypeRef)target, context)){
-          report(CLASS_NOT_ACCESSIBLE, ast, new Object[]{target, context});
+          report(CLASS_NOT_ACCESSIBLE, ast, target, context);
           return false;
         }
       }
@@ -1740,9 +1696,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression target = typeCheck(ast.getTarget(), context);
       if(target == null) return null;
       if(target.type().isBasicType() || target.type().isNullType()){
-        report(
-          INCOMPATIBLE_TYPE, ast.getTarget(),
-          new IxCode.TypeRef[]{rootClass(), target.type()});
+        report(INCOMPATIBLE_TYPE, ast.getTarget(), rootClass(), target.type());
         return null;
       }
       IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
@@ -1785,11 +1739,9 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       
       if(field == null){
-        report(FIELD_NOT_FOUND, ast, new Object[]{targetType, ast.getName()});
+        report(FIELD_NOT_FOUND, ast, targetType, ast.getName());
       }else{
-        report(
-          FIELD_NOT_ACCESSIBLE, ast, 
-          new Object[]{targetType, ast.getName(), getContextClass()});
+        report(FIELD_NOT_ACCESSIBLE, ast,  targetType, ast.getName(), getContextClass());
       }
       return null;
     }
@@ -1801,26 +1753,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       methods = target.findMethod(name, params);
       if(methods.length > 0){
         if(methods.length > 1){
-          report(
-            AMBIGUOUS_METHOD, ast,
-            new Object[]{
-              new Object[]{
-                methods[0].affiliation(), name, methods[0].arguments()
-              },
-              new Object[]{
-                methods[1].affiliation(), name, methods[1].arguments()
-              }
-            });
+          report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
           return Pair.make(false, null);
         }
         if(!isAccessible(methods[0], getContextClass())){
-          report(
-            METHOD_NOT_ACCESSIBLE, ast,
-            new Object[]{
-              methods[0].affiliation(), name, methods[0].arguments(),
-              getContextClass()
-            }
-          );
+          report(METHOD_NOT_ACCESSIBLE, ast, methods[0].affiliation(), name, methods[0].arguments(), getContextClass());
           return Pair.make(false, null);
         }
         return Pair.make(false, methods[0]);
@@ -1845,7 +1782,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       String name = ast.getName();
       ClosureLocalBinding binding = local.lookupOnlyCurrentScope(name);
       if(binding != null){
-        report(DUPLICATE_LOCAL_VARIABLE, ast, new Object[]{name});
+        report(DUPLICATE_LOCAL_VARIABLE, ast, name);
         return null;
       }
       IxCode.TypeRef type = resolve(ast.getType(), getSolver());
@@ -1896,7 +1833,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         }     
         if(type == null) return null;
         if(!type.isInterface()){
-          report(INTERFACE_REQUIRED, ast.getType(), new Object[]{type});
+          report(INTERFACE_REQUIRED, ast.getType(), type);
           return null;
         }
         if(error) return null;
@@ -1910,7 +1847,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           }
         }
         if(method == null){
-          report(METHOD_NOT_FOUND, ast, new Object[]{type, name, argTypes});
+          report(METHOD_NOT_FOUND, ast, type, name, argTypes);
           return null;
         }
         local.setMethod(method);
@@ -1931,24 +1868,18 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(target == null || index == null) return null;
       if(target.isArrayType()){
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
-          report(
-            INCOMPATIBLE_TYPE, ast, new Object[]{IxCode.BasicTypeRef.INT, index.type()});
+          report(INCOMPATIBLE_TYPE, ast, IxCode.BasicTypeRef.INT, index.type());
           return null;
         }
         return new IxCode.ArrayRef(target, index);
       }    
       if(target.isBasicType()){
-        report(
-          INCOMPATIBLE_TYPE,
-          ast.getLeft(), new Object[]{rootClass(), target.type()});
+        report(INCOMPATIBLE_TYPE, ast.getLeft(), rootClass(), target.type());
         return null;
       }
       if(target.isArrayType()){
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
-          report(
-            INCOMPATIBLE_TYPE, 
-            ast.getRight(), new Object[]{IxCode.BasicTypeRef.INT, index.type()}
-          );
+          report(INCOMPATIBLE_TYPE,  ast.getRight(), IxCode.BasicTypeRef.INT, index.type());
           return null;
         }
         return new IxCode.ArrayRef(target, index);
@@ -1956,9 +1887,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.Expression[] params = {index};
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, (IxCode.ObjectTypeRef)target.type(), "get", new IxCode.Expression[]{index});
       if(result._2 == null){
-        report(
-          METHOD_NOT_FOUND, ast, 
-          new Object[]{target.type(), "get", types(params)});
+        report(METHOD_NOT_FOUND, ast,  target.type(), "get", types(params));
         return null;
       }
       return new IxCode.Call(target, result._2, params);
@@ -1971,13 +1900,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       selfClass = getContextClass();
       IxCode.FieldRef field = findField(selfClass, ast.getName());
       if(field == null){
-        report(FIELD_NOT_FOUND, ast, new Object[]{selfClass, ast.getName()});
+        report(FIELD_NOT_FOUND, ast, selfClass, ast.getName());
         return null;
       }
       if(!isAccessible(field, selfClass)){
-        report(
-          FIELD_NOT_ACCESSIBLE, ast, 
-          new Object[]{field.affiliation(), ast.getName(), selfClass});
+        report(FIELD_NOT_ACCESSIBLE, ast,  field.affiliation(), ast.getName(), selfClass);
         return null;
       }    
       return new IxCode.RefField(new IxCode.This(selfClass), field);
@@ -1989,22 +1916,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(parameters == null || type == null) return null;
       IxCode.ConstructorRef[] constructors = type.findConstructor(parameters);
       if(constructors.length == 0){
-        report(CONSTRUCTOR_NOT_FOUND, ast, new Object[]{type, types(parameters)});
+        report(CONSTRUCTOR_NOT_FOUND, ast, type, types(parameters));
         return null;
       }
       if(constructors.length > 1){
-        report(
-          AMBIGUOUS_CONSTRUCTOR, ast,
-          new Object[]{
-            new Object[]{
-              constructors[0].affiliation(),
-              constructors[0].getArgs()
-            },
-            new Object[]{
-              constructors[1].affiliation(),
-              constructors[1].getArgs()
-            }
-          });
+        report(AMBIGUOUS_CONSTRUCTOR, ast, new Object[]{constructors[0].affiliation(), constructors[0].getArgs()}, new Object[]{constructors[1].affiliation(), constructors[1].getArgs()});
         return null;
       }
       return new IxCode.NewObject(constructors[0], parameters);
@@ -2033,23 +1949,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodRef[] methods = targetType.findMethod(ast.getName(), params);
       
       if(methods.length == 0){
-        report(
-          METHOD_NOT_FOUND, ast, 
-          new Object[]{targetType, name, types(params)});
+        report(METHOD_NOT_FOUND, ast,  targetType, name, types(params));
         return null;
       }
       
       if(methods.length > 1){
-        report(
-          AMBIGUOUS_METHOD, ast,
-          new Object[]{
-            new Object[]{
-              methods[0].affiliation(), name, methods[0].arguments()
-            },
-            new Object[]{
-              methods[1].affiliation(), name, methods[1].arguments()
-            }
-          });
+        report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
         return null;
       }
       
@@ -2086,29 +1991,15 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodRef[] methods = targetType.findMethod(name, params);
       
       if(methods.length == 0){
-        report(
-          METHOD_NOT_FOUND, ast, new Object[]{targetType, name, types(params)});
+        report(METHOD_NOT_FOUND, ast, targetType, name, types(params));
         return null;
       }
       if(methods.length > 1){
-        report(
-          AMBIGUOUS_METHOD, ast,
-          new Object[]{
-            new Object[]{
-              methods[0].affiliation(), name, methods[0].arguments()
-            },
-            new Object[]{
-              methods[1].affiliation(), name, methods[1].arguments()
-            }
-          });
+        report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
         return null;
       }    
       if((methods[0].modifier() & Modifier.STATIC) != 0){
-        report(
-          ILLEGAL_METHOD_CALL, ast,
-          new Object[]{
-            methods[0].affiliation(), name, methods[0].arguments()
-          });
+        report(ILLEGAL_METHOD_CALL, ast,  methods[0].affiliation(), name, methods[0].arguments());
         return null;
       }    
       params = convert(methods[0].arguments(), params);
@@ -2120,7 +2011,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(type == null) return null;
       IxCode.FieldRef field = findField(type, ast.getName());
       if(field == null){
-        report(FIELD_NOT_FOUND, ast, new Object[]{type, ast.getName()});
+        report(FIELD_NOT_FOUND, ast, type, ast.getName());
         return null;
       }
       return new IxCode.StaticFieldRef(type, field);
@@ -2134,18 +2025,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.MethodRef[] methods = type.findMethod(ast.getName(), params);
       
       if(methods.length == 0){
-        report(
-          METHOD_NOT_FOUND, ast, 
-          new Object[]{type, ast.getName(), types(params)});
+        report(METHOD_NOT_FOUND, ast,  type, ast.getName(), types(params));
         return null;
       }
       if(methods.length > 1){
-        report(
-          AMBIGUOUS_METHOD, ast,
-          new Object[]{
-            ast.getName(),
-            typeNames(methods[0].arguments()), typeNames(methods[1].arguments())
-          });
+        report(AMBIGUOUS_METHOD, ast,  ast.getName(), typeNames(methods[0].arguments()), typeNames(methods[1].arguments()));
         return null;
       }
       
@@ -2191,9 +2075,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.ActionStatement block = translate(ast.getStatement(), context);
         
         if(collection.isBasicType()){
-          report(
-            INCOMPATIBLE_TYPE, collectionAST,
-            new Object[]{load("java.util.Collection"), collection.type()});
+          report(INCOMPATIBLE_TYPE, collectionAST, load("java.util.Collection"), collection.type());
           return null;
         }
         ClosureLocalBinding bind2 = new ClosureLocalBinding(
@@ -2283,7 +2165,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           if(texpr != null && texpr.type() != IxCode.BasicTypeRef.BOOLEAN){
             IxCode.TypeRef expect = IxCode.BasicTypeRef.BOOLEAN;
             IxCode.TypeRef actual = texpr.type();
-            report(INCOMPATIBLE_TYPE, expr, new Object[]{expect, actual});
+            report(INCOMPATIBLE_TYPE, expr, expect, actual);
           }
           exprs.push(texpr);
           IxCode.ActionStatement tstmt = translate(stmt, context);
@@ -2326,7 +2208,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
           if(condition != null && condition.type() != expected){
             IxCode.TypeRef appeared = condition.type();
-            report(INCOMPATIBLE_TYPE, astCondition, new Object[]{expected, appeared});
+            report(INCOMPATIBLE_TYPE, astCondition, expected, appeared);
           }
         }else{
           condition = new IxCode.BoolLiteral(true);
@@ -2371,7 +2253,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.Expression condition = typeCheck(ast.getCondition(), context);
         IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
         if(condition != null && condition.type() != expected){
-          report(INCOMPATIBLE_TYPE, ast.getCondition(), new Object[]{expected, condition.type()});
+          report(INCOMPATIBLE_TYPE, ast.getCondition(), expected, condition.type());
         }
         IxCode.ActionStatement thenBlock = translate(ast.getThenBlock(), context);
         IxCode.ActionStatement elseBlock = ast.getElseBlock() == null ? null : translate(ast.getElseBlock(), context);
@@ -2390,7 +2272,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
         if(condition != null && condition.type() != expected){
           IxCode.TypeRef actual = condition.type();
-          report(INCOMPATIBLE_TYPE, ast, new Object[]{expected, actual});
+          report(INCOMPATIBLE_TYPE, ast, expected, actual);
         }
         IxCode.ActionStatement thenBlock = translate(ast.getBlock(), context);
         return new IxCode.ConditionalLoop(condition, thenBlock);
@@ -2404,14 +2286,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(ast.getExpression() == null){
         IxCode.TypeRef expected = IxCode.BasicTypeRef.VOID;
         if(returnType != expected){
-          report(CANNOT_RETURN_VALUE, ast, new Object[0]);
+          report(CANNOT_RETURN_VALUE, ast);
         }
         return new IxCode.Return(null);
       }else{
         IxCode.Expression returned = typeCheck(ast.getExpression(), context);
         if(returned == null) return new IxCode.Return(null);
         if(returned.type() == IxCode.BasicTypeRef.VOID){
-          report(CANNOT_RETURN_VALUE, ast, new Object[0]);
+          report(CANNOT_RETURN_VALUE, ast);
         }else {
           returned = processAssignable(ast.getExpression(), returnType, returned);
           if(returned == null) return new IxCode.Return(null);
@@ -2424,7 +2306,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       if(b == null) return null;
       if(a == b.type()) return b;
       if(!IxCode.TypeRules.isAssignable(a, b.type())){
-        report(INCOMPATIBLE_TYPE, ast, new Object[]{ a, b.type() });
+        report(INCOMPATIBLE_TYPE, ast, a, b.type());
         return null;
       }
       b = new IxCode.AsInstanceOf(b, a);
@@ -2499,7 +2381,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
           continue;
         }
         if(!IxCode.TypeRules.isAssignable(type, nodes[i].type())){
-          report(INCOMPATIBLE_TYPE, asts[i], new IxCode.TypeRef[]{type, nodes[i].type()});
+          report(INCOMPATIBLE_TYPE, asts[i], type, nodes[i].type());
           error = true;
           continue;
         }
@@ -2535,10 +2417,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.TypeRef expected = load("java.lang.Throwable");
         IxCode.TypeRef detected = expression.type();
         if(!IxCode.TypeRules.isSuperType(expected, detected)){
-          report(
-            INCOMPATIBLE_TYPE, ast.getExpression(), 
-            new Object[]{ expected, detected}
-          );
+          report(INCOMPATIBLE_TYPE, ast.getExpression(),  expected, detected);
         }
       }
       return new IxCode.Throw(expression);
@@ -2550,9 +2429,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       ClosureLocalBinding 
         binding = localContext.lookupOnlyCurrentScope(ast.getName());
       if(binding != null){
-        report(
-          DUPLICATE_LOCAL_VARIABLE, ast,
-          new Object[]{ast.getName()});
+        report(DUPLICATE_LOCAL_VARIABLE, ast, ast.getName());
         return new IxCode.NOP();
       }
       IxCode.TypeRef leftType = CodeAnalysis.this.resolve(ast.getType());
@@ -2589,7 +2466,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         IxCode.TypeRef arg = (IxCode.TypeRef)accept(ast.getArguments()[i], context);
         IxCode.TypeRef expected = load("java.lang.Throwable");
         if(!IxCode.TypeRules.isSuperType(expected, arg)){
-          report(INCOMPATIBLE_TYPE, ast.getArguments()[i], new Object[]{expected, arg});
+          report(INCOMPATIBLE_TYPE, ast.getArguments()[i], expected, arg);
         }
         binds[i] = local.lookupOnlyCurrentScope(ast.getArguments()[i].getName());
         catchBlocks[i] = translate(ast.getRecBlocks()[i], context);
@@ -2601,17 +2478,17 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     public Object visit(SynchronizedStatement ast, LocalContext context) {
       IxCode.Expression lock = typeCheck(ast.getTarget(), context);
       IxCode.ActionStatement block = translate(ast.getBlock(), context);
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return new IxCode.Synchronized(lock, block);
     }
     
     public Object visit(BreakStatement ast, LocalContext context) {
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return new IxCode.Break();
     }
     
     public Object visit(ContinueStatement ast, LocalContext context) {
-      report(UNIMPLEMENTED_FEATURE, ast, new Object[0]);
+      report(UNIMPLEMENTED_FEATURE, ast);
       return new IxCode.Continue();
     }
   //-------------------------------------------------------------------------//
@@ -2691,16 +2568,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.ClassTypeRef superClass = currentClass.getSuperClass();
       IxCode.ConstructorRef[] matched = superClass.findConstructor(params);
       if(matched.length == 0){
-        report(CONSTRUCTOR_NOT_FOUND, ast, new Object[]{superClass, types(params)});
+        report(CONSTRUCTOR_NOT_FOUND, ast, superClass, types(params));
         return null;
       }
       if(matched.length > 1){
-        report(
-          AMBIGUOUS_CONSTRUCTOR, ast,
-          new Object[]{
-            new Object[]{superClass, types(params)},
-            new Object[]{superClass, types(params)}
-          });
+        report(AMBIGUOUS_CONSTRUCTOR, ast, new Object[]{superClass, types(params)}, new Object[]{superClass, types(params)});
         return null;
       }
       IxCode.Super init = new IxCode.Super(
@@ -2718,7 +2590,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     public IxCode.TypeRef resolve(TypeSpec type, NameResolution resolver) {
       IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.resolve(type);
       if(resolvedType == null){
-        report(CLASS_NOT_FOUND, type, new Object[]{type.getComponentName()});      
+        report(CLASS_NOT_FOUND, type, type.getComponentName());
       }
       return resolvedType;
     }

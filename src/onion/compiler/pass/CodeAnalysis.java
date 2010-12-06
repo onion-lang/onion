@@ -108,14 +108,6 @@ public class CodeAnalysis {
     reporter.report(error, node.getLocation(), items);
   }
 
-  private boolean numeric(IxCode.TypeRef symbol) {
-    return 
-    (symbol.isBasicType()) &&
-    ( symbol == IxCode.BasicTypeRef.BYTE || symbol == IxCode.BasicTypeRef.SHORT ||
-      symbol == IxCode.BasicTypeRef.INT || symbol == IxCode.BasicTypeRef.LONG ||
-      symbol == IxCode.BasicTypeRef.FLOAT || symbol == IxCode.BasicTypeRef.DOUBLE);
-  }
-  
   public IxCode.ClassTypeRef load(String name) {
     return table.load(name);
   }

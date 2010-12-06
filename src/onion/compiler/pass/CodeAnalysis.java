@@ -945,30 +945,44 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(PostIncrement node, LocalContext context) {
       LocalContext local = (LocalContext)context;
-      onion.lang.syntax.Expression operand = node.getTarget();
-      IxCode.Expression irOperand = typeCheck(operand, context);
-      if(irOperand == null) return null;
-      if((!irOperand.isBasicType()) || !hasNumericType(irOperand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{irOperand.type()}});
+      IxCode.Expression operand = typeCheck(node.getTarget(), context);
+      if(operand == null) return null;
+      if((!operand.isBasicType()) || !hasNumericType(operand)){
+        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{operand.type()}});
         return null;
       }
-      int varIndex = local.addEntry(local.newName(), irOperand.type());
       IxCode.Expression result = null;
-      if(irOperand instanceof IxCode.RefLocal){
-        IxCode.RefLocal ref = (IxCode.RefLocal)irOperand;
+      if(operand instanceof IxCode.RefLocal){
+        int varIndex = local.addEntry(local.newName(), operand.type());
+        IxCode.RefLocal ref = (IxCode.RefLocal)operand;
         result = new IxCode.Begin(
-          new IxCode.SetLocal(0, varIndex, irOperand.type(), irOperand),
+          new IxCode.SetLocal(0, varIndex, operand.type(), operand),
           new IxCode.SetLocal(
             ref.frame(), ref.index(), ref.type(),
             new IxCode.BinaryExpression(
-              ADD, irOperand.type(), 
-              new IxCode.RefLocal(0, varIndex, irOperand.type()),
+              ADD, operand.type(),
+              new IxCode.RefLocal(0, varIndex, operand.type()),
               new IxCode.IntLiteral(1)
             )
           ),
-          new IxCode.RefLocal(0, varIndex, irOperand.type())
+          new IxCode.RefLocal(0, varIndex, operand.type())
         );
-      }else{
+      }else if(operand instanceof IxCode.RefField){
+        IxCode.RefField ref = (IxCode.RefField)operand;
+        int varIndex = local.addEntry(local.newName(), ref.target.type());
+        result = new IxCode.Begin(
+          new IxCode.SetLocal(0, varIndex, ref.target.type(), ref.target),
+          new IxCode.SetField(
+            new IxCode.RefLocal(0, varIndex, ref.target.type()),
+            ref.field,
+            new IxCode.BinaryExpression(
+              ADD, operand.type(),
+              new IxCode.RefField(new IxCode.RefLocal(0, varIndex, ref.target.type()), ref.field),
+              new IxCode.IntLiteral(1)
+            )
+          )
+        );
+      }else {
         report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
       }
       return result;
@@ -976,30 +990,44 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(PostDecrement node, LocalContext context) {
       LocalContext local = (LocalContext)context;
-      onion.lang.syntax.Expression operand = node.getTarget();
-      IxCode.Expression irOperand = typeCheck(operand, context);
-      if(irOperand == null) return null;
-      if((!irOperand.isBasicType()) || !hasNumericType(irOperand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{irOperand.type()}});
+      IxCode.Expression operand = typeCheck(node.getTarget(), context);
+      if(operand == null) return null;
+      if((!operand.isBasicType()) || !hasNumericType(operand)){
+        report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{operand.type()}});
         return null;
       }
-      int varIndex = local.addEntry(local.newName(), irOperand.type());
       IxCode.Expression result = null;
-      if(irOperand instanceof IxCode.RefLocal){
-        IxCode.RefLocal ref = (IxCode.RefLocal)irOperand;
+      if(operand instanceof IxCode.RefLocal){
+        int varIndex = local.addEntry(local.newName(), operand.type());
+        IxCode.RefLocal ref = (IxCode.RefLocal)operand;
         result = new IxCode.Begin(
-          new IxCode.SetLocal(0, varIndex, irOperand.type(), irOperand),
+          new IxCode.SetLocal(0, varIndex, operand.type(), operand),
           new IxCode.SetLocal(
             ref.frame(), ref.index(), ref.type(),
             new IxCode.BinaryExpression(
-              SUBTRACT, irOperand.type(), 
-              new IxCode.RefLocal(0, varIndex, irOperand.type()),
+              SUBTRACT, operand.type(),
+              new IxCode.RefLocal(0, varIndex, operand.type()),
               new IxCode.IntLiteral(1)
             )
           ),
-          new IxCode.RefLocal(0, varIndex, irOperand.type())
+          new IxCode.RefLocal(0, varIndex, operand.type())
         );
-      }else{
+      }else if(operand instanceof IxCode.RefField){
+        IxCode.RefField ref = (IxCode.RefField)operand;
+        int varIndex = local.addEntry(local.newName(), ref.target.type());
+        result = new IxCode.Begin(
+          new IxCode.SetLocal(0, varIndex, ref.target.type(), ref.target),
+          new IxCode.SetField(
+            new IxCode.RefLocal(0, varIndex, ref.target.type()),
+            ref.field,
+            new IxCode.BinaryExpression(
+              SUBTRACT, operand.type(),
+              new IxCode.RefField(new IxCode.RefLocal(0, varIndex, ref.target.type()), ref.field),
+              new IxCode.IntLiteral(1)
+            )
+          )
+        );
+      }else {
         report(UNIMPLEMENTED_FEATURE, node, new Object[0]);
       }
       return result;

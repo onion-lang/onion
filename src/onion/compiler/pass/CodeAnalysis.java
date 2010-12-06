@@ -133,12 +133,12 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     String moduleName = module != null ? module.getName() : null;
     return createName(moduleName, Paths.cutExtension(unit.getSourceFileName()) + "Main");
   }
-  
+
 //---------------------------------------------------------------------------//
   public ClassTable getTable(){
     return table;
   }
-  
+
   public void setSolver(NameResolution resolver){
     this.solver = resolver;
   }
@@ -334,7 +334,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       ClassTable table = getTable();
       if(count > 0){
         IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
-        node.setSourceFile(Paths.getName(unit.getSourceFileName()));
+        node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
         node.setResolutionComplete(true);
         table.addSourceClass(node);
         node.addDefaultConstructor();
@@ -346,7 +346,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     public Object visit(ClassDeclaration ast, String context) {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
-      node.setSourceFile(Paths.getName(getUnit().getSourceFileName()));
+      node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
       if(getTable().lookup(node.getName()) != null){
         report(DUPLICATE_CLASS,  ast, new Object[]{node.getName()});
         return null;
@@ -361,7 +361,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     public Object visit(InterfaceDeclaration ast, String context) {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
-      node.setSourceFile(Paths.getName(getUnit().getSourceFileName()));
+      node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
       ClassTable table = getTable();
       if(table.lookup(node.getName()) != null){
         report(DUPLICATE_CLASS,  ast, new Object[]{node.getName()});

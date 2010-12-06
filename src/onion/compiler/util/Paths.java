@@ -15,11 +15,11 @@ import java.io.File;
  */
 public class Paths {
   private Paths(){}
-  public static String getName(String path){
+  public static String nameOf(String path){
     return new File(path).getName();
   }
   public static String cutExtension(String path){
-    String name = getName(path);
+    String name = nameOf(path);
     return name.substring(0, name.lastIndexOf('.'));
   }
 }

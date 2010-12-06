@@ -53,9 +53,6 @@ public class CodeAnalysis {
   }
 
 //---------------------------------------------------------------------------//
-  public ClassTable getTable(){
-    return table;
-  }
 
   public void setSolver(NameResolution resolver){
     this.solver = resolver;
@@ -230,7 +227,7 @@ public class CodeAnalysis {
           count++;
         }
       }
-      ClassTable table = getTable();
+      ClassTable table = CodeAnalysis.this.table;
       if(count > 0){
         IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
         node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
@@ -246,7 +243,7 @@ public class CodeAnalysis {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
       node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
-      if(getTable().lookup(node.name()) != null){
+      if(table.lookup(node.name()) != null){
         report(DUPLICATE_CLASS,  ast, node.name());
         return null;
       }
@@ -260,7 +257,7 @@ public class CodeAnalysis {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
       node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
-      ClassTable table = getTable();
+      ClassTable table = CodeAnalysis.this.table;
       if(table.lookup(node.name()) != null){
         report(DUPLICATE_CLASS,  ast, node.name());
         return null;
@@ -548,7 +545,7 @@ public class CodeAnalysis {
       
       IxCode.ClassTypeRef symbol = null;
       if(ast == null){
-        symbol = getTable().rootClass();
+        symbol = table.rootClass();
       }else{
         symbol = (IxCode.ClassTypeRef) resolve(ast, resolver);
       }
@@ -875,7 +872,7 @@ public class CodeAnalysis {
           report(IS_NOT_BOXABLE_TYPE, ast.getLeft(), left.type());
           return null;
         }else{
-          left = Boxing.boxing(getTable(), left);
+          left = Boxing.boxing(table, left);
         }
       }
       if(right.isBasicType()){
@@ -883,7 +880,7 @@ public class CodeAnalysis {
           report(IS_NOT_BOXABLE_TYPE, ast.getRight(), right.type());
           return null;
         }else{
-          right = Boxing.boxing(getTable(), right);
+          right = Boxing.boxing(table, right);
         }
       }
       IxCode.MethodRef toString;

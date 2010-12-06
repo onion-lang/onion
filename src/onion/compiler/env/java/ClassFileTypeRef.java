@@ -44,7 +44,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     return (javaClass.getModifiers() & Constants.ACC_INTERFACE) != 0;
   }
 
-  public int getModifier() {
+  public int modifier() {
     return modifier;
   }
   

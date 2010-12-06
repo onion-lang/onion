@@ -101,7 +101,7 @@ public class CodeGeneration  {
   }
   
   private int classModifier(IxCode.ClassDefinition node){
-    int modifier = toJavaModifier(node.getModifier());
+    int modifier = toJavaModifier(node.modifier());
     modifier |= node.isInterface() ? Constants.ACC_INTERFACE : modifier;
     modifier |= (!Modifier.isInternal(modifier)) ? Constants.ACC_PUBLIC : modifier;
     return modifier;

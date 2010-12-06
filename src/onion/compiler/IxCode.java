@@ -523,16 +523,8 @@ public interface IxCode {
       return isInterface;
     }
 
-    public int getModifier() {
+    public int modifier() {
       return modifier;
-    }
-
-    public void setModifier(int modifier) {
-      this.modifier = modifier;
-    }
-
-    public void setName(String name) {
-      this.name = name;
     }
 
     public String name() {
@@ -563,15 +555,15 @@ public interface IxCode {
       return isResolutionComplete;
     }
 
-    public void addMethod(MethodRef method) {
+    public void add(MethodRef method) {
       methods.add(method);
     }
 
-    public void addField(FieldRef field) {
+    public void add(FieldRef field) {
       fields.add(field);
     }
 
-    public void addConstructor(ConstructorRef constructor) {
+    public void add(ConstructorRef constructor) {
       constructors.add(constructor);
     }
 
@@ -1682,7 +1674,7 @@ public interface IxCode {
         return false;
       }
 
-      public int getModifier() {
+      public int modifier() {
         return 0;
       }
 
@@ -2108,7 +2100,7 @@ public interface IxCode {
      */
     interface ObjectTypeRef extends TypeRef {
       boolean isInterface();
-      int getModifier();
+      int modifier();
       ClassTypeRef getSuperClass();
       ClassTypeRef[] getInterfaces();
       MethodRef[] methods();

@@ -339,7 +339,7 @@ public class CodeAnalysis {
       String name = ast.getName();
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
       put(ast, node);
-      contextClass.addField(node);
+      contextClass.add(node);
       return null;
     }
     
@@ -351,7 +351,7 @@ public class CodeAnalysis {
       int modifier = ast.getModifier() | getAccess();
       IxCode.ConstructorDefinition node = new IxCode.ConstructorDefinition(modifier, contextClass, args, null, null);
       put(ast, node);
-      contextClass.addConstructor(node);
+      contextClass.add(node);
       return null;
     }
 
@@ -371,7 +371,7 @@ public class CodeAnalysis {
       String name = ast.getName();    
       IxCode.MethodDefinition node = new IxCode.MethodDefinition(modifier, contextClass, name, args, returnType, null);
       put(ast, node);
-      contextClass.addMethod(node);
+      contextClass.add(node);
       return null;
     }
     
@@ -383,7 +383,7 @@ public class CodeAnalysis {
       String name = ast.getName();    
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
       put(ast, node);
-      contextClass.addField(node);
+      contextClass.add(node);
       return node;
     }
     
@@ -431,7 +431,7 @@ public class CodeAnalysis {
       IxCode.MethodDefinition node =
         new IxCode.MethodDefinition(modifier, classType, name, args, returnType, null);
       put(ast, node);
-      classType.addMethod(node);
+      classType.add(node);
       return null;
     }
     
@@ -452,7 +452,7 @@ public class CodeAnalysis {
       IxCode.MethodDefinition node =
         new IxCode.MethodDefinition(modifier, classType, name, args, returnType, null);
       put(ast, node);
-      classType.addMethod(node);
+      classType.add(node);
       return null;
     }
     
@@ -466,7 +466,7 @@ public class CodeAnalysis {
       
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, classType, name, type);
       put(ast, node);
-      classType.addField(node);
+      classType.add(node);
       return null;
     }
       
@@ -633,7 +633,7 @@ public class CodeAnalysis {
           }else {
             IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
             generated.add(generatedMethod);
-            getContextClass().addMethod(generatedMethod);
+            getContextClass().add(generatedMethod);
           }
         }
       }
@@ -817,8 +817,8 @@ public class CodeAnalysis {
         statements.add(new IxCode.Return(null));
         method.setBlock(new IxCode.StatementBlock(statements));
         method.setFrame(context.getContextFrame());
-        klass.addMethod(method);      
-        klass.addMethod(createMain(klass, method, "main", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID));
+        klass.add(method);
+        klass.add(createMain(klass, method, "main", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID));
       }
       return null;
     }
@@ -1576,7 +1576,7 @@ public class CodeAnalysis {
       if(hasSamePackage(target, context)){
         return true;
       }else{
-        if(Modifier.isInternal(target.getModifier())){
+        if(Modifier.isInternal(target.modifier())){
           return false;
         }else{
           return true;

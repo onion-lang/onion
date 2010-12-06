@@ -45,7 +45,7 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
     return (klass.getModifiers() & java.lang.reflect.Modifier.INTERFACE) != 0;
   }
 
-  public int getModifier() {
+  public int modifier() {
     return modifier;
   }
   

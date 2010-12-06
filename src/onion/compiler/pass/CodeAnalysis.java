@@ -415,10 +415,10 @@ public class CodeAnalysis {
         return true;      
       }
       visit.add(symbol);
-      if(hasCylicitySub(symbol.getSuperClass(), (HashSet)visit.clone())){
+      if(hasCylicitySub(symbol.superClass(), (HashSet)visit.clone())){
         return true;      
       }
-      IxCode.ClassTypeRef[] interfaces = symbol.getInterfaces();
+      IxCode.ClassTypeRef[] interfaces = symbol.interfaces();
       for (int i = 0; i < interfaces.length; i++) {
         if(hasCylicitySub(interfaces[i], (HashSet)visit.clone())){
           return true;        
@@ -460,8 +460,8 @@ public class CodeAnalysis {
         node.setInterfaces(interfaces.toArray(new IxCode.ClassTypeRef[0]));
         node.setResolutionComplete(true);
       }else{
-        constructTypeHierarchy(ref.getSuperClass(), visit);
-        IxCode.ClassTypeRef[] interfaces = ref.getInterfaces();
+        constructTypeHierarchy(ref.superClass(), visit);
+        IxCode.ClassTypeRef[] interfaces = ref.interfaces();
         for(int i = 0; i < interfaces.length; i++){
           constructTypeHierarchy(interfaces[i], visit);
         }
@@ -1229,7 +1229,7 @@ public class CodeAnalysis {
       params = typeCheckExps(ast.getParams(), context);
       if(params == null) return null;
       IxCode.ClassTypeRef contextClass = CodeAnalysis.this.definition;
-      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.superClass(), ast.getName(), params);
       if(result._2 == null){
         if(result._1) report(METHOD_NOT_FOUND, ast, contextClass, ast.getName(), types(params));
         return null;
@@ -1394,7 +1394,7 @@ public class CodeAnalysis {
           report(INCOMPATIBLE_TYPE,  indexing.getRight(), IxCode.BasicTypeRef.INT, index.type());
           return null;
         }
-        IxCode.TypeRef base = targetType.getBase();
+        IxCode.TypeRef base = targetType.base();
         value = processAssignable(ast.getRight(), base, value);
         if(value == null) return null;
         return new IxCode.ArraySet(target, index, value);
@@ -1535,9 +1535,9 @@ public class CodeAnalysis {
           return fields[i];
         }
       }
-      IxCode.FieldRef field = findField(target.getSuperClass(), name);
+      IxCode.FieldRef field = findField(target.superClass(), name);
       if(field != null) return field;
-      IxCode.ClassTypeRef[] interfaces = target.getInterfaces();
+      IxCode.ClassTypeRef[] interfaces = target.interfaces();
       for(int i = 0; i < interfaces.length; i++){
         field = findField(interfaces[i], name);
         if(field != null) return field;
@@ -1549,7 +1549,7 @@ public class CodeAnalysis {
       AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassTypeRef context
     ) {
       if(target.isArrayType()){
-        IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).getComponent();
+        IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).component();
         if(!component.isBasicType()){
           if(!isAccessible((IxCode.ClassTypeRef)component, definition)){
             report(CLASS_NOT_ACCESSIBLE, ast, target, context);
@@ -2399,7 +2399,7 @@ public class CodeAnalysis {
       IxCode.Expression[] params = typeCheckExps(ast.getInitializers(), context);
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBody(), context);
       IxCode.ClassDefinition currentClass = definition;
-      IxCode.ClassTypeRef superClass = currentClass.getSuperClass();
+      IxCode.ClassTypeRef superClass = currentClass.superClass();
       IxCode.ConstructorRef[] matched = superClass.findConstructor(params);
       if(matched.length == 0){
         report(CONSTRUCTOR_NOT_FOUND, ast, superClass, types(params));

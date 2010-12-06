@@ -51,7 +51,7 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
     return klass.getName();
   }
 
-  public IxCode.ClassTypeRef getSuperClass() {
+  public IxCode.ClassTypeRef superClass() {
     Class superKlass = klass.getSuperclass();
     if(superKlass == null) return table.rootClass();
     IxCode.ClassTypeRef superClass = table.load(superKlass.getName());
@@ -59,7 +59,7 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
     return superClass;
   }
 
-  public IxCode.ClassTypeRef[] getInterfaces() {
+  public IxCode.ClassTypeRef[] interfaces() {
     Class[] interfaces = klass.getInterfaces();
     IxCode.ClassTypeRef[] interfaceSyms = new IxCode.ClassTypeRef[interfaces.length];
     for(int i = 0; i < interfaces.length; i++){

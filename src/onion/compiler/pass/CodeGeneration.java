@@ -57,7 +57,7 @@ public class CodeGeneration  {
       return BASIC_TYPE_MAPPING.get(type);
     }else if(type.isArrayType()){
       IxCode.ArrayTypeRef arrayType = (IxCode.ArrayTypeRef)type;
-      return new ArrayType(translateIxTypeToVmType(arrayType.getComponent()), arrayType.getDimension());
+      return new ArrayType(translateIxTypeToVmType(arrayType.component()), arrayType.dimension());
     }else if(type.isClassType()){
       return new ObjectType(type.name());
     }else{
@@ -111,8 +111,8 @@ public class CodeGeneration  {
     int modifier = classModifier(node);
     String className = node.name();
     generator = new SymbolGenerator(className + CLOSURE_CLASS_SUFFIX);
-    String superClass = node.getSuperClass().name();
-    String[] interfaces = namesOf(node.getInterfaces());
+    String superClass = node.superClass().name();
+    String[] interfaces = namesOf(node.interfaces());
     String file = node.getSourceFile();
     ClassGen gen = new ClassGen(className, superClass, file, modifier, interfaces);
     IxCode.ConstructorRef[] constructors = node.constructors();
@@ -752,7 +752,7 @@ public class CodeGeneration  {
     IxCode.ArrayTypeRef targetType = (IxCode.ArrayTypeRef)node.getObject().type();
     InstructionHandle start = codeExpression(node.getObject(), code);
     codeExpression(node.getIndex(), code);
-    code.appendArrayLoad(typeOf(targetType.getBase()));
+    code.appendArrayLoad(typeOf(targetType.base()));
     return start;
   }
   
@@ -769,7 +769,7 @@ public class CodeGeneration  {
     code.appendDup(1);
     codeExpression(node.getIndex(), code);
     codeExpression(node.getValue(), code);
-    code.appendArrayStore(typeOf(targetType.getBase()));
+    code.appendArrayStore(typeOf(targetType.base()));
     return start;
   }
   
@@ -790,7 +790,7 @@ public class CodeGeneration  {
   public InstructionHandle codeNewArray(IxCode.NewArray node, CodeProxy code){
     InstructionHandle start = codeExpressions(node.parameters, code);
     IxCode.ArrayTypeRef type = node.arrayType;
-    code.appendNewArray(typeOf(type.getComponent()), (short)node.parameters.length);
+    code.appendNewArray(typeOf(type.component()), (short)node.parameters.length);
     return start;
   }
   

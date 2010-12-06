@@ -72,7 +72,7 @@ public interface IxCode {
       }
 
       public TypeRef type(){
-        return ((ArrayTypeRef)object.type()).getBase();
+        return ((ArrayTypeRef)object.type()).base();
       }
     }
 
@@ -535,7 +535,7 @@ public interface IxCode {
       this.superClass = superClass;
     }
 
-    public ClassTypeRef getSuperClass() {
+    public ClassTypeRef superClass() {
       return superClass;
     }
 
@@ -543,7 +543,7 @@ public interface IxCode {
       this.interfaces = interfaces;
     }
 
-    public ClassTypeRef[] getInterfaces() {
+    public ClassTypeRef[] interfaces() {
       return interfaces;
     }
 
@@ -622,7 +622,7 @@ public interface IxCode {
 
     public static ConstructorDefinition newDefaultConstructor(ClassTypeRef type) {
       StatementBlock block = new StatementBlock(new Return(null));
-      Super init = new Super(type.getSuperClass(), new TypeRef[0], new Expression[0]);
+      Super init = new Super(type.superClass(), new TypeRef[0], new Expression[0]);
       ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
       node.setFrame(new LocalFrame(null));
       return node;
@@ -1651,27 +1651,21 @@ public interface IxCode {
       public ArrayTypeRef(TypeRef component, int dimension, ClassTable table){
         this.component = component;
         this.dimension = dimension;
+        this.table = table;
         this.superClass = table.load("java.lang.Object");
-        this.interfaces = new ClassTypeRef[]{
-          table.load("java.io.Serializable"),
-          table.load("java.lang.Cloneable")
-        };
+        this.interfaces = new ClassTypeRef[]{table.load("java.io.Serializable"), table.load("java.lang.Cloneable")};
         this.name = Strings.repeat("[", dimension) + component.name();
       }
 
-      public TypeRef getComponent(){
+      public TypeRef component(){
         return component;
       }
 
-      public TypeRef getBase(){
-        if(dimension == 1){
-          return component;
-        }else{
-          return table.loadArray(component, dimension - 1);
-        }
+      public TypeRef base(){
+        return dimension == 1 ? component : table.loadArray(component, dimension - 1);
       }
 
-      public int getDimension(){
+      public int dimension(){
         return dimension;
       }
 
@@ -1683,11 +1677,11 @@ public interface IxCode {
         return 0;
       }
 
-      public ClassTypeRef getSuperClass() {
+      public ClassTypeRef superClass() {
         return superClass;
       }
 
-      public ClassTypeRef[] getInterfaces() {
+      public ClassTypeRef[] interfaces() {
         return interfaces;
       }
 
@@ -1886,10 +1880,10 @@ public interface IxCode {
         if(target == null) return null;
         FieldRef field = target.field(name);
         if(field != null) return field;
-        field = find(target.getSuperClass(), name);
+        field = find(target.superClass(), name);
         if(field != null) return field;
-        ClassTypeRef[] interfaces = target.getInterfaces();
-        for(ClassTypeRef anInterface:target.getInterfaces()){
+        ClassTypeRef[] interfaces = target.interfaces();
+        for(ClassTypeRef anInterface:target.interfaces()){
           field = find(anInterface, name);
           if(field != null) return field;
         }
@@ -1977,9 +1971,9 @@ public interface IxCode {
         for(MethodRef m:target.methods(name)){
           if(matcher.matches(m.arguments(), params)) methods.add(m);
         }
-        ClassTypeRef superClass = target.getSuperClass();
+        ClassTypeRef superClass = target.superClass();
         find(methods, superClass, name, params);
-        ClassTypeRef[] interfaces = target.getInterfaces();
+        ClassTypeRef[] interfaces = target.interfaces();
         for(ClassTypeRef anInterface:interfaces) {
           find(methods, anInterface, name, params);
         }
@@ -2067,8 +2061,8 @@ public interface IxCode {
     interface ObjectTypeRef extends TypeRef {
       boolean isInterface();
       int modifier();
-      ClassTypeRef getSuperClass();
-      ClassTypeRef[] getInterfaces();
+      ClassTypeRef superClass();
+      ClassTypeRef[] interfaces();
       MethodRef[] methods();
       MethodRef[] methods(String name);
       FieldRef[] fields();
@@ -2143,7 +2137,7 @@ public interface IxCode {
             return isSuperTypeForClass((ClassTypeRef) left, (ClassTypeRef) right);
           }
           if(right.isArrayType()){
-            return left == ((ArrayTypeRef) right).getSuperClass();
+            return left == ((ArrayTypeRef) right).superClass();
           }
           if(right.isNullType()){
             return true;
@@ -2168,15 +2162,15 @@ public interface IxCode {
 
       private static boolean isSuperTypeForArray(
         ArrayTypeRef left, ArrayTypeRef right){
-        return isSuperType(left.getBase(), right.getBase());
+        return isSuperType(left.base(), right.base());
       }
 
       private static boolean isSuperTypeForClass(ClassTypeRef left, ClassTypeRef right){
         if(right == null) return false;
         if(left == right) return true;
-        if(isSuperTypeForClass(left, right.getSuperClass())) return true;
-        for(int i = 0; i < right.getInterfaces().length; i++){
-          if(isSuperTypeForClass(left, right.getInterfaces()[i])) return true;
+        if(isSuperTypeForClass(left, right.superClass())) return true;
+        for(int i = 0; i < right.interfaces().length; i++){
+          if(isSuperTypeForClass(left, right.interfaces()[i])) return true;
         }
         return false;
       }

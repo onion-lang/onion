@@ -31,7 +31,7 @@ public class Classes {
     for(int i = 0; i < methods.length; i++){
       set.add(methods[i]);
     }
-    IxCode.ClassTypeRef[] interfaces = type.getInterfaces();
+    IxCode.ClassTypeRef[] interfaces = type.interfaces();
     for(int i = 0 ; i < interfaces.length; i++){
       collectInterfaceMethods(interfaces[i], set);
     }

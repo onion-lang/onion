@@ -50,7 +50,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     return javaClass.getClassName();
   }
 
-  public IxCode.ClassTypeRef getSuperClass() {
+  public IxCode.ClassTypeRef superClass() {
     IxCode.ClassTypeRef superClass = table.load(javaClass.getSuperclassName());
     if(superClass == this){
       return null;
@@ -58,7 +58,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     return superClass;
   }
 
-  public IxCode.ClassTypeRef[] getInterfaces() {
+  public IxCode.ClassTypeRef[] interfaces() {
     String[] interfaceNames = javaClass.getInterfaceNames();
     IxCode.ClassTypeRef[] interfaces = new IxCode.ClassTypeRef[interfaceNames.length];
     for(int i = 0; i < interfaces.length; i++){

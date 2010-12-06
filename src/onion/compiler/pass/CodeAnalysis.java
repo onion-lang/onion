@@ -2016,71 +2016,60 @@ public class CodeAnalysis {
   //------------------------- statements ------------------------------------//
     public Object visit(ForeachStatement ast, LocalContext context) {
       onion.lang.syntax.Expression collectionAST = ast.getCollection();
-      LocalContext local = context;
       try {
-        local.openScope();
+        context.openScope();
         IxCode.Expression collection = typeCheck(collectionAST, context);
         Argument arg = ast.getDeclaration();
         accept(arg, context);
-        ClosureLocalBinding bind = local.lookupOnlyCurrentScope(arg.getName());
         IxCode.ActionStatement block = translate(ast.getStatement(), context);
-        
         if(collection.isBasicType()){
           report(INCOMPATIBLE_TYPE, collectionAST, load("java.util.Collection"), collection.type());
           return null;
         }
-        ClosureLocalBinding bind2 = new ClosureLocalBinding(
-          0, local.addEntry(local.newName(), collection.type()), collection.type());
-        IxCode.ActionStatement init =
-          new IxCode.ExpressionStatement(new IxCode.SetLocal(bind2, collection));
+        ClosureLocalBinding elementVar = context.lookupOnlyCurrentScope(arg.getName());
+        ClosureLocalBinding collectionVar = new ClosureLocalBinding(0, context.addEntry(context.newName(), collection.type()), collection.type());
+        IxCode.ActionStatement init;
         if(collection.isArrayType()){
-          ClosureLocalBinding bind3 = new ClosureLocalBinding(
-            0, local.addEntry(local.newName(), IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT
+          ClosureLocalBinding counterVariable = new ClosureLocalBinding(0, context.addEntry(context.newName(), IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT);
+          init = new IxCode.StatementBlock(
+            new IxCode.ExpressionStatement(new IxCode.SetLocal(collectionVar, collection)),
+            new IxCode.ExpressionStatement(new IxCode.SetLocal(counterVariable, new IxCode.IntLiteral(0)))
           );
-          init = new IxCode.StatementBlock(init, new IxCode.ExpressionStatement(new IxCode.SetLocal(bind3, new IxCode.IntLiteral(0))));
           block = new IxCode.ConditionalLoop(
             new IxCode.BinaryExpression(
               LESS_THAN, IxCode.BasicTypeRef.BOOLEAN,
-              ref(bind3),
-              new IxCode.ArrayLength(ref(bind2))
+              ref(counterVariable),
+              new IxCode.ArrayLength(ref(collectionVar))
             ),
             new IxCode.StatementBlock(
-              assign(bind, indexref(bind2, ref(bind3))),
+              assign(elementVar, indexref(collectionVar, ref(counterVariable))),
               block,
-              assign(
-                bind3, 
-                new IxCode.BinaryExpression(ADD, IxCode.BasicTypeRef.INT, ref(bind3), new IxCode.IntLiteral(1))
-              )
+              assign(counterVariable, new IxCode.BinaryExpression(ADD, IxCode.BasicTypeRef.INT, ref(counterVariable), new IxCode.IntLiteral(1)))
             )
           );
           return new IxCode.StatementBlock(init, block);
         }else{
-          IxCode.ObjectTypeRef iterator = load("java.util.Iterator");
-          ClosureLocalBinding bind3 = new ClosureLocalBinding(
-            0, local.addEntry(local.newName(), iterator), iterator
-          );
-          IxCode.MethodRef mIterator, mNext, mHasNext;
-          mIterator = findMethod(collectionAST, (IxCode.ObjectTypeRef) collection.type(), "iterator");
-          mNext = findMethod(ast.getCollection(), iterator, "next");
-          mHasNext = findMethod(ast.getCollection(), iterator, "hasNext");
+          IxCode.ObjectTypeRef iteratorType = load("java.util.Iterator");
+          ClosureLocalBinding iteratorVar = new ClosureLocalBinding(0, context.addEntry(context.newName(), iteratorType), iteratorType);
+          IxCode.MethodRef mIterator = findMethod(collectionAST, (IxCode.ObjectTypeRef) collection.type(), "iterator");
+          IxCode.MethodRef mNext = findMethod(ast.getCollection(), iteratorType, "next");
+          IxCode.MethodRef mHasNext = findMethod(ast.getCollection(), iteratorType, "hasNext");
           init = new IxCode.StatementBlock(
-            init,
-            assign(bind3, new IxCode.Call(ref(bind2), mIterator, new IxCode.Expression[0]))
+            new IxCode.ExpressionStatement(new IxCode.SetLocal(collectionVar, collection)),
+            assign(iteratorVar, new IxCode.Call(ref(collectionVar), mIterator, new IxCode.Expression[0]))
           );
-          IxCode.Expression callNext = new IxCode.Call(
-            ref(bind3), mNext, new IxCode.Expression[0]
-          );
-          if(bind.getType() != rootClass()){
-            callNext = new IxCode.AsInstanceOf(callNext, bind.getType());
+          IxCode.Expression next = new IxCode.Call(ref(iteratorVar), mNext, new IxCode.Expression[0]);
+          if(elementVar.getType() != rootClass()){
+            next = new IxCode.AsInstanceOf(next, elementVar.getType());
           }
           block = new IxCode.ConditionalLoop(
-            new IxCode.Call(ref(bind3), mHasNext, new IxCode.Expression[0]),
-            new IxCode.StatementBlock(assign(bind, callNext), block)
+            new IxCode.Call(ref(iteratorVar), mHasNext, new IxCode.Expression[0]),
+            new IxCode.StatementBlock(assign(elementVar, next), block)
           );
           return new IxCode.StatementBlock(init, block);
         }
       }finally{
-        local.closeScope();
+        context.closeScope();
       }
     }
     

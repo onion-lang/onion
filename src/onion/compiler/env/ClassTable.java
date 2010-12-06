@@ -22,35 +22,32 @@ import org.apache.bcel.classfile.JavaClass;
  * Date: 2005/06/22
  */
 public class ClassTable {
-  private List<IxCode.ClassDefinition> sourceClasses;
-  private Map<String, IxCode.ClassDefinition> sourceClassMap;
-  private Map<String, IxCode.ClassTypeRef> classFileMap;
-  private Map<String, IxCode.ArrayTypeRef> arrayMap;
+  private LinkedHashMap<String, IxCode.ClassDefinition> classes;
+  private Map<String, IxCode.ClassTypeRef> classFiles;
+  private Map<String, IxCode.ArrayTypeRef> arrayClasses;
   private ClassFileTable table;
   
   public ClassTable(String classPath) {
-    sourceClasses  = new ArrayList<IxCode.ClassDefinition>();
-    sourceClassMap = new HashMap<String, IxCode.ClassDefinition>();
-    classFileMap   = new HashMap<String, IxCode.ClassTypeRef>();
-    arrayMap       = new HashMap<String, IxCode.ArrayTypeRef>();
-    table          = new ClassFileTable(classPath);
+    classes = new LinkedHashMap<String, IxCode.ClassDefinition>();
+    classFiles = new HashMap<String, IxCode.ClassTypeRef>();
+    arrayClasses = new HashMap<String, IxCode.ArrayTypeRef>();
+    table = new ClassFileTable(classPath);
   }
   
   public void addSourceClass(IxCode.ClassDefinition node){
-    sourceClasses.add(node);
-    sourceClassMap.put(node.getName(), node);
+    classes.put(node.getName(), node);
   }
   
   public IxCode.ClassDefinition[] getSourceClasses(){
-    return (IxCode.ClassDefinition[])sourceClasses.toArray(new IxCode.ClassDefinition[0]);
+    return classes.values().toArray(new IxCode.ClassDefinition[0]);
   }
   
   public IxCode.ArrayTypeRef loadArray(IxCode.TypeRef component, int dimension){
     String arrayName = Strings.repeat("[", dimension) + component.getName();
-    IxCode.ArrayTypeRef array = (IxCode.ArrayTypeRef) arrayMap.get(arrayName);
+    IxCode.ArrayTypeRef array = (IxCode.ArrayTypeRef) arrayClasses.get(arrayName);
     if(array != null) return array;
     array = new IxCode.ArrayTypeRef(component, dimension, this);
-    arrayMap.put(arrayName, array);
+    arrayClasses.put(arrayName, array);
     return array;
   }
   
@@ -60,14 +57,12 @@ public class ClassTable {
       JavaClass javaClass = table.load(className);
       if(javaClass != null){
         clazz = new ClassFileTypeRef(javaClass, this);
-        addClassFileSymbol(clazz);
+        classFiles.put(clazz.getName(), clazz);
       }else{
         try {
-          clazz = new ClassObjectTypeRef(
-            Class.forName(className, true, Thread.currentThread().getContextClassLoader()), this
-          );
-          addClassFileSymbol(clazz);
-        }catch(ClassNotFoundException e){          
+          clazz = new ClassObjectTypeRef(Class.forName(className, true, Thread.currentThread().getContextClassLoader()), this);
+          classFiles.put(clazz.getName(), clazz);
+        }catch(ClassNotFoundException e){
         }
       }
     }
@@ -79,11 +74,8 @@ public class ClassTable {
   }
   
   public IxCode.ClassTypeRef lookup(String className){
-    IxCode.ClassTypeRef symbol = (IxCode.ClassTypeRef) sourceClassMap.get(className);
-    return (symbol != null) ? symbol : (IxCode.ClassTypeRef) classFileMap.get(className);
+    IxCode.ClassTypeRef ref = classes.get(className);
+    return (ref != null) ? ref : classFiles.get(className);
   }
-  
-  private void addClassFileSymbol(IxCode.ClassTypeRef symbol){
-    classFileMap.put(symbol.getName(), symbol);
-  }
+
 }

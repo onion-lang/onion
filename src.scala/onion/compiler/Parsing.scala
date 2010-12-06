@@ -3,10 +3,8 @@ package onion.compiler
 import collection.mutable.ArrayBuffer
 import collection.JavaConversions._
 import onion.compiler.util.Messages
-import onion.compiler.Location
 import java.io.{Reader, IOException}
 import parser.{JJOnionParser, Token, ParseException}
-import onion.compiler.Location
 
 /**
  * Created by IntelliJ IDEA.
@@ -22,7 +20,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
   def newEnvironment(source: Array[InputSource]): Null = null
   def doProcess(source: Array[InputSource], environment: Null): Array[AST.CompilationUnit] = {
     def parse(reader: Reader, fileName: String): AST.CompilationUnit = {
-      new JJOnionParser(reader).unit.copy(sourceFile = fileName)
+      new JJOnionParser(reader).unit().copy(sourceFile = fileName)
     }
     val buffer = new ArrayBuffer[AST.CompilationUnit]()
     val problems = new ArrayBuffer[CompileError]()

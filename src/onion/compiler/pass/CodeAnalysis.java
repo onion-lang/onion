@@ -832,31 +832,24 @@ public class CodeAnalysis {
       setUnit(unit);
       TopLevelElement[] toplevels = unit.getTopLevels();
       LocalContext context = new LocalContext();
-      List statements = new ArrayList();
-      String className = topClass();
-      setSolver(findSolver(className));
+      List<IxCode.ActionStatement> statements = new ArrayList<IxCode.ActionStatement>();
+      setSolver(findSolver(topClass()));
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
       IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);
-      
-      IxCode.MethodDefinition method = new IxCode.MethodDefinition(
-        Modifier.PUBLIC, klass, 
-        "start", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID, null
-      );
+      IxCode.MethodDefinition method = new IxCode.MethodDefinition(Modifier.PUBLIC, klass,  "start", new IxCode.TypeRef[]{argsType}, IxCode.BasicTypeRef.VOID, null);
       context.addEntry("args", argsType);
-      for(int i = 0; i < toplevels.length; i++){
-        TopLevelElement element = toplevels[i];
+      for(TopLevelElement element:toplevels) {
         if(!(element instanceof TypeDeclaration)){
           setContextClass(klass);
         }
         if(element instanceof Statement){
           context.setMethod(method);
-          IxCode.ActionStatement statement = (IxCode.ActionStatement) accept(toplevels[i], context);
+          IxCode.ActionStatement statement = (IxCode.ActionStatement) accept(element, context);
           statements.add(statement);
         }else{
-          accept(toplevels[i], null);
+          accept(element, null);
         }
       }    
-      
       if(klass != null){
         statements.add(new IxCode.Return(null));
         method.setBlock(new IxCode.StatementBlock(statements));

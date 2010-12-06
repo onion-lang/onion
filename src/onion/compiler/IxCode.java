@@ -2143,21 +2143,11 @@ public interface IxCode {
       }
 
       public boolean matches(TypeRef[] arguments, Expression[] parameters){
-        return matchesSub(arguments, parameters);
-      }
-
-      private static boolean matchesSub(
-        TypeRef[] arguments, Expression[] parameters){
         if(arguments.length != parameters.length) return false;
         TypeRef[] parameterTypes = new TypeRef[parameters.length];
         for(int i = 0; i < parameters.length; i++){
           parameterTypes[i] = parameters[i].type();
         }
-        return matchesSub(arguments, parameterTypes);
-      }
-
-      private static boolean matchesSub(
-        TypeRef[] arguments, TypeRef[] parameterTypes){
         for(int i = 0; i < arguments.length; i++){
           if(!TypeRules.isSuperType(arguments[i], parameterTypes[i])){
             return false;

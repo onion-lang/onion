@@ -58,7 +58,7 @@ public class OnionCompiler {
     String sourceFile = error.getSourceFile();
     StringBuffer message = new StringBuffer();
     if(sourceFile == null){
-      message.append(MessageFormat.format("{0}", new Object[]{error.getMessage()}));
+      message.append(MessageFormat.format("{0}", error.getMessage()));
     }else{
       String line = null, lineNum = null;
       try {
@@ -67,12 +67,7 @@ public class OnionCompiler {
       } catch (IOException e) {
         e.printStackTrace();
       }
-      message.append(
-        MessageFormat.format(
-          "{0}:{1}: {2}", new Object[]{sourceFile, lineNum, error.getMessage()}
-        )
-      );
-      
+      message.append(MessageFormat.format("{0}:{1}: {2}", sourceFile, lineNum, error.getMessage()));
       message.append(Systems.getLineSeparator());
       message.append("\t\t");
       message.append(line);

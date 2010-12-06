@@ -39,11 +39,34 @@ public class CodeGeneration  {
   
   private static final String FRAME_PREFIX = "frame";
   private static final String CLOSURE_CLASS_SUFFIX = "Closure";
-  private VMTypeBridge bridge;
-  
+
+  private static final Map<IxCode.BasicTypeRef, Type> BASIC_TYPE_MAPPING = new HashMap(){{
+    put(IxCode.BasicTypeRef.BYTE,			BasicType.BYTE);
+    put(IxCode.BasicTypeRef.SHORT,		BasicType.SHORT);
+    put(IxCode.BasicTypeRef.CHAR,			BasicType.CHAR);
+    put(IxCode.BasicTypeRef.INT,			BasicType.INT);
+    put(IxCode.BasicTypeRef.LONG, 		BasicType.LONG);
+    put(IxCode.BasicTypeRef.FLOAT,		BasicType.FLOAT);
+    put(IxCode.BasicTypeRef.DOUBLE, 	BasicType.DOUBLE);
+    put(IxCode.BasicTypeRef.BOOLEAN,	BasicType.BOOLEAN);
+    put(IxCode.BasicTypeRef.VOID,			BasicType.VOID);
+  }};
+
+  public static Type translateIxTypeToVmType(IxCode.TypeRef type){
+    if(type.isBasicType()){
+      return BASIC_TYPE_MAPPING.get(type);
+    }else if(type.isArrayType()){
+      IxCode.ArrayTypeRef arrayType = (IxCode.ArrayTypeRef)type;
+      return new ArrayType(translateIxTypeToVmType(arrayType.getComponent()), arrayType.getDimension());
+    }else if(type.isClassType()){
+      return new ObjectType(type.name());
+    }else{
+      return Type.NULL;
+    }
+  }
+
   public CodeGeneration(CompilerConfig config) {
     this.config = config;
-    this.bridge = new VMTypeBridge();
   }
 
   public CompiledClass[] process(IxCode.ClassDefinition[] classes) {
@@ -1293,13 +1316,13 @@ public class CodeGeneration  {
   }
 
   private Type typeOf(IxCode.TypeRef type) {
-    return bridge.toVMType(type);
+    return translateIxTypeToVmType(type);
   }
 
   private Type[] typesOf(IxCode.TypeRef[] types) {
     Type[] destinationTypes = new Type[types.length];
     for (int i = 0; i < destinationTypes.length; i++) {
-      destinationTypes[i] = bridge.toVMType(types[i]);
+      destinationTypes[i] = translateIxTypeToVmType(types[i]);
     }
     return destinationTypes;
   }

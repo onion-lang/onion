@@ -1927,14 +1927,12 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class FieldRefComparator implements Comparator {
+    class FieldRefComparator implements Comparator<FieldRef> {
       public FieldRefComparator() {
       }
 
-      public int compare(Object arg0, Object arg1) {
-        FieldRef f1 = (FieldRef) arg0;
-        FieldRef f2 = (FieldRef) arg1;
-        return f1.name().compareTo(f2.name());
+      public int compare(FieldRef o1, FieldRef o2) {
+        return o1.name().compareTo(o2.name());
       }
     }
 
@@ -1953,36 +1951,32 @@ public interface IxCode {
      * Date: 2005/06/30
      */
     class MethodRefFinder {
-      private static Comparator sorter = new Comparator(){
-        public int compare(Object method1, Object method2) {
-          MethodRef m1 = (MethodRef)method1;
-          MethodRef m2 = (MethodRef)method2;
+      private final Comparator<MethodRef> sorter = new Comparator<MethodRef>(){
+        public int compare(MethodRef m1, MethodRef m2) {
           TypeRef[] arg1 = m1.arguments();
           TypeRef[] arg2 = m2.arguments();
-          int length = arg1.length;
           if(isAllSuperType(arg2, arg1)) return -1;
           if(isAllSuperType(arg1, arg2)) return 1;
           return 0;
         }
       };
 
-      private ParameterMatcher matcher;
+      private final ParameterMatcher matcher = new StandardParameterMatcher();
 
       public MethodRefFinder() {
-        this.matcher = new StandardParameterMatcher();
       }
 
       public MethodRef[] find(ObjectTypeRef target, String name, Expression[] arguments){
-        Set methods = new TreeSet(new MethodRefComparator());
+        Set<MethodRef> methods = new TreeSet<MethodRef>(new MethodRefComparator());
         find(methods, target, name, arguments);
-        List selectedMethods = new ArrayList();
+        List<MethodRef> selectedMethods = new ArrayList<MethodRef>();
         selectedMethods.addAll(methods);
         Collections.sort(selectedMethods, sorter);
         if(selectedMethods.size() < 2){
           return (MethodRef[]) selectedMethods.toArray(new MethodRef[0]);
         }
-        MethodRef method1 = (MethodRef) selectedMethods.get(0);
-        MethodRef method2 = (MethodRef) selectedMethods.get(1);
+        MethodRef method1 = selectedMethods.get(0);
+        MethodRef method2 = selectedMethods.get(1);
         if(isAmbiguous(method1, method2)){
           return (MethodRef[]) selectedMethods.toArray(new MethodRef[0]);
         }
@@ -1993,15 +1987,12 @@ public interface IxCode {
         return sorter.compare(method1, method2) >= 0;
       }
 
-      private void find(
-        Set methods, ObjectTypeRef target, String name, Expression[] params){
+      private void find(Set<MethodRef> methods, ObjectTypeRef target, String name, Expression[] params){
         if(target == null) return;
         MethodRef[] ms = target.methods();
         for(int i = 0; i < ms.length; i++){
           MethodRef m = ms[i];
-          if(m.name().equals(name) && matcher.matches(m.arguments(), params)){
-            methods.add(m);
-          }
+          if(m.name().equals(name) && matcher.matches(m.arguments(), params)) methods.add(m);
         }
         ClassTypeRef superClass = target.getSuperClass();
         find(methods, superClass, name, params);
@@ -2011,8 +2002,7 @@ public interface IxCode {
         }
       }
 
-      private static boolean isAllSuperType(
-        TypeRef[] arg1, TypeRef[] arg2){
+      private static boolean isAllSuperType(TypeRef[] arg1, TypeRef[] arg2){
         for(int i = 0; i < arg1.length; i++){
           if(!TypeRules.isSuperType(arg1[i], arg2[i])) return false;
         }
@@ -2034,28 +2024,16 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class MethodRefComparator implements Comparator {
-
-      public MethodRefComparator() {
-      }
-
-      public int compare(Object arg0, Object arg1) {
-        MethodRef m1 = (MethodRef)arg0;
-        MethodRef m2 = (MethodRef)arg1;
+    class MethodRefComparator implements Comparator<MethodRef> {
+      public int compare(MethodRef m1, MethodRef m2) {
         int result = m1.name().compareTo(m2.name());
-        if(result != 0){
-          return result;
-        }
+        if(result != 0) return result;
         TypeRef[] args1 = m1.arguments();
         TypeRef[] args2 = m2.arguments();
         result = args1.length - args2.length;
-        if(result != 0){
-          return result;
-        }
+        if(result != 0) return result;
         for(int i = 0; i < args1.length; i++){
-          if(args1[i] != args2[i]){
-            return args1[i].name().compareTo(args2[i].name());
-          }
+          if(args1[i] != args2[i]) return args1[i].name().compareTo(args2[i].name());
         }
         return 0;
       }

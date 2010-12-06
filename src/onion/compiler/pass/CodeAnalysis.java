@@ -316,9 +316,7 @@ public class CodeAnalysis {
       setContextClass(node);
       setSolver(findSolver(node.name()));
       constructTypeHierarchy(node, new ArrayList());
-      if(hasCyclicity(node)){
-        report(CYCLIC_INHERITANCE, ast, new Object[]{node.name()});
-      }
+      if(hasCyclicity(node)) report(CYCLIC_INHERITANCE, ast, node.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -338,7 +336,7 @@ public class CodeAnalysis {
       setSolver(findSolver(node.name()));
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)){
-        report(CYCLIC_INHERITANCE, ast, new Object[]{node.name()});
+        report(CYCLIC_INHERITANCE, ast, node.name());
       }
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
@@ -351,7 +349,7 @@ public class CodeAnalysis {
       IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;  
       if(!(type.isObjectType() && ((IxCode.ObjectTypeRef)type).isInterface())){
-        report(INTERFACE_REQUIRED, ast.getType(), new Object[]{type});
+        report(INTERFACE_REQUIRED, ast.getType(), type);
         return null;
       }
       IxCode.ClassDefinition contextClass = getContextClass();
@@ -587,13 +585,9 @@ public class CodeAnalysis {
         if(symbol instanceof IxCode.ClassDefinition){
           astNode = lookupAST((IxCode.ClassDefinition)symbol);
         }
-        report(ILLEGAL_INHERITANCE, astNode, new Object[]{symbol.name()});
+        report(ILLEGAL_INHERITANCE, astNode, symbol.name());
       }
       return symbol;
-    }
-    
-    private void report(int error, AstNode ast, Object[] items){
-      report(error, ast, items);
     }
   }
   
@@ -660,11 +654,7 @@ public class CodeAnalysis {
         IxCode.MethodRef method = (IxCode.MethodRef) i.next();
         if(methodSet.contains(method)) continue;
         if(generated.contains(method)){
-          report(
-            DUPLICATE_GENERATED_METHOD, lookupAST(node),
-            new Object[]{
-              method.affiliation(), method.name(), method.arguments()
-            });
+          report(DUPLICATE_GENERATED_METHOD, lookupAST(node), method.affiliation(), method.name(), method.arguments());
           continue;
         }
         IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
@@ -719,7 +709,7 @@ public class CodeAnalysis {
       if(constructors.contains(node)){
         IxCode.ClassTypeRef classType = node.affiliation();
         IxCode.TypeRef[] args = node.getArgs();
-        report(DUPLICATE_CONSTRUCTOR, ast, new Object[]{classType, args});
+        report(DUPLICATE_CONSTRUCTOR, ast, classType, args);
       }else{
         constructors.add(node);
       }
@@ -732,7 +722,7 @@ public class CodeAnalysis {
       if(fields.contains(node)){
         IxCode.ClassTypeRef classType = node.affiliation();
         String name = node.name();
-        report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
+        report(DUPLICATE_FIELD, ast, classType, name);
       }else{
         fields.add(node);
       }
@@ -746,7 +736,7 @@ public class CodeAnalysis {
         IxCode.ClassTypeRef classType = node.affiliation();
         String name = node.name();
         IxCode.TypeRef[] args = node.arguments();
-        report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
+        report(DUPLICATE_METHOD, ast, classType, name, args);
       }else{
         methods.add(node);
       }
@@ -759,7 +749,7 @@ public class CodeAnalysis {
       if(fields.contains(node)){
         IxCode.ClassTypeRef classType = node.affiliation();
         String name = node.name();
-        report(DUPLICATE_FIELD, ast, new Object[]{classType, name});
+        report(DUPLICATE_FIELD, ast, classType, name);
       }else{
         fields.add(node);
       }
@@ -773,7 +763,7 @@ public class CodeAnalysis {
         IxCode.ClassTypeRef classType = node.affiliation();
         String name = node.name();
         IxCode.TypeRef[] args = node.arguments();
-        report(DUPLICATE_METHOD, ast, new Object[]{classType, name, args});
+        report(DUPLICATE_METHOD, ast, classType, name, args);
       }else{
         methods.add(node);
       }
@@ -786,7 +776,7 @@ public class CodeAnalysis {
       if(functions.contains(node)){
         String name = node.name();
         IxCode.TypeRef[] args = node.arguments();
-        report(DUPLICATE_FUNCTION, ast, new Object[]{name, args});
+        report(DUPLICATE_FUNCTION, ast, name, args);
       }else{
         functions.add(node);
       }
@@ -798,7 +788,7 @@ public class CodeAnalysis {
       if(node == null) return null;
       if(variables.contains(node)){
         String name = node.name();
-        report(DUPLICATE_GLOBAL_VARIABLE, ast, new Object[]{name});      
+        report(DUPLICATE_GLOBAL_VARIABLE, ast, name);
       }else{
         variables.add(node);
       }
@@ -812,10 +802,6 @@ public class CodeAnalysis {
         accept(members[i], context);
       }
       return null;
-    }
-    
-    private void report(int error, AstNode ast, Object[] items){
-      report(error, ast, items);
     }
   }
   
@@ -833,6 +819,7 @@ public class CodeAnalysis {
       TopLevelElement[] toplevels = unit.getTopLevels();
       LocalContext context = new LocalContext();
       List<IxCode.ActionStatement> statements = new ArrayList<IxCode.ActionStatement>();
+      String className = topClass();
       setSolver(findSolver(topClass()));
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
       IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);

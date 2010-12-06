@@ -1621,7 +1621,7 @@ public class CodeAnalysis {
       return null;
     }
     
-    private boolean checkAccessible(
+    private boolean isAccessible(
       AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassTypeRef context
     ) {
       if(target.isArrayType()){
@@ -1650,7 +1650,7 @@ public class CodeAnalysis {
         return null;
       }
       IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
-      if(!checkAccessible(ast, targetType, contextClass)) return null;
+      if(!isAccessible(ast, targetType, contextClass)) return null;
       String name = ast.getName();
       if(target.type().isArrayType()){
         if(name.equals("length") || name.equals("size")){
@@ -1663,14 +1663,11 @@ public class CodeAnalysis {
       if(field != null && isAccessible(field, getContextClass())){
         return new IxCode.RefField(target, field);
       }
-      Pair<Boolean, IxCode.MethodRef> result;
-      boolean continuable;
-      
-      result = tryFindMethod(ast, targetType, name, new IxCode.Expression[0]);
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, targetType, name, new IxCode.Expression[0]);
       if(result._2 != null){
         return new IxCode.Call(target, result._2, new IxCode.Expression[0]);
       }
-      continuable = result._1;
+      boolean continuable = result._1;
       if(!continuable) return null;
       
       String getterName;

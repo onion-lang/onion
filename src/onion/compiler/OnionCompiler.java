@@ -11,9 +11,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import onion.compiler.pass.*;
+import onion.compiler.pass.Parsing;
+import onion.compiler.pass.CodeAnalysis;
+import onion.compiler.pass.CodeGeneration;
 import onion.compiler.util.*;
-import onion.lang.syntax.Location;
 
 
 /**
@@ -64,8 +65,8 @@ public class OnionCompiler {
     }else{
       String line = null, lineNum = null;
       try {
-        line = location != null ? getLine(sourceFile, location.getLine()) : "";
-        lineNum = location != null ? Integer.toString(location.getLine()) : "";
+        line = location != null ? getLine(sourceFile, location.line()) : "";
+        lineNum = location != null ? Integer.toString(location.line()) : "";
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -81,7 +82,7 @@ public class OnionCompiler {
       message.append(Systems.getLineSeparator());
       message.append("\t\t");
       if(location != null){
-        message.append(getCursor(location.getColumn()));
+        message.append(getCursor(location.column()));
       }
     }
     System.err.println(new String(message));

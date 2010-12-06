@@ -19,7 +19,7 @@ import onion.compiler.CompilationException;
 import onion.compiler.parser.*;
 import onion.compiler.util.*;
 import onion.lang.syntax.CompilationUnit;
-import onion.lang.syntax.Location;
+import onion.compiler.Location;
 
 
 /**

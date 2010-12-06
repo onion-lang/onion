@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import onion.compiler.util.Messages;
-import onion.lang.syntax.Location;
 
 
 /**

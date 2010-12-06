@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.lang.syntax;
+package onion.compiler;
 
 /**
  * @author Kota Mizushima
@@ -20,11 +20,11 @@ public final class Location {
     this.column = column;
   }
 
-  public int getColumn() {
-    return column;
+  public int line() {
+    return line;
   }
 
-  public int getLine() {
-    return line;
+  public int column() {
+    return column;
   }
 }

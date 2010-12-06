@@ -12,6 +12,7 @@ options {
 PARSER_BEGIN(JJOnionParser)
 package onion.compiler.parser;
 import onion.compiler.AST;
+import onion.compiler.Location;
 import onion.compiler.util.*;
 import onion.lang.syntax.OnionParser;
 import scala.Tuple2;
@@ -43,15 +44,15 @@ public class JJOnionParser implements OnionParser {
   /*
    * convenience method to create a Location
    */
-  private static AST.Position p(Token t) {
-    return new AST.Position(t.beginLine, t.beginColumn);
+  private static Location p(Token t) {
+    return new Location(t.beginLine, t.beginColumn);
   }
 
   /*
    * convenience method to create a Location
    */
-  private static AST.Position p(int line, int column) {
-    return new AST.Position(line, column);
+  private static Location p(int line, int column) {
+    return new Location(line, column);
   }
 
   /*
@@ -411,16 +412,16 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
 
 AST.AccessSection default_section() : {
   ArrayBuffer<AST.MemberDeclaration> members = new ArrayBuffer<AST.MemberDeclaration>();
-  AST.MemberDeclaration m; int mset; AST.Position pos;
+  AST.MemberDeclaration m; int mset; Location location;
 }{
   {mset = 0;}
   ([mset=modifiers()] m=member_decl(mset) {
-     append(members, m); pos = m.pos();
+     append(members, m); location = m.location();
    }
   )
   {mset = 0;}
   ([mset=modifiers()] m=member_decl(mset) {append(members, m);})*
-  {return new AST.AccessSection(pos, AST.M_PRIVATE(), toList(members));}
+  {return new AST.AccessSection(location, AST.M_PRIVATE(), toList(members));}
 }
 
 AST.AccessSection access_section() :{
@@ -551,7 +552,7 @@ AST.TypeNode type() : {
     for(int i = 0; i < d; i++) {
       desc = new AST.ArrayType(desc);
     }
-    return new AST.TypeNode(c.pos(), desc);
+    return new AST.TypeNode(c.location(), desc);
   }
 }
 
@@ -636,7 +637,7 @@ AST.TryStatement try_stmt() :{
 }
 
 AST.ExpressionStatement exp_stmt() :{AST.Expression e;}{
-  e=expression() ";" {return new AST.ExpressionStatement(e.pos(), e);}
+  e=expression() ";" {return new AST.ExpressionStatement(e.location(), e);}
 }
 
 AST.EmptyStatement empty_stmt() :{Token t;}{
@@ -653,7 +654,7 @@ AST.BranchStatement branch_stmt() : {
   List<AST.Statement> ss = null; AST.BlockStatement elseBlock = null;
 }{
   t="branch" "{"
-    (("case" e=expression() "=>" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.pos(), ss)));})+
+    (("case" e=expression() "=>" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.location(), ss)));})+
     ["else" elseBlock=block()]
   "}" { return new AST.BranchStatement(p(t), toList(es), elseBlock); }
 }

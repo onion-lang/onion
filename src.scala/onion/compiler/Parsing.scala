@@ -3,9 +3,10 @@ package onion.compiler
 import collection.mutable.ArrayBuffer
 import collection.JavaConversions._
 import onion.compiler.util.Messages
-import onion.lang.syntax.Location
+import onion.compiler.Location
 import java.io.{Reader, IOException}
 import parser.{JJOnionParser, Token, ParseException}
+import onion.compiler.Location
 
 /**
  * Created by IntelliJ IDEA.

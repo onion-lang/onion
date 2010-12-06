@@ -7,10 +7,7 @@
  * ************************************************************** */
 package onion.lang.syntax;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
+import onion.compiler.Location;
 import onion.lang.syntax.visitor.ASTVisitor;
 
 /**
@@ -24,7 +21,7 @@ public class CompilationUnit extends AstNode {
   private final TopLevelElement[] topLevels;
 
   public CompilationUnit(
-    Location loc, ModuleDeclaration moduleDeclaration, 
+    Location loc, ModuleDeclaration moduleDeclaration,
     ImportListDeclaration importListDeclaration, TopLevelElement[] topLevels) {
     this.moduleDeclaration = moduleDeclaration;
     this.importListDeclaration = importListDeclaration;

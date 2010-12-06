@@ -8,6 +8,7 @@
 package onion.lang.syntax;
 
 
+import onion.compiler.Location;
 import onion.lang.syntax.visitor.ASTVisitor;
 
 /**

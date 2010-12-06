@@ -7,6 +7,7 @@
  * ************************************************************** */
 package onion.lang.syntax;
 
+import onion.compiler.Location;
 import onion.lang.syntax.visitor.ASTVisitor;
 
 /**
@@ -22,7 +23,7 @@ public class ClosureExpression extends Expression{
   private final BlockStatement block;
   
   public ClosureExpression(
-    Location loc, TypeSpec type, String name, Argument[] arguments, 
+    Location loc, TypeSpec type, String name, Argument[] arguments,
     TypeSpec returnType, BlockStatement block
   ) {
     this.type = type;

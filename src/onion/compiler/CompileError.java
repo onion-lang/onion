@@ -7,8 +7,6 @@
  * ************************************************************** */
 package onion.compiler;
 
-import onion.lang.syntax.Location;
-
 /**
  * @author Kota Mizushima
  * 

@@ -7,6 +7,7 @@
  * ************************************************************** */
 package onion.lang.syntax;
 
+import onion.compiler.Location;
 import onion.lang.syntax.visitor.ASTVisitor;
 
 /**
@@ -20,7 +21,7 @@ public class TryStatement extends Statement {
   private final BlockStatement finBlock;
 
   public TryStatement(
-    Location loc, BlockStatement tryBlock, BlockStatement[] recBlocks, 
+    Location loc, BlockStatement tryBlock, BlockStatement[] recBlocks,
     Argument[] arguments, BlockStatement finBlock
   ) {
     this.tryBlock = tryBlock;

@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.lang.syntax;
 
-import onion.lang.syntax.visitor.ASTVisitor;
+import onion.compiler.Location;
 
 
 /**

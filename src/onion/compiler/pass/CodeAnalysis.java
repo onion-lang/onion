@@ -943,9 +943,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return new IxCode.Call(left, concat, new IxCode.Expression[]{right});
     }
     
-    public Object visit(PostIncrement node, LocalContext context) {
-      LocalContext local = (LocalContext)context;
-      IxCode.Expression operand = typeCheck(node.getTarget(), context);
+    public Object visit(PostIncrement node, LocalContext local) {
+      IxCode.Expression operand = typeCheck(node.getTarget(), local);
       if(operand == null) return null;
       if((!operand.isBasicType()) || !hasNumericType(operand)){
         report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{operand.type()}});
@@ -988,9 +987,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       return result;
     }
     
-    public Object visit(PostDecrement node, LocalContext context) {
-      LocalContext local = (LocalContext)context;
-      IxCode.Expression operand = typeCheck(node.getTarget(), context);
+    public Object visit(PostDecrement node, LocalContext local) {
+      IxCode.Expression operand = typeCheck(node.getTarget(), local);
       if(operand == null) return null;
       if((!operand.isBasicType()) || !hasNumericType(operand)){
         report(INCOMPATIBLE_OPERAND_TYPE, node, new Object[]{node.getSymbol(), new IxCode.TypeRef[]{operand.type()}});

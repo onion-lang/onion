@@ -1302,366 +1302,367 @@ public class CodeGeneration implements IxCode.BinaryExpression.Constants, IxCode
     }
     return destinationTypes;
   }
+
+  public static class CodeProxy {
+    private InstructionList code;
+    private InstructionFactory factory;
+    private LocalFrame frame;
+    private int frameObjectIndex;
+    private int[] indexTable;
+    private MethodGen method;
+
+    public CodeProxy(ConstantPoolGen pool){
+      this.code = new InstructionList();
+      this.factory = new InstructionFactory(pool);
+    }
+
+    public void setFrame(LocalFrame frame){
+      this.frame = frame;
+    }
+
+    public LocalFrame getFrame(){
+      return frame;
+    }
+
+    public int getFrameObjectIndex(){
+      return frameObjectIndex;
+    }
+
+    public void setFrameObjectIndex(int frameObjectIndex){
+      this.frameObjectIndex = frameObjectIndex;
+    }
+
+    public void setIndexTable(int[] indexTable){
+      this.indexTable = (int[]) indexTable.clone();
+    }
+
+    public int index(int index){
+      return indexTable[index];
+    }
+
+    public int[] getIndexTable(){
+      return (int[]) indexTable.clone();
+    }
+
+    public void setMethod(MethodGen method){
+      this.method = method;
+    }
+
+    public MethodGen getMethod(){
+      return method;
+    }
+
+    public InstructionList getCode(){
+      return code;
+    }
+
+    public CodeExceptionGen addExceptionHandler(InstructionHandle start_pc, InstructionHandle end_pc, InstructionHandle handler_pc, ObjectType catch_type) {
+      return method.addExceptionHandler(start_pc, end_pc, handler_pc, catch_type);
+    }
+
+    public LineNumberGen addLineNumber(InstructionHandle ih, int src_line) {
+      return method.addLineNumber(ih, src_line);
+    }
+
+    public InstructionHandle appendCallConstructor(ObjectType type, Type[] params){
+      return appendInvoke(type.getClassName(), "<init>", Type.VOID, params, Constants.INVOKESPECIAL);
+    }
+
+    public InstructionHandle appendDefaultValue(Type type){
+      InstructionHandle start;
+      if(type instanceof BasicType){
+        if(type == BasicType.BOOLEAN){
+          start = appendConstant(Boolean.valueOf(false));
+        }else if(type == BasicType.BYTE){
+          start = appendConstant(new Byte((byte)0));
+        }else if(type == BasicType.SHORT){
+          start = appendConstant(new Short((short)0));
+        }else if(type == BasicType.CHAR){
+          start = appendConstant(new Character((char)0));
+        }else if(type == BasicType.INT){
+          start = appendConstant(new Integer(0));
+        }else if(type == BasicType.LONG){
+          start = appendConstant(new Long(0));
+        }else if(type == BasicType.FLOAT){
+          start = appendConstant(new Float(0.0f));
+        }else if(type == BasicType.DOUBLE){
+          start = appendConstant(new Double(0.0));
+        }else{
+          start = append(InstructionConstants.NOP);
+        }
+      }else{
+        start = appendNull(type);
+      }
+      return start;
+    }
+
+    private final Map BOXING_TABLE = new HashMap(){{
+      put(Type.BOOLEAN,  new ObjectType("java.lang.Boolean"));
+      put(Type.BYTE,     new ObjectType("java.lang.Byte"));
+      put(Type.SHORT,    new ObjectType("java.lang.Short"));
+      put(Type.CHAR,     new ObjectType("java.lang.Character"));
+      put(Type.INT,      new ObjectType("java.lang.Integer"));
+      put(Type.LONG,     new ObjectType("java.lang.Long"));
+      put(Type.FLOAT,    new ObjectType("java.lang.Float"));
+      put(Type.DOUBLE,   new ObjectType("java.lang.Double"));
+    }};
+
+    public ObjectType boxing(Type type){
+      ObjectType boxedType = (ObjectType)BOXING_TABLE.get(type);
+      if(boxedType == null) throw new RuntimeException("type " + type + "cannot be boxed");
+      return boxedType;
+    }
+
+    public InstructionHandle appendArrayLoad(Type type) {
+      return code.append(InstructionFactory.createArrayLoad(type));
+    }
+
+    public InstructionHandle appendArrayStore(Type type) {
+      return code.append(InstructionFactory.createArrayStore(type));
+    }
+
+    public InstructionHandle appendBinaryOperation(String op, Type type) {
+      return code.append(InstructionFactory.createBinaryOperation(op, type));
+    }
+
+    public BranchHandle appendBranchInstruction(short opcode, InstructionHandle target) {
+      return code.append(InstructionFactory.createBranchInstruction(opcode, target));
+    }
+
+    public InstructionHandle appendDup(int size) {
+      return code.append(InstructionFactory.createDup(size));
+    }
+
+    public InstructionHandle appendDup_1(int size) {
+      return code.append(InstructionFactory.createDup_1(size));
+    }
+
+    public InstructionHandle appendDup_2(int size) {
+      return code.append(InstructionFactory.createDup_2(size));
+    }
+
+    public InstructionHandle appendLoad(Type type, int index) {
+      return code.append(InstructionFactory.createLoad(type, index));
+    }
+
+    public InstructionHandle appendNull(Type type) {
+      return code.append(InstructionFactory.createNull(type));
+    }
+
+    public InstructionHandle appendPop(int size) {
+      return code.append(InstructionFactory.createPop(size));
+    }
+
+    public InstructionHandle appendReturn(Type type) {
+      return code.append(InstructionFactory.createReturn(type));
+    }
+
+    public InstructionHandle appendStore(Type type, int index) {
+      return code.append(InstructionFactory.createStore(type, index));
+    }
+
+    public InstructionHandle appendThis() {
+      return code.append(InstructionFactory.createThis());
+    }
+
+    public InstructionHandle appendAppend(Type type) {
+      return code.append(factory.createAppend(type));
+    }
+
+    public InstructionHandle appendCast(Type src_type, Type dest_type) {
+      return code.append(factory.createCast(src_type, dest_type));
+    }
+
+    public InstructionHandle appendCheckCast(ReferenceType t) {
+      return code.append(factory.createCheckCast(t));
+    }
+
+    public InstructionHandle appendConstant(Object value) {
+      return code.append(factory.createConstant(value));
+    }
+
+    public InstructionHandle appendFieldAccess(String class_name, String name, Type type, short kind) {
+      return code.append(factory.createFieldAccess(class_name, name, type, kind));
+    }
+
+    public InstructionHandle appendGetField(String class_name, String name, Type t) {
+      return code.append(factory.createGetField(class_name, name, t));
+    }
+
+    public InstructionHandle appendGetStatic(String class_name, String name, Type t) {
+      return code.append(factory.createGetStatic(class_name, name, t));
+    }
+
+    public InstructionHandle appendInstanceOf(ReferenceType t) {
+      return code.append(factory.createInstanceOf(t));
+    }
+
+    public InstructionHandle appendInvoke(String class_name, String name, Type ret_type, Type[] arg_types, short kind) {
+      return code.append(factory.createInvoke(class_name, name, ret_type, arg_types, kind));
+    }
+
+    public InstructionHandle appendNew(String s) {
+      return code.append(factory.createNew(s));
+    }
+
+    public InstructionHandle appendNew(ObjectType t) {
+      return code.append(factory.createNew(t));
+    }
+
+    public InstructionHandle appendNewArray(Type t, short dim) {
+      return code.append(factory.createNewArray(t, dim));
+    }
+
+    public InstructionHandle appendPutField(String class_name, String name, Type t) {
+      return code.append(factory.createPutField(class_name, name, t));
+    }
+    public InstructionHandle appendPutStatic(String class_name, String name, Type t) {
+      return code.append(factory.createPutStatic(class_name, name, t));
+    }
+
+    public BranchHandle append(BranchInstruction i) {
+      return code.append(i);
+    }
+
+    public InstructionHandle append(CompoundInstruction c) {
+      return code.append(c);
+    }
+
+    public InstructionHandle append(Instruction i) {
+      return code.append(i);
+    }
+
+    public InstructionHandle append(Instruction i, CompoundInstruction c) {
+      return code.append(i, c);
+    }
+
+    public InstructionHandle append(Instruction i, Instruction j) {
+      return code.append(i, j);
+    }
+
+    public InstructionHandle append(Instruction i, InstructionList il) {
+      return code.append(i, il);
+    }
+
+    public BranchHandle append(InstructionHandle ih, BranchInstruction i) {
+      return code.append(ih, i);
+    }
+
+    public InstructionHandle append(InstructionHandle ih, CompoundInstruction c) {
+      return code.append(ih, c);
+    }
+
+    public InstructionHandle append(InstructionHandle ih, Instruction i) {
+      return code.append(ih, i);
+    }
+
+    public InstructionHandle append(InstructionHandle ih, InstructionList il) {
+      return code.append(ih, il);
+    }
+
+    public InstructionHandle append(InstructionList il) {
+      return code.append(il);
+    }
+
+    public InstructionHandle getEnd() {
+      return code.getEnd();
+    }
+
+    public InstructionHandle[] getInstructionHandles() {
+      return code.getInstructionHandles();
+    }
+
+    public int[] getInstructionPositions() {
+      return code.getInstructionPositions();
+    }
+
+    public Instruction[] getInstructions() {
+      return code.getInstructions();
+    }
+
+    public int getLength() {
+      return code.getLength();
+    }
+
+    public InstructionHandle getStart() {
+      return code.getStart();
+    }
+
+    public BranchHandle insert(BranchInstruction i) {
+      return code.insert(i);
+    }
+
+    public InstructionHandle insert(CompoundInstruction c) {
+      return code.insert(c);
+    }
+
+    public InstructionHandle insert(Instruction i) {
+      return code.insert(i);
+    }
+
+    public InstructionHandle insert(Instruction i, CompoundInstruction c) {
+      return code.insert(i, c);
+    }
+
+    public InstructionHandle insert(Instruction i, Instruction j) {
+      return code.insert(i, j);
+    }
+
+    public InstructionHandle insert(Instruction i, InstructionList il) {
+      return code.insert(i, il);
+    }
+
+    public BranchHandle insert(InstructionHandle ih, BranchInstruction i) {
+      return code.insert(ih, i);
+    }
+
+    public InstructionHandle insert(InstructionHandle ih, CompoundInstruction c) {
+      return code.insert(ih, c);
+    }
+
+    public InstructionHandle insert(InstructionHandle ih, Instruction i) {
+      return code.insert(ih, i);
+    }
+
+    public InstructionHandle insert(InstructionHandle ih, InstructionList il) {
+      return code.insert(ih, il);
+    }
+
+    public InstructionHandle insert(InstructionList il) {
+      return code.insert(il);
+    }
+
+    public boolean isEmpty() {
+      return code.isEmpty();
+    }
+
+    public Iterator iterator() {
+      return code.iterator();
+    }
+
+    public void move(InstructionHandle ih, InstructionHandle target) {
+      code.move(ih, target);
+    }
+
+    public void move(InstructionHandle start, InstructionHandle end, InstructionHandle target) {
+      code.move(start, end, target);
+    }
+
+    public void redirectBranches(InstructionHandle old_target, InstructionHandle new_target) {
+      code.redirectBranches(old_target, new_target);
+    }
+
+    public void redirectExceptionHandlers(CodeExceptionGen[] exceptions, InstructionHandle old_target, InstructionHandle new_target) {
+      code.redirectExceptionHandlers(exceptions, old_target, new_target);
+    }
+
+    public void redirectLocalVariables(LocalVariableGen[] lg, InstructionHandle old_target, InstructionHandle new_target) {
+      code.redirectLocalVariables(lg, old_target, new_target);
+    }
+
+    public void update() {
+      code.update();
+    }
+  }
 }
 
-class CodeProxy {
-  private InstructionList code;
-  private InstructionFactory factory;
-  private LocalFrame frame;
-  private int frameObjectIndex;
-  private int[] indexTable;
-  private MethodGen method;  
-  
-  public CodeProxy(ConstantPoolGen pool){
-    this.code = new InstructionList();
-    this.factory = new InstructionFactory(pool);
-  }
-  
-  public void setFrame(LocalFrame frame){
-    this.frame = frame;
-  }
-  
-  public LocalFrame getFrame(){
-    return frame;
-  }
-  
-  public int getFrameObjectIndex(){
-    return frameObjectIndex;
-  }
-  
-  public void setFrameObjectIndex(int frameObjectIndex){
-    this.frameObjectIndex = frameObjectIndex;
-  }
-  
-  public void setIndexTable(int[] indexTable){
-    this.indexTable = (int[]) indexTable.clone();
-  }
-  
-  public int index(int index){
-    return indexTable[index];
-  }
-  
-  public int[] getIndexTable(){
-    return (int[]) indexTable.clone();
-  }
-  
-  public void setMethod(MethodGen method){
-    this.method = method;
-  }
-  
-  public MethodGen getMethod(){
-    return method;
-  }
-  
-  public InstructionList getCode(){
-    return code;
-  }
-  
-  public CodeExceptionGen addExceptionHandler(InstructionHandle start_pc, InstructionHandle end_pc, InstructionHandle handler_pc, ObjectType catch_type) {
-    return method.addExceptionHandler(start_pc, end_pc, handler_pc, catch_type);
-  }
-  
-  public LineNumberGen addLineNumber(InstructionHandle ih, int src_line) {
-    return method.addLineNumber(ih, src_line);
-  }
-  
-  public InstructionHandle appendCallConstructor(ObjectType type, Type[] params){
-    return appendInvoke(type.getClassName(), "<init>", Type.VOID, params, Constants.INVOKESPECIAL);
-  }
-  
-  public InstructionHandle appendDefaultValue(Type type){
-    InstructionHandle start;
-    if(type instanceof BasicType){
-      if(type == BasicType.BOOLEAN){
-        start = appendConstant(Boolean.valueOf(false));
-      }else if(type == BasicType.BYTE){
-        start = appendConstant(new Byte((byte)0));
-      }else if(type == BasicType.SHORT){
-        start = appendConstant(new Short((short)0));
-      }else if(type == BasicType.CHAR){
-        start = appendConstant(new Character((char)0));
-      }else if(type == BasicType.INT){
-        start = appendConstant(new Integer(0));
-      }else if(type == BasicType.LONG){
-        start = appendConstant(new Long(0));
-      }else if(type == BasicType.FLOAT){
-        start = appendConstant(new Float(0.0f));
-      }else if(type == BasicType.DOUBLE){
-        start = appendConstant(new Double(0.0));
-      }else{
-        start = append(InstructionConstants.NOP);
-      }
-    }else{
-      start = appendNull(type);
-    }
-    return start;
-  }
-  
-  private final Map BOXING_TABLE = new HashMap(){{
-    put(Type.BOOLEAN,  new ObjectType("java.lang.Boolean"));
-    put(Type.BYTE,     new ObjectType("java.lang.Byte"));
-    put(Type.SHORT,    new ObjectType("java.lang.Short"));
-    put(Type.CHAR,     new ObjectType("java.lang.Character"));
-    put(Type.INT,      new ObjectType("java.lang.Integer"));
-    put(Type.LONG,     new ObjectType("java.lang.Long"));
-    put(Type.FLOAT,    new ObjectType("java.lang.Float"));
-    put(Type.DOUBLE,   new ObjectType("java.lang.Double"));
-  }};
-  
-  public ObjectType boxing(Type type){
-    ObjectType boxedType = (ObjectType)BOXING_TABLE.get(type);
-    if(boxedType == null) throw new RuntimeException("type " + type + "cannot be boxed");
-    return boxedType;
-  }
-  
-  public InstructionHandle appendArrayLoad(Type type) {
-    return code.append(InstructionFactory.createArrayLoad(type));
-  }
-  
-  public InstructionHandle appendArrayStore(Type type) {
-    return code.append(InstructionFactory.createArrayStore(type));
-  }
-  
-  public InstructionHandle appendBinaryOperation(String op, Type type) {
-    return code.append(InstructionFactory.createBinaryOperation(op, type));
-  }
-  
-  public BranchHandle appendBranchInstruction(short opcode, InstructionHandle target) {
-    return code.append(InstructionFactory.createBranchInstruction(opcode, target));
-  }
-  
-  public InstructionHandle appendDup(int size) {
-    return code.append(InstructionFactory.createDup(size));
-  }
-  
-  public InstructionHandle appendDup_1(int size) {
-    return code.append(InstructionFactory.createDup_1(size));
-  }
-  
-  public InstructionHandle appendDup_2(int size) {
-    return code.append(InstructionFactory.createDup_2(size));
-  }
-  
-  public InstructionHandle appendLoad(Type type, int index) {
-    return code.append(InstructionFactory.createLoad(type, index));
-  }
-  
-  public InstructionHandle appendNull(Type type) {
-    return code.append(InstructionFactory.createNull(type));
-  }
-  
-  public InstructionHandle appendPop(int size) {
-    return code.append(InstructionFactory.createPop(size));
-  }
-  
-  public InstructionHandle appendReturn(Type type) {
-    return code.append(InstructionFactory.createReturn(type));
-  }
-  
-  public InstructionHandle appendStore(Type type, int index) {
-    return code.append(InstructionFactory.createStore(type, index));
-  }
-  
-  public InstructionHandle appendThis() {
-    return code.append(InstructionFactory.createThis());
-  }
-  
-  public InstructionHandle appendAppend(Type type) {
-    return code.append(factory.createAppend(type));
-  }
-  
-  public InstructionHandle appendCast(Type src_type, Type dest_type) {
-    return code.append(factory.createCast(src_type, dest_type));
-  }
-  
-  public InstructionHandle appendCheckCast(ReferenceType t) {
-    return code.append(factory.createCheckCast(t));
-  }
-  
-  public InstructionHandle appendConstant(Object value) {
-    return code.append(factory.createConstant(value));
-  }
-  
-  public InstructionHandle appendFieldAccess(String class_name, String name, Type type, short kind) {
-    return code.append(factory.createFieldAccess(class_name, name, type, kind));
-  }
-  
-  public InstructionHandle appendGetField(String class_name, String name, Type t) {
-    return code.append(factory.createGetField(class_name, name, t));
-  }
-  
-  public InstructionHandle appendGetStatic(String class_name, String name, Type t) {
-    return code.append(factory.createGetStatic(class_name, name, t));
-  }
-  
-  public InstructionHandle appendInstanceOf(ReferenceType t) {
-    return code.append(factory.createInstanceOf(t));
-  }
-  
-  public InstructionHandle appendInvoke(String class_name, String name, Type ret_type, Type[] arg_types, short kind) {
-    return code.append(factory.createInvoke(class_name, name, ret_type, arg_types, kind));
-  }
-  
-  public InstructionHandle appendNew(String s) {
-    return code.append(factory.createNew(s));
-  }
-  
-  public InstructionHandle appendNew(ObjectType t) {
-    return code.append(factory.createNew(t));
-  }
-  
-  public InstructionHandle appendNewArray(Type t, short dim) {
-    return code.append(factory.createNewArray(t, dim));
-  }
-  
-  public InstructionHandle appendPutField(String class_name, String name, Type t) {
-    return code.append(factory.createPutField(class_name, name, t));
-  }
-  public InstructionHandle appendPutStatic(String class_name, String name, Type t) {
-    return code.append(factory.createPutStatic(class_name, name, t));
-  }
-  
-  public BranchHandle append(BranchInstruction i) {
-    return code.append(i);
-  }
-  
-  public InstructionHandle append(CompoundInstruction c) {
-    return code.append(c);
-  }
-  
-  public InstructionHandle append(Instruction i) {
-    return code.append(i);
-  }
-  
-  public InstructionHandle append(Instruction i, CompoundInstruction c) {
-    return code.append(i, c);
-  }
-  
-  public InstructionHandle append(Instruction i, Instruction j) {
-    return code.append(i, j);
-  }
-  
-  public InstructionHandle append(Instruction i, InstructionList il) {
-    return code.append(i, il);
-  }
-  
-  public BranchHandle append(InstructionHandle ih, BranchInstruction i) {
-    return code.append(ih, i);
-  }
-  
-  public InstructionHandle append(InstructionHandle ih, CompoundInstruction c) {
-    return code.append(ih, c);
-  }
-  
-  public InstructionHandle append(InstructionHandle ih, Instruction i) {
-    return code.append(ih, i);
-  }
-  
-  public InstructionHandle append(InstructionHandle ih, InstructionList il) {
-    return code.append(ih, il);
-  }
-  
-  public InstructionHandle append(InstructionList il) {
-    return code.append(il);
-  }
-  
-  public InstructionHandle getEnd() {
-    return code.getEnd();
-  }
-  
-  public InstructionHandle[] getInstructionHandles() {
-    return code.getInstructionHandles();
-  }
-  
-  public int[] getInstructionPositions() {
-    return code.getInstructionPositions();
-  }
-  
-  public Instruction[] getInstructions() {
-    return code.getInstructions();
-  }
-  
-  public int getLength() {
-    return code.getLength();
-  }
-  
-  public InstructionHandle getStart() {
-    return code.getStart();
-  }
-  
-  public BranchHandle insert(BranchInstruction i) {
-    return code.insert(i);
-  }
-  
-  public InstructionHandle insert(CompoundInstruction c) {
-    return code.insert(c);
-  }
-  
-  public InstructionHandle insert(Instruction i) {
-    return code.insert(i);
-  }
-  
-  public InstructionHandle insert(Instruction i, CompoundInstruction c) {
-    return code.insert(i, c);
-  }
-  
-  public InstructionHandle insert(Instruction i, Instruction j) {
-    return code.insert(i, j);
-  }
-  
-  public InstructionHandle insert(Instruction i, InstructionList il) {
-    return code.insert(i, il);
-  }
-  
-  public BranchHandle insert(InstructionHandle ih, BranchInstruction i) {
-    return code.insert(ih, i);
-  }
-  
-  public InstructionHandle insert(InstructionHandle ih, CompoundInstruction c) {
-    return code.insert(ih, c);
-  }
-  
-  public InstructionHandle insert(InstructionHandle ih, Instruction i) {
-    return code.insert(ih, i);
-  }
-  
-  public InstructionHandle insert(InstructionHandle ih, InstructionList il) {
-    return code.insert(ih, il);
-  }
-  
-  public InstructionHandle insert(InstructionList il) {
-    return code.insert(il);
-  }
-  
-  public boolean isEmpty() {
-    return code.isEmpty();
-  }
-  
-  public Iterator iterator() {
-    return code.iterator();
-  }
-  
-  public void move(InstructionHandle ih, InstructionHandle target) {
-    code.move(ih, target);
-  }
-  
-  public void move(InstructionHandle start, InstructionHandle end, InstructionHandle target) {
-    code.move(start, end, target);
-  }
-  
-  public void redirectBranches(InstructionHandle old_target, InstructionHandle new_target) {
-    code.redirectBranches(old_target, new_target);
-  }
-  
-  public void redirectExceptionHandlers(CodeExceptionGen[] exceptions, InstructionHandle old_target, InstructionHandle new_target) {
-    code.redirectExceptionHandlers(exceptions, old_target, new_target);
-  }
-  
-  public void redirectLocalVariables(LocalVariableGen[] lg, InstructionHandle old_target, InstructionHandle new_target) {
-    code.redirectLocalVariables(lg, old_target, new_target);
-  }
-  
-  public void update() {
-    code.update();
-  }
-}

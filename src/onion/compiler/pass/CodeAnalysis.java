@@ -42,7 +42,7 @@ public class CodeAnalysis {
   private CompilationUnit unit;
   private StaticImportList staticImportedList;
   private ImportList importedList;
-  private IxCode.ClassDefinition contextClass;
+  private IxCode.ClassDefinition definition;
   private NameResolution solver;
   private int access;
   
@@ -229,11 +229,10 @@ public class CodeAnalysis {
     
     public Object visit(ClassDeclaration ast, Void context) {
       nconstructor = 0;
-      IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      contextClass = node;
-      solver = findSolver(node.name());
-      constructTypeHierarchy(node, new ArrayList());
-      if(hasCyclicity(node)) report(CYCLIC_INHERITANCE, ast, node.name());
+      definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      solver = findSolver(definition.name());
+      constructTypeHierarchy(definition, new ArrayList());
+      if(hasCyclicity(definition)) report(CYCLIC_INHERITANCE, ast, definition.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -241,19 +240,16 @@ public class CodeAnalysis {
       for(int i = 0; i < sections.length; i++){
         accept(sections[i]);
       }
-      if(nconstructor == 0){
-        node.addDefaultConstructor();
-      }
+      if(nconstructor == 0) definition.addDefaultConstructor();
       return null;
     }
       
     public Object visit(InterfaceDeclaration ast, Void context) {
-      IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      contextClass = node;
-      solver = findSolver(node.name());
-      constructTypeHierarchy(node, new ArrayList());
-      if(hasCyclicity(node)){
-        report(CYCLIC_INHERITANCE, ast, node.name());
+      definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      solver = findSolver(definition.name());
+      constructTypeHierarchy(definition, new ArrayList());
+      if(hasCyclicity(definition)){
+        report(CYCLIC_INHERITANCE, ast, definition.name());
       }
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
@@ -271,21 +267,20 @@ public class CodeAnalysis {
       }
       int modifier = ast.getModifier() | access | Modifier.FORWARDED;
       String name = ast.getName();
-      IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
+      IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, definition, name, type);
       put(ast, node);
-      contextClass.add(node);
+      definition.add(node);
       return null;
     }
     
     public Object visit(ConstructorDeclaration ast, Void context) {
       nconstructor++;
       IxCode.TypeRef[] args = typesOf(ast.getArguments());
-      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       if(args == null) return null;
       int modifier = ast.getModifier() | access;
-      IxCode.ConstructorDefinition node = new IxCode.ConstructorDefinition(modifier, contextClass, args, null, null);
+      IxCode.ConstructorDefinition node = new IxCode.ConstructorDefinition(modifier, definition, args, null, null);
       put(ast, node);
-      contextClass.add(node);
+      definition.add(node);
       return null;
     }
 
@@ -299,25 +294,23 @@ public class CodeAnalysis {
       }
       if(args == null || returnType == null) return null;
 
-      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       int modifier = ast.getModifier() | access;
       if(ast.getBlock() == null) modifier |= Modifier.ABSTRACT;
       String name = ast.getName();    
-      IxCode.MethodDefinition node = new IxCode.MethodDefinition(modifier, contextClass, name, args, returnType, null);
+      IxCode.MethodDefinition node = new IxCode.MethodDefinition(modifier, definition, name, args, returnType, null);
       put(ast, node);
-      contextClass.add(node);
+      definition.add(node);
       return null;
     }
     
     public Object visit(FieldDeclaration ast, Void context) {
       IxCode.TypeRef type = resolve(ast.getType());
       if(type == null) return null;
-      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       int modifier = ast.getModifier() | access;
       String name = ast.getName();    
-      IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
+      IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, definition, name, type);
       put(ast, node);
-      contextClass.add(node);
+      definition.add(node);
       return node;
     }
     
@@ -342,11 +335,11 @@ public class CodeAnalysis {
     
     private IxCode.FieldDefinition createFieldNode(FieldDeclaration ast){
       IxCode.TypeRef type = resolve(ast.getType());
-      if(type == null) return null;
-      IxCode.FieldDefinition node = new IxCode.FieldDefinition(
-        ast.getModifier() | access, contextClass,
-        ast.getName(), type);
-      return node;
+      if(type == null) {
+        return null;
+      }else {
+        return new IxCode.FieldDefinition(ast.getModifier() | access, definition, ast.getName(), type);
+      }
     }
       
     public Object visit(InterfaceMethodDeclaration ast, Void context) {
@@ -358,14 +351,11 @@ public class CodeAnalysis {
         returnType = IxCode.BasicTypeRef.VOID;
       }
       if(args == null || returnType == null) return null;
-      
       int modifier = Modifier.PUBLIC | Modifier.ABSTRACT;
-      IxCode.ClassDefinition classType = contextClass;
-      String name = ast.getName();    
-      IxCode.MethodDefinition node =
-        new IxCode.MethodDefinition(modifier, classType, name, args, returnType, null);
+      String name = ast.getName();
+      IxCode.MethodDefinition node = new IxCode.MethodDefinition(modifier, definition, name, args, returnType, null);
       put(ast, node);
-      classType.add(node);
+      definition.add(node);
       return null;
     }
     
@@ -532,8 +522,8 @@ public class CodeAnalysis {
       methods.clear();
       fields.clear();
       constructors.clear();
-      CodeAnalysis.this.contextClass = node;
-      CodeAnalysis.this.solver = findSolver(node.name());
+      definition = node;
+      solver = findSolver(node.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -567,7 +557,7 @@ public class CodeAnalysis {
           }else {
             IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
             generated.add(generatedMethod);
-            contextClass.add(generatedMethod);
+            definition.add(generatedMethod);
           }
         }
       }
@@ -575,7 +565,7 @@ public class CodeAnalysis {
     
     private IxCode.MethodDefinition createEmptyMethod(IxCode.FieldRef field, IxCode.MethodRef method){
       IxCode.Expression target;
-      target = new IxCode.RefField(new IxCode.This(contextClass), field);
+      target = new IxCode.RefField(new IxCode.This(definition), field);
       IxCode.TypeRef[] args = method.arguments();
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       LocalFrame frame = new LocalFrame(null);
@@ -591,7 +581,7 @@ public class CodeAnalysis {
         statement = new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null));
       }
       IxCode.MethodDefinition node = new IxCode.MethodDefinition(
-        Modifier.PUBLIC, contextClass, method.name(),
+        Modifier.PUBLIC, definition, method.name(),
         method.arguments(), method.returnType(), statement
       );
       node.setFrame(frame);
@@ -604,7 +594,7 @@ public class CodeAnalysis {
       methods.clear();
       fields.clear();
       constructors.clear();
-      CodeAnalysis.this.contextClass = node;
+      CodeAnalysis.this.definition = node;
       CodeAnalysis.this.solver = findSolver(node.name());
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
@@ -737,7 +727,7 @@ public class CodeAnalysis {
       context.add("args", argsType);
       for(TopLevelElement element:toplevels) {
         if(!(element instanceof TypeDeclaration)){
-          CodeAnalysis.this.contextClass = klass;
+          CodeAnalysis.this.definition = klass;
         }
         if(element instanceof Statement){
           context.setMethod(method);
@@ -776,13 +766,13 @@ public class CodeAnalysis {
     }
     
     public Object visit(InterfaceDeclaration ast, LocalContext context) {
-      CodeAnalysis.this.contextClass = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      CodeAnalysis.this.definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
       return null;
     }
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
-      CodeAnalysis.this.contextClass = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      CodeAnalysis.this.solver = findSolver(contextClass.name());
+      CodeAnalysis.this.definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      CodeAnalysis.this.solver = findSolver(definition.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
       }
@@ -1238,7 +1228,7 @@ public class CodeAnalysis {
       IxCode.Expression[] params;
       params = typeCheckExps(ast.getParams(), context);
       if(params == null) return null;
-      IxCode.ClassTypeRef contextClass = CodeAnalysis.this.contextClass;
+      IxCode.ClassTypeRef contextClass = CodeAnalysis.this.definition;
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.getSuperClass(), ast.getName(), params);
       if(result._2 == null){
         if(result._1) report(METHOD_NOT_FOUND, ast, contextClass, ast.getName(), types(params));
@@ -1483,7 +1473,7 @@ public class CodeAnalysis {
       if(context.isStatic()) {
         return null;
       }else {
-        return new IxCode.This(contextClass);
+        return new IxCode.This(definition);
       }
     }
     
@@ -1561,7 +1551,7 @@ public class CodeAnalysis {
       if(target.isArrayType()){
         IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).getComponent();
         if(!component.isBasicType()){
-          if(!isAccessible((IxCode.ClassTypeRef)component, contextClass)){
+          if(!isAccessible((IxCode.ClassTypeRef)component, definition)){
             report(CLASS_NOT_ACCESSIBLE, ast, target, context);
             return false;
           }
@@ -1576,7 +1566,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(FieldOrMethodRef ast, LocalContext context) {
-      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
+      IxCode.ClassDefinition contextClass = CodeAnalysis.this.definition;
       IxCode.Expression target = typeCheck(ast.getTarget(), context);
       if(target == null) return null;
       if(target.type().isBasicType() || target.type().isNullType()){
@@ -1594,7 +1584,7 @@ public class CodeAnalysis {
         }
       }
       IxCode.FieldRef field = findField(targetType, name);
-      if(field != null && isAccessible(field, CodeAnalysis.this.contextClass)){
+      if(field != null && isAccessible(field, CodeAnalysis.this.definition)){
         return new IxCode.RefField(target, field);
       }
       Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, targetType, name, new IxCode.Expression[0]);
@@ -1622,7 +1612,7 @@ public class CodeAnalysis {
       if(field == null){
         report(FIELD_NOT_FOUND, ast, targetType, ast.getName());
       }else{
-        report(FIELD_NOT_ACCESSIBLE, ast,  targetType, ast.getName(), CodeAnalysis.this.contextClass);
+        report(FIELD_NOT_ACCESSIBLE, ast,  targetType, ast.getName(), CodeAnalysis.this.definition);
       }
       return null;
     }
@@ -1637,8 +1627,8 @@ public class CodeAnalysis {
           report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
           return Pair.make(false, null);
         }
-        if(!isAccessible(methods[0], contextClass)){
-          report(METHOD_NOT_ACCESSIBLE, ast, methods[0].affiliation(), name, methods[0].arguments(), contextClass);
+        if(!isAccessible(methods[0], definition)){
+          report(METHOD_NOT_ACCESSIBLE, ast, methods[0].affiliation(), name, methods[0].arguments(), definition);
           return Pair.make(false, null);
         }
         return Pair.make(false, methods[0]);
@@ -1778,7 +1768,7 @@ public class CodeAnalysis {
     public Object visit(SelfFieldReference ast, LocalContext context) {
       IxCode.ClassTypeRef selfClass = null;
       if(context.isStatic()) return null;
-      selfClass = contextClass;
+      selfClass = definition;
       IxCode.FieldRef field = findField(selfClass, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, selfClass, ast.getName());
@@ -1825,7 +1815,7 @@ public class CodeAnalysis {
     public Object visit(SelfMethodCall ast, LocalContext context) {
       IxCode.Expression[] params = typeCheckExps(ast.getArguments(), context);
       if(params == null) return null;
-      IxCode.ClassDefinition targetType = contextClass;
+      IxCode.ClassDefinition targetType = definition;
       IxCode.MethodRef[] methods = targetType.findMethod(ast.getName(), params);
       if(methods.length == 0){
         report(METHOD_NOT_FOUND, ast,  targetType, ast.getName(), types(params));
@@ -2408,7 +2398,7 @@ public class CodeAnalysis {
       }
       IxCode.Expression[] params = typeCheckExps(ast.getInitializers(), context);
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBody(), context);
-      IxCode.ClassDefinition currentClass = contextClass;
+      IxCode.ClassDefinition currentClass = definition;
       IxCode.ClassTypeRef superClass = currentClass.getSuperClass();
       IxCode.ConstructorRef[] matched = superClass.findConstructor(params);
       if(matched.length == 0){

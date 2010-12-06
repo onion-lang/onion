@@ -27,9 +27,9 @@ import onion.compiler.util.Paths;
 import onion.compiler.util.Systems;
 import onion.lang.syntax.*;
 import onion.lang.syntax.visitor.ASTVisitor;
+import static onion.compiler.SemanticErrorReporter.Constants.*;
 
-
-public class CodeAnalysis implements SemanticErrorReporter.Constants {
+public class CodeAnalysis {
   private SemanticErrorReporter reporter;
   private CompilerConfig conf;
   private ClassTable table;

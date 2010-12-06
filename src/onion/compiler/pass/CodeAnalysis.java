@@ -255,7 +255,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         table.addSourceClass(node);
         node.addDefaultConstructor();
         put(unit, node);
-        addSolver(node.getName(), new NameResolution(list, table));
+        addSolver(node.getName(), new NameResolution(list));
       }
     }
     
@@ -270,7 +270,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       ClassTable table = getTable();
       getTable().addSourceClass(node);
       put(ast, node);
-      addSolver(node.getName(), new NameResolution(getImport(), table));
+      addSolver(node.getName(), new NameResolution(getImport()));
       return null;    
     }
     
@@ -285,9 +285,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       }
       table.addSourceClass(node);
       put(ast, node);
-      addSolver(
-        node.getName(), new NameResolution(getImport(), getTable())
-      );
+      addSolver(node.getName(), new NameResolution(getImport()) );
       return null;
     }
     
@@ -2775,13 +2773,11 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
    * @author Kota Mizushima
    * Date: 2005/06/13
    */
-  public static class NameResolution {
+  public class NameResolution {
     private ImportList imports;
-    private ClassTable table;
 
-    public NameResolution(ImportList imports, ClassTable table) {
+    public NameResolution(ImportList imports) {
       this.imports = imports;
-      this.table = table;
     }
 
     public IxCode.TypeRef resolve(TypeSpec specifier) {

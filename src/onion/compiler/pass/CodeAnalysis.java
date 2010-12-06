@@ -160,24 +160,6 @@ public class CodeAnalysis {
     reporter.report(error, node.getLocation(), items);
   }
 
-  public static IxCode.TypeRef promoteNumericTypes(IxCode.TypeRef left,  IxCode.TypeRef right) {
-    if(!numeric(left) || !numeric(right)) return null;
-    if(left == IxCode.BasicTypeRef.DOUBLE || right == IxCode.BasicTypeRef.DOUBLE){
-      return IxCode.BasicTypeRef.DOUBLE;
-    }
-    if(left == IxCode.BasicTypeRef.FLOAT || right == IxCode.BasicTypeRef.FLOAT){
-      return IxCode.BasicTypeRef.FLOAT;
-    }
-    if(left == IxCode.BasicTypeRef.LONG || right == IxCode.BasicTypeRef.LONG){
-      return IxCode.BasicTypeRef.LONG;
-    }
-    return IxCode.BasicTypeRef.INT;
-  }
-  
-  public static boolean hasNumericType(IxCode.Expression expression) {
-    return numeric(expression.type());
-  }
-  
   private static boolean numeric(IxCode.TypeRef symbol) {
     return 
     (symbol.isBasicType()) &&

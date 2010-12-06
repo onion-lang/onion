@@ -225,6 +225,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       list.add(new ImportItem("*", "java.util.*"));
       list.add(new ImportItem("*", "javax.swing.*"));
       list.add(new ImportItem("*", "java.awt.event.*"));
+      list.add(new ImportItem("*", "onion.*"));
       list.add(new ImportItem("*", moduleName != null ? moduleName + ".*" : "*"));
       if(imports != null){
         for(int i = 0; i < imports.size(); i++){

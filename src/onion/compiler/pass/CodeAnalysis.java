@@ -214,25 +214,24 @@ public class CodeAnalysis {
   }
   
   private class TypeHeaderAnalysis extends ASTVisitor<Void> {
-    private int countConstructor;
+    private int nconstructor;
   
     public TypeHeaderAnalysis() {
     }
     
-    public void process(CompilationUnit unit){
-      CodeAnalysis.this.unit = unit;
-      TopLevelElement[] toplevels = unit.getTopLevels();
-      for(int i = 0; i < toplevels.length; i++){
-        CodeAnalysis.this.solver = findSolver(topClass());
-        accept(toplevels[i]);
+    public void process(CompilationUnit compilationUnit){
+      unit = compilationUnit;
+      for(TopLevelElement top:compilationUnit.getTopLevels()){
+        solver = findSolver(topClass());
+        accept(top);
       }
     }
     
     public Object visit(ClassDeclaration ast, Void context) {
-      countConstructor = 0;
+      nconstructor = 0;
       IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      CodeAnalysis.this.contextClass = node;
-      CodeAnalysis.this.solver = findSolver(node.name());
+      contextClass = node;
+      solver = findSolver(node.name());
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)) report(CYCLIC_INHERITANCE, ast, node.name());
       if(ast.getDefaultSection() != null){
@@ -242,7 +241,7 @@ public class CodeAnalysis {
       for(int i = 0; i < sections.length; i++){
         accept(sections[i]);
       }
-      if(countConstructor == 0){
+      if(nconstructor == 0){
         node.addDefaultConstructor();
       }
       return null;
@@ -250,8 +249,8 @@ public class CodeAnalysis {
       
     public Object visit(InterfaceDeclaration ast, Void context) {
       IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      CodeAnalysis.this.contextClass = node;
-      CodeAnalysis.this.solver = findSolver(node.name());
+      contextClass = node;
+      solver = findSolver(node.name());
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)){
         report(CYCLIC_INHERITANCE, ast, node.name());
@@ -270,7 +269,6 @@ public class CodeAnalysis {
         report(INTERFACE_REQUIRED, ast.getType(), type);
         return null;
       }
-      IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       int modifier = ast.getModifier() | access | Modifier.FORWARDED;
       String name = ast.getName();
       IxCode.FieldDefinition node = new IxCode.FieldDefinition(modifier, contextClass, name, type);
@@ -280,7 +278,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(ConstructorDeclaration ast, Void context) {
-      countConstructor++;
+      nconstructor++;
       IxCode.TypeRef[] args = typesOf(ast.getArguments());
       IxCode.ClassDefinition contextClass = CodeAnalysis.this.contextClass;
       if(args == null) return null;

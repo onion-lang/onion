@@ -33,7 +33,7 @@ import static onion.compiler.IxCode.UnaryExpression.Constants.*;
 
 public class CodeAnalysis {
   private SemanticErrorReporter reporter;
-  private CompilerConfig conf;
+  private CompilerConfig config;
   private ClassTable table;
   private Map irt2ast;
   private Map ast2irt;
@@ -2566,13 +2566,13 @@ public class CodeAnalysis {
     }
   }
   
-  public CodeAnalysis(CompilerConfig conf) {
-    this.conf     = conf;
-    this.table    = new ClassTable(classpath(this.conf.getClassPath()));
+  public CodeAnalysis(CompilerConfig config) {
+    this.config   = config;
+    this.table    = new ClassTable(classpath(config.getClassPath()));
     this.irt2ast  = new HashMap();
     this.ast2irt  = new HashMap();
     this.solvers  = new HashMap();
-    this.reporter = new SemanticErrorReporter(this.conf.getMaxErrorReports());
+    this.reporter = new SemanticErrorReporter(this.config.getMaxErrorReports());
   }
   
   public IxCode.ClassDefinition[] process(CompilationUnit[] units){

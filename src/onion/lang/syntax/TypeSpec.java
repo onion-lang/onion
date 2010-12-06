@@ -50,7 +50,7 @@ public class TypeSpec extends AstNode {
   }
   
   public int getComponentKind(){
-    return component.getKind();
+    return component.kind();
   }
   
   public int getDimension() {

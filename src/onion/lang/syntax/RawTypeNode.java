@@ -36,7 +36,7 @@ public class RawTypeNode extends TypeNode {
     return name;
   }
 
-  public int getKind(){
+  public int kind(){
     return kind;
   }
   

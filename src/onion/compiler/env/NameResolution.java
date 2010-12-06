@@ -29,7 +29,7 @@ public class NameResolution {
     RawTypeNode component = specifier.getComponent();
     String name = component.name();
     IxCode.TypeRef resolvedType;
-    if(component.getKind() == RawTypeNode.BASIC){
+    if(component.kind() == RawTypeNode.BASIC){
       resolvedType =
         name.equals("char") ? IxCode.BasicTypeRef.CHAR :
         name.equals("byte") ? IxCode.BasicTypeRef.BYTE :
@@ -40,7 +40,7 @@ public class NameResolution {
         name.equals("double") ? IxCode.BasicTypeRef.DOUBLE :
         name.equals("boolean") ? IxCode.BasicTypeRef.BOOLEAN :
                                   IxCode.BasicTypeRef.VOID;
-    }else if(component.getKind() == RawTypeNode.NOT_QUALIFIED){
+    }else if(component.kind() == RawTypeNode.NOT_QUALIFIED){
       resolvedType = forName(name, false);
     }else{
       resolvedType = forName(name, true);

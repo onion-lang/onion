@@ -78,7 +78,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
   }
 
   private void requireMethodTable() {
-    if(methods != null){
+    if(methods == null){
       methods = new MultiTable<IxCode.MethodRef>();
       for(Method method:javaClass.getMethods()){
         if(!method.getName().equals(CONSTRUCTOR_NAME)) methods.add(translate(method));
@@ -109,7 +109,9 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     if(constructors == null){
       constructors = new ArrayList<IxCode.ConstructorRef>();
       for(Method method:javaClass.getMethods()) {
-        constructors.add(translateConstructor(method));
+        if(method.getName().equals(CONSTRUCTOR_NAME)) {
+          constructors.add(translateConstructor(method));
+        }
       }
     }
     return constructors.toArray(new IxCode.ConstructorRef[0]);

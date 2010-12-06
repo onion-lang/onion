@@ -111,12 +111,11 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
   public IxCode.ConstructorRef[] constructors() {
     if(constructors == null){
       constructors = new ArrayList<IxCode.ConstructorRef>();
-      Constructor[] methods1 = klass.getConstructors();
       for(Constructor method:klass.getConstructors()) {
         constructors.add(translate(method));
       }
     }
-    return (IxCode.ConstructorRef[]) constructors.toArray(new IxCode.ConstructorRef[0]);
+    return constructors.toArray(new IxCode.ConstructorRef[0]);
   }
 
   private static int toOnionModifier(int src){

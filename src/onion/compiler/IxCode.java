@@ -1796,38 +1796,34 @@ public interface IxCode {
      * Date: 2005/06/30
      */
     class ConstructorRefFinder {
-      private static Comparator sorter = new Comparator(){
-        public int compare(Object constructor1, Object constructor2) {
-          ConstructorRef c1 = (ConstructorRef)constructor1;
-          ConstructorRef c2 = (ConstructorRef)constructor2;
+      private final Comparator<IxCode.ConstructorRef> sorter = new Comparator<ConstructorRef>(){
+        public int compare(IxCode.ConstructorRef c1, IxCode.ConstructorRef c2) {
           TypeRef[] arg1 = c1.getArgs();
           TypeRef[] arg2 = c2.getArgs();
-          int length = arg1.length;
           if(isAllSuperType(arg2, arg1)) return -1;
           if(isAllSuperType(arg1, arg2)) return 1;
           return 0;
         }
       };
-
-      private ParameterMatcher matcher;
-
-      public ConstructorRefFinder() {
-        this.matcher = new StandardParameterMatcher();
-      }
-
+      private final ParameterMatcher matcher = new StandardParameterMatcher();
       public ConstructorRef[] find(ClassTypeRef target, Expression[] args){
-        Set constructors = new TreeSet(new ConstructorRefComparator());
-        find(constructors, target, args);
-        List selected = new ArrayList();
+        Set<ConstructorRef> constructors = new TreeSet<ConstructorRef>(new ConstructorRefComparator());
+        if(target == null) return new ConstructorRef[0];
+        ConstructorRef[] cs = target.constructors();
+        for(int i = 0; i < cs.length; i++){
+          ConstructorRef c = cs[i];
+          if(matcher.matches(c.getArgs(), args)) constructors.add(c);
+        }
+        List<ConstructorRef> selected = new ArrayList<ConstructorRef>();
         selected.addAll(constructors);
         Collections.sort(selected, sorter);
         if(selected.size() < 2){
-          return (ConstructorRef[]) selected.toArray(new ConstructorRef[0]);
+          return selected.toArray(new ConstructorRef[0]);
         }
-        ConstructorRef constructor1 = (ConstructorRef) selected.get(0);
-        ConstructorRef constructor2 = (ConstructorRef) selected.get(1);
+        ConstructorRef constructor1 = selected.get(0);
+        ConstructorRef constructor2 = selected.get(1);
         if(isAmbiguous(constructor1, constructor2)){
-          return (ConstructorRef[]) selected.toArray(new ConstructorRef[0]);
+          return selected.toArray(new ConstructorRef[0]);
         }
         return new ConstructorRef[]{constructor1};
       }
@@ -1836,19 +1832,7 @@ public interface IxCode {
         return sorter.compare(constructor1, constructor2) >= 0;
       }
 
-      private void find(Set constructors, ClassTypeRef target, Expression[] arguments){
-        if(target == null) return;
-        ConstructorRef[] cs = target.constructors();
-        for(int i = 0; i < cs.length; i++){
-          ConstructorRef c = cs[i];
-          if(matcher.matches(c.getArgs(), arguments)){
-            constructors.add(c);
-          }
-        }
-      }
-
-      private static boolean isAllSuperType(
-        TypeRef[] arg1, TypeRef[] arg2){
+      private boolean isAllSuperType(TypeRef[] arg1, TypeRef[] arg2){
         for(int i = 0; i < arg1.length; i++){
           if(!TypeRules.isSuperType(arg1[i], arg2[i])) return false;
         }
@@ -1898,23 +1882,15 @@ public interface IxCode {
      * Date: 2005/07/15
      */
     class FieldRefFinder {
-
-      public FieldRefFinder() {
-      }
-
       public FieldRef find(ObjectTypeRef target, String name){
         if(target == null) return null;
-        FieldRef[] fields = target.fields();
-        for (int i = 0; i < fields.length; i++) {
-          if(fields[i].name().equals(name)){
-            return fields[i];
-          }
-        }
-        FieldRef field = find(target.getSuperClass(), name);
+        FieldRef field = target.field(name);
+        if(field != null) return field;
+        field = find(target.getSuperClass(), name);
         if(field != null) return field;
         ClassTypeRef[] interfaces = target.getInterfaces();
-        for(int i = 0; i < interfaces.length; i++){
-          field = find(interfaces[i], name);
+        for(ClassTypeRef anInterface:target.getInterfaces()){
+          field = find(anInterface, name);
           if(field != null) return field;
         }
         return null;
@@ -1997,16 +1973,15 @@ public interface IxCode {
 
       private void find(Set<MethodRef> methods, ObjectTypeRef target, String name, Expression[] params){
         if(target == null) return;
-        MethodRef[] ms = target.methods();
-        for(int i = 0; i < ms.length; i++){
-          MethodRef m = ms[i];
-          if(m.name().equals(name) && matcher.matches(m.arguments(), params)) methods.add(m);
+        MethodRef[] ms = target.methods(name);
+        for(MethodRef m:target.methods(name)){
+          if(matcher.matches(m.arguments(), params)) methods.add(m);
         }
         ClassTypeRef superClass = target.getSuperClass();
         find(methods, superClass, name, params);
         ClassTypeRef[] interfaces = target.getInterfaces();
-        for(int i = 0; i < interfaces.length; i++){
-          find(methods, interfaces[i], name, params);
+        for(ClassTypeRef anInterface:interfaces) {
+          find(methods, anInterface, name, params);
         }
       }
 

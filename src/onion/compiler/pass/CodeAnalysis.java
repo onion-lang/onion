@@ -2403,9 +2403,10 @@ public class CodeAnalysis {
   //-------------------------------------------------------------------------//
     
   //----------------------------- members ----------------------------------------//  
-    public Object visit(FunctionDeclaration ast, LocalContext context) {
+    public Object visit(FunctionDeclaration ast, LocalContext local) {
       IxCode.MethodDefinition function = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(function == null) return null;
+      LocalContext context = new LocalContext();
       if(Modifier.isStatic(function.modifier())){
         context.setStatic(true);
       }
@@ -2441,10 +2442,11 @@ public class CodeAnalysis {
       return null;
     }
     
-    public Object visit(MethodDeclaration ast, LocalContext context) {
+    public Object visit(MethodDeclaration ast, LocalContext local) {
       IxCode.MethodDefinition method = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(method == null) return null;
       if(ast.getBlock() == null) return null;
+      LocalContext context = new LocalContext();
       if(Modifier.isStatic(method.modifier())){
         context.setStatic(true);
       }
@@ -2460,9 +2462,10 @@ public class CodeAnalysis {
       return null;
     }
     
-    public Object visit(ConstructorDeclaration ast, LocalContext context) {
+    public Object visit(ConstructorDeclaration ast, LocalContext local) {
       IxCode.ConstructorDefinition constructor = (IxCode.ConstructorDefinition) lookupKernelNode(ast);
       if(constructor == null) return null;
+      LocalContext context = new LocalContext();
       context.setConstructor(constructor);
       IxCode.TypeRef[] args = constructor.getArgs();
       for(int i = 0; i < args.length; i++){

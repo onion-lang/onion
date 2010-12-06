@@ -27,7 +27,12 @@ public class MultiTable<E extends Named> implements Iterable<E> {
     }
   }
   public List<E> get(String key) {
-    return mapping.get(key);
+    List<E> values = mapping.get(key);
+    if(values == null) {
+      values = new ArrayList<E>();
+      mapping.put(key, values);
+    }
+    return values;
   }
   public List<E> values() {
     List<E> list = new ArrayList<E>();

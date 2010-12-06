@@ -301,7 +301,7 @@ public class SemanticErrorReporter {
     problem(
       position,
       format(
-        message("error.semantic.ambiguousMethod"),
+        message("error.semantic.ambiguousConstructor"),
         target1, args2, target2, args2));
   }
   

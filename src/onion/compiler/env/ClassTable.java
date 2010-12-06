@@ -35,7 +35,7 @@ public class ClassTable {
   }
   
   public void addSourceClass(IxCode.ClassDefinition node){
-    classes.put(node.getName(), node);
+    classes.put(node.name(), node);
   }
   
   public IxCode.ClassDefinition[] getSourceClasses(){
@@ -43,7 +43,7 @@ public class ClassTable {
   }
   
   public IxCode.ArrayTypeRef loadArray(IxCode.TypeRef component, int dimension){
-    String arrayName = Strings.repeat("[", dimension) + component.getName();
+    String arrayName = Strings.repeat("[", dimension) + component.name();
     IxCode.ArrayTypeRef array = (IxCode.ArrayTypeRef) arrayClasses.get(arrayName);
     if(array != null) return array;
     array = new IxCode.ArrayTypeRef(component, dimension, this);
@@ -57,11 +57,11 @@ public class ClassTable {
       JavaClass javaClass = table.load(className);
       if(javaClass != null){
         clazz = new ClassFileTypeRef(javaClass, this);
-        classFiles.put(clazz.getName(), clazz);
+        classFiles.put(clazz.name(), clazz);
       }else{
         try {
           clazz = new ClassObjectTypeRef(Class.forName(className, true, Thread.currentThread().getContextClassLoader()), this);
-          classFiles.put(clazz.getName(), clazz);
+          classFiles.put(clazz.name(), clazz);
         }catch(ClassNotFoundException e){
         }
       }

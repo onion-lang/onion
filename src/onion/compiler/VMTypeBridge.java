@@ -40,7 +40,7 @@ public class VMTypeBridge {
       return new ArrayType(
         toVMType(arrayType.getComponent()), arrayType.getDimension());
     }else if(type.isClassType()){
-      return new ObjectType(((IxCode.ClassTypeRef)type).getName());
+      return new ObjectType(((IxCode.ClassTypeRef)type).name());
     }else{
       return Type.NULL;
     }

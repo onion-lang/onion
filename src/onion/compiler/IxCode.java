@@ -544,7 +544,7 @@ public interface IxCode {
       this.name = name;
     }
 
-    public String getName() {
+    public String name() {
       return name;
     }
 
@@ -1668,7 +1668,7 @@ public interface IxCode {
           table.load("java.io.Serializable"),
           table.load("java.lang.Cloneable")
         };
-        this.name = Strings.repeat("[", dimension) + component.getName();
+        this.name = Strings.repeat("[", dimension) + component.name();
       }
 
       public TypeRef getComponent(){
@@ -1711,7 +1711,7 @@ public interface IxCode {
         return superClass.getFields();
       }
 
-      public String getName() {
+      public String name() {
         return name;
       }
 
@@ -1745,7 +1745,7 @@ public interface IxCode {
         this.name = name;
       }
 
-      public String getName(){
+      public String name(){
         return name;
       }
 
@@ -1890,7 +1890,7 @@ public interface IxCode {
         }
         for(int i = 0; i < args1.length; i++){
           if(args1[i] != args2[i]){
-            return args1[i].getName().compareTo(args2[i].getName());
+            return args1[i].name().compareTo(args2[i].name());
           }
         }
         return 0;
@@ -2066,7 +2066,7 @@ public interface IxCode {
         }
         for(int i = 0; i < args1.length; i++){
           if(args1[i] != args2[i]){
-            return args1[i].getName().compareTo(args2[i].getName());
+            return args1[i].name().compareTo(args2[i].name());
           }
         }
         return 0;
@@ -2086,7 +2086,7 @@ public interface IxCode {
         this.name = name;
       }
 
-      public String getName(){
+      public String name(){
         return name;
       }
 
@@ -2162,7 +2162,7 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     interface TypeRef {
-      String getName();
+      String name();
       boolean isBasicType();
       boolean isClassType();
       boolean isNullType();

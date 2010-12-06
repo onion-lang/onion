@@ -256,7 +256,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         table.addSourceClass(node);
         node.addDefaultConstructor();
         put(unit, node);
-        addSolver(node.getName(), new NameResolution(list));
+        addSolver(node.name(), new NameResolution(list));
       }
     }
     
@@ -264,14 +264,14 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       String module = context;
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
       node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
-      if(getTable().lookup(node.getName()) != null){
-        report(DUPLICATE_CLASS,  ast, new Object[]{node.getName()});
+      if(getTable().lookup(node.name()) != null){
+        report(DUPLICATE_CLASS,  ast, new Object[]{node.name()});
         return null;
       }
       ClassTable table = getTable();
       getTable().addSourceClass(node);
       put(ast, node);
-      addSolver(node.getName(), new NameResolution(getImport()));
+      addSolver(node.name(), new NameResolution(getImport()));
       return null;    
     }
     
@@ -280,13 +280,13 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
       node.setSourceFile(Paths.nameOf(getUnit().getSourceFileName()));
       ClassTable table = getTable();
-      if(table.lookup(node.getName()) != null){
-        report(DUPLICATE_CLASS,  ast, new Object[]{node.getName()});
+      if(table.lookup(node.name()) != null){
+        report(DUPLICATE_CLASS,  ast, new Object[]{node.name()});
         return null;
       }
       table.addSourceClass(node);
       put(ast, node);
-      addSolver(node.getName(), new NameResolution(getImport()) );
+      addSolver(node.name(), new NameResolution(getImport()) );
       return null;
     }
     
@@ -314,10 +314,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       countConstructor = 0;
       IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
       setContextClass(node);
-      setSolver(findSolver(node.getName()));
+      setSolver(findSolver(node.name()));
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)){
-        report(CYCLIC_INHERITANCE, ast, new Object[]{node.getName()});
+        report(CYCLIC_INHERITANCE, ast, new Object[]{node.name()});
       }
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
@@ -335,10 +335,10 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     public Object visit(InterfaceDeclaration ast, Void context) {
       IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
       setContextClass(node);
-      setSolver(findSolver(node.getName()));
+      setSolver(findSolver(node.name()));
       constructTypeHierarchy(node, new ArrayList());
       if(hasCyclicity(node)){
-        report(CYCLIC_INHERITANCE, ast, new Object[]{node.getName()});
+        report(CYCLIC_INHERITANCE, ast, new Object[]{node.name()});
       }
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
@@ -531,7 +531,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         if(node.isResolutionComplete()) return;
         IxCode.ClassTypeRef superClass = null;
         List interfaces = new ArrayList();
-        NameResolution resolver = findSolver(node.getName());
+        NameResolution resolver = findSolver(node.name());
         if(node.isInterface()){
           InterfaceDeclaration ast = (InterfaceDeclaration) lookupAST(node);
           superClass = rootClass();
@@ -587,7 +587,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
         if(symbol instanceof IxCode.ClassDefinition){
           astNode = lookupAST((IxCode.ClassDefinition)symbol);
         }
-        report(ILLEGAL_INHERITANCE, astNode, new Object[]{symbol.getName()});
+        report(ILLEGAL_INHERITANCE, astNode, new Object[]{symbol.name()});
       }
       return symbol;
     }
@@ -630,7 +630,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       fields.clear();
       constructors.clear();
       setContextClass(node);
-      setSolver(findSolver(node.getName()));
+      setSolver(findSolver(node.name()));
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
@@ -705,7 +705,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
       fields.clear();
       constructors.clear();
       setContextClass(node);
-      setSolver(findSolver(node.getName()));
+      setSolver(findSolver(node.name()));
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
         accept(members[i], context);
@@ -894,7 +894,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
       setContextClass((IxCode.ClassDefinition) lookupKernelNode(ast));
-      setSolver(findSolver(getContextClass().getName()));
+      setSolver(findSolver(getContextClass().name()));
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
       }
@@ -1622,8 +1622,8 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     }
     
     boolean hasSamePackage(IxCode.ClassTypeRef a, IxCode.ClassTypeRef b) {
-      String name1 = a.getName();
-      String name2 = b.getName();
+      String name1 = a.name();
+      String name2 = b.name();
       int index;
       index = name1.lastIndexOf(".");
       if(index >= 0){
@@ -2130,7 +2130,7 @@ public class CodeAnalysis implements SemanticErrorReporter.Constants {
     private String[] typeNames(IxCode.TypeRef[] types) {
       String[] names = new String[types.length];
       for(int i = 0; i < names.length; i++){
-        names[i] = types[i].getName();
+        names[i] = types[i].name();
       }
       return names;
     }

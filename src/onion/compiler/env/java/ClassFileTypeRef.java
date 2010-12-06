@@ -48,7 +48,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
     return modifier;
   }
   
-  public String getName() {
+  public String name() {
     return javaClass.getClassName();
   }
 

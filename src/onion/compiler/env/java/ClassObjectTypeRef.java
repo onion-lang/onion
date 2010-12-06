@@ -49,7 +49,7 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
     return modifier;
   }
   
-  public String getName() {
+  public String name() {
     return klass.getName();
   }
 

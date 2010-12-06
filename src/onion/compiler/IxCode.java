@@ -463,9 +463,9 @@ public interface IxCode {
     private String name;
     private ClassTypeRef superClass;
     private ClassTypeRef[] interfaces;
-    private List fields = new ArrayList();
-    private List methods = new ArrayList();
-    private List constructors = new ArrayList();
+    private OrderedTable<FieldRef> fields = new OrderedTable<FieldRef>();
+    private MultiTable<MethodRef> methods = new MultiTable<MethodRef>();
+    private List<ConstructorRef> constructors = new ArrayList<ConstructorRef>();
     private boolean isResolutionComplete;
     private boolean hasCyclicity;
     private String sourceFile;
@@ -572,15 +572,23 @@ public interface IxCode {
     }
 
     public MethodRef[] methods() {
-      return ((MethodRef[])methods.toArray(new MethodRef[0]));
+      return (MethodRef[])(methods.values().toArray(new MethodRef[0]));
+    }
+
+    public MethodRef[] methods(String name) {
+      return (MethodRef[])(methods.get(name).toArray(new MethodRef[0]));
     }
 
     public FieldRef[] fields() {
-      return ((FieldRef[])fields.toArray(new FieldRef[0]));
+      return (FieldRef[])(fields.values().toArray(new FieldRef[0]));
     }
 
-    public ConstructorRef[] getConstructors() {
-      return ((ConstructorRef[]) constructors.toArray(new ConstructorRef[0]));
+    public FieldRef field(String name) {
+      return fields.get(name);
+    }
+
+    public ConstructorRef[] constructors() {
+      return (ConstructorRef[])(constructors.toArray(new ConstructorRef[0]));
     }
 
     public void setSourceFile(String sourceFile) {
@@ -604,10 +612,7 @@ public interface IxCode {
     private Super superInitializer;
     private LocalFrame frame;
 
-    public ConstructorDefinition(
-      int modifier, ClassTypeRef classType,
-      TypeRef[] arguments, StatementBlock block, Super superInitializer
-    ) {
+    public ConstructorDefinition(int modifier, ClassTypeRef classType, TypeRef[] arguments, StatementBlock block, Super superInitializer) {
       this.modifier = modifier;
       this.classType = classType;
       this.arguments = arguments;
@@ -1774,7 +1779,7 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     interface ClassTypeRef extends ObjectTypeRef {
-      ConstructorRef[] getConstructors();
+      ConstructorRef[] constructors();
       ConstructorRef[] findConstructor(Expression[] params);
     }
 
@@ -1825,7 +1830,7 @@ public interface IxCode {
 
       private void find(Set constructors, ClassTypeRef target, Expression[] arguments){
         if(target == null) return;
-        ConstructorRef[] cs = target.getConstructors();
+        ConstructorRef[] cs = target.constructors();
         for(int i = 0; i < cs.length; i++){
           ConstructorRef c = cs[i];
           if(matcher.matches(c.getArgs(), arguments)){
@@ -1937,7 +1942,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    interface MemberRef {
+    interface MemberRef extends Named {
       int modifier();
       ClassTypeRef affiliation();
       String name();

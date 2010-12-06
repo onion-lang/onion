@@ -115,7 +115,7 @@ public class CodeGeneration  {
     String[] interfaces = namesOf(node.getInterfaces());
     String file = node.getSourceFile();
     ClassGen gen = new ClassGen(className, superClass, file, modifier, interfaces);
-    IxCode.ConstructorRef[] constructors = node.getConstructors();
+    IxCode.ConstructorRef[] constructors = node.constructors();
     for (int i = 0; i < constructors.length; i++) {
       codeConstructor(gen, ((IxCode.ConstructorDefinition) constructors[i]));
     }

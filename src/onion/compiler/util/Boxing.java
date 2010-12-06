@@ -45,7 +45,7 @@ public class Boxing {
       throw new IllegalArgumentException("node type must be boxable type");
     }
     IxCode.ClassTypeRef boxedType = boxedType(table, (IxCode.BasicTypeRef)type);
-    IxCode.ConstructorRef[] cs = boxedType.getConstructors();
+    IxCode.ConstructorRef[] cs = boxedType.constructors();
     for(int i = 0; i < cs.length; i++){
       IxCode.TypeRef[] args = cs[i].getArgs();
       if(args.length == 1 && args[i] == type){

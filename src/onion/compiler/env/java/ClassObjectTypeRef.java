@@ -84,7 +84,7 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
     return (IxCode.FieldRef[]) fields.clone();
   }
   
-  public IxCode.ConstructorRef[] getConstructors() {
+  public IxCode.ConstructorRef[] constructors() {
     if(constructors == null){
       setConstructors(klass.getConstructors());
     }

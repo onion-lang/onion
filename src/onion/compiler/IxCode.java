@@ -741,7 +741,9 @@ public interface IxCode {
       return type().isClassType();
     }
 
-    public boolean isNullType() { return type().isNullType(); }
+    public boolean isNullType() {
+      return type().isNullType();
+    }
 
     public boolean isReferenceType(){ return type().isObjectType(); }
 
@@ -936,15 +938,17 @@ public interface IxCode {
       this(null, target, checked);
     }
 
-    public TypeRef getCheckType() {
+    public TypeRef checked() {
       return checked;
     }
 
-    public Expression getTarget() {
+    public Expression target() {
       return target;
     }
 
-    public TypeRef type() { return BasicTypeRef.BOOLEAN; }
+    public TypeRef type() {
+      return BasicTypeRef.BOOLEAN;
+    }
   }
 
   /**
@@ -1861,25 +1865,20 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class ConstructorRefComparator implements Comparator {
+    class ConstructorRefComparator implements Comparator<ConstructorRef> {
 
       public ConstructorRefComparator() {
       }
 
-      public int compare(Object arg0, Object arg1) {
-        ConstructorRef c1 = (ConstructorRef)arg0;
-        ConstructorRef c2 = (ConstructorRef)arg1;
-        int result;
+      public int compare(ConstructorRef c1, ConstructorRef c2) {
         TypeRef[] args1 = c1.getArgs();
         TypeRef[] args2 = c2.getArgs();
-        result = args1.length - args2.length;
+        int result = args1.length - args2.length;
         if(result != 0){
           return result;
         }
         for(int i = 0; i < args1.length; i++){
-          if(args1[i] != args2[i]){
-            return args1[i].name().compareTo(args2[i].name());
-          }
+          if(args1[i] != args2[i]) return args1[i].name().compareTo(args2[i].name());
         }
         return 0;
       }

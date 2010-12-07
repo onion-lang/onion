@@ -1183,7 +1183,7 @@ public class CodeGeneration  {
   
   public InstructionHandle codeIsInstance(IxCode.InstanceOf node, CodeProxy code){
     InstructionHandle start = codeExpression(node.target, code);
-    code.appendInstanceOf((ReferenceType)typeOf(node.getCheckType()));
+    code.appendInstanceOf((ReferenceType)typeOf(node.checked()));
     return start;
   }
   

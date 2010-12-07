@@ -238,13 +238,9 @@ public class CodeAnalysis {
       mapper = find(definition.name());
       constructTypeHierarchy(definition, new ArrayList());
       if(hasCyclicity(definition)) report(CYCLIC_INHERITANCE, ast, definition.name());
-      if(ast.getDefaultSection() != null){
-        accept(ast.getDefaultSection());
-      }
+      if(ast.getDefaultSection() != null) accept(ast.getDefaultSection());
       AccessSection[] sections = ast.getSections();
-      for(int i = 0; i < sections.length; i++){
-        accept(sections[i]);
-      }
+      for (AccessSection section : sections)  accept(section);
       if(nconstructor == 0) definition.addDefaultConstructor();
       return null;
     }
@@ -334,8 +330,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(Argument ast, Void context){
-      IxCode.TypeRef type = mapFrom(ast.getType());
-      return type;
+      return mapFrom(ast.getType());
     }
     
     public Object visit(InterfaceMethodDeclaration ast, Void context) {
@@ -388,33 +383,25 @@ public class CodeAnalysis {
       
     public Object visit(AccessSection section, Void context){
       if(section == null) return null;
-
       CodeAnalysis.this.access = section.getID();
       MemberDeclaration[] members = section.getMembers();
-      for(int i = 0; i < members.length; i++){
-        accept(members[i], context);
+      for (MemberDeclaration member : members) {
+        accept(member, context);
       }
       return null;
     }
     
     public boolean hasCyclicity(IxCode.ClassDefinition start){
-      return hasCylicitySub(start, new HashSet());
+      return hasCylicitySub(start, new HashSet<IxCode.ClassTypeRef>());
     }
     
-    private boolean hasCylicitySub(IxCode.ClassTypeRef symbol, HashSet visit){
-      if(symbol == null) return false;
-      if(visit.contains(symbol)){
-        return true;      
-      }
-      visit.add(symbol);
-      if(hasCylicitySub(symbol.superClass(), (HashSet)visit.clone())){
-        return true;      
-      }
-      IxCode.ClassTypeRef[] interfaces = symbol.interfaces();
-      for (int i = 0; i < interfaces.length; i++) {
-        if(hasCylicitySub(interfaces[i], (HashSet)visit.clone())){
-          return true;        
-        }
+    private boolean hasCylicitySub(IxCode.ClassTypeRef ref, HashSet<IxCode.ClassTypeRef> visit){
+      if(ref == null) return false;
+      if(visit.contains(ref)) return true;
+      visit.add(ref);
+      if(hasCylicitySub(ref.superClass(), (HashSet<IxCode.ClassTypeRef>)visit.clone())) return true;
+      for (IxCode.ClassTypeRef anInterface : ref.interfaces()) {
+        if (hasCylicitySub(anInterface, (HashSet<IxCode.ClassTypeRef>) visit.clone()))  return true;
       }
       return false;
     }
@@ -481,18 +468,18 @@ public class CodeAnalysis {
   }
   
   private class DuplicationChecker extends ASTVisitor<Void> {
-    private Set methods;
-    private Set constructors;
-    private Set fields;
-    private Set variables;
-    private Set functions;
+    private Set<IxCode.MethodRef> methods;
+    private Set<IxCode.ConstructorRef> constructors;
+    private Set<IxCode.FieldRef> fields;
+    private Set<IxCode.FieldRef> variables;
+    private Set<IxCode.MethodRef> functions;
     
     public DuplicationChecker() {
-      this.methods      = new TreeSet(new IxCode.MethodRefComparator());
-      this.fields       = new TreeSet(new IxCode.FieldRefComparator());
-      this.constructors = new TreeSet(new IxCode.ConstructorRefComparator());
-      this.variables    = new TreeSet(new IxCode.FieldRefComparator());
-      this.functions    = new TreeSet(new IxCode.MethodRefComparator());
+      this.methods      = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
+      this.fields       = new TreeSet<IxCode.FieldRef>(new IxCode.FieldRefComparator());
+      this.constructors = new TreeSet<IxCode.ConstructorRef>(new IxCode.ConstructorRefComparator());
+      this.variables    = new TreeSet<IxCode.FieldRef>(new IxCode.FieldRefComparator());
+      this.functions    = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
     }
     
     public void process(CompilationUnit unit){
@@ -1088,7 +1075,7 @@ public class CodeAnalysis {
       return new IxCode.BinaryExpression(kind, resultType, left, right);
     }
     
-    IxCode.Expression checkNumExp(int kind, onion.lang.syntax.BinaryExpression ast, IxCode.Expression left, IxCode.Expression right, LocalContext context) {
+    IxCode.Expression checkNumExp(int kind, BinaryExpression ast, IxCode.Expression left, IxCode.Expression right, LocalContext context) {
       if((!hasNumericType(left)) || (!hasNumericType(right))){
         report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
@@ -1234,8 +1221,7 @@ public class CodeAnalysis {
       for(int i = 0; i < ast.size(); i++){
         elements[i] = typeCheck(ast.getExpression(i), context);
       }
-      IxCode.ListLiteral node = new IxCode.ListLiteral(elements, load("java.util.List"));
-      return node;
+      return new IxCode.ListLiteral(elements, load("java.util.List"));
     }
     
     public Object visit(onion.lang.syntax.StringLiteral ast, LocalContext context) {
@@ -1382,37 +1368,37 @@ public class CodeAnalysis {
     }
     
     Object processFieldOrMethodAssign(Assignment ast, LocalContext context){
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(AdditionAssignment ast, LocalContext context) {
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(SubtractionAssignment ast, LocalContext context) {
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(MultiplicationAssignment ast, LocalContext context) {
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(DivisionAssignment ast, LocalContext context) {
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(ModuloAssignment ast, LocalContext context) {
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      typeCheck(ast.getRight(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
@@ -1472,11 +1458,7 @@ public class CodeAnalysis {
       if(hasSamePackage(target, context)){
         return true;
       }else{
-        if(Modifier.isInternal(target.modifier())){
-          return false;
-        }else{
-          return true;
-        }
+        return Modifier.isInternal(target.modifier()) ? false : true;
       }
     }
     
@@ -1485,41 +1467,28 @@ public class CodeAnalysis {
       if(targetType == context) return true;
       int modifier = member.modifier();
       if(IxCode.TypeRules.isSuperType(targetType, context)){
-        if(Modifier.isProtected(modifier) || Modifier.isPublic(modifier)){
-          return true;
-        }else{
-          return false;
-        }
+        return Modifier.isProtected(modifier) || Modifier.isPublic(modifier) ? true : false;
       }else{
-        if(Modifier.isPublic(modifier)){
-          return true;
-        }else{
-          return false;
-        }
+        return Modifier.isPublic(modifier) ? true : false;
       }
     }
     
     private IxCode.FieldRef findField(IxCode.ObjectTypeRef target, String name) {
       if(target == null) return null;
       IxCode.FieldRef[] fields = target.fields();
-      for (int i = 0; i < fields.length; i++) {
-        if(fields[i].name().equals(name)){
-          return fields[i];
-        }
+      for (IxCode.FieldRef field : fields) {
+        if (field.name().equals(name))  return field;
       }
       IxCode.FieldRef field = findField(target.superClass(), name);
       if(field != null) return field;
-      IxCode.ClassTypeRef[] interfaces = target.interfaces();
-      for(int i = 0; i < interfaces.length; i++){
-        field = findField(interfaces[i], name);
-        if(field != null) return field;
+      for (IxCode.ClassTypeRef anInterface : target.interfaces()) {
+        field = findField(anInterface, name);
+        if (field != null) return field;
       }
       return null;
     }
     
-    private boolean isAccessible(
-      AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassTypeRef context
-    ) {
+    private boolean isAccessible(AstNode ast, IxCode.ObjectTypeRef target, IxCode.ClassTypeRef context) {
       if(target.isArrayType()){
         IxCode.TypeRef component = ((IxCode.ArrayTypeRef)target).component();
         if(!component.isBasicType()){
@@ -1627,14 +1596,14 @@ public class CodeAnalysis {
         report(DUPLICATE_LOCAL_VARIABLE, ast, name);
         return null;
       }
-      IxCode.TypeRef type = resolve(ast.getType(), mapper);
+      IxCode.TypeRef type = mapFrom(ast.getType(), mapper);
       if(type == null) return null;
       context.add(name, type);
       return type;
     }
     
     public Object visit(onion.lang.syntax.NewArray ast, LocalContext context) {
-      IxCode.TypeRef type = resolve(ast.getType(), mapper);
+      IxCode.TypeRef type = mapFrom(ast.getType(), mapper);
       IxCode.Expression[] parameters = typeCheckExps(ast.getArguments(), context);
       if(type == null || parameters == null) return null;
       IxCode.ArrayTypeRef resultType = loadArray(type, parameters.length);
@@ -1644,7 +1613,7 @@ public class CodeAnalysis {
     public Object visit(Cast ast, LocalContext context) {
       IxCode.Expression node = typeCheck(ast.getTarget(), context);
       if(node == null) return null;
-      IxCode.TypeRef conversion = resolve(ast.getType(), mapper);
+      IxCode.TypeRef conversion = mapFrom(ast.getType(), mapper);
       if(conversion == null) return null;
       node = new IxCode.AsInstanceOf(node, conversion);
       return node;
@@ -1697,11 +1666,8 @@ public class CodeAnalysis {
     }
 
     private IxCode.MethodRef matches(IxCode.TypeRef[] argTypes, String name, IxCode.MethodRef[] methods) {
-      for(int i = 0; i < methods.length; i++){
-        IxCode.TypeRef[] types = methods[i].arguments();
-        if(name.equals(methods[i].name()) && equals(argTypes, types)){
-          return methods[i];
-        }
+      for (IxCode.MethodRef method : methods) {
+        if (name.equals(method.name()) && equals(argTypes, method.arguments()))  return method;
       }
       return null;
     }
@@ -1738,9 +1704,8 @@ public class CodeAnalysis {
     }
     
     public Object visit(SelfFieldReference ast, LocalContext context) {
-      IxCode.ClassTypeRef selfClass = null;
       if(context.isStatic()) return null;
-      selfClass = definition;
+      IxCode.ClassTypeRef selfClass = definition;
       IxCode.FieldRef field = findField(selfClass, ast.getName());
       if(field == null){
         report(FIELD_NOT_FOUND, ast, selfClass, ast.getName());
@@ -1771,7 +1736,7 @@ public class CodeAnalysis {
         
     public Object visit(IsInstance ast, LocalContext context) {
       IxCode.Expression target = typeCheck(ast.getTarget(), context);
-      IxCode.TypeRef checkType = resolve(ast.getType(), mapper);
+      IxCode.TypeRef checkType = mapFrom(ast.getType(), mapper);
       if(target == null || checkType == null) return null;
       return new IxCode.InstanceOf(target, checkType);
     }
@@ -1898,7 +1863,7 @@ public class CodeAnalysis {
   
   //------------------------- statements ------------------------------------//
     public Object visit(ForeachStatement ast, LocalContext context) {
-      onion.lang.syntax.Expression collectionAST = ast.getCollection();
+      Expression collectionAST = ast.getCollection();
       try {
         context.openScope();
         IxCode.Expression collection = typeCheck(collectionAST, context);
@@ -1976,36 +1941,30 @@ public class CodeAnalysis {
     public Object visit(CondStatement node, LocalContext context) {
       try {
         context.openScope();
-        
         int size = node.size();
-        Stack exprs = new Stack();
-        Stack stmts = new Stack();
+        Stack<IxCode.Expression> expressions = new Stack<IxCode.Expression>();
+        Stack<IxCode.ActionStatement> statements = new Stack<IxCode.ActionStatement>();
         for(int i = 0; i < size; i++){        
-          onion.lang.syntax.Expression expr = node.getCondition(i);
-          Statement  stmt = node.getBlock(i);
-          IxCode.Expression texpr = typeCheck(expr, context);
-          if(texpr != null && texpr.type() != IxCode.BasicTypeRef.BOOLEAN){
+          Expression expression = node.getCondition(i);
+          Statement statement = node.getBlock(i);
+          IxCode.Expression typedExpression = typeCheck(expression, context);
+          if(typedExpression != null && typedExpression.type() != IxCode.BasicTypeRef.BOOLEAN){
             IxCode.TypeRef expect = IxCode.BasicTypeRef.BOOLEAN;
-            IxCode.TypeRef actual = texpr.type();
-            report(INCOMPATIBLE_TYPE, expr, expect, actual);
+            IxCode.TypeRef actual = typedExpression.type();
+            report(INCOMPATIBLE_TYPE, expression, expect, actual);
           }
-          exprs.push(texpr);
-          IxCode.ActionStatement tstmt = translate(stmt, context);
-          stmts.push(tstmt);
+          expressions.push(typedExpression);
+          IxCode.ActionStatement tstmt = translate(statement, context);
+          statements.push(tstmt);
         }
-        
-        Statement elseStmt = node.getElseBlock();
+        Statement elseStatement = node.getElseBlock();
         IxCode.ActionStatement result = null;
-        if(elseStmt != null){
-          result = translate(elseStmt, context);
+        if(elseStatement != null){
+          result = translate(elseStatement, context);
         }
-        
         for(int i = 0; i < size; i++){
-          IxCode.Expression expr = (IxCode.Expression)exprs.pop();
-          IxCode.ActionStatement stmt = (IxCode.ActionStatement)stmts.pop();
-          result = new IxCode.IfStatement(expr, stmt, result);
+          result = new IxCode.IfStatement(expressions.pop(), statements.pop(), result);
         }
-        
         return result;
       }finally{
         context.closeScope();
@@ -2015,34 +1974,21 @@ public class CodeAnalysis {
     public Object visit(ForStatement ast, LocalContext context) {
       try{
         context.openScope();
-        
-        IxCode.ActionStatement init = null;
-        if(ast.getInit() != null){
-          init = translate(ast.getInit(), context);
-        }else{
-          init = new IxCode.NOP();
-        }
+        IxCode.ActionStatement init = ast.getInit() != null ? translate(ast.getInit(), context) : new IxCode.NOP();
         IxCode.Expression condition;
-        onion.lang.syntax.Expression astCondition = ast.getCondition();
-        if(astCondition != null){
+        if(ast.getCondition() != null){
           condition = typeCheck(ast.getCondition(), context);
           IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
           if(condition != null && condition.type() != expected){
             IxCode.TypeRef appeared = condition.type();
-            report(INCOMPATIBLE_TYPE, astCondition, expected, appeared);
+            report(INCOMPATIBLE_TYPE, ast.getCondition(), expected, appeared);
           }
         }else{
           condition = new IxCode.BoolLiteral(true);
         }
-        IxCode.Expression update = null;
-        if(ast.getUpdate() != null){
-          update = typeCheck(ast.getUpdate(), context);
-        }
-        IxCode.ActionStatement loop = translate(
-          ast.getBlock(), context);
-        if(update != null){
-          loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionStatement(update));
-        }
+        IxCode.Expression update = ast.getUpdate() != null ? typeCheck(ast.getUpdate(), context) : null;
+        IxCode.ActionStatement loop = translate(ast.getBlock(), context);
+        if(update != null) loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionStatement(update));
         IxCode.ActionStatement result = new IxCode.ConditionalLoop(condition, loop);
         result = new IxCode.StatementBlock(init, result);
         return result;
@@ -2100,7 +2046,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(ReturnStatement ast, LocalContext context) {
-      IxCode.TypeRef returnType = ((LocalContext)context).returnType();
+      IxCode.TypeRef returnType = context.returnType();
       if(ast.getExpression() == null){
         IxCode.TypeRef expected = IxCode.BasicTypeRef.VOID;
         if(returnType != expected){
@@ -2150,27 +2096,21 @@ public class CodeAnalysis {
         }else{
           statement = processCases(ast, condition, name, context);
         }
-        IxCode.StatementBlock block = new IxCode.StatementBlock(
-          new IxCode.ExpressionStatement(new IxCode.SetLocal(0, index, condition.type(), condition)),
-          statement
-        );
-        return block;
+        return new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.SetLocal(0, index, condition.type(), condition)), statement);
       }finally{
         context.closeScope();
       }
     }
     
-    IxCode.ActionStatement processCases(
-      SelectStatement ast, IxCode.Expression cond, String var, LocalContext context
-    ) {
+    IxCode.ActionStatement processCases(SelectStatement ast, IxCode.Expression cond, String var, LocalContext context) {
       CaseBranch[] cases = ast.getCases();
-      List nodes = new ArrayList();
-      List thens = new ArrayList();
-      for(int i = 0; i < cases.length; i++){
-        onion.lang.syntax.Expression[] astExpressions = cases[i].getExpressions();
+      List<IxCode.Expression> nodes = new ArrayList<IxCode.Expression>();
+      List<IxCode.ActionStatement> thens = new ArrayList<IxCode.ActionStatement>();
+      for (CaseBranch aCase : cases) {
+        Expression[] astExpressions = aCase.getExpressions();
         ClosureLocalBinding bind = context.lookup(var);
         nodes.add(processNodes(astExpressions, cond.type(), bind, context));
-        thens.add(translate(cases[i].getBlock(), context));
+        thens.add(translate(aCase.getBlock(), context));
       }
       IxCode.ActionStatement statement;
       if(ast.getElseBlock() != null){
@@ -2178,11 +2118,7 @@ public class CodeAnalysis {
       }else{
         statement = null;
       }
-      for(int i = cases.length - 1; i >= 0; i--){
-        IxCode.Expression value = (IxCode.Expression) nodes.get(i);
-        IxCode.ActionStatement then = (IxCode.ActionStatement) thens.get(i);
-        statement = new IxCode.IfStatement(value, then, statement);
-      }
+      for(int i = cases.length - 1; i >= 0; i--) statement = new IxCode.IfStatement(nodes.get(i), thens.get(i), statement);
       return statement;
     }
     
@@ -2393,8 +2329,8 @@ public class CodeAnalysis {
   //----------------------------------------------------------------------------// 
   //----------------------------------------------------------------------------//
   
-    public IxCode.TypeRef resolve(TypeSpec type, NameMapper resolver) {
-      IxCode.TypeRef resolvedType = (IxCode.TypeRef) resolver.map(type);
+    public IxCode.TypeRef mapFrom(TypeSpec type, NameMapper mapper) {
+      IxCode.TypeRef resolvedType = mapper.map(type);
       if(resolvedType == null){
         report(CLASS_NOT_FOUND, type, type.getComponentName());
       }
@@ -2452,25 +2388,15 @@ public class CodeAnalysis {
   
   public IxCode.ClassDefinition[] process(CompilationUnit[] units){
     ClassTableBuilder builder = new ClassTableBuilder();
-    for(int i = 0; i < units.length; i++){
-      builder.process(units[i]);
-    }
+    for (CompilationUnit unit : units)  builder.process(unit);
     TypeHeaderAnalysis analysis = new TypeHeaderAnalysis();
-    for(int i = 0; i < units.length; i++){
-      analysis.process(units[i]);
-    }
+    for (CompilationUnit unit : units)  analysis.process(unit);
     TypeChecker checker = new TypeChecker();
-    for(int i = 0; i < units.length; i++){
-      checker.process(units[i]);
-    }
+    for (CompilationUnit unit : units) checker.process(unit);
     DuplicationChecker duplicationChecker = new DuplicationChecker();
-    for(int i = 0; i < units.length; i++){
-      duplicationChecker.process(units[i]);
-    }
+    for (CompilationUnit unit : units)  duplicationChecker.process(unit);
     CompileError[] problems = getProblems();
-    if(problems.length > 0){
-      throw new CompilationException(Arrays.asList(problems));
-    }
+    if(problems.length > 0) throw new CompilationException(Arrays.asList(problems));
     return getSourceClasses();
   }
 

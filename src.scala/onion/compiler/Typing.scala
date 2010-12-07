@@ -5,7 +5,7 @@ import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
 import _root_.onion.compiler.IxCode.BinaryExpression.Constants._
 import _root_.onion.compiler.IxCode.UnaryExpression.Constants._
-import _root_.scala.collection.mutable.{Buffer, Map, HashMap, Set => MutableSet}
+import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 
 /**
  * Created by IntelliJ IDEA.
@@ -316,7 +316,342 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   def processTyping(node: AST.CompilationUnit) {
-    //TODO: Implement this method.
+    def processNodes(nodes: Array[AST.Expression], typeRef: IxCode.TypeRef, bind: ClosureLocalBinding, context: LocalContext): IxCode.Expression = {
+      val expressions = new Array[IxCode.Expression](nodes.length)
+      var error: Boolean = false
+      for(i <- 0 until nodes.length){
+        val expressionOpt = typed(nodes(i), context)
+        expressions(i) = expressionOpt.getOrElse(null)
+        if(expressions(i) == null) {
+          error = true
+        } else if (!IxCode.TypeRules.isAssignable(typeRef, expressions(i).`type`)) {
+          report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expressions(i).`type`)
+          error = true
+        } else {
+          if (expressions(i).isBasicType && expressions(i).`type` != typeRef) expressions(i) = new IxCode.AsInstanceOf(expressions(i), typeRef)
+          if (expressions(i).isReferenceType && expressions(i).`type` != rootClass) expressions(i) = new IxCode.AsInstanceOf(expressions(i), rootClass)
+        }
+      }
+      if (!error) {
+        var node: IxCode.Expression = if(expressions(0).isReferenceType) {
+          createEquals(IxCode.BinaryExpression.Constants.EQUAL, new IxCode.RefLocal(bind), expressions(0))
+        } else {
+          new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(0))
+        }
+        for(i <- 1 until expressions.length) {
+          node = new IxCode.BinaryExpression(LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, node, new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(i)))
+        }
+        node
+      } else {
+        null
+      }
+    }
+    def processAssignable(node: AST.Node, a: IxCode.TypeRef, b: IxCode.Expression): IxCode.Expression = {
+      if (b == null) return null
+      if (a == b.`type`) return b
+      if (!IxCode.TypeRules.isAssignable(a, b.`type`)) {
+        report(INCOMPATIBLE_TYPE, node, a, b.`type`)
+        return null
+      }
+      new IxCode.AsInstanceOf(node.location, b, a)
+    }
+    def openScope[A](context: LocalContext)(block: => A): A = try {
+      context.openScope()
+      block
+    } finally {
+      context.closeScope()
+    }
+    def openFrame[A](context: LocalContext)(block: => A): A = try {
+      context.openFrame()
+      block
+    } finally {
+      context.closeFrame
+    }
+    def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext) {
+
+    }
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext) {
+
+    }
+    def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext) {
+
+    }
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){
+
+    }
+    def typed(node: AST.Expression, context: LocalContext): Option[IxCode.Expression] = {
+      null //TODO Implement this method
+    }
+    def translate(node: AST.Statement, context: LocalContext): IxCode.ActionStatement = node match {
+      case AST.BlockStatement(loc, elements) =>
+        openScope(context){
+          new IxCode.StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
+        }
+      case node@AST.BreakStatement(loc) =>
+        report(UNIMPLEMENTED_FEATURE, node)
+        new IxCode.Break(loc)
+      case node@AST.BranchStatement(loc, _, _) =>
+        openScope(context) {
+          val size = node.clauses.size
+          val expressions = new Stack[IxCode.Expression]
+          val statements = new Stack[IxCode.ActionStatement]
+          for((expression, statement) <- node.clauses) {
+            val typedExpression = typed(expression, context).getOrElse(null)
+            if (typedExpression != null && typedExpression.`type` != IxCode.BasicTypeRef.BOOLEAN) {
+              val expect = IxCode.BasicTypeRef.BOOLEAN
+              val actual = typedExpression.`type`
+              report(INCOMPATIBLE_TYPE, expression, expect, actual)
+            }
+            expressions.push(typedExpression)
+            statements.push(translate(statement, context))
+          }
+          val elseStatement = node.elseBlock
+          var result: IxCode.ActionStatement = null
+          if (elseStatement != null) {
+            result = translate(elseStatement, context)
+          }
+          for(i <- 0 until size) {
+            result = new IxCode.IfStatement(expressions.pop, statements.pop, result)
+          }
+          return result
+        }
+      case node@AST.ContinueStatement(loc) =>
+        report(UNIMPLEMENTED_FEATURE, node)
+        new IxCode.Continue(loc)
+      case node@AST.EmptyStatement(loc) =>
+        new IxCode.NOP(loc)
+      case node@AST.ExpressionStatement(loc, body) =>
+        typed(body, context).map{e =>  new IxCode.ExpressionStatement(loc, e)}.getOrElse(new IxCode.NOP(loc))
+      case node@AST.ForeachStatement(loc, _, _, _) =>
+        openScope(context) {
+          val collection = typed(node.collection, context).getOrElse(null)
+          val arg = node.arg
+          mapFrom(arg.typeRef)
+          var block = translate(node.statement, context)
+          if (collection.isBasicType) {
+            report(INCOMPATIBLE_TYPE, node.collection, load("java.util.Collection"), collection.`type`)
+            return new IxCode.NOP(node.location)
+          }
+          val elementVar = context.lookupOnlyCurrentScope(arg.name)
+          val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`)
+          var init: IxCode.ActionStatement = null
+          if (collection.isArrayType) {
+            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT)
+            init = new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.SetLocal(collectionVar, collection)), new IxCode.ExpressionStatement(new IxCode.SetLocal(counterVariable, new IxCode.IntLiteral(0))))
+            block = new IxCode.ConditionalLoop(new IxCode.BinaryExpression(LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ref(counterVariable), new IxCode.ArrayLength(ref(collectionVar))), new IxCode.StatementBlock(assign(elementVar, indexref(collectionVar, ref(counterVariable))), block, assign(counterVariable, new IxCode.BinaryExpression(ADD, IxCode.BasicTypeRef.INT, ref(counterVariable), new IxCode.IntLiteral(1)))))
+            new IxCode.StatementBlock(init, block)
+          }
+          else {
+            val iteratorType = load("java.util.Iterator")
+            var iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
+            var mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[IxCode.ObjectTypeRef], "iterator")
+            var mNext: IxCode.MethodRef = findMethod(node.collection, iteratorType, "next")
+            var mHasNext: IxCode.MethodRef = findMethod(node.collection, iteratorType, "hasNext")
+            init = new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.SetLocal(collectionVar, collection)), assign(iteratorVar, new IxCode.Call(ref(collectionVar), mIterator, new Array[IxCode.Expression](0))))
+            var next: IxCode.Expression = new IxCode.Call(ref(iteratorVar), mNext, new Array[IxCode.Expression](0))
+            if (elementVar.getType != rootClass) {
+              next = new IxCode.AsInstanceOf(next, elementVar.getType)
+            }
+            block = new IxCode.ConditionalLoop(new IxCode.Call(ref(iteratorVar), mHasNext, new Array[IxCode.Expression](0)), new IxCode.StatementBlock(assign(elementVar, next), block))
+            new IxCode.StatementBlock(init, block)
+          }
+        }
+      case node@AST.ForStatement(loc, _, _, _, _) =>
+        openScope(context) {
+          val init = Option(node.init).map{init => translate(init, context)}.getOrElse(new IxCode.NOP(loc))
+          val condition = (for(c <- Option(node.condition)) yield {
+            val conditionOpt = typed(c, context)
+            val expected = IxCode.BasicTypeRef.BOOLEAN
+            for(condition <- conditionOpt; if condition.`type` != expected) {
+              report(INCOMPATIBLE_TYPE, node.condition, condition.`type`, expected)
+            }
+            conditionOpt.getOrElse(null)
+          }).getOrElse(new IxCode.BoolLiteral(loc, true))
+          val update = Option(node.update).flatMap{update => typed(update, context)}.getOrElse(null)
+          var loop = translate(node.block, context)
+          if(update != null) loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionStatement(update))
+          new IxCode.StatementBlock(init.location, init, new IxCode.ConditionalLoop(condition, loop))
+        }
+      case node@AST.IfStatement(loc, _, _, _) => 
+        openScope(context) {
+          val conditionOpt = typed(node.condition, context)
+          val expected = IxCode.BasicTypeRef.BOOLEAN
+          for(condition <- conditionOpt if condition.`type` != expected) {
+            report(INCOMPATIBLE_TYPE, node.condition, expected, condition.`type`)
+          }
+          val thenBlock = translate(node.thenBlock, context)
+          val elseBlock = if (node.elseBlock == null) null else translate(node.elseBlock, context)
+          conditionOpt.map{c => new IxCode.IfStatement(c, thenBlock, elseBlock)}.getOrElse(new IxCode.NOP(loc))
+        }
+      case node@AST.LocalVariableDeclaration(loc, name, typeRef, init) =>
+        val binding = context.lookupOnlyCurrentScope(name)
+        if (binding != null) {
+          report(DUPLICATE_LOCAL_VARIABLE, node, name)
+          return new IxCode.NOP(loc)
+        }
+        val lhsType = mapFrom(node.typeRef)
+        if (lhsType == null) return new IxCode.NOP(loc)
+        val index = context.add(name, lhsType)
+        var local: IxCode.SetLocal = null
+        if (init != null) {
+          var valueNode = typed(init, context)
+          valueNode match {
+            case None => return new IxCode.NOP(loc)
+            case Some(v) =>
+              val value = processAssignable(init, lhsType, v)
+              if(value == null) return new IxCode.NOP(loc)
+              local = new IxCode.SetLocal(loc, 0, index, lhsType, value)
+          }
+        }
+        else {
+          local = new IxCode.SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
+        }
+        new IxCode.ExpressionStatement(local)
+      case node@AST.ReturnStatement(loc, _) =>
+        val returnType = context.returnType
+        if(node.result == null) {
+          val expected  = IxCode.BasicTypeRef.VOID
+          if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
+          return new IxCode.Return(loc, null)
+        } else {
+          val returnedOpt= typed(node.result, context)
+          if (returnedOpt == null) return new IxCode.Return(loc, null)
+          (for(returned <- returnedOpt) yield {
+            if (returned.`type` == IxCode.BasicTypeRef.VOID) {
+              report(CANNOT_RETURN_VALUE, node)
+              new IxCode.Return(loc, null)
+            } else {
+              val value = processAssignable(node.result, returnType, returned)
+              if (value == null) return new IxCode.Return(loc, null)
+              new IxCode.Return(loc, value)
+            }
+          }).getOrElse(new IxCode.Return(loc, null))
+        }
+      case node@AST.SelectStatement(loc, _, _, _) =>
+        val conditionOpt = typed(node.condition, context)
+        if(conditionOpt == None) return new IxCode.NOP(loc)
+        val condition = conditionOpt.get
+        val name = context.newName
+        val index = context.add(name, condition.`type`)
+        val statement = if(node.cases.length == 0) {
+          Option(node.elseBlock).map{e => translate(e, context)}.getOrElse(new IxCode.NOP(loc))
+        }else {
+          val cases = node.cases
+          val nodes = Buffer[IxCode.Expression]()
+          val thens = Buffer[IxCode.ActionStatement]()
+          for((expressions, then)<- cases) {
+            val bind = context.lookup(name)
+            nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
+            thens += translate(then, context)
+          }
+          var branches: IxCode.ActionStatement = if(node.elseBlock != null) {
+            translate(node.elseBlock, context)
+          }else {
+            null
+          }
+          for(i <- (cases.length - 1) to (0, -1)) {
+            branches = new IxCode.IfStatement(nodes(i), thens(i), branches)
+          }
+          branches
+        }
+        new IxCode.StatementBlock(condition.location, new IxCode.ExpressionStatement(condition.location, new IxCode.SetLocal(0, index, condition.`type`, condition)), statement)
+      case node@AST.SynchronizedStatement(loc, _, _) =>
+        openScope(context) {
+          val lock = typed(node.condition, context).getOrElse(null)
+          val block = translate(node.block, context)
+          report(UNIMPLEMENTED_FEATURE, node)
+          new IxCode.Synchronized(node.location, lock, block)
+        }
+      case node@AST.ThrowStatement(loc, target) => null
+        val expressionOpt = typed(target, context)
+        for(expression <- expressionOpt) {
+          val expected = load("java.lang.Throwable")
+          val detected = expression.`type`
+          if (!IxCode.TypeRules.isSuperType(expected, detected)) {
+            report(INCOMPATIBLE_TYPE, node, expected, detected)
+          }
+        }
+        new IxCode.Throw(loc, expressionOpt.getOrElse(null))
+      case node@AST.TryStatement(loc, tryBlock, recClauses, finBlock) =>
+        val tryStatement = translate(tryBlock, context)
+        val binds = new Array[ClosureLocalBinding](recClauses.length)
+        val catchBlocks = new Array[IxCode.ActionStatement](recClauses.length)
+        for(i <- 0 until recClauses.length) {
+          val (argument, body) = recClauses(i)
+          openScope(context) {
+            val argType = mapFrom(argument.typeRef)
+            val expected = load("java.lang.Throwable")
+            if (!IxCode.TypeRules.isSuperType(expected, argType)) {
+              report(INCOMPATIBLE_TYPE, argument, expected, argType)
+            }
+            binds(i) = context.lookupOnlyCurrentScope(argument.name)
+            catchBlocks(i) = translate(body, context)
+          }
+        }
+        new IxCode.Try(loc, tryStatement, binds, catchBlocks)
+      case node@AST.WhileStatement(loc, _, _) =>
+        openScope(context) {
+          val conditionOpt = typed(node.condition, context)
+          val expected = IxCode.BasicTypeRef.BOOLEAN
+          for(condition <- conditionOpt) {
+            val actual = condition.`type`
+            if(actual != expected)  report(INCOMPATIBLE_TYPE, node, expected, actual)
+          }
+          val thenBlock = translate(node.block, context)
+          new IxCode.ConditionalLoop(loc, conditionOpt.getOrElse(null), thenBlock)
+        }
+    }
+    def defaultValue(typeRef: IxCode.TypeRef): IxCode.Expression = IxCode.Expression.defaultValue(typeRef)
+    def addReturnNode(node: IxCode.ActionStatement, returnType: IxCode.TypeRef): IxCode.StatementBlock = {
+      return new IxCode.StatementBlock(node, new IxCode.Return(defaultValue(returnType)))
+    }
+    def createMain(top: IxCode.ClassTypeRef, ref: IxCode.MethodRef, name: String, args: Array[IxCode.TypeRef], ret: IxCode.TypeRef): IxCode.MethodDefinition = {
+      val method = new IxCode.MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
+      val frame = new LocalFrame(null)
+      val params = new Array[IxCode.Expression](args.length)
+      for(i <- 0 until args.length) {
+        val arg = args(i)
+        val index = frame.add("args" + i, arg)
+        params(i) = new IxCode.RefLocal(0, index, arg)
+      }
+      method.setFrame(frame)
+      val constructor = top.findConstructor(new Array[IxCode.Expression](0))(0)
+      var block = new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.Call(new IxCode.NewObject(constructor, new Array[IxCode.Expression](0)), ref, params)))
+      block = addReturnNode(block, IxCode.BasicTypeRef.VOID)
+      method.setBlock(block)
+      method
+    }
+    unit_ = node
+    val toplevels = node.toplevels
+    val context = new LocalContext
+    val statements = Buffer[IxCode.ActionStatement]()
+    mapper_ = find(topClass)
+    val klass = loadTopClass.asInstanceOf[IxCode.ClassDefinition]
+    val argsType = loadArray(load("java.lang.String"), 1)
+    val method= new IxCode.MethodDefinition(node.location, AST.M_PUBLIC, klass, "start", Array[IxCode.TypeRef](argsType), IxCode.BasicTypeRef.VOID, null)
+    context.add("args", argsType)
+    for (element <- toplevels) {
+      if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass;
+      if(element.isInstanceOf[AST.Statement]){
+        context.setMethod(method)
+        statements += translate(element.asInstanceOf[AST.Statement], context)
+      }else {
+        element match {
+          case node: AST.ClassDeclaration => processClassDeclaration(node, context)
+          case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
+          case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
+          case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
+          case _ =>
+        }
+      }
+    }
+    if (klass != null) {
+      statements += new IxCode.Return(null)
+      method.setBlock(new IxCode.StatementBlock(statements))
+      method.setFrame(context.getContextFrame)
+      klass.add(method)
+      klass.add(createMain(klass, method, "main", Array[IxCode.TypeRef](argsType), IxCode.BasicTypeRef.VOID))
+    }
   }
   def processDuplication(node: AST.CompilationUnit) {
     val methods = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
@@ -506,5 +841,29 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     val mappedType = mapper.map(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, AST.toString(typeNode.desc))
     return mappedType
+  }
+  private def createEquals(kind: Int, lhs: IxCode.Expression, rhs: IxCode.Expression): IxCode.Expression = {
+    val params = Array[IxCode.Expression](new IxCode.AsInstanceOf(rhs, rootClass))
+    val target = lhs.`type`.asInstanceOf[IxCode.ObjectTypeRef]
+    val methods = target.findMethod("equals", params)
+    var node: IxCode.Expression = new IxCode.Call(lhs, methods(0), params)
+    if (kind == IxCode.BinaryExpression.Constants.NOT_EQUAL) {
+      node = new IxCode.UnaryExpression(NOT, IxCode.BasicTypeRef.BOOLEAN, node)
+    }
+    node
+  }
+  private def indexref(bind: ClosureLocalBinding, value: IxCode.Expression): IxCode.Expression = new IxCode.ArrayRef(new IxCode.RefLocal(bind), value)
+  private def assign(bind: ClosureLocalBinding, value: IxCode.Expression): IxCode.ActionStatement = new IxCode.ExpressionStatement(new IxCode.SetLocal(bind, value))
+  private def ref(bind: ClosureLocalBinding): IxCode.Expression = new IxCode.RefLocal(bind)
+  private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String): IxCode.MethodRef = {
+    return findMethod(node, target, name, new Array[IxCode.Expression](0))
+  }
+  private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String, params: Array[IxCode.Expression]): IxCode.MethodRef = {
+    val methods: Array[IxCode.MethodRef] = target.findMethod(name, params)
+    if (methods.length == 0) {
+      report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
+      return null
+    }
+    return methods(0)
   }
 }

@@ -220,29 +220,17 @@ public interface IxCode {
     class StatementBlock extends ActionStatement {
       private final ActionStatement[] statements;
 
-      public StatementBlock(Location location, ActionStatement[] statements) {
+      public StatementBlock(Location location, ActionStatement... statements) {
         super(location);
         this.statements = statements;
       }
 
-      public StatementBlock(ActionStatement[] statements) {
+      public StatementBlock(ActionStatement... statements) {
         this(null, statements);
       }
 
-      public StatementBlock(List statements) {
+      public StatementBlock(List<ActionStatement> statements) {
         this((ActionStatement[])statements.toArray(new ActionStatement[0]));
-      }
-
-      public StatementBlock(ActionStatement statement) {
-        this(new ActionStatement[]{statement});
-      }
-
-      public StatementBlock(ActionStatement statement1, ActionStatement statement2){
-        this(new ActionStatement[]{statement1, statement2});
-      }
-
-      public StatementBlock(ActionStatement statement1, ActionStatement statement2, ActionStatement statement3){
-        this(new ActionStatement[]{statement1, statement2, statement3});
       }
 
       public ActionStatement[] getStatements() {

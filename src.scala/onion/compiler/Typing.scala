@@ -66,10 +66,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.getMaxErrorReports)
   def newEnvironment(source: Array[AST.CompilationUnit]) = new TypingEnvironment
   def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[IxCode.ClassDefinition] = {
+    for(unit <- source) processHeader(unit)
     null
   }
 
-  def buildClassTable(unit: AST.CompilationUnit) {
+  def processHeader(unit: AST.CompilationUnit) {
     unit_ = unit
     val module = unit.module
     val imports = unit.imports

@@ -12,17 +12,16 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-
 import onion.compiler.*;
 import onion.lang.syntax.Modifier;
-
 import org.apache.bcel.Constants;
+import static org.apache.bcel.Constants.*;
 
 /**
  * @author Kota Mizushima
  * Date: 2006/1/10
  */
-public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements Constants{
+public class ReflectionalClassTypeRef extends IxCode.AbstractClassTypeRef {
   private static final String CONSTRUCTOR_NAME = "<init>";
   private Class klass;
   private ClassTable table;
@@ -32,7 +31,7 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
   private List<IxCode.ConstructorRef> constructors;
   private OnionTypeBridge bridge;
   
-  public ClassObjectTypeRef(Class klass, ClassTable table) {
+  public ReflectionalClassTypeRef(Class klass, ClassTable table) {
     this.klass = klass;
     this.table = table;
     this.bridge = new OnionTypeBridge(table);
@@ -136,31 +135,24 @@ public class ClassObjectTypeRef extends IxCode.AbstractClassTypeRef implements C
 
   private IxCode.MethodRef translate(Method method){
     Class[] arguments = method.getParameterTypes();
-    IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
+    IxCode.TypeRef[] argumentRefs = new IxCode.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
-      argumentSymbols[i] = bridge.toOnionType(arguments[i]);
+      argumentRefs[i] = bridge.toOnionType(arguments[i]);
     }
-    IxCode.TypeRef returnSymbol = bridge.toOnionType(method.getReturnType());
-    return new ClassFileMethodRef(
-      toOnionModifier(method.getModifiers()),
-      this, method.getName(), argumentSymbols, returnSymbol);
+    IxCode.TypeRef returnRef = bridge.toOnionType(method.getReturnType());
+    return new ClassFileMethodRef(toOnionModifier(method.getModifiers()), this, method.getName(), argumentRefs, returnRef);
   }
   
   private IxCode.FieldRef translate(Field field){
-    IxCode.TypeRef symbol = bridge.toOnionType(field.getType());
-    return new ClassFileFieldRef(
-      toOnionModifier(field.getModifiers()), 
-      this, field.getName(), symbol);
+    return new ClassFileFieldRef(toOnionModifier(field.getModifiers()),  this, field.getName(), bridge.toOnionType(field.getType()));
   }
   
   private IxCode.ConstructorRef translate(Constructor constructor){
     Class[] arguments = constructor.getParameterTypes();
-    IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
+    IxCode.TypeRef[] argumentRefs = new IxCode.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
-      argumentSymbols[i] = bridge.toOnionType(arguments[i]);
+      argumentRefs[i] = bridge.toOnionType(arguments[i]);
     }
-    return new ClassFileConstructorRef(
-      toOnionModifier(constructor.getModifiers()),
-      this, "<init>", argumentSymbols);
+    return new ClassFileConstructorRef(toOnionModifier(constructor.getModifiers()), this, "<init>", argumentRefs);
   }
 }

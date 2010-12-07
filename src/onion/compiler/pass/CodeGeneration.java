@@ -406,7 +406,7 @@ public class CodeGeneration  {
   public void codeField(ClassGen gen, IxCode.FieldDefinition node) {
     FieldGen field = new FieldGen(
       toJavaModifier(node.modifier()),
-      typeOf(node.getType()), node.name(), gen.getConstantPool());
+      typeOf(node.type()), node.name(), gen.getConstantPool());
     gen.addField(field.getField());
   }
 

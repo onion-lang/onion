@@ -799,7 +799,7 @@ public interface IxCode {
       return name;
     }
 
-    public TypeRef getType() {
+    public TypeRef type() {
       return type;
     }
 
@@ -823,7 +823,7 @@ public interface IxCode {
       this(null, target, field);
     }
 
-    public TypeRef type() { return field.getType(); }
+    public TypeRef type() { return field.type(); }
   }
 
   /**
@@ -846,7 +846,7 @@ public interface IxCode {
       this(null, target, field, value);
     }
 
-    public TypeRef type() { return field.getType(); }
+    public TypeRef type() { return field.type(); }
 
     public Expression getObject() { return object; }
 
@@ -1391,7 +1391,7 @@ public interface IxCode {
         this(null, target, field);
       }
 
-      public TypeRef type() { return field.getType(); }
+      public TypeRef type() { return field.type(); }
     }
 
     /**
@@ -1414,7 +1414,7 @@ public interface IxCode {
         this(null, target, field, value);
       }
 
-      public TypeRef type() { return field.getType(); }
+      public TypeRef type() { return field.type(); }
     }
 
     /**
@@ -1898,7 +1898,7 @@ public interface IxCode {
     interface FieldRef extends MemberRef {
       public int modifier();
       public ClassTypeRef affiliation();
-      public TypeRef getType();
+      public TypeRef type();
     }
 
     /**

@@ -547,7 +547,7 @@ public class CodeAnalysis {
     }
     
     private void generateDelegationMethods(IxCode.FieldDefinition node, Set generated, Set methodSet){
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) node.getType();
+      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) node.type();
       Set src = Classes.getInterfaceMethods(type);
       for (Iterator i = src.iterator(); i.hasNext();) {
         IxCode.MethodRef method = (IxCode.MethodRef) i.next();
@@ -1373,7 +1373,7 @@ public class CodeAnalysis {
         report(FIELD_NOT_ACCESSIBLE, ast, field.affiliation(), field.name(), selfClass);
         return null;
       }
-      value = processAssignable(ast.getRight(), field.getType(), value);
+      value = processAssignable(ast.getRight(), field.type(), value);
       if(value == null) return null;
       return new IxCode.SetField(new IxCode.This(selfClass), field, value);
     }

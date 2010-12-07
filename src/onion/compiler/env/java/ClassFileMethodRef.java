@@ -14,17 +14,15 @@ import onion.compiler.IxCode;
  * Date: 2005/06/27
  */
 public class ClassFileMethodRef implements IxCode.MethodRef {
-  private int modifier;
-  private IxCode.ClassTypeRef classType;
-  private String name;
-  private IxCode.TypeRef[] arguments;
-  private IxCode.TypeRef returnType;
+  private final int modifier;
+  private final IxCode.ClassTypeRef affiliation;
+  private final String name;
+  private final IxCode.TypeRef[] arguments;
+  private final IxCode.TypeRef returnType;
 
-  public ClassFileMethodRef(
-    int modifier, IxCode.ClassTypeRef classType, String name,
-    IxCode.TypeRef[] arguments, IxCode.TypeRef returnType) {
+  public ClassFileMethodRef(int modifier, IxCode.ClassTypeRef affiliation, String name, IxCode.TypeRef[] arguments, IxCode.TypeRef returnType) {
     this.modifier = modifier;
-    this.classType = classType;
+    this.affiliation = affiliation;
     this.name = name;
     this.arguments = (IxCode.TypeRef[]) arguments.clone();
     this.returnType = returnType;
@@ -35,7 +33,7 @@ public class ClassFileMethodRef implements IxCode.MethodRef {
   }
 
   public IxCode.ClassTypeRef affiliation() {
-    return classType;
+    return affiliation;
   }
 
   public String name() {

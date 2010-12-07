@@ -21,7 +21,7 @@ import org.apache.bcel.generic.Type;
  * @author Kota Mizushima
  * Date: 2005/06/22
  */
-public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Constants{
+public class ClassFileClassTypeRef extends IxCode.AbstractClassTypeRef implements Constants{
   private static final String CONSTRUCTOR_NAME = "<init>";
   private JavaClass javaClass;
   private ClassTable table;  
@@ -31,7 +31,7 @@ public class ClassFileTypeRef extends IxCode.AbstractClassTypeRef implements Con
   private List<IxCode.ConstructorRef> constructors;
   private OnionTypeBridge bridge;
   
-  public ClassFileTypeRef(JavaClass javaClass, ClassTable table) {
+  public ClassFileClassTypeRef(JavaClass javaClass, ClassTable table) {
     this.javaClass = javaClass;
     this.table = table;
     this.bridge = new OnionTypeBridge(table);

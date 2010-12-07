@@ -9,9 +9,9 @@ package onion.compiler;
 
 import java.util.*;
 
-import onion.compiler.env.java.ClassFileTypeRef;
+import onion.compiler.env.java.ClassFileClassTypeRef;
 import onion.compiler.env.java.ClassFileTable;
-import onion.compiler.env.java.ClassObjectTypeRef;
+import onion.compiler.env.java.ReflectionalClassTypeRef;
 import onion.compiler.util.Strings;
 
 import org.apache.bcel.classfile.JavaClass;
@@ -51,11 +51,11 @@ public class ClassTable {
     if(clazz == null){
       JavaClass javaClass = table.load(className);
       if(javaClass != null){
-        clazz = new ClassFileTypeRef(javaClass, this);
+        clazz = new ClassFileClassTypeRef(javaClass, this);
         classFiles.put(clazz.name(), clazz);
       }else{
         try {
-          clazz = new ClassObjectTypeRef(Class.forName(className, true, Thread.currentThread().getContextClassLoader()), this);
+          clazz = new ReflectionalClassTypeRef(Class.forName(className, true, Thread.currentThread().getContextClassLoader()), this);
           classFiles.put(clazz.name(), clazz);
         }catch(ClassNotFoundException e){
         }

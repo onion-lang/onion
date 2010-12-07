@@ -15,14 +15,13 @@ import onion.compiler.IxCode;
  */
 public class ClassFileFieldRef implements IxCode.FieldRef {
   private int modifier;
-  private IxCode.ClassTypeRef classType;
+  private IxCode.ClassTypeRef affiliation;
   private String name;
   private IxCode.TypeRef type;
 
-  public ClassFileFieldRef(
-    int modifier, IxCode.ClassTypeRef classType, String name, IxCode.TypeRef type) {
+  public ClassFileFieldRef(int modifier, IxCode.ClassTypeRef affiliation, String name, IxCode.TypeRef type) {
     this.modifier = modifier;
-    this.classType = classType;
+    this.affiliation = affiliation;
     this.name = name;
     this.type = type;
   }
@@ -32,14 +31,14 @@ public class ClassFileFieldRef implements IxCode.FieldRef {
   }
 
   public IxCode.ClassTypeRef affiliation() {
-    return classType;
+    return affiliation;
   }
 
   public String name() {
     return name;
   }
 
-  public IxCode.TypeRef getType() {
+  public IxCode.TypeRef type() {
     return type;
   }
 }

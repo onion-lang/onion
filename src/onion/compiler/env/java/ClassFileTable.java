@@ -35,19 +35,14 @@ public class ClassFileTable {
    * @return
    */
   public JavaClass load(String className) {
-    JavaClass klass = lookup(className);
-    return klass != null ? klass : addNewClass(className) ;
-  }
-  
-  public JavaClass lookup(String className){
     try {
       return repository.loadClass(className);
     } catch (ClassNotFoundException e) {
-      return null;
+      return add(className);
     }
   }
-  
-  private JavaClass addNewClass(String className){
+
+  private JavaClass add(String className){
     try {
       ClassPath.ClassFile classFile = classPath.getClassFile(className);
       InputStream input = classFile.getInputStream();

@@ -8,6 +8,7 @@
 package onion.compiler;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -15,7 +16,7 @@ import java.util.List;
  * @author Kota Mizushima
  * 
  */
-public class ImportList {  
+public class ImportList implements Iterable<ImportItem> {
   private List items = new ArrayList();
 
   public ImportList(){
@@ -35,5 +36,9 @@ public class ImportList {
   
   public int size(){
     return items.size();
+  }
+
+  public Iterator<ImportItem> iterator() {
+    return items.iterator();
   }
 }

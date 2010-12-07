@@ -611,6 +611,7 @@ public interface IxCode {
    * Date: 2005/04/17
    */
   class ConstructorDefinition implements Node, ConstructorRef {
+    private Location location;
     private int modifier;
     private ClassTypeRef classType;
     private TypeRef[] arguments;
@@ -619,6 +620,11 @@ public interface IxCode {
     private LocalFrame frame;
 
     public ConstructorDefinition(int modifier, ClassTypeRef classType, TypeRef[] arguments, StatementBlock block, Super superInitializer) {
+      this(null, modifier, classType, arguments, block, superInitializer);
+    }
+
+    public ConstructorDefinition(Location location, int modifier, ClassTypeRef classType, TypeRef[] arguments, StatementBlock block, Super superInitializer) {
+      this.location = location;
       this.modifier = modifier;
       this.classType = classType;
       this.arguments = arguments;
@@ -632,6 +638,10 @@ public interface IxCode {
       ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
       node.setFrame(new LocalFrame(null));
       return node;
+    }
+
+    public Location location() {
+      return location;
     }
 
     public String name() {

@@ -1,10 +1,10 @@
 package onion.compiler
-import _root_.scala.collection.mutable.{Map, HashMap}
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
 import _root_.onion.compiler.IxCode.BinaryExpression.Constants._
 import _root_.onion.compiler.IxCode.UnaryExpression.Constants._
+import _root_.scala.collection.mutable.{Buffer, Map, HashMap, Set => MutableSet}
 
 /**
  * Created by IntelliJ IDEA.
@@ -59,14 +59,17 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private val ast2ixt_ = Map[AST.Node, IxCode.Node]()
   private var ixt2ast_ = Map[IxCode.Node, AST.Node]()
   private var mappers_  = Map[String, NameMapper]()
+  private var access_ : Int = _
   private var mapper_ : NameMapper = _
   private var importedList_ : ImportList = _
   private var staticImportedList_ : StaticImportList = _
+  private var definition_ : IxCode.ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.getMaxErrorReports)
   def newEnvironment(source: Array[AST.CompilationUnit]) = new TypingEnvironment
   def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[IxCode.ClassDefinition] = {
     for(unit <- source) processHeader(unit)
+    for(unit <- source) processOutline(unit)
     null
   }
 
@@ -127,6 +130,188 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       add(node.name, new NameMapper(list))
     }
   }
+  def processOutline(unit: AST.CompilationUnit) {
+    var nconstructors = 0
+    unit_ = unit
+    def processClassDeclaration(node: AST.ClassDeclaration) {
+      nconstructors = 0
+      definition_ = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      mapper_ = find(definition_.name)
+      constructTypeHierarchy(definition_, MutableSet[IxCode.ClassTypeRef]())
+      if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
+      if(node.defaultSection != null) {
+        access_ = node.defaultSection.modifiers
+        for(member <- node.defaultSection.members) member match {
+          case node: AST.FieldDeclaration => processFieldDeclaration(node)
+          case node: AST.MethodDeclaration => processMethodDeclaration(node)
+          case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
+          case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+        }
+      }
+      for(section <- node.sections; member <- section.members) {
+        access_ = section.modifiers
+        member match {
+          case node: AST.FieldDeclaration => processFieldDeclaration(node)
+          case node: AST.MethodDeclaration => processMethodDeclaration(node)
+          case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
+          case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+        }
+      }
+      if (nconstructors == 0) definition_.addDefaultConstructor
+    }
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
+      definition_ = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      mapper_ = find(definition_.name)
+      constructTypeHierarchy(definition_, MutableSet[IxCode.ClassTypeRef]())
+      if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
+      for(method <- node.methods) processInterfaceMethodDeclaration(method)
+    }
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration) {
+      val typeRef = mapFrom(node.typeRef)
+      if (typeRef == null) return null
+      val modifier = node.modifiers | AST.M_PUBLIC
+      val classType = loadTopClass.asInstanceOf[IxCode.ClassDefinition]
+      val name = node.name
+      val field = new IxCode.FieldDefinition(node.location, modifier, classType, name, typeRef)
+      put(node, field)
+      classType.add(field)
+    }
+    def processFunctionDeclaration(node: AST.FunctionDeclaration) {
+      val argsOption = typesOf(node.args)
+      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else IxCode.BasicTypeRef.VOID)
+      for(args <- argsOption; returnType <- returnTypeOption) {
+        val classType= loadTopClass.asInstanceOf[IxCode.ClassDefinition]
+        val modifier = node.modifiers | AST.M_PUBLIC
+        val name = node.name
+        val method = new IxCode.MethodDefinition(node.location, modifier, classType, name, args.toArray, returnType, null)
+        put(node, method)
+        classType.add(method)
+      }
+    }
+    def processFieldDeclaration(node: AST.FieldDeclaration) {
+      val typeRef = mapFrom(node.typeRef)
+      if (typeRef == null) return null
+      val modifier = node.modifiers | access_
+      val name = node.name
+      val field = new IxCode.FieldDefinition(node.location, modifier, definition_, name, typeRef)
+      put(node, field)
+      definition_.add(field)
+    }
+    def processMethodDeclaration(node: AST.MethodDeclaration) {
+      val argsOption = typesOf(node.args)
+      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else IxCode.BasicTypeRef.VOID)
+      for(args <- argsOption; returnType <- returnTypeOption) {
+        var modifier = node.modifiers | access_
+        if (node.block == null) modifier |= AST.M_ABSTRACT
+        val name = node.name
+        val method = new IxCode.MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
+        put(node, method)
+        definition_.add(method)
+      }
+    }
+    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration) {
+      val argsOption = typesOf(node.args)
+      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else IxCode.BasicTypeRef.VOID)
+      for(args <- argsOption; returnType <- returnTypeOption) {
+        val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
+        val name = node.name
+        var method = new IxCode.MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
+        put(node, method)
+        definition_.add(method)
+      }
+    }
+    def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
+      nconstructors += 1
+      val argsOption = typesOf(node.args)
+      for(args <- argsOption) {
+        val modifier = node.modifiers | access_
+        val constructor = new IxCode.ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
+        put(node, constructor)
+        definition_.add(constructor)
+      }
+    }
+    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
+      val typeRef = mapFrom(node.typeRef)
+      if (typeRef == null) return null
+      if (!(typeRef.isObjectType && (typeRef.asInstanceOf[IxCode.ObjectTypeRef]).isInterface)) {
+        report(INTERFACE_REQUIRED, node, typeRef)
+        return null
+      }
+      val modifier = node.modifiers | access_ | AST.M_FORWARDED
+      var name = node.name
+      var field = new IxCode.FieldDefinition(node.location, modifier, definition_, name, typeRef)
+      put(node, field)
+      definition_.add(field)
+    }
+    def cyclic(start: IxCode.ClassDefinition): Boolean = {
+      def loop(node: IxCode.ClassTypeRef, visit: Set[IxCode.ClassTypeRef]): Boolean = {
+        if(node == null) return false
+        if(visit.contains(node)) return true
+        val newVisit = visit + node
+        if(loop(node.superClass, newVisit)) return true
+        for(interface <- node.interfaces) if(loop(interface, newVisit)) return true
+        return false
+      }
+      loop(start, Set[IxCode.ClassTypeRef]())
+    }
+    def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): IxCode.ClassTypeRef = {
+      val typeRef = if(node == null) table_.rootClass else mapFrom(node, mapper).asInstanceOf[IxCode.ClassTypeRef]
+      if (typeRef == null) return null
+      val isInterface = typeRef.isInterface
+      if (((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))) {
+        var location: Location = null
+        if (typeRef.isInstanceOf[IxCode.ClassDefinition]) {
+          location = typeRef.asInstanceOf[IxCode.ClassDefinition].location
+        }
+        report(ILLEGAL_INHERITANCE, location, typeRef.name)
+      }
+      typeRef
+    }
+    def constructTypeHierarchy(node: IxCode.ClassTypeRef, visit: MutableSet[IxCode.ClassTypeRef]) {
+      if(node == null || visit.contains(node)) return
+      visit += node
+      node match {
+        case node: IxCode.ClassDefinition =>
+          if (node.isResolutionComplete) return
+          val interfaces = Buffer[IxCode.ClassTypeRef]()
+          val resolver = find(node.name)
+          var superClass: IxCode.ClassTypeRef = null
+          if (node.isInterface) {
+            val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
+            val superClass = rootClass
+            for (typeSpec <- ast.superInterfaces) {
+              val superType = validateSuperType(typeSpec, true, resolver)
+              if (superType != null) interfaces += superType
+            }
+          }else {
+            val ast = lookupAST(node).asInstanceOf[AST.ClassDeclaration]
+            val superClass = validateSuperType(ast.superClass, false, resolver)
+            for (typeSpec <- ast.superInterfaces) {
+              var superType = validateSuperType(typeSpec, true, resolver)
+              if (superType != null) interfaces += superType
+            }
+          }
+          constructTypeHierarchy(superClass, visit)
+          for (superType <- interfaces)  constructTypeHierarchy(superType, visit)
+          node.setSuperClass(superClass)
+          node.setInterfaces(interfaces.toArray)
+          node.setResolutionComplete(true)
+        case _ =>
+          constructTypeHierarchy(node.superClass, visit)
+          for (interface<- node.interfaces)  constructTypeHierarchy(interface, visit)
+      }
+    }
+    for(top <- unit.toplevels) {
+      mapper_ = find(topClass)
+      top match {
+        case node : AST.ClassDeclaration => processClassDeclaration(node)
+        case node : AST.InterfaceDeclaration => processInterfaceDeclaration(node)
+        case node : AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
+        case node : AST.FunctionDeclaration => processFunctionDeclaration(node)
+        case _ =>
+      }
+    }
+  }
   def report(error: Int, node: AST.Node, items: AnyRef*) {
     report(error, node.location, items)
   }
@@ -142,8 +327,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   def problems: Array[CompileError] = reporter_.getProblems
   def sourceClasses: Array[IxCode.ClassDefinition] = table_.classes.values.toArray(new Array[IxCode.ClassDefinition](0))
   def topClass: String = {
-    var module = unit_.module
-    var moduleName: String = if (module != null) module.name else null
+    val module = unit_.module
+    val moduleName = if (module != null) module.name else null
     return createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
   }
   private def put(astNode: AST.Node, kernelNode: IxCode.Node) {
@@ -153,9 +338,13 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def lookupAST(kernelNode: IxCode.Node): Option[AST.Node] =  ixt2ast_.get(kernelNode)
   private def lookupKernelNode(astNode: AST.Node): Option[IxCode.Node] = ast2ixt_.get(astNode)
   private def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
-  private def find(className: String): Option[NameMapper] = mappers_.get(className)
+  private def find(className: String): NameMapper = mappers_(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Array[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.getPathSeparator).append(path)}.toString
+  private def typesOf(arguments: List[AST.Argument]): Option[List[IxCode.TypeRef]] = {
+    val result = arguments.map{arg => mapFrom(arg.typeRef)}
+    if(result.exists(_ == null)) Some(result) else None
+  }
   private def mapFrom(typeNode: AST.TypeNode): IxCode.TypeRef = mapFrom(typeNode, mapper_)
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): IxCode.TypeRef = {
     val mappedType = mapper.map(typeNode)

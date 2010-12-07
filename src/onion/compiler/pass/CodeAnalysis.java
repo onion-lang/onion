@@ -253,48 +253,48 @@ public class CodeAnalysis {
       return null;
     }
     
-    public Object visit(DelegationDeclaration ast, Void context) {
-      IxCode.TypeRef type = mapFrom(ast.getType());
+    public Object visit(DelegationDeclaration node, Void context) {
+      IxCode.TypeRef type = mapFrom(node.getType());
       if(type == null) return null;  
       if(!(type.isObjectType() && ((IxCode.ObjectTypeRef)type).isInterface())){
-        report(INTERFACE_REQUIRED, ast.getType(), type);
+        report(INTERFACE_REQUIRED, node.getType(), type);
         return null;
       }
-      int modifier = ast.getModifier() | access | Modifier.FORWARDED;
-      String name = ast.getName();
-      IxCode.FieldDefinition node = new IxCode.FieldDefinition(ast.getLocation(), modifier, definition, name, type);
-      put(ast, node);
-      definition.add(node);
+      int modifier = node.getModifier() | access | Modifier.FORWARDED;
+      String name = node.getName();
+      IxCode.FieldDefinition field = new IxCode.FieldDefinition(node.getLocation(), modifier, definition, name, type);
+      put(node, field);
+      definition.add(field);
       return null;
     }
     
-    public Object visit(ConstructorDeclaration ast, Void context) {
+    public Object visit(ConstructorDeclaration node, Void context) {
       nconstructor++;
-      IxCode.TypeRef[] args = typesOf(ast.getArguments());
+      IxCode.TypeRef[] args = typesOf(node.getArguments());
       if(args == null) return null;
-      int modifier = ast.getModifier() | access;
-      IxCode.ConstructorDefinition node = new IxCode.ConstructorDefinition(modifier, definition, args, null, null);
-      put(ast, node);
-      definition.add(node);
+      int modifier = node.getModifier() | access;
+      IxCode.ConstructorDefinition constructorDefinition = new IxCode.ConstructorDefinition(modifier, definition, args, null, null);
+      put(node, constructorDefinition);
+      definition.add(constructorDefinition);
       return null;
     }
 
-    public Object visit(MethodDeclaration ast, Void context) {
-      IxCode.TypeRef[] args = typesOf(ast.getArguments());
+    public Object visit(MethodDeclaration node, Void context) {
+      IxCode.TypeRef[] args = typesOf(node.getArguments());
       IxCode.TypeRef returnType;
-      if(ast.getReturnType() != null){
-        returnType = mapFrom(ast.getReturnType());
+      if(node.getReturnType() != null){
+        returnType = mapFrom(node.getReturnType());
       }else{
         returnType = IxCode.BasicTypeRef.VOID;
       }
       if(args == null || returnType == null) return null;
 
-      int modifier = ast.getModifier() | access;
-      if(ast.getBlock() == null) modifier |= Modifier.ABSTRACT;
-      String name = ast.getName();    
-      IxCode.MethodDefinition node = new IxCode.MethodDefinition(ast.getLocation(), modifier, definition, name, args, returnType, null);
-      put(ast, node);
-      definition.add(node);
+      int modifier = node.getModifier() | access;
+      if(node.getBlock() == null) modifier |= Modifier.ABSTRACT;
+      String name = node.getName();
+      IxCode.MethodDefinition method = new IxCode.MethodDefinition(node.getLocation(), modifier, definition, name, args, returnType, null);
+      put(node, method);
+      definition.add(method);
       return null;
     }
     
@@ -503,11 +503,8 @@ public class CodeAnalysis {
     private void generateMethods(){
       Set<IxCode.MethodRef> generated = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
       Set<IxCode.MethodRef> methodSet = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
-      for(Iterator i = fields.iterator(); i.hasNext();){
-        IxCode.FieldDefinition node = (IxCode.FieldDefinition)i.next();
-        if(Modifier.isForwarded(node.modifier())){
-          generateDelegationMethods(node ,generated, methodSet);
-        }
+      for(IxCode.FieldRef node:fields) {
+        if(Modifier.isForwarded(node.modifier())) generateDelegationMethods((IxCode.FieldDefinition)node ,generated, methodSet);
       }
     }
     

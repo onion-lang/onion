@@ -21,15 +21,15 @@ public abstract class BinaryExpression extends Expression {
     this.right = right;
   }
   
-  public String getSymbol(){
+  public String symbol(){
     return symbol;
   }
 
-  public Expression getLeft() {
+  public Expression left() {
     return left;
   }
 
-  public Expression getRight() {
+  public Expression right() {
     return right;
   }
 }

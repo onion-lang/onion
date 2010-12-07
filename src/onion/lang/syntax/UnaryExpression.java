@@ -20,11 +20,11 @@ public abstract class UnaryExpression extends Expression {
     this.symbol = symbol;
   }
   
-  public String getSymbol(){ 
+  public String symbol(){
     return symbol; 
   }
   
-  public Expression getTarget() { 
+  public Expression target() {
     return target; 
   }  
 }

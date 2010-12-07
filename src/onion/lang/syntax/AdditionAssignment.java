@@ -13,8 +13,6 @@ package onion.lang.syntax;
 
 import onion.lang.syntax.visitor.ASTVisitor;
 
-;
-
 
 /**
  * @author Kota Mizushima

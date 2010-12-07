@@ -715,15 +715,15 @@ public class CodeAnalysis {
     
   //------------------------- binary expressions ----------------------------------//
     public Object visit(Addition ast, LocalContext context) {
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       if(left.isBasicType() && right.isBasicType()){
         return checkNumExp(ADD, ast, left, right);
       }
       if(left.isBasicType()){
         if(left.type() == IxCode.BasicTypeRef.VOID){
-          report(IS_NOT_BOXABLE_TYPE, ast.getLeft(), left.type());
+          report(IS_NOT_BOXABLE_TYPE, ast.left(), left.type());
           return null;
         }else{
           left = Boxing.boxing(table, left);
@@ -731,16 +731,16 @@ public class CodeAnalysis {
       }
       if(right.isBasicType()){
         if(right.type() == IxCode.BasicTypeRef.VOID){
-          report(IS_NOT_BOXABLE_TYPE, ast.getRight(), right.type());
+          report(IS_NOT_BOXABLE_TYPE, ast.right(), right.type());
           return null;
         }else{
           right = Boxing.boxing(table, right);
         }
       }
       IxCode.MethodRef toString;
-      toString = findMethod(ast.getLeft(), (IxCode.ObjectTypeRef)left.type(), "toString");
+      toString = findMethod(ast.left(), (IxCode.ObjectTypeRef)left.type(), "toString");
       left = new IxCode.Call(left, toString, new IxCode.Expression[0]);
-      toString = findMethod(ast.getRight(), (IxCode.ObjectTypeRef)right.type(), "toString");
+      toString = findMethod(ast.right(), (IxCode.ObjectTypeRef)right.type(), "toString");
       right = new IxCode.Call(right, toString, new IxCode.Expression[0]);
       IxCode.MethodRef concat =
         findMethod(ast, (IxCode.ObjectTypeRef)left.type(), "concat", new IxCode.Expression[]{right});
@@ -748,10 +748,10 @@ public class CodeAnalysis {
     }
     
     public Object visit(PostIncrement node, LocalContext context) {
-      IxCode.Expression operand = typeCheck(node.getTarget(), context);
+      IxCode.Expression operand = typed(node.target(), context);
       if(operand == null) return null;
       if((!operand.isBasicType()) || !hasNumericType(operand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, node.getSymbol(), new IxCode.TypeRef[]{operand.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol(), new IxCode.TypeRef[]{operand.type()});
         return null;
       }
       IxCode.Expression result = null;
@@ -792,10 +792,10 @@ public class CodeAnalysis {
     }
 
     public Object visit(PostDecrement node, LocalContext context) {
-      IxCode.Expression operand = typeCheck(node.getTarget(), context);
+      IxCode.Expression operand = typed(node.target(), context);
       if(operand == null) return null;
       if((!operand.isBasicType()) || !hasNumericType(operand)){
-        report(INCOMPATIBLE_OPERAND_TYPE, node, node.getSymbol(), new IxCode.TypeRef[]{operand.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol(), new IxCode.TypeRef[]{operand.type()});
         return null;
       }
       IxCode.Expression result = null;
@@ -837,39 +837,39 @@ public class CodeAnalysis {
     
     @Override
     public Object visit(Elvis ast, LocalContext context) {
-      IxCode.Expression l = typeCheck(ast.getLeft(), context);
-      IxCode.Expression r = typeCheck(ast.getRight(), context);
+      IxCode.Expression l = typed(ast.left(), context);
+      IxCode.Expression r = typed(ast.right(), context);
       if(l.isBasicType() || r.isBasicType() || !IxCode.TypeRules.isAssignable(l.type(), r.type())) {
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{l.type(), r.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{l.type(), r.type()});
         return null;
       }
       return new IxCode.BinaryExpression(ELVIS, l.type(), l, r);
     }
     
     public Object visit(Subtraction ast, LocalContext context) {
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       return checkNumExp(SUBTRACT, ast, left, right);
     }
     
     public Object visit(Multiplication ast, LocalContext context) {
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       return checkNumExp(MULTIPLY,  ast, left, right);
     }
     
     public Object visit(Division ast, LocalContext context) {
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       return checkNumExp(DIVIDE, ast, left, right);
     }
     
     public Object visit(Modulo ast, LocalContext context) {
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       return checkNumExp(MOD, ast, left, right);
     }
@@ -958,12 +958,12 @@ public class CodeAnalysis {
     }
     
     IxCode.Expression[] processLogicalExpression(onion.lang.syntax.BinaryExpression ast, LocalContext context){
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if((leftType != IxCode.BasicTypeRef.BOOLEAN) || (rightType != IxCode.BasicTypeRef.BOOLEAN)){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       return new IxCode.Expression[]{left, right};
@@ -971,8 +971,8 @@ public class CodeAnalysis {
     
     IxCode.Expression processShiftExpression(
       int kind, onion.lang.syntax.BinaryExpression ast, LocalContext context){
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       if(!left.type().isBasicType()){
         IxCode.Expression[] params = new IxCode.Expression[]{right};
@@ -984,13 +984,13 @@ public class CodeAnalysis {
         return new IxCode.Call(left, result._2, params);
       }
       if(!right.type().isBasicType()){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.BasicTypeRef leftType = (IxCode.BasicTypeRef)left.type();
       IxCode.BasicTypeRef rightType = (IxCode.BasicTypeRef)right.type();
       if((!leftType.isInteger()) || (!rightType.isInteger())){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.TypeRef leftResultType = promoteInteger(leftType);
@@ -1015,11 +1015,11 @@ public class CodeAnalysis {
     }  
       
     IxCode.Expression checkBitExp(int kind, onion.lang.syntax.BinaryExpression ast, LocalContext context){
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       if((!left.isBasicType()) || (!right.isBasicType())){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.BasicTypeRef leftType = (IxCode.BasicTypeRef)left.type();
@@ -1030,7 +1030,7 @@ public class CodeAnalysis {
       }else if(leftType.isBoolean() && rightType.isBoolean()){
         resultType = IxCode.BasicTypeRef.BOOLEAN;
       }else{
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{leftType, rightType});
         return null;
       }
       if(left.type() != resultType){
@@ -1044,7 +1044,7 @@ public class CodeAnalysis {
     
     IxCode.Expression checkNumExp(int kind, BinaryExpression ast, IxCode.Expression left, IxCode.Expression right) {
       if((!hasNumericType(left)) || (!hasNumericType(right))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.TypeRef resultType = promote(left.type(), right.type());
@@ -1058,15 +1058,15 @@ public class CodeAnalysis {
     }
     
     IxCode.Expression checkRefEqualsExp(int kind, onion.lang.syntax.BinaryExpression ast, LocalContext context){
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type();
       IxCode.TypeRef rightType = right.type();
       if(
         (left.isBasicType() && (!right.isBasicType())) ||
         ((!left.isBasicType()) && (right.isBasicType()))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{leftType, rightType});
         return null;
       }
       if(left.isBasicType() && right.isBasicType()){
@@ -1079,7 +1079,7 @@ public class CodeAnalysis {
             right = new IxCode.AsInstanceOf(right, resultType);
           }
         }else if(leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN){
-          report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
+          report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{leftType, rightType});
           return null;
         }
       }
@@ -1087,12 +1087,12 @@ public class CodeAnalysis {
     }
     
     IxCode.Expression checkEqualExp(int kind, onion.lang.syntax.BinaryExpression ast, LocalContext context){
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if((left.isBasicType() && (!right.isBasicType())) || ((!left.isBasicType()) && (right.isBasicType()))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{leftType, rightType});
         return null;
       }
       if(left.isBasicType() && right.isBasicType()){      
@@ -1105,7 +1105,7 @@ public class CodeAnalysis {
             right = new IxCode.AsInstanceOf(right, resultType);
           }
         }else if(leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN){
-          report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{leftType, rightType});
+          report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{leftType, rightType});
           return null;
         }
       }else if(left.isReferenceType() && right.isReferenceType()){
@@ -1126,12 +1126,12 @@ public class CodeAnalysis {
     }
     
     IxCode.Expression[] processComparableExpression(onion.lang.syntax.BinaryExpression ast, LocalContext context) {
-      IxCode.Expression left = typeCheck(ast.getLeft(), context);
-      IxCode.Expression right = typeCheck(ast.getRight(), context);
+      IxCode.Expression left = typed(ast.left(), context);
+      IxCode.Expression right = typed(ast.right(), context);
       if(left == null || right == null) return null;
       IxCode.TypeRef leftType = left.type(), rightType = right.type();
       if((!numeric(left.type())) || (!numeric(right.type()))){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
+        report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.symbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
       }
       IxCode.TypeRef resultType = promote(leftType, rightType);
@@ -1185,7 +1185,7 @@ public class CodeAnalysis {
     public Object visit(ListLiteral ast, LocalContext context) {
       IxCode.Expression[] elements = new IxCode.Expression[ast.size()];
       for(int i = 0; i < ast.size(); i++){
-        elements[i] = typeCheck(ast.getExpression(i), context);
+        elements[i] = typed(ast.getExpression(i), context);
       }
       return new IxCode.ListLiteral(elements, load("java.util.List"));
     }
@@ -1201,7 +1201,7 @@ public class CodeAnalysis {
     
   //---------------------------- unary expressions ------------------------------//
     public Object visit(Posit ast, LocalContext context) {
-      IxCode.Expression node = typeCheck(ast.getTarget(), context);
+      IxCode.Expression node = typed(ast.target(), context);
       if(node == null) return null;
       if(!hasNumericType(node)){
         report(INCOMPATIBLE_OPERAND_TYPE, ast,  "+", new IxCode.TypeRef[]{node.type()});
@@ -1212,7 +1212,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(Negate ast, LocalContext context) {
-      IxCode.Expression node = typeCheck(ast.getTarget(), context);
+      IxCode.Expression node = typed(ast.target(), context);
       if(node == null) return null;
       if(!hasNumericType(node)){
         report(INCOMPATIBLE_OPERAND_TYPE, ast, "-", new IxCode.TypeRef[]{node.type()});
@@ -1223,7 +1223,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(Not ast, LocalContext context) {
-      IxCode.Expression node = typeCheck(ast.getTarget(), context);
+      IxCode.Expression node = typed(ast.target(), context);
       if(node == null) return null;
       if(node.type() != IxCode.BasicTypeRef.BOOLEAN){
         report(INCOMPATIBLE_OPERAND_TYPE, ast, "!", new IxCode.TypeRef[]{node.type()});
@@ -1236,7 +1236,7 @@ public class CodeAnalysis {
     
   //---------------------------- assignment operators ---------------------------//
     public Object visit(Assignment ast, LocalContext context) {
-      onion.lang.syntax.Expression left = ast.getLeft();
+      onion.lang.syntax.Expression left = ast.left();
       if(left instanceof Id){
         return processLocalAssign(ast, context);
       }else if(left instanceof SelfFieldReference){
@@ -1250,9 +1250,9 @@ public class CodeAnalysis {
     }
     
     private IxCode.Expression processLocalAssign(Assignment ast, LocalContext context){
-      IxCode.Expression value = typeCheck(ast.getRight(), context);
+      IxCode.Expression value = typed(ast.right(), context);
       if(value == null) return null;
-      Id id = (Id) ast.getLeft();
+      Id id = (Id) ast.left();
       ClosureLocalBinding bind = context.lookup(id.getName());
       int frame, index;
       IxCode.TypeRef leftType, rightType = value.type();
@@ -1269,15 +1269,15 @@ public class CodeAnalysis {
         }
         index = context.add(id.getName(), leftType);
       }
-      value = processAssignable(ast.getRight(), leftType, value);
+      value = processAssignable(ast.right(), leftType, value);
       if(value == null) return null;
       return new IxCode.SetLocal(frame, index, leftType, value);
     }
     
     private Object processSelfFieldAssign(Assignment ast, LocalContext context){
-      IxCode.Expression value = typeCheck(ast.getRight(), context);
+      IxCode.Expression value = typed(ast.right(), context);
       if(value == null) return null;
-      SelfFieldReference ref = (SelfFieldReference) ast.getLeft();
+      SelfFieldReference ref = (SelfFieldReference) ast.left();
       IxCode.ClassTypeRef selfClass;
       if(context.isGlobal()){
         selfClass = loadTopClass();
@@ -1297,29 +1297,29 @@ public class CodeAnalysis {
         report(FIELD_NOT_ACCESSIBLE, ast, field.affiliation(), field.name(), selfClass);
         return null;
       }
-      value = processAssignable(ast.getRight(), field.type(), value);
+      value = processAssignable(ast.right(), field.type(), value);
       if(value == null) return null;
       return new IxCode.SetField(new IxCode.This(selfClass), field, value);
     }
     
     Object processArrayAssign(Assignment ast, LocalContext context){
-      IxCode.Expression value = typeCheck(ast.getRight(), context);
-      Indexing indexing = (Indexing) ast.getLeft();
-      IxCode.Expression target = typeCheck(indexing.getLeft(), context);
-      IxCode.Expression index = typeCheck(indexing.getRight(), context);
+      IxCode.Expression value = typed(ast.right(), context);
+      Indexing indexing = (Indexing) ast.left();
+      IxCode.Expression target = typed(indexing.left(), context);
+      IxCode.Expression index = typed(indexing.right(), context);
       if(value == null || target == null || index == null) return null;
       if(target.isBasicType()){
-        report(INCOMPATIBLE_TYPE, indexing.getLeft(), rootClass(), target.type());
+        report(INCOMPATIBLE_TYPE, indexing.left(), rootClass(), target.type());
         return null;
       }
       if(target.isArrayType()){
         IxCode.ArrayTypeRef targetType = ((IxCode.ArrayTypeRef)target.type());
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
-          report(INCOMPATIBLE_TYPE,  indexing.getRight(), IxCode.BasicTypeRef.INT, index.type());
+          report(INCOMPATIBLE_TYPE,  indexing.right(), IxCode.BasicTypeRef.INT, index.type());
           return null;
         }
         IxCode.TypeRef base = targetType.base();
-        value = processAssignable(ast.getRight(), base, value);
+        value = processAssignable(ast.right(), base, value);
         if(value == null) return null;
         return new IxCode.ArraySet(target, index, value);
       }
@@ -1334,37 +1334,37 @@ public class CodeAnalysis {
     }
     
     Object processFieldOrMethodAssign(Assignment ast, LocalContext context){
-      typeCheck(ast.getRight(), context);
+      typed(ast.right(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(AdditionAssignment ast, LocalContext context) {
-      typeCheck(ast.getRight(), context);
+      typed(ast.right(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(SubtractionAssignment ast, LocalContext context) {
-      typeCheck(ast.getRight(), context);
+      typed(ast.right(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(MultiplicationAssignment ast, LocalContext context) {
-      typeCheck(ast.getRight(), context);
+      typed(ast.right(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(DivisionAssignment ast, LocalContext context) {
-      typeCheck(ast.getRight(), context);
+      typed(ast.right(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
     
     public Object visit(ModuloAssignment ast, LocalContext context) {
-      typeCheck(ast.getRight(), context);
+      typed(ast.right(), context);
       report(UNIMPLEMENTED_FEATURE, ast);
       return null;
     }
@@ -1470,7 +1470,7 @@ public class CodeAnalysis {
     
     public Object visit(FieldOrMethodRef ast, LocalContext context) {
       IxCode.ClassDefinition contextClass = CodeAnalysis.this.definition;
-      IxCode.Expression target = typeCheck(ast.getTarget(), context);
+      IxCode.Expression target = typed(ast.getTarget(), context);
       if(target == null) return null;
       if(target.type().isBasicType() || target.type().isNullType()){
         report(INCOMPATIBLE_TYPE, ast.getTarget(), rootClass(), target.type());
@@ -1573,7 +1573,7 @@ public class CodeAnalysis {
     }
       
     public Object visit(Cast ast, LocalContext context) {
-      IxCode.Expression node = typeCheck(ast.getTarget(), context);
+      IxCode.Expression node = typed(ast.getTarget(), context);
       if(node == null) return null;
       IxCode.TypeRef conversion = mapFrom(ast.getType(), mapper);
       if(conversion == null) return null;
@@ -1635,8 +1635,8 @@ public class CodeAnalysis {
     }
 
     public Object visit(Indexing ast, LocalContext context) {
-      IxCode.Expression target = typeCheck(ast.getLeft(), context);
-      IxCode.Expression index = typeCheck(ast.getRight(), context);
+      IxCode.Expression target = typed(ast.left(), context);
+      IxCode.Expression index = typed(ast.right(), context);
       if(target == null || index == null) return null;
       if(target.isArrayType()){
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
@@ -1646,12 +1646,12 @@ public class CodeAnalysis {
         return new IxCode.ArrayRef(target, index);
       }    
       if(target.isBasicType()){
-        report(INCOMPATIBLE_TYPE, ast.getLeft(), rootClass(), target.type());
+        report(INCOMPATIBLE_TYPE, ast.left(), rootClass(), target.type());
         return null;
       }
       if(target.isArrayType()){
         if(!(index.isBasicType() && ((IxCode.BasicTypeRef)index.type()).isInteger())){
-          report(INCOMPATIBLE_TYPE,  ast.getRight(), IxCode.BasicTypeRef.INT, index.type());
+          report(INCOMPATIBLE_TYPE,  ast.right(), IxCode.BasicTypeRef.INT, index.type());
           return null;
         }
         return new IxCode.ArrayRef(target, index);
@@ -1697,7 +1697,7 @@ public class CodeAnalysis {
     }
         
     public Object visit(IsInstance ast, LocalContext context) {
-      IxCode.Expression target = typeCheck(ast.getTarget(), context);
+      IxCode.Expression target = typed(ast.getTarget(), context);
       IxCode.TypeRef checkType = mapFrom(ast.getType(), mapper);
       if(target == null || checkType == null) return null;
       return new IxCode.InstanceOf(target, checkType);
@@ -1744,7 +1744,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(MethodCall ast, LocalContext context) {
-      IxCode.Expression target = typeCheck(ast.getTarget(), context);
+      IxCode.Expression target = typed(ast.getTarget(), context);
       if(target == null) return null;
       IxCode.Expression[] params = typeCheckExps(ast.getArguments(), context);
       if(params == null) return null;
@@ -1808,7 +1808,7 @@ public class CodeAnalysis {
       IxCode.Expression[] expressions = new IxCode.Expression[ast.length];
       boolean success = true;
       for(int i = 0; i < ast.length; i++){
-        expressions[i] = typeCheck(ast[i], context);
+        expressions[i] = typed(ast[i], context);
         if(expressions[i] == null){
           success = false;
         }
@@ -1826,7 +1826,7 @@ public class CodeAnalysis {
       Expression collectionAST = node.getCollection();
       try {
         context.openScope();
-        IxCode.Expression collection = typeCheck(collectionAST, context);
+        IxCode.Expression collection = typed(collectionAST, context);
         Argument arg = node.getDeclaration();
         accept(arg, context);
         IxCode.ActionStatement block = translate(node.getStatement(), context);
@@ -1894,7 +1894,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(ExpressionStatement node, LocalContext context) {
-      IxCode.Expression expression = typeCheck(node.getExpression(), context);
+      IxCode.Expression expression = typed(node.getExpression(), context);
       return new IxCode.ExpressionStatement(expression);
     }
     
@@ -1907,7 +1907,7 @@ public class CodeAnalysis {
         for(int i = 0; i < size; i++){        
           Expression expression = node.getCondition(i);
           Statement statement = node.getBlock(i);
-          IxCode.Expression typedExpression = typeCheck(expression, context);
+          IxCode.Expression typedExpression = typed(expression, context);
           if(typedExpression != null && typedExpression.type() != IxCode.BasicTypeRef.BOOLEAN){
             IxCode.TypeRef expect = IxCode.BasicTypeRef.BOOLEAN;
             IxCode.TypeRef actual = typedExpression.type();
@@ -1937,7 +1937,7 @@ public class CodeAnalysis {
         IxCode.ActionStatement init = ast.getInit() != null ? translate(ast.getInit(), context) : new IxCode.NOP();
         IxCode.Expression condition;
         if(ast.getCondition() != null){
-          condition = typeCheck(ast.getCondition(), context);
+          condition = typed(ast.getCondition(), context);
           IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
           if(condition != null && condition.type() != expected){
             IxCode.TypeRef appeared = condition.type();
@@ -1946,7 +1946,7 @@ public class CodeAnalysis {
         }else{
           condition = new IxCode.BoolLiteral(true);
         }
-        IxCode.Expression update = ast.getUpdate() != null ? typeCheck(ast.getUpdate(), context) : null;
+        IxCode.Expression update = ast.getUpdate() != null ? typed(ast.getUpdate(), context) : null;
         IxCode.ActionStatement loop = translate(ast.getBlock(), context);
         if(update != null) loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionStatement(update));
         IxCode.ActionStatement result = new IxCode.ConditionalLoop(condition, loop);
@@ -1974,7 +1974,7 @@ public class CodeAnalysis {
     public Object visit(IfStatement node, LocalContext context) {
       try{
         context.openScope();
-        IxCode.Expression condition = typeCheck(node.getCondition(), context);
+        IxCode.Expression condition = typed(node.getCondition(), context);
         IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
         if(condition != null && condition.type() != expected){
           report(INCOMPATIBLE_TYPE, node.getCondition(), expected, condition.type());
@@ -1990,7 +1990,7 @@ public class CodeAnalysis {
     public Object visit(WhileStatement node, LocalContext context) {
       try{
         context.openScope();
-        IxCode.Expression condition = typeCheck(node.getCondition(), context);
+        IxCode.Expression condition = typed(node.getCondition(), context);
         IxCode.TypeRef expected = IxCode.BasicTypeRef.BOOLEAN;
         if(condition != null && condition.type() != expected){
           IxCode.TypeRef actual = condition.type();
@@ -2010,7 +2010,7 @@ public class CodeAnalysis {
         if(returnType != expected) report(CANNOT_RETURN_VALUE, node);
         return new IxCode.Return(null);
       }else{
-        IxCode.Expression returned = typeCheck(node.getExpression(), context);
+        IxCode.Expression returned = typed(node.getExpression(), context);
         if(returned == null) return new IxCode.Return(null);
         if(returned.type() == IxCode.BasicTypeRef.VOID){
           report(CANNOT_RETURN_VALUE, node);
@@ -2036,7 +2036,7 @@ public class CodeAnalysis {
     public Object visit(SelectStatement node, LocalContext context) {
       try{
         context.openScope();
-        IxCode.Expression condition = typeCheck(node.getCondition(), context);
+        IxCode.Expression condition = typed(node.getCondition(), context);
         if(condition == null){
           return new IxCode.NOP();
         }
@@ -2078,7 +2078,7 @@ public class CodeAnalysis {
       IxCode.Expression[] expressions = new IxCode.Expression[nodes.length];
       boolean error = false;
       for(int i = 0; i < nodes.length; i++){
-        expressions[i] = typeCheck(nodes[i], context);
+        expressions[i] = typed(nodes[i], context);
         if(expressions[i] == null){
           error = true;
         }else if(!IxCode.TypeRules.isAssignable(typeRef, expressions[i].type())){
@@ -2106,7 +2106,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(ThrowStatement node, LocalContext context) {
-      IxCode.Expression expression = typeCheck(node.getExpression(), context);
+      IxCode.Expression expression = typed(node.getExpression(), context);
       if(expression != null){
         IxCode.TypeRef expected = load("java.lang.Throwable");
         IxCode.TypeRef detected = expression.type();
@@ -2129,7 +2129,7 @@ public class CodeAnalysis {
       int index = context.add(node.getName(), leftType);
       IxCode.SetLocal local;
       if(initializer != null){
-        IxCode.Expression valueNode = typeCheck(initializer, context);
+        IxCode.Expression valueNode = typed(initializer, context);
         if(valueNode == null) return new IxCode.NOP();
         valueNode = processAssignable(initializer, leftType, valueNode);
         if(valueNode == null) return new IxCode.NOP();
@@ -2167,7 +2167,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(SynchronizedStatement node, LocalContext context) {
-      IxCode.Expression lock = typeCheck(node.getTarget(), context);
+      IxCode.Expression lock = typed(node.getTarget(), context);
       IxCode.ActionStatement block = translate(node.getBlock(), context);
       report(UNIMPLEMENTED_FEATURE, node);
       return new IxCode.Synchronized(lock, block);
@@ -2317,7 +2317,7 @@ public class CodeAnalysis {
       );
     }
     
-    IxCode.Expression typeCheck(onion.lang.syntax.Expression expression, LocalContext context){
+    IxCode.Expression typed(onion.lang.syntax.Expression expression, LocalContext context){
       return (IxCode.Expression) expression.accept(this, context);
     }
       

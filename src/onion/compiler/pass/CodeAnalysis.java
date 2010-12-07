@@ -30,6 +30,7 @@ import onion.lang.syntax.visitor.ASTVisitor;
 import static onion.compiler.SemanticErrorReporter.Constants.*;
 import static onion.compiler.IxCode.BinaryExpression.Constants.*;
 import static onion.compiler.IxCode.UnaryExpression.Constants.*;
+import static onion.lang.syntax.Modifier.isProtected;
 
 public class CodeAnalysis {
   private SemanticErrorReporter reporter;
@@ -185,8 +186,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(ClassDeclaration ast, String context) {
-      String module = context;
-      IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(module, ast.getName()));
+      IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(ast.getModifier(), createFQCN(context, ast.getName()));
       node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
       if(table.lookup(node.name()) != null){
         report(DUPLICATE_CLASS,  ast, node.name());
@@ -199,8 +199,7 @@ public class CodeAnalysis {
     }
     
     public Object visit(InterfaceDeclaration ast, String context) {
-      String module = context;
-      IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getLocation(), ast.getModifier(), createFQCN(module, ast.getName()), null);
+      IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getLocation(), ast.getModifier(), createFQCN(context, ast.getName()), null);
       node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
       ClassTable table = CodeAnalysis.this.table;
       if(table.lookup(node.name()) != null){
@@ -236,7 +235,7 @@ public class CodeAnalysis {
       nconstructor = 0;
       definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
       mapper = find(definition.name());
-      constructTypeHierarchy(definition, new ArrayList());
+      constructTypeHierarchy(definition, new ArrayList<IxCode.ClassTypeRef>());
       if(hasCyclicity(definition)) report(CYCLIC_INHERITANCE, ast, definition.name());
       if(ast.getDefaultSection() != null) accept(ast.getDefaultSection());
       AccessSection[] sections = ast.getSections();
@@ -248,14 +247,9 @@ public class CodeAnalysis {
     public Object visit(InterfaceDeclaration ast, Void context) {
       definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
       mapper = find(definition.name());
-      constructTypeHierarchy(definition, new ArrayList());
-      if(hasCyclicity(definition)){
-        report(CYCLIC_INHERITANCE, ast, definition.name());
-      }
-      InterfaceMethodDeclaration[] members = ast.getDeclarations();
-      for(int i = 0; i < members.length; i++){
-        accept(members[i], context);
-      }
+      constructTypeHierarchy(definition, new ArrayList<IxCode.ClassTypeRef>());
+      if(hasCyclicity(definition)) report(CYCLIC_INHERITANCE, ast, definition.name());
+      for (InterfaceMethodDeclaration member : ast.getDeclarations())  accept(member, context);
       return null;
     }
     
@@ -395,13 +389,13 @@ public class CodeAnalysis {
       return hasCylicitySub(start, new HashSet<IxCode.ClassTypeRef>());
     }
     
-    private boolean hasCylicitySub(IxCode.ClassTypeRef ref, HashSet<IxCode.ClassTypeRef> visit){
+    private boolean hasCylicitySub(IxCode.ClassTypeRef ref, Set<IxCode.ClassTypeRef> visit){
       if(ref == null) return false;
       if(visit.contains(ref)) return true;
       visit.add(ref);
-      if(hasCylicitySub(ref.superClass(), (HashSet<IxCode.ClassTypeRef>)visit.clone())) return true;
+      if(hasCylicitySub(ref.superClass(), new HashSet<IxCode.ClassTypeRef>(visit))) return true;
       for (IxCode.ClassTypeRef anInterface : ref.interfaces()) {
-        if (hasCylicitySub(anInterface, (HashSet<IxCode.ClassTypeRef>) visit.clone()))  return true;
+        if (hasCylicitySub(anInterface, new HashSet<IxCode.ClassTypeRef>(visit)))  return true;
       }
       return false;
     }
@@ -418,7 +412,6 @@ public class CodeAnalysis {
         if(node.isInterface()){
           InterfaceDeclaration ast = (InterfaceDeclaration) lookupAST(node);
           superClass = rootClass();
-          TypeSpec[] typeSpecifiers = ast.getInterfaces();
           for(TypeSpec typeSpec:ast.getInterfaces()) {
             IxCode.ClassTypeRef superType = validateSuperType(typeSpec, true, resolver);
             if(superType != null) interfaces.add(superType);
@@ -440,9 +433,8 @@ public class CodeAnalysis {
         node.setResolutionComplete(true);
       }else{
         constructTypeHierarchy(ref.superClass(), visit);
-        IxCode.ClassTypeRef[] interfaces = ref.interfaces();
-        for(int i = 0; i < interfaces.length; i++){
-          constructTypeHierarchy(interfaces[i], visit);
+        for (IxCode.ClassTypeRef anInterface : ref.interfaces()) {
+          constructTypeHierarchy(anInterface, visit);
         }
       }
     }
@@ -482,14 +474,13 @@ public class CodeAnalysis {
       this.functions    = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
     }
     
-    public void process(CompilationUnit unit){
-      CodeAnalysis.this.unit = unit;
+    public void process(CompilationUnit compilationUnit){
+      unit = compilationUnit;
       variables.clear();
       functions.clear();
-      TopLevelElement[] toplevels = unit.getTopLevels();    
-      for(int i = 0; i < toplevels.length; i++){
-        CodeAnalysis.this.mapper = find(topClass());
-        accept(toplevels[i]);
+      for (TopLevelElement toplevel : compilationUnit.getTopLevels()) {
+        mapper = find(topClass());
+        accept(toplevel);
       }
     }
     
@@ -504,17 +495,14 @@ public class CodeAnalysis {
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection());
       }
-      AccessSection[] sections = ast.getSections();
-      for(int i = 0; i < sections.length; i++){
-        accept(sections[i]);
-      }
+      for (AccessSection section : ast.getSections())  accept(section);
       generateMethods();
       return null;
     }
     
     private void generateMethods(){
-      Set generated = new TreeSet(new IxCode.MethodRefComparator());
-      Set methodSet = new TreeSet(new IxCode.MethodRefComparator());
+      Set<IxCode.MethodRef> generated = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
+      Set<IxCode.MethodRef> methodSet = new TreeSet<IxCode.MethodRef>(new IxCode.MethodRefComparator());
       for(Iterator i = fields.iterator(); i.hasNext();){
         IxCode.FieldDefinition node = (IxCode.FieldDefinition)i.next();
         if(Modifier.isForwarded(node.modifier())){
@@ -523,15 +511,14 @@ public class CodeAnalysis {
       }
     }
     
-    private void generateDelegationMethods(IxCode.FieldDefinition node, Set generated, Set methodSet){
+    private void generateDelegationMethods(IxCode.FieldDefinition node, Set<IxCode.MethodRef> generated, Set<IxCode.MethodRef> methodSet){
       IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) node.type();
-      Set src = Classes.getInterfaceMethods(type);
-      for (Iterator i = src.iterator(); i.hasNext();) {
-        IxCode.MethodRef method = (IxCode.MethodRef) i.next();
-        if(!methodSet.contains(method)) {
-          if(generated.contains(method)){
+      Set<IxCode.MethodRef> src = Classes.getInterfaceMethods(type);
+      for (IxCode.MethodRef method : src) {
+        if (!methodSet.contains(method)) {
+          if (generated.contains(method)) {
             report(DUPLICATE_GENERATED_METHOD, node.location(), method.affiliation(), method.name(), method.arguments());
-          }else {
+          } else {
             IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
             generated.add(generatedMethod);
             definition.add(generatedMethod);
@@ -570,10 +557,7 @@ public class CodeAnalysis {
       constructors.clear();
       definition = node;
       mapper = find(node.name());
-      InterfaceMethodDeclaration[] members = ast.getDeclarations();
-      for(int i = 0; i < members.length; i++){
-        accept(members[i], context);
-      }
+      for (InterfaceMethodDeclaration member : ast.getDeclarations())  accept(member, context);
       return null;
     }
     
@@ -656,10 +640,7 @@ public class CodeAnalysis {
       
     public Object visit(AccessSection section, Void context){
       if(section == null) return null;    
-      MemberDeclaration[] members = section.getMembers();
-      for(int i = 0; i < members.length; i++){
-        accept(members[i], context);
-      }
+      for (MemberDeclaration member : section.getMembers())  accept(member, context);
       return null;
     }
   }
@@ -678,7 +659,6 @@ public class CodeAnalysis {
       TopLevelElement[] toplevels = unit.getTopLevels();
       LocalContext context = new LocalContext();
       List<IxCode.ActionStatement> statements = new ArrayList<IxCode.ActionStatement>();
-      String className = topClass();
       CodeAnalysis.this.mapper = find(topClass());
       IxCode.ClassDefinition klass = (IxCode.ClassDefinition) loadTopClass();
       IxCode.ArrayTypeRef argsType = loadArray(load("java.lang.String"), 1);
@@ -752,7 +732,7 @@ public class CodeAnalysis {
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
       if(left.isBasicType() && right.isBasicType()){
-        return checkNumExp(ADD, ast, left, right, context);
+        return checkNumExp(ADD, ast, left, right);
       }
       if(left.isBasicType()){
         if(left.type() == IxCode.BasicTypeRef.VOID){
@@ -883,28 +863,28 @@ public class CodeAnalysis {
       IxCode.Expression left = typeCheck(ast.getLeft(), context);
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      return checkNumExp(SUBTRACT, ast, left, right, context);
+      return checkNumExp(SUBTRACT, ast, left, right);
     }
     
     public Object visit(Multiplication ast, LocalContext context) {
       IxCode.Expression left = typeCheck(ast.getLeft(), context);
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      return checkNumExp(MULTIPLY,  ast, left, right, context);
+      return checkNumExp(MULTIPLY,  ast, left, right);
     }
     
     public Object visit(Division ast, LocalContext context) {
       IxCode.Expression left = typeCheck(ast.getLeft(), context);
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      return checkNumExp(DIVIDE, ast, left, right, context);
+      return checkNumExp(DIVIDE, ast, left, right);
     }
     
     public Object visit(Modulo ast, LocalContext context) {
       IxCode.Expression left = typeCheck(ast.getLeft(), context);
       IxCode.Expression right = typeCheck(ast.getRight(), context);
       if(left == null || right == null) return null;
-      return checkNumExp(MOD, ast, left, right, context);
+      return checkNumExp(MOD, ast, left, right);
     }
       
     public Object visit(XOR ast, LocalContext context) {
@@ -1075,7 +1055,7 @@ public class CodeAnalysis {
       return new IxCode.BinaryExpression(kind, resultType, left, right);
     }
     
-    IxCode.Expression checkNumExp(int kind, BinaryExpression ast, IxCode.Expression left, IxCode.Expression right, LocalContext context) {
+    IxCode.Expression checkNumExp(int kind, BinaryExpression ast, IxCode.Expression left, IxCode.Expression right) {
       if((!hasNumericType(left)) || (!hasNumericType(right))){
         report(INCOMPATIBLE_OPERAND_TYPE, ast, ast.getSymbol(), new IxCode.TypeRef[]{left.type(), right.type()});
         return null;
@@ -1466,11 +1446,7 @@ public class CodeAnalysis {
       IxCode.ClassTypeRef targetType = member.affiliation();
       if(targetType == context) return true;
       int modifier = member.modifier();
-      if(IxCode.TypeRules.isSuperType(targetType, context)){
-        return Modifier.isProtected(modifier) || Modifier.isPublic(modifier) ? true : false;
-      }else{
-        return Modifier.isPublic(modifier) ? true : false;
-      }
+      return IxCode.TypeRules.isSuperType(targetType, context) ? isProtected(modifier) || Modifier.isPublic(modifier) : Modifier.isPublic(modifier) ? true : false;
     }
     
     private IxCode.FieldRef findField(IxCode.ObjectTypeRef target, String name) {
@@ -1776,9 +1752,7 @@ public class CodeAnalysis {
     
     private IxCode.Expression[] doCastInsertion(IxCode.TypeRef[] arguments, IxCode.Expression[] params){
       for(int i = 0; i < params.length; i++){
-        if(arguments[i] != params[i].type()){
-          params[i] = new IxCode.AsInstanceOf(params[i], arguments[i]);
-        }
+        if(arguments[i] != params[i].type()) params[i] = new IxCode.AsInstanceOf(params[i], arguments[i]);
       }
       return params;
     }

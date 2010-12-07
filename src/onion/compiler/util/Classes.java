@@ -7,6 +7,7 @@
  * ************************************************************** */
 package onion.compiler.util;
 
+import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -20,20 +21,18 @@ public class Classes {
   private Classes() {
   }
 
-  public static Set getInterfaceMethods(IxCode.ClassTypeRef type){
-    Set methods =  new TreeSet(new IxCode.MethodRefComparator());
+  public static Set<IxCode.MethodRef> getInterfaceMethods(IxCode.ClassTypeRef type){
+    Set<IxCode.MethodRef> methods =  new TreeSet(new IxCode.MethodRefComparator());
     collectInterfaceMethods(type, methods);
     return methods;
   }
   
-  private static void collectInterfaceMethods(IxCode.ClassTypeRef type, Set set){
+  private static void collectInterfaceMethods(IxCode.ClassTypeRef type, Set<IxCode.MethodRef> set){
     IxCode.MethodRef[] methods = type.methods();
-    for(int i = 0; i < methods.length; i++){
-      set.add(methods[i]);
-    }
+    set.addAll(Arrays.asList(methods));
     IxCode.ClassTypeRef[] interfaces = type.interfaces();
-    for(int i = 0 ; i < interfaces.length; i++){
-      collectInterfaceMethods(interfaces[i], set);
+    for (IxCode.ClassTypeRef anInterface : interfaces) {
+      collectInterfaceMethods(anInterface, set);
     }
   }
 }

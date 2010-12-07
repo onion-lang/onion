@@ -773,26 +773,30 @@ public interface IxCode {
    * Date: 2005/04/17
    */
   class FieldDefinition implements Node, FieldRef {
+    private final Location location;
+    private final int modifier;
+    private final ClassTypeRef affiliation;
+    private final String name;
+    private final TypeRef type;
 
-    private int modifier;
-    private ClassTypeRef classType;
-    private String name;
-    private TypeRef type;
-
-    public FieldDefinition(
-      int modifier, ClassTypeRef classType, String name, TypeRef type) {
+    public FieldDefinition(Location location, int modifier, ClassTypeRef affiliation, String name, TypeRef type) {
+      this.location = location;
       this.modifier = modifier;
-      this.classType = classType;
+      this.affiliation = affiliation;
       this.name = name;
       this.type = type;
     }
 
-    public ClassTypeRef affiliation() {
-      return classType;
+    public Location location() {
+      return location;
     }
 
     public int modifier() {
       return modifier;
+    }
+
+    public ClassTypeRef affiliation() {
+      return affiliation;
     }
 
     public String name() {
@@ -1186,6 +1190,7 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     class MethodDefinition implements Node, MethodRef {
+      private final Location location;
       private int modifier;
       private ClassTypeRef classType;
       private String name;
@@ -1195,15 +1200,18 @@ public interface IxCode {
       private boolean closure;
       private LocalFrame frame;
 
-      public MethodDefinition(
-        int modifier, ClassTypeRef classType, String name, TypeRef[] arguments,
-        TypeRef returnType, StatementBlock block){
+      public MethodDefinition(Location location, int modifier, ClassTypeRef classType, String name, TypeRef[] arguments, TypeRef returnType, StatementBlock block){
+        this.location = location;
         this.modifier = modifier;
         this.classType = classType;
         this.name = name;
         this.arguments = arguments;
         this.returnType = returnType;
         this.block = block;
+      }
+
+      public Location location() {
+        return location;
       }
 
       public int modifier() {

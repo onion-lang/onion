@@ -16,8 +16,8 @@ import onion.lang.syntax.Modifier;
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.generic.*;
-import static onion.compiler.IxCode.BinaryExpression.Constants.*;
-import static onion.compiler.IxCode.UnaryExpression.Constants.*;
+import static onion.compiler.IxCode.BinaryTerm.Constants.*;
+import static onion.compiler.IxCode.UnaryTerm.Constants.*;
 /**
  * @author Kota Mizushima Date: 2005/04/10
  */
@@ -130,7 +130,7 @@ public class CodeGeneration  {
     compiledClasses.add(gen.getJavaClass());
   }
   
-  public InstructionHandle codeExpressions(IxCode.Expression[] nodes, CodeProxy code){
+  public InstructionHandle codeExpressions(IxCode.Term[] nodes, CodeProxy code){
     InstructionHandle start;
     if(nodes.length > 0){
       start = codeExpression(nodes[0], code);
@@ -347,7 +347,7 @@ public class CodeGeneration  {
     code.appendDup(1);
     code.appendCallConstructor(
       new ObjectType("java.util.ArrayList"), new Type[0]);
-    IxCode.Expression[] elements = node.getElements();
+    IxCode.Term[] elements = node.getElements();
     for(int i = 0; i < elements.length; i++){
       code.appendDup(1);
       codeExpression(elements[i], code);
@@ -423,9 +423,9 @@ public class CodeGeneration  {
     return start;
   }
 
-  public InstructionHandle codeExpressionStatement(IxCode.ExpressionStatement node, CodeProxy code) {
-    InstructionHandle start = codeExpression(node.expression, code);
-    IxCode.TypeRef type = node.expression.type();
+  public InstructionHandle codeExpressionStatement(IxCode.ExpressionActionStatement node, CodeProxy code) {
+    InstructionHandle start = codeExpression(node.term, code);
+    IxCode.TypeRef type = node.term.type();
     if (type != IxCode.BasicTypeRef.VOID) {
       if (isWideType(type)) {
         code.append(InstructionConstants.POP2);
@@ -440,8 +440,8 @@ public class CodeGeneration  {
     InstructionHandle start;
     if (node instanceof IxCode.StatementBlock) {
       start = codeBlock((IxCode.StatementBlock) node, code);
-    } else if (node instanceof IxCode.ExpressionStatement) {
-      start = codeExpressionStatement((IxCode.ExpressionStatement) node, code);
+    } else if (node instanceof IxCode.ExpressionActionStatement) {
+      start = codeExpressionStatement((IxCode.ExpressionActionStatement) node, code);
     } else if (node instanceof IxCode.IfStatement) {
       start = codeIf((IxCode.IfStatement) node, code);
     } else if (node instanceof IxCode.ConditionalLoop) {
@@ -464,9 +464,9 @@ public class CodeGeneration  {
 
   public InstructionHandle codeReturn(IxCode.Return node, CodeProxy code) {
     InstructionHandle start;
-    if (node.expression != null) {
-      start = codeExpression(node.expression, code);
-      Type type = typeOf(node.expression.type());
+    if (node.term != null) {
+      start = codeExpression(node.term, code);
+      Type type = typeOf(node.term.type());
       code.appendReturn(type);
     } else {
       start = code.append(InstructionConstants.RETURN);
@@ -479,7 +479,7 @@ public class CodeGeneration  {
   }
   
   public InstructionHandle codeThrowNode(IxCode.Throw node, CodeProxy code){
-    InstructionHandle start = codeExpression(node.expression, code);
+    InstructionHandle start = codeExpression(node.term, code);
     code.append(InstructionConstants.ATHROW);
     return start;
   }
@@ -557,56 +557,56 @@ public class CodeGeneration  {
   }
 
   public InstructionHandle codeExpression(
-    IxCode.Expression node, CodeProxy code) {
+    IxCode.Term node, CodeProxy code) {
     InstructionHandle start;
-    if (node instanceof IxCode.BinaryExpression) {
-      start = codeBinaryExpression((IxCode.BinaryExpression) node, code);
-    } else if(node instanceof IxCode.UnaryExpression) {
-      start = codeUnaryExpression((IxCode.UnaryExpression) node, code);
+    if (node instanceof IxCode.BinaryTerm) {
+      start = codeBinaryExpression((IxCode.BinaryTerm) node, code);
+    } else if(node instanceof IxCode.UnaryTerm) {
+      start = codeUnaryExpression((IxCode.UnaryTerm) node, code);
     } else if(node instanceof IxCode.Begin) {
       start = codeBegin((IxCode.Begin) node, code);
     } else if(node instanceof IxCode.SetLocal) {
       start = codeLocalAssign((IxCode.SetLocal) node, code);
     } else if(node instanceof IxCode.RefLocal) {
       start = codeLocalRef((IxCode.RefLocal) node, code);
-    } else if(node instanceof IxCode.StaticFieldRef) {
-      start = codeStaticFieldRef((IxCode.StaticFieldRef) node, code);
+    } else if(node instanceof IxCode.RefStaticField) {
+      start = codeStaticFieldRef((IxCode.RefStaticField) node, code);
     } else if(node instanceof IxCode.RefField) {
       start = codeFieldRef((IxCode.RefField) node, code);
     } else if(node instanceof IxCode.SetField) {
       start = codeFieldAssign((IxCode.SetField) node, code);
     } else if(node instanceof IxCode.Call) {
       start = codeMethodCall((IxCode.Call) node, code);
-    } else if(node instanceof IxCode.ArrayRef){
-      start = codeArrayRef((IxCode.ArrayRef)node, code);
+    } else if(node instanceof IxCode.RefArray){
+      start = codeArrayRef((IxCode.RefArray)node, code);
     } else if(node instanceof IxCode.ArrayLength){
       start = codeArrayLengthNode((IxCode.ArrayLength)node, code);
-    } else if(node instanceof IxCode.ArraySet){
-      start = codeArrayAssignment((IxCode.ArraySet)node, code);
+    } else if(node instanceof IxCode.SetArray){
+      start = codeArrayAssignment((IxCode.SetArray)node, code);
     } else if(node instanceof IxCode.NewObject){
       start = codeNew((IxCode.NewObject)node, code);
     } else if(node instanceof IxCode.NewArray){
       start = codeNewArray((IxCode.NewArray)node, code);
-    } else if(node instanceof IxCode.ArrayRef){
-      start = codeArrayRef((IxCode.ArrayRef)node, code);
+    } else if(node instanceof IxCode.RefArray){
+      start = codeArrayRef((IxCode.RefArray)node, code);
     } else if(node instanceof IxCode.CallStatic){
       start = codeStaticMethodCall((IxCode.CallStatic)node, code);
-    } else if(node instanceof IxCode.CharacterLiteral){
-      start = codeChar((IxCode.CharacterLiteral)node, code);
-    } else if(node instanceof IxCode.StringLiteral) {
-      start = codeString((IxCode.StringLiteral) node, code);
-    } else if(node instanceof IxCode.IntLiteral) {
-      start = codeInteger((IxCode.IntLiteral)node, code);
-    } else if(node instanceof IxCode.LongLiteral){
-      start = codeLong((IxCode.LongLiteral)node, code);
-  	} else if(node instanceof IxCode.FloatLiteral) {
-  	  start = codeFloat((IxCode.FloatLiteral)node ,code);
-  	} else if(node instanceof IxCode.DoubleLiteral) {
-  	  start = codeDouble((IxCode.DoubleLiteral)node, code);
-  	} else if(node instanceof IxCode.BoolLiteral) {
-  	  start = codeBoolean((IxCode.BoolLiteral)node, code);
-  	} else if(node instanceof IxCode.NullLiteral) {
-  	  start = codeNull((IxCode.NullLiteral)node, code);
+    } else if(node instanceof IxCode.CharacterValue){
+      start = codeChar((IxCode.CharacterValue)node, code);
+    } else if(node instanceof IxCode.StringValue) {
+      start = codeString((IxCode.StringValue) node, code);
+    } else if(node instanceof IxCode.IntValue) {
+      start = codeInteger((IxCode.IntValue)node, code);
+    } else if(node instanceof IxCode.LongValue){
+      start = codeLong((IxCode.LongValue)node, code);
+  	} else if(node instanceof IxCode.FloatValue) {
+  	  start = codeFloat((IxCode.FloatValue)node ,code);
+  	} else if(node instanceof IxCode.DoubleValue) {
+  	  start = codeDouble((IxCode.DoubleValue)node, code);
+  	} else if(node instanceof IxCode.BoolValue) {
+  	  start = codeBoolean((IxCode.BoolValue)node, code);
+  	} else if(node instanceof IxCode.NullValue) {
+  	  start = codeNull((IxCode.NullValue)node, code);
   	} else if(node instanceof IxCode.AsInstanceOf) {
   	  start = codeCast((IxCode.AsInstanceOf)node, code);
   	} else if(node instanceof IxCode.This) {
@@ -627,11 +627,11 @@ public class CodeGeneration  {
   
   public InstructionHandle codeBegin(IxCode.Begin node, CodeProxy code) {
     InstructionHandle start;
-    IxCode.Expression[] expressions = node.getExpressions();
-    if(expressions.length > 0){
-      start = codeExpression(expressions[0], code);
-      for (int i = 1; i < expressions.length; i++) {
-        IxCode.TypeRef type = expressions[i - 1].type();
+    IxCode.Term[] terms = node.getExpressions();
+    if(terms.length > 0){
+      start = codeExpression(terms[0], code);
+      for (int i = 1; i < terms.length; i++) {
+        IxCode.TypeRef type = terms[i - 1].type();
         if (type != IxCode.BasicTypeRef.VOID) {
           if (isWideType(type)) {
             code.append(InstructionConstants.POP2);
@@ -639,7 +639,7 @@ public class CodeGeneration  {
             code.append(InstructionConstants.POP);
           }
         }
-        codeExpression(expressions[i], code);
+        codeExpression(terms[i], code);
       }
     }else{
       start = code.append(InstructionConstants.NOP);
@@ -721,7 +721,7 @@ public class CodeGeneration  {
     return start;
   }
 
-  public InstructionHandle codeStaticFieldRef(IxCode.StaticFieldRef node, CodeProxy code) {
+  public InstructionHandle codeStaticFieldRef(IxCode.RefStaticField node, CodeProxy code) {
     String classType = node.field.affiliation().name();
     String name = node.field.name();
     Type type = typeOf(node.type());
@@ -748,7 +748,7 @@ public class CodeGeneration  {
     return start;
   }
   
-  public InstructionHandle codeArrayRef(IxCode.ArrayRef node, CodeProxy code){
+  public InstructionHandle codeArrayRef(IxCode.RefArray node, CodeProxy code){
     IxCode.ArrayTypeRef targetType = (IxCode.ArrayTypeRef)node.getObject().type();
     InstructionHandle start = codeExpression(node.getObject(), code);
     codeExpression(node.getIndex(), code);
@@ -763,12 +763,12 @@ public class CodeGeneration  {
   }
   
   public InstructionHandle codeArrayAssignment(
-    IxCode.ArraySet node, CodeProxy code){
-    IxCode.ArrayTypeRef targetType = (IxCode.ArrayTypeRef)node.getObject().type();
-    InstructionHandle start = codeExpression(node.getObject(), code);
+    IxCode.SetArray node, CodeProxy code){
+    IxCode.ArrayTypeRef targetType = (IxCode.ArrayTypeRef)node.object().type();
+    InstructionHandle start = codeExpression(node.object(), code);
     code.appendDup(1);
-    codeExpression(node.getIndex(), code);
-    codeExpression(node.getValue(), code);
+    codeExpression(node.index(), code);
+    codeExpression(node.value(), code);
     code.appendArrayStore(typeOf(targetType.base()));
     return start;
   }
@@ -816,7 +816,7 @@ public class CodeGeneration  {
   }
 
   public InstructionHandle codeBinaryExpression(
-    IxCode.BinaryExpression node, CodeProxy code
+    IxCode.BinaryTerm node, CodeProxy code
   ){
     if(node.kind() == LOGICAL_AND){
       return codeLogicalAnd(node, code);
@@ -825,8 +825,8 @@ public class CodeGeneration  {
     }else if(node.kind() == ELVIS){
       return codeElvis(node, code);
     }
-    IxCode.Expression left = node.lhs();
-    IxCode.Expression right = node.rhs();
+    IxCode.Term left = node.lhs();
+    IxCode.Term right = node.rhs();
     InstructionHandle start = codeExpression(left, code);
     codeExpression(right, code);
     switch (node.kind()) {
@@ -882,7 +882,7 @@ public class CodeGeneration  {
     }
   }
   
-  public InstructionHandle codeLogicalAnd(IxCode.BinaryExpression node, CodeProxy code) {
+  public InstructionHandle codeLogicalAnd(IxCode.BinaryTerm node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.lhs(), code);
     BranchHandle b1 = null, b2 = null, b3 = null;
     
@@ -898,7 +898,7 @@ public class CodeGeneration  {
     return start;
   }
 
-  public InstructionHandle codeLogicalOr(IxCode.BinaryExpression node, CodeProxy code) {
+  public InstructionHandle codeLogicalOr(IxCode.BinaryTerm node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.lhs(), code);
     BranchHandle b1 = null, b2 = null, b3 = null;
     b1 = code.append(new IFNE(null));
@@ -913,7 +913,7 @@ public class CodeGeneration  {
     return start;
   }
   
-  public InstructionHandle codeElvis(IxCode.BinaryExpression node, CodeProxy code) {
+  public InstructionHandle codeElvis(IxCode.BinaryTerm node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.lhs(), code);
     code.appendDup(1);
     code.appendNull(typeOf(node.type()));
@@ -1080,40 +1080,40 @@ public class CodeGeneration  {
     b2.setTarget(code.append(InstructionConstants.NOP));
   }
   
-  public InstructionHandle codeChar(IxCode.CharacterLiteral node, CodeProxy code) {
+  public InstructionHandle codeChar(IxCode.CharacterValue node, CodeProxy code) {
     return code.appendConstant(new Character(node.getValue()));
   }
 
-  public InstructionHandle codeString(IxCode.StringLiteral node, CodeProxy code) {
-    return code.appendConstant(node.getValue());
+  public InstructionHandle codeString(IxCode.StringValue node, CodeProxy code) {
+    return code.appendConstant(node.value());
   }
   
-  public InstructionHandle codeInteger(IxCode.IntLiteral node, CodeProxy code){
+  public InstructionHandle codeInteger(IxCode.IntValue node, CodeProxy code){
     return code.appendConstant(new Integer(node.getValue()));
   }
   
-  public InstructionHandle codeLong(IxCode.LongLiteral node, CodeProxy code){
+  public InstructionHandle codeLong(IxCode.LongValue node, CodeProxy code){
     return code.appendConstant(new Long(node.getValue()));
   }
   
-  public InstructionHandle codeFloat(IxCode.FloatLiteral node, CodeProxy code){
+  public InstructionHandle codeFloat(IxCode.FloatValue node, CodeProxy code){
     return code.appendConstant(new Float(node.getValue()));
   }
   
-  public InstructionHandle codeDouble(IxCode.DoubleLiteral node, CodeProxy code){
+  public InstructionHandle codeDouble(IxCode.DoubleValue node, CodeProxy code){
     return code.appendConstant(new Double(node.getValue()));
   }
   
-  public InstructionHandle codeBoolean(IxCode.BoolLiteral node, CodeProxy code){
+  public InstructionHandle codeBoolean(IxCode.BoolValue node, CodeProxy code){
     return code.appendConstant(Boolean.valueOf(node.getValue()));
   }
   
-  public InstructionHandle codeNull(IxCode.NullLiteral node, CodeProxy code){
+  public InstructionHandle codeNull(IxCode.NullValue node, CodeProxy code){
     return code.append(InstructionConstants.ACONST_NULL);
   }
   
   public InstructionHandle codeUnaryExpression(
-    IxCode.UnaryExpression node, CodeProxy code) {
+    IxCode.UnaryTerm node, CodeProxy code) {
     InstructionHandle start = codeExpression(node.getOperand(), code);
     IxCode.TypeRef type = node.getOperand().type();
     switch(node.getKind()){
@@ -1175,9 +1175,9 @@ public class CodeGeneration  {
   }
 
   public InstructionHandle codeCast(IxCode.AsInstanceOf node, CodeProxy code) {
-    IxCode.Expression target = node.getTarget();
+    IxCode.Term target = node.target();
     InstructionHandle start = codeExpression(target, code);
-    code.appendCast(typeOf(target.type()), typeOf(node.getConversion()));
+    code.appendCast(typeOf(target.type()), typeOf(node.destination()));
     return start;
   }
   

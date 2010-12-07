@@ -25,19 +25,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/07/06
      */
-    class ArrayLength extends Expression {
-      private final Expression target;
+    class ArrayLength extends Term {
+      private final Term target;
 
-      public ArrayLength(Expression target) {
+      public ArrayLength(Term target) {
         this(null, target);
       }
 
-      public ArrayLength(Location location, Expression target) {
+      public ArrayLength(Location location, Term target) {
         super(location);
         this.target = target;
       }
 
-      public Expression getTarget() {
+      public Term getTarget() {
         return target;
       }
 
@@ -50,24 +50,24 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class ArrayRef extends Expression {
-      private final Expression object, index;
+    class RefArray extends Term {
+      private final Term object, index;
 
-      public ArrayRef(Expression target, Expression index) {
+      public RefArray(Term target, Term index) {
         this(null, target, index);
       }
 
-      public ArrayRef(Location location, Expression target, Expression index) {
+      public RefArray(Location location, Term target, Term index) {
         super(location);
         this.object = target;
         this.index = index;
       }
 
-      public Expression getIndex() {
+      public Term getIndex() {
         return index;
       }
 
-      public Expression getObject() {
+      public Term getObject() {
         return object;
       }
 
@@ -80,29 +80,29 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class ArraySet extends Expression {
-      private final Expression object, index, value;
+    class SetArray extends Term {
+      private final Term object, index, value;
 
-      public ArraySet(Expression target, Expression index, Expression value) {
+      public SetArray(Term target, Term index, Term value) {
         this(null, target, index, value);
       }
 
-      public ArraySet(Location location, Expression target, Expression index, Expression value) {
+      public SetArray(Location location, Term target, Term index, Term value) {
         super(location);
         this.object = target;
         this.index = index;
         this.value = value;
       }
 
-      public Expression getIndex() {
+      public Term index() {
         return index;
       }
 
-      public Expression getObject() {
+      public Term object() {
         return object;
       }
 
-      public Expression getValue() {
+      public Term value() {
         return value;
       }
 
@@ -115,40 +115,40 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class Begin extends Expression {
-      private final Expression[] expressions;
+    class Begin extends Term {
+      private final Term[] terms;
 
-      public Begin(Expression[] expressions) {
-        this(null, expressions);
+      public Begin(Term[] terms) {
+        this(null, terms);
       }
 
-      public Begin(Location location, Expression[] expressions) {
+      public Begin(Location location, Term[] terms) {
         super(location);
-        this.expressions = expressions;
+        this.terms = terms;
       }
 
       public Begin(List expressions) {
-        this((Expression[])expressions.toArray(new Expression[0]));
+        this((Term[])expressions.toArray(new Term[0]));
       }
 
-      public Begin(Expression expression) {
-        this(new Expression[]{expression});
+      public Begin(Term term) {
+        this(new Term[]{term});
       }
 
-      public Begin(Expression expression1, Expression expression2){
-        this(new Expression[]{expression1, expression2});
+      public Begin(Term expression1, Term expression2){
+        this(new Term[]{expression1, expression2});
       }
 
-      public Begin(Expression expression1, Expression expression2, Expression expression3){
-        this(new Expression[]{expression1, expression2, expression3});
+      public Begin(Term expression1, Term expression2, Term expression3){
+        this(new Term[]{expression1, expression2, expression3});
       }
 
-      public Expression[] getExpressions() {
-        return expressions;
+      public Term[] getExpressions() {
+        return terms;
       }
 
       public TypeRef type() {
-        return expressions[expressions.length - 1].type();
+        return terms[terms.length - 1].type();
       }
     }
 
@@ -156,7 +156,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class BinaryExpression extends Expression {
+    class BinaryTerm extends Term {
       public interface Constants {
           int ADD = 0;
           int SUBTRACT = 1;
@@ -189,14 +189,14 @@ public interface IxCode {
       }
 
       private final int kind;
-      private final Expression lhs, rhs;
+      private final Term lhs, rhs;
       private final TypeRef type;
 
-      public BinaryExpression(int kind, TypeRef type, Expression lhs, Expression rhs) {
+      public BinaryTerm(int kind, TypeRef type, Term lhs, Term rhs) {
         this(null, kind, type, lhs, rhs);
       }
       
-      public BinaryExpression(Location location, int kind, TypeRef type, Expression lhs, Expression rhs) {
+      public BinaryTerm(Location location, int kind, TypeRef type, Term lhs, Term rhs) {
         super(location);
         this.kind = kind;
         this.lhs = lhs;
@@ -204,9 +204,9 @@ public interface IxCode {
         this.type = type;
       }
 
-      public Expression lhs(){ return lhs; }
+      public Term lhs(){ return lhs; }
 
-      public Expression rhs(){ return rhs; }
+      public Term rhs(){ return rhs; }
 
       public int kind(){ return kind; }
 
@@ -242,15 +242,15 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class BoolLiteral extends Expression {
+    class BoolValue extends Term {
       private final boolean value;
 
-      public BoolLiteral(Location location, boolean value){
+      public BoolValue(Location location, boolean value){
         super(location);
         this.value = value;
       }
       
-      public BoolLiteral(boolean value) {
+      public BoolValue(boolean value) {
         this(null, value);
       }
 
@@ -280,15 +280,15 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class ByteLiteral extends Expression {
+    class ByteValue extends Term {
       private final byte value;
 
-      public ByteLiteral(Location location, byte value) {
+      public ByteValue(Location location, byte value) {
         super(location);
         this.value = value;
       }
 
-      public ByteLiteral(byte value) {
+      public ByteValue(byte value) {
         this(null, value);
       }
 
@@ -305,19 +305,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class Call extends Expression {
-      public final Expression target;
+    class Call extends Term {
+      public final Term target;
       public final MethodRef method;
-      public final Expression[] parameters;
+      public final Term[] parameters;
 
-      public Call(Location location, Expression target, MethodRef method, Expression[] parameters) {
+      public Call(Location location, Term target, MethodRef method, Term[] parameters) {
         super(location);
         this.target = target;
         this.method = method;
         this.parameters = parameters;
       }
 
-      public Call(Expression target, MethodRef method, Expression[] parameters) {
+      public Call(Term target, MethodRef method, Term[] parameters) {
         this(null, target, method, parameters);
       }
 
@@ -328,19 +328,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class CallStatic extends Expression {
+    class CallStatic extends Term {
       public ObjectTypeRef target;
       public MethodRef method;
-      public Expression[] parameters;
+      public Term[] parameters;
 
-      public CallStatic(Location location, ObjectTypeRef target, MethodRef method, Expression[] parameters) {
+      public CallStatic(Location location, ObjectTypeRef target, MethodRef method, Term[] parameters) {
         super(location);
         this.target = target;
         this.method = method;
         this.parameters = parameters;
       }
 
-      public CallStatic(ObjectTypeRef target, MethodRef method, Expression[] parameters) {
+      public CallStatic(ObjectTypeRef target, MethodRef method, Term[] parameters) {
         this(null, target, method, parameters);
       }
 
@@ -351,19 +351,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class CallSuper extends Expression {
-      private final Expression target;
+    class CallSuper extends Term {
+      private final Term target;
       private final MethodRef method;
-      private final Expression[] params;
+      private final Term[] params;
 
-      public CallSuper(Location location, Expression target, MethodRef method, Expression[] params) {
+      public CallSuper(Location location, Term target, MethodRef method, Term[] params) {
         super(location);
         this.target = target;
         this.method = method;
         this.params = params;
       }
 
-      public CallSuper(Expression target, MethodRef method, Expression[] params) {
+      public CallSuper(Term target, MethodRef method, Term[] params) {
         this(null, target, method, params);
       }
 
@@ -371,7 +371,7 @@ public interface IxCode {
         return method.returnType();
       }
 
-      public Expression getTarget() {
+      public Term getTarget() {
         return target;
       }
 
@@ -379,7 +379,7 @@ public interface IxCode {
         return method;
       }
 
-      public Expression[] getParams() {
+      public Term[] getParams() {
         return params;
       }
     }
@@ -388,30 +388,30 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class AsInstanceOf extends Expression {
-    private final Expression target;
-    private final TypeRef conversion;
+  class AsInstanceOf extends Term {
+    private final Term target;
+    private final TypeRef destination;
 
-    public AsInstanceOf(Location location, Expression target, TypeRef conversion) {
+    public AsInstanceOf(Location location, Term target, TypeRef destination) {
       super(location);
       this.target = target;
-      this.conversion = conversion;
+      this.destination = destination;
     }
 
-    public AsInstanceOf(Expression target, TypeRef conversion) {
-      this(null, target, conversion);
+    public AsInstanceOf(Term target, TypeRef destination) {
+      this(null, target, destination);
     }
 
-    public TypeRef getConversion() {
-      return conversion;
+    public TypeRef destination() {
+      return destination;
     }
 
-    public Expression getTarget() {
+    public Term target() {
       return target;
     }
 
     public TypeRef type() {
-      return conversion;
+      return destination;
     }
   }
 
@@ -419,15 +419,15 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class CharacterLiteral extends Expression {
+  class CharacterValue extends Term {
     private final char value;
 
-    public CharacterLiteral(Location location, char value) {
+    public CharacterValue(Location location, char value) {
       super(location);
       this.value = value;
     }
 
-    public CharacterLiteral(char value) {
+    public CharacterValue(char value) {
       this(null, value);
     }
 
@@ -622,7 +622,7 @@ public interface IxCode {
 
     public static ConstructorDefinition newDefaultConstructor(ClassTypeRef type) {
       StatementBlock block = new StatementBlock(new Return(null));
-      Super init = new Super(type.superClass(), new TypeRef[0], new Expression[0]);
+      Super init = new Super(type.superClass(), new TypeRef[0], new Term[0]);
       ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
       node.setFrame(new LocalFrame(null));
       return node;
@@ -690,15 +690,15 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class DoubleLiteral extends Expression {
+  class DoubleValue extends Term {
     private final double value;
 
-    public DoubleLiteral(Location location, double value) {
+    public DoubleValue(Location location, double value) {
       super(location);
       this.value = value;
     }
 
-    public DoubleLiteral(double value) {
+    public DoubleValue(double value) {
       this(null, value);
     }
 
@@ -715,9 +715,9 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  abstract class Expression implements Node {
+  abstract class Term implements Node {
     private final Location location;
-    public Expression(Location location) {
+    public Term(Location location) {
       this.location = location;
     }
 
@@ -745,16 +745,16 @@ public interface IxCode {
 
     public boolean isReferenceType(){ return type().isObjectType(); }
 
-    public static Expression defaultValue(TypeRef type){
-      if(type == BasicTypeRef.CHAR) return new CharacterLiteral((char)0);
-      if(type == BasicTypeRef.BYTE)return new ByteLiteral((byte)0);
-      if(type == BasicTypeRef.SHORT) return new ShortLiteral((short)0);
-      if(type == BasicTypeRef.INT) return new IntLiteral(0);
-      if(type == BasicTypeRef.LONG) return new LongLiteral(0);
-      if(type == BasicTypeRef.FLOAT) return new FloatLiteral(0.0f);
-      if(type == BasicTypeRef.DOUBLE) return new DoubleLiteral(0.0);
-      if(type == BasicTypeRef.BOOLEAN) return new BoolLiteral(false);
-      if(type.isObjectType()) return new NullLiteral();
+    public static Term defaultValue(TypeRef type){
+      if(type == BasicTypeRef.CHAR) return new CharacterValue((char)0);
+      if(type == BasicTypeRef.BYTE)return new ByteValue((byte)0);
+      if(type == BasicTypeRef.SHORT) return new ShortValue((short)0);
+      if(type == BasicTypeRef.INT) return new IntValue(0);
+      if(type == BasicTypeRef.LONG) return new LongValue(0);
+      if(type == BasicTypeRef.FLOAT) return new FloatValue(0.0f);
+      if(type == BasicTypeRef.DOUBLE) return new DoubleValue(0.0);
+      if(type == BasicTypeRef.BOOLEAN) return new BoolValue(false);
+      if(type.isObjectType()) return new NullValue();
       return null;
     }
   }
@@ -763,14 +763,14 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class ExpressionStatement extends ActionStatement {
-    public final Expression expression;
-    public ExpressionStatement(Location location, Expression expression){
+  class ExpressionActionStatement extends ActionStatement {
+    public final Term term;
+    public ExpressionActionStatement(Location location, Term term){
       super(location);
-      this.expression = expression;
+      this.term = term;
     }
-    public ExpressionStatement(Expression expression){
-      this(null, expression);
+    public ExpressionActionStatement(Term term){
+      this(null, term);
     }
   }
 
@@ -819,17 +819,17 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class RefField extends Expression {
-    public Expression target;
+  class RefField extends Term {
+    public Term target;
     public FieldRef field;
 
-    public RefField(Location location, Expression target, FieldRef field) {
+    public RefField(Location location, Term target, FieldRef field) {
       super(location);
       this.target = target;
       this.field = field;
     }
 
-    public RefField(Expression target, FieldRef field) {
+    public RefField(Term target, FieldRef field) {
       this(null, target, field);
     }
 
@@ -840,44 +840,44 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class SetField extends Expression {
-    private final Expression object;
+  class SetField extends Term {
+    private final Term object;
     private final FieldRef field;
-    private final Expression value;
+    private final Term value;
 
-    public SetField(Location location, Expression target, FieldRef field, Expression value) {
+    public SetField(Location location, Term target, FieldRef field, Term value) {
       super(location);
       this.object = target;
       this.field = field;
       this.value = value;
     }
 
-    public SetField(Expression target, FieldRef field, Expression value) {
+    public SetField(Term target, FieldRef field, Term value) {
       this(null, target, field, value);
     }
 
     public TypeRef type() { return field.type(); }
 
-    public Expression getObject() { return object; }
+    public Term getObject() { return object; }
 
     public FieldRef getField() { return field; }
 
-    public Expression getValue() { return value; }
+    public Term getValue() { return value; }
   }
 
   /**
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class FloatLiteral extends Expression {
+  class FloatValue extends Term {
     private final float value;
 
-    public FloatLiteral(Location location, float value){
+    public FloatValue(Location location, float value){
       super(location);
       this.value = value;
     }
 
-    public FloatLiteral(float value){
+    public FloatValue(float value){
       this(null, value);
     }
 
@@ -891,21 +891,21 @@ public interface IxCode {
    * Date: 2005/04/17
    */
   class IfStatement extends ActionStatement {
-    private final Expression condition;
+    private final Term condition;
     private final ActionStatement thenStatement, elseStatement;
 
-    public IfStatement(Location location, Expression condition, ActionStatement thenStatement, ActionStatement elseStatement){
+    public IfStatement(Location location, Term condition, ActionStatement thenStatement, ActionStatement elseStatement){
       super(location);
       this.condition = condition;
       this.thenStatement = thenStatement;
       this.elseStatement = elseStatement;
     }
 
-    public IfStatement(Expression condition, ActionStatement thenStatement, ActionStatement elseStatement){
+    public IfStatement(Term condition, ActionStatement thenStatement, ActionStatement elseStatement){
       this(null, condition, thenStatement, elseStatement);
     }
 
-    public Expression getCondition() {
+    public Term getCondition() {
       return condition;
     }
 
@@ -922,17 +922,17 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class InstanceOf extends Expression {
-    public Expression target;
+  class InstanceOf extends Term {
+    public Term target;
     public TypeRef checked;
 
-    public InstanceOf(Location location, Expression target, TypeRef checked){
+    public InstanceOf(Location location, Term target, TypeRef checked){
       super(location);
       this.target = target;
       this.checked = checked;
     }
 
-    public InstanceOf(Expression target, TypeRef checked) {
+    public InstanceOf(Term target, TypeRef checked) {
       this(null, target, checked);
     }
 
@@ -940,7 +940,7 @@ public interface IxCode {
       return checked;
     }
 
-    public Expression target() {
+    public Term target() {
       return target;
     }
 
@@ -953,13 +953,13 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class IntLiteral extends Expression {
+  class IntValue extends Term {
     private int value;
-    public IntLiteral(Location location, int value){
+    public IntValue(Location location, int value){
       super(location);
       this.value = value;
     }
-    public IntLiteral(int value){
+    public IntValue(int value){
       this(null, value);
     }
     public int getValue() {
@@ -973,21 +973,21 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/06/21
    */
-  class ListLiteral extends Expression {
-    private final Expression[] elements;
+  class ListLiteral extends Term {
+    private final Term[] elements;
     private final TypeRef type;
 
-    public ListLiteral(Location location, Expression[] elements, TypeRef type) {
+    public ListLiteral(Location location, Term[] elements, TypeRef type) {
       super(location);
       this.elements = elements;
       this.type = type;
     }
 
-    public ListLiteral(Expression[] elements, TypeRef type) {
+    public ListLiteral(Term[] elements, TypeRef type) {
       this(null, elements, type);
     }
 
-    public Expression[] getElements() {
+    public Term[] getElements() {
       return elements;
     }
 
@@ -1000,7 +1000,7 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class RefLocal extends Expression {
+  class RefLocal extends Term {
     private int frame;
     private int index;
     private TypeRef type;
@@ -1031,13 +1031,13 @@ public interface IxCode {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class SetLocal extends Expression {
+  class SetLocal extends Term {
     private final int frame;
     private final int index;
-    private final Expression value;
+    private final Term value;
     private final TypeRef type;
 
-    public SetLocal(Location location, int frame, int index, TypeRef type, Expression value){
+    public SetLocal(Location location, int frame, int index, TypeRef type, Term value){
       super(location);
       this.frame = frame;
       this.index = index;
@@ -1045,11 +1045,11 @@ public interface IxCode {
       this.value = value;
     }
 
-    public SetLocal(int frame, int index, TypeRef type, Expression value){
+    public SetLocal(int frame, int index, TypeRef type, Term value){
       this(null, frame, index, type, value);
     }
 
-    public SetLocal(ClosureLocalBinding bind, Expression value){
+    public SetLocal(ClosureLocalBinding bind, Term value){
       this(null, bind.getFrame(), bind.getIndex(), bind.getType(), value);
     }
 
@@ -1065,7 +1065,7 @@ public interface IxCode {
       return type;
     }
 
-    public Expression getValue() {
+    public Term getValue() {
       return value;
     }
   }
@@ -1074,7 +1074,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class NewClosure extends Expression {
+    class NewClosure extends Term {
       private ClassTypeRef type;
       private MethodRef method;
       private ActionStatement block;
@@ -1136,15 +1136,15 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class LongLiteral extends Expression {
+    class LongValue extends Term {
       private final long value;
 
-      public LongLiteral(Location location, long value){
+      public LongValue(Location location, long value){
         super(location);
         this.value = value;
       }
 
-      public LongLiteral(long value){
+      public LongValue(long value){
         this(null, value);
       }
 
@@ -1158,15 +1158,15 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     class ConditionalLoop extends ActionStatement {
-      public final Expression condition;
+      public final Term condition;
       public final ActionStatement stmt;
 
-      public ConditionalLoop(Location location, Expression condition, ActionStatement stmt) {
+      public ConditionalLoop(Location location, Term condition, ActionStatement stmt) {
         super(location);
         this.condition = condition;
         this.stmt = stmt;
       }
-      public ConditionalLoop(Expression condition, ActionStatement stmt) {
+      public ConditionalLoop(Term condition, ActionStatement stmt) {
         this(null, condition, stmt);
       }
     }
@@ -1271,34 +1271,34 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class NewObject extends Expression {
+    class NewObject extends Term {
       public final ConstructorRef constructor;
-      public final Expression[] parameters;
+      public final Term[] parameters;
 
-      public NewObject(Location location, ConstructorRef constructor, Expression[] parameters){
+      public NewObject(Location location, ConstructorRef constructor, Term[] parameters){
         super(location);
         this.constructor = constructor;
         this.parameters = parameters;
       }
 
-      public NewObject(ConstructorRef constructor, Expression[] parameters){
+      public NewObject(ConstructorRef constructor, Term[] parameters){
         this(null, constructor, parameters);
       }
 
       public TypeRef type() { return constructor.affiliation(); }
     }
 
-    class NewArray extends Expression {
+    class NewArray extends Term {
       public final ArrayTypeRef arrayType;
-      public final Expression[] parameters;
+      public final Term[] parameters;
 
-      public NewArray(Location location, ArrayTypeRef arrayType, Expression[] parameters){
+      public NewArray(Location location, ArrayTypeRef arrayType, Term[] parameters){
         super(location);
         this.arrayType = arrayType;
         this.parameters = parameters;
       }
 
-      public NewArray(ArrayTypeRef arrayType, Expression[] parameters){
+      public NewArray(ArrayTypeRef arrayType, Term[] parameters){
         this(null, arrayType, parameters);
       }
 
@@ -1323,12 +1323,12 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class NullLiteral extends Expression {
-      public NullLiteral(Location location){
+    class NullValue extends Term {
+      public NullValue(Location location){
         super(location);
       }
 
-      public NullLiteral(){
+      public NullValue(){
         super(null);
       }
 
@@ -1340,15 +1340,15 @@ public interface IxCode {
      * Date: 2005/04/17
      */
     class Return extends ActionStatement {
-      public final Expression expression;
+      public final Term term;
 
-      public Return(Location location, Expression expression) {
+      public Return(Location location, Term term) {
         super(location);
-        this.expression = expression;
+        this.term = term;
       }
 
-      public Return(Expression expression) {
-        this(null, expression);
+      public Return(Term term) {
+        this(null, term);
       }
 
     }
@@ -1357,14 +1357,14 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class ShortLiteral extends Expression {
+    class ShortValue extends Term {
       private short value;
-      public ShortLiteral(Location location, short value) {
+      public ShortValue(Location location, short value) {
         super(location);
         this.value = value;
       }
       
-      public ShortLiteral(short value){
+      public ShortValue(short value){
         this(null, value);
       }
 
@@ -1393,17 +1393,17 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class StaticFieldRef extends Expression {
+    class RefStaticField extends Term {
       public ClassTypeRef target;
       public FieldRef field;
 
-      public StaticFieldRef(Location location, ClassTypeRef target, FieldRef field){
+      public RefStaticField(Location location, ClassTypeRef target, FieldRef field){
         super(location);
         this.target = target;
         this.field = field;
       }
 
-      public StaticFieldRef(ClassTypeRef target, FieldRef field){
+      public RefStaticField(ClassTypeRef target, FieldRef field){
         this(null, target, field);
       }
 
@@ -1414,19 +1414,19 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class StaticFieldSet extends Expression {
+    class SetStaticField extends Term {
       public ObjectTypeRef target;
       public FieldRef field;
-      public Expression value;
+      public Term value;
 
-      public StaticFieldSet(Location location, ObjectTypeRef target, FieldRef field, Expression value){
+      public SetStaticField(Location location, ObjectTypeRef target, FieldRef field, Term value){
         super(location);
         this.target = target;
         this.field = field;
         this.value = value;
       }
 
-      public StaticFieldSet(ObjectTypeRef target, FieldRef field, Expression value){
+      public SetStaticField(ObjectTypeRef target, FieldRef field, Term value){
         this(null, target, field, value);
       }
 
@@ -1437,21 +1437,21 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class StringLiteral extends Expression {
+    class StringValue extends Term {
       public String value;
       public TypeRef type;
 
-      public StringLiteral(Location location, String value, TypeRef type){
+      public StringValue(Location location, String value, TypeRef type){
         super(location);
         this.value = value;
         this.type = type;
       }
 
-      public StringLiteral(String value, TypeRef type){
+      public StringValue(String value, TypeRef type){
         this(null, value, type);
       }
 
-      public String getValue() { return value; }
+      public String value() { return value; }
 
       public TypeRef type() { return type; }
     }
@@ -1463,13 +1463,13 @@ public interface IxCode {
     class Super implements Node {
       private ClassTypeRef classType;
       private TypeRef[] arguments;
-      private Expression[] expressions;
+      private Term[] terms;
 
       public Super(
-        ClassTypeRef classType, TypeRef[] arguments, Expression[] expressions){
+        ClassTypeRef classType, TypeRef[] arguments, Term[] terms){
         this.classType = classType;
         this.arguments = arguments;
-        this.expressions = expressions;
+        this.terms = terms;
       }
 
       public ClassTypeRef getClassType() {
@@ -1480,8 +1480,8 @@ public interface IxCode {
         return arguments;
       }
 
-      public Expression[] getExpressions() {
-        return expressions;
+      public Term[] getExpressions() {
+        return terms;
       }
 
     }
@@ -1491,15 +1491,15 @@ public interface IxCode {
      * Date: 2005/06/17
      */
     class Synchronized extends ActionStatement {
-      public final Expression expression;
+      public final Term term;
       public final ActionStatement statement;
-      public Synchronized(Location location, Expression expression, ActionStatement statement){
+      public Synchronized(Location location, Term term, ActionStatement statement){
         super(location);
-        this.expression = expression;
+        this.term = term;
         this.statement = statement;
       }
-      public Synchronized(Expression expression, ActionStatement statement){
-        this(null, expression, statement);
+      public Synchronized(Term term, ActionStatement statement){
+        this(null, term, statement);
       }
     }
 
@@ -1507,7 +1507,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class This extends Expression {
+    class This extends Term {
       private final ClassTypeRef type;
 
       public This(Location location, ClassTypeRef type){
@@ -1527,13 +1527,13 @@ public interface IxCode {
      * Date: 2005/06/17
      */
     class Throw extends ActionStatement {
-      public final Expression expression;
-      public Throw(Location location, Expression expression){
+      public final Term term;
+      public Throw(Location location, Term term){
         super(location);
-        this.expression = expression;
+        this.term = term;
       }
-      public Throw(Expression expression){
-        this(null, expression);
+      public Throw(Term term){
+        this(null, term);
       }
     }
 
@@ -1560,7 +1560,7 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class UnaryExpression extends Expression {
+    class UnaryTerm extends Term {
       public interface Constants {
           int PLUS = 0;
           int MINUS = 1;
@@ -1569,17 +1569,17 @@ public interface IxCode {
       }
 
       private final int kind;
-      private final Expression operand;
+      private final Term operand;
       private final TypeRef type;
 
-      public UnaryExpression(Location location, int kind, TypeRef type, Expression operand) {
+      public UnaryTerm(Location location, int kind, TypeRef type, Term operand) {
         super(location);
         this.kind = kind;
         this.operand = operand;
         this.type = type;
       }
 
-      public UnaryExpression(int kind, TypeRef type, Expression operand) {
+      public UnaryTerm(int kind, TypeRef type, Term operand) {
         this(null, kind, type, operand);
       }
 
@@ -1587,7 +1587,7 @@ public interface IxCode {
         return kind;
       }
 
-      public Expression getOperand(){
+      public Term getOperand(){
         return operand;
       }
 
@@ -1605,7 +1605,7 @@ public interface IxCode {
         constructorRefFinder = new ConstructorRefFinder();
       }
 
-      public ConstructorRef[] findConstructor(Expression[] params){
+      public ConstructorRef[] findConstructor(Term[] params){
         return constructorRefFinder.find(this, params);
       }
 
@@ -1635,7 +1635,7 @@ public interface IxCode {
         return fieldRefFinder.find(this, name);
       }
 
-      public MethodRef[] findMethod(String name, Expression[] params) {
+      public MethodRef[] findMethod(String name, Term[] params) {
         return methodRefFinder.find(this, name, params);
       }
 
@@ -1798,7 +1798,7 @@ public interface IxCode {
      */
     interface ClassTypeRef extends ObjectTypeRef {
       ConstructorRef[] constructors();
-      ConstructorRef[] findConstructor(Expression[] params);
+      ConstructorRef[] findConstructor(Term[] params);
     }
 
     /**
@@ -1816,7 +1816,7 @@ public interface IxCode {
         }
       };
       private final ParameterMatcher matcher = new StandardParameterMatcher();
-      public ConstructorRef[] find(ClassTypeRef target, Expression[] args){
+      public ConstructorRef[] find(ClassTypeRef target, Term[] args){
         Set<ConstructorRef> constructors = new TreeSet<ConstructorRef>(new ConstructorRefComparator());
         if(target == null) return new ConstructorRef[0];
         ConstructorRef[] cs = target.constructors();
@@ -1955,7 +1955,7 @@ public interface IxCode {
       public MethodRefFinder() {
       }
 
-      public MethodRef[] find(ObjectTypeRef target, String name, Expression[] arguments){
+      public MethodRef[] find(ObjectTypeRef target, String name, Term[] arguments){
         Set<MethodRef> methods = new TreeSet<MethodRef>(new MethodRefComparator());
         find(methods, target, name, arguments);
         List<MethodRef> selectedMethods = new ArrayList<MethodRef>();
@@ -1976,7 +1976,7 @@ public interface IxCode {
         return sorter.compare(method1, method2) >= 0;
       }
 
-      private void find(Set<MethodRef> methods, ObjectTypeRef target, String name, Expression[] params){
+      private void find(Set<MethodRef> methods, ObjectTypeRef target, String name, Term[] params){
         if(target == null) return;
         MethodRef[] ms = target.methods(name);
         for(MethodRef m:target.methods(name)){
@@ -2078,7 +2078,7 @@ public interface IxCode {
       MethodRef[] methods(String name);
       FieldRef[] fields();
       FieldRef field(String name);
-      MethodRef[] findMethod(String name, Expression[] params);
+      MethodRef[] findMethod(String name, Term[] params);
     }
 
     /**
@@ -2086,7 +2086,7 @@ public interface IxCode {
      * Date: 2005/06/30
      */
     interface ParameterMatcher {
-      public boolean matches(TypeRef[] arguments, Expression[] parameters);
+      public boolean matches(TypeRef[] arguments, Term[] parameters);
     }
 
     /**
@@ -2097,7 +2097,7 @@ public interface IxCode {
       public StandardParameterMatcher() {
       }
 
-      public boolean matches(TypeRef[] arguments, Expression[] parameters){
+      public boolean matches(TypeRef[] arguments, Term[] parameters){
         if(arguments.length != parameters.length) return false;
         TypeRef[] parameterTypes = new TypeRef[parameters.length];
         for(int i = 0; i < parameters.length; i++){

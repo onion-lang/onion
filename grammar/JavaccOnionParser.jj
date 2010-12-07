@@ -373,7 +373,7 @@ GlobalVariableDeclaration var_decl(int modifiers) : {
   TypeSpec ty = null;
   Expression e = null;
 }{
-  t1="var" t2=<FID> [":" ty=type()] ["=" e=expression()] ";" {
+  t1="var" t2=<FID> [":" ty=type()] ["=" e=term()] ";" {
     return new GlobalVariableDeclaration(
       p(t1), modifiers, t2.image.substring(1), ty, e
     );
@@ -515,7 +515,7 @@ ConstructorDeclaration constructor_decl() : {
   Expression[] params = EMPTY_EXPS;
   BlockStatement stmts;
 }{
-  t = "new" ["(" args = args() ")"] [":" "(" params = expressions() ")"] stmts = block() {
+  t = "new" ["(" args = args() ")"] [":" "(" params = terms() ")"] stmts = block() {
     return new ConstructorDeclaration(p(t), args, params, stmts);
   }
 }
@@ -618,7 +618,7 @@ DelegationDeclaration delegate_decl() : {
   DelegationDeclaration declaration;
 }{
   start = "forward" name = <FID> [":" type = type()]
-  ["=" initializer = expression()] ";" {
+  ["=" initializer = term()] ";" {
     declaration =
       new DelegationDeclaration(name.image.substring(1), type, initializer);
     setLocation(declaration, start);
@@ -634,7 +634,7 @@ FieldDeclaration field_decl():{
   FieldDeclaration declaration;
 }{
   name = <FID> ":" [type = type()]
-  ["=" initializer = expression()] ";" {
+  ["=" initializer = term()] ";" {
     declaration = new FieldDeclaration(name.image.substring(1), type, initializer);
     setLocation(declaration, name);
     return declaration;
@@ -662,7 +662,7 @@ Statement stmt():{Statement st;}{
 }
 
 LocalVariableDeclaration local_var_stmt() :{Token t; TypeSpec ty; Expression e = null;}{
-  t=<ID> ":" ty=type() ["=" e=expression()] ";" {
+  t=<ID> ":" ty=type() ["=" e=term()] ";" {
     return new LocalVariableDeclaration(p(t), t.image, ty, e);
   }
 }
@@ -676,7 +676,7 @@ ContinueStatement continue_stmt() :{Token t; ContinueStatement st;}{
 }
 
 ThrowStatement throw_stmt() :{Token t;Expression e;}{
-  t="throw" e=expression() ";" {return new ThrowStatement(p(t), e);}
+  t="throw" e=term() ";" {return new ThrowStatement(p(t), e);}
 }
 
 TryStatement try_stmt() :{
@@ -695,7 +695,7 @@ TryStatement try_stmt() :{
 }
 
 ExpressionStatement exp_stmt() :{Expression e;}{
-  e=expression() ";" {return new ExpressionStatement(e.getLocation(), e);}
+  e=term() ";" {return new ExpressionStatement(e.getLocation(), e);}
 }
 
 EmptyStatement empty_stmt() :{Token t; EmptyStatement s;}{
@@ -703,7 +703,7 @@ EmptyStatement empty_stmt() :{Token t; EmptyStatement s;}{
 }
 
 IfStatement if_stmt() :{Token t; Expression e; BlockStatement b1, b2 = null;}{
-  t="if" e=expression() b1=block() [LOOKAHEAD(2) "else" b2=block()] {
+  t="if" e=term() b1=block() [LOOKAHEAD(2) "else" b2=block()] {
     return new IfStatement(p(t), e, b1, b2);
   }
 }
@@ -717,7 +717,7 @@ CondStatement cond_stmt() : {
 }{
   t = "cond" "{"
     (
-      cond = expression() { exprs.add(cond); }
+      cond = term() { exprs.add(cond); }
       thenBlock = block() { thens.add(thenBlock); }
     )+
     ["else" elseBlock = block()]
@@ -734,16 +734,16 @@ CondStatement cond_stmt() : {
 
 CaseBranch case_branch() : {
   Token t;
-  Expression expression;
+  Expression term;
   Statement[] block;
-  List expressions = new ArrayList();
+  List terms = new ArrayList();
   CaseBranch branch;
 }{
-  t="case" expression=expression() {expressions.add(expression);}
-  ("," expression=expression() {expressions.add(expression);})* ":"
+  t="case" term=term() {terms.add(term);}
+  ("," term=term() {terms.add(term);})* ":"
   block=stmts() {
     branch = new CaseBranch(
-      (Expression[])expressions.toArray(new Expression[0]),
+      (Expression[])terms.toArray(new Expression[0]),
       new BlockStatement(block[0].getLocation(), block)
     );
     setLocation(branch, t);
@@ -760,7 +760,7 @@ SelectStatement select_stmt() :{
   SelectStatement statement;
   Statement[] stmts = new Statement[0];  
 }{
-  t1="select" e=expression() "{"
+  t1="select" e=term() "{"
     (branch=case_branch() {branches.add(branch);})*
     [t2="else:" [stmts=stmts()] { elseBlock = new BlockStatement(p(t2), stmts); }]    
   "}" {
@@ -773,19 +773,19 @@ SelectStatement select_stmt() :{
 }
 
 ReturnStatement return_stmt() :{Token t; Expression e = null;}{
-  t="return" [e=expression()] ";" {return new ReturnStatement(p(t), e);}
+  t="return" [e=term()] ";" {return new ReturnStatement(p(t), e);}
 }
 
 SynchronizedStatement synchronized_stmt() :{Token t; Expression e = null; BlockStatement b;}{
-  t="synchronized" [e=expression()] b=block() {return new SynchronizedStatement(p(t), e, b);}
+  t="synchronized" [e=term()] b=block() {return new SynchronizedStatement(p(t), e, b);}
 }
 
 WhileStatement while_stmt() :{Token t; Expression e; BlockStatement b;}{
-  t="while" e=expression() b=block() {return new WhileStatement(p(t), e, b);}
+  t="while" e=term() b=block() {return new WhileStatement(p(t), e, b);}
 }
 
 ForeachStatement foreach_stmt() :{Token t; Argument a; Expression e; BlockStatement b;}{
-  t="foreach" a=argument() (LOOKAHEAD({la("in")}) <ID>) e=expression() b=block() {
+  t="foreach" a=argument() (LOOKAHEAD({la("in")}) <ID>) e=term() b=block() {
     return new ForeachStatement(p(t), a, e, b);
   }
 }
@@ -794,12 +794,12 @@ ForStatement for_stmt() :{
   Token t; Statement st; Expression e1 = null, e2 = null; BlockStatement b;
 }{
   t = "for" (LOOKAHEAD(2) st=local_var_stmt() | st=exp_stmt() | st=empty_stmt())
-  [e1=expression()] ";" [e2=expression()] b=block() {
+  [e1=term()] ";" [e2=term()] b=block() {
   	return new ForStatement(p(t), st, e1, e2, b);
   }
 }
 
-Expression expression() :{Expression e;}{
+Expression term() :{Expression e;}{
   e = assignable() { return e; }
 }
 
@@ -910,9 +910,9 @@ Expression primary_suffix() : {
   Token t, n;
 }{
   e=primary()
-( t="[" a=expression() "]"              {e = new Indexing(e, a); setLocation(e, t);}
+( t="[" a=term() "]"              {e = new Indexing(e, a); setLocation(e, t);}
 | LOOKAHEAD(3)
-  t="." n=<ID> "(" as=expressions() ")" {e = new MethodCall(e, c(n), as); setLocation(e, t);}
+  t="." n=<ID> "(" as=terms() ")" {e = new MethodCall(e, c(n), as); setLocation(e, t);}
 | t="." n=<ID>                          {e = new FieldOrMethodRef(e, c(n)); setLocation(e, t);}
 | t="$" type=type()                     {e = new Cast(e, type); setLocation(e, t);}
 | t="++"                                {e = new PostIncrement(e); setLocation(e, t); }
@@ -926,16 +926,16 @@ Expression primary() : {
 }{
   t=<FID>                               {return new SelfFieldReference(p(t), c(t).substring(1));}
 | t="super" "." n=<ID>
-  ["(" exps=expressions() ")"]          {return new SuperMethodCall(p(t), c(n), exps);}
+  ["(" exps=terms() ")"]          {return new SuperMethodCall(p(t), c(n), exps);}
 | LOOKAHEAD(4)
   ty=class_type() t="::" n=<ID>
-  "(" exps=expressions()  ")"           {return new StaticMethodCall(p(t), ty, c(n), exps);}
+  "(" exps=terms()  ")"           {return new StaticMethodCall(p(t), ty, c(n), exps);}
 | LOOKAHEAD(2)
   ty=class_type() t="::" n=<ID>         {return new StaticIDExpression(p(t), ty, c(n));}
 | LOOKAHEAD(2)
-  t=<ID> "(" exps=expressions() ")"     {return new SelfMethodCall(p(t), c(t), exps);}
+  t=<ID> "(" exps=terms() ")"     {return new SelfMethodCall(p(t), c(t), exps);}
 | t=<ID>                                {return new Id(p(t), c(t));}
-| t="[" exps=expressions() "]"          {return new ListLiteral(p(t), exps);}
+| t="[" exps=terms() "]"          {return new ListLiteral(p(t), exps);}
 | t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"]
   stmts=block()                         {
     String mname;
@@ -952,8 +952,8 @@ Expression primary() : {
     return new ClosureExpression(p(t), ty, mname, args, null, stmts);
   }
 | t="new" ty=type()
-  ( "[" (exps=expressions()) "]"        {return new NewArray(p(t), ty, exps);}
-  | ["(" (exps=expressions()) ")"]      {return new NewObject(p(t), ty, exps);}
+  ( "[" (exps=terms()) "]"        {return new NewArray(p(t), ty, exps);}
+  | ["(" (exps=terms()) ")"]      {return new NewObject(p(t), ty, exps);}
   )
 | t="self"                              {return new CurrentInstance(p(t));}
 | e=integer_literal()                   {return e;}
@@ -962,11 +962,11 @@ Expression primary() : {
 | e=string_literal()                    {return e;}
 | e=boolean_literal()                   {return e;}
 | e=null_literal()                      {return e;}
-| "(" e=expression() ")"                {return e;}
+| "(" e=term() ")"                {return e;}
 }
 
-Expression[] expressions() :{List args = list(); Expression arg;}{
-  [arg=expression() {args.add(arg);} ("," arg=expression() {args.add(arg);})*] {
+Expression[] terms() :{List args = list(); Expression arg;}{
+  [arg=term() {args.add(arg);} ("," arg=term() {args.add(arg);})*] {
     return (Expression[])args.toArray(new Expression[0]);
   }
 }

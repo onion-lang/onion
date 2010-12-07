@@ -3,8 +3,8 @@ import _root_.java.util.{TreeSet => JTreeSet}
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
-import _root_.onion.compiler.IxCode.BinaryExpression.Constants._
-import _root_.onion.compiler.IxCode.UnaryExpression.Constants._
+import _root_.onion.compiler.IxCode.BinaryTerm.Constants._
+import _root_.onion.compiler.IxCode.UnaryTerm.Constants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 
 /**
@@ -316,8 +316,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   def processTyping(node: AST.CompilationUnit) {
-    def processNodes(nodes: Array[AST.Expression], typeRef: IxCode.TypeRef, bind: ClosureLocalBinding, context: LocalContext): IxCode.Expression = {
-      val expressions = new Array[IxCode.Expression](nodes.length)
+    def processNodes(nodes: Array[AST.Expression], typeRef: IxCode.TypeRef, bind: ClosureLocalBinding, context: LocalContext): IxCode.Term = {
+      val expressions = new Array[IxCode.Term](nodes.length)
       var error: Boolean = false
       for(i <- 0 until nodes.length){
         val expressionOpt = typed(nodes(i), context)
@@ -333,20 +333,20 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
       }
       if (!error) {
-        var node: IxCode.Expression = if(expressions(0).isReferenceType) {
-          createEquals(IxCode.BinaryExpression.Constants.EQUAL, new IxCode.RefLocal(bind), expressions(0))
+        var node: IxCode.Term = if(expressions(0).isReferenceType) {
+          createEquals(IxCode.BinaryTerm.Constants.EQUAL, new IxCode.RefLocal(bind), expressions(0))
         } else {
-          new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(0))
+          new IxCode.BinaryTerm(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(0))
         }
         for(i <- 1 until expressions.length) {
-          node = new IxCode.BinaryExpression(LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, node, new IxCode.BinaryExpression(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(i)))
+          node = new IxCode.BinaryTerm(LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, node, new IxCode.BinaryTerm(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(i)))
         }
         node
       } else {
         null
       }
     }
-    def processAssignable(node: AST.Node, a: IxCode.TypeRef, b: IxCode.Expression): IxCode.Expression = {
+    def processAssignable(node: AST.Node, a: IxCode.TypeRef, b: IxCode.Term): IxCode.Term = {
       if (b == null) return null
       if (a == b.`type`) return b
       if (!IxCode.TypeRules.isAssignable(a, b.`type`)) {
@@ -379,7 +379,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){
 
     }
-    def typed(node: AST.Expression, context: LocalContext): Option[IxCode.Expression] = {
+    def typed(node: AST.Expression, context: LocalContext): Option[IxCode.Term] = {
       null //TODO Implement this method
     }
     def translate(node: AST.Statement, context: LocalContext): IxCode.ActionStatement = node match {
@@ -393,7 +393,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.BranchStatement(loc, _, _) =>
         openScope(context) {
           val size = node.clauses.size
-          val expressions = new Stack[IxCode.Expression]
+          val expressions = new Stack[IxCode.Term]
           val statements = new Stack[IxCode.ActionStatement]
           for((expression, statement) <- node.clauses) {
             val typedExpression = typed(expression, context).getOrElse(null)
@@ -421,7 +421,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.EmptyStatement(loc) =>
         new IxCode.NOP(loc)
       case node@AST.ExpressionStatement(loc, body) =>
-        typed(body, context).map{e =>  new IxCode.ExpressionStatement(loc, e)}.getOrElse(new IxCode.NOP(loc))
+        typed(body, context).map{e =>  new IxCode.ExpressionActionStatement(loc, e)}.getOrElse(new IxCode.NOP(loc))
       case node@AST.ForeachStatement(loc, _, _, _) =>
         openScope(context) {
           val collection = typed(node.collection, context).getOrElse(null)
@@ -437,8 +437,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           var init: IxCode.ActionStatement = null
           if (collection.isArrayType) {
             val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT)
-            init = new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.SetLocal(collectionVar, collection)), new IxCode.ExpressionStatement(new IxCode.SetLocal(counterVariable, new IxCode.IntLiteral(0))))
-            block = new IxCode.ConditionalLoop(new IxCode.BinaryExpression(LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ref(counterVariable), new IxCode.ArrayLength(ref(collectionVar))), new IxCode.StatementBlock(assign(elementVar, indexref(collectionVar, ref(counterVariable))), block, assign(counterVariable, new IxCode.BinaryExpression(ADD, IxCode.BasicTypeRef.INT, ref(counterVariable), new IxCode.IntLiteral(1)))))
+            init = new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(new IxCode.SetLocal(collectionVar, collection)), new IxCode.ExpressionActionStatement(new IxCode.SetLocal(counterVariable, new IxCode.IntValue(0))))
+            block = new IxCode.ConditionalLoop(new IxCode.BinaryTerm(LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ref(counterVariable), new IxCode.ArrayLength(ref(collectionVar))), new IxCode.StatementBlock(assign(elementVar, indexref(collectionVar, ref(counterVariable))), block, assign(counterVariable, new IxCode.BinaryTerm(ADD, IxCode.BasicTypeRef.INT, ref(counterVariable), new IxCode.IntValue(1)))))
             new IxCode.StatementBlock(init, block)
           }
           else {
@@ -447,12 +447,12 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             var mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[IxCode.ObjectTypeRef], "iterator")
             var mNext: IxCode.MethodRef = findMethod(node.collection, iteratorType, "next")
             var mHasNext: IxCode.MethodRef = findMethod(node.collection, iteratorType, "hasNext")
-            init = new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.SetLocal(collectionVar, collection)), assign(iteratorVar, new IxCode.Call(ref(collectionVar), mIterator, new Array[IxCode.Expression](0))))
-            var next: IxCode.Expression = new IxCode.Call(ref(iteratorVar), mNext, new Array[IxCode.Expression](0))
+            init = new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(new IxCode.SetLocal(collectionVar, collection)), assign(iteratorVar, new IxCode.Call(ref(collectionVar), mIterator, new Array[IxCode.Term](0))))
+            var next: IxCode.Term = new IxCode.Call(ref(iteratorVar), mNext, new Array[IxCode.Term](0))
             if (elementVar.getType != rootClass) {
               next = new IxCode.AsInstanceOf(next, elementVar.getType)
             }
-            block = new IxCode.ConditionalLoop(new IxCode.Call(ref(iteratorVar), mHasNext, new Array[IxCode.Expression](0)), new IxCode.StatementBlock(assign(elementVar, next), block))
+            block = new IxCode.ConditionalLoop(new IxCode.Call(ref(iteratorVar), mHasNext, new Array[IxCode.Term](0)), new IxCode.StatementBlock(assign(elementVar, next), block))
             new IxCode.StatementBlock(init, block)
           }
         }
@@ -466,10 +466,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
               report(INCOMPATIBLE_TYPE, node.condition, condition.`type`, expected)
             }
             conditionOpt.getOrElse(null)
-          }).getOrElse(new IxCode.BoolLiteral(loc, true))
+          }).getOrElse(new IxCode.BoolValue(loc, true))
           val update = Option(node.update).flatMap{update => typed(update, context)}.getOrElse(null)
           var loop = translate(node.block, context)
-          if(update != null) loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionStatement(update))
+          if(update != null) loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionActionStatement(update))
           new IxCode.StatementBlock(init.location, init, new IxCode.ConditionalLoop(condition, loop))
         }
       case node@AST.IfStatement(loc, _, _, _) => 
@@ -506,7 +506,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         else {
           local = new IxCode.SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
         }
-        new IxCode.ExpressionStatement(local)
+        new IxCode.ExpressionActionStatement(local)
       case node@AST.ReturnStatement(loc, _) =>
         val returnType = context.returnType
         if(node.result == null) {
@@ -537,7 +537,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           Option(node.elseBlock).map{e => translate(e, context)}.getOrElse(new IxCode.NOP(loc))
         }else {
           val cases = node.cases
-          val nodes = Buffer[IxCode.Expression]()
+          val nodes = Buffer[IxCode.Term]()
           val thens = Buffer[IxCode.ActionStatement]()
           for((expressions, then)<- cases) {
             val bind = context.lookup(name)
@@ -554,7 +554,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
           branches
         }
-        new IxCode.StatementBlock(condition.location, new IxCode.ExpressionStatement(condition.location, new IxCode.SetLocal(0, index, condition.`type`, condition)), statement)
+        new IxCode.StatementBlock(condition.location, new IxCode.ExpressionActionStatement(condition.location, new IxCode.SetLocal(0, index, condition.`type`, condition)), statement)
       case node@AST.SynchronizedStatement(loc, _, _) =>
         openScope(context) {
           val lock = typed(node.condition, context).getOrElse(null)
@@ -601,22 +601,22 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           new IxCode.ConditionalLoop(loc, conditionOpt.getOrElse(null), thenBlock)
         }
     }
-    def defaultValue(typeRef: IxCode.TypeRef): IxCode.Expression = IxCode.Expression.defaultValue(typeRef)
+    def defaultValue(typeRef: IxCode.TypeRef): IxCode.Term = IxCode.Term.defaultValue(typeRef)
     def addReturnNode(node: IxCode.ActionStatement, returnType: IxCode.TypeRef): IxCode.StatementBlock = {
       return new IxCode.StatementBlock(node, new IxCode.Return(defaultValue(returnType)))
     }
     def createMain(top: IxCode.ClassTypeRef, ref: IxCode.MethodRef, name: String, args: Array[IxCode.TypeRef], ret: IxCode.TypeRef): IxCode.MethodDefinition = {
       val method = new IxCode.MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
       val frame = new LocalFrame(null)
-      val params = new Array[IxCode.Expression](args.length)
+      val params = new Array[IxCode.Term](args.length)
       for(i <- 0 until args.length) {
         val arg = args(i)
         val index = frame.add("args" + i, arg)
         params(i) = new IxCode.RefLocal(0, index, arg)
       }
       method.setFrame(frame)
-      val constructor = top.findConstructor(new Array[IxCode.Expression](0))(0)
-      var block = new IxCode.StatementBlock(new IxCode.ExpressionStatement(new IxCode.Call(new IxCode.NewObject(constructor, new Array[IxCode.Expression](0)), ref, params)))
+      val constructor = top.findConstructor(new Array[IxCode.Term](0))(0)
+      var block = new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(new IxCode.Call(new IxCode.NewObject(constructor, new Array[IxCode.Term](0)), ref, params)))
       block = addReturnNode(block, IxCode.BasicTypeRef.VOID)
       method.setBlock(block)
       method
@@ -709,14 +709,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       val methodSet = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
       def makeDelegationMethod(delegated: IxCode.FieldRef, delegator: IxCode.MethodRef): IxCode.MethodDefinition = {
         val args = delegator.arguments
-        val params = new Array[IxCode.Expression](args.length)
+        val params = new Array[IxCode.Term](args.length)
         val frame = new LocalFrame(null)
         for(i <- 0 until params.length) {
           val index = frame.add("arg" + i, args(i))
           params(i) = new IxCode.RefLocal(new ClosureLocalBinding(0, index, args(i)))
         }
         val target = new IxCode.Call(new IxCode.RefField(new IxCode.This(definition_), delegated), delegator, params)
-        val statement = if (delegator.returnType != IxCode.BasicTypeRef.VOID) new IxCode.StatementBlock(new IxCode.Return(target)) else new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null))
+        val statement = if (delegator.returnType != IxCode.BasicTypeRef.VOID) new IxCode.StatementBlock(new IxCode.Return(target)) else new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(target), new IxCode.Return(null))
         val node = new IxCode.MethodDefinition(null, AST.M_PUBLIC, definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
         node.setFrame(frame)
         node
@@ -842,23 +842,23 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, AST.toString(typeNode.desc))
     return mappedType
   }
-  private def createEquals(kind: Int, lhs: IxCode.Expression, rhs: IxCode.Expression): IxCode.Expression = {
-    val params = Array[IxCode.Expression](new IxCode.AsInstanceOf(rhs, rootClass))
+  private def createEquals(kind: Int, lhs: IxCode.Term, rhs: IxCode.Term): IxCode.Term = {
+    val params = Array[IxCode.Term](new IxCode.AsInstanceOf(rhs, rootClass))
     val target = lhs.`type`.asInstanceOf[IxCode.ObjectTypeRef]
     val methods = target.findMethod("equals", params)
-    var node: IxCode.Expression = new IxCode.Call(lhs, methods(0), params)
-    if (kind == IxCode.BinaryExpression.Constants.NOT_EQUAL) {
-      node = new IxCode.UnaryExpression(NOT, IxCode.BasicTypeRef.BOOLEAN, node)
+    var node: IxCode.Term = new IxCode.Call(lhs, methods(0), params)
+    if (kind == IxCode.BinaryTerm.Constants.NOT_EQUAL) {
+      node = new IxCode.UnaryTerm(NOT, IxCode.BasicTypeRef.BOOLEAN, node)
     }
     node
   }
-  private def indexref(bind: ClosureLocalBinding, value: IxCode.Expression): IxCode.Expression = new IxCode.ArrayRef(new IxCode.RefLocal(bind), value)
-  private def assign(bind: ClosureLocalBinding, value: IxCode.Expression): IxCode.ActionStatement = new IxCode.ExpressionStatement(new IxCode.SetLocal(bind, value))
-  private def ref(bind: ClosureLocalBinding): IxCode.Expression = new IxCode.RefLocal(bind)
+  private def indexref(bind: ClosureLocalBinding, value: IxCode.Term): IxCode.Term = new IxCode.RefArray(new IxCode.RefLocal(bind), value)
+  private def assign(bind: ClosureLocalBinding, value: IxCode.Term): IxCode.ActionStatement = new IxCode.ExpressionActionStatement(new IxCode.SetLocal(bind, value))
+  private def ref(bind: ClosureLocalBinding): IxCode.Term = new IxCode.RefLocal(bind)
   private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String): IxCode.MethodRef = {
-    return findMethod(node, target, name, new Array[IxCode.Expression](0))
+    return findMethod(node, target, name, new Array[IxCode.Term](0))
   }
-  private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String, params: Array[IxCode.Expression]): IxCode.MethodRef = {
+  private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String, params: Array[IxCode.Term]): IxCode.MethodRef = {
     val methods: Array[IxCode.MethodRef] = target.findMethod(name, params)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})

@@ -108,6 +108,11 @@ public class CodeAnalysis {
     reporter.report(error, node.getLocation(), items);
   }
 
+  public void report(int error, Location location, Object... items) {
+    reporter.setSourceFile(unit.getSourceFileName());
+    reporter.report(error, location, items);
+  }
+
   public IxCode.ClassTypeRef load(String name) {
     return table.load(name);
   }
@@ -540,7 +545,7 @@ public class CodeAnalysis {
         IxCode.MethodRef method = (IxCode.MethodRef) i.next();
         if(!methodSet.contains(method)) {
           if(generated.contains(method)){
-            report(DUPLICATE_GENERATED_METHOD, lookupAST(node), method.affiliation(), method.name(), method.arguments());
+            report(DUPLICATE_GENERATED_METHOD, node.location(), method.affiliation(), method.name(), method.arguments());
           }else {
             IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
             generated.add(generatedMethod);

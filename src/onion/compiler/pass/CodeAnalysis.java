@@ -583,8 +583,8 @@ public class CodeAnalysis {
       methods.clear();
       fields.clear();
       constructors.clear();
-      CodeAnalysis.this.definition = node;
-      CodeAnalysis.this.mapper = find(node.name());
+      definition = node;
+      mapper = find(node.name());
       InterfaceMethodDeclaration[] members = ast.getDeclarations();
       for(int i = 0; i < members.length; i++){
         accept(members[i], context);
@@ -596,9 +596,7 @@ public class CodeAnalysis {
       IxCode.ConstructorDefinition node = (IxCode.ConstructorDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(constructors.contains(node)){
-        IxCode.ClassTypeRef classType = node.affiliation();
-        IxCode.TypeRef[] args = node.getArgs();
-        report(DUPLICATE_CONSTRUCTOR, ast, classType, args);
+        report(DUPLICATE_CONSTRUCTOR, ast, node.affiliation(), node.getArgs());
       }else{
         constructors.add(node);
       }
@@ -609,9 +607,7 @@ public class CodeAnalysis {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        IxCode.ClassTypeRef classType = node.affiliation();
-        String name = node.name();
-        report(DUPLICATE_FIELD, ast, classType, name);
+        report(DUPLICATE_FIELD, ast, node.affiliation(), node.name());
       }else{
         fields.add(node);
       }
@@ -622,10 +618,7 @@ public class CodeAnalysis {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        IxCode.ClassTypeRef classType = node.affiliation();
-        String name = node.name();
-        IxCode.TypeRef[] args = node.arguments();
-        report(DUPLICATE_METHOD, ast, classType, name, args);
+        report(DUPLICATE_METHOD, ast, node.affiliation(), node.name(), node.arguments());
       }else{
         methods.add(node);
       }
@@ -636,9 +629,7 @@ public class CodeAnalysis {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(fields.contains(node)){
-        IxCode.ClassTypeRef classType = node.affiliation();
-        String name = node.name();
-        report(DUPLICATE_FIELD, ast, classType, name);
+        report(DUPLICATE_FIELD, ast, node.affiliation(), node.name());
       }else{
         fields.add(node);
       }
@@ -649,10 +640,7 @@ public class CodeAnalysis {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(methods.contains(node)){
-        IxCode.ClassTypeRef classType = node.affiliation();
-        String name = node.name();
-        IxCode.TypeRef[] args = node.arguments();
-        report(DUPLICATE_METHOD, ast, classType, name, args);
+        report(DUPLICATE_METHOD, ast, node.affiliation(), node.name(), node.arguments());
       }else{
         methods.add(node);
       }
@@ -663,9 +651,7 @@ public class CodeAnalysis {
       IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(functions.contains(node)){
-        String name = node.name();
-        IxCode.TypeRef[] args = node.arguments();
-        report(DUPLICATE_FUNCTION, ast, name, args);
+        report(DUPLICATE_FUNCTION, ast, node.name(), node.arguments());
       }else{
         functions.add(node);
       }
@@ -676,8 +662,7 @@ public class CodeAnalysis {
       IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
       if(node == null) return null;
       if(variables.contains(node)){
-        String name = node.name();
-        report(DUPLICATE_GLOBAL_VARIABLE, ast, name);
+        report(DUPLICATE_GLOBAL_VARIABLE, ast, node.name());
       }else{
         variables.add(node);
       }
@@ -755,13 +740,13 @@ public class CodeAnalysis {
     }
     
     public Object visit(InterfaceDeclaration ast, LocalContext context) {
-      CodeAnalysis.this.definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
       return null;
     }
     
     public Object visit(ClassDeclaration ast, LocalContext context) {
-      CodeAnalysis.this.definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      CodeAnalysis.this.mapper = find(definition.name());
+      definition = (IxCode.ClassDefinition) lookupKernelNode(ast);
+      mapper = find(definition.name());
       if(ast.getDefaultSection() != null){
         accept(ast.getDefaultSection(), context);
       }

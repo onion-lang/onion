@@ -174,7 +174,7 @@ public class CodeAnalysis {
         }
       }
       if(count > 0){
-        IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
+        IxCode.ClassDefinition node = IxCode.ClassDefinition.newClass(unit.getLocation(), 0, topClass(), table.rootClass(), new IxCode.ClassTypeRef[0]);
         node.setSourceFile(Paths.nameOf(compilationUnit.getSourceFileName()));
         node.setResolutionComplete(true);
         table.classes().add(node);
@@ -200,7 +200,7 @@ public class CodeAnalysis {
     
     public Object visit(InterfaceDeclaration ast, String context) {
       String module = context;
-      IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getModifier(), createFQCN(module, ast.getName()), null);
+      IxCode.ClassDefinition node = IxCode.ClassDefinition.newInterface(ast.getLocation(), ast.getModifier(), createFQCN(module, ast.getName()), null);
       node.setSourceFile(Paths.nameOf(unit.getSourceFileName()));
       ClassTable table = CodeAnalysis.this.table;
       if(table.lookup(node.name()) != null){
@@ -460,25 +460,23 @@ public class CodeAnalysis {
       }
     }
     
-    private IxCode.ClassTypeRef validateSuperType(
-      TypeSpec ast, boolean shouldInterface, NameMapper resolver){
-      
-      IxCode.ClassTypeRef symbol = null;
-      if(ast == null){
-        symbol = table.rootClass();
+    private IxCode.ClassTypeRef validateSuperType(TypeSpec spec, boolean mustBeInterface, NameMapper mapper){
+      IxCode.ClassTypeRef typeRef = null;
+      if(spec == null){
+        typeRef = table.rootClass();
       }else{
-        symbol = (IxCode.ClassTypeRef) mapFrom(ast, resolver);
+        typeRef = (IxCode.ClassTypeRef) mapFrom(spec, mapper);
       }
-      if(symbol == null) return null;
-      boolean isInterface = symbol.isInterface();
-      if(((!isInterface) && shouldInterface) || (isInterface && (!shouldInterface))){
-        AstNode astNode = null;
-        if(symbol instanceof IxCode.ClassDefinition){
-          astNode = lookupAST((IxCode.ClassDefinition)symbol);
+      if(typeRef == null) return null;
+      boolean isInterface = typeRef.isInterface();
+      if(((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))){
+        Location location = null;
+        if(typeRef instanceof IxCode.ClassDefinition){
+          location = ((IxCode.ClassDefinition)typeRef).location();
         }
-        report(ILLEGAL_INHERITANCE, astNode, symbol.name());
+        report(ILLEGAL_INHERITANCE, location, typeRef.name());
       }
-      return symbol;
+      return typeRef;
     }
   }
   

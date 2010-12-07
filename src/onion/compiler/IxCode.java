@@ -458,6 +458,7 @@ public interface IxCode {
    * Date: 2005/04/17
    */
   class ClassDefinition extends AbstractClassTypeRef implements Node, Named {
+    private final Location location;
     private boolean isInterface;
     private int modifier;
     private String name;
@@ -478,7 +479,8 @@ public interface IxCode {
      * @param superClass super class
      * @param interfaces super interfaces
      */
-    public ClassDefinition(boolean isInterface, int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces) {
+    public ClassDefinition(Location location, boolean isInterface, int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces) {
+      this.location = location;
       this.isInterface = isInterface;
       this.modifier = modifier;
       this.name = name;
@@ -493,8 +495,8 @@ public interface IxCode {
      * @param interfaces
      * @return
      */
-    public static ClassDefinition newInterface(int modifier, String name, ClassTypeRef[] interfaces){
-      return new ClassDefinition(true, modifier, name, null, interfaces);
+    public static ClassDefinition newInterface(Location location, int modifier, String name, ClassTypeRef[] interfaces){
+      return new ClassDefinition(location, true, modifier, name, null, interfaces);
     }
 
     /**
@@ -505,8 +507,8 @@ public interface IxCode {
      * @param interfaces
      * @return
      */
-    public static ClassDefinition newClass(int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces){
-      return new ClassDefinition(false, modifier, name, superClass, interfaces);
+    public static ClassDefinition newClass(Location location, int modifier, String name, ClassTypeRef superClass, ClassTypeRef[] interfaces){
+      return new ClassDefinition(location, false, modifier, name, superClass, interfaces);
     }
 
     /**
@@ -516,7 +518,11 @@ public interface IxCode {
      * @return
      */
     public static ClassDefinition newClass(int modifier, String name) {
-      return new ClassDefinition(false, modifier, name, null, null);
+      return new ClassDefinition(null, false, modifier, name, null, null);
+    }
+
+    public Location location() {
+      return location;
     }
 
     public boolean isInterface() {

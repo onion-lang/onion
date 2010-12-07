@@ -3,6 +3,7 @@ import _root_.java.util.{TreeSet => JTreeSet}
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
+import _root_.onion.compiler.IxCode._
 import _root_.onion.compiler.IxCode.BinaryTerm.Constants._
 import _root_.onion.compiler.IxCode.UnaryTerm.Constants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
@@ -14,7 +15,7 @@ import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
  * Time: 10:46:42
  * To change this template use File | Settings | File Templates.
  */
-class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AST.CompilationUnit], Array[IxCode.ClassDefinition]] {
+class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AST.CompilationUnit], Array[ClassDefinition]] {
   class TypingEnvironment
   type Environment = TypingEnvironment
   type Dimension = Int
@@ -26,22 +27,22 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     loop(descriptor, 0)
   }
   private class NameMapper(imports: ImportList) {
-    def map(typeNode: AST.TypeNode): IxCode.TypeRef = map(typeNode.desc)
-    def map(descriptor : AST.TypeDescriptor): IxCode.TypeRef = descriptor match {
-      case AST.PrimitiveType(AST.KChar)       => IxCode.BasicTypeRef.CHAR
-      case AST.PrimitiveType(AST.KByte)       => IxCode.BasicTypeRef.BYTE
-      case AST.PrimitiveType(AST.KShort)      => IxCode.BasicTypeRef.SHORT
-      case AST.PrimitiveType(AST.KInt)        => IxCode.BasicTypeRef.INT
-      case AST.PrimitiveType(AST.KLong)       => IxCode.BasicTypeRef.LONG
-      case AST.PrimitiveType(AST.KFloat)      => IxCode.BasicTypeRef.FLOAT
-      case AST.PrimitiveType(AST.KDouble)     => IxCode.BasicTypeRef.DOUBLE
-      case AST.PrimitiveType(AST.KBoolean)    => IxCode.BasicTypeRef.BOOLEAN
-      case AST.PrimitiveType(AST.KVoid)       => IxCode.BasicTypeRef.VOID
+    def map(typeNode: AST.TypeNode): TypeRef = map(typeNode.desc)
+    def map(descriptor : AST.TypeDescriptor): TypeRef = descriptor match {
+      case AST.PrimitiveType(AST.KChar)       => BasicTypeRef.CHAR
+      case AST.PrimitiveType(AST.KByte)       => BasicTypeRef.BYTE
+      case AST.PrimitiveType(AST.KShort)      => BasicTypeRef.SHORT
+      case AST.PrimitiveType(AST.KInt)        => BasicTypeRef.INT
+      case AST.PrimitiveType(AST.KLong)       => BasicTypeRef.LONG
+      case AST.PrimitiveType(AST.KFloat)      => BasicTypeRef.FLOAT
+      case AST.PrimitiveType(AST.KDouble)     => BasicTypeRef.DOUBLE
+      case AST.PrimitiveType(AST.KBoolean)    => BasicTypeRef.BOOLEAN
+      case AST.PrimitiveType(AST.KVoid)       => BasicTypeRef.VOID
       case AST.ReferenceType(name, qualified) => forName(name, qualified)
       case AST.ParameterizedType(base, _)     => map(base)
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
     }
-    private def forName(name: String, qualified: Boolean): IxCode.ClassTypeRef = {
+    private def forName(name: String, qualified: Boolean): ClassTypeRef = {
       if(qualified) {
         return table_.load(name);
       }else {
@@ -57,18 +58,18 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   private val table_  = new ClassTable(classpath(config.getClassPath))
-  private val ast2ixt_ = Map[AST.Node, IxCode.Node]()
-  private var ixt2ast_ = Map[IxCode.Node, AST.Node]()
+  private val ast2ixt_ = Map[AST.Node, Node]()
+  private var ixt2ast_ = Map[Node, AST.Node]()
   private var mappers_  = Map[String, NameMapper]()
   private var access_ : Int = _
   private var mapper_ : NameMapper = _
   private var importedList_ : ImportList = _
   private var staticImportedList_ : StaticImportList = _
-  private var definition_ : IxCode.ClassDefinition = _
+  private var definition_ : ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.getMaxErrorReports)
   def newEnvironment(source: Array[AST.CompilationUnit]) = new TypingEnvironment
-  def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[IxCode.ClassDefinition] = {
+  def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
     for(unit <- source) processOutline(unit)
     for(unit <- source) processTyping(unit)
@@ -101,7 +102,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     var count = 0
     for(top <- unit.toplevels) top match {
       case declaration: AST.ClassDeclaration =>
-        val node = IxCode.ClassDefinition.newClass(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null, null)
+        val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null, null)
         node.setSourceFile(Paths.nameOf(unit.sourceFile))
         if (table_.lookup(node.name) != null) {
           report(DUPLICATE_CLASS, declaration, node.name)
@@ -111,7 +112,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           add(node.name, new NameMapper(importedList_))
         }
       case declaration: AST.InterfaceDeclaration =>
-        val node = IxCode.ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
+        val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
         node.setSourceFile(Paths.nameOf(unit.sourceFile))
         if (table_.lookup(node.name) != null) {
           report(DUPLICATE_CLASS, declaration, node.name)
@@ -124,7 +125,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         count += 1
     }
     if (count > 0) {
-      val node = IxCode.ClassDefinition.newClass(unit.location, 0, topClass, table_.rootClass, new Array[IxCode.ClassTypeRef](0))
+      val node = ClassDefinition.newClass(unit.location, 0, topClass, table_.rootClass, new Array[ClassTypeRef](0))
       node.setSourceFile(Paths.nameOf(unit_.sourceFile))
       node.setResolutionComplete(true)
       table_.classes.add(node)
@@ -138,9 +139,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     unit_ = unit
     def processClassDeclaration(node: AST.ClassDeclaration) {
       nconstructors = 0
-      definition_ = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
-      constructTypeHierarchy(definition_, MutableSet[IxCode.ClassTypeRef]())
+      constructTypeHierarchy(definition_, MutableSet[ClassTypeRef]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
       if(node.defaultSection != null) {
         access_ = node.defaultSection.modifiers
@@ -163,9 +164,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (nconstructors == 0) definition_.addDefaultConstructor
     }
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
-      definition_ = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
-      constructTypeHierarchy(definition_, MutableSet[IxCode.ClassTypeRef]())
+      constructTypeHierarchy(definition_, MutableSet[ClassTypeRef]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
       for(method <- node.methods) processInterfaceMethodDeclaration(method)
     }
@@ -173,20 +174,20 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return null
       val modifier = node.modifiers | AST.M_PUBLIC
-      val classType = loadTopClass.asInstanceOf[IxCode.ClassDefinition]
+      val classType = loadTopClass.asInstanceOf[ClassDefinition]
       val name = node.name
-      val field = new IxCode.FieldDefinition(node.location, modifier, classType, name, typeRef)
+      val field = new FieldDefinition(node.location, modifier, classType, name, typeRef)
       put(node, field)
       classType.add(field)
     }
     def processFunctionDeclaration(node: AST.FunctionDeclaration) {
       val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else IxCode.BasicTypeRef.VOID)
+      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicTypeRef.VOID)
       for(args <- argsOption; returnType <- returnTypeOption) {
-        val classType= loadTopClass.asInstanceOf[IxCode.ClassDefinition]
+        val classType= loadTopClass.asInstanceOf[ClassDefinition]
         val modifier = node.modifiers | AST.M_PUBLIC
         val name = node.name
-        val method = new IxCode.MethodDefinition(node.location, modifier, classType, name, args.toArray, returnType, null)
+        val method = new MethodDefinition(node.location, modifier, classType, name, args.toArray, returnType, null)
         put(node, method)
         classType.add(method)
       }
@@ -196,29 +197,29 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (typeRef == null) return null
       val modifier = node.modifiers | access_
       val name = node.name
-      val field = new IxCode.FieldDefinition(node.location, modifier, definition_, name, typeRef)
+      val field = new FieldDefinition(node.location, modifier, definition_, name, typeRef)
       put(node, field)
       definition_.add(field)
     }
     def processMethodDeclaration(node: AST.MethodDeclaration) {
       val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else IxCode.BasicTypeRef.VOID)
+      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicTypeRef.VOID)
       for(args <- argsOption; returnType <- returnTypeOption) {
         var modifier = node.modifiers | access_
         if (node.block == null) modifier |= AST.M_ABSTRACT
         val name = node.name
-        val method = new IxCode.MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
+        val method = new MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
         put(node, method)
         definition_.add(method)
       }
     }
     def processInterfaceMethodDeclaration(node: AST.MethodDeclaration) {
       val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else IxCode.BasicTypeRef.VOID)
+      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicTypeRef.VOID)
       for(args <- argsOption; returnType <- returnTypeOption) {
         val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
         val name = node.name
-        var method = new IxCode.MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
+        var method = new MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
         put(node, method)
         definition_.add(method)
       }
@@ -228,7 +229,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       val argsOption = typesOf(node.args)
       for(args <- argsOption) {
         val modifier = node.modifiers | access_
-        val constructor = new IxCode.ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
+        val constructor = new ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
         put(node, constructor)
         definition_.add(constructor)
       }
@@ -236,18 +237,18 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return null
-      if (!(typeRef.isObjectType && (typeRef.asInstanceOf[IxCode.ObjectTypeRef]).isInterface)) {
+      if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectTypeRef]).isInterface)) {
         report(INTERFACE_REQUIRED, node, typeRef)
         return null
       }
       val modifier = node.modifiers | access_ | AST.M_FORWARDED
       var name = node.name
-      var field = new IxCode.FieldDefinition(node.location, modifier, definition_, name, typeRef)
+      var field = new FieldDefinition(node.location, modifier, definition_, name, typeRef)
       put(node, field)
       definition_.add(field)
     }
-    def cyclic(start: IxCode.ClassDefinition): Boolean = {
-      def loop(node: IxCode.ClassTypeRef, visit: Set[IxCode.ClassTypeRef]): Boolean = {
+    def cyclic(start: ClassDefinition): Boolean = {
+      def loop(node: ClassTypeRef, visit: Set[ClassTypeRef]): Boolean = {
         if(node == null) return false
         if(visit.contains(node)) return true
         val newVisit = visit + node
@@ -255,30 +256,30 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         for(interface <- node.interfaces) if(loop(interface, newVisit)) return true
         return false
       }
-      loop(start, Set[IxCode.ClassTypeRef]())
+      loop(start, Set[ClassTypeRef]())
     }
-    def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): IxCode.ClassTypeRef = {
-      val typeRef = if(node == null) table_.rootClass else mapFrom(node, mapper).asInstanceOf[IxCode.ClassTypeRef]
+    def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassTypeRef = {
+      val typeRef = if(node == null) table_.rootClass else mapFrom(node, mapper).asInstanceOf[ClassTypeRef]
       if (typeRef == null) return null
       val isInterface = typeRef.isInterface
       if (((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))) {
         var location: Location = null
-        if (typeRef.isInstanceOf[IxCode.ClassDefinition]) {
-          location = typeRef.asInstanceOf[IxCode.ClassDefinition].location
+        if (typeRef.isInstanceOf[ClassDefinition]) {
+          location = typeRef.asInstanceOf[ClassDefinition].location
         }
         report(ILLEGAL_INHERITANCE, location, typeRef.name)
       }
       typeRef
     }
-    def constructTypeHierarchy(node: IxCode.ClassTypeRef, visit: MutableSet[IxCode.ClassTypeRef]) {
+    def constructTypeHierarchy(node: ClassTypeRef, visit: MutableSet[ClassTypeRef]) {
       if(node == null || visit.contains(node)) return
       visit += node
       node match {
-        case node: IxCode.ClassDefinition =>
+        case node: ClassDefinition =>
           if (node.isResolutionComplete) return
-          val interfaces = Buffer[IxCode.ClassTypeRef]()
+          val interfaces = Buffer[ClassTypeRef]()
           val resolver = find(node.name)
-          var superClass: IxCode.ClassTypeRef = null
+          var superClass: ClassTypeRef = null
           if (node.isInterface) {
             val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
             val superClass = rootClass
@@ -316,44 +317,44 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   def processTyping(node: AST.CompilationUnit) {
-    def processNodes(nodes: Array[AST.Expression], typeRef: IxCode.TypeRef, bind: ClosureLocalBinding, context: LocalContext): IxCode.Term = {
-      val expressions = new Array[IxCode.Term](nodes.length)
+    def processNodes(nodes: Array[AST.Expression], typeRef: TypeRef, bind: ClosureLocalBinding, context: LocalContext): Term = {
+      val expressions = new Array[Term](nodes.length)
       var error: Boolean = false
       for(i <- 0 until nodes.length){
         val expressionOpt = typed(nodes(i), context)
         expressions(i) = expressionOpt.getOrElse(null)
         if(expressions(i) == null) {
           error = true
-        } else if (!IxCode.TypeRules.isAssignable(typeRef, expressions(i).`type`)) {
+        } else if (!TypeRules.isAssignable(typeRef, expressions(i).`type`)) {
           report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expressions(i).`type`)
           error = true
         } else {
-          if (expressions(i).isBasicType && expressions(i).`type` != typeRef) expressions(i) = new IxCode.AsInstanceOf(expressions(i), typeRef)
-          if (expressions(i).isReferenceType && expressions(i).`type` != rootClass) expressions(i) = new IxCode.AsInstanceOf(expressions(i), rootClass)
+          if (expressions(i).isBasicType && expressions(i).`type` != typeRef) expressions(i) = new AsInstanceOf(expressions(i), typeRef)
+          if (expressions(i).isReferenceType && expressions(i).`type` != rootClass) expressions(i) = new AsInstanceOf(expressions(i), rootClass)
         }
       }
       if (!error) {
-        var node: IxCode.Term = if(expressions(0).isReferenceType) {
-          createEquals(IxCode.BinaryTerm.Constants.EQUAL, new IxCode.RefLocal(bind), expressions(0))
+        var node: Term = if(expressions(0).isReferenceType) {
+          createEquals(BinaryTerm.Constants.EQUAL, new RefLocal(bind), expressions(0))
         } else {
-          new IxCode.BinaryTerm(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(0))
+          new BinaryTerm(EQUAL, BasicTypeRef.BOOLEAN, new RefLocal(bind), expressions(0))
         }
         for(i <- 1 until expressions.length) {
-          node = new IxCode.BinaryTerm(LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, node, new IxCode.BinaryTerm(EQUAL, IxCode.BasicTypeRef.BOOLEAN, new IxCode.RefLocal(bind), expressions(i)))
+          node = new BinaryTerm(LOGICAL_OR, BasicTypeRef.BOOLEAN, node, new BinaryTerm(EQUAL, BasicTypeRef.BOOLEAN, new RefLocal(bind), expressions(i)))
         }
         node
       } else {
         null
       }
     }
-    def processAssignable(node: AST.Node, a: IxCode.TypeRef, b: IxCode.Term): IxCode.Term = {
+    def processAssignable(node: AST.Node, a: TypeRef, b: Term): Term = {
       if (b == null) return null
       if (a == b.`type`) return b
-      if (!IxCode.TypeRules.isAssignable(a, b.`type`)) {
+      if (!TypeRules.isAssignable(a, b.`type`)) {
         report(INCOMPATIBLE_TYPE, node, a, b.`type`)
         return null
       }
-      new IxCode.AsInstanceOf(node.location, b, a)
+      new AsInstanceOf(node.location, b, a)
     }
     def openScope[A](context: LocalContext)(block: => A): A = try {
       context.openScope()
@@ -379,26 +380,26 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){
 
     }
-    def typed(node: AST.Expression, context: LocalContext): Option[IxCode.Term] = {
+    def typed(node: AST.Expression, context: LocalContext): Option[Term] = {
       null //TODO Implement this method
     }
-    def translate(node: AST.Statement, context: LocalContext): IxCode.ActionStatement = node match {
+    def translate(node: AST.Statement, context: LocalContext): ActionStatement = node match {
       case AST.BlockStatement(loc, elements) =>
         openScope(context){
-          new IxCode.StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
+          new StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
         }
       case node@AST.BreakStatement(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
-        new IxCode.Break(loc)
+        new Break(loc)
       case node@AST.BranchStatement(loc, _, _) =>
         openScope(context) {
           val size = node.clauses.size
-          val expressions = new Stack[IxCode.Term]
-          val statements = new Stack[IxCode.ActionStatement]
+          val expressions = new Stack[Term]
+          val statements = new Stack[ActionStatement]
           for((expression, statement) <- node.clauses) {
             val typedExpression = typed(expression, context).getOrElse(null)
-            if (typedExpression != null && typedExpression.`type` != IxCode.BasicTypeRef.BOOLEAN) {
-              val expect = IxCode.BasicTypeRef.BOOLEAN
+            if (typedExpression != null && typedExpression.`type` != BasicTypeRef.BOOLEAN) {
+              val expect = BasicTypeRef.BOOLEAN
               val actual = typedExpression.`type`
               report(INCOMPATIBLE_TYPE, expression, expect, actual)
             }
@@ -406,22 +407,22 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             statements.push(translate(statement, context))
           }
           val elseStatement = node.elseBlock
-          var result: IxCode.ActionStatement = null
+          var result: ActionStatement = null
           if (elseStatement != null) {
             result = translate(elseStatement, context)
           }
           for(i <- 0 until size) {
-            result = new IxCode.IfStatement(expressions.pop, statements.pop, result)
+            result = new IfStatement(expressions.pop, statements.pop, result)
           }
           return result
         }
       case node@AST.ContinueStatement(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
-        new IxCode.Continue(loc)
+        new Continue(loc)
       case node@AST.EmptyStatement(loc) =>
-        new IxCode.NOP(loc)
+        new NOP(loc)
       case node@AST.ExpressionStatement(loc, body) =>
-        typed(body, context).map{e =>  new IxCode.ExpressionActionStatement(loc, e)}.getOrElse(new IxCode.NOP(loc))
+        typed(body, context).map{e =>  new ExpressionActionStatement(loc, e)}.getOrElse(new NOP(loc))
       case node@AST.ForeachStatement(loc, _, _, _) =>
         openScope(context) {
           val collection = typed(node.collection, context).getOrElse(null)
@@ -430,205 +431,205 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           var block = translate(node.statement, context)
           if (collection.isBasicType) {
             report(INCOMPATIBLE_TYPE, node.collection, load("java.util.Collection"), collection.`type`)
-            return new IxCode.NOP(node.location)
+            return new NOP(node.location)
           }
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
           val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`)
-          var init: IxCode.ActionStatement = null
+          var init: ActionStatement = null
           if (collection.isArrayType) {
-            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, IxCode.BasicTypeRef.INT), IxCode.BasicTypeRef.INT)
-            init = new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(new IxCode.SetLocal(collectionVar, collection)), new IxCode.ExpressionActionStatement(new IxCode.SetLocal(counterVariable, new IxCode.IntValue(0))))
-            block = new IxCode.ConditionalLoop(new IxCode.BinaryTerm(LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ref(counterVariable), new IxCode.ArrayLength(ref(collectionVar))), new IxCode.StatementBlock(assign(elementVar, indexref(collectionVar, ref(counterVariable))), block, assign(counterVariable, new IxCode.BinaryTerm(ADD, IxCode.BasicTypeRef.INT, ref(counterVariable), new IxCode.IntValue(1)))))
-            new IxCode.StatementBlock(init, block)
+            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicTypeRef.INT), BasicTypeRef.INT)
+            init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0))))
+            block = new ConditionalLoop(new BinaryTerm(LESS_THAN, BasicTypeRef.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))), new StatementBlock(assign(elementVar, indexref(collectionVar, ref(counterVariable))), block, assign(counterVariable, new BinaryTerm(ADD, BasicTypeRef.INT, ref(counterVariable), new IntValue(1)))))
+            new StatementBlock(init, block)
           }
           else {
             val iteratorType = load("java.util.Iterator")
             var iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
-            var mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[IxCode.ObjectTypeRef], "iterator")
-            var mNext: IxCode.MethodRef = findMethod(node.collection, iteratorType, "next")
-            var mHasNext: IxCode.MethodRef = findMethod(node.collection, iteratorType, "hasNext")
-            init = new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(new IxCode.SetLocal(collectionVar, collection)), assign(iteratorVar, new IxCode.Call(ref(collectionVar), mIterator, new Array[IxCode.Term](0))))
-            var next: IxCode.Term = new IxCode.Call(ref(iteratorVar), mNext, new Array[IxCode.Term](0))
+            var mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectTypeRef], "iterator")
+            var mNext: MethodRef = findMethod(node.collection, iteratorType, "next")
+            var mHasNext: MethodRef = findMethod(node.collection, iteratorType, "hasNext")
+            init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0))))
+            var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
             if (elementVar.getType != rootClass) {
-              next = new IxCode.AsInstanceOf(next, elementVar.getType)
+              next = new AsInstanceOf(next, elementVar.getType)
             }
-            block = new IxCode.ConditionalLoop(new IxCode.Call(ref(iteratorVar), mHasNext, new Array[IxCode.Term](0)), new IxCode.StatementBlock(assign(elementVar, next), block))
-            new IxCode.StatementBlock(init, block)
+            block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
+            new StatementBlock(init, block)
           }
         }
       case node@AST.ForStatement(loc, _, _, _, _) =>
         openScope(context) {
-          val init = Option(node.init).map{init => translate(init, context)}.getOrElse(new IxCode.NOP(loc))
+          val init = Option(node.init).map{init => translate(init, context)}.getOrElse(new NOP(loc))
           val condition = (for(c <- Option(node.condition)) yield {
             val conditionOpt = typed(c, context)
-            val expected = IxCode.BasicTypeRef.BOOLEAN
+            val expected = BasicTypeRef.BOOLEAN
             for(condition <- conditionOpt; if condition.`type` != expected) {
               report(INCOMPATIBLE_TYPE, node.condition, condition.`type`, expected)
             }
             conditionOpt.getOrElse(null)
-          }).getOrElse(new IxCode.BoolValue(loc, true))
+          }).getOrElse(new BoolValue(loc, true))
           val update = Option(node.update).flatMap{update => typed(update, context)}.getOrElse(null)
           var loop = translate(node.block, context)
-          if(update != null) loop = new IxCode.StatementBlock(loop, new IxCode.ExpressionActionStatement(update))
-          new IxCode.StatementBlock(init.location, init, new IxCode.ConditionalLoop(condition, loop))
+          if(update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
+          new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
         }
       case node@AST.IfStatement(loc, _, _, _) => 
         openScope(context) {
           val conditionOpt = typed(node.condition, context)
-          val expected = IxCode.BasicTypeRef.BOOLEAN
+          val expected = BasicTypeRef.BOOLEAN
           for(condition <- conditionOpt if condition.`type` != expected) {
             report(INCOMPATIBLE_TYPE, node.condition, expected, condition.`type`)
           }
           val thenBlock = translate(node.thenBlock, context)
           val elseBlock = if (node.elseBlock == null) null else translate(node.elseBlock, context)
-          conditionOpt.map{c => new IxCode.IfStatement(c, thenBlock, elseBlock)}.getOrElse(new IxCode.NOP(loc))
+          conditionOpt.map{c => new IfStatement(c, thenBlock, elseBlock)}.getOrElse(new NOP(loc))
         }
       case node@AST.LocalVariableDeclaration(loc, name, typeRef, init) =>
         val binding = context.lookupOnlyCurrentScope(name)
         if (binding != null) {
           report(DUPLICATE_LOCAL_VARIABLE, node, name)
-          return new IxCode.NOP(loc)
+          return new NOP(loc)
         }
         val lhsType = mapFrom(node.typeRef)
-        if (lhsType == null) return new IxCode.NOP(loc)
+        if (lhsType == null) return new NOP(loc)
         val index = context.add(name, lhsType)
-        var local: IxCode.SetLocal = null
+        var local: SetLocal = null
         if (init != null) {
           var valueNode = typed(init, context)
           valueNode match {
-            case None => return new IxCode.NOP(loc)
+            case None => return new NOP(loc)
             case Some(v) =>
               val value = processAssignable(init, lhsType, v)
-              if(value == null) return new IxCode.NOP(loc)
-              local = new IxCode.SetLocal(loc, 0, index, lhsType, value)
+              if(value == null) return new NOP(loc)
+              local = new SetLocal(loc, 0, index, lhsType, value)
           }
         }
         else {
-          local = new IxCode.SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
+          local = new SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
         }
-        new IxCode.ExpressionActionStatement(local)
+        new ExpressionActionStatement(local)
       case node@AST.ReturnStatement(loc, _) =>
         val returnType = context.returnType
         if(node.result == null) {
-          val expected  = IxCode.BasicTypeRef.VOID
+          val expected  = BasicTypeRef.VOID
           if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
-          return new IxCode.Return(loc, null)
+          return new Return(loc, null)
         } else {
           val returnedOpt= typed(node.result, context)
-          if (returnedOpt == null) return new IxCode.Return(loc, null)
+          if (returnedOpt == null) return new Return(loc, null)
           (for(returned <- returnedOpt) yield {
-            if (returned.`type` == IxCode.BasicTypeRef.VOID) {
+            if (returned.`type` == BasicTypeRef.VOID) {
               report(CANNOT_RETURN_VALUE, node)
-              new IxCode.Return(loc, null)
+              new Return(loc, null)
             } else {
               val value = processAssignable(node.result, returnType, returned)
-              if (value == null) return new IxCode.Return(loc, null)
-              new IxCode.Return(loc, value)
+              if (value == null) return new Return(loc, null)
+              new Return(loc, value)
             }
-          }).getOrElse(new IxCode.Return(loc, null))
+          }).getOrElse(new Return(loc, null))
         }
       case node@AST.SelectStatement(loc, _, _, _) =>
         val conditionOpt = typed(node.condition, context)
-        if(conditionOpt == None) return new IxCode.NOP(loc)
+        if(conditionOpt == None) return new NOP(loc)
         val condition = conditionOpt.get
         val name = context.newName
         val index = context.add(name, condition.`type`)
         val statement = if(node.cases.length == 0) {
-          Option(node.elseBlock).map{e => translate(e, context)}.getOrElse(new IxCode.NOP(loc))
+          Option(node.elseBlock).map{e => translate(e, context)}.getOrElse(new NOP(loc))
         }else {
           val cases = node.cases
-          val nodes = Buffer[IxCode.Term]()
-          val thens = Buffer[IxCode.ActionStatement]()
+          val nodes = Buffer[Term]()
+          val thens = Buffer[ActionStatement]()
           for((expressions, then)<- cases) {
             val bind = context.lookup(name)
             nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
             thens += translate(then, context)
           }
-          var branches: IxCode.ActionStatement = if(node.elseBlock != null) {
+          var branches: ActionStatement = if(node.elseBlock != null) {
             translate(node.elseBlock, context)
           }else {
             null
           }
           for(i <- (cases.length - 1) to (0, -1)) {
-            branches = new IxCode.IfStatement(nodes(i), thens(i), branches)
+            branches = new IfStatement(nodes(i), thens(i), branches)
           }
           branches
         }
-        new IxCode.StatementBlock(condition.location, new IxCode.ExpressionActionStatement(condition.location, new IxCode.SetLocal(0, index, condition.`type`, condition)), statement)
+        new StatementBlock(condition.location, new ExpressionActionStatement(condition.location, new SetLocal(0, index, condition.`type`, condition)), statement)
       case node@AST.SynchronizedStatement(loc, _, _) =>
         openScope(context) {
           val lock = typed(node.condition, context).getOrElse(null)
           val block = translate(node.block, context)
           report(UNIMPLEMENTED_FEATURE, node)
-          new IxCode.Synchronized(node.location, lock, block)
+          new Synchronized(node.location, lock, block)
         }
       case node@AST.ThrowStatement(loc, target) => null
         val expressionOpt = typed(target, context)
         for(expression <- expressionOpt) {
           val expected = load("java.lang.Throwable")
           val detected = expression.`type`
-          if (!IxCode.TypeRules.isSuperType(expected, detected)) {
+          if (!TypeRules.isSuperType(expected, detected)) {
             report(INCOMPATIBLE_TYPE, node, expected, detected)
           }
         }
-        new IxCode.Throw(loc, expressionOpt.getOrElse(null))
+        new Throw(loc, expressionOpt.getOrElse(null))
       case node@AST.TryStatement(loc, tryBlock, recClauses, finBlock) =>
         val tryStatement = translate(tryBlock, context)
         val binds = new Array[ClosureLocalBinding](recClauses.length)
-        val catchBlocks = new Array[IxCode.ActionStatement](recClauses.length)
+        val catchBlocks = new Array[ActionStatement](recClauses.length)
         for(i <- 0 until recClauses.length) {
           val (argument, body) = recClauses(i)
           openScope(context) {
             val argType = mapFrom(argument.typeRef)
             val expected = load("java.lang.Throwable")
-            if (!IxCode.TypeRules.isSuperType(expected, argType)) {
+            if (!TypeRules.isSuperType(expected, argType)) {
               report(INCOMPATIBLE_TYPE, argument, expected, argType)
             }
             binds(i) = context.lookupOnlyCurrentScope(argument.name)
             catchBlocks(i) = translate(body, context)
           }
         }
-        new IxCode.Try(loc, tryStatement, binds, catchBlocks)
+        new Try(loc, tryStatement, binds, catchBlocks)
       case node@AST.WhileStatement(loc, _, _) =>
         openScope(context) {
           val conditionOpt = typed(node.condition, context)
-          val expected = IxCode.BasicTypeRef.BOOLEAN
+          val expected = BasicTypeRef.BOOLEAN
           for(condition <- conditionOpt) {
             val actual = condition.`type`
             if(actual != expected)  report(INCOMPATIBLE_TYPE, node, expected, actual)
           }
           val thenBlock = translate(node.block, context)
-          new IxCode.ConditionalLoop(loc, conditionOpt.getOrElse(null), thenBlock)
+          new ConditionalLoop(loc, conditionOpt.getOrElse(null), thenBlock)
         }
     }
-    def defaultValue(typeRef: IxCode.TypeRef): IxCode.Term = IxCode.Term.defaultValue(typeRef)
-    def addReturnNode(node: IxCode.ActionStatement, returnType: IxCode.TypeRef): IxCode.StatementBlock = {
-      return new IxCode.StatementBlock(node, new IxCode.Return(defaultValue(returnType)))
+    def defaultValue(typeRef: TypeRef): Term = Term.defaultValue(typeRef)
+    def addReturnNode(node: ActionStatement, returnType: TypeRef): StatementBlock = {
+      return new StatementBlock(node, new Return(defaultValue(returnType)))
     }
-    def createMain(top: IxCode.ClassTypeRef, ref: IxCode.MethodRef, name: String, args: Array[IxCode.TypeRef], ret: IxCode.TypeRef): IxCode.MethodDefinition = {
-      val method = new IxCode.MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
+    def createMain(top: ClassTypeRef, ref: MethodRef, name: String, args: Array[TypeRef], ret: TypeRef): MethodDefinition = {
+      val method = new MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
       val frame = new LocalFrame(null)
-      val params = new Array[IxCode.Term](args.length)
+      val params = new Array[Term](args.length)
       for(i <- 0 until args.length) {
         val arg = args(i)
         val index = frame.add("args" + i, arg)
-        params(i) = new IxCode.RefLocal(0, index, arg)
+        params(i) = new RefLocal(0, index, arg)
       }
       method.setFrame(frame)
-      val constructor = top.findConstructor(new Array[IxCode.Term](0))(0)
-      var block = new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(new IxCode.Call(new IxCode.NewObject(constructor, new Array[IxCode.Term](0)), ref, params)))
-      block = addReturnNode(block, IxCode.BasicTypeRef.VOID)
+      val constructor = top.findConstructor(new Array[Term](0))(0)
+      var block = new StatementBlock(new ExpressionActionStatement(new Call(new NewObject(constructor, new Array[Term](0)), ref, params)))
+      block = addReturnNode(block, BasicTypeRef.VOID)
       method.setBlock(block)
       method
     }
     unit_ = node
     val toplevels = node.toplevels
     val context = new LocalContext
-    val statements = Buffer[IxCode.ActionStatement]()
+    val statements = Buffer[ActionStatement]()
     mapper_ = find(topClass)
-    val klass = loadTopClass.asInstanceOf[IxCode.ClassDefinition]
+    val klass = loadTopClass.asInstanceOf[ClassDefinition]
     val argsType = loadArray(load("java.lang.String"), 1)
-    val method= new IxCode.MethodDefinition(node.location, AST.M_PUBLIC, klass, "start", Array[IxCode.TypeRef](argsType), IxCode.BasicTypeRef.VOID, null)
+    val method= new MethodDefinition(node.location, AST.M_PUBLIC, klass, "start", Array[TypeRef](argsType), BasicTypeRef.VOID, null)
     context.add("args", argsType)
     for (element <- toplevels) {
       if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass;
@@ -646,21 +647,21 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     if (klass != null) {
-      statements += new IxCode.Return(null)
-      method.setBlock(new IxCode.StatementBlock(statements))
+      statements += new Return(null)
+      method.setBlock(new StatementBlock(statements))
       method.setFrame(context.getContextFrame)
       klass.add(method)
-      klass.add(createMain(klass, method, "main", Array[IxCode.TypeRef](argsType), IxCode.BasicTypeRef.VOID))
+      klass.add(createMain(klass, method, "main", Array[TypeRef](argsType), BasicTypeRef.VOID))
     }
   }
   def processDuplication(node: AST.CompilationUnit) {
-    val methods = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
-    val fields = new JTreeSet[IxCode.FieldRef](new IxCode.FieldRefComparator)
-    val constructors = new JTreeSet[IxCode.ConstructorRef](new IxCode.ConstructorRefComparator)
-    val variables = new JTreeSet[IxCode.FieldRef](new IxCode.FieldRefComparator)
-    val functions = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
+    val methods = new JTreeSet[MethodRef](new MethodRefComparator)
+    val fields = new JTreeSet[FieldRef](new FieldRefComparator)
+    val constructors = new JTreeSet[ConstructorRef](new ConstructorRefComparator)
+    val variables = new JTreeSet[FieldRef](new FieldRefComparator)
+    val functions = new JTreeSet[MethodRef](new MethodRefComparator)
     def processFieldDeclaration(node: AST.FieldDeclaration) {
-      val field = lookupKernelNode(node).asInstanceOf[IxCode.FieldDefinition]
+      val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return null
       if (fields.contains(field)) {
         report(DUPLICATE_FIELD, node, field.affiliation, field.name)
@@ -669,7 +670,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processMethodDeclaration(node: AST.MethodDeclaration) {
-      val method = lookupKernelNode(node).asInstanceOf[IxCode.MethodDefinition]
+      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return null
       if (methods.contains(method)) {
         report(DUPLICATE_METHOD, node, method.affiliation, method.name, method.arguments)
@@ -678,7 +679,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
-      val constructor = lookupKernelNode(node).asInstanceOf[IxCode.ConstructorDefinition]
+      val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
       if (constructor == null) return null
       if (constructors.contains(constructor)) {
         report(DUPLICATE_CONSTRUCTOR, node, constructor.affiliation, constructor.getArgs)
@@ -687,7 +688,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
-      val field = lookupKernelNode(node).asInstanceOf[IxCode.FieldDefinition]
+      val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return null
       if (fields.contains(field)) {
         report(DUPLICATE_FIELD, node, field.affiliation, field.name)
@@ -696,7 +697,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processInterfaceMethodDeclaration(node: AST.MethodDeclaration) {
-      val method = lookupKernelNode(node).asInstanceOf[IxCode.MethodDefinition]
+      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return null
       if (methods.contains(method)) {
         report(DUPLICATE_METHOD, node, method.affiliation, method.name, method.arguments)
@@ -705,24 +706,24 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def generateMethods() {
-      val generated = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
-      val methodSet = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
-      def makeDelegationMethod(delegated: IxCode.FieldRef, delegator: IxCode.MethodRef): IxCode.MethodDefinition = {
+      val generated = new JTreeSet[MethodRef](new MethodRefComparator)
+      val methodSet = new JTreeSet[MethodRef](new MethodRefComparator)
+      def makeDelegationMethod(delegated: FieldRef, delegator: MethodRef): MethodDefinition = {
         val args = delegator.arguments
-        val params = new Array[IxCode.Term](args.length)
+        val params = new Array[Term](args.length)
         val frame = new LocalFrame(null)
         for(i <- 0 until params.length) {
           val index = frame.add("arg" + i, args(i))
-          params(i) = new IxCode.RefLocal(new ClosureLocalBinding(0, index, args(i)))
+          params(i) = new RefLocal(new ClosureLocalBinding(0, index, args(i)))
         }
-        val target = new IxCode.Call(new IxCode.RefField(new IxCode.This(definition_), delegated), delegator, params)
-        val statement = if (delegator.returnType != IxCode.BasicTypeRef.VOID) new IxCode.StatementBlock(new IxCode.Return(target)) else new IxCode.StatementBlock(new IxCode.ExpressionActionStatement(target), new IxCode.Return(null))
-        val node = new IxCode.MethodDefinition(null, AST.M_PUBLIC, definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
+        val target = new Call(new RefField(new This(definition_), delegated), delegator, params)
+        val statement = if (delegator.returnType != BasicTypeRef.VOID) new StatementBlock(new Return(target)) else new StatementBlock(new ExpressionActionStatement(target), new Return(null))
+        val node = new MethodDefinition(null, AST.M_PUBLIC, definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
         node.setFrame(frame)
         node
       }
-      def generateDelegationMethods(node: IxCode.FieldDefinition) {
-        val typeRef = node.`type`.asInstanceOf[IxCode.ClassTypeRef]
+      def generateDelegationMethods(node: FieldDefinition) {
+        val typeRef = node.`type`.asInstanceOf[ClassTypeRef]
         val src = Classes.getInterfaceMethods(typeRef)
         for (method <- src) {
           if (!methodSet.contains(method)) {
@@ -738,7 +739,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
       }
       for (node <- fields) {
-        if ((AST.M_FORWARDED & node.modifier) != 0) generateDelegationMethods(node.asInstanceOf[IxCode.FieldDefinition])
+        if ((AST.M_FORWARDED & node.modifier) != 0) generateDelegationMethods(node.asInstanceOf[FieldDefinition])
       }
     }
     def processAccessSection(node: AST.AccessSection) {
@@ -750,7 +751,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration) {
-      val field = lookupKernelNode(node).asInstanceOf[IxCode.FieldDefinition]
+      val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return null
       if (variables.contains(field)) {
         report(DUPLICATE_GLOBAL_VARIABLE, node, field.name)
@@ -759,7 +760,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processFunctionDeclaration(node: AST.FunctionDeclaration) {
-      val method = lookupKernelNode(node).asInstanceOf[IxCode.MethodDefinition]
+      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return null
       if (functions.contains(method)) {
         report(DUPLICATE_FUNCTION, node, method.name, method.arguments)
@@ -768,7 +769,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processClassDeclaration(node: AST.ClassDeclaration) {
-      val clazz = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       if (clazz == null) return null
       methods.clear()
       fields.clear()
@@ -780,7 +781,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       generateMethods()
     }
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
-      var clazz = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      var clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       if (clazz == null) return null
       methods.clear()
       fields.clear()
@@ -811,55 +812,55 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     reporter_.report(error, location, items.toArray)
   }
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
-  def load(name: String): IxCode.ClassTypeRef = table_.load(name)
-  def loadTopClass: IxCode.ClassTypeRef = table_.load(topClass)
-  def loadArray(base: IxCode.TypeRef, dimension: Int): IxCode.ArrayTypeRef = table_.loadArray(base, dimension)
-  def rootClass: IxCode.ClassTypeRef = table_.rootClass
+  def load(name: String): ClassTypeRef = table_.load(name)
+  def loadTopClass: ClassTypeRef = table_.load(topClass)
+  def loadArray(base: TypeRef, dimension: Int): ArrayTypeRef = table_.loadArray(base, dimension)
+  def rootClass: ClassTypeRef = table_.rootClass
   def problems: Array[CompileError] = reporter_.getProblems
-  def sourceClasses: Array[IxCode.ClassDefinition] = table_.classes.values.toArray(new Array[IxCode.ClassDefinition](0))
+  def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray(new Array[ClassDefinition](0))
   def topClass: String = {
     val module = unit_.module
     val moduleName = if (module != null) module.name else null
     return createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
   }
-  private def put(astNode: AST.Node, kernelNode: IxCode.Node) {
+  private def put(astNode: AST.Node, kernelNode: Node) {
     ast2ixt_(astNode) = kernelNode
     ixt2ast_(kernelNode) = astNode
   }
-  private def lookupAST(kernelNode: IxCode.Node): Option[AST.Node] =  ixt2ast_.get(kernelNode)
-  private def lookupKernelNode(astNode: AST.Node): Option[IxCode.Node] = ast2ixt_.get(astNode)
+  private def lookupAST(kernelNode: Node): Option[AST.Node] =  ixt2ast_.get(kernelNode)
+  private def lookupKernelNode(astNode: AST.Node): Option[Node] = ast2ixt_.get(astNode)
   private def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
   private def find(className: String): NameMapper = mappers_(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Array[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.getPathSeparator).append(path)}.toString
-  private def typesOf(arguments: List[AST.Argument]): Option[List[IxCode.TypeRef]] = {
+  private def typesOf(arguments: List[AST.Argument]): Option[List[TypeRef]] = {
     val result = arguments.map{arg => mapFrom(arg.typeRef)}
     if(result.exists(_ == null)) Some(result) else None
   }
-  private def mapFrom(typeNode: AST.TypeNode): IxCode.TypeRef = mapFrom(typeNode, mapper_)
-  private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): IxCode.TypeRef = {
+  private def mapFrom(typeNode: AST.TypeNode): TypeRef = mapFrom(typeNode, mapper_)
+  private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): TypeRef = {
     val mappedType = mapper.map(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, AST.toString(typeNode.desc))
     return mappedType
   }
-  private def createEquals(kind: Int, lhs: IxCode.Term, rhs: IxCode.Term): IxCode.Term = {
-    val params = Array[IxCode.Term](new IxCode.AsInstanceOf(rhs, rootClass))
-    val target = lhs.`type`.asInstanceOf[IxCode.ObjectTypeRef]
+  private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
+    val params = Array[Term](new AsInstanceOf(rhs, rootClass))
+    val target = lhs.`type`.asInstanceOf[ObjectTypeRef]
     val methods = target.findMethod("equals", params)
-    var node: IxCode.Term = new IxCode.Call(lhs, methods(0), params)
-    if (kind == IxCode.BinaryTerm.Constants.NOT_EQUAL) {
-      node = new IxCode.UnaryTerm(NOT, IxCode.BasicTypeRef.BOOLEAN, node)
+    var node: Term = new Call(lhs, methods(0), params)
+    if (kind == BinaryTerm.Constants.NOT_EQUAL) {
+      node = new UnaryTerm(NOT, BasicTypeRef.BOOLEAN, node)
     }
     node
   }
-  private def indexref(bind: ClosureLocalBinding, value: IxCode.Term): IxCode.Term = new IxCode.RefArray(new IxCode.RefLocal(bind), value)
-  private def assign(bind: ClosureLocalBinding, value: IxCode.Term): IxCode.ActionStatement = new IxCode.ExpressionActionStatement(new IxCode.SetLocal(bind, value))
-  private def ref(bind: ClosureLocalBinding): IxCode.Term = new IxCode.RefLocal(bind)
-  private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String): IxCode.MethodRef = {
-    return findMethod(node, target, name, new Array[IxCode.Term](0))
+  private def indexref(bind: ClosureLocalBinding, value: Term): Term = new RefArray(new RefLocal(bind), value)
+  private def assign(bind: ClosureLocalBinding, value: Term): ActionStatement = new ExpressionActionStatement(new SetLocal(bind, value))
+  private def ref(bind: ClosureLocalBinding): Term = new RefLocal(bind)
+  private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String): MethodRef = {
+    return findMethod(node, target, name, new Array[Term](0))
   }
-  private def findMethod(node: AST.Node, target: IxCode.ObjectTypeRef, name: String, params: Array[IxCode.Term]): IxCode.MethodRef = {
-    val methods: Array[IxCode.MethodRef] = target.findMethod(name, params)
+  private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String, params: Array[Term]): MethodRef = {
+    val methods: Array[MethodRef] = target.findMethod(name, params)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
       return null

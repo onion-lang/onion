@@ -12,6 +12,12 @@ object AST {
   val M_PROTECTED = 256
   val M_PRIVATE = 512
   val M_FORWARDED = 1024
+  def toString(descriptor: TypeDescriptor): String = descriptor match {
+    case PrimitiveType(kind) => kind.toString
+    case ReferenceType(name, _) => name
+    case ParameterizedType(component, params) => toString(component) + params.map(toString(_)).mkString("[", ",", "]")
+    case ArrayType(component) => toString(component) + "[]"
+  }
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A) { buffer += element }
   abstract sealed class TypeDescriptor
@@ -19,16 +25,18 @@ object AST {
   case class ReferenceType(name: String, qualified: Boolean) extends TypeDescriptor
   case class ParameterizedType(component: TypeDescriptor, params: List[TypeDescriptor]) extends TypeDescriptor
   case class ArrayType(component: TypeDescriptor) extends TypeDescriptor
-  abstract sealed class PrimitiveTypeKind
-  case object KByte extends PrimitiveTypeKind
-  case object KShort extends PrimitiveTypeKind
-  case object KInt extends PrimitiveTypeKind
-  case object KLong extends PrimitiveTypeKind
-  case object KChar extends PrimitiveTypeKind
-  case object KFloat extends PrimitiveTypeKind
-  case object KDouble extends PrimitiveTypeKind
-  case object KBoolean extends PrimitiveTypeKind
-  case object KVoid extends PrimitiveTypeKind
+  abstract sealed class PrimitiveTypeKind(val name: String) {
+    override def toString: String = name
+  }
+  case object KByte extends PrimitiveTypeKind("byte")
+  case object KShort extends PrimitiveTypeKind("short")
+  case object KInt extends PrimitiveTypeKind("int")
+  case object KLong extends PrimitiveTypeKind("long")
+  case object KChar extends PrimitiveTypeKind("char")
+  case object KFloat extends PrimitiveTypeKind("float")
+  case object KDouble extends PrimitiveTypeKind("double")
+  case object KBoolean extends PrimitiveTypeKind("boolean")
+  case object KVoid extends PrimitiveTypeKind("void")
   //workaround to be used from Java
   val K_BYTE = KByte
   val K_SHORT = KShort

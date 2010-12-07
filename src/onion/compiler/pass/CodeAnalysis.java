@@ -46,15 +46,15 @@ public class CodeAnalysis {
   private IxCode.ClassDefinition definition;
   private NameMapper mapper;
   private int access;
-  
+
+  //---------------------------------------------------------------------------//
+
   public String topClass(){
     ModuleDeclaration module = unit.getModuleDeclaration();
     String moduleName = module != null ? module.getName() : null;
     return createName(moduleName, Paths.cutExtension(unit.getSourceFileName()) + "Main");
   }
 
-  //---------------------------------------------------------------------------//
-  
   public void put(AstNode astNode, IxCode.Node kernelNode){
     ast2irt.put(astNode, kernelNode);
     irt2ast.put(kernelNode, astNode);

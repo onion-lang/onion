@@ -1,4 +1,5 @@
 package onion.compiler
+import _root_.java.util.{TreeSet => JTreeSet}
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
@@ -70,7 +71,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[IxCode.ClassDefinition] = {
     for(unit <- source) processHeader(unit)
     for(unit <- source) processOutline(unit)
-    null
+    for(unit <- source) processTyping(unit)
+    for(unit <- source) processDuplication(unit)
+    table_.classes.values.toList.toArray
   }
 
   def processHeader(unit: AST.CompilationUnit) {
@@ -308,6 +311,159 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         case node : AST.InterfaceDeclaration => processInterfaceDeclaration(node)
         case node : AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
         case node : AST.FunctionDeclaration => processFunctionDeclaration(node)
+        case _ =>
+      }
+    }
+  }
+  def processTyping(node: AST.CompilationUnit) {
+    //TODO: Implement this method.
+  }
+  def processDuplication(node: AST.CompilationUnit) {
+    val methods = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
+    val fields = new JTreeSet[IxCode.FieldRef](new IxCode.FieldRefComparator)
+    val constructors = new JTreeSet[IxCode.ConstructorRef](new IxCode.ConstructorRefComparator)
+    val variables = new JTreeSet[IxCode.FieldRef](new IxCode.FieldRefComparator)
+    val functions = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
+    def processFieldDeclaration(node: AST.FieldDeclaration) {
+      val field = lookupKernelNode(node).asInstanceOf[IxCode.FieldDefinition]
+      if (field == null) return null
+      if (fields.contains(field)) {
+        report(DUPLICATE_FIELD, node, field.affiliation, field.name)
+      } else {
+        fields.add(field)
+      }
+    }
+    def processMethodDeclaration(node: AST.MethodDeclaration) {
+      val method = lookupKernelNode(node).asInstanceOf[IxCode.MethodDefinition]
+      if (method == null) return null
+      if (methods.contains(method)) {
+        report(DUPLICATE_METHOD, node, method.affiliation, method.name, method.arguments)
+      } else {
+        methods.add(method)
+      }
+    }
+    def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
+      val constructor = lookupKernelNode(node).asInstanceOf[IxCode.ConstructorDefinition]
+      if (constructor == null) return null
+      if (constructors.contains(constructor)) {
+        report(DUPLICATE_CONSTRUCTOR, node, constructor.affiliation, constructor.getArgs)
+      } else {
+        constructors.add(constructor)
+      }
+    }
+    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
+      val field = lookupKernelNode(node).asInstanceOf[IxCode.FieldDefinition]
+      if (field == null) return null
+      if (fields.contains(field)) {
+        report(DUPLICATE_FIELD, node, field.affiliation, field.name)
+      } else {
+        fields.add(field)
+      }
+    }
+    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration) {
+      val method = lookupKernelNode(node).asInstanceOf[IxCode.MethodDefinition]
+      if (method == null) return null
+      if (methods.contains(method)) {
+        report(DUPLICATE_METHOD, node, method.affiliation, method.name, method.arguments)
+      } else {
+        methods.add(method)
+      }
+    }
+    def generateMethods() {
+      val generated = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
+      val methodSet = new JTreeSet[IxCode.MethodRef](new IxCode.MethodRefComparator)
+      def makeDelegationMethod(delegated: IxCode.FieldRef, delegator: IxCode.MethodRef): IxCode.MethodDefinition = {
+        val args = delegator.arguments
+        val params = new Array[IxCode.Expression](args.length)
+        val frame = new LocalFrame(null)
+        for(i <- 0 until params.length) {
+          val index = frame.add("arg" + i, args(i))
+          params(i) = new IxCode.RefLocal(new ClosureLocalBinding(0, index, args(i)))
+        }
+        val target = new IxCode.Call(new IxCode.RefField(new IxCode.This(definition_), delegated), delegator, params)
+        val statement = if (delegator.returnType != IxCode.BasicTypeRef.VOID) new IxCode.StatementBlock(new IxCode.Return(target)) else new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null))
+        val node = new IxCode.MethodDefinition(null, AST.M_PUBLIC, definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
+        node.setFrame(frame)
+        node
+      }
+      def generateDelegationMethods(node: IxCode.FieldDefinition) {
+        val typeRef = node.`type`.asInstanceOf[IxCode.ClassTypeRef]
+        val src = Classes.getInterfaceMethods(typeRef)
+        for (method <- src) {
+          if (!methodSet.contains(method)) {
+            if (generated.contains(method)) {
+              report(DUPLICATE_GENERATED_METHOD, node.location, method.affiliation, method.name, method.arguments)
+            }
+            else {
+              val generatedMethod = makeDelegationMethod(node, method)
+              generated.add(generatedMethod)
+              definition_.add(generatedMethod)
+            }
+          }
+        }
+      }
+      for (node <- fields) {
+        if ((AST.M_FORWARDED & node.modifier) != 0) generateDelegationMethods(node.asInstanceOf[IxCode.FieldDefinition])
+      }
+    }
+    def processAccessSection(node: AST.AccessSection) {
+      for(member <- node.members) member match {
+        case node: AST.FieldDeclaration => processFieldDeclaration(node)
+        case node: AST.MethodDeclaration => processMethodDeclaration(node)
+        case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
+        case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+      }
+    }
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration) {
+      val field = lookupKernelNode(node).asInstanceOf[IxCode.FieldDefinition]
+      if (field == null) return null
+      if (variables.contains(field)) {
+        report(DUPLICATE_GLOBAL_VARIABLE, node, field.name)
+      }else {
+        variables.add(field)
+      }
+    }
+    def processFunctionDeclaration(node: AST.FunctionDeclaration) {
+      val method = lookupKernelNode(node).asInstanceOf[IxCode.MethodDefinition]
+      if (method == null) return null
+      if (functions.contains(method)) {
+        report(DUPLICATE_FUNCTION, node, method.name, method.arguments)
+      } else {
+        functions.add(method)
+      }
+    }
+    def processClassDeclaration(node: AST.ClassDeclaration) {
+      val clazz = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      if (clazz == null) return null
+      methods.clear()
+      fields.clear()
+      constructors.clear()
+      definition_ = clazz
+      mapper_ = find(clazz.name)
+      if (node.defaultSection != null) processAccessSection(node.defaultSection)
+      for (section <- node.sections) processAccessSection(section)
+      generateMethods()
+    }
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
+      var clazz = lookupKernelNode(node).asInstanceOf[IxCode.ClassDefinition]
+      if (clazz == null) return null
+      methods.clear()
+      fields.clear()
+      constructors.clear()
+      definition_ = clazz
+      mapper_ = find(clazz.name)
+      for (node <- node.methods) processInterfaceMethodDeclaration(node)
+    }
+    unit_ = node
+    variables.clear()
+    functions.clear()
+    for (toplevel <- node.toplevels) {
+      mapper_ = find(topClass)
+      toplevel match {
+        case node: AST.ClassDeclaration => processClassDeclaration(node)
+        case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
+        case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
+        case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
         case _ =>
       }
     }

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -484,18 +483,18 @@ public class CodeAnalysis {
       }
     }
     
-    public Object visit(ClassDeclaration ast, Void context) {
-      IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
+    public Object visit(ClassDeclaration node, Void context) {
+      IxCode.ClassDefinition clazz = (IxCode.ClassDefinition) lookupKernelNode(node);
+      if(clazz == null) return null;
       methods.clear();
       fields.clear();
       constructors.clear();
-      definition = node;
-      mapper = find(node.name());
-      if(ast.getDefaultSection() != null){
-        accept(ast.getDefaultSection());
+      definition = clazz;
+      mapper = find(clazz.name());
+      if(node.getDefaultSection() != null){
+        accept(node.getDefaultSection());
       }
-      for (AccessSection section : ast.getSections())  accept(section);
+      for (AccessSection section : node.getSections())  accept(section);
       generateMethods();
       return null;
     }
@@ -509,14 +508,14 @@ public class CodeAnalysis {
     }
     
     private void generateDelegationMethods(IxCode.FieldDefinition node, Set<IxCode.MethodRef> generated, Set<IxCode.MethodRef> methodSet){
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) node.type();
-      Set<IxCode.MethodRef> src = Classes.getInterfaceMethods(type);
+      IxCode.ClassTypeRef typeRef = (IxCode.ClassTypeRef) node.type();
+      Set<IxCode.MethodRef> src = Classes.getInterfaceMethods(typeRef);
       for (IxCode.MethodRef method : src) {
         if (!methodSet.contains(method)) {
           if (generated.contains(method)) {
             report(DUPLICATE_GENERATED_METHOD, node.location(), method.affiliation(), method.name(), method.arguments());
           } else {
-            IxCode.MethodDefinition generatedMethod = createEmptyMethod(node, method);
+            IxCode.MethodDefinition generatedMethod = makeDelegationMethod(node, method);
             generated.add(generatedMethod);
             definition.add(generatedMethod);
           }
@@ -524,113 +523,106 @@ public class CodeAnalysis {
       }
     }
     
-    private IxCode.MethodDefinition createEmptyMethod(IxCode.FieldRef field, IxCode.MethodRef method){
-      IxCode.Expression target;
-      target = new IxCode.RefField(new IxCode.This(definition), field);
-      IxCode.TypeRef[] args = method.arguments();
+    private IxCode.MethodDefinition makeDelegationMethod(IxCode.FieldRef delegated, IxCode.MethodRef delegator){
+      IxCode.TypeRef[] args = delegator.arguments();
       IxCode.Expression[] params = new IxCode.Expression[args.length];
       LocalFrame frame = new LocalFrame(null);
       for(int i = 0; i < params.length; i++){
         int index = frame.add("arg" + i, args[i]);
         params[i] = new IxCode.RefLocal(new ClosureLocalBinding(0, index, args[i]));
       }
-      target = new IxCode.Call(target, method, params);
-      IxCode.StatementBlock statement;
-      if(method.returnType() != IxCode.BasicTypeRef.VOID){
-        statement = new IxCode.StatementBlock(new IxCode.Return(target));
-      }else{
-        statement = new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null));
-      }
-      IxCode.MethodDefinition node = new IxCode.MethodDefinition(null, Modifier.PUBLIC, definition, method.name(), method.arguments(), method.returnType(), statement);
+      IxCode.Expression target = new IxCode.Call(new IxCode.RefField(new IxCode.This(definition), delegated), delegator, params);
+      IxCode.StatementBlock statement = delegator.returnType() != IxCode.BasicTypeRef.VOID ? new IxCode.StatementBlock(new IxCode.Return(target)) : new IxCode.StatementBlock(new IxCode.ExpressionStatement(target), new IxCode.Return(null));
+      IxCode.MethodDefinition node = new IxCode.MethodDefinition(null, Modifier.PUBLIC, definition, delegator.name(), delegator.arguments(), delegator.returnType(), statement);
       node.setFrame(frame);
       return node;
     }
       
-    public Object visit(InterfaceDeclaration ast, Void context) {
-      IxCode.ClassDefinition node = (IxCode.ClassDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
+    public Object visit(InterfaceDeclaration node, Void context) {
+      IxCode.ClassDefinition clazz = (IxCode.ClassDefinition) lookupKernelNode(node);
+      if(clazz == null) return null;
       methods.clear();
       fields.clear();
       constructors.clear();
-      definition = node;
-      mapper = find(node.name());
-      for (InterfaceMethodDeclaration member : ast.getDeclarations())  accept(member, context);
+      definition = clazz;
+      mapper = find(clazz.name());
+      for (InterfaceMethodDeclaration member : node.getDeclarations())  accept(member, context);
       return null;
     }
     
-    public Object visit(ConstructorDeclaration ast, Void context) {
-      IxCode.ConstructorDefinition node = (IxCode.ConstructorDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(constructors.contains(node)){
-        report(DUPLICATE_CONSTRUCTOR, ast, node.affiliation(), node.getArgs());
+    public Object visit(ConstructorDeclaration node, Void context) {
+      IxCode.ConstructorDefinition constructor = (IxCode.ConstructorDefinition) lookupKernelNode(node);
+      if(constructor == null) return null;
+      if(constructors.contains(constructor)){
+        report(DUPLICATE_CONSTRUCTOR, node, constructor.affiliation(), constructor.getArgs());
       }else{
-        constructors.add(node);
+        constructors.add(constructor);
       }
       return null;
     }
     
-    public Object visit(DelegationDeclaration ast, Void context) {
-      IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(fields.contains(node)){
-        report(DUPLICATE_FIELD, ast, node.affiliation(), node.name());
+    public Object visit(DelegationDeclaration node, Void context) {
+      IxCode.FieldDefinition field = (IxCode.FieldDefinition) lookupKernelNode(node);
+      if(field == null) return null;
+      if(fields.contains(field)){
+        report(DUPLICATE_FIELD, node, field.affiliation(), field.name());
       }else{
-        fields.add(node);
+        fields.add(field);
       }
       return null;
     }
     
-    public Object visit(MethodDeclaration ast, Void context) {
-      IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(methods.contains(node)){
-        report(DUPLICATE_METHOD, ast, node.affiliation(), node.name(), node.arguments());
+    public Object visit(MethodDeclaration node, Void context) {
+      IxCode.MethodDefinition method = (IxCode.MethodDefinition) lookupKernelNode(node);
+      if(method == null) return null;
+      if(methods.contains(method)){
+        report(DUPLICATE_METHOD, node, method.affiliation(), method.name(), method.arguments());
       }else{
-        methods.add(node);
+        methods.add(method);
       }
       return null;
     }
     
-    public Object visit(FieldDeclaration ast, Void context) {
-      IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(fields.contains(node)){
-        report(DUPLICATE_FIELD, ast, node.affiliation(), node.name());
+    public Object visit(FieldDeclaration node, Void context) {
+      IxCode.FieldDefinition field = (IxCode.FieldDefinition) lookupKernelNode(node);
+      if(field == null) return null;
+      if(fields.contains(field)){
+        report(DUPLICATE_FIELD, node, field.affiliation(), field.name());
       }else{
-        fields.add(node);
+        fields.add(field);
       }
       return null;
     }
     
-    public Object visit(InterfaceMethodDeclaration ast, Void context) {
-      IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(methods.contains(node)){
-        report(DUPLICATE_METHOD, ast, node.affiliation(), node.name(), node.arguments());
+    public Object visit(InterfaceMethodDeclaration node, Void context) {
+      IxCode.MethodDefinition method = (IxCode.MethodDefinition) lookupKernelNode(node);
+      if(method == null) return null;
+      if(methods.contains(method)){
+        report(DUPLICATE_METHOD, node, method.affiliation(), method.name(), method.arguments());
       }else{
-        methods.add(node);
+        methods.add(method);
       }
       return null;
     }
     
-    public Object visit(FunctionDeclaration ast, Void context) {
-      IxCode.MethodDefinition node = (IxCode.MethodDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(functions.contains(node)){
-        report(DUPLICATE_FUNCTION, ast, node.name(), node.arguments());
+    public Object visit(FunctionDeclaration node, Void context) {
+      IxCode.MethodDefinition method = (IxCode.MethodDefinition) lookupKernelNode(node);
+      if(method == null) return null;
+      if(functions.contains(method)){
+        report(DUPLICATE_FUNCTION, node, method.name(), method.arguments());
       }else{
-        functions.add(node);
+        functions.add(method);
       }
       return null;
     }
     
-    public Object visit(GlobalVariableDeclaration ast, Void context) {
-      IxCode.FieldDefinition node = (IxCode.FieldDefinition) lookupKernelNode(ast);
-      if(node == null) return null;
-      if(variables.contains(node)){
-        report(DUPLICATE_GLOBAL_VARIABLE, ast, node.name());
+    public Object visit(GlobalVariableDeclaration node, Void context) {
+      IxCode.FieldDefinition field = (IxCode.FieldDefinition) lookupKernelNode(node);
+      if(field == null) return null;
+      if(variables.contains(field)){
+        report(DUPLICATE_GLOBAL_VARIABLE, node, field.name());
       }else{
-        variables.add(node);
+        variables.add(field);
       }
       return null;
     }

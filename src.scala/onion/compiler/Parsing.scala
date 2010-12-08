@@ -2,9 +2,9 @@ package onion.compiler
 
 import collection.mutable.ArrayBuffer
 import collection.JavaConversions._
-import onion.compiler.util.Messages
 import java.io.{Reader, IOException}
-import parser.{JJOnionParser, Token, ParseException}
+import _root_.onion.compiler.util.Messages
+import _root_.onion.compiler.parser.{JJOnionParser, Token, ParseException}
 
 /**
  * Created by IntelliJ IDEA.

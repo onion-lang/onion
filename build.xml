@@ -32,7 +32,7 @@
   </taskdef>
 
   <path id="build.classpath">
-    <pathelement path="${build}"/>
+    <pathelement path="${src}"/>
     <pathelement path="${bcel.path}" />
     <pathelement path="${junit.path}" />
     <pathelement path="${scala-compiler.jar}"/>
@@ -71,15 +71,17 @@
   	<mkdir dir="${build.lib}" />
     <scalac destdir="${build}" classpathref="build.classpath">
       <include name="**/*.scala"/>
+      <include name="**/*.java"/>
       <src>
         <pathelement location="${src.scala}"/>
+        <pathelement location="${src.parser}"/>
         <pathelement location="${src}"/>
       </src>
     </scalac>
     <javac srcdir="${src.lib}" destdir="${build.lib}" source="1.5"/>
     <javac srcdir="${src}:${src.parser}" destdir="${build}" source="1.5" debug="true">
       <classpath>
-        <path refid="lib" />
+        <path refid="build.classpath" />
       </classpath>
     </javac>
     <copy todir="${build}/resources">

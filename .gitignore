@@ -1,3 +1,6 @@
 build/
-src.parser
+build.lib/
+src.parser/
+onion-library.jar
+onion.jar
 .idea/workspace.xml

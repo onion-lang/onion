@@ -26,7 +26,7 @@ public class FieldOrMethodRef extends Expression {
     return visitor.visit(this, context);
   }
 
-  public Expression getTarget() {
+  public Expression target() {
     return target;
   }
 

@@ -29,14 +29,14 @@ public class IsInstance extends Expression {
   /**
    * @return target
    */
-  public Expression getTarget() {
+  public Expression target() {
     return target;
   }
 
   /**
    * @return type
    */
-  public TypeSpec getType() {
+  public TypeSpec destinationType() {
     return type;
   }
 }

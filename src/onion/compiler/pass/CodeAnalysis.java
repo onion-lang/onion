@@ -1332,48 +1332,48 @@ public class CodeAnalysis {
       return new IxCode.Call(target, result._2, params);
     }
     
-    Object processFieldOrMethodAssign(Assignment ast, LocalContext context){
-      typed(ast.right(), context);
-      report(UNIMPLEMENTED_FEATURE, ast);
+    Object processFieldOrMethodAssign(Assignment node, LocalContext context){
+      typed(node.right(), context);
+      report(UNIMPLEMENTED_FEATURE, node);
       return null;
     }
     
-    public Object visit(AdditionAssignment ast, LocalContext context) {
-      typed(ast.right(), context);
-      report(UNIMPLEMENTED_FEATURE, ast);
+    public Object visit(AdditionAssignment node, LocalContext context) {
+      typed(node.right(), context);
+      report(UNIMPLEMENTED_FEATURE, node);
       return null;
     }
     
-    public Object visit(SubtractionAssignment ast, LocalContext context) {
-      typed(ast.right(), context);
-      report(UNIMPLEMENTED_FEATURE, ast);
+    public Object visit(SubtractionAssignment node, LocalContext context) {
+      typed(node.right(), context);
+      report(UNIMPLEMENTED_FEATURE, node);
       return null;
     }
     
-    public Object visit(MultiplicationAssignment ast, LocalContext context) {
-      typed(ast.right(), context);
-      report(UNIMPLEMENTED_FEATURE, ast);
+    public Object visit(MultiplicationAssignment node, LocalContext context) {
+      typed(node.right(), context);
+      report(UNIMPLEMENTED_FEATURE, node);
       return null;
     }
     
-    public Object visit(DivisionAssignment ast, LocalContext context) {
-      typed(ast.right(), context);
-      report(UNIMPLEMENTED_FEATURE, ast);
+    public Object visit(DivisionAssignment node, LocalContext context) {
+      typed(node.right(), context);
+      report(UNIMPLEMENTED_FEATURE, node);
       return null;
     }
     
-    public Object visit(ModuloAssignment ast, LocalContext context) {
-      typed(ast.right(), context);
-      report(UNIMPLEMENTED_FEATURE, ast);
+    public Object visit(ModuloAssignment node, LocalContext context) {
+      typed(node.right(), context);
+      report(UNIMPLEMENTED_FEATURE, node);
       return null;
     }
   //-----------------------------------------------------------------------------//
   
   //---------------------------- other expressions ------------------------------//
-    public Object visit(Id ast, LocalContext context) {
-      ClosureLocalBinding bind = context.lookup(ast.getName());
+    public Object visit(Id node, LocalContext context) {
+      ClosureLocalBinding bind = context.lookup(node.getName());
       if(bind == null){
-        report(VARIABLE_NOT_FOUND, ast, ast.getName());
+        report(VARIABLE_NOT_FOUND, node, node.getName());
         return null;
       }
       return new IxCode.RefLocal(bind);
@@ -1467,17 +1467,17 @@ public class CodeAnalysis {
       return true;
     }
     
-    public Object visit(FieldOrMethodRef ast, LocalContext context) {
-      IxCode.ClassDefinition contextClass = CodeAnalysis.this.definition;
-      IxCode.Term target = typed(ast.getTarget(), context);
+    public Object visit(FieldOrMethodRef node, LocalContext context) {
+      final IxCode.ClassDefinition contextClass = definition;
+      final IxCode.Term target = typed(node.target(), context);
       if(target == null) return null;
       if(target.type().isBasicType() || target.type().isNullType()){
-        report(INCOMPATIBLE_TYPE, ast.getTarget(), rootClass(), target.type());
+        report(INCOMPATIBLE_TYPE, node.target(), rootClass(), target.type());
         return null;
       }
-      IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
-      if(!isAccessible(ast, targetType, contextClass)) return null;
-      String name = ast.getName();
+      final IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
+      if(!isAccessible(node, targetType, contextClass)) return null;
+      final String name = node.getName();
       if(target.type().isArrayType()){
         if(name.equals("length") || name.equals("size")){
           return new IxCode.ArrayLength(target);
@@ -1485,36 +1485,32 @@ public class CodeAnalysis {
           return null;
         }
       }
-      IxCode.FieldRef field = findField(targetType, name);
-      if(field != null && isAccessible(field, CodeAnalysis.this.definition)){
+      final IxCode.FieldRef field = findField(targetType, name);
+      if(field != null && isAccessible(field, definition)){
         return new IxCode.RefField(target, field);
       }
-      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, targetType, name, new IxCode.Term[0]);
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(node, targetType, name, new IxCode.Term[0]);
       if(result._2 != null){
         return new IxCode.Call(target, result._2, new IxCode.Term[0]);
       }
       boolean continuable = result._1;
       if(!continuable) return null;
-      
-      String getterName;
-      getterName = getter(name);
-      result = tryFindMethod(ast, targetType, getterName, new IxCode.Term[0]);
+      String getterName = getter(name);
+      result = tryFindMethod(node, targetType, getterName, new IxCode.Term[0]);
       if(result._2 != null){
         return new IxCode.Call(target, result._2, new IxCode.Term[0]);
       }
       continuable = result._1;
       if(!continuable) return null;
-      
       getterName = getterBoolean(name);
-      result = tryFindMethod(ast, targetType, getterName, new IxCode.Term[0]);
+      result = tryFindMethod(node, targetType, getterName, new IxCode.Term[0]);
       if(result._2 != null){
         return new IxCode.Call(target, result._2, new IxCode.Term[0]);
       }
-      
       if(field == null){
-        report(FIELD_NOT_FOUND, ast, targetType, ast.getName());
+        report(FIELD_NOT_FOUND, node, targetType, node.getName());
       }else{
-        report(FIELD_NOT_ACCESSIBLE, ast,  targetType, ast.getName(), CodeAnalysis.this.definition);
+        report(FIELD_NOT_ACCESSIBLE, node,  targetType, node.getName(), CodeAnalysis.this.definition);
       }
       return null;
     }
@@ -1580,19 +1576,19 @@ public class CodeAnalysis {
       return node;
     }
     
-    public boolean equals(IxCode.TypeRef[] types1, IxCode.TypeRef[] types2) {
-      if(types1.length != types2.length) return false;
-      for(int i = 0; i < types1.length; i++){
-        if(types1[i] != types2[i]) return false;
+    public boolean equals(IxCode.TypeRef[] ltype, IxCode.TypeRef[] rtype) {
+      if(ltype.length != rtype.length) return false;
+      for(int i = 0; i < ltype.length; i++){
+        if(ltype[i] != rtype[i]) return false;
       }
       return true;
     }
     
-    public Object visit(ClosureExpression ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getType());
-      Argument[] args = ast.getArguments();
+    public Object visit(ClosureExpression node, LocalContext context) {
+      IxCode.ClassTypeRef typeRef = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(node.getType());
+      Argument[] args = node.getArguments();
       IxCode.TypeRef[] argTypes = new IxCode.TypeRef[args.length];
-      String name = ast.getName();
+      String name = node.getName();
       try {
         context.openFrame();
         boolean error = false;
@@ -1602,25 +1598,25 @@ public class CodeAnalysis {
             error = true;
           }
         }     
-        if(type == null) return null;
-        if(!type.isInterface()){
-          report(INTERFACE_REQUIRED, ast.getType(), type);
+        if(typeRef == null) return null;
+        if(!typeRef.isInterface()){
+          report(INTERFACE_REQUIRED, node.getType(), typeRef);
           return null;
         }
         if(error) return null;
-        IxCode.MethodRef[] methods = type.methods();
+        IxCode.MethodRef[] methods = typeRef.methods();
         IxCode.MethodRef method = matches(argTypes, name, methods);
         if(method == null){
-          report(METHOD_NOT_FOUND, ast, type, name, argTypes);
+          report(METHOD_NOT_FOUND, node, typeRef, name, argTypes);
           return null;
         }
         context.setMethod(method);
         context.getContextFrame().parent().setAllClosed(true);
-        IxCode.ActionStatement block = translate(ast.getBlock(), context);
+        IxCode.ActionStatement block = translate(node.getBlock(), context);
         block = addReturnNode(block, method.returnType());
-        IxCode.NewClosure node = new IxCode.NewClosure(type, method, block);
-        node.setFrame(context.getContextFrame());
-        return node;
+        IxCode.NewClosure result = new IxCode.NewClosure(typeRef, method, block);
+        result.setFrame(context.getContextFrame());
+        return result;
       }finally{
         context.closeFrame();
       }     
@@ -1695,11 +1691,11 @@ public class CodeAnalysis {
       return new IxCode.NewObject(constructors[0], parameters);
     }
         
-    public Object visit(IsInstance ast, LocalContext context) {
-      IxCode.Term target = typed(ast.getTarget(), context);
-      IxCode.TypeRef checkType = mapFrom(ast.getType(), mapper);
-      if(target == null || checkType == null) return null;
-      return new IxCode.InstanceOf(target, checkType);
+    public Object visit(IsInstance node, LocalContext context) {
+      IxCode.Term target = typed(node.target(), context);
+      IxCode.TypeRef destinationType = mapFrom(node.destinationType(), mapper);
+      if(target == null || destinationType == null) return null;
+      return new IxCode.InstanceOf(target, destinationType);
     }
     
     private IxCode.TypeRef[] types(IxCode.Term[] parameters){
@@ -1742,23 +1738,22 @@ public class CodeAnalysis {
       return params;
     }
     
-    public Object visit(MethodCall ast, LocalContext context) {
-      IxCode.Term target = typed(ast.getTarget(), context);
+    public Object visit(MethodCall node, LocalContext context) {
+      final IxCode.Term target = typed(node.target(), context);
       if(target == null) return null;
-      IxCode.Term[] params = typedTerms(ast.getArguments(), context);
+      final IxCode.Term[] params = typedTerms(node.getArguments(), context);
       if(params == null) return null;
-      IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
-      final String name = ast.getName();
-      IxCode.MethodRef[] methods = targetType.findMethod(name, params);
-      
+      final IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
+      final String name = node.name();
+      final IxCode.MethodRef[] methods = targetType.findMethod(name, params);
       if(methods.length == 0){
-        report(METHOD_NOT_FOUND, ast, targetType, name, types(params));
+        report(METHOD_NOT_FOUND, node, targetType, name, types(params));
         return null;
       }else if(methods.length > 1){
-        report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
+        report(AMBIGUOUS_METHOD, node, new Object[]{methods[0].affiliation(), name, methods[0].arguments()}, new Object[]{methods[1].affiliation(), name, methods[1].arguments()});
         return null;
       }else if((methods[0].modifier() & Modifier.STATIC) != 0){
-        report(ILLEGAL_METHOD_CALL, ast,  methods[0].affiliation(), name, methods[0].arguments());
+        report(ILLEGAL_METHOD_CALL, node,  methods[0].affiliation(), name, methods[0].arguments());
         return null;
       }else {
         return new IxCode.Call(target, methods[0], doCastInsertion(methods[0].arguments(), params));

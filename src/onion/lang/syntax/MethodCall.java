@@ -33,11 +33,11 @@ public class MethodCall extends Expression {
     return visitor.visit(this, context);
   }
 
-  public Expression getTarget() {
+  public Expression target() {
     return target;
   }
 
-  public String getName() {
+  public String name() {
     return name;
   }
 

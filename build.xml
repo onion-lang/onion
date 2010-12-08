@@ -3,6 +3,8 @@
 <project name="onion" default="compile" basedir=".">
   <property environment="env" />
   <property name="src" value="src" />
+  <property name="src.lib" value="src.lib" />
+  <property name="src.scala" value="src.scala" />
   <property name="src.parser" value="src.parser" />
   <property name="src.test" value="src.test" />
   <property name="bin" value="bin" />
@@ -19,10 +21,22 @@
   <property name="dist-src" value="onion-${version}-src" />
   <property name="dist-bin" value="onion-${version}" />
   <property file="build.properties" />
+  <property name="scala-compiler.jar" value="${lib}/scala/scala-compiler.jar"/>
+  <property name="scala-library.jar" value="${lib}/scala/scala-library.jar"/>
 
-  <path id="lib">
+  <taskdef resource="scala/tools/ant/antlib.xml">
+    <classpath>
+      <pathelement location="${scala-compiler.jar}"/>
+      <pathelement location="${scala-library.jar}"/>
+    </classpath>
+  </taskdef>
+
+  <path id="build.classpath">
+    <pathelement path="${build}"/>
     <pathelement path="${bcel.path}" />
     <pathelement path="${junit.path}" />
+    <pathelement path="${scala-compiler.jar}"/>
+    <pathelement path="${scala-library.jar}"/>
   </path>
 
   <fileset id="shared" dir=".">
@@ -55,6 +69,14 @@
   <target name="compile" depends="grammar">
     <mkdir dir="${build}" />
   	<mkdir dir="${build.lib}" />
+    <scalac destdir="${build}" classpathref="build.classpath">
+      <include name="**/*.scala"/>
+      <src>
+        <pathelement location="${src.scala}"/>
+        <pathelement location="${src}"/>
+      </src>
+    </scalac>
+    <javac srcdir="${src.lib}" destdir="${build.lib}" source="1.5"/>
     <javac srcdir="${src}:${src.parser}" destdir="${build}" source="1.5" debug="true">
       <classpath>
         <path refid="lib" />
@@ -100,18 +122,24 @@
     <copy todir="${install.path}/docs">
       <fileset dir="${docs}" />
     </copy>
+    <!--
     <copy todir="${install.path}">
       <fileset dir=".">
         <include name="Readme.txt"/>
         <include name="${jar.name}"/>
         <include name="${lib-jar.name}"/>
         <include name="${bcel.path}"/>
+        <include name="${scala-library.jar}"/>
+        <include name="${scala-compiler.jar}"/>
       </fileset>
     </copy>
-    <copy file="README.markdown" tofile="${install.path}/README"/>
-    <copy file="${jar.name}"     tofile="${install.path}/onion.jar"/>
-  	<copy file="${lib-jar.name}" tofile="${install.path}/onion-library.jar"/>
-    <copy file="${bcel.path}"    tofile="${install.path}/lib/bcel.jar"/>
+    -->
+    <copy file="README.markdown"      tofile="${install.path}/README"/>
+    <copy file="${jar.name}"           tofile="${install.path}/onion.jar"/>
+  	<copy file="${lib-jar.name}"      tofile="${install.path}/onion-library.jar"/>
+    <copy file="${bcel.path}"          tofile="${install.path}/lib/bcel.jar"/>
+    <copy file="${scala-library.jar}" tofile="${install.path}/lib/scala-library.jar"/>
+    <copy file="${scala-compiler.jar}" tofile="${install.path}/lib/scala-compiler.jar"/>
   </target>
 
   <target name="dist-src">

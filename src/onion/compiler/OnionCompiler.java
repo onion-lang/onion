@@ -48,7 +48,6 @@ public class OnionCompiler {
       CodeGeneration pass3 = new CodeGeneration(config);
       return pass3.process(pass2.process(pass1.process(srcs)));
       */
-      System.err.println("experimental mode");
       return (CompiledClass[])(new onion.compiler.Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs)); 
     }catch(CompilationException ex){
       for(CompileError error:ex) printError(error);

@@ -27,7 +27,7 @@ public:
 				@left = @left * 10 + input;
 				setValue(@left);
 			}
-		}rec e :NumberFormatException{
+		}catch e :NumberFormatException{
 			if label == "C" {
 				@left = 0;
 				@right = 0;

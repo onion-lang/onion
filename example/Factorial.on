@@ -18,7 +18,7 @@ while (line = input("ŠKæ‚ğ‹‚ß‚½‚¢”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B> ", reader)) != null {
     }else{
       System::out.println("fact(" + number + ") = " + fact(number));
     }
-  }rec e :NumberFormatException {
+  }catch e :NumberFormatException {
     System::out.println("®”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B");
   }
 }

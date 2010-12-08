@@ -31,26 +31,28 @@ public class CommandLineParser {
     List<String> invalidOptNames = new ArrayList<String>();
     {
       int i;
-      for(i = 0; i < cmdline.length && cmdline[i].startsWith("-");) {
-        String param = cmdline[i];
-        OptionConf conf = getConf(param);
-        if(conf == null){
-          invalidOptNames.add(param);
-          i++;
-        }else if(conf.hasArgument()){
-          if(i + 1 >= cmdline.length){
-            lackedOptNames.add(param);
-          }else{
-            opts.put(param, cmdline[i + 1]);
+      for(i = 0; i < cmdline.length; ) {
+        if(cmdline[i].startsWith("-")) {
+          String param = cmdline[i];
+          OptionConf conf = getConf(param);
+          if(conf == null){
+            invalidOptNames.add(param);
+            i++;
+          }else if(conf.hasArgument()){
+            if(i + 1 >= cmdline.length){
+              lackedOptNames.add(param);
+            }else{
+              opts.put(param, cmdline[i + 1]);
+            }
+            i += 2;
+          } else{
+            noArgOpts.put(param, new Object());
+            i++;
           }
-          i+=2;
-        }else{
-          noArgOpts.put(param, new Object());
+        }else {
+          args.add(cmdline[i]);
           i++;
         }
-      }
-      for(; i < cmdline.length; i++) {
-        args.add(cmdline[i]);
       }
     }
     if(lackedOptNames.size() == 0 && invalidOptNames.size() == 0){

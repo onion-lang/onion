@@ -1,6 +1,7 @@
 package onion.compiler
 
 object AST {
+  val NIL: Any = Nil
   val M_INTERNAL = 1
   val M_SYNCHRONIZED = 2
   val M_FINAL = 4
@@ -57,11 +58,11 @@ object AST {
   case class ImportClause(location: Location, mapping: List[(String, String)]) extends Node
   abstract sealed class Toplevel extends Node
   abstract sealed class Expression extends Node
-  abstract sealed class BinaryExpression(symbol: String) extends Expression {
+  abstract sealed class BinaryExpression(val symbol: String) extends Expression {
     def left: Expression
     def right: Expression
   }
-  abstract sealed class UnaryExpression(symbol: String) extends Expression {
+  abstract sealed class UnaryExpression(val symbol: String) extends Expression {
     def target: Expression
   }
   case class Addition(location: Location, left: Expression, right: Expression) extends BinaryExpression("+")

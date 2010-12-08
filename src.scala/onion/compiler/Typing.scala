@@ -1,5 +1,4 @@
 package onion.compiler
-import _root_.java.util.{TreeSet => JTreeSet}
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
@@ -7,6 +6,7 @@ import _root_.onion.compiler.IxCode._
 import _root_.onion.compiler.IxCode.BinaryTerm.Constants._
 import _root_.onion.compiler.IxCode.UnaryTerm.Constants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
+import java.util.{Arrays, TreeSet => JTreeSet}
 
 /**
  * Created by IntelliJ IDEA.
@@ -75,6 +75,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     for(unit <- source) processOutline(unit)
     for(unit <- source) processTyping(unit)
     for(unit <- source) processDuplication(unit)
+    val problems = reporter_.getProblems
+    if (problems.length > 0) throw new CompilationException(Arrays.asList(problems:_*))
     table_.classes.values.toList.toArray
   }
 
@@ -91,8 +93,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     list.add(new ImportItem("*", "java.awt.event.*"))
     list.add(new ImportItem("*", "onion.*"))
     list.add(new ImportItem("*", if (moduleName != null) moduleName + ".*" else "*"))
-    for((key, value) <- imports.mapping) {
-      list.add(new ImportItem(key, value))
+    if(imports != null) {
+      for((key, value) <- imports.mapping) {
+        list.add(new ImportItem(key, value))
+      }
     }
     val staticList = new StaticImportList
     staticList.add(new StaticImportItem("java.lang.System", true))
@@ -283,14 +287,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           var superClass: ClassTypeRef = null
           if (node.isInterface) {
             val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
-            val superClass = rootClass
+            superClass = rootClass
             for (typeSpec <- ast.superInterfaces) {
               val superType = validateSuperType(typeSpec, true, resolver)
               if (superType != null) interfaces += superType
             }
           }else {
             val ast = lookupAST(node).asInstanceOf[AST.ClassDeclaration]
-            val superClass = validateSuperType(ast.superClass, false, resolver)
+            superClass = validateSuperType(ast.superClass, false, resolver)
             for (typeSpec <- ast.superInterfaces) {
               var superType = validateSuperType(typeSpec, true, resolver)
               if (superType != null) interfaces += superType
@@ -369,17 +373,315 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     } finally {
       context.closeFrame
     }
+    def processMethodDeclaration(node: AST.MethodDeclaration) {
+      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
+      if (method == null) return null
+      if (node.block == null) return null
+      val context = new LocalContext
+      if((method.modifier & AST.M_STATIC) != 0) {
+        context.setStatic(true)
+      }
+      context.setMethod(method)
+      val arguments = method.arguments
+      for(i <- 0 until arguments.length) {
+        context.add(node.args(i).name, arguments(i))
+      }
+      val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], method.returnType)
+      method.setBlock(block)
+      method.setFrame(context.getContextFrame)
+    }
+    def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
+      val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
+      if (constructor == null) return null
+      val context = new LocalContext
+      context.setConstructor(constructor)
+      val args = constructor.getArgs
+      for(i <- 0 until args.length) {
+        context.add(node.args(i).name, args(i))
+      }
+      val params = typedTerms(node.superInits.toArray, context)
+      val currentClass = definition_
+      val superClass = currentClass.superClass
+      val matched = superClass.findConstructor(params)
+      if (matched.length == 0) {
+        report(CONSTRUCTOR_NOT_FOUND, node, superClass, types(params))
+        return null
+      }else if (matched.length > 1) {
+        report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, types(params)), Array[AnyRef](superClass, types(params)))
+        return null
+      }else {
+        val init = new Super(superClass, matched(0).getArgs, params)
+        val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], IxCode.BasicTypeRef.VOID)
+        constructor.setSuperInitializer(init)
+        constructor.setBlock(block)
+        constructor.setFrame(context.getContextFrame)
+      }
+    }
     def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext) {
-
+      definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+      mapper_ = find(definition_.name)
+      for(section <- Option(node.defaultSection); member <- section.members) {
+        member match {
+          case member: AST.FieldDeclaration =>
+          case member: AST.MethodDeclaration =>
+            processMethodDeclaration(member)
+          case member: AST.ConstructorDeclaration =>
+            processConstructorDeclaration(member)
+          case member: AST.DelegatedFieldDeclaration =>
+        }
+      }
+      for(section <- node.sections; member <- section.members) {
+        member match {
+          case member: AST.FieldDeclaration =>
+          case member: AST.MethodDeclaration =>
+            processMethodDeclaration(member)
+          case member: AST.ConstructorDeclaration =>
+            processConstructorDeclaration(member)
+          case member: AST.DelegatedFieldDeclaration =>
+        }
+      }
     }
-    def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext) {
-
-    }
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext) { () }
     def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext) {
-
+      val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
+      if (function == null) return null
+      val context = new LocalContext
+      if ((function.modifier & AST.M_STATIC) != 0) {
+        context.setStatic(true)
+      }
+      context.setMethod(function)
+      val arguments = function.arguments
+      for(i <- 0 until arguments.length) {
+        context.add(node.args(i).name, arguments(i))
+      }
+      val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], function.returnType)
+      function.setBlock(block)
+      function.setFrame(context.getContextFrame)
     }
-    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){
-
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){()}
+    def processLocalAssign(node: AST.Assignment, context: LocalContext): Term = {
+      var value: Term = typed(node.right, context).getOrElse(null)
+      if (value == null) return null
+      val id: AST.Id = node.left.asInstanceOf[AST.Id]
+      val bind: ClosureLocalBinding = context.lookup(id.name)
+      var frame: Int = 0
+      var index: Int = 0
+      var leftType: TypeRef = null
+      var rightType: TypeRef = value.`type`
+      if (bind != null) {
+        frame = bind.getFrame
+        index = bind.getIndex
+        leftType = bind.getType
+      } else {
+        frame = 0
+        if (rightType.isNullType) {
+          leftType = rootClass
+        } else {
+          leftType = rightType
+        }
+        index = context.add(id.name, leftType)
+      }
+      value = processAssignable(node.right, leftType, value)
+      if (value != null) new SetLocal(frame, index, leftType, value) else null
+    }
+    def processThisFieldAssign(node: AST.Assignment, context: LocalContext): Term = {
+      var value: Term = typed(node.right, context).getOrElse(null)
+      if (value == null) return null
+      val ref = node.left.asInstanceOf[AST.UnqualifiedFieldReference]
+      var selfClass: ClassTypeRef = null
+      if (context.isGlobal) {
+        selfClass = loadTopClass
+      } else {
+        if (context.method != null) {
+          selfClass = context.method.affiliation
+        }
+        else {
+          selfClass = context.constructor.affiliation
+        }
+      }
+      var field: FieldRef = findField(selfClass, ref.name)
+      if (field == null) {
+        report(FIELD_NOT_FOUND, ref, selfClass, ref.name)
+        return null
+      }
+      if (!isAccessible(field, selfClass)) {
+        report(FIELD_NOT_ACCESSIBLE, node, field.affiliation, field.name, selfClass)
+        return null
+      }
+      value = processAssignable(node.right, field.`type`, value)
+      return if (value != null) new SetField(new This(selfClass), field, value) else null
+    }
+    def processArrayAssign(node: AST.Assignment, context: LocalContext): Term = {
+      var value = typed(node.right, context).getOrElse(null)
+      val indexing = node.left.asInstanceOf[AST.Indexing]
+      val target = typed(indexing.left, context).getOrElse(null)
+      val index = typed(indexing.right, context).getOrElse(null)
+      if (value == null || target == null || index == null) return null
+      if (target.isBasicType) {
+        report(INCOMPATIBLE_TYPE, indexing.left, rootClass, target.`type`)
+        return null
+      }
+      if (target.isArrayType) {
+        val targetType = (target.`type`.asInstanceOf[ArrayTypeRef])
+        if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
+          report(INCOMPATIBLE_TYPE, indexing.right, IxCode.BasicTypeRef.INT, index.`type`)
+          return null
+        }
+        value = processAssignable(node.right, targetType.base, value)
+        if (value == null) return null
+        new SetArray(target, index, value)
+      }else {
+        val params = Array[Term](index, value)
+        tryFindMethod(node, target.`type`.asInstanceOf[ObjectTypeRef], "set", Array[Term](index, value)) match {
+          case Left(_) =>
+            report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
+            null
+          case Right(method) =>
+            new Call(target, method, params)
+        }
+      }
+    }
+    def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {
+      typed(node.right, context)
+      report(UNIMPLEMENTED_FEATURE, node)
+      return null
+    }
+    def processEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+      var left: Term = typed(node.left, context).getOrElse(null)
+      var right: Term = typed(node.right, context).getOrElse(null)
+      if (left == null || right == null) return null
+      val leftType: TypeRef = left.`type`
+      val rightType: TypeRef = right.`type`
+      if ((left.isBasicType && (!right.isBasicType)) || ((!left.isBasicType) && (right.isBasicType))) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
+        return null
+      }
+      if (left.isBasicType && right.isBasicType) {
+        if (hasNumericType(left) && hasNumericType(right)) {
+          var resultType: TypeRef = promote(leftType, rightType)
+          if (resultType != left.`type`) left = new AsInstanceOf(left, resultType)
+          if (resultType != right.`type`) right = new AsInstanceOf(right, resultType)
+        }
+        else if (leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
+          return null
+        }
+      }
+      else if (left.isReferenceType && right.isReferenceType) {
+        return createEquals(kind, left, right)
+      }
+      new BinaryTerm(kind, IxCode.BasicTypeRef.BOOLEAN, left, right)
+    }
+    def processShiftExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+      var left: Term = typed(node.left, context).getOrElse(null)
+      var right: Term = typed(node.right, context).getOrElse(null)
+      if (left == null || right == null) return null
+      if (!left.`type`.isBasicType) {
+        var params: Array[Term] = Array[Term](right)
+        tryFindMethod(node, left.`type`.asInstanceOf[ObjectTypeRef], "add", params) match {
+          case Left(_) =>
+            report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
+            return null
+          case Right(method) =>
+            return new Call(left, method, params)
+        }
+      }
+      if (!right.`type`.isBasicType) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+        return null
+      }
+      val leftType: BasicTypeRef = left.`type`.asInstanceOf[BasicTypeRef]
+      val rightType: BasicTypeRef = right.`type`.asInstanceOf[BasicTypeRef]
+      if ((!leftType.isInteger) || (!rightType.isInteger)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+        return null
+      }
+      var leftResultType: TypeRef = promoteInteger(leftType)
+      if (leftResultType != leftType) {
+        left = new AsInstanceOf(left, leftResultType)
+      }
+      if (rightType != IxCode.BasicTypeRef.INT) {
+        right = new AsInstanceOf(right, IxCode.BasicTypeRef.INT)
+      }
+      new BinaryTerm(kind, IxCode.BasicTypeRef.BOOLEAN, left, right)
+    }
+    def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
+      var left: Term = typed(node.left, context).getOrElse(null)
+      var right: Term = typed(node.right, context).getOrElse(null)
+      if (left == null || right == null) return null
+      var leftType: TypeRef = left.`type`
+      var rightType: TypeRef = right.`type`
+      if ((!numeric(left.`type`)) || (!numeric(right.`type`))) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+        return null
+      }
+      var resultType: TypeRef = promote(leftType, rightType)
+      if (leftType != resultType)  left = new AsInstanceOf(left, resultType)
+      if (rightType != resultType)  right = new AsInstanceOf(right, resultType)
+      return Array[Term](left, right)
+    }
+    def processBitExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+      var left: Term = typed(node.left, context).getOrElse(null)
+      var right: Term = typed(node.right, context).getOrElse(null)
+      if (left == null || right == null) return null
+      if ((!left.isBasicType) || (!right.isBasicType)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+        return null
+      }
+      var leftType: BasicTypeRef = left.`type`.asInstanceOf[BasicTypeRef]
+      var rightType: BasicTypeRef = right.`type`.asInstanceOf[BasicTypeRef]
+      var resultType: TypeRef = null
+      if (leftType.isInteger && rightType.isInteger) {
+        resultType = promote(leftType, rightType)
+      }
+      else if (leftType.isBoolean && rightType.isBoolean) {
+        resultType = IxCode.BasicTypeRef.BOOLEAN
+      }
+      else {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
+        return null
+      }
+      if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
+      if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
+      return new BinaryTerm(kind, resultType, left, right)
+    }
+    def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
+      val left: Term = typed(node.left, context).getOrElse(null)
+      val right: Term = typed(node.right, context).getOrElse(null)
+      if (left == null || right == null) return null
+      val leftType: TypeRef = left.`type`
+      val rightType: TypeRef = right.`type`
+      if ((leftType != IxCode.BasicTypeRef.BOOLEAN) || (rightType != IxCode.BasicTypeRef.BOOLEAN)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+        return null
+      }
+      return Array[Term](left, right)
+    }
+    def processRefEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+      var left: Term = typed(node.left, context).getOrElse(null)
+      var right: Term = typed(node.right, context).getOrElse(null)
+      if (left == null || right == null) return null
+      val leftType: TypeRef = left.`type`
+      val rightType: TypeRef = right.`type`
+      if ((left.isBasicType && (!right.isBasicType)) || ((!left.isBasicType) && (right.isBasicType))) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
+        return null
+      }
+      if (left.isBasicType && right.isBasicType) {
+        if (hasNumericType(left) && hasNumericType(right)) {
+          val resultType: TypeRef = promote(leftType, rightType)
+          if (resultType != left.`type`) {
+            left = new AsInstanceOf(left, resultType)
+          }
+          if (resultType != right.`type`) {
+            right = new AsInstanceOf(right, resultType)
+          }
+        } else if (leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
+          return null
+        }
+      }
+      new BinaryTerm(kind, IxCode.BasicTypeRef.BOOLEAN, left, right)
     }
     def typedTerms(nodes: Array[AST.Expression], context: LocalContext): Array[Term] = {
       var failed = false
@@ -387,54 +689,148 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if(failed) null else result
     }
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
-      case node@AST.Addition(loc, l, r) =>
-        null
-      case node@AST.Assignment(loc, l, r) =>
-        null
-      case node@AST.BitAnd(loc, l, r) =>
-        null
-      case node@AST.BitOr(loc, l, r) =>
-        null
-      case node@AST.Division(loc, left, right) =>
-        null
-      case node@AST.GreaterOrEqual(loc, left, right) =>
-        null
-      case node@AST.GreaterThan(loc, left, right) =>
-        null
-      case node@AST.Elvis(loc, left, right) =>
-        null
-      case node@AST.Equal(loc, left, right) =>
-        null
-      case node@AST.LessOrEqual(loc, left, right) =>
-        null
-      case node@AST.LessThan(loc, left, right) =>
-        null
-      case node@AST.Indexing(loc, left, right) =>
-        null
-      case node@AST.LogicalAnd(loc, left, right) =>
-        null
-      case node@AST.LogicalOr(loc, left, right) =>
-        null
-      case node@AST.NotEqual(loc, left, right) =>
-        null
-      case node@AST.LogicalRightShift(loc, left, right) =>
-        null
-      case node@AST.MathLeftShift(loc, left, right) =>
-        null
-      case node@AST.MathRightShift(loc, left, right) =>
-        null
-      case node@AST.Modulo(loc, left, right) =>
-        null
-      case node@AST.Multiplication(loc, left, right) =>
-        null
-      case node@AST.ReferenceEqual(loc, left, right) =>
-        null
-      case node@AST.ReferenceNotEqual(loc, left, right) =>
-        null
+      case node@AST.Addition(loc, _, _) =>
+        var left: Term = typed(node.left, context).getOrElse(null)
+        var right: Term = typed(node.right, context).getOrElse(null)
+        if (left == null || right == null) return None
+        if (left.isBasicType && right.isBasicType) {
+          return Option(processNumericExpression(ADD, node, left, right))
+        }
+        if (left.isBasicType) {
+          if (left.`type` == IxCode.BasicTypeRef.VOID) {
+            report(IS_NOT_BOXABLE_TYPE, node.left, left.`type`)
+            return None
+          }
+          else {
+            left = Boxing.boxing(table_, left)
+          }
+        }
+        if (right.isBasicType) {
+          if (right.`type` == IxCode.BasicTypeRef.VOID) {
+            report(IS_NOT_BOXABLE_TYPE, node.right, right.`type`)
+            return None
+          }
+          else {
+            right = Boxing.boxing(table_, right)
+          }
+        }
+        val toStringL: MethodRef = findMethod(node.left, left.`type`.asInstanceOf[ObjectTypeRef], "toString")
+        val toStringR: MethodRef = findMethod(node.right, right.`type`.asInstanceOf[ObjectTypeRef], "toString")
+        left = new Call(left, toStringL, new Array[Term](0))
+        right = new Call(right, toStringR, new Array[Term](0))
+        val concat: MethodRef = findMethod(node, left.`type`.asInstanceOf[ObjectTypeRef], "concat", Array[Term](right))
+        Some(new Call(left, concat, Array[Term](right)))
       case node@AST.Subtraction(loc, left, right) =>
-        null
+        val left = typed(node.left, context).getOrElse(null)
+        var right= typed(node.right, context).getOrElse(null)
+        if (left == null || right == null) return None
+        Option(processNumericExpression(SUBTRACT, node, left, right))
+      case node@AST.Multiplication(loc, left, right) =>
+        val left = typed(node.left, context).getOrElse(null)
+        var right= typed(node.right, context).getOrElse(null)
+        if (left == null || right == null) return None
+        Option(processNumericExpression(MULTIPLY, node, left, right))
+      case node@AST.Division(loc, left, right) =>
+        val left = typed(node.left, context).getOrElse(null)
+        var right= typed(node.right, context).getOrElse(null)
+        if (left == null || right == null) return None
+        Option(processNumericExpression(DIVIDE, node, left, right))
+      case node@AST.Modulo(loc, left, right) =>
+        val left = typed(node.left, context).getOrElse(null)
+        var right= typed(node.right, context).getOrElse(null)
+        if (left == null || right == null) return None
+        Option(processNumericExpression(MOD, node, left, right))
+      case node@AST.Assignment(loc, l, r) =>
+        node.left match {
+          case _ : AST.Id =>
+            Option(processLocalAssign(node, context))
+          case _ : AST.UnqualifiedFieldReference =>
+            Option(processThisFieldAssign(node, context))
+          case _ : AST.Indexing =>
+            Option(processArrayAssign(node, context))
+          case _ : AST.MemberSelection =>
+            Option(processMemberAssign(node, context))
+          case _ =>
+            None
+        }
+      case node@AST.LogicalAnd(loc, left, right) =>
+        val ops = processLogicalExpression(node, context)
+        if (ops == null) None else Some(new BinaryTerm(LOGICAL_AND, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+      case node@AST.LogicalOr(loc, left, right) =>
+        val ops = processLogicalExpression(node, context)
+        if (ops == null) None else Some(new BinaryTerm(LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+      case node@AST.BitAnd(loc, l, r) =>
+        Option(processBitExpression(BIT_AND, node, context))
+      case node@AST.BitOr(loc, l, r) =>
+        Option(processBitExpression(BIT_OR, node, context))
       case node@AST.XOR(loc, left, right) =>
-        null
+        Option(processBitExpression(XOR, node, context))
+      case node@AST.LogicalRightShift(loc, left, right) =>
+        Option(processShiftExpression(BIT_SHIFT_R3, node, context))
+      case node@AST.MathLeftShift(loc, left, right) =>
+        Option(processShiftExpression(BIT_SHIFT_L2, node, context))
+      case node@AST.MathRightShift(loc, left, right) =>
+        Option(processShiftExpression(BIT_SHIFT_R2, node, context))
+      case node@AST.GreaterOrEqual(loc, left, right) =>
+        val ops = processComparableExpression(node, context)
+        if (ops == null) None else Some(new BinaryTerm(GREATER_OR_EQUAL, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+      case node@AST.GreaterThan(loc, left, right) =>
+        val ops = processComparableExpression(node, context)
+        if (ops == null) None else Some(new BinaryTerm(GREATER_THAN, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+      case node@AST.LessOrEqual(loc, left, right) =>
+        val ops = processComparableExpression(node, context)
+        if (ops == null) None else Some(new BinaryTerm(LESS_OR_EQUAL, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+      case node@AST.LessThan(loc, left, right) =>
+        val ops = processComparableExpression(node, context)
+        if (ops == null) None else Some(new BinaryTerm(LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+      case node@AST.Equal(loc, left, right) =>
+        Option(processEquals(EQUAL, node, context))
+      case node@AST.NotEqual(loc, left, right) =>
+        Option(processEquals(NOT_EQUAL, node, context))
+      case node@AST.ReferenceEqual(loc, left, right) =>
+        Option(processRefEquals(EQUAL, node, context))
+      case node@AST.ReferenceNotEqual(loc, left, right) =>
+        Option(processRefEquals(NOT_EQUAL, node, context))
+      case node@AST.Elvis(loc, _, _) =>
+        val left = typed(node.left, context).getOrElse(null)
+        val right = typed(node.right, context).getOrElse(null)
+        if(left == null || right == null) return None
+        if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+          None
+        }else {
+          Some(new BinaryTerm(ELVIS, left.`type`, left, right))
+        }
+      case node@AST.Indexing(loc, left, right) =>
+        val target = typed(node.left, context).getOrElse(null)
+        val index = typed(node.right, context).getOrElse(null)
+        if (target == null || index == null) return None
+        if (target.isArrayType) {
+          if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
+            report(INCOMPATIBLE_TYPE, node, BasicTypeRef.INT, index.`type`)
+            return None
+          }
+          return Some(new RefArray(target, index))
+        }
+        if (target.isBasicType) {
+          report(INCOMPATIBLE_TYPE, node.left, rootClass, target.`type`)
+          return None
+        }
+        if (target.isArrayType) {
+          if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
+            report(INCOMPATIBLE_TYPE, node.right, BasicTypeRef.INT, index.`type`)
+            return None
+          }
+          return new Some(new RefArray(target, index))
+        }
+        val params = Array(index)
+        tryFindMethod(node, target.`type`.asInstanceOf[ObjectTypeRef], "get", Array[Term](index)) match {
+          case Left(_) =>
+            report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+            None
+          case Right(method) =>
+            Some(new Call(target, method, params))
+        }
       case node@AST.AdditionAssignment(loc, left, right) =>
         typed(left, context)
         typed(right, context)
@@ -490,10 +886,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val name = node.mname
         val argTypes: Array[TypeRef] = new Array[TypeRef](args.length)
         openFrame(context){
-          val argTypes = args.map{arg => mapFrom(arg.typeRef)}.toArray
+          val argTypes = args.map{arg => addArgument(arg, context)}.toArray
           val error = argTypes.exists(_ == null)
           if (error) return None
-          if (typeRef == null) return null
+          if (typeRef == null) return None
           if (!typeRef.isInterface) {
             report(INTERFACE_REQUIRED, node.typeRef, typeRef)
             return None
@@ -576,7 +972,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val target = typed(node.target, context).getOrElse(null)
         if (target == null) return None
         val params = typedTerms(node.args.toArray, context)
-        if (params == null) return null
+        if (params == null) return None
         val targetType = target.`type`.asInstanceOf[ObjectTypeRef]
         val name = node.name
         val methods = targetType.findMethod(name, params)
@@ -706,7 +1102,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
       case node@AST.StaticMemberSelection(loc, _, _) =>
         val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
-        if (typeRef == null) return null
+        if (typeRef == null) return None
         val field = findField(typeRef, node.name)
         if (field == null) {
           report(FIELD_NOT_FOUND, node, typeRef, node.name)
@@ -788,7 +1184,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         openScope(context) {
           val collection = typed(node.collection, context).getOrElse(null)
           val arg = node.arg
-          mapFrom(arg.typeRef)
+          addArgument(arg, context)
           var block = translate(node.statement, context)
           if (collection.isBasicType) {
             report(INCOMPATIBLE_TYPE, node.collection, load("java.util.Collection"), collection.`type`)
@@ -941,7 +1337,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         for(i <- 0 until recClauses.length) {
           val (argument, body) = recClauses(i)
           openScope(context) {
-            val argType = mapFrom(argument.typeRef)
+            val argType = addArgument(argument, context)
             val expected = load("java.lang.Throwable")
             if (!TypeRules.isSuperType(expected, argType)) {
               report(INCOMPATIBLE_TYPE, argument, expected, argType)
@@ -990,7 +1386,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     mapper_ = find(topClass)
     val klass = loadTopClass.asInstanceOf[ClassDefinition]
     val argsType = loadArray(load("java.lang.String"), 1)
-    val method= new MethodDefinition(node.location, AST.M_PUBLIC, klass, "start", Array[TypeRef](argsType), BasicTypeRef.VOID, null)
+    val method = new MethodDefinition(node.location, AST.M_PUBLIC, klass, "start", Array[TypeRef](argsType), BasicTypeRef.VOID, null)
     context.add("args", argsType)
     for (element <- toplevels) {
       if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass;
@@ -1166,11 +1562,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   def report(error: Int, node: AST.Node, items: AnyRef*) {
-    report(error, node.location, items)
+    report(error, node.location, items:_*)
   }
   def report(error: Int, location: Location, items: AnyRef*) {
-    reporter_.setSourceFile(unit_.sourceFile)
-    reporter_.report(error, location, items.toArray)
+    def report_(items: Array[AnyRef]) {
+      reporter_.setSourceFile(unit_.sourceFile)
+      reporter_.report(error, location, items)
+    }
+    report_(items.toArray)
   }
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
   def load(name: String): ClassTypeRef = table_.load(name)
@@ -1188,15 +1587,15 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     ast2ixt_(astNode) = kernelNode
     ixt2ast_(kernelNode) = astNode
   }
-  private def lookupAST(kernelNode: Node): Option[AST.Node] =  ixt2ast_.get(kernelNode)
-  private def lookupKernelNode(astNode: AST.Node): Option[Node] = ast2ixt_.get(astNode)
+  private def lookupAST(kernelNode: Node): AST.Node =  ixt2ast_.get(kernelNode).getOrElse(null)
+  private def lookupKernelNode(astNode: AST.Node): Node = ast2ixt_.get(astNode).getOrElse(null)
   private def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
-  private def find(className: String): NameMapper = mappers_(className)
+  private def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Array[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.getPathSeparator).append(path)}.toString
   private def typesOf(arguments: List[AST.Argument]): Option[List[TypeRef]] = {
     val result = arguments.map{arg => mapFrom(arg.typeRef)}
-    if(result.exists(_ == null)) Some(result) else None
+    if(result.forall(_ != null)) Some(result) else None
   }
   private def mapFrom(typeNode: AST.TypeNode): TypeRef = mapFrom(typeNode, mapper_)
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): TypeRef = {
@@ -1251,7 +1650,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def findField(target: ObjectTypeRef, name: String): FieldRef = {
     if(target == null) return null
     var field = target.field(name)
-    if(target != null) return field
+    if(field != null) return field
     field = findField(target.superClass, name)
     if (field != null) return field
     for (interface <- target.interfaces) {
@@ -1315,4 +1714,50 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def getter(name: String): String =  "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
   private def getterBoolean(name: String): String =  "is" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
   private def setter(name: String): String =  "set" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
+  private def promote(left: TypeRef, right: TypeRef): TypeRef = {
+    if (!numeric(left) || !numeric(right)) return null
+    if ((left eq IxCode.BasicTypeRef.DOUBLE) || (right eq IxCode.BasicTypeRef.DOUBLE)) {
+      return IxCode.BasicTypeRef.DOUBLE
+    }
+    if ((left eq IxCode.BasicTypeRef.FLOAT) || (right eq IxCode.BasicTypeRef.FLOAT)) {
+      return IxCode.BasicTypeRef.FLOAT
+    }
+    if ((left eq IxCode.BasicTypeRef.LONG) || (right eq IxCode.BasicTypeRef.LONG)) {
+      return IxCode.BasicTypeRef.LONG
+    }
+    return IxCode.BasicTypeRef.INT
+  }
+  private def processNumericExpression(kind: Int, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
+    var left = lt
+    var right = rt
+    if ((!hasNumericType(left)) || (!hasNumericType(right))) {
+      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
+      return null
+    }
+    var resultType: TypeRef = promote(left.`type`, right.`type`)
+    if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
+    if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
+    return new BinaryTerm(kind, resultType, left, right)
+  }
+  private def promoteInteger(typeRef: TypeRef): TypeRef = {
+    if (typeRef == IxCode.BasicTypeRef.BYTE || typeRef == IxCode.BasicTypeRef.SHORT || typeRef == IxCode.BasicTypeRef.CHAR || typeRef == IxCode.BasicTypeRef.INT) {
+      return IxCode.BasicTypeRef.INT
+    }
+    if (typeRef == IxCode.BasicTypeRef.LONG) {
+      return IxCode.BasicTypeRef.LONG
+    }
+    return null
+  }
+  private def addArgument(arg: AST.Argument, context: LocalContext): TypeRef = {
+    val name = arg.name
+    var binding = context.lookupOnlyCurrentScope(name)
+    if (binding != null) {
+      report(DUPLICATE_LOCAL_VARIABLE, arg, name)
+      return null
+    }
+    val argType = mapFrom(arg.typeRef, mapper_)
+    if(argType == null) return null
+    context.add(name, argType)
+    argType
+  }
 }

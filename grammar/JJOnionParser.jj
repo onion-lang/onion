@@ -370,7 +370,7 @@ AST.GlobalVariableDeclaration var_decl(int modifiers) : {
 
 AST.FunctionDeclaration fun_decl(int modifiers) : {
   Token t1, t2;
-  List<AST.Argument> args = null;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty = null;
   AST.BlockStatement b = null;
 }{
@@ -484,8 +484,8 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
 
 AST.ConstructorDeclaration constructor_decl(int mset) : {
   Token t;
-  List<AST.Argument> args = null;
-  List<AST.Expression> params = null;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  List<AST.Expression> params = (List<AST.Expression>)AST.NIL();
   AST.BlockStatement block;
 }{
   t = "new" ["(" args = args() ")"] [":" "(" params = terms() ")"] block = block() {
@@ -495,7 +495,7 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
 
 AST.MethodDeclaration method_decl(int mset) : {
   Token t;
-  List<AST.Argument> args = null;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty = null;
   AST.BlockStatement b = null;
 }{
@@ -506,7 +506,7 @@ AST.MethodDeclaration method_decl(int mset) : {
 
 AST.MethodDeclaration interface_method_decl() : {
   Token n;
-  List<AST.Argument> args = null;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty  = null;
 }{
   n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {
@@ -649,13 +649,13 @@ AST.IfStatement if_stmt() :{Token t; AST.Expression e; AST.BlockStatement b1, b2
 }
 
 AST.BranchStatement branch_stmt() : {
-  Token t; AST.Expression e;
+  Token t, t2; AST.Expression e;
   ArrayBuffer<Tuple2<AST.Expression, AST.BlockStatement>> es = new ArrayBuffer<Tuple2<AST.Expression, AST.BlockStatement>>();
   List<AST.Statement> ss = null; AST.BlockStatement elseBlock = null;
 }{
   t="branch" "{"
     (("case" e=term() "=>" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.location(), ss)));})+
-    ["else" elseBlock=block()]
+    [t2="else" "=>" ss=stmts() {elseBlock = new AST.BlockStatement(p(t2), ss);}]
   "}" { return new AST.BranchStatement(p(t), toList(es), elseBlock); }
 }
 
@@ -793,7 +793,7 @@ AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
 }
 
 AST.Expression primary_suffix() : {
-  Token t, n; AST.Expression e, a; List<AST.Expression> args = null;
+  Token t, n; AST.Expression e, a; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
   AST.TypeNode type;
 }{
   e=primary()
@@ -808,7 +808,9 @@ AST.Expression primary_suffix() : {
 
 AST.Expression primary() : {
   Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
-  List<AST.Expression> es = null; List<AST.Argument> args = null; AST.BlockStatement body;
+  List<AST.Expression> es = (List<AST.Expression>)AST.NIL();
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  AST.BlockStatement body;
 }{
   t=<FID>                                                           {return new AST.UnqualifiedFieldReference(p(t), c(t).substring(1));}
 | t="super" "." n=<ID> ["(" es=terms() ")"]                         {return new AST.SuperMethodCall(p(t), c(n), es);}

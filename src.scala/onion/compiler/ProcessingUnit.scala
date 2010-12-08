@@ -8,7 +8,7 @@ package onion.compiler
  * To change this template use File | Settings | File Templates.
  */
 
-trait ProcessingUnit[A, B] {
+trait ProcessingUnit[A, B] {self =>
   type Environment
   def newEnvironment(source: A): Environment
   def doProcess(source: A, environment: Environment): B
@@ -20,5 +20,11 @@ trait ProcessingUnit[A, B] {
     val result = doProcess(source, newEnvironment(source))
     post(source, result)
     result
+  }
+
+  def andThen[C](nextUnit: ProcessingUnit[B, C]): ProcessingUnit[A, C] = new ProcessingUnit[A, C] {
+    type Environment = Null
+    def newEnvironment(source: A): Null = null
+    def doProcess(source: A, environment: Null): C = nextUnit.process(self.process(source))
   }
 }

@@ -380,8 +380,264 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){
 
     }
-    def typed(node: AST.Expression, context: LocalContext): Option[Term] = {
-      null //TODO Implement this method
+    def typedTerms(nodes: Array[AST.Expression], context: LocalContext): Array[Term] = {
+      var failed = false
+      val result = nodes.map{node => typed(node, context).getOrElse{failed = true; null}}
+      if(failed) null else result
+    }
+    def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
+      case node@AST.Addition(loc, l, r) =>
+        null
+      case node@AST.AdditionAssignment(loc, l, r) =>
+        null
+      case node@AST.Assignment(loc, l, r) =>
+        null
+      case node@AST.BitAnd(loc, l, r) =>
+        null
+      case node@AST.BitOr(loc, l, r) =>
+        null
+      case node@AST.Division(loc, left, right) =>
+        null
+      case node@AST.DivisionAssignment(loc, left, right) =>
+        null
+      case node@AST.GreaterOrEqual(loc, left, right) =>
+        null
+      case node@AST.GreaterThan(loca, left, right) =>
+        null
+      case node@AST.Elvis(loc, left, right) =>
+        null
+      case node@AST.Equal(loc, left, right) =>
+        null
+      case node@AST.LessOrEqual(loc, left, right) =>
+        null
+      case node@AST.LessThan(loc, left, right) =>
+        null
+      case node@AST.Indexing(loc, left, right) =>
+        null
+      case node@AST.LogicalAnd(loc, left, right) =>
+        null
+      case node@AST.LogicalOr(loc, left, right) =>
+        null
+      case node@AST.NotEqual(loc, left, right) =>
+        null
+      case node@AST.LogicalRightShift(loc, left, right) =>
+        null
+      case node@AST.MathLeftShift(loc, left, right) =>
+        null
+      case node@AST.MathRightShift(loc, left, right) =>
+        null
+      case node@AST.Modulo(loc, left, right) =>
+        null
+      case node@AST.ModuloAssignment(loc, left, right) =>
+        null
+      case node@AST.Multiplication(loc, left, right) =>
+        null
+      case node@AST.MultiplicationAssignment(loc, left, right) =>
+        null
+      case node@AST.ReferenceEqual(loc, left, right) =>
+        null
+      case node@AST.ReferenceNotEqual(loc, left, right) =>
+        null
+      case node@AST.Subtraction(loc, left, right) =>
+        null
+      case node@AST.SubtractionAssignment(loc, left, right) =>
+        null
+      case node@AST.XOR(loc, left, right) =>
+        null
+      case node@AST.CharacterLiteral(loc, v) =>
+        Some(new CharacterValue(loc, v))
+      case node@AST.IntegerLiteral(loc, v) =>
+        Some(new IntValue(loc, v))
+      case node@AST.LongLiteral(loc, v) =>
+        Some(new LongValue(loc, v))
+      case node@AST.FloatLiteral(loc, v) =>
+        Some(new FloatValue(loc, v))
+      case node@AST.DoubleLiteral(loc, v) =>
+        Some(new DoubleValue(loc, v))
+      case node@AST.BooleanLiteral(loc, v) =>
+        Some(new BoolValue(loc, v))
+      case node@AST.ListLiteral(loc, elements) =>
+        Some(new ListLiteral(elements.map{e => typed(e, context).getOrElse(null)}.toArray, load("java.util.List")))
+      case node@AST.NullLiteral(loc) =>
+        Some(new NullValue(loc))
+      case node@AST.Cast(loc, src, to) =>
+        val term = typed(node.src, context).getOrElse(null)
+        if(term == null) None
+        else {
+          val destination = mapFrom(node.to, mapper_)
+          if(destination == null) None
+          else Some(new AsInstanceOf(term, destination))
+        }
+      case node@AST.ClosureExpression(loc, typeRe, mname, args, returns, body) =>
+        null
+      case node@AST.CurrentInstance(loc) =>
+        if(context.isStatic) None else Some(new This(loc, definition_))
+      case node@AST.Id(loc, name) =>
+        val bind = context.lookup(name)
+        if (bind == null) {
+          report(VARIABLE_NOT_FOUND, node, node.name)
+          None
+        }else {
+          Some(new RefLocal(bind))
+        }
+      case node@AST.IsInstance(loc, target, typeRef) =>
+        null
+      case node@AST.MemberSelection(loc, target/*nullable*/, name) =>
+        null
+      case node@AST.MethodCall(loc, target/*nullable*/, name, args) =>
+        null
+      case node@AST.Negate(loc, target) =>
+        var term = typed(node.target, context).getOrElse(null)
+        if (term == null) return None
+        if (!hasNumericType(term)) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, "-", Array[TypeRef](term.`type`))
+          return None
+        }
+        Some(new UnaryTerm(MINUS, term.`type`, term))
+      case node@AST.NewArray(loc, _, _) =>
+        val typeRef = mapFrom(node.typeRef, mapper_)
+        var parameters = typedTerms(node.args.toArray, context)
+        if(typeRef == null || parameters == null) return None
+        val resultType = loadArray(typeRef, parameters.length)
+        Some(new NewArray(resultType, parameters))
+      case node@AST.NewObject(loc, _, _) =>
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        val parameters = typedTerms(node.args.toArray, context)
+        if (parameters == null || typeRef == null) return None
+        val constructors = typeRef.findConstructor(parameters)
+        if (constructors.length == 0) {
+          report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters))
+          return None
+        }else if (constructors.length > 1) {
+          report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](constructors(0).affiliation, constructors(0).getArgs), Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs))
+          return None
+        }else {
+          Some(new NewObject(constructors(0), parameters))
+        }
+      case node@AST.Not(loc, target) =>
+        val term = typed(node.target, context).getOrElse(null)
+        if (term == null) return None
+        if (term.`type` != IxCode.BasicTypeRef.BOOLEAN) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, "!", Array[TypeRef](term.`type`))
+          return None
+        }
+        Some(new UnaryTerm(NOT, BasicTypeRef.BOOLEAN, term))
+      case node@AST.Posit(loc, target) =>
+        val term = typed(node.target, context).getOrElse(null)
+        if (term == null) return None
+        if (!hasNumericType(term)) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, "+", Array[TypeRef](term.`type`))
+          return None
+        }
+        Some(new UnaryTerm(PLUS, term.`type`, term))
+      case node@AST.PostDecrement(loc, target) =>
+        val operand = typed(node.target, context).getOrElse(null)
+        if (operand == null) return None
+        if ((!operand.isBasicType) || !hasNumericType(operand)) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, "--", Array[TypeRef](operand.`type`))
+          return None
+        }
+        Some(operand match {
+          case ref: RefLocal =>
+            val varIndex = context.add(context.newName, operand.`type`)
+            new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(SUBTRACT, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
+          case ref: RefField =>
+            var varIndex: Int = context.add(context.newName, ref.target.`type`)
+            new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(SUBTRACT, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
+          case _ =>
+            report(UNIMPLEMENTED_FEATURE, node)
+            null
+        })
+      case node@AST.PostIncrement(loc, target) =>
+        val operand = typed(node.target, context).getOrElse(null)
+        if (operand == null) return None
+        if ((!operand.isBasicType) || !hasNumericType(operand)) {
+          report(INCOMPATIBLE_OPERAND_TYPE, node, "++", Array[TypeRef](operand.`type`))
+          return None
+        }
+        Option(operand match {
+          case ref: RefLocal =>
+            val varIndex = context.add(context.newName, operand.`type`)
+            new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(ADD, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
+          case ref: RefField =>
+            var varIndex: Int = context.add(context.newName, ref.target.`type`)
+            new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(ADD, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
+          case _ =>
+            report(UNIMPLEMENTED_FEATURE, node)
+            null
+        })
+      case node@AST.UnqualifiedFieldReference(loc, name) =>
+        if (context.isStatic) return None
+        val selfClass = definition_
+        val field = findField(selfClass, node.name)
+        if (field == null) {
+          report(FIELD_NOT_FOUND, node, selfClass, node.name)
+          None
+        }else if (!isAccessible(field, selfClass)) {
+          report(FIELD_NOT_ACCESSIBLE, node, field.affiliation, node.name, selfClass)
+          None
+        }else {
+          Some(new RefField(new This(selfClass), field))
+        }
+      case node@AST.UnqualifiedMethodCall(loc, name, args) =>
+        var params = typedTerms(node.args.toArray, context)
+        if (params == null) return None
+        val targetType = definition_
+        val methods = targetType.findMethod(node.name, params)
+        if (methods.length == 0) {
+          report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
+          None
+        } else if (methods.length > 1) {
+          report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, node.name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, node.name, methods(1).arguments))
+          None
+        } else {
+          params = doCastInsertion(methods(0).arguments, params)
+          if ((methods(0).modifier & AST.M_STATIC) != 0) {
+            Some(new CallStatic(targetType, methods(0), params))
+          } else {
+            Some(new Call(new This(targetType), methods(0), params))
+          }
+        }
+      case node@AST.StaticMemberSelection(loc, _, _) =>
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        if (typeRef == null) return null
+        val field = findField(typeRef, node.name)
+        if (field == null) {
+          report(FIELD_NOT_FOUND, node, typeRef, node.name)
+          None
+        }else {
+          Some(new RefStaticField(typeRef,field))
+        }
+      case node@AST.StaticMethodCall(loc, _, _, _) =>
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        val parameters = typedTerms(node.args.toArray, context)
+        if (typeRef == null || parameters == null) {
+          None
+        } else {
+          val methods = typeRef.findMethod(node.name, parameters)
+          if (methods.length == 0) {
+            report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
+            None
+          } else if (methods.length > 1) {
+            report(AMBIGUOUS_METHOD, node, node.name, typeNames(methods(0).arguments), typeNames(methods(1).arguments))
+            None
+          } else {
+            Some(new CallStatic(typeRef, methods(0), doCastInsertion(methods(0).arguments, parameters)))
+          }
+        }
+      case node@AST.StringLiteral(loc, value) =>
+        Some(new StringValue(loc, value, load("java.lang.String")))
+      case node@AST.SuperMethodCall(loc, _, _) =>
+        val parameters = typedTerms(node.args.toArray, context)
+        if (parameters == null) return None
+        val contextClass = definition_
+        val result = tryFindMethod(node, contextClass.superClass, node.name, parameters)
+        result match {
+          case Some(method) => Some(new CallSuper(new This(contextClass), method, parameters))
+          case None =>
+            report(METHOD_NOT_FOUND, node, contextClass, node.name, types(parameters))
+            None
+        }
     }
     def translate(node: AST.Statement, context: LocalContext): ActionStatement = node match {
       case AST.BlockStatement(loc, elements) =>
@@ -860,11 +1116,88 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     return findMethod(node, target, name, new Array[Term](0))
   }
   private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String, params: Array[Term]): MethodRef = {
-    val methods: Array[MethodRef] = target.findMethod(name, params)
+    val methods = target.findMethod(name, params)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
       return null
     }
     return methods(0)
+  }
+  private def hasSamePackage(a: ClassTypeRef, b: ClassTypeRef): Boolean = {
+    var name1 = a.name
+    var name2 = b.name
+    var index: Int = 0
+    index = name1.lastIndexOf(".")
+    if (index >= 0)  name1 = name1.substring(0, index)
+    else name1 = ""
+    index = name2.lastIndexOf(".")
+    name2 = if(index >= 0) name2.substring(0, index) else ""
+    return name1 == name2
+  }
+  private def isAccessible(target: ClassTypeRef, context: ClassTypeRef): Boolean = {
+    if (hasSamePackage(target, context))  true else (target.modifier & AST.M_INTERNAL) == 0
+  }
+  private def isAccessible(member: MemberRef, context: ClassTypeRef): Boolean = {
+    val targetType = member.affiliation
+    if (targetType == context) return true
+    val modifier = member.modifier
+    if (TypeRules.isSuperType(targetType, context)) (modifier & AST.M_PROTECTED) != 0 || (modifier & AST.M_PUBLIC) != 0 else (AST.M_PUBLIC & modifier) != 0
+  }
+  private def findField(target: ObjectTypeRef, name: String): FieldRef = {
+    if(target == null) return null
+    var field = target.field(name)
+    if(target != null) return field
+    field = findField(target.superClass, name)
+    if (field != null) return field
+    for (interface <- target.interfaces) {
+      field = findField(interface, name)
+      if (field != null) return field
+    }
+    return null
+  }
+  private def isAccessible(node: AST.Node, target: ObjectTypeRef, context: ClassTypeRef): Boolean = {
+    if (target.isArrayType) {
+      val component = (target.asInstanceOf[ArrayTypeRef]).component
+      if (!component.isBasicType) {
+        if (!isAccessible(component.asInstanceOf[ClassTypeRef], definition_)) {
+          report(CLASS_NOT_ACCESSIBLE, node, target, context)
+          return false
+        }
+      }
+    } else {
+      if (!isAccessible(target.asInstanceOf[ClassTypeRef], context)) {
+        report(CLASS_NOT_ACCESSIBLE, node, target, context)
+        return false
+      }
+    }
+    return true
+  }
+  private def hasNumericType(term: Term): Boolean =  return numeric(term.`type`)
+  private def numeric(symbol: TypeRef): Boolean = {
+    (symbol.isBasicType) && (symbol == BasicTypeRef.BYTE || symbol == BasicTypeRef.SHORT || symbol == BasicTypeRef.CHAR || symbol == BasicTypeRef.INT || symbol == BasicTypeRef.LONG || symbol == BasicTypeRef.FLOAT || symbol == BasicTypeRef.DOUBLE)
+  }
+  private def doCastInsertion(arguments: Array[TypeRef], params: Array[Term]): Array[Term] = {
+    for(i <- 0 until params.length) {
+      if (arguments(i) != params(i).`type`) params(i) = new AsInstanceOf(params(i), arguments(i))
+    }
+    return params
+  }
+  private def types(terms: Array[Term]): Array[TypeRef] = terms.map{term => term.`type`}
+  private def typeNames(types: Array[TypeRef]): Array[String] = types.map{t => t.name}
+  private def tryFindMethod(node: AST.Node, target: ObjectTypeRef, name: String, params: Array[Term]): Option[MethodRef] = {
+    val methods = target.findMethod(name, params)
+    if (methods.length > 0) {
+      if (methods.length > 1) {
+        report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))
+        None
+      } else if (!isAccessible(methods(0), definition_)) {
+        report(METHOD_NOT_ACCESSIBLE, node, methods(0).affiliation, name, methods(0).arguments, definition_)
+        None
+      } else {
+        Some(methods(0))
+      }
+    }else {
+      None
+    }
   }
 }

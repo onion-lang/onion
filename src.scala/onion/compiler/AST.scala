@@ -113,7 +113,7 @@ object AST {
   case class ReferenceEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("===")
   case class ReferenceNotEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("!==")
   case class UnqualifiedFieldReference(location: Location, name: String) extends Expression
-  case class UnqualifiedMethodCall(location: Location, name: String, args: Expression) extends Expression
+  case class UnqualifiedMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
   case class StaticMemberSelection(location: Location, typeRef: TypeNode, name: String) extends Expression
   case class StaticMethodCall(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) extends Expression
   case class StringLiteral(location: Location, value: String) extends Expression

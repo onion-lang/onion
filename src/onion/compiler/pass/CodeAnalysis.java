@@ -1149,17 +1149,16 @@ public class CodeAnalysis {
       return new IxCode.FloatValue(ast.getValue());
     }
     
-    public Object visit(SuperMethodCall ast, LocalContext context) {
-      IxCode.Term[] params;
-      params = typeCheckExps(ast.getParams(), context);
-      if(params == null) return null;
-      IxCode.ClassTypeRef contextClass = CodeAnalysis.this.definition;
-      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(ast, contextClass.superClass(), ast.getName(), params);
+    public Object visit(SuperMethodCall node, LocalContext context) {
+      IxCode.Term[] parameters = typedTerms(node.getParams(), context);
+      if(parameters == null) return null;
+      IxCode.ClassTypeRef contextClass = definition;
+      Pair<Boolean, IxCode.MethodRef> result = tryFindMethod(node, contextClass.superClass(), node.getName(), parameters);
       if(result._2 == null){
-        if(result._1) report(METHOD_NOT_FOUND, ast, contextClass, ast.getName(), types(params));
+        if(result._1) report(METHOD_NOT_FOUND, node, contextClass, node.getName(), types(parameters));
         return null;
       }
-      return new IxCode.CallSuper(new IxCode.This(contextClass), result._2, params);
+      return new IxCode.CallSuper(new IxCode.This(contextClass), result._2, parameters);
     }
     
     public Object visit(DoubleLiteral ast, LocalContext context) {
@@ -1200,26 +1199,26 @@ public class CodeAnalysis {
   //-----------------------------------------------------------------------------//
     
   //---------------------------- unary expressions ------------------------------//
-    public Object visit(Posit ast, LocalContext context) {
-      IxCode.Term node = typed(ast.target(), context);
-      if(node == null) return null;
-      if(!hasNumericType(node)){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast,  "+", new IxCode.TypeRef[]{node.type()});
+    public Object visit(Posit node, LocalContext context) {
+      IxCode.Term term = typed(node.target(), context);
+      if(term == null) return null;
+      if(!hasNumericType(term)){
+        report(INCOMPATIBLE_OPERAND_TYPE, node,  "+", new IxCode.TypeRef[]{term.type()});
         return null;
       }
-      node = new IxCode.UnaryTerm(PLUS, node.type(), node);
-      return node;
+      term = new IxCode.UnaryTerm(PLUS, term.type(), term);
+      return term;
     }
     
-    public Object visit(Negate ast, LocalContext context) {
-      IxCode.Term node = typed(ast.target(), context);
-      if(node == null) return null;
-      if(!hasNumericType(node)){
-        report(INCOMPATIBLE_OPERAND_TYPE, ast, "-", new IxCode.TypeRef[]{node.type()});
+    public Object visit(Negate node, LocalContext context) {
+      IxCode.Term term = typed(node.target(), context);
+      if(term == null) return null;
+      if(!hasNumericType(term)){
+        report(INCOMPATIBLE_OPERAND_TYPE, node, "-", new IxCode.TypeRef[]{term.type()});
         return null;
       }
-      node = new IxCode.UnaryTerm(MINUS, node.type(), node);
-      return node;
+      term = new IxCode.UnaryTerm(MINUS, term.type(), term);
+      return term;
     }
     
     public Object visit(Not ast, LocalContext context) {
@@ -1566,7 +1565,7 @@ public class CodeAnalysis {
     
     public Object visit(NewArray ast, LocalContext context) {
       IxCode.TypeRef type = mapFrom(ast.getType(), mapper);
-      IxCode.Term[] parameters = typeCheckExps(ast.getArguments(), context);
+      IxCode.Term[] parameters = typedTerms(ast.getArguments(), context);
       if(type == null || parameters == null) return null;
       IxCode.ArrayTypeRef resultType = loadArray(type, parameters.length);
       return new IxCode.NewArray(resultType, parameters);
@@ -1680,17 +1679,17 @@ public class CodeAnalysis {
       return new IxCode.RefField(new IxCode.This(selfClass), field);
     }
     
-    public Object visit(NewObject ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getType());
-      IxCode.Term[] parameters = typeCheckExps(ast.getArguments(), context);
-      if(parameters == null || type == null) return null;
-      IxCode.ConstructorRef[] constructors = type.findConstructor(parameters);
+    public Object visit(NewObject node, LocalContext context) {
+      IxCode.ClassTypeRef typeRef = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(node.getType());
+      IxCode.Term[] parameters = typedTerms(node.getArguments(), context);
+      if(parameters == null || typeRef == null) return null;
+      IxCode.ConstructorRef[] constructors = typeRef.findConstructor(parameters);
       if(constructors.length == 0){
-        report(CONSTRUCTOR_NOT_FOUND, ast, type, types(parameters));
+        report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters));
         return null;
       }
       if(constructors.length > 1){
-        report(AMBIGUOUS_CONSTRUCTOR, ast, new Object[]{constructors[0].affiliation(), constructors[0].getArgs()}, new Object[]{constructors[1].affiliation(), constructors[1].getArgs()});
+        report(AMBIGUOUS_CONSTRUCTOR, node, new Object[]{constructors[0].affiliation(), constructors[0].getArgs()}, new Object[]{constructors[1].affiliation(), constructors[1].getArgs()});
         return null;
       }
       return new IxCode.NewObject(constructors[0], parameters);
@@ -1711,16 +1710,16 @@ public class CodeAnalysis {
       return types;
     }
     
-    public Object visit(SelfMethodCall ast, LocalContext context) {
-      IxCode.Term[] params = typeCheckExps(ast.getArguments(), context);
+    public Object visit(SelfMethodCall node, LocalContext context) {
+      IxCode.Term[] params = typedTerms(node.getArguments(), context);
       if(params == null) return null;
       IxCode.ClassDefinition targetType = definition;
-      IxCode.MethodRef[] methods = targetType.findMethod(ast.getName(), params);
+      IxCode.MethodRef[] methods = targetType.findMethod(node.getName(), params);
       if(methods.length == 0){
-        report(METHOD_NOT_FOUND, ast,  targetType, ast.getName(), types(params));
+        report(METHOD_NOT_FOUND, node,  targetType, node.getName(), types(params));
         return null;
       }else if(methods.length > 1){
-        report(AMBIGUOUS_METHOD, ast, new Object[]{methods[0].affiliation(), ast.getName(), methods[0].arguments()}, new Object[]{methods[1].affiliation(), ast.getName(), methods[1].arguments()});
+        report(AMBIGUOUS_METHOD, node, new Object[]{methods[0].affiliation(), node.getName(), methods[0].arguments()}, new Object[]{methods[1].affiliation(), node.getName(), methods[1].arguments()});
         return null;
       }else {
         /*
@@ -1746,7 +1745,7 @@ public class CodeAnalysis {
     public Object visit(MethodCall ast, LocalContext context) {
       IxCode.Term target = typed(ast.getTarget(), context);
       if(target == null) return null;
-      IxCode.Term[] params = typeCheckExps(ast.getArguments(), context);
+      IxCode.Term[] params = typedTerms(ast.getArguments(), context);
       if(params == null) return null;
       IxCode.ObjectTypeRef targetType = (IxCode.ObjectTypeRef) target.type();
       final String name = ast.getName();
@@ -1766,32 +1765,32 @@ public class CodeAnalysis {
       }
     }
     
-    public Object visit(StaticIDExpression ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getType());
-      if(type == null) return null;
-      IxCode.FieldRef field = findField(type, ast.getName());
+    public Object visit(StaticIDExpression node, LocalContext context) {
+      IxCode.ClassTypeRef typeRef = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(node.getType());
+      if(typeRef == null) return null;
+      IxCode.FieldRef field = findField(typeRef, node.getName());
       if(field == null){
-        report(FIELD_NOT_FOUND, ast, type, ast.getName());
+        report(FIELD_NOT_FOUND, node, typeRef, node.getName());
         return null;
       }
-      return new IxCode.RefStaticField(type, field);
+      return new IxCode.RefStaticField(typeRef, field);
     }
     
-    public Object visit(StaticMethodCall ast, LocalContext context) {
-      IxCode.ClassTypeRef type = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(ast.getTarget());
-      IxCode.Term[] params = typeCheckExps(ast.getArgs(), context);
-      if(type == null || params == null) {
+    public Object visit(StaticMethodCall node, LocalContext context) {
+      IxCode.ClassTypeRef typeRef = (IxCode.ClassTypeRef) CodeAnalysis.this.mapFrom(node.getTarget());
+      IxCode.Term[] parameters = typedTerms(node.getArgs(), context);
+      if(typeRef == null || parameters == null) {
         return null;
       }else {
-        IxCode.MethodRef[] methods = type.findMethod(ast.getName(), params);
+        IxCode.MethodRef[] methods = typeRef.findMethod(node.getName(), parameters);
         if(methods.length == 0){
-          report(METHOD_NOT_FOUND, ast,  type, ast.getName(), types(params));
+          report(METHOD_NOT_FOUND, node,  typeRef, node.getName(), types(parameters));
           return null;
         }else if(methods.length > 1){
-          report(AMBIGUOUS_METHOD, ast,  ast.getName(), typeNames(methods[0].arguments()), typeNames(methods[1].arguments()));
+          report(AMBIGUOUS_METHOD, node,  node.getName(), typeNames(methods[0].arguments()), typeNames(methods[1].arguments()));
           return null;
         }else {
-          return new IxCode.CallStatic(type, methods[0], doCastInsertion(methods[0].arguments(), params));
+          return new IxCode.CallStatic(typeRef, methods[0], doCastInsertion(methods[0].arguments(), parameters));
         }
       }
     }
@@ -1804,7 +1803,7 @@ public class CodeAnalysis {
       return names;
     }
     
-    private IxCode.Term[] typeCheckExps(onion.lang.syntax.Expression[] ast, LocalContext context){
+    private IxCode.Term[] typedTerms(onion.lang.syntax.Expression[] ast, LocalContext context){
       IxCode.Term[] terms = new IxCode.Term[ast.length];
       boolean success = true;
       for(int i = 0; i < ast.length; i++){
@@ -2253,7 +2252,7 @@ public class CodeAnalysis {
       for(int i = 0; i < args.length; i++){
         context.add(ast.getArguments()[i].getName(), args[i]);
       }
-      IxCode.Term[] params = typeCheckExps(ast.getInitializers(), context);
+      IxCode.Term[] params = typedTerms(ast.getInitializers(), context);
       IxCode.StatementBlock block = (IxCode.StatementBlock) accept(ast.getBody(), context);
       IxCode.ClassDefinition currentClass = definition;
       IxCode.ClassTypeRef superClass = currentClass.superClass();

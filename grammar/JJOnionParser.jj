@@ -810,12 +810,12 @@ AST.Expression primary() : {
   Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
   List<AST.Expression> es = null; List<AST.Argument> args = null; AST.BlockStatement body;
 }{
-  t=<FID>                                                                 {return new AST.MemberSelection(p(t), null, c(t).substring(1));}
+  t=<FID>                                                           {return new AST.UnqualifiedFieldReference(p(t), c(t).substring(1));}
 | t="super" "." n=<ID> ["(" es=terms() ")"]                         {return new AST.SuperMethodCall(p(t), c(n), es);}
 | LOOKAHEAD(4) ty=class_type() t="::" n=<ID> "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
-| LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                              {return new AST.StaticMemberSelection(p(t), ty, c(n));}
-| LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.MethodCall(p(t), null, c(t), es);}
-| t=<ID>                                                                  {return new AST.Id(p(t), c(t));}
+| LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
+| LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
+| t=<ID>                                                            {return new AST.Id(p(t), c(t));}
 | t="[" es=terms() "]"                                              {return new AST.ListLiteral(p(t), es);}
 | t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
     String mname;

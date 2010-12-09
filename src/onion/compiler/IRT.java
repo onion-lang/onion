@@ -11,20 +11,20 @@ import java.util.*;
  * Time: 21:20:19
  * To change this template use File | Settings | File Templates.
  */
-public interface IRT {
+public class IRT {
     /**
      * This interface represents an internal representation node of onion program.
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface Node {
+    public static interface Node {
     }
 
     /**
      * @author Kota Mizushima
      * Date: 2005/07/06
      */
-    class ArrayLength extends Term {
+    public static class ArrayLength extends Term {
       private final Term target;
 
       public ArrayLength(Term target) {
@@ -49,7 +49,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class RefArray extends Term {
+    public static class RefArray extends Term {
       private final Term object, index;
 
       public RefArray(Term target, Term index) {
@@ -79,7 +79,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    class SetArray extends Term {
+    public static class SetArray extends Term {
       private final Term object, index, value;
 
       public SetArray(Term target, Term index, Term value) {
@@ -114,7 +114,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class Begin extends Term {
+    public static class Begin extends Term {
       private final Term[] terms;
 
       public Begin(Term[] terms) {
@@ -155,8 +155,8 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class BinaryTerm extends Term {
-      public interface Constants {
+    public static class BinaryTerm extends Term {
+      public static interface Constants {
           int ADD = 0;
           int SUBTRACT = 1;
           int MULTIPLY = 2;
@@ -216,7 +216,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class StatementBlock extends ActionStatement {
+    public static class StatementBlock extends ActionStatement {
       private final ActionStatement[] statements;
 
       public StatementBlock(Location location, ActionStatement... statements) {
@@ -241,7 +241,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class BoolValue extends Term {
+    public static class BoolValue extends Term {
       private final boolean value;
 
       public BoolValue(Location location, boolean value){
@@ -266,7 +266,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Break extends ActionStatement {
+    public static class Break extends ActionStatement {
       public Break() {
         this(null);
       }
@@ -279,7 +279,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class ByteValue extends Term {
+    public static class ByteValue extends Term {
       private final byte value;
 
       public ByteValue(Location location, byte value) {
@@ -304,7 +304,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class Call extends Term {
+    public static class Call extends Term {
       public final Term target;
       public final MethodRef method;
       public final Term[] parameters;
@@ -327,7 +327,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class CallStatic extends Term {
+    public static class CallStatic extends Term {
       public ObjectTypeRef target;
       public MethodRef method;
       public Term[] parameters;
@@ -350,7 +350,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class CallSuper extends Term {
+    public static class CallSuper extends Term {
       private final Term target;
       private final MethodRef method;
       private final Term[] params;
@@ -387,7 +387,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class AsInstanceOf extends Term {
+  public static class AsInstanceOf extends Term {
     private final Term target;
     private final TypeRef destination;
 
@@ -418,7 +418,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class CharacterValue extends Term {
+  public static class CharacterValue extends Term {
     private final char value;
 
     public CharacterValue(Location location, char value) {
@@ -444,7 +444,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class ClassDefinition extends AbstractClassTypeRef implements Node, Named {
+  public static class ClassDefinition extends AbstractClassTypeRef implements Node, Named {
     private final Location location;
     private boolean isInterface;
     private int modifier;
@@ -597,7 +597,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class ConstructorDefinition implements Node, ConstructorRef {
+  public static class ConstructorDefinition implements Node, ConstructorRef {
     private Location location;
     private int modifier;
     private ClassTypeRef classType;
@@ -676,7 +676,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class Continue extends ActionStatement {
+  public static class Continue extends ActionStatement {
     public Continue(Location location){
       super(location);
     }
@@ -689,7 +689,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class DoubleValue extends Term {
+  public static class DoubleValue extends Term {
     private final double value;
 
     public DoubleValue(Location location, double value) {
@@ -714,7 +714,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  abstract class Term implements Node {
+  abstract public static class Term implements Node {
     private final Location location;
     public Term(Location location) {
       this.location = location;
@@ -762,7 +762,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class ExpressionActionStatement extends ActionStatement {
+  public static class ExpressionActionStatement extends ActionStatement {
     public final Term term;
     public ExpressionActionStatement(Location location, Term term){
       super(location);
@@ -777,7 +777,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class FieldDefinition implements Node, FieldRef {
+  public static class FieldDefinition implements Node, FieldRef {
     private final Location location;
     private final int modifier;
     private final ClassTypeRef affiliation;
@@ -818,7 +818,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class RefField extends Term {
+  public static class RefField extends Term {
     public Term target;
     public FieldRef field;
 
@@ -839,7 +839,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class SetField extends Term {
+  public static class SetField extends Term {
     private final Term object;
     private final FieldRef field;
     private final Term value;
@@ -868,7 +868,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class FloatValue extends Term {
+  public static class FloatValue extends Term {
     private final float value;
 
     public FloatValue(Location location, float value){
@@ -889,7 +889,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class IfStatement extends ActionStatement {
+  public static class IfStatement extends ActionStatement {
     private final Term condition;
     private final ActionStatement thenStatement, elseStatement;
 
@@ -921,7 +921,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class InstanceOf extends Term {
+  public static class InstanceOf extends Term {
     public Term target;
     public TypeRef checked;
 
@@ -952,7 +952,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/17
    */
-  class IntValue extends Term {
+  public static class IntValue extends Term {
     private int value;
     public IntValue(Location location, int value){
       super(location);
@@ -972,7 +972,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/06/21
    */
-  class ListLiteral extends Term {
+  public static class ListLiteral extends Term {
     private final Term[] elements;
     private final TypeRef type;
 
@@ -999,7 +999,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class RefLocal extends Term {
+  public static class RefLocal extends Term {
     private int frame;
     private int index;
     private TypeRef type;
@@ -1030,7 +1030,7 @@ public interface IRT {
    * @author Kota Mizushima
    * Date: 2005/04/17
    */
-  class SetLocal extends Term {
+  public static class SetLocal extends Term {
     private final int frame;
     private final int index;
     private final Term value;
@@ -1073,7 +1073,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class NewClosure extends Term {
+    public static class NewClosure extends Term {
       private ClassTypeRef type;
       private MethodRef method;
       private ActionStatement block;
@@ -1135,7 +1135,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class LongValue extends Term {
+    public static class LongValue extends Term {
       private final long value;
 
       public LongValue(Location location, long value){
@@ -1156,7 +1156,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class ConditionalLoop extends ActionStatement {
+    public static class ConditionalLoop extends ActionStatement {
       public final Term condition;
       public final ActionStatement stmt;
 
@@ -1174,7 +1174,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class Member implements Node {
+    public static class Member implements Node {
       private final int modifier;
       private final TypeRef classType;
 
@@ -1196,7 +1196,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class MethodDefinition implements Node, MethodRef {
+    public static class MethodDefinition implements Node, MethodRef {
       private final Location location;
       private int modifier;
       private ClassTypeRef classType;
@@ -1270,7 +1270,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class NewObject extends Term {
+    public static class NewObject extends Term {
       public final ConstructorRef constructor;
       public final Term[] parameters;
 
@@ -1287,7 +1287,7 @@ public interface IRT {
       public TypeRef type() { return constructor.affiliation(); }
     }
 
-    class NewArray extends Term {
+    public static class NewArray extends Term {
       public final ArrayTypeRef arrayType;
       public final Term[] parameters;
 
@@ -1309,7 +1309,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class NOP extends ActionStatement {
+    public static class NOP extends ActionStatement {
       public NOP(Location location) {
         super(location);
       }
@@ -1322,7 +1322,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class NullValue extends Term {
+    public static class NullValue extends Term {
       public NullValue(Location location){
         super(location);
       }
@@ -1338,7 +1338,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class Return extends ActionStatement {
+    public static class Return extends ActionStatement {
       public final Term term;
 
       public Return(Location location, Term term) {
@@ -1356,7 +1356,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class ShortValue extends Term {
+    public static class ShortValue extends Term {
       private short value;
       public ShortValue(Location location, short value) {
         super(location);
@@ -1378,7 +1378,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    abstract class ActionStatement {
+    abstract public static class ActionStatement {
       private final Location location;
       public ActionStatement(Location location) {
         this.location = location;
@@ -1392,7 +1392,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class RefStaticField extends Term {
+    public static class RefStaticField extends Term {
       public ClassTypeRef target;
       public FieldRef field;
 
@@ -1413,7 +1413,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class SetStaticField extends Term {
+    public static class SetStaticField extends Term {
       public ObjectTypeRef target;
       public FieldRef field;
       public Term value;
@@ -1436,7 +1436,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class StringValue extends Term {
+    public static class StringValue extends Term {
       public String value;
       public TypeRef type;
 
@@ -1459,7 +1459,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class Super implements Node {
+    public static class Super implements Node {
       private ClassTypeRef classType;
       private TypeRef[] arguments;
       private Term[] terms;
@@ -1489,7 +1489,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Synchronized extends ActionStatement {
+    public static class Synchronized extends ActionStatement {
       public final Term term;
       public final ActionStatement statement;
       public Synchronized(Location location, Term term, ActionStatement statement){
@@ -1506,7 +1506,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class OuterThis extends Term {
+    public static class OuterThis extends Term {
       private final ClassTypeRef type;
 
       public OuterThis(Location location, ClassTypeRef type){
@@ -1525,7 +1525,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class This extends Term {
+    public static class This extends Term {
       private final ClassTypeRef type;
 
       public This(Location location, ClassTypeRef type){
@@ -1544,7 +1544,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Throw extends ActionStatement {
+    public static class Throw extends ActionStatement {
       public final Term term;
       public Throw(Location location, Term term){
         super(location);
@@ -1559,7 +1559,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
-    class Try extends ActionStatement {
+    public static class Try extends ActionStatement {
       public ActionStatement tryStatement;
       public ClosureLocalBinding[] catchTypes;
       public ActionStatement[] catchStatements;
@@ -1578,8 +1578,8 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class UnaryTerm extends Term {
-      public interface Constants {
+    public static class UnaryTerm extends Term {
+      public static interface Constants {
           int PLUS = 0;
           int MINUS = 1;
           int NOT = 2;
@@ -1616,7 +1616,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/07/15
      */
-    abstract class AbstractClassTypeRef extends AbstractObjectTypeRef implements ClassTypeRef {
+    abstract public static class AbstractClassTypeRef extends AbstractObjectTypeRef implements ClassTypeRef {
       private ConstructorRefFinder constructorRefFinder;
 
       public AbstractClassTypeRef() {
@@ -1640,7 +1640,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/07/15
      */
-    abstract class AbstractObjectTypeRef implements ObjectTypeRef {
+    abstract public static class AbstractObjectTypeRef implements ObjectTypeRef {
       private MethodRefFinder methodRefFinder;
       private FieldRefFinder fieldRefFinder;
 
@@ -1674,7 +1674,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class ArrayTypeRef extends AbstractObjectTypeRef {
+    public static class ArrayTypeRef extends AbstractObjectTypeRef {
       private ClassTable table;
       private TypeRef component;
       private int dimension;
@@ -1752,7 +1752,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class BasicTypeRef implements TypeRef {
+    public static class BasicTypeRef implements TypeRef {
       public static final BasicTypeRef BYTE = new BasicTypeRef("byte");
       public static final BasicTypeRef SHORT = new BasicTypeRef("short");
       public static final BasicTypeRef CHAR = new BasicTypeRef("char");
@@ -1814,7 +1814,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface ClassTypeRef extends ObjectTypeRef {
+    public static interface ClassTypeRef extends ObjectTypeRef {
       ConstructorRef[] constructors();
       ConstructorRef[] findConstructor(Term[] params);
     }
@@ -1823,7 +1823,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/30
      */
-    class ConstructorRefFinder {
+    public static class ConstructorRefFinder {
       private final Comparator<IRT.ConstructorRef> sorter = new Comparator<ConstructorRef>(){
         public int compare(IRT.ConstructorRef c1, IRT.ConstructorRef c2) {
           TypeRef[] arg1 = c1.getArgs();
@@ -1872,7 +1872,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/15
      */
-    interface ConstructorRef extends MemberRef {
+    public static interface ConstructorRef extends MemberRef {
       public ClassTypeRef affiliation();
       public TypeRef[] getArgs();
     }
@@ -1881,7 +1881,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class ConstructorRefComparator implements Comparator<ConstructorRef> {
+    public static class ConstructorRefComparator implements Comparator<ConstructorRef> {
 
       public ConstructorRefComparator() {
       }
@@ -1904,7 +1904,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/07/15
      */
-    class FieldRefFinder {
+    public static class FieldRefFinder {
       public FieldRef find(ObjectTypeRef target, String name){
         if(target == null) return null;
         FieldRef field = target.field(name);
@@ -1924,7 +1924,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/15
      */
-    interface FieldRef extends MemberRef {
+    public static interface FieldRef extends MemberRef {
       public int modifier();
       public ClassTypeRef affiliation();
       public TypeRef type();
@@ -1934,7 +1934,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class FieldRefComparator implements Comparator<FieldRef> {
+    public static class FieldRefComparator implements Comparator<FieldRef> {
       public FieldRefComparator() {
       }
 
@@ -1947,7 +1947,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/21
      */
-    interface MemberRef extends Named {
+    public static interface MemberRef extends Named {
       int modifier();
       ClassTypeRef affiliation();
       String name();
@@ -1957,7 +1957,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/30
      */
-    class MethodRefFinder {
+    public static class MethodRefFinder {
       private final Comparator<MethodRef> sorter = new Comparator<MethodRef>(){
         public int compare(MethodRef m1, MethodRef m2) {
           TypeRef[] arg1 = m1.arguments();
@@ -2020,7 +2020,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/15
      */
-    interface MethodRef extends MemberRef {
+    public static interface MethodRef extends MemberRef {
       public ClassTypeRef affiliation();
       public TypeRef[] arguments();
       public TypeRef returnType();
@@ -2030,7 +2030,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/07/12
      */
-    class MethodRefComparator implements Comparator<MethodRef> {
+    public static class MethodRefComparator implements Comparator<MethodRef> {
       public int compare(MethodRef m1, MethodRef m2) {
         int result = m1.name().compareTo(m2.name());
         if(result != 0) return result;
@@ -2049,7 +2049,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    class NullTypeRef implements TypeRef {
+    public static class NullTypeRef implements TypeRef {
       public static NullTypeRef NULL = new NullTypeRef("null");
 
       private String name;
@@ -2087,7 +2087,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    interface ObjectTypeRef extends TypeRef {
+    public static interface ObjectTypeRef extends TypeRef {
       boolean isInterface();
       int modifier();
       ClassTypeRef superClass();
@@ -2103,7 +2103,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/30
      */
-    interface ParameterMatcher {
+    public static interface ParameterMatcher {
       public boolean matches(TypeRef[] arguments, Term[] parameters);
     }
 
@@ -2111,7 +2111,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/30
      */
-    class StandardParameterMatcher implements ParameterMatcher {
+    public static class StandardParameterMatcher implements ParameterMatcher {
       public StandardParameterMatcher() {
       }
 
@@ -2134,7 +2134,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/04/17
      */
-    interface TypeRef {
+    public static interface TypeRef {
       String name();
       boolean isBasicType();
       boolean isClassType();
@@ -2147,7 +2147,7 @@ public interface IRT {
      * @author Kota Mizushima
      * Date: 2005/06/22
      */
-    class TypeRules {
+    public static class TypeRules {
 
       private TypeRules() {
       }

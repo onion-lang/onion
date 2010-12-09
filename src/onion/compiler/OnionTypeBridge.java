@@ -21,27 +21,27 @@ import org.apache.bcel.generic.Type;
  */
 public class OnionTypeBridge {
   private static Map basicTypeTable = new HashMap(){{
-    put(BasicType.BYTE, IxCode.BasicTypeRef.BYTE);
-    put(BasicType.SHORT, IxCode.BasicTypeRef.SHORT);
-    put(BasicType.CHAR, IxCode.BasicTypeRef.CHAR);
-    put(BasicType.INT, IxCode.BasicTypeRef.INT);
-    put(BasicType.LONG, IxCode.BasicTypeRef.LONG);
-    put(BasicType.FLOAT, IxCode.BasicTypeRef.FLOAT);
-    put(BasicType.DOUBLE, IxCode.BasicTypeRef.DOUBLE);
-    put(BasicType.BOOLEAN, IxCode.BasicTypeRef.BOOLEAN);
-    put(BasicType.VOID, IxCode.BasicTypeRef.VOID);
+    put(BasicType.BYTE, IRT.BasicTypeRef.BYTE);
+    put(BasicType.SHORT, IRT.BasicTypeRef.SHORT);
+    put(BasicType.CHAR, IRT.BasicTypeRef.CHAR);
+    put(BasicType.INT, IRT.BasicTypeRef.INT);
+    put(BasicType.LONG, IRT.BasicTypeRef.LONG);
+    put(BasicType.FLOAT, IRT.BasicTypeRef.FLOAT);
+    put(BasicType.DOUBLE, IRT.BasicTypeRef.DOUBLE);
+    put(BasicType.BOOLEAN, IRT.BasicTypeRef.BOOLEAN);
+    put(BasicType.VOID, IRT.BasicTypeRef.VOID);
   }};
   
   private static Map c2t = new HashMap(){{
-    put(byte.class, IxCode.BasicTypeRef.BYTE);
-    put(short.class, IxCode.BasicTypeRef.SHORT);
-    put(char.class, IxCode.BasicTypeRef.CHAR);
-    put(int.class, IxCode.BasicTypeRef.INT);
-    put(long.class, IxCode.BasicTypeRef.LONG);
-    put(float.class, IxCode.BasicTypeRef.FLOAT);
-    put(double.class, IxCode.BasicTypeRef.DOUBLE);
-    put(boolean.class, IxCode.BasicTypeRef.BOOLEAN);
-    put(void.class, IxCode.BasicTypeRef.VOID);
+    put(byte.class, IRT.BasicTypeRef.BYTE);
+    put(short.class, IRT.BasicTypeRef.SHORT);
+    put(char.class, IRT.BasicTypeRef.CHAR);
+    put(int.class, IRT.BasicTypeRef.INT);
+    put(long.class, IRT.BasicTypeRef.LONG);
+    put(float.class, IRT.BasicTypeRef.FLOAT);
+    put(double.class, IRT.BasicTypeRef.DOUBLE);
+    put(boolean.class, IRT.BasicTypeRef.BOOLEAN);
+    put(void.class, IRT.BasicTypeRef.VOID);
   }};
   
   private ClassTable table;
@@ -50,11 +50,11 @@ public class OnionTypeBridge {
     this.table = table;
   }
   
-  public IxCode.TypeRef toOnionType(Class klass) {
-    IxCode.TypeRef returnType = (IxCode.TypeRef) c2t.get(klass);
+  public IRT.TypeRef toOnionType(Class klass) {
+    IRT.TypeRef returnType = (IRT.TypeRef) c2t.get(klass);
     if(returnType != null) return returnType;
     if(!klass.isArray()){
-      IxCode.ClassTypeRef symbol = table.load(klass.getName());
+      IRT.ClassTypeRef symbol = table.load(klass.getName());
       if(symbol != null){
         return symbol;
       }else{
@@ -69,18 +69,18 @@ public class OnionTypeBridge {
         component = klass.getComponentType();
         if(component.getComponentType() == null) break;
       }
-      IxCode.TypeRef componentType = toOnionType(component);
+      IRT.TypeRef componentType = toOnionType(component);
       return table.loadArray(componentType, dimension);
     }
     return null;
   }
   
-  public IxCode.TypeRef toOnionType(Type type) {
-    IxCode.TypeRef returnType = (IxCode.TypeRef) basicTypeTable.get(type);
+  public IRT.TypeRef toOnionType(Type type) {
+    IRT.TypeRef returnType = (IRT.TypeRef) basicTypeTable.get(type);
     if(returnType != null) return returnType;
     if(type instanceof ObjectType){
       ObjectType objType = (ObjectType)type;
-      IxCode.ClassTypeRef symbol = table.load(objType.getClassName());
+      IRT.ClassTypeRef symbol = table.load(objType.getClassName());
       if(symbol != null){
         return symbol;
       }else{
@@ -89,7 +89,7 @@ public class OnionTypeBridge {
     }
     if(type instanceof ArrayType){
       ArrayType arrType = (ArrayType)type;
-      IxCode.TypeRef component = toOnionType(arrType.getBasicType());
+      IRT.TypeRef component = toOnionType(arrType.getBasicType());
       if(component != null){        
         return table.loadArray(component, arrType.getDimensions());
       }

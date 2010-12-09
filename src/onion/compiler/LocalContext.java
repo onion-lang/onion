@@ -20,8 +20,8 @@ public class LocalContext {
   private boolean isGlobal;
   private boolean isMethod;
   private LocalFrame contextFrame;
-  private IxCode.MethodRef method;
-  private IxCode.ConstructorDefinition constructor;
+  private IRT.MethodRef method;
+  private IRT.ConstructorDefinition constructor;
   private SymbolGenerator generator;
 
   public LocalContext() {
@@ -57,28 +57,28 @@ public class LocalContext {
     return generator.generate();
   }
   
-  public IxCode.TypeRef returnType(){
+  public IRT.TypeRef returnType(){
     if(isMethod){
       return method.returnType();
     }else{
-      return IxCode.BasicTypeRef.VOID;
+      return IRT.BasicTypeRef.VOID;
     }
   }
   
-  public IxCode.MethodRef method(){
+  public IRT.MethodRef method(){
     return method;
   }
   
-  public IxCode.ConstructorRef constructor(){
+  public IRT.ConstructorRef constructor(){
     return constructor;
   }
   
-  public void setMethod(IxCode.MethodRef method) {
+  public void setMethod(IRT.MethodRef method) {
     this.method = method;
     this.isMethod = true;
   }
   
-  public void setConstructor(IxCode.ConstructorDefinition constructor){
+  public void setConstructor(IRT.ConstructorDefinition constructor){
     this.constructor = constructor;
     this.isMethod = false;
   }
@@ -123,11 +123,11 @@ public class LocalContext {
     return contextFrame.lookupOnlyCurrentScope(name);
   }
   
-  public int add(String name, IxCode.TypeRef type) {
+  public int add(String name, IRT.TypeRef type) {
     return contextFrame.add(name, type);
   }
   
-  public String add(IxCode.TypeRef type){
+  public String add(IRT.TypeRef type){
     String name = newName();
     contextFrame.add(name, type);
     return name;

@@ -1,7 +1,6 @@
 package onion.compiler;
 
 import onion.compiler.util.Strings;
-import onion.compiler.Modifier;
 
 import java.util.*;
 
@@ -12,7 +11,7 @@ import java.util.*;
  * Time: 21:20:19
  * To change this template use File | Settings | File Templates.
  */
-public interface IxCode {
+public interface IRT {
     /**
      * This interface represents an internal representation node of onion program.
      * @author Kota Mizushima
@@ -1825,8 +1824,8 @@ public interface IxCode {
      * Date: 2005/06/30
      */
     class ConstructorRefFinder {
-      private final Comparator<IxCode.ConstructorRef> sorter = new Comparator<ConstructorRef>(){
-        public int compare(IxCode.ConstructorRef c1, IxCode.ConstructorRef c2) {
+      private final Comparator<IRT.ConstructorRef> sorter = new Comparator<ConstructorRef>(){
+        public int compare(IRT.ConstructorRef c1, IRT.ConstructorRef c2) {
           TypeRef[] arg1 = c1.getArgs();
           TypeRef[] arg2 = c2.getArgs();
           if(isAllSuperType(arg2, arg1)) return -1;

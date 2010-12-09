@@ -75,7 +75,7 @@ public class LocalFrame {
     return binds;
   }
   
-  public int add(String name, IxCode.TypeRef type){
+  public int add(String name, IRT.TypeRef type){
     LocalBinding bind = scope.get(name);    
     //if name is already registered, it returns -1 which means failure.
     if(bind != null) return -1;

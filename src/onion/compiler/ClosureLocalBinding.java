@@ -14,7 +14,7 @@ package onion.compiler;
 public class ClosureLocalBinding extends LocalBinding {
   private int frame;
   
-  public ClosureLocalBinding(int frame, int index, IxCode.TypeRef type) {
+  public ClosureLocalBinding(int frame, int index, IRT.TypeRef type) {
     super(index, type);
     this.frame = frame;
   }

@@ -52,19 +52,19 @@ public class TestLocalFrame extends TestCase {
   }
 
   public void testEntries() {
-    frame.add("foo", IxCode.BasicTypeRef.BOOLEAN);
-    frame.add("bar", IxCode.BasicTypeRef.BYTE);
-    frame.add("baz", IxCode.BasicTypeRef.INT);
+    frame.add("foo", IRT.BasicTypeRef.BOOLEAN);
+    frame.add("bar", IRT.BasicTypeRef.BYTE);
+    frame.add("baz", IRT.BasicTypeRef.INT);
     LocalBinding[] binds = frame.entries();
   }
 
   public void testAddAndLookup() {
     assertNull(frame.lookup("foo"));
-    int index = frame.add("foo", IxCode.BasicTypeRef.BOOLEAN);
+    int index = frame.add("foo", IRT.BasicTypeRef.BOOLEAN);
     ClosureLocalBinding bind, bind2;
     bind = frame.lookupOnlyCurrentScope("foo");
     assertEquals(bind.getIndex(), index);
-    assertEquals(bind.getType(), IxCode.BasicTypeRef.BOOLEAN);
+    assertEquals(bind.getType(), IRT.BasicTypeRef.BOOLEAN);
     bind2 = frame.lookup("foo");
     assertEquals(bind, bind2);
   }

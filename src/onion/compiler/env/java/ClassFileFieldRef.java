@@ -7,19 +7,19 @@
  * ************************************************************** */
 package onion.compiler.env.java;
 
-import onion.compiler.IxCode;
+import onion.compiler.IRT;
 
 /**
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileFieldRef implements IxCode.FieldRef {
+public class ClassFileFieldRef implements IRT.FieldRef {
   private int modifier;
-  private IxCode.ClassTypeRef affiliation;
+  private IRT.ClassTypeRef affiliation;
   private String name;
-  private IxCode.TypeRef type;
+  private IRT.TypeRef type;
 
-  public ClassFileFieldRef(int modifier, IxCode.ClassTypeRef affiliation, String name, IxCode.TypeRef type) {
+  public ClassFileFieldRef(int modifier, IRT.ClassTypeRef affiliation, String name, IRT.TypeRef type) {
     this.modifier = modifier;
     this.affiliation = affiliation;
     this.name = name;
@@ -30,7 +30,7 @@ public class ClassFileFieldRef implements IxCode.FieldRef {
     return modifier;
   }
 
-  public IxCode.ClassTypeRef affiliation() {
+  public IRT.ClassTypeRef affiliation() {
     return affiliation;
   }
 
@@ -38,7 +38,7 @@ public class ClassFileFieldRef implements IxCode.FieldRef {
     return name;
   }
 
-  public IxCode.TypeRef type() {
+  public IRT.TypeRef type() {
     return type;
   }
 }

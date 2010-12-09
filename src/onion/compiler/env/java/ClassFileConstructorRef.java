@@ -7,32 +7,32 @@
  * ************************************************************** */
 package onion.compiler.env.java;
 
-import onion.compiler.IxCode;
+import onion.compiler.IRT;
 
 /**
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileConstructorRef implements IxCode.ConstructorRef {
+public class ClassFileConstructorRef implements IRT.ConstructorRef {
   private int modifier;
-  private IxCode.ClassTypeRef classType;
+  private IRT.ClassTypeRef classType;
   private String name;
-  private IxCode.TypeRef[] args;
+  private IRT.TypeRef[] args;
 
   public ClassFileConstructorRef(
-    int modifier, IxCode.ClassTypeRef classType, String name, IxCode.TypeRef[] args
+    int modifier, IRT.ClassTypeRef classType, String name, IRT.TypeRef[] args
   ) {
     this.modifier = modifier;
     this.classType = classType;
     this.name = name;
-    this.args = (IxCode.TypeRef[]) args.clone();
+    this.args = (IRT.TypeRef[]) args.clone();
   }
   
   public int modifier(){
     return modifier;
   }
 
-  public IxCode.ClassTypeRef affiliation() {
+  public IRT.ClassTypeRef affiliation() {
     return classType;
   }
 
@@ -40,7 +40,7 @@ public class ClassFileConstructorRef implements IxCode.ConstructorRef {
     return name;
   }
 
-  public IxCode.TypeRef[] getArgs() {
+  public IRT.TypeRef[] getArgs() {
     return args;
   }
 }

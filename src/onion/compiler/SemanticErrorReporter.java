@@ -87,8 +87,8 @@ public class SemanticErrorReporter {
 
   private void reportIncompatibleType(
     Location position, Object[] items){
-    IxCode.TypeRef expected = (IxCode.TypeRef) items[0];
-    IxCode.TypeRef detected = (IxCode.TypeRef) items[1];
+    IRT.TypeRef expected = (IRT.TypeRef) items[0];
+    IRT.TypeRef detected = (IRT.TypeRef) items[1];
     problem(
       position,
       format(
@@ -96,7 +96,7 @@ public class SemanticErrorReporter {
         expected.name(), detected.name()));
   }
   
-  private String names(IxCode.TypeRef[] types){
+  private String names(IRT.TypeRef[] types){
     StringBuffer buffer = new StringBuffer();
     if(types.length > 0){
       buffer.append(types[0].name());
@@ -111,7 +111,7 @@ public class SemanticErrorReporter {
   private void reportIncompatibleOperandType(
     Location position, Object[] items){
     String operator = (String) items[0];
-    IxCode.TypeRef[] operands = (IxCode.TypeRef[]) items[1];
+    IRT.TypeRef[] operands = (IRT.TypeRef[]) items[1];
     problem(
       position,
       format(message("error.semantic.incompatibleOperandType"), 
@@ -138,7 +138,7 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.fieldNotFound"), 
-        ((IxCode.TypeRef)items[0]).name(), (String)items[1]));
+        ((IRT.TypeRef)items[0]).name(), (String)items[1]));
   }
   
   private void reportMethodNotFound(
@@ -147,20 +147,20 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.methodNotFound"),
-        ((IxCode.TypeRef)items[0]).name(), (String)items[1],
-        names(((IxCode.TypeRef[])items[2]))));
+        ((IRT.TypeRef)items[0]).name(), (String)items[1],
+        names(((IRT.TypeRef[])items[2]))));
   }
   
   private void reportAmbiguousMethod(
     Location position, Object[] items){
     Object[] item1 = (Object[])items[0];
     Object[] item2 = (Object[])items[1];
-    String target1 = ((IxCode.ObjectTypeRef)item1[0]).name();
+    String target1 = ((IRT.ObjectTypeRef)item1[0]).name();
     String name1 = (String)item1[1];
-    String args1 = names((IxCode.TypeRef[])item1[2]);
-    String target2 = ((IxCode.ObjectTypeRef)item2[0]).name();
+    String args1 = names((IRT.TypeRef[])item1[2]);
+    String target2 = ((IRT.ObjectTypeRef)item2[0]).name();
     String name2 = (String)item2[1];
-    String args2 = names((IxCode.TypeRef[])item2[2]);
+    String args2 = names((IRT.TypeRef[])item2[2]);
     problem(
       position,
       format(
@@ -188,7 +188,7 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.duplicatedField"),
-        ((IxCode.TypeRef)items[0]).name(), (String)items[1]));
+        ((IRT.TypeRef)items[0]).name(), (String)items[1]));
   }
   
   private void reportDuplicateMethod(
@@ -197,8 +197,8 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.duplicatedMethod"),
-        ((IxCode.TypeRef)items[0]).name(), (String)items[1],
-        names((IxCode.TypeRef[])items[2])));
+        ((IRT.TypeRef)items[0]).name(), (String)items[1],
+        names((IRT.TypeRef[])items[2])));
   }
   
   private void reportDuplicateGlobalVariable(
@@ -216,7 +216,7 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.duplicatedGlobalVariable"),
-        (String)items[0], names((IxCode.TypeRef[])items[1])));
+        (String)items[0], names((IRT.TypeRef[])items[1])));
   }
   
   private void reportDuplicateConstructor(
@@ -225,7 +225,7 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.duplicatedConstructor"),
-        ((IxCode.TypeRef)items[0]).name(), names((IxCode.TypeRef[])items[1])));
+        ((IRT.TypeRef)items[0]).name(), names((IRT.TypeRef[])items[1])));
   }
   
   private void reportMethodNotAccessible(
@@ -234,10 +234,10 @@ public class SemanticErrorReporter {
       position, 
       format(
         message("error.semantic.methodNotAccessible"),
-        ((IxCode.ObjectTypeRef)items[0]).name(),
+        ((IRT.ObjectTypeRef)items[0]).name(),
         (String)items[1],
-        names(((IxCode.TypeRef[])items[2])),
-        ((IxCode.ClassTypeRef)items[3]).name()));
+        names(((IRT.TypeRef[])items[2])),
+        ((IRT.ClassTypeRef)items[3]).name()));
   }
   
   private void reportFieldNotAccessible(
@@ -246,9 +246,9 @@ public class SemanticErrorReporter {
       position, 
       format(
         message("error.semantic.fieldNotAccessible"), 
-        ((IxCode.ClassTypeRef)items[0]).name(),
+        ((IRT.ClassTypeRef)items[0]).name(),
         (String)items[1],
-        ((IxCode.ClassTypeRef)items[2]).name()));
+        ((IRT.ClassTypeRef)items[2]).name()));
   }
   
   private void reportClassNotAccessible(
@@ -257,8 +257,8 @@ public class SemanticErrorReporter {
       position, 
       format(
         message("error.semantic.classNotAccessible"), 
-        ((IxCode.ClassTypeRef)items[0]).name(),
-        ((IxCode.ClassTypeRef)items[1]).name()));
+        ((IRT.ClassTypeRef)items[0]).name(),
+        ((IRT.ClassTypeRef)items[1]).name()));
   }
   
   private void reportCyclicInheritance(
@@ -284,8 +284,8 @@ public class SemanticErrorReporter {
   
   private void reportConstructorNotFound(
     Location position, Object[] items){
-    String type = ((IxCode.TypeRef)items[0]).name();
-    String args = names(((IxCode.TypeRef[])items[1]));
+    String type = ((IRT.TypeRef)items[0]).name();
+    String args = names(((IRT.TypeRef[])items[1]));
     problem(
       position, 
       format(message("error.semantic.constructorNotFound"), type, args));
@@ -294,10 +294,10 @@ public class SemanticErrorReporter {
   private void reportAmbiguousConstructor(Location position, Object[] items){
     Object[] item1 = (Object[])items[0];
     Object[] item2 = (Object[])items[1];
-    String target1 = ((IxCode.ObjectTypeRef)item1[0]).name();
-    String args1 = names((IxCode.TypeRef[])item1[1]);
-    String target2 = ((IxCode.ObjectTypeRef)item2[0]).name();
-    String args2 = names((IxCode.TypeRef[])item2[1]);
+    String target1 = ((IRT.ObjectTypeRef)item1[0]).name();
+    String args1 = names((IRT.TypeRef[])item1[1]);
+    String target2 = ((IRT.ObjectTypeRef)item2[0]).name();
+    String args2 = names((IRT.TypeRef[])item2[1]);
     problem(
       position,
       format(
@@ -306,7 +306,7 @@ public class SemanticErrorReporter {
   }
   
   private void reportInterfaceRequied(Location position, Object[] items){
-    IxCode.TypeRef type = (IxCode.TypeRef)items[0];
+    IRT.TypeRef type = (IRT.TypeRef)items[0];
     problem(
       position, 
       format(message("error.semantic.interfaceRequired"), type.name()));
@@ -322,8 +322,8 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.duplicateGeneratedMethod"),
-        ((IxCode.TypeRef)items[0]).name(), (String)items[1],
-        names((IxCode.TypeRef[])items[2])));
+        ((IRT.TypeRef)items[0]).name(), (String)items[1],
+        names((IRT.TypeRef[])items[2])));
   }
   
   private void reportIsNotBoxableType(Location position, Object[] items){
@@ -331,7 +331,7 @@ public class SemanticErrorReporter {
       position,
       format(
         message("error.semantic.isNotBoxableType"),
-        ((IxCode.TypeRef)items[0]).name()));
+        ((IRT.TypeRef)items[0]).name()));
   }
   
   private void problem(Location position, String message){

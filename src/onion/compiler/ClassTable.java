@@ -21,33 +21,33 @@ import org.apache.bcel.classfile.JavaClass;
  * Date: 2005/06/22
  */
 public class ClassTable {
-  private OrderedTable<IxCode.ClassDefinition> classes;
-  private Map<String, IxCode.ClassTypeRef> classFiles;
-  private Map<String, IxCode.ArrayTypeRef> arrayClasses;
+  private OrderedTable<IRT.ClassDefinition> classes;
+  private Map<String, IRT.ClassTypeRef> classFiles;
+  private Map<String, IRT.ArrayTypeRef> arrayClasses;
   private ClassFileTable table;
   
   public ClassTable(String classPath) {
-    classes = new OrderedTable<IxCode.ClassDefinition>();
-    classFiles = new HashMap<String, IxCode.ClassTypeRef>();
-    arrayClasses = new HashMap<String, IxCode.ArrayTypeRef>();
+    classes = new OrderedTable<IRT.ClassDefinition>();
+    classFiles = new HashMap<String, IRT.ClassTypeRef>();
+    arrayClasses = new HashMap<String, IRT.ArrayTypeRef>();
     table = new ClassFileTable(classPath);
   }
   
-  public OrderedTable<IxCode.ClassDefinition> classes() {
+  public OrderedTable<IRT.ClassDefinition> classes() {
     return classes;
   }
   
-  public IxCode.ArrayTypeRef loadArray(IxCode.TypeRef component, int dimension){
+  public IRT.ArrayTypeRef loadArray(IRT.TypeRef component, int dimension){
     String arrayName = Strings.repeat("[", dimension) + component.name();
-    IxCode.ArrayTypeRef array = arrayClasses.get(arrayName);
+    IRT.ArrayTypeRef array = arrayClasses.get(arrayName);
     if(array != null) return array;
-    array = new IxCode.ArrayTypeRef(component, dimension, this);
+    array = new IRT.ArrayTypeRef(component, dimension, this);
     arrayClasses.put(arrayName, array);
     return array;
   }
   
-  public IxCode.ClassTypeRef load(String className){
-    IxCode.ClassTypeRef clazz = lookup(className);
+  public IRT.ClassTypeRef load(String className){
+    IRT.ClassTypeRef clazz = lookup(className);
     if(clazz == null){
       JavaClass javaClass = table.load(className);
       if(javaClass != null){
@@ -64,12 +64,12 @@ public class ClassTable {
     return clazz;
   }
   
-  public IxCode.ClassTypeRef rootClass(){
+  public IRT.ClassTypeRef rootClass(){
     return load("java.lang.Object");
   }
   
-  public IxCode.ClassTypeRef lookup(String className){
-    IxCode.ClassTypeRef ref = classes.get(className);
+  public IRT.ClassTypeRef lookup(String className){
+    IRT.ClassTypeRef ref = classes.get(className);
     return (ref != null) ? ref : classFiles.get(className);
   }
 

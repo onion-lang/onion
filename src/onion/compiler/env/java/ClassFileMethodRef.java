@@ -7,24 +7,24 @@
  * ************************************************************** */
 package onion.compiler.env.java;
 
-import onion.compiler.IxCode;
+import onion.compiler.IRT;
 
 /**
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileMethodRef implements IxCode.MethodRef {
+public class ClassFileMethodRef implements IRT.MethodRef {
   private final int modifier;
-  private final IxCode.ClassTypeRef affiliation;
+  private final IRT.ClassTypeRef affiliation;
   private final String name;
-  private final IxCode.TypeRef[] arguments;
-  private final IxCode.TypeRef returnType;
+  private final IRT.TypeRef[] arguments;
+  private final IRT.TypeRef returnType;
 
-  public ClassFileMethodRef(int modifier, IxCode.ClassTypeRef affiliation, String name, IxCode.TypeRef[] arguments, IxCode.TypeRef returnType) {
+  public ClassFileMethodRef(int modifier, IRT.ClassTypeRef affiliation, String name, IRT.TypeRef[] arguments, IRT.TypeRef returnType) {
     this.modifier = modifier;
     this.affiliation = affiliation;
     this.name = name;
-    this.arguments = (IxCode.TypeRef[]) arguments.clone();
+    this.arguments = (IRT.TypeRef[]) arguments.clone();
     this.returnType = returnType;
   }
   
@@ -32,7 +32,7 @@ public class ClassFileMethodRef implements IxCode.MethodRef {
     return modifier;
   }
 
-  public IxCode.ClassTypeRef affiliation() {
+  public IRT.ClassTypeRef affiliation() {
     return affiliation;
   }
 
@@ -40,11 +40,11 @@ public class ClassFileMethodRef implements IxCode.MethodRef {
     return name;
   }
 
-  public IxCode.TypeRef[] arguments() {
+  public IRT.TypeRef[] arguments() {
     return arguments;
   }
 
-  public IxCode.TypeRef returnType() {
+  public IRT.TypeRef returnType() {
     return returnType;
   }
 }

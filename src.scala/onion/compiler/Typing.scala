@@ -2,9 +2,9 @@ package onion.compiler
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.SemanticErrorReporter.Constants._
-import _root_.onion.compiler.IxCode._
-import _root_.onion.compiler.IxCode.BinaryTerm.Constants._
-import _root_.onion.compiler.IxCode.UnaryTerm.Constants._
+import _root_.onion.compiler.IRT._
+import _root_.onion.compiler.IRT.BinaryTerm.Constants._
+import _root_.onion.compiler.IRT.UnaryTerm.Constants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 
@@ -420,7 +420,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         return null
       }else {
         val init = new Super(superClass, matched(0).getArgs, params)
-        val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], IxCode.BasicTypeRef.VOID)
+        val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], IRT.BasicTypeRef.VOID)
         constructor.setSuperInitializer(init)
         constructor.setBlock(block)
         constructor.setFrame(context.getContextFrame)
@@ -533,7 +533,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (target.isArrayType) {
         val targetType = (target.`type`.asInstanceOf[ArrayTypeRef])
         if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
-          report(INCOMPATIBLE_TYPE, indexing.right, IxCode.BasicTypeRef.INT, index.`type`)
+          report(INCOMPATIBLE_TYPE, indexing.right, IRT.BasicTypeRef.INT, index.`type`)
           return null
         }
         value = processAssignable(node.right, targetType.base, value)
@@ -571,7 +571,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           if (resultType != left.`type`) left = new AsInstanceOf(left, resultType)
           if (resultType != right.`type`) right = new AsInstanceOf(right, resultType)
         }
-        else if (leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN) {
+        else if (leftType != IRT.BasicTypeRef.BOOLEAN || rightType != IRT.BasicTypeRef.BOOLEAN) {
           report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
           return null
         }
@@ -579,7 +579,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       else if (left.isReferenceType && right.isReferenceType) {
         return createEquals(kind, left, right)
       }
-      new BinaryTerm(kind, IxCode.BasicTypeRef.BOOLEAN, left, right)
+      new BinaryTerm(kind, IRT.BasicTypeRef.BOOLEAN, left, right)
     }
     def processShiftExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
       var left: Term = typed(node.left, context).getOrElse(null)
@@ -609,10 +609,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (leftResultType != leftType) {
         left = new AsInstanceOf(left, leftResultType)
       }
-      if (rightType != IxCode.BasicTypeRef.INT) {
-        right = new AsInstanceOf(right, IxCode.BasicTypeRef.INT)
+      if (rightType != IRT.BasicTypeRef.INT) {
+        right = new AsInstanceOf(right, IRT.BasicTypeRef.INT)
       }
-      new BinaryTerm(kind, IxCode.BasicTypeRef.BOOLEAN, left, right)
+      new BinaryTerm(kind, IRT.BasicTypeRef.BOOLEAN, left, right)
     }
     def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
       var left: Term = typed(node.left, context).getOrElse(null)
@@ -644,7 +644,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         resultType = promote(leftType, rightType)
       }
       else if (leftType.isBoolean && rightType.isBoolean) {
-        resultType = IxCode.BasicTypeRef.BOOLEAN
+        resultType = IRT.BasicTypeRef.BOOLEAN
       }
       else {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
@@ -660,7 +660,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (left == null || right == null) return null
       val leftType: TypeRef = left.`type`
       val rightType: TypeRef = right.`type`
-      if ((leftType != IxCode.BasicTypeRef.BOOLEAN) || (rightType != IxCode.BasicTypeRef.BOOLEAN)) {
+      if ((leftType != IRT.BasicTypeRef.BOOLEAN) || (rightType != IRT.BasicTypeRef.BOOLEAN)) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
         return null
       }
@@ -685,12 +685,12 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           if (resultType != right.`type`) {
             right = new AsInstanceOf(right, resultType)
           }
-        } else if (leftType != IxCode.BasicTypeRef.BOOLEAN || rightType != IxCode.BasicTypeRef.BOOLEAN) {
+        } else if (leftType != IRT.BasicTypeRef.BOOLEAN || rightType != IRT.BasicTypeRef.BOOLEAN) {
           report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
           return null
         }
       }
-      new BinaryTerm(kind, IxCode.BasicTypeRef.BOOLEAN, left, right)
+      new BinaryTerm(kind, IRT.BasicTypeRef.BOOLEAN, left, right)
     }
     def typedTerms(nodes: Array[AST.Expression], context: LocalContext): Array[Term] = {
       var failed = false
@@ -706,7 +706,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           return Option(processNumericExpression(ADD, node, left, right))
         }
         if (left.isBasicType) {
-          if (left.`type` == IxCode.BasicTypeRef.VOID) {
+          if (left.`type` == IRT.BasicTypeRef.VOID) {
             report(IS_NOT_BOXABLE_TYPE, node.left, left.`type`)
             return None
           }
@@ -715,7 +715,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
         }
         if (right.isBasicType) {
-          if (right.`type` == IxCode.BasicTypeRef.VOID) {
+          if (right.`type` == IRT.BasicTypeRef.VOID) {
             report(IS_NOT_BOXABLE_TYPE, node.right, right.`type`)
             return None
           }
@@ -764,10 +764,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
       case node@AST.LogicalAnd(loc, left, right) =>
         val ops = processLogicalExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LOGICAL_AND, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+        if (ops == null) None else Some(new BinaryTerm(LOGICAL_AND, IRT.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
       case node@AST.LogicalOr(loc, left, right) =>
         val ops = processLogicalExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LOGICAL_OR, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+        if (ops == null) None else Some(new BinaryTerm(LOGICAL_OR, IRT.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
       case node@AST.BitAnd(loc, l, r) =>
         Option(processBitExpression(BIT_AND, node, context))
       case node@AST.BitOr(loc, l, r) =>
@@ -782,16 +782,16 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         Option(processShiftExpression(BIT_SHIFT_R2, node, context))
       case node@AST.GreaterOrEqual(loc, left, right) =>
         val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(GREATER_OR_EQUAL, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+        if (ops == null) None else Some(new BinaryTerm(GREATER_OR_EQUAL, IRT.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
       case node@AST.GreaterThan(loc, left, right) =>
         val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(GREATER_THAN, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+        if (ops == null) None else Some(new BinaryTerm(GREATER_THAN, IRT.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
       case node@AST.LessOrEqual(loc, left, right) =>
         val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LESS_OR_EQUAL, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+        if (ops == null) None else Some(new BinaryTerm(LESS_OR_EQUAL, IRT.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
       case node@AST.LessThan(loc, left, right) =>
         val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LESS_THAN, IxCode.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
+        if (ops == null) None else Some(new BinaryTerm(LESS_THAN, IRT.BasicTypeRef.BOOLEAN, ops(0), ops(1)))
       case node@AST.Equal(loc, left, right) =>
         Option(processEquals(EQUAL, node, context))
       case node@AST.NotEqual(loc, left, right) =>
@@ -1030,7 +1030,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.Not(loc, target) =>
         val term = typed(node.target, context).getOrElse(null)
         if (term == null) return None
-        if (term.`type` != IxCode.BasicTypeRef.BOOLEAN) {
+        if (term.`type` != IRT.BasicTypeRef.BOOLEAN) {
           report(INCOMPATIBLE_OPERAND_TYPE, node, "!", Array[TypeRef](term.`type`))
           return None
         }
@@ -1731,16 +1731,16 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def setter(name: String): String =  "set" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
   private def promote(left: TypeRef, right: TypeRef): TypeRef = {
     if (!numeric(left) || !numeric(right)) return null
-    if ((left eq IxCode.BasicTypeRef.DOUBLE) || (right eq IxCode.BasicTypeRef.DOUBLE)) {
-      return IxCode.BasicTypeRef.DOUBLE
+    if ((left eq IRT.BasicTypeRef.DOUBLE) || (right eq IRT.BasicTypeRef.DOUBLE)) {
+      return IRT.BasicTypeRef.DOUBLE
     }
-    if ((left eq IxCode.BasicTypeRef.FLOAT) || (right eq IxCode.BasicTypeRef.FLOAT)) {
-      return IxCode.BasicTypeRef.FLOAT
+    if ((left eq IRT.BasicTypeRef.FLOAT) || (right eq IRT.BasicTypeRef.FLOAT)) {
+      return IRT.BasicTypeRef.FLOAT
     }
-    if ((left eq IxCode.BasicTypeRef.LONG) || (right eq IxCode.BasicTypeRef.LONG)) {
-      return IxCode.BasicTypeRef.LONG
+    if ((left eq IRT.BasicTypeRef.LONG) || (right eq IRT.BasicTypeRef.LONG)) {
+      return IRT.BasicTypeRef.LONG
     }
-    return IxCode.BasicTypeRef.INT
+    return IRT.BasicTypeRef.INT
   }
   private def processNumericExpression(kind: Int, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
     var left = lt
@@ -1755,11 +1755,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     return new BinaryTerm(kind, resultType, left, right)
   }
   private def promoteInteger(typeRef: TypeRef): TypeRef = {
-    if (typeRef == IxCode.BasicTypeRef.BYTE || typeRef == IxCode.BasicTypeRef.SHORT || typeRef == IxCode.BasicTypeRef.CHAR || typeRef == IxCode.BasicTypeRef.INT) {
-      return IxCode.BasicTypeRef.INT
+    if (typeRef == IRT.BasicTypeRef.BYTE || typeRef == IRT.BasicTypeRef.SHORT || typeRef == IRT.BasicTypeRef.CHAR || typeRef == IRT.BasicTypeRef.INT) {
+      return IRT.BasicTypeRef.INT
     }
-    if (typeRef == IxCode.BasicTypeRef.LONG) {
-      return IxCode.BasicTypeRef.LONG
+    if (typeRef == IRT.BasicTypeRef.LONG) {
+      return IRT.BasicTypeRef.LONG
     }
     return null
   }

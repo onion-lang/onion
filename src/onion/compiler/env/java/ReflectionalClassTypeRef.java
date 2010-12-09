@@ -14,21 +14,19 @@ import java.util.ArrayList;
 import java.util.List;
 import onion.compiler.*;
 import onion.compiler.Modifier;
-import org.apache.bcel.Constants;
-import static org.apache.bcel.Constants.*;
 
 /**
  * @author Kota Mizushima
  * Date: 2006/1/10
  */
-public class ReflectionalClassTypeRef extends IxCode.AbstractClassTypeRef {
+public class ReflectionalClassTypeRef extends IRT.AbstractClassTypeRef {
   private static final String CONSTRUCTOR_NAME = "<init>";
   private Class klass;
   private ClassTable table;
   private int modifier;
-  private MultiTable<IxCode.MethodRef> methods;
-  private OrderedTable<IxCode.FieldRef> fields;
-  private List<IxCode.ConstructorRef> constructors;
+  private MultiTable<IRT.MethodRef> methods;
+  private OrderedTable<IRT.FieldRef> fields;
+  private List<IRT.ConstructorRef> constructors;
   private OnionTypeBridge bridge;
   
   public ReflectionalClassTypeRef(Class klass, ClassTable table) {
@@ -50,36 +48,36 @@ public class ReflectionalClassTypeRef extends IxCode.AbstractClassTypeRef {
     return klass.getName();
   }
 
-  public IxCode.ClassTypeRef superClass() {
+  public IRT.ClassTypeRef superClass() {
     Class superKlass = klass.getSuperclass();
     if(superKlass == null) return table.rootClass();
-    IxCode.ClassTypeRef superClass = table.load(superKlass.getName());
+    IRT.ClassTypeRef superClass = table.load(superKlass.getName());
     if(superClass == this) return null;
     return superClass;
   }
 
-  public IxCode.ClassTypeRef[] interfaces() {
+  public IRT.ClassTypeRef[] interfaces() {
     Class[] interfaces = klass.getInterfaces();
-    IxCode.ClassTypeRef[] interfaceSyms = new IxCode.ClassTypeRef[interfaces.length];
+    IRT.ClassTypeRef[] interfaceSyms = new IRT.ClassTypeRef[interfaces.length];
     for(int i = 0; i < interfaces.length; i++){
       interfaceSyms[i] = table.load(interfaces[i].getName());
     }
     return interfaceSyms;
   }
   
-  public IxCode.MethodRef[] methods() {
+  public IRT.MethodRef[] methods() {
     requireMethodTable();
-    return methods.values().toArray(new IxCode.MethodRef[0]);
+    return methods.values().toArray(new IRT.MethodRef[0]);
   }
 
-  public IxCode.MethodRef[] methods(String name) {
+  public IRT.MethodRef[] methods(String name) {
     requireMethodTable();
-    return methods.get(name).toArray(new IxCode.MethodRef[0]);
+    return methods.get(name).toArray(new IRT.MethodRef[0]);
   }
 
   private void requireMethodTable() {
     if(methods == null){
-      methods = new MultiTable<IxCode.MethodRef>();
+      methods = new MultiTable<IRT.MethodRef>();
       for(Method method:klass.getMethods()){
         if(!method.getName().equals(CONSTRUCTOR_NAME)){
           methods.add(translate(method));
@@ -88,33 +86,33 @@ public class ReflectionalClassTypeRef extends IxCode.AbstractClassTypeRef {
     }
   }
   
-  public IxCode.FieldRef[] fields() {
+  public IRT.FieldRef[] fields() {
     requireFieldTable();
-    return fields.values().toArray(new IxCode.FieldRef[0]);
+    return fields.values().toArray(new IRT.FieldRef[0]);
   }
 
-  public IxCode.FieldRef field(String name) {
+  public IRT.FieldRef field(String name) {
     requireFieldTable();
     return fields.get(name);
   }
 
   private void requireFieldTable() {
     if(fields == null){
-      fields = new OrderedTable<IxCode.FieldRef>();
+      fields = new OrderedTable<IRT.FieldRef>();
       for(Field field:klass.getFields()) {
         fields.add(translate(field));
       }
     }
   }
 
-  public IxCode.ConstructorRef[] constructors() {
+  public IRT.ConstructorRef[] constructors() {
     if(constructors == null){
-      constructors = new ArrayList<IxCode.ConstructorRef>();
+      constructors = new ArrayList<IRT.ConstructorRef>();
       for(Constructor method:klass.getConstructors()) {
         constructors.add(translate(method));
       }
     }
-    return constructors.toArray(new IxCode.ConstructorRef[0]);
+    return constructors.toArray(new IRT.ConstructorRef[0]);
   }
 
   private static int toOnionModifier(int src){
@@ -133,23 +131,23 @@ public class ReflectionalClassTypeRef extends IxCode.AbstractClassTypeRef {
     return (modifier & flag) != 0;
   }
 
-  private IxCode.MethodRef translate(Method method){
+  private IRT.MethodRef translate(Method method){
     Class[] arguments = method.getParameterTypes();
-    IxCode.TypeRef[] argumentRefs = new IxCode.TypeRef[arguments.length];
+    IRT.TypeRef[] argumentRefs = new IRT.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentRefs[i] = bridge.toOnionType(arguments[i]);
     }
-    IxCode.TypeRef returnRef = bridge.toOnionType(method.getReturnType());
+    IRT.TypeRef returnRef = bridge.toOnionType(method.getReturnType());
     return new ClassFileMethodRef(toOnionModifier(method.getModifiers()), this, method.getName(), argumentRefs, returnRef);
   }
   
-  private IxCode.FieldRef translate(Field field){
+  private IRT.FieldRef translate(Field field){
     return new ClassFileFieldRef(toOnionModifier(field.getModifiers()),  this, field.getName(), bridge.toOnionType(field.getType()));
   }
   
-  private IxCode.ConstructorRef translate(Constructor constructor){
+  private IRT.ConstructorRef translate(Constructor constructor){
     Class[] arguments = constructor.getParameterTypes();
-    IxCode.TypeRef[] argumentRefs = new IxCode.TypeRef[arguments.length];
+    IRT.TypeRef[] argumentRefs = new IRT.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentRefs[i] = bridge.toOnionType(arguments[i]);
     }

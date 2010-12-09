@@ -21,14 +21,14 @@ import org.apache.bcel.generic.Type;
  * @author Kota Mizushima
  * Date: 2005/06/22
  */
-public class ClassFileClassTypeRef extends IxCode.AbstractClassTypeRef implements Constants{
+public class ClassFileClassTypeRef extends IRT.AbstractClassTypeRef implements Constants{
   private static final String CONSTRUCTOR_NAME = "<init>";
   private JavaClass javaClass;
   private ClassTable table;  
   private int modifier;
-  private MultiTable<IxCode.MethodRef> methods;
-  private OrderedTable<IxCode.FieldRef> fields;
-  private List<IxCode.ConstructorRef> constructors;
+  private MultiTable<IRT.MethodRef> methods;
+  private OrderedTable<IRT.FieldRef> fields;
+  private List<IRT.ConstructorRef> constructors;
   private OnionTypeBridge bridge;
   
   public ClassFileClassTypeRef(JavaClass javaClass, ClassTable table) {
@@ -50,71 +50,71 @@ public class ClassFileClassTypeRef extends IxCode.AbstractClassTypeRef implement
     return javaClass.getClassName();
   }
 
-  public IxCode.ClassTypeRef superClass() {
-    IxCode.ClassTypeRef superClass = table.load(javaClass.getSuperclassName());
+  public IRT.ClassTypeRef superClass() {
+    IRT.ClassTypeRef superClass = table.load(javaClass.getSuperclassName());
     if(superClass == this){
       return null;
     }
     return superClass;
   }
 
-  public IxCode.ClassTypeRef[] interfaces() {
+  public IRT.ClassTypeRef[] interfaces() {
     String[] interfaceNames = javaClass.getInterfaceNames();
-    IxCode.ClassTypeRef[] interfaces = new IxCode.ClassTypeRef[interfaceNames.length];
+    IRT.ClassTypeRef[] interfaces = new IRT.ClassTypeRef[interfaceNames.length];
     for(int i = 0; i < interfaces.length; i++){
       interfaces[i] = table.load(interfaceNames[i]);
     }
     return interfaces;
   }
   
-  public IxCode.MethodRef[] methods() {
+  public IRT.MethodRef[] methods() {
     requireMethodTable();
-    return methods.values().toArray(new IxCode.MethodRef[0]);
+    return methods.values().toArray(new IRT.MethodRef[0]);
   }
 
-  public IxCode.MethodRef[] methods(String name) {
+  public IRT.MethodRef[] methods(String name) {
     requireMethodTable();
-    return methods.get(name).toArray(new IxCode.MethodRef[0]);
+    return methods.get(name).toArray(new IRT.MethodRef[0]);
   }
 
   private void requireMethodTable() {
     if(methods == null){
-      methods = new MultiTable<IxCode.MethodRef>();
+      methods = new MultiTable<IRT.MethodRef>();
       for(Method method:javaClass.getMethods()){
         if(!method.getName().equals(CONSTRUCTOR_NAME)) methods.add(translate(method));
       }
     }
   }
 
-  public IxCode.FieldRef[] fields() {
+  public IRT.FieldRef[] fields() {
     requireFieldTable();
-    return fields.values().toArray(new IxCode.FieldRef[0]);
+    return fields.values().toArray(new IRT.FieldRef[0]);
   }
 
-  public IxCode.FieldRef field(String name) {
+  public IRT.FieldRef field(String name) {
     requireFieldTable();
     return fields.get(name);
   }
 
   private void requireFieldTable() {
     if(fields == null){
-      fields = new OrderedTable<IxCode.FieldRef>();
+      fields = new OrderedTable<IRT.FieldRef>();
       for(Field field:javaClass.getFields()) {
         fields.add(translate(field));
       }
     }
   }
   
-  public IxCode.ConstructorRef[] constructors() {
+  public IRT.ConstructorRef[] constructors() {
     if(constructors == null){
-      constructors = new ArrayList<IxCode.ConstructorRef>();
+      constructors = new ArrayList<IRT.ConstructorRef>();
       for(Method method:javaClass.getMethods()) {
         if(method.getName().equals(CONSTRUCTOR_NAME)) {
           constructors.add(translateConstructor(method));
         }
       }
     }
-    return constructors.toArray(new IxCode.ConstructorRef[0]);
+    return constructors.toArray(new IRT.ConstructorRef[0]);
   }
 
   private static int toOnionModifier(int src){
@@ -133,28 +133,28 @@ public class ClassFileClassTypeRef extends IxCode.AbstractClassTypeRef implement
     return (modifier & flag) != 0;
   }
   
-  private IxCode.MethodRef translate(Method method){
+  private IRT.MethodRef translate(Method method){
     Type[] arguments = method.getArgumentTypes();
-    IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
+    IRT.TypeRef[] argumentSymbols = new IRT.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentSymbols[i] = bridge.toOnionType(arguments[i]);
     }
-    IxCode.TypeRef returnSymbol = bridge.toOnionType(method.getReturnType());
+    IRT.TypeRef returnSymbol = bridge.toOnionType(method.getReturnType());
     return new ClassFileMethodRef(
       toOnionModifier(method.getModifiers()),
       this, method.getName(), argumentSymbols, returnSymbol);
   }
   
-  private IxCode.FieldRef translate(Field field){
-    IxCode.TypeRef symbol = bridge.toOnionType(field.getType());
+  private IRT.FieldRef translate(Field field){
+    IRT.TypeRef symbol = bridge.toOnionType(field.getType());
     return new ClassFileFieldRef(
       toOnionModifier(field.getModifiers()), 
       this, field.getName(), symbol);
   }
   
-  private IxCode.ConstructorRef translateConstructor(Method method){
+  private IRT.ConstructorRef translateConstructor(Method method){
     Type[] arguments = method.getArgumentTypes();
-    IxCode.TypeRef[] argumentSymbols = new IxCode.TypeRef[arguments.length];
+    IRT.TypeRef[] argumentSymbols = new IRT.TypeRef[arguments.length];
     for (int i = 0; i < arguments.length; i++) {
       argumentSymbols[i] = bridge.toOnionType(arguments[i]);
     }

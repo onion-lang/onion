@@ -7,17 +7,15 @@
  * ************************************************************** */
 package onion.compiler;
 
-import onion.compiler.IxCode;
-
 
 /**
  * @author Kota Mizushima
  */
 public class LocalBinding{  
   private final int index;  
-  private final IxCode.TypeRef type;
+  private final IRT.TypeRef type;
   
-  public LocalBinding(int index, IxCode.TypeRef type){
+  public LocalBinding(int index, IRT.TypeRef type){
     this.index	= index;
     this.type = type;
   }
@@ -26,7 +24,7 @@ public class LocalBinding{
     return index;
   }
 
-  public IxCode.TypeRef getType() {
+  public IRT.TypeRef getType() {
     return type;
   }
 }

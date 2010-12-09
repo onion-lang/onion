@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 
-import onion.compiler.IxCode;
+import onion.compiler.IRT;
 
 /**
  * @author Kota Mizushima
@@ -21,17 +21,17 @@ public class Classes {
   private Classes() {
   }
 
-  public static Set<IxCode.MethodRef> getInterfaceMethods(IxCode.ClassTypeRef type){
-    Set<IxCode.MethodRef> methods =  new TreeSet(new IxCode.MethodRefComparator());
+  public static Set<IRT.MethodRef> getInterfaceMethods(IRT.ClassTypeRef type){
+    Set<IRT.MethodRef> methods =  new TreeSet(new IRT.MethodRefComparator());
     collectInterfaceMethods(type, methods);
     return methods;
   }
   
-  private static void collectInterfaceMethods(IxCode.ClassTypeRef type, Set<IxCode.MethodRef> set){
-    IxCode.MethodRef[] methods = type.methods();
+  private static void collectInterfaceMethods(IRT.ClassTypeRef type, Set<IRT.MethodRef> set){
+    IRT.MethodRef[] methods = type.methods();
     set.addAll(Arrays.asList(methods));
-    IxCode.ClassTypeRef[] interfaces = type.interfaces();
-    for (IxCode.ClassTypeRef anInterface : interfaces) {
+    IRT.ClassTypeRef[] interfaces = type.interfaces();
+    for (IRT.ClassTypeRef anInterface : interfaces) {
       collectInterfaceMethods(anInterface, set);
     }
   }

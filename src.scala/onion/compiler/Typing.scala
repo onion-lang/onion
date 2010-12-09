@@ -361,6 +361,15 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
       new AsInstanceOf(node.location, b, a)
     }
+    def openClosure[A](context: LocalContext)(block: => A): A = try {
+      val tmp = context.isClosure
+      try {
+        context.setClosure(true)
+        block
+      }finally{
+        context.setClosure(tmp)
+      }
+    }
     def openScope[A](context: LocalContext)(block: => A): A = try {
       context.openScope()
       block
@@ -886,27 +895,29 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val name = node.mname
         val argTypes: Array[TypeRef] = new Array[TypeRef](args.length)
         openFrame(context){
-          val argTypes = args.map{arg => addArgument(arg, context)}.toArray
-          val error = argTypes.exists(_ == null)
-          if (error) return None
-          if (typeRef == null) return None
-          if (!typeRef.isInterface) {
-            report(INTERFACE_REQUIRED, node.typeRef, typeRef)
-            return None
+          openClosure(context) {
+            val argTypes = args.map{arg => addArgument(arg, context)}.toArray
+            val error = argTypes.exists(_ == null)
+            if (error) return None
+            if (typeRef == null) return None
+            if (!typeRef.isInterface) {
+              report(INTERFACE_REQUIRED, node.typeRef, typeRef)
+              return None
+            }
+            val methods = typeRef.methods
+            val method = matches(argTypes, name, methods)
+            if (method == null) {
+              report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
+              return None
+            }
+            context.setMethod(method)
+            context.getContextFrame.parent.setAllClosed(true)
+            var block = translate(node.body, context)
+            block = addReturnNode(block, method.returnType)
+            val result = new NewClosure(typeRef, method, block)
+            result.setFrame(context.getContextFrame)
+            Some(result)
           }
-          val methods = typeRef.methods
-          val method = matches(argTypes, name, methods)
-          if (method == null) {
-            report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
-            return None
-          }
-          context.setMethod(method)
-          context.getContextFrame.parent.setAllClosed(true)
-          var block = translate(node.body, context)
-          block = addReturnNode(block, method.returnType)
-          val result = new NewClosure(typeRef, method, block)
-          result.setFrame(context.getContextFrame)
-          Some(result)
         }
       case node@AST.CurrentInstance(loc) =>
         if(context.isStatic) None else Some(new This(loc, definition_))
@@ -1097,7 +1108,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           if ((methods(0).modifier & AST.M_STATIC) != 0) {
             Some(new CallStatic(targetType, methods(0), params))
           } else {
-            Some(new Call(new This(targetType), methods(0), params))
+            if(context.isClosure) {
+              Some(new Call(new OuterThis(targetType), methods(0), params))
+            }else {
+              Some(new Call(new This(targetType), methods(0), params))
+            }
           }
         }
       case node@AST.StaticMemberSelection(loc, _, _) =>

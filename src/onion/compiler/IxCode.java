@@ -1507,6 +1507,25 @@ public interface IxCode {
      * @author Kota Mizushima
      * Date: 2005/06/17
      */
+    class OuterThis extends Term {
+      private final ClassTypeRef type;
+
+      public OuterThis(Location location, ClassTypeRef type){
+        super(location);
+        this.type = type;
+      }
+
+      public OuterThis(ClassTypeRef classType){
+        this(null, classType);
+      }
+
+      public TypeRef type() { return type; }
+    }
+
+    /**
+     * @author Kota Mizushima
+     * Date: 2005/06/17
+     */
     class This extends Term {
       private final ClassTypeRef type;
 

@@ -25,6 +25,9 @@ public class CodeGeneration  {
   private CompilerConfig config;
   private List compiledClasses = new ArrayList();
   private SymbolGenerator generator;
+  private boolean isStatic;
+  private boolean isClosure;
+  private String currentClosureName;
   
   private static Map unboxingMethods = new HashMap(){{
     put("java.lang.Byte", "byteValue");
@@ -38,6 +41,7 @@ public class CodeGeneration  {
   }};
   
   private static final String FRAME_PREFIX = "frame";
+  private static final String OUTER_THIS = "outer$";
   private static final String CLOSURE_CLASS_SUFFIX = "Closure";
 
   private static final Map<IxCode.BasicTypeRef, Type> BASIC_TYPE_MAPPING = new HashMap(){{
@@ -144,6 +148,8 @@ public class CodeGeneration  {
   }
 
   public void codeConstructor(ClassGen gen, IxCode.ConstructorDefinition node) {
+    boolean isStaticOld = isStatic;
+    isStatic = false;
     CodeProxy code = new CodeProxy(gen.getConstantPool());
     LocalFrame frame = node.getFrame();
     code.setFrame(frame);
@@ -156,7 +162,8 @@ public class CodeGeneration  {
     Type[] arguments = typesOf(node.getArgs());
     MethodGen method = new MethodGen(
       modifier, Type.VOID, arguments, args, "<init>",
-      classType.getClassName(), code.getCode(), gen.getConstantPool());
+      classType.getClassName(), code.getCode(), gen.getConstantPool()
+    );
     if(frame.isClosed()){
       int frameObjectIndex = frameObjectIndex(1, node.getArgs());
       code.setFrameObjectIndex(frameObjectIndex);
@@ -177,9 +184,12 @@ public class CodeGeneration  {
     method.setMaxStack();
     code.appendReturn(typeOf(IxCode.BasicTypeRef.VOID));
     gen.addMethod(method.getMethod());
+    isStatic = isStaticOld;
   }
 
   public void codeMethod(ClassGen gen, IxCode.MethodDefinition node) {
+    boolean isStaticOld = isStatic;
+    isStatic = Modifier.isStatic(node.modifier());
     CodeProxy code = new CodeProxy(gen.getConstantPool());
     LocalFrame frame = node.getFrame();
     code.setFrame(frame);
@@ -216,6 +226,7 @@ public class CodeGeneration  {
       method.setMaxStack();
     }
     gen.addMethod(method.getMethod());
+    isStatic = isStaticOld;
   }
   
   private void appendInitialCode(CodeProxy code, LocalFrame frame, Type[] arguments, int origin) {
@@ -270,27 +281,29 @@ public class CodeGeneration  {
     IxCode.ClassTypeRef classType = node.getClassType();
     String closureName = generator.generate();
     Type[] arguments = typesOf(node.getArguments());
-    ClassGen gen = new ClassGen(
-      closureName, "java.lang.Object", "<generated>", Constants.ACC_PUBLIC,
-      new String[]{classType.name()});
-    
+    ClassGen gen = new ClassGen(closureName, "java.lang.Object", "<generated>", Constants.ACC_PUBLIC, new String[]{classType.name()});
     Set methods = Classes.getInterfaceMethods(classType);
     methods.remove(node.getMethod());
-    implementsMethods(
-      gen, (IxCode.MethodRef[]) methods.toArray(new IxCode.MethodRef[0]));
-    
+    implementsMethods(gen, (IxCode.MethodRef[]) methods.toArray(new IxCode.MethodRef[0]));
     LocalFrame frame = node.getFrame();
     int depth = frame.depth();
     for(int i = 1; i <= depth; i++){
       FieldGen field = new FieldGen(
         Constants.ACC_PRIVATE, new ArrayType("java.lang.Object", 1),
-        FRAME_PREFIX + i,
-        gen.getConstantPool());
+        FRAME_PREFIX + i, gen.getConstantPool()
+      );
       gen.addField(field.getField());
     }
+    gen.addField(
+      new FieldGen(
+        Constants.ACC_PUBLIC,
+        new ObjectType("java.lang.Object"),
+        OUTER_THIS,
+        gen.getConstantPool()
+      ).getField()
+    );
     Type[] types = closureArguments(depth);
-    MethodGen method = 
-      createClosureConstructor(closureName, types, gen.getConstantPool());
+    MethodGen method = createClosureConstructor(closureName, types, gen.getConstantPool());
     gen.addMethod(method.getMethod());
     
     CodeProxy closureCode = new CodeProxy(gen.getConstantPool());
@@ -308,25 +321,49 @@ public class CodeGeneration  {
     }else{
       closureCode.setIndexTable(makeIndexTableFor(1, frame));
     }
+    boolean isClosureOld = isClosure;
+    String currentClosureNameOld = currentClosureName;
+    isClosure = true;
+    currentClosureName = closureName;
     codeStatement(node.getBlock(), closureCode);
+    isClosure = isClosureOld;
+    currentClosureName = currentClosureNameOld;
     method.setMaxLocals();
     method.setMaxStack();
     gen.addMethod(method.getMethod());
     compiledClasses.add(gen.getJavaClass());
-    
     InstructionHandle start = code.appendNew(new ObjectType(closureName));
     code.appendDup(1);
     String name = code.getMethod().getClassName();
     int index = code.getFrameObjectIndex();
+    if(!isStatic) {
+      if(isClosure) {
+        code.appendThis();
+        code.appendGetField(currentClosureName, OUTER_THIS, new ObjectType("java.lang.Object"));
+      }else {
+        code.appendThis();
+      }
+    }
     code.appendLoad(new ArrayType("java.lang.Object", 1), index);
     for(int i = 1; i < depth; i++){
       code.appendThis();
-      code.appendGetField(
-        name, FRAME_PREFIX + i, new ArrayType("java.lang.Object", 1));
+      code.appendGetField(name, FRAME_PREFIX + i, new ArrayType("java.lang.Object", 1));
     }
-    code.appendCallConstructor(
-      new ObjectType(closureName), closureArguments(depth));
+    code.appendCallConstructor(new ObjectType(closureName), complementOuterThis(closureArguments(depth)));
     return start;
+  }
+
+  private Type[] complementOuterThis(Type[] types) {
+    if(!isStatic) {
+      Type[] newTypes = new Type[types.length + 1];
+      newTypes[0] = new ObjectType("java.lang.Object");
+      for(int i = 0; i < types.length; i++) {
+        newTypes[i + 1] = types[i];
+      }
+      return newTypes;
+    }else {
+      return types;
+    }
   }
   
   private Type[] closureArguments(int size){
@@ -341,8 +378,7 @@ public class CodeGeneration  {
     ObjectType listType = (ObjectType) typeOf(node.type());
     InstructionHandle start = code.appendNew("java.util.ArrayList");
     code.appendDup(1);
-    code.appendCallConstructor(
-      new ObjectType("java.util.ArrayList"), new Type[0]);
+    code.appendCallConstructor(new ObjectType("java.util.ArrayList"), new Type[0]);
     IxCode.Term[] elements = node.getElements();
     for(int i = 0; i < elements.length; i++){
       code.appendDup(1);
@@ -376,21 +412,35 @@ public class CodeGeneration  {
     return names;
   }
   
-  private MethodGen createClosureConstructor(
-    String className, Type[] types, ConstantPoolGen pool){
-    String[] argNames = new String[types.length];
-    for(int i = 0; i < types.length; i++){
-      argNames[i] = FRAME_PREFIX + i;
+  private MethodGen createClosureConstructor(String className, Type[] types, ConstantPoolGen pool){
+    String[] argNames;
+    if(isStatic) {
+      argNames = new String[types.length];
+      for(int i = 0; i < types.length; i++){
+        argNames[i] = FRAME_PREFIX + (i + 1);
+      }
+    }else{
+      argNames = new String[types.length + 1];
+      argNames[0] = OUTER_THIS;
+      for(int i = 0; i < types.length; i++){
+        argNames[i + 1] = FRAME_PREFIX + (i + 1);
+      }
     }
     CodeProxy code = new CodeProxy(pool);
     MethodGen constructor = new MethodGen(
-      Constants.ACC_PUBLIC, Type.VOID, types, argNames, "<init>",
+      Constants.ACC_PUBLIC, Type.VOID, complementOuterThis(types), argNames, "<init>",
       className, code.getCode(), pool);
     code.appendThis();
     code.appendCallConstructor(Type.OBJECT, new Type[0]);
+    if(!isStatic) {
+      code.appendThis();
+      code.appendLoad(Type.OBJECT, 1);
+      code.appendPutField(className, OUTER_THIS, Type.OBJECT);
+    }
+    int origin = isStatic ? 1 : 2;
     for(int i = 0; i < types.length; i++){
       code.appendThis();
-      code.appendLoad(types[i], i + 1);
+      code.appendLoad(types[i], i + origin);
       code.appendPutField(className, FRAME_PREFIX + (i + 1), types[i]);
     }
     code.append(InstructionConstants.RETURN);
@@ -607,6 +657,8 @@ public class CodeGeneration  {
   	  start = codeCast((IxCode.AsInstanceOf)node, code);
   	} else if(node instanceof IxCode.This) {
   	  start = codeSelf((IxCode.This)node, code);
+    } else if(node instanceof IxCode.OuterThis) {
+      start = codeOuterThis((IxCode.OuterThis)node, code);
   	} else if(node instanceof IxCode.InstanceOf){
   	  start = codeIsInstance((IxCode.InstanceOf)node, code);
   	} else if(node instanceof IxCode.NewClosure){
@@ -1185,6 +1237,12 @@ public class CodeGeneration  {
   
   public InstructionHandle codeSelf(IxCode.This node, CodeProxy code){
     return code.append(InstructionConstants.ALOAD_0);
+  }
+
+  public InstructionHandle codeOuterThis(IxCode.OuterThis node, CodeProxy code){
+    code.appendThis();
+    code.appendGetField(currentClosureName, OUTER_THIS, Type.OBJECT);
+    return code.appendCast(Type.OBJECT, typeOf(node.type()));
   }
 
   public InstructionHandle codeFieldRef(IxCode.RefField node, CodeProxy code) {

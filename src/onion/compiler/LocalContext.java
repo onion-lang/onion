@@ -15,6 +15,7 @@ import onion.compiler.util.SymbolGenerator;
  * Date: 2005/06/28
  */
 public class LocalContext {
+  private boolean isClosure;
   private boolean isStatic;
   private boolean isGlobal;
   private boolean isMethod;
@@ -34,6 +35,14 @@ public class LocalContext {
   
   public void setGlobal(boolean isGlobal) {
     this.isGlobal = isGlobal;
+  }
+
+  public void setClosure(boolean isClosure) {
+    this.isClosure = isClosure;
+  }
+
+  public boolean isClosure() {
+    return isClosure;
   }
   
   public boolean isStatic() {

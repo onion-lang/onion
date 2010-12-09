@@ -346,7 +346,7 @@ AST.ImportClause import_decl() :{
 
 AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
 ( LOOKAHEAD(2)
-  top=stmt()
+  top=statement()
 | [mset=modifiers()]
   ( top=type_decl(mset)
   | top=fun_decl(mset)
@@ -382,12 +382,12 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
   (ty=interface_decl(modifiers) | ty=class_decl(modifiers)) {return ty;}
 }
 
-AST.BlockStatement block():{Token t; List<AST.Statement> stmts = null; AST.BlockStatement s;}{
-  t="{" [stmts=stmts()] "}" {return new AST.BlockStatement(p(t), stmts);}
+AST.BlockStatement block():{Token t; List<AST.Statement> statements = (List<AST.Statement>)AST.NIL(); AST.BlockStatement s;}{
+  t="{" [statements=statements()] "}" {return new AST.BlockStatement(p(t), statements);}
 }
 
-List<AST.Statement> stmts():{ AST.Statement s; ArrayBuffer<AST.Statement> stmts = new ArrayBuffer<AST.Statement>(); }{
-  (s=stmt() { append(stmts, s); })+ {return toList(stmts);}
+List<AST.Statement> statements():{ AST.Statement s; ArrayBuffer<AST.Statement> statements = new ArrayBuffer<AST.Statement>(); }{
+  (s=statement() { append(statements, s); })+ {return toList(statements);}
 }
 
 int modifiers():{ mset = 0; Token t = null, last = null; }{
@@ -589,45 +589,43 @@ AST.FieldDeclaration field_decl(int modifiers):{
   }
 }
 
-AST.Statement stmt():{AST.Statement st;}{
+AST.Statement statement():{AST.Statement s;}{
   LOOKAHEAD(2)
-  st=local_var_stmt()         {return st;}
-| st=if_stmt()                {return st;}
-| st=while_stmt()             {return st;}
-| st=for_stmt()               {return st;}
-| st=select_stmt()            {return st;}
-| st=branch_stmt()            {return st;}
-| st=block()                  {return st;}
-| st=try_stmt()               {return st;}
-| st=throw_stmt()             {return st;}
-| st=break_stmt()             {return st;}
-| st=continue_stmt()          {return st;}
-| st=return_stmt()            {return st;}
-| st=exp_stmt()               {return st;}
-| st=empty_stmt()             {return st;}
-| st=synchronized_stmt()      {return st;}
-| st=foreach_stmt()           {return st;}
+  s=local_var_statement()    {return s;}
+| s=if_statement()           {return s;}
+| s=while_statement()        {return s;}
+| s=for_statement()          {return s;}
+| s=select_statement()       {return s;}
+| s=branch_statement()       {return s;}
+| s=block()                  {return s;}
+| s=try_statement()          {return s;}
+| s=throw_statement()        {return s;}
+| s=break_statement()        {return s;}
+| s=continue_statement()     {return s;}
+| s=return_statement()       {return s;}
+| s=exp_statement()          {return s;}
+| s=empty_statement()        {return s;}
+| s=synchronized_statement() {return s;}
+| s=foreach_statement()      {return s;}
 }
 
-AST.LocalVariableDeclaration local_var_stmt() :{Token t; AST.TypeNode ty; AST.Expression e = null;}{
-  t=<ID> ":" ty=type() ["=" e=term()] ";" {
-    return new AST.LocalVariableDeclaration(p(t), t.image, ty, e);
-  }
+AST.LocalVariableDeclaration local_var_statement() :{Token t; AST.TypeNode ty; AST.Expression e = null;}{
+  t=<ID> ":" ty=type() ["=" e=term()] ";" {return new AST.LocalVariableDeclaration(p(t), t.image, ty, e);}
 }
 
-AST.BreakStatement break_stmt() :{Token t;}{
+AST.BreakStatement break_statement() :{Token t;}{
   t="break" ";" {return new AST.BreakStatement(p(t));}
 }
 
-AST.ContinueStatement continue_stmt() :{Token t; AST.ContinueStatement st;}{
+AST.ContinueStatement continue_statement() :{Token t; AST.ContinueStatement st;}{
   t="continue" ";" {return new AST.ContinueStatement(p(t));}
 }
 
-AST.ThrowStatement throw_stmt() :{Token t; AST.Expression e;}{
+AST.ThrowStatement throw_statement() :{Token t; AST.Expression e;}{
   t="throw" e=term() ";" {return new AST.ThrowStatement(p(t), e);}
 }
 
-AST.TryStatement try_stmt() :{
+AST.TryStatement try_statement() :{
   Token t; AST.Argument a; AST.BlockStatement b1, b2, b3 = null;
   ArrayBuffer<Tuple2<AST.Argument,AST.BlockStatement>> as = new ArrayBuffer<Tuple2<AST.Argument, AST.BlockStatement>>();
 }{
@@ -635,30 +633,30 @@ AST.TryStatement try_stmt() :{
   ["finally" b3=block()] {return new AST.TryStatement(p(t), b1, toList(as), b3);}
 }
 
-AST.ExpressionStatement exp_stmt() :{AST.Expression e;}{
+AST.ExpressionStatement exp_statement() :{AST.Expression e;}{
   e=term() ";" {return new AST.ExpressionStatement(e.location(), e);}
 }
 
-AST.EmptyStatement empty_stmt() :{Token t;}{
+AST.EmptyStatement empty_statement() :{Token t;}{
   t=";" {return new AST.EmptyStatement(p(t));}
 }
 
-AST.IfStatement if_stmt() :{Token t; AST.Expression e; AST.BlockStatement b1, b2 = null;}{
+AST.IfStatement if_statement() :{Token t; AST.Expression e; AST.BlockStatement b1, b2 = null;}{
   t="if" e=term() b1=block() [LOOKAHEAD(2) "else" b2=block()] {return new AST.IfStatement(p(t), e, b1, b2);}
 }
 
-AST.BranchStatement branch_stmt() : {
+AST.BranchStatement branch_statement() : {
   Token t, t2; AST.Expression e;
   ArrayBuffer<Tuple2<AST.Expression, AST.BlockStatement>> es = new ArrayBuffer<Tuple2<AST.Expression, AST.BlockStatement>>();
   List<AST.Statement> ss = null; AST.BlockStatement elseBlock = null;
 }{
   t="branch" "{"
-    (("case" e=term() ":" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.location(), ss)));})+
-    [t2="else" ":" ss=stmts() {elseBlock = new AST.BlockStatement(p(t2), ss);}]
+    (("case" e=term() ":" ss=statements()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.location(), ss)));})+
+    [t2="else" ":" ss=statements() {elseBlock = new AST.BlockStatement(p(t2), ss);}]
   "}" { return new AST.BranchStatement(p(t), toList(es), elseBlock); }
 }
 
-AST.SelectStatement select_stmt() :{
+AST.SelectStatement select_statement() :{
   Token t1, t2; AST.Expression e1, e2;
   ArrayBuffer<AST.Expression> es = new ArrayBuffer<AST.Expression>();
   List<AST.Statement> ss = null;
@@ -666,35 +664,35 @@ AST.SelectStatement select_stmt() :{
   AST.BlockStatement elseBlock = null ;
 }{
   t1="select" e1=term() "{"
-    ((t2="case" e2=term() {append(es, e2);} ("," e2=term() {append(es, e2);})* ":" ss=stmts()) {
+    ((t2="case" e2=term() {append(es, e2);} ("," e2=term() {append(es, e2);})* ":" ss=statements()) {
       append(branches, new Tuple2<List<AST.Expression>, AST.BlockStatement>(toList(es), new AST.BlockStatement(p(t2), ss)));
     })*
-    [t2="else" ":" [ss=stmts()] { elseBlock = new AST.BlockStatement(p(t2), ss); }]    
+    [t2="else" ":" [ss=statements()] { elseBlock = new AST.BlockStatement(p(t2), ss); }]
   "}" {
     return new AST.SelectStatement(p(t1), e1, toList(branches), elseBlock);
   }
 }
 
-AST.ReturnStatement return_stmt() :{Token t; AST.Expression e = null;}{
+AST.ReturnStatement return_statement() :{Token t; AST.Expression e = null;}{
   t="return" [e=term()] ";" {return new AST.ReturnStatement(p(t), e);}
 }
 
-AST.SynchronizedStatement synchronized_stmt() :{Token t; AST.Expression e = null; AST.BlockStatement b;}{
+AST.SynchronizedStatement synchronized_statement() :{Token t; AST.Expression e = null; AST.BlockStatement b;}{
   t="synchronized" [e=term()] b=block() {return new AST.SynchronizedStatement(p(t), e, b);}
 }
 
-AST.WhileStatement while_stmt() :{Token t; AST.Expression e; AST.BlockStatement b;}{
+AST.WhileStatement while_statement() :{Token t; AST.Expression e; AST.BlockStatement b;}{
   t="while" e=term() b=block() {return new AST.WhileStatement(p(t), e, b);}
 }
 
-AST.ForeachStatement foreach_stmt() :{Token t; AST.Argument a; AST.Expression e; AST.BlockStatement b;}{
+AST.ForeachStatement foreach_statement() :{Token t; AST.Argument a; AST.Expression e; AST.BlockStatement b;}{
   t="foreach" a=argument() (LOOKAHEAD({la("in")}) <ID>) e=term() b=block() {
     return new AST.ForeachStatement(p(t), a, e, b);
   }
 }
 
-AST.ForStatement for_stmt() :{Token t; AST.Statement s; AST.Expression e1 = null, e2 = null; AST.BlockStatement b;}{
-  t="for" (LOOKAHEAD(2) s=local_var_stmt() | s=exp_stmt() | s=empty_stmt())
+AST.ForStatement for_statement() :{Token t; AST.Statement s; AST.Expression e1 = null, e2 = null; AST.BlockStatement b;}{
+  t="for" (LOOKAHEAD(2) s=local_var_statement() | s=exp_statement() | s=empty_statement())
   [e1=term()] ";" [e2=term()] b=block() {
   	return new AST.ForStatement(p(t), s, e1, e2, b);
   }

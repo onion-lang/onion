@@ -5,20 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.lang.syntax;
+package onion.compiler;
 
-import onion.lang.syntax.visitor.ASTVisitor;
-
-/**
- * @author Kota Mizushima
- *  
- */
-public class DivisionAssignment extends BinaryExpression {
-  public DivisionAssignment(Expression left, Expression right) {
-    super("/=", left, right);
-  }
-
-  public Object accept(ASTVisitor visitor, Object context) {
-    return visitor.visit(this, context);
-  }
+public interface OnionParser {
 }

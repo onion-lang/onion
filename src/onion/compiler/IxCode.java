@@ -1,7 +1,7 @@
 package onion.compiler;
 
 import onion.compiler.util.Strings;
-import onion.lang.syntax.Modifier;
+import onion.compiler.Modifier;
 
 import java.util.*;
 

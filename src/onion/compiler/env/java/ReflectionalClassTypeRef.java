@@ -13,7 +13,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import onion.compiler.*;
-import onion.lang.syntax.Modifier;
+import onion.compiler.Modifier;
 import org.apache.bcel.Constants;
 import static org.apache.bcel.Constants.*;
 

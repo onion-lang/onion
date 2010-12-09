@@ -13,8 +13,8 @@ PARSER_BEGIN(JJOnionParser)
 package onion.compiler.parser;
 import onion.compiler.AST;
 import onion.compiler.Location;
+import onion.compiler.OnionParser;
 import onion.compiler.util.*;
-import onion.lang.syntax.OnionParser;
 import scala.Tuple2;
 import scala.collection.immutable.*;
 import scala.collection.mutable.ArrayBuffer;

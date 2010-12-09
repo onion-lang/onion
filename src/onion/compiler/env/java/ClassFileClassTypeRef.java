@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import onion.compiler.*;
-import onion.lang.syntax.Modifier;
+import onion.compiler.Modifier;
 
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.*;

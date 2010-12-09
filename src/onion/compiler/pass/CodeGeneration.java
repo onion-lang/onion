@@ -11,7 +11,7 @@ import java.util.*;
 
 import onion.compiler.*;
 import onion.compiler.util.*;
-import onion.lang.syntax.Modifier;
+import onion.compiler.Modifier;
 
 import org.apache.bcel.Constants;
 import org.apache.bcel.classfile.JavaClass;

@@ -160,10 +160,10 @@ public class CodeGeneration  {
     if(frame.isClosed()){
       int frameObjectIndex = frameObjectIndex(1, node.getArgs());
       code.setFrameObjectIndex(frameObjectIndex);
-      code.setIndexTable(indexTableFor(frame));   
+      code.setIndexTable(makeIndexTableForClosureFrame(frame));
       appendInitialCode(code, frame, arguments, 1);
     }else{
-      code.setIndexTable(indexTableFor(1, frame));
+      code.setIndexTable(makeIndexTableFor(1, frame));
     }
     code.setMethod(method);
     IxCode.Super init = node.getSuperInitializer();
@@ -190,29 +190,25 @@ public class CodeGeneration  {
     String[] argNames = names(arguments.length);
     String name = node.name();
     String className = node.affiliation().name();
-    MethodGen method = new MethodGen(
-      modifier, returned, arguments, argNames, name, className,
-      code.getCode(), gen.getConstantPool());
+    MethodGen method = new MethodGen(modifier, returned, arguments, argNames, name, className, code.getCode(), gen.getConstantPool());
     code.setMethod(method);
     if (!Modifier.isAbstract(node.modifier())) {
       if(frame.isClosed()){
         int origin;
         if(Modifier.isStatic(node.modifier())){
-          code.setFrameObjectIndex(
-            frameObjectIndex(0, node.arguments()));
+          code.setFrameObjectIndex(frameObjectIndex(0, node.arguments()));
           origin = 0;
         }else{
-          code.setFrameObjectIndex(
-            frameObjectIndex(1, node.arguments()));
+          code.setFrameObjectIndex(frameObjectIndex(1, node.arguments()));
           origin = 1;
         }
-        code.setIndexTable(indexTableFor(frame));
+        code.setIndexTable(makeIndexTableForClosureFrame(frame));
         appendInitialCode(code, frame, arguments, origin);
       }else{
         if (Modifier.isStatic(node.modifier())) {
-          code.setIndexTable(indexTableFor(0, frame));
+          code.setIndexTable(makeIndexTableFor(0, frame));
         } else {
-          code.setIndexTable(indexTableFor(1, frame));
+          code.setIndexTable(makeIndexTableFor(1, frame));
         }
       }
       codeBlock(node.getBlock(), code);
@@ -307,10 +303,10 @@ public class CodeGeneration  {
     if(frame.isClosed()){
       int frameObjectIndex = frameObjectIndex(1, node.getArguments());
       closureCode.setFrameObjectIndex(frameObjectIndex);
-      closureCode.setIndexTable(indexTableFor(frame));      
+      closureCode.setIndexTable(makeIndexTableForClosureFrame(frame));
       appendInitialCode(closureCode, frame, arguments, 1);
     }else{
-      closureCode.setIndexTable(indexTableFor(1, frame));
+      closureCode.setIndexTable(makeIndexTableFor(1, frame));
     }
     codeStatement(node.getBlock(), closureCode);
     method.setMaxLocals();
@@ -1283,7 +1279,7 @@ public class CodeGeneration  {
     return maxIndex;
   }
 
-  private int[] indexTableFor(int origin, LocalFrame frame) {
+  private int[] makeIndexTableFor(int origin, LocalFrame frame) {
     LocalBinding[] bindings = frame.entries();
     int[] indexTable = new int[bindings.length];
     int maxIndex = origin;
@@ -1298,7 +1294,7 @@ public class CodeGeneration  {
     return indexTable;
   }
   
-  private int[] indexTableFor(LocalFrame frame) {
+  private int[] makeIndexTableForClosureFrame(LocalFrame frame) {
     LocalBinding[] bindings = frame.entries();
     int[] indexTable = new int[bindings.length];
     int maxIndex = 0;

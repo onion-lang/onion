@@ -154,7 +154,6 @@ TOKEN:
 | <K_DEF:          "def"          >
 | <K_DOUBLE:       "double"       >
 | <K_ELSE:         "else"         >
-| <K_ELSE_LABEL:   "else:"        >
 | <K_FALSE:        "false"        >
 | <K_FINALLY:      "finally"      >
 | <K_FINAL:        "final"        >
@@ -654,8 +653,8 @@ AST.BranchStatement branch_stmt() : {
   List<AST.Statement> ss = null; AST.BlockStatement elseBlock = null;
 }{
   t="branch" "{"
-    (("case" e=term() "=>" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.location(), ss)));})+
-    [t2="else" "=>" ss=stmts() {elseBlock = new AST.BlockStatement(p(t2), ss);}]
+    (("case" e=term() ":" ss=stmts()) {append(es, new Tuple2<AST.Expression, AST.BlockStatement>(e, new AST.BlockStatement(e.location(), ss)));})+
+    [t2="else" ":" ss=stmts() {elseBlock = new AST.BlockStatement(p(t2), ss);}]
   "}" { return new AST.BranchStatement(p(t), toList(es), elseBlock); }
 }
 
@@ -670,7 +669,7 @@ AST.SelectStatement select_stmt() :{
     ((t2="case" e2=term() {append(es, e2);} ("," e2=term() {append(es, e2);})* ":" ss=stmts()) {
       append(branches, new Tuple2<List<AST.Expression>, AST.BlockStatement>(toList(es), new AST.BlockStatement(p(t2), ss)));
     })*
-    [t2="else:" [ss=stmts()] { elseBlock = new AST.BlockStatement(p(t2), ss); }]    
+    [t2="else" ":" [ss=stmts()] { elseBlock = new AST.BlockStatement(p(t2), ss); }]    
   "}" {
     return new AST.SelectStatement(p(t1), e1, toList(branches), elseBlock);
   }

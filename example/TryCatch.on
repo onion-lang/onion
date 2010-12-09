@@ -4,11 +4,11 @@ for i = 0; i < 10; i++ {
   try {
     System::out.println(i);
     branch {
-    case i < 3 =>
+    case i < 3:
       throw new IOException;
-    case i < 6 =>
+    case i < 6:
       throw new RuntimeException;
-    else =>
+    else:
       throw new Exception;
     }
   } catch e: IOException {

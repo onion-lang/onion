@@ -7,9 +7,10 @@ def countLines(file: File): int {
   return count;
 }
 def process(file: File, callback: Function1) {
+  if(file == null) { return; }
   foreach myFile: File in file.listFiles {
     if myFile.isDirectory {
-      process(file, callback);
+      process(myFile, callback);
     } else {
       callback.call(myFile);
     }
@@ -17,7 +18,7 @@ def process(file: File, callback: Function1) {
 }
 lines = 0;
 foreach file: File in [new File("src"), new File("src.scala"), new File("grammar")] {
-  process(new File("src"), #(file: Object){
+  process(file, #(file: Object){
     f = file$File;
     if f.name.endsWith(".scala") || f.name.endsWith(".java") || f.name.endsWith(".jj") {
       lines = lines + countLines(f);

@@ -1050,7 +1050,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           report(INCOMPATIBLE_OPERAND_TYPE, node, "--", Array[TypeRef](operand.`type`))
           return None
         }
-        Some(operand match {
+        Option(operand match {
           case ref: RefLocal =>
             val varIndex = context.add(context.newName, operand.`type`)
             new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(SUBTRACT, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
@@ -1058,7 +1058,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             var varIndex: Int = context.add(context.newName, ref.target.`type`)
             new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(SUBTRACT, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
           case _ =>
-            report(UNIMPLEMENTED_FEATURE, node)
+            report(LVALUE_REQUIRED, target);
             null
         })
       case node@AST.PostIncrement(loc, target) =>
@@ -1076,7 +1076,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             var varIndex: Int = context.add(context.newName, ref.target.`type`)
             new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(ADD, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
           case _ =>
-            report(UNIMPLEMENTED_FEATURE, node)
+            report(LVALUE_REQUIRED, target);
             null
         })
       case node@AST.UnqualifiedFieldReference(loc, name) =>

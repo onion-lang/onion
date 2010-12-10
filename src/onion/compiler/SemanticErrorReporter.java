@@ -48,6 +48,7 @@ public class SemanticErrorReporter {
     int DUPLICATE_CONSTRUCTOR = 25;
     int DUPLICATE_GENERATED_METHOD = 26;
     int IS_NOT_BOXABLE_TYPE = 27;
+    int LVALUE_REQUIRED = 28;
   }
   
   private List problems;
@@ -58,6 +59,10 @@ public class SemanticErrorReporter {
   public SemanticErrorReporter(int threshold) {
     this.threshold = threshold;
     this.problems = new ArrayList();
+  }
+
+  private String format(String string) {
+    return MessageFormat.format(string, new Object[0]);
   }
   
   private String format(String string, String arg){
@@ -116,6 +121,10 @@ public class SemanticErrorReporter {
       position,
       format(message("error.semantic.incompatibleOperandType"), 
       (String)items[0], names(operands)));
+  }
+
+  private void reportLValueRequired(Location position, Object[] items){
+    problem(position, format(message("error.semantic.lValueRequired")));
   }
   
   private void reportVariableNotFound(
@@ -421,6 +430,8 @@ public class SemanticErrorReporter {
       	break;
       case Constants.IS_NOT_BOXABLE_TYPE:
         reportIsNotBoxableType(position, items);
+      case Constants.LVALUE_REQUIRED:
+        reportLValueRequired(position, items);
       	break;
     }
     if(errorCount >= threshold){

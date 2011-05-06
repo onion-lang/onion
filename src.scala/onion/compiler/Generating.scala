@@ -1,6 +1,7 @@
 package onion.compiler
 
 import pass.CodeGeneration
+import onion.compiler.IRT.ClassDefinition
 
 /**
  * Created by IntelliJ IDEA.
@@ -16,6 +17,7 @@ class Generating(config: CompilerConfig) extends AnyRef with ProcessingUnit[Arra
   def newEnvironment(source: Array[IRT.ClassDefinition]): CodeGeneratingEnvironment = {
     new CodeGeneratingEnvironment
   }
+
   private val generator = new CodeGeneration(config)
   def doProcess(source: Array[IRT.ClassDefinition], environment: CodeGeneratingEnvironment): Array[CompiledClass] = {
     generator.process(source)

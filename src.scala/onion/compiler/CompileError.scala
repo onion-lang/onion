@@ -7,10 +7,12 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.io.IOException
-import java.io.Reader
-
-class StreamInputSource(var reader: Reader, name: String) extends InputSource {
-  def openReader: Reader = reader
-  def getName: String =  name
+/**
+ * @author Kota Mizushima
+ *
+ */
+class CompileError(val sourceFile: String, val location: Location, val message: String) {
+  def getSourceFile: String = sourceFile
+  def getLocation: Location = location
+  def getMessage: String =  message
 }

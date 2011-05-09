@@ -7,10 +7,9 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.io.IOException
 import java.io.Reader
 
-class StreamInputSource(var reader: Reader, name: String) extends InputSource {
-  def openReader: Reader = reader
-  def getName: String =  name
+trait InputSource {
+  def openReader: Reader
+  def getName: String
 }

@@ -7,10 +7,15 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.io.IOException
-import java.io.Reader
+import collection.mutable.HashMap
 
-class StreamInputSource(var reader: Reader, name: String) extends InputSource {
-  def openReader: Reader = reader
-  def getName: String =  name
+
+class SymbolTable {
+  private val table = new HashMap[Symbol, AnyRef]
+
+  def put(key: Symbol, value: AnyRef): Unit =  table.put(key, value)
+
+  def get(key: Symbol): AnyRef = table.get(key)
+
+  def containsKey(key: Symbol): Boolean = table.contains(key)
 }

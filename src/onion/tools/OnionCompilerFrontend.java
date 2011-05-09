@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 import onion.compiler.CompiledClass;
-import onion.compiler.CompilerConfig;
 import onion.compiler.OnionCompiler;
+import onion.compiler.CompilerConfig;
 import onion.compiler.ScriptException;
 import onion.compiler.util.Messages;
 import onion.compiler.util.Systems;

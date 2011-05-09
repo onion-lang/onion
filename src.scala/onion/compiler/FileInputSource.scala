@@ -9,8 +9,17 @@ package onion.compiler
 
 import java.io.IOException
 import java.io.Reader
+import onion.compiler.util.Inputs
 
-class StreamInputSource(var reader: Reader, name: String) extends InputSource {
-  def openReader: Reader = reader
-  def getName: String =  name
+class FileInputSource(val file: String) extends InputSource {
+  def openReader: Reader = {
+    if (reader == null) reader = Inputs.newReader(file)
+    return reader
+  }
+
+  def getName: String = {
+    return file
+  }
+
+  private var reader: Reader = null
 }

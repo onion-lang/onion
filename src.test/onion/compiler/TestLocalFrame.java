@@ -44,11 +44,11 @@ public class TestLocalFrame extends TestCase {
   }
 
   public void testOpenAndCloseScope() {
-    LocalScope scope = frame.getScope();
+    LocalScope scope = frame.scope();
     frame.openScope();
-    assertSame(scope, frame.getScope().getParent());
+    assertSame(scope, frame.scope().parent());
     frame.closeScope();
-    assertSame(scope, frame.getScope());
+    assertSame(scope, frame.scope());
   }
 
   public void testEntries() {

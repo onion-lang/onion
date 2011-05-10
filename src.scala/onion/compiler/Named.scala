@@ -1,4 +1,4 @@
-package onion.compiler;
+package onion.compiler
 
 /**
  * Created by IntelliJ IDEA.
@@ -7,6 +7,6 @@ package onion.compiler;
  * Time: 23:18:16
  * To change this template use File | Settings | File Templates.
  */
-public interface Named {
-  String name();
+trait Named {
+  def name: String
 }

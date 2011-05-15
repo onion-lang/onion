@@ -12,6 +12,7 @@ class OnionProject(info: ProjectInfo) extends DefaultProject(info)
   override def mainClass = Some("onion.tools.OnionCompilerFrontend")
   override def manifestClassPath = Some("lib/bcel.jar lib/scala-compiler.jar lib/scala-library.jar")
   override lazy val compile = compileAction dependsOn(grammar) describedAs("compile java and scala sources")
+  override lazy val clean =  cleanAction && task { Files.clean(Path.fromFile("src/main/parser/onion"), LOGGER); None }
   override lazy val `package` = {
     packageAction && task {
       val currentTime = System.currentTimeMillis()
@@ -43,5 +44,6 @@ class OnionProject(info: ProjectInfo) extends DefaultProject(info)
       None
     }
   }
+  override lazy val packageProject = packageProjectAction dependsOn(clean) describedAs("package all files contained in this project except generated files")
   override def mainSourceRoots = super.mainSourceRoots +++ "src"/"main"/"parser" +++ "src"/"main"/"onion_lib"
 }

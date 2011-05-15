@@ -46,4 +46,8 @@ class OnionProject(info: ProjectInfo) extends DefaultProject(info)
   }
   override lazy val packageProject = packageProjectAction dependsOn(clean) describedAs("package all files contained in this project except generated files")
   override def mainSourceRoots = super.mainSourceRoots +++ "src"/"main"/"parser" +++ "src"/"main"/"onion_lib"
+  lazy val packageBinaryProject = task {
+    println("implement this")
+    None
+  }
 }

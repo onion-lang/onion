@@ -1,6 +1,7 @@
 build/
 build.lib/
 project/boot/
+src/main/parser/onion
 target/
 src.parser/
 onion-library.jar

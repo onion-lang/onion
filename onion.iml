@@ -13,11 +13,20 @@
     <output url="file://$MODULE_DIR$/build" />
     <exclude-output />
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/src.scala" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src.test" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src.parser" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src.lib" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src.scala" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/java" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/resources" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/scala" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/test/java" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/test/resources" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/test/scala" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/project/build" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/parser" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/onion_lib" isTestSource="false" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="inheritedJdk" />

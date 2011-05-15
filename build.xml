@@ -84,7 +84,7 @@
   </target>
 
   <target name="jar" depends="compile">
-    <jar destfile="onion.jar" basedir="${build}" manifest="resources/Manifest.mf"/>
+    <jar destfile="onion.jar" basedir="${build}" manifest="src/main/resources/Manifest.mf"/>
     <jar destfile="onion-library.jar" basedir="${build.lib}"/>
   </target>
 	

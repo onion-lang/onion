@@ -20,5 +20,8 @@
     </wildcardResourcePatterns>
     <annotationProcessing enabled="false" useClasspath="true" />
   </component>
+  <component name="SbtSettings">
+    <option name="useSbtOutputDirs" value="false" />
+  </component>
 </project>
 

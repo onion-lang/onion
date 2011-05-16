@@ -1,7 +1,7 @@
 package onion.compiler
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
-import _root_.onion.compiler.SemanticErrorReporter.Constants._
+import _root_.onion.compiler.SemanticErrorReporter.SemanticErrorConstants._
 import _root_.onion.compiler.IRT._
 import _root_.onion.compiler.IRT.BinaryTerm.Constants._
 import _root_.onion.compiler.IRT.UnaryTerm.Constants._

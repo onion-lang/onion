@@ -24,7 +24,7 @@ trait ProcessingUnit[A, B] {self =>
 
   def andThen[C](nextUnit: ProcessingUnit[B, C]): ProcessingUnit[A, C] = new ProcessingUnit[A, C] {
     type Environment = Null
-    def newEnvironment(source: A): Null = null
+    def newEnvironment(source: A): Environment = null
     def doProcess(source: A, environment: Null): C = nextUnit.process(self.process(source))
   }
 }

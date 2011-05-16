@@ -19,39 +19,8 @@ import onion.compiler.util.Messages;
  * Date: 2005/06/23
  */
 public class SemanticErrorReporter {
-  public interface Constants {
-    int INCOMPATIBLE_TYPE = 0;
-    int INCOMPATIBLE_OPERAND_TYPE = 1;
-    int VARIABLE_NOT_FOUND = 2;
-    int CLASS_NOT_FOUND = 3;
-    int FIELD_NOT_FOUND = 4;
-    int METHOD_NOT_FOUND = 5;
-    int AMBIGUOUS_METHOD = 6;
-    int DUPLICATE_LOCAL_VARIABLE = 7;
-    int DUPLICATE_CLASS = 8;
-    int DUPLICATE_FIELD = 9;
-    int DUPLICATE_METHOD = 10;
-    int DUPLICATE_GLOBAL_VARIABLE = 11;
-    int DUPLICATE_FUNCTION = 12;
-    int METHOD_NOT_ACCESSIBLE = 13;
-    int FIELD_NOT_ACCESSIBLE = 14;
-    int CLASS_NOT_ACCESSIBLE = 15;
-    int CYCLIC_INHERITANCE = 16;
-    int CYCLIC_DELEGATION = 17;
-    int ILLEGAL_INHERITANCE = 18;
-    int ILLEGAL_METHOD_CALL = 19;
-    int CANNOT_RETURN_VALUE = 20;
-    int CONSTRUCTOR_NOT_FOUND = 21;
-    int AMBIGUOUS_CONSTRUCTOR= 22;
-    int INTERFACE_REQUIRED = 23;
-    int UNIMPLEMENTED_FEATURE = 24;
-    int DUPLICATE_CONSTRUCTOR = 25;
-    int DUPLICATE_GENERATED_METHOD = 26;
-    int IS_NOT_BOXABLE_TYPE = 27;
-    int LVALUE_REQUIRED = 28;
-  }
-  
-  private List problems;
+
+    private List problems;
   private String sourceFile;
   private int errorCount;
   private int threshold;  
@@ -350,87 +319,87 @@ public class SemanticErrorReporter {
   public void report(int error, Location position, Object[] items){
     errorCount++;    
     switch(error){
-      case Constants.INCOMPATIBLE_TYPE:
+      case SemanticErrorConstants.INCOMPATIBLE_TYPE:
         reportIncompatibleType(position, items);
       	break;
-      case Constants.INCOMPATIBLE_OPERAND_TYPE:
+      case SemanticErrorConstants.INCOMPATIBLE_OPERAND_TYPE:
         reportIncompatibleOperandType(position, items);
       	break;
-      case Constants.VARIABLE_NOT_FOUND:
+      case SemanticErrorConstants.VARIABLE_NOT_FOUND:
         reportVariableNotFound(position, items);
       	break;
-      case Constants.CLASS_NOT_FOUND:
+      case SemanticErrorConstants.CLASS_NOT_FOUND:
         reportClassNotFound(position, items);
       	break;
-      case Constants.FIELD_NOT_FOUND:
+      case SemanticErrorConstants.FIELD_NOT_FOUND:
         reportFieldNotFound(position, items);
       	break;
-      case Constants.METHOD_NOT_FOUND:
+      case SemanticErrorConstants.METHOD_NOT_FOUND:
         reportMethodNotFound(position, items);
       	break;
-      case Constants.AMBIGUOUS_METHOD:
+      case SemanticErrorConstants.AMBIGUOUS_METHOD:
         reportAmbiguousMethod(position, items);
       	break;
-      case Constants.DUPLICATE_LOCAL_VARIABLE:
+      case SemanticErrorConstants.DUPLICATE_LOCAL_VARIABLE:
         reportDuplicateLocalVariable(position, items);
       	break;
-      case Constants.DUPLICATE_CLASS:
+      case SemanticErrorConstants.DUPLICATE_CLASS:
         reportDuplicateClass(position, items);
       	break;
-      case Constants.DUPLICATE_FIELD:
+      case SemanticErrorConstants.DUPLICATE_FIELD:
         reportDuplicateField(position, items);
       	break;
-      case Constants.DUPLICATE_METHOD:
+      case SemanticErrorConstants.DUPLICATE_METHOD:
         reportDuplicateMethod(position, items);
       	break;
-      case Constants.DUPLICATE_GLOBAL_VARIABLE:
+      case SemanticErrorConstants.DUPLICATE_GLOBAL_VARIABLE:
         reportDuplicateGlobalVariable(position, items);
       	break;
-      case Constants.DUPLICATE_FUNCTION:
+      case SemanticErrorConstants.DUPLICATE_FUNCTION:
         reportDuplicateFunction(position, items);
       	break;
-      case Constants.METHOD_NOT_ACCESSIBLE:
+      case SemanticErrorConstants.METHOD_NOT_ACCESSIBLE:
         reportMethodNotAccessible(position, items);
       	break;
-      case Constants.FIELD_NOT_ACCESSIBLE:
+      case SemanticErrorConstants.FIELD_NOT_ACCESSIBLE:
         reportFieldNotAccessible(position, items);
       	break;
-      case Constants.CLASS_NOT_ACCESSIBLE:
+      case SemanticErrorConstants.CLASS_NOT_ACCESSIBLE:
         reportClassNotAccessible(position, items);
       	break;
-      case Constants.CYCLIC_INHERITANCE:
+      case SemanticErrorConstants.CYCLIC_INHERITANCE:
         reportCyclicInheritance(position, items);
       	break;
-      case Constants.CYCLIC_DELEGATION:
+      case SemanticErrorConstants.CYCLIC_DELEGATION:
         reportCyclicDelegation(position, items);
       	break;
-      case Constants.ILLEGAL_INHERITANCE:
+      case SemanticErrorConstants.ILLEGAL_INHERITANCE:
         reportIllegalInheritance(position, items);
       	break;
-      case Constants.CANNOT_RETURN_VALUE:
+      case SemanticErrorConstants.CANNOT_RETURN_VALUE:
         reportCannotReturnValue(position, items);
       	break;
-      case Constants.CONSTRUCTOR_NOT_FOUND:
+      case SemanticErrorConstants.CONSTRUCTOR_NOT_FOUND:
         reportConstructorNotFound(position, items);
       	break;
-      case Constants.AMBIGUOUS_CONSTRUCTOR:
+      case SemanticErrorConstants.AMBIGUOUS_CONSTRUCTOR:
         reportAmbiguousConstructor(position, items);
       	break;
-      case Constants.INTERFACE_REQUIRED:
+      case SemanticErrorConstants.INTERFACE_REQUIRED:
         reportInterfaceRequied(position, items);
       	break;
-      case Constants.UNIMPLEMENTED_FEATURE:
+      case SemanticErrorConstants.UNIMPLEMENTED_FEATURE:
         reportUnimplementedFeature(position, items);
       	break;
-      case Constants.DUPLICATE_CONSTRUCTOR:
+      case SemanticErrorConstants.DUPLICATE_CONSTRUCTOR:
         reportDuplicateConstructor(position ,items);
       	break;
-      case Constants.DUPLICATE_GENERATED_METHOD:
+      case SemanticErrorConstants.DUPLICATE_GENERATED_METHOD:
         reportDuplicateGeneratedMethod(position, items);
       	break;
-      case Constants.IS_NOT_BOXABLE_TYPE:
+      case SemanticErrorConstants.IS_NOT_BOXABLE_TYPE:
         reportIsNotBoxableType(position, items);
-      case Constants.LVALUE_REQUIRED:
+      case SemanticErrorConstants.LVALUE_REQUIRED:
         reportLValueRequired(position, items);
       	break;
     }

@@ -20,7 +20,6 @@
       <sourceFolder url="file://$MODULE_DIR$/src/test/java" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/test/resources" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/test/scala" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/project/build" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/main/parser" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/main/onion_lib" isTestSource="false" />
     </content>

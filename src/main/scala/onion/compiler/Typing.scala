@@ -1,10 +1,10 @@
 package onion.compiler
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
-import _root_.onion.compiler.SemanticErrorConstants._
 import _root_.onion.compiler.IRT._
 import _root_.onion.compiler.IRT.BinaryTerm.Constants._
 import _root_.onion.compiler.IRT.UnaryTerm.Constants._
+import _root_.onion.compiler.SemanticErrorConstants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 

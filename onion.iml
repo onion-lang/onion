@@ -4,13 +4,13 @@
     <facet type="scala" name="Scala">
       <configuration>
         <option name="compilerLibraryLevel" value="Global" />
-        <option name="compilerLibraryName" value="scala-2.9.0" />
-        <option name="maximumHeapSize" value="1024" />
+        <option name="compilerLibraryName" value="scala-2.8.1.final" />
       </configuration>
     </facet>
   </component>
   <component name="NewModuleRootManager" inherit-compiler-output="false">
-    <output url="file://$MODULE_DIR$/build" />
+    <output url="file://$MODULE_DIR$/target/scala_2.9.0/classes" />
+    <output-test url="file://$MODULE_DIR$/target/scala_2.9.0/test-classes" />
     <exclude-output />
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
@@ -43,7 +43,7 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="library" exported="" name="scala-2.9.0" level="application" />
+    <orderEntry type="library" name="scala-2.8.1.final" level="application" />
   </component>
 </module>
 

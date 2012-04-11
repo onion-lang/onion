@@ -1,6 +1,6 @@
-build
-build.lib
+build/
+build.lib/
 project/boot
 src/main/parser/onion
-target
-.idea/workspace.xml
+target/
+.idea/*

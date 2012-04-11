@@ -3,4 +3,5 @@ build.lib/
 project/boot
 src/main/parser/onion
 target/
-.idea/*
+.idea/
+.idea_modules/

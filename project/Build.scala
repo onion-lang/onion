@@ -3,12 +3,14 @@ import Keys._
 import classpath._
 import Project.Initialize
 import java.util.jar.{Attributes, Manifest}
+import sbtassembly.Plugin._
+import AssemblyKeys._
 
 object Build extends Build {
   lazy val root = Project(
     id = "onion", 
     base = file("."), 
-    settings = onionSettigns
+    settings = assemblySettings ++ onionSettigns
   )
 
   lazy val dist = TaskKey[Unit]("onion-dist")
@@ -36,8 +38,6 @@ object Build extends Build {
   }
 
   private def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
-    System.exit(0)
-    println("exec javacc ...")
     Fork.java(None, 
       "-cp" :: 
       Path.makeString(classpath.map(_.data)) :: 

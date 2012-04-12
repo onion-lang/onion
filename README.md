@@ -1,7 +1,7 @@
-# Statically typed object-oriented programming language Onion
+# Onion - statically typed object-oriented programming language on JVM
 
-Onion is an object-oriented programming language.  Source-codes of Onion
-is compiled into JVM class files.  Please refer Install.txt for installation.
+Onion is an object-oriented programming language.  Codes of Onion compiles
+into JVM class files.  Please refer Install.txt for installation.
 
 ## Usage of tools
 ### onionc

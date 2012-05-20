@@ -477,7 +477,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       var leftType: TypeRef = null
       var rightType: TypeRef = value.`type`
       if (bind != null) {
-        frame = bind.getFrame
+        frame = bind.getFrameIndex
         index = bind.getIndex
         leftType = bind.getType
       } else {

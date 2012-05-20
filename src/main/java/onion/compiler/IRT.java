@@ -1,5 +1,6 @@
 package onion.compiler;
 
+import onion.compiler.ClosureLocalBinding;
 import onion.compiler.util.Strings;
 
 import java.util.*;
@@ -1012,7 +1013,7 @@ public class IRT {
     }
 
     public RefLocal(ClosureLocalBinding bind) {
-      this(null, bind.getFrame(), bind.getIndex(), bind.getType());
+      this(null, bind.getFrameIndex(), bind.getIndex(), bind.getType());
     }
 
     public RefLocal(int frame, int index, TypeRef type) {
@@ -1049,7 +1050,7 @@ public class IRT {
     }
 
     public SetLocal(ClosureLocalBinding bind, Term value){
-      this(null, bind.getFrame(), bind.getIndex(), bind.getType(), value);
+      this(null, bind.getFrameIndex(), bind.getIndex(), bind.getType(), value);
     }
 
     public int getFrame() {

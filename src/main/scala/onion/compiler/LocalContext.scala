@@ -8,6 +8,7 @@
 package onion.compiler
 
 import onion.compiler.util.SymbolGenerator
+import util.SymbolGenerator
 
 /**
  * @author Kota Mizushima

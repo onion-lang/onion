@@ -14,7 +14,7 @@ import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 
 import onion.compiler.*;
-import onion.compiler.ScriptException;
+import onion.compiler.exceptions.ScriptException;
 
 
 

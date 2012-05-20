@@ -119,13 +119,13 @@ public class ClassFileClassTypeRef extends IRT.AbstractClassTypeRef implements C
 
   private static int toOnionModifier(int src){
     int modifier = 0;
-    modifier |= (isOn(src, ACC_PRIVATE) ? Modifier.PRIVATE : modifier);
-    modifier |= (isOn(src, ACC_PROTECTED) ? Modifier.PROTECTED : modifier);
-    modifier |= (isOn(src, ACC_PUBLIC) ? Modifier.PUBLIC : modifier);
-    modifier |= (isOn(src, ACC_STATIC) ? Modifier.STATIC : modifier);
-    modifier |= (isOn(src, ACC_SYNCHRONIZED) ? Modifier.SYNCHRONIZED : modifier);
-    modifier |= (isOn(src, ACC_ABSTRACT) ? Modifier.ABSTRACT : modifier);
-    modifier |= (isOn(src, ACC_FINAL) ? Modifier.FINAL : modifier);
+    modifier |= (isOn(src, ACC_PRIVATE) ? Modifier.PRIVATE() : modifier);
+    modifier |= (isOn(src, ACC_PROTECTED) ? Modifier.PROTECTED() : modifier);
+    modifier |= (isOn(src, ACC_PUBLIC) ? Modifier.PUBLIC() : modifier);
+    modifier |= (isOn(src, ACC_STATIC) ? Modifier.STATIC() : modifier);
+    modifier |= (isOn(src, ACC_SYNCHRONIZED) ? Modifier.SYNCHRONIZED() : modifier);
+    modifier |= (isOn(src, ACC_ABSTRACT) ? Modifier.ABSTRACT() : modifier);
+    modifier |= (isOn(src, ACC_FINAL) ? Modifier.FINAL() : modifier);
     return modifier;
   }
   

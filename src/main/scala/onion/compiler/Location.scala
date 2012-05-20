@@ -8,31 +8,9 @@
 package onion.compiler;
 
 /**
- * This class represents an exception while script is running.
- *
  * @author Kota Mizushima
- * Date: 2005/09/15
+ * Location in a Scala code.
+ * @param line line number in the source.  Note that it is 1 origin.
+ * @param column column number in the source.  It is 1 origin, too.
  */
-public class ScriptException extends RuntimeException {
-  public ScriptException() {
-  }
-
-  public ScriptException(String message) {
-    super(message);
-  }
-
-  /**
-   * @param message error message
-   * @param cause why this exception has thrown
-   */
-  public ScriptException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  /**
-   * @param cause
-   */
-  public ScriptException(Throwable cause) {
-    super(cause);
-  }
-}
+final case class Location(line: Int, column: Int)

@@ -6,31 +6,10 @@
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
 package onion.compiler;
+import scala.reflect.BeanProperty
 
 /**
  * @author Kota Mizushima
  * Date: 2005/04/09
  */
-public class CompiledClass {
-  private final String className;
-  private final String outputPath;
-  private final byte[] content;
-
-  public CompiledClass(String className, String outputPath, byte[] content) {
-    this.className = className;
-    this.outputPath = outputPath;
-    this.content = content;
-  }
-  
-  public String getClassName() {
-    return className;
-  }
-  
-  public String getOutputPath() {
-    return outputPath;
-  }
-  
-  public byte[] getContent() {
-    return content;
-  }
-}
+case class CompiledClass(@BeanProperty className: String, @BeanProperty outputPath: String, @BeanProperty content: Array[Byte])

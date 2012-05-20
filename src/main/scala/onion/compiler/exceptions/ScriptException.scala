@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler;
+package onion.compiler.exceptions
 
 /**
  * This class represents an exception while script is running.
@@ -13,26 +13,15 @@ package onion.compiler;
  * @author Kota Mizushima
  * Date: 2005/09/15
  */
-public class ScriptException extends RuntimeException {
-  public ScriptException() {
-  }
-
-  public ScriptException(String message) {
-    super(message);
-  }
-
-  /**
-   * @param message error message
-   * @param cause why this exception has thrown
-   */
-  public ScriptException(String message, Throwable cause) {
-    super(message, cause);
+class ScriptException(message: String, cause: Throwable) extends RuntimeException(message, cause) {
+  def this() {
+    this("", null)
   }
 
   /**
    * @param cause
    */
-  public ScriptException(Throwable cause) {
-    super(cause);
+  def this(cause: Throwable) {
+    this("", cause)
   }
 }

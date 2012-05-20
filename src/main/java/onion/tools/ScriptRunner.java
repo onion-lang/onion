@@ -11,7 +11,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Map;
 
 import onion.compiler.*;
-import onion.compiler.ScriptException;
+import onion.compiler.exceptions.ScriptException;
 import onion.compiler.util.Messages;
 import onion.compiler.util.Systems;
 import onion.tools.option.CommandLineParser;

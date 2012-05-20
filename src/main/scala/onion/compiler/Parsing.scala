@@ -5,6 +5,8 @@ import collection.JavaConversions._
 import java.io.{Reader, IOException}
 import _root_.onion.compiler.util.Messages
 import _root_.onion.compiler.parser.{JJOnionParser, Token, ParseException}
+import onion.compiler.parser.JJOnionParser
+import onion.compiler.parser.JJOnionParser
 
 /**
  * Created by IntelliJ IDEA.

@@ -9,22 +9,8 @@ package onion.compiler;
 
 /**
  * @author Kota Mizushima
- * 
+ * Location in a Scala code.
+ * @param line line number in the source.  Note that it is 1 origin.
+ * @param column column number in the source.  It is 1 origin, too.
  */
-public final class Location {
-  private int line;
-  private int column;
-
-  public Location(int line, int column) {
-    this.line = line;
-    this.column = column;
-  }
-
-  public int line() {
-    return line;
-  }
-
-  public int column() {
-    return column;
-  }
-}
+final case class Location(line: Int, column: Int)

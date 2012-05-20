@@ -5,7 +5,6 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler;
+package onion.compiler
 
-public interface OnionParser {
-}
+trait OnionParser

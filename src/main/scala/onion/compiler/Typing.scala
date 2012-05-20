@@ -6,7 +6,6 @@ import _root_.onion.compiler.IRT.BinaryTerm.Constants._
 import _root_.onion.compiler.IRT.UnaryTerm.Constants._
 import _root_.onion.compiler.SemanticErrorConstants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
-import exceptions.CompilationException
 import java.util.{Arrays, TreeSet => JTreeSet}
 
 /**

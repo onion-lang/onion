@@ -9,7 +9,6 @@ package onion.compiler
 
 import _root_.scala.collection.JavaConverters._
 import _root_.scala.collection.Iterator
-import exceptions.CompilationException
 import java.io.BufferedReader
 import java.io.IOException
 import java.text.MessageFormat

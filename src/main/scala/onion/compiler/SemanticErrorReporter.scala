@@ -7,6 +7,7 @@ package onion.compiler
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
+
 import java.text.MessageFormat
 import java.util.ArrayList
 import java.util.List

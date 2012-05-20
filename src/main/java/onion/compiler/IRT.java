@@ -623,7 +623,7 @@ public class IRT {
     public static ConstructorDefinition newDefaultConstructor(ClassTypeRef type) {
       StatementBlock block = new StatementBlock(new Return(null));
       Super init = new Super(type.superClass(), new TypeRef[0], new Term[0]);
-      ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC, type, new TypeRef[0], block, init);
+      ConstructorDefinition node =  new ConstructorDefinition(Modifier.PUBLIC(), type, new TypeRef[0], block, init);
       node.setFrame(new LocalFrame(null));
       return node;
     }

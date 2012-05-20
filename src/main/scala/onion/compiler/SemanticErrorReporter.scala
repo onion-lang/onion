@@ -12,6 +12,7 @@ import java.text.MessageFormat
 import java.util.ArrayList
 import java.util.List
 import onion.compiler.util.Messages
+import onion.compiler.exceptions.CompilationException
 
 /**
  * @author Kota Mizushima

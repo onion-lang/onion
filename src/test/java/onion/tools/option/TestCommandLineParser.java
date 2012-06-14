@@ -11,10 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 import onion.tools.option.CommandLineParser;
-import onion.tools.option.OptionConf;
-import onion.tools.option.ParseFailure;
-import onion.tools.option.ParseResult;
-import onion.tools.option.ParseSuccess;
 
 import junit.framework.TestCase;
 

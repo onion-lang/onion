@@ -5,26 +5,16 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.tools.option;
+package onion.tools.option
 
 /**
  * @author Kota Mizushima
- * Date: 2005/04/08
+ *         Date: 2005/04/08
  */
-public class OptionConf {
-  private final String optionName;
-  private final boolean hasArgument;
+class ParseFailure(lackedOptions: Array[String], invalidOptions: Array[String]) extends ParseResult {
+  def getStatus: Int = ParseResult.FAILURE
 
-  public OptionConf(String optionName, boolean hasArgument) {
-    this.optionName = optionName;
-    this.hasArgument = hasArgument;
-  }
-  
-  public String getOptionName(){
-    return optionName;
-  }
-  
-  public boolean hasArgument(){
-    return hasArgument;
-  }
+  def getLackedOptions: Array[String] = lackedOptions
+
+  def getInvalidOptions: Array[String] = invalidOptions
 }

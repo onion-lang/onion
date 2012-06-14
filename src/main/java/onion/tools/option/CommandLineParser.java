@@ -29,32 +29,32 @@ public class CommandLineParser {
     List<String> args = new ArrayList<String>();
     List<String> lackedOptNames = new ArrayList<String>();
     List<String> invalidOptNames = new ArrayList<String>();
-    {
-      int i;
-      for(i = 0; i < cmdline.length; ) {
-        if(cmdline[i].startsWith("-")) {
-          String param = cmdline[i];
-          OptionConf conf = getConf(param);
-          if(conf == null){
-            invalidOptNames.add(param);
-            i++;
-          }else if(conf.hasArgument()){
-            if(i + 1 >= cmdline.length){
-              lackedOptNames.add(param);
-            }else{
-              opts.put(param, cmdline[i + 1]);
-            }
-            i += 2;
-          } else{
-            noArgOpts.put(param, new Object());
-            i++;
+
+    int i;
+    for(i = 0; i < cmdline.length; ) {
+      if(cmdline[i].startsWith("-")) {
+        String param = cmdline[i];
+        OptionConf conf = getConf(param);
+        if(conf == null){
+          invalidOptNames.add(param);
+          i++;
+        }else if(conf.hasArgument()){
+          if(i + 1 >= cmdline.length){
+            lackedOptNames.add(param);
+          }else{
+            opts.put(param, cmdline[i + 1]);
           }
-        }else {
-          args.add(cmdline[i]);
+          i += 2;
+        } else{
+          noArgOpts.put(param, new Object());
           i++;
         }
+      }else {
+        args.add(cmdline[i]);
+        i++;
       }
     }
+
     if(lackedOptNames.size() == 0 && invalidOptNames.size() == 0){
       return new ParseSuccess(noArgOpts, opts, args);
     }else{

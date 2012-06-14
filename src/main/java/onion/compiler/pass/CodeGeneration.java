@@ -22,14 +22,14 @@ import static onion.compiler.IRT.UnaryTerm.Constants.*;
  * @author Kota Mizushima Date: 2005/04/10
  */
 public class CodeGeneration  {
-  private CompilerConfig config;
-  private List compiledClasses = new ArrayList();
+  private final CompilerConfig config;
+  private final List compiledClasses = new ArrayList();
   private SymbolGenerator generator;
   private boolean isStatic;
   private boolean isClosure;
   private String currentClosureName;
   
-  private static Map unboxingMethods = new HashMap(){{
+  private static final Map unboxingMethods = new HashMap(){{
     put("java.lang.Byte", "byteValue");
     put("java.lang.Short", "shortValue");
     put("java.lang.Character", "charValue");
@@ -595,15 +595,14 @@ public class CodeGeneration  {
   }
 
   private String[] namesOf(IRT.ClassTypeRef[] symbols) {
-    String[] names = new String[symbols.length];
-    for (int i = 0; i < names.length; i++) {
-      names[i] = nameOf(symbols[i]);
+    List<String> names = new ArrayList<String>();
+    for (IRT.ClassTypeRef symbol: symbols) {
+       names.add(nameOf(symbol));
     }
-    return names;
+    return names.toArray(new String[0]);
   }
 
-  public InstructionHandle codeExpression(
-    IRT.Term node, CodeProxy code) {
+  public InstructionHandle codeExpression(IRT.Term node, CodeProxy code) {
     InstructionHandle start;
     if (node instanceof IRT.BinaryTerm) {
       start = codeBinaryExpression((IRT.BinaryTerm) node, code);

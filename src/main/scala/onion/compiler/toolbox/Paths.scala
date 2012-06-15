@@ -5,31 +5,19 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.toolbox;
+package onion.compiler.toolbox
+
+import java.io.File
 
 /**
  * @author Kota Mizushima
- * Date: 2005/07/07
+ *         Date: 2005/06/17
  */
-public class SymbolGenerator {
-  private final String prefix;
-  private int count;
-  
-  public SymbolGenerator(String prefix) {
-    this.prefix = prefix;
-  }
+object Paths {
+  def nameOf(path: String): String = new File(path).getName
 
-  public String getPrefix(){
-    return prefix;
-  }
-  
-  public int getCount(){
-    return count;
-  }
-  
-  public String generate(){
-    String newSymbol = prefix + count;
-    count++;
-    return newSymbol;
+  def cutExtension(path: String): String = {
+    val name = nameOf(path)
+    name.substring(0, name.lastIndexOf('.'))
   }
 }

@@ -78,7 +78,7 @@ class LocalScope(val parent: LocalScope) {
   }
 
   override def toString(): String = {
-    val separator = Systems.getLineSeparator()
+    val separator = Systems.getLineSeparator
     val string = new StringBuffer()
     string.append("[")
     string.append(separator)

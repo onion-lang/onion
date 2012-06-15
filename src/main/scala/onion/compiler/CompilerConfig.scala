@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler
 
-import onion.compiler.util.ArrayUtil
+import onion.compiler.toolbox.ArrayUtil
 
 /**
  * @author Kota Mizushima

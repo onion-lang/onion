@@ -1,7 +1,7 @@
 package onion.compiler;
 
 import onion.compiler.ClosureLocalBinding;
-import onion.compiler.util.Strings;
+import onion.compiler.toolbox.Strings;
 
 import java.util.*;
 

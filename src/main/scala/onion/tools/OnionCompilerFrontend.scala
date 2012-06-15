@@ -20,8 +20,8 @@ import onion.compiler.CompiledClass
 import onion.compiler.OnionCompiler
 import onion.compiler.CompilerConfig
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.util.Messages
-import onion.compiler.util.Systems
+import onion.compiler.toolbox.Messages
+import onion.compiler.toolbox.Systems
 import onion.tools.option.CommandLineParser
 import onion.tools.option.OptionConf
 import onion.tools.option.ParseFailure

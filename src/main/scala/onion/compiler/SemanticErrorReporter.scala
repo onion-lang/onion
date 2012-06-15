@@ -11,7 +11,7 @@ package onion.compiler
 import java.text.MessageFormat
 import java.util.ArrayList
 import java.util.List
-import onion.compiler.util.Messages
+import onion.compiler.toolbox.Messages
 import onion.compiler.exceptions.CompilationException
 
 /**

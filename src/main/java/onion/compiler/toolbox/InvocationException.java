@@ -1,4 +1,4 @@
-package onion.compiler.util;
+package onion.compiler.toolbox;
 
 public class InvocationException extends RuntimeException {
   public InvocationException(Exception reason) {

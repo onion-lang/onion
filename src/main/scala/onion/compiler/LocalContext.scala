@@ -7,8 +7,8 @@
  * ************************************************************** */
 package onion.compiler
 
-import onion.compiler.util.SymbolGenerator
-import util.SymbolGenerator
+import onion.compiler.toolbox.SymbolGenerator
+import toolbox.SymbolGenerator
 
 /**
  * @author Kota Mizushima

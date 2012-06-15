@@ -9,7 +9,7 @@ package onion.compiler
 
 import java.lang.{Byte => JByte, Short => JShort, Character => JCharacter, Integer => JInteger, Long => JLong, Double => JDouble, Float => JFloat, Boolean => JBoolean }
 import java.util.{Map => JMap, HashMap => JHashMap, List, ArrayList, Set, Iterator}
-import onion.compiler.util._
+import onion.compiler.toolbox._
 import org.apache.bcel.Constants
 import org.apache.bcel.classfile.JavaClass
 import org.apache.bcel.generic._
@@ -700,9 +700,9 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def codeList(node: IRT.ListLiteral, code: CodeGeneration.CodeProxy): InstructionHandle = {
     val listType: ObjectType = typeOf(node.`type`).asInstanceOf[ObjectType]
-    val start: InstructionHandle = code.appendNew("java.util.ArrayList")
+    val start: InstructionHandle = code.appendNew("java.toolbox.ArrayList")
     code.appendDup(1)
-    code.appendCallConstructor(new ObjectType("java.util.ArrayList"), new Array[Type](0))
+    code.appendCallConstructor(new ObjectType("java.toolbox.ArrayList"), new Array[Type](0))
     val elements: Array[IRT.Term] = node.getElements
     var i: Int = 0
     while (i < elements.length) {

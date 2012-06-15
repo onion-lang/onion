@@ -1,6 +1,6 @@
 package onion.compiler
 import _root_.scala.collection.JavaConversions._
-import _root_.onion.compiler.util.{Boxing, Classes, Paths, Systems}
+import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.IRT._
 import _root_.onion.compiler.IRT.BinaryTerm.Constants._
@@ -89,7 +89,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     val list = new ImportList
     list.add(new ImportItem("*", "java.lang.*"))
     list.add(new ImportItem("*", "java.io.*"))
-    list.add(new ImportItem("*", "java.util.*"))
+    list.add(new ImportItem("*", "java.toolbox.*"))
     list.add(new ImportItem("*", "javax.swing.*"))
     list.add(new ImportItem("*", "java.awt.event.*"))
     list.add(new ImportItem("*", "onion.*"))
@@ -878,7 +878,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.BooleanLiteral(loc, v) =>
         Some(new BoolValue(loc, v))
       case node@AST.ListLiteral(loc, elements) =>
-        Some(new ListLiteral(elements.map{e => typed(e, context).getOrElse(null)}.toArray, load("java.util.List")))
+        Some(new ListLiteral(elements.map{e => typed(e, context).getOrElse(null)}.toArray, load("java.toolbox.List")))
       case node@AST.NullLiteral(loc) =>
         Some(new NullValue(loc))
       case node@AST.Cast(loc, src, to) =>
@@ -1202,7 +1202,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           addArgument(arg, context)
           var block = translate(node.statement, context)
           if (collection.isBasicType) {
-            report(INCOMPATIBLE_TYPE, node.collection, load("java.util.Collection"), collection.`type`)
+            report(INCOMPATIBLE_TYPE, node.collection, load("java.toolbox.Collection"), collection.`type`)
             return new NOP(node.location)
           }
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
@@ -1215,7 +1215,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             new StatementBlock(init, block)
           }
           else {
-            val iteratorType = load("java.util.Iterator")
+            val iteratorType = load("java.toolbox.Iterator")
             var iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
             var mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectTypeRef], "iterator")
             var mNext: MethodRef = findMethod(node.collection, iteratorType, "next")

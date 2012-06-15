@@ -29,7 +29,7 @@ public class CodeGeneration  {
   private boolean isClosure;
   private String currentClosureName;
   
-  private static final Map unboxingMethods = new HashMap(){{
+  private static final Map<String, String> unboxingMethods = new HashMap<String, String>(){{
     put("java.lang.Byte", "byteValue");
     put("java.lang.Short", "shortValue");
     put("java.lang.Character", "charValue");
@@ -44,7 +44,7 @@ public class CodeGeneration  {
   private static final String OUTER_THIS = "outer$";
   private static final String CLOSURE_CLASS_SUFFIX = "Closure";
 
-  private static final Map<IRT.BasicTypeRef, Type> BASIC_TYPE_MAPPING = new HashMap(){{
+  private static final Map<IRT.BasicTypeRef, Type> BASIC_TYPE_MAPPING = new HashMap<IRT.BasicTypeRef, Type>(){{
     put(IRT.BasicTypeRef.BYTE,			BasicType.BYTE);
     put(IRT.BasicTypeRef.SHORT,		BasicType.SHORT);
     put(IRT.BasicTypeRef.CHAR,			BasicType.CHAR);
@@ -78,16 +78,15 @@ public class CodeGeneration  {
     String base = config.getOutputDirectory();
     base = base != null ? base : ".";
     base += Systems.getFileSeparator();
-    for (int i = 0; i < classes.length; i++) {
-      codeClass(classes[i]);
-    }
-    CompiledClass[] classFiles = new CompiledClass[compiledClasses.size()];
-    for(int i = 0; i < compiledClasses.size(); i++){
-      JavaClass clazz = (JavaClass) compiledClasses.get(i);
+    for (IRT.ClassDefinition klass:classes) codeClass(klass);
+
+    List<CompiledClass> classFiles = new ArrayList<CompiledClass>();
+    for (Object o:compiledClasses) {
+      JavaClass clazz = (JavaClass)o;
       String outDir = getOutputDir(base, clazz.getClassName());
-      classFiles[i] = new CompiledClass(clazz.getClassName(), outDir, clazz.getBytes());
+      classFiles.add(new CompiledClass(clazz.getClassName(), outDir, clazz.getBytes()));
     }
-    return classFiles;
+    return classFiles.toArray(new CompiledClass[0]);
   }
   
   private String getOutputDir(String base, String fqcn){
@@ -97,11 +96,7 @@ public class CodeGeneration  {
   
   private String getPackageName(String fqcn){
     int index = fqcn.lastIndexOf("\\.");
-    if(index < 0){
-      return "";
-    }else{
-      return fqcn.substring(0, index);
-    }
+    return index < 0 ? "" : fqcn.substring(0, index);
   }
   
   private int classModifier(IRT.ClassDefinition node){
@@ -119,18 +114,22 @@ public class CodeGeneration  {
     String[] interfaces = namesOf(node.interfaces());
     String file = node.getSourceFile();
     ClassGen gen = new ClassGen(className, superClass, file, modifier, interfaces);
+
     IRT.ConstructorRef[] constructors = node.constructors();
-    for (int i = 0; i < constructors.length; i++) {
-      codeConstructor(gen, ((IRT.ConstructorDefinition) constructors[i]));
+    for (IRT.ConstructorRef ref:constructors) {
+      codeConstructor(gen, ((IRT.ConstructorDefinition) ref));
     }
+
     IRT.MethodRef[] methods = node.methods();
-    for (int i = 0; i < methods.length; i++) {
-      codeMethod(gen, ((IRT.MethodDefinition) methods[i]));
+    for (IRT.MethodRef ref:methods) {
+      codeMethod(gen, ((IRT.MethodDefinition) ref));
     }
+
     IRT.FieldRef[] fields = node.fields();
-    for (int i = 0; i < fields.length; i++) {
-      codeField(gen, ((IRT.FieldDefinition) fields[i]));
+    for (IRT.FieldRef ref:fields) {
+      codeField(gen, ((IRT.FieldDefinition) ref));
     }
+
     compiledClasses.add(gen.getJavaClass());
   }
   
@@ -157,6 +156,7 @@ public class CodeGeneration  {
     for (int i = 0; i < args.length; i++) {
       args[i] = "arg" + i;
     }
+
     ObjectType classType = (ObjectType) typeOf(node.affiliation());
     int modifier = toJavaModifier(node.modifier());
     Type[] arguments = typesOf(node.getArgs());
@@ -164,6 +164,7 @@ public class CodeGeneration  {
       modifier, Type.VOID, arguments, args, "<init>",
       classType.getClassName(), code.getCode(), gen.getConstantPool()
     );
+
     if(frame.isClosed()){
       int frameObjectIndex = frameObjectIndex(1, node.getArgs());
       code.setFrameObjectIndex(frameObjectIndex);

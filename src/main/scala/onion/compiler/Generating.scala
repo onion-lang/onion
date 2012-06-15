@@ -1,7 +1,5 @@
 package onion.compiler
 
-import pass.CodeGeneration
-
 /**
  * Created by IntelliJ IDEA.
  * User: Mizushima

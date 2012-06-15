@@ -7,10 +7,11 @@
  * ************************************************************** */
 package onion.compiler
 
+import environment.{ReflectionalClassTypeRef, ClassFileTable, ClassFileClassTypeRef}
 import java.util._
-import onion.compiler.env.java.ClassFileClassTypeRef
-import onion.compiler.env.java.ClassFileTable
-import onion.compiler.env.java.ReflectionalClassTypeRef
+import onion.compiler.environment.ClassFileClassTypeRef
+import onion.compiler.environment.ClassFileTable
+import onion.compiler.environment.ReflectionalClassTypeRef
 import onion.compiler.util.Strings
 import org.apache.bcel.classfile.JavaClass
 

@@ -1095,7 +1095,7 @@ class CodeGeneration(config: CompilerConfig) {
         code.appendInvoke(boxed.getClassName, "<init>", Type.VOID, Array[Type](`type`), Constants.INVOKESPECIAL)
         code.appendDup_2(1)
         code.appendArrayStore(Type.OBJECT)
-        val method: String = unboxingMethods.get(boxed.getClassName).asInstanceOf[String]
+        val method: String = unboxingMethods(boxed.getClassName).asInstanceOf[String]
         code.appendInvoke(boxed.getClassName, method, `type`, new Array[Type](0), Constants.INVOKEVIRTUAL)
       }
       else {
@@ -1127,7 +1127,7 @@ class CodeGeneration(config: CompilerConfig) {
       code.appendArrayLoad(Type.OBJECT)
       if (node.isBasicType) {
         val boxed: ObjectType = code.boxing(`type`)
-        val method: String = unboxingMethods.get(boxed.getClassName).asInstanceOf[String]
+        val method: String = unboxingMethods(boxed.getClassName).asInstanceOf[String]
         code.appendCast(Type.OBJECT, boxed)
         code.appendInvoke(boxed.getClassName, method, `type`, new Array[Type](0), Constants.INVOKEVIRTUAL)
       }

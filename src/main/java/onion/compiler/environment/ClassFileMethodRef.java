@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.env.java;
+package onion.compiler.environment;
 
 import onion.compiler.IRT;
 
@@ -13,19 +13,19 @@ import onion.compiler.IRT;
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileConstructorRef implements IRT.ConstructorRef {
-  private int modifier;
-  private IRT.ClassTypeRef classType;
-  private String name;
-  private IRT.TypeRef[] args;
+public class ClassFileMethodRef implements IRT.MethodRef {
+  private final int modifier;
+  private final IRT.ClassTypeRef affiliation;
+  private final String name;
+  private final IRT.TypeRef[] arguments;
+  private final IRT.TypeRef returnType;
 
-  public ClassFileConstructorRef(
-    int modifier, IRT.ClassTypeRef classType, String name, IRT.TypeRef[] args
-  ) {
+  public ClassFileMethodRef(int modifier, IRT.ClassTypeRef affiliation, String name, IRT.TypeRef[] arguments, IRT.TypeRef returnType) {
     this.modifier = modifier;
-    this.classType = classType;
+    this.affiliation = affiliation;
     this.name = name;
-    this.args = (IRT.TypeRef[]) args.clone();
+    this.arguments = (IRT.TypeRef[]) arguments.clone();
+    this.returnType = returnType;
   }
   
   public int modifier(){
@@ -33,14 +33,18 @@ public class ClassFileConstructorRef implements IRT.ConstructorRef {
   }
 
   public IRT.ClassTypeRef affiliation() {
-    return classType;
+    return affiliation;
   }
 
   public String name() {
     return name;
   }
 
-  public IRT.TypeRef[] getArgs() {
-    return args;
+  public IRT.TypeRef[] arguments() {
+    return arguments;
+  }
+
+  public IRT.TypeRef returnType() {
+    return returnType;
   }
 }

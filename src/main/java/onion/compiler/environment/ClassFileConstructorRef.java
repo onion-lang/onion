@@ -5,7 +5,7 @@
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
-package onion.compiler.env.java;
+package onion.compiler.environment;
 
 import onion.compiler.IRT;
 
@@ -13,32 +13,34 @@ import onion.compiler.IRT;
  * @author Kota Mizushima
  * Date: 2005/06/27
  */
-public class ClassFileFieldRef implements IRT.FieldRef {
+public class ClassFileConstructorRef implements IRT.ConstructorRef {
   private int modifier;
-  private IRT.ClassTypeRef affiliation;
+  private IRT.ClassTypeRef classType;
   private String name;
-  private IRT.TypeRef type;
+  private IRT.TypeRef[] args;
 
-  public ClassFileFieldRef(int modifier, IRT.ClassTypeRef affiliation, String name, IRT.TypeRef type) {
+  public ClassFileConstructorRef(
+    int modifier, IRT.ClassTypeRef classType, String name, IRT.TypeRef[] args
+  ) {
     this.modifier = modifier;
-    this.affiliation = affiliation;
+    this.classType = classType;
     this.name = name;
-    this.type = type;
+    this.args = (IRT.TypeRef[]) args.clone();
   }
-
-  public int modifier() {
+  
+  public int modifier(){
     return modifier;
   }
 
   public IRT.ClassTypeRef affiliation() {
-    return affiliation;
+    return classType;
   }
 
   public String name() {
     return name;
   }
 
-  public IRT.TypeRef type() {
-    return type;
+  public IRT.TypeRef[] getArgs() {
+    return args;
   }
 }

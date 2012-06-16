@@ -20,32 +20,34 @@ import org.apache.bcel.generic.Type;
  * Date: 2005/06/28
  */
 public class OnionTypeBridge {
-  private static Map basicTypeTable = new HashMap(){{
-    put(BasicType.BYTE, IRT.BasicTypeRef.BYTE);
-    put(BasicType.SHORT, IRT.BasicTypeRef.SHORT);
-    put(BasicType.CHAR, IRT.BasicTypeRef.CHAR);
-    put(BasicType.INT, IRT.BasicTypeRef.INT);
-    put(BasicType.LONG, IRT.BasicTypeRef.LONG);
-    put(BasicType.FLOAT, IRT.BasicTypeRef.FLOAT);
-    put(BasicType.DOUBLE, IRT.BasicTypeRef.DOUBLE);
-    put(BasicType.BOOLEAN, IRT.BasicTypeRef.BOOLEAN);
-    put(BasicType.VOID, IRT.BasicTypeRef.VOID);
-  }};
-  
-  private static Map c2t = new HashMap(){{
-    put(byte.class, IRT.BasicTypeRef.BYTE);
-    put(short.class, IRT.BasicTypeRef.SHORT);
-    put(char.class, IRT.BasicTypeRef.CHAR);
-    put(int.class, IRT.BasicTypeRef.INT);
-    put(long.class, IRT.BasicTypeRef.LONG);
-    put(float.class, IRT.BasicTypeRef.FLOAT);
-    put(double.class, IRT.BasicTypeRef.DOUBLE);
-    put(boolean.class, IRT.BasicTypeRef.BOOLEAN);
-    put(void.class, IRT.BasicTypeRef.VOID);
-  }};
+  private static final Map<BasicType, IRT.BasicTypeRef> basicTypeTable = new HashMap<BasicType, IRT.BasicTypeRef>();
+  private static final Map<Class<?>, IRT.BasicTypeRef> c2t = new HashMap<Class<?>, IRT.BasicTypeRef>();
+
+  static {
+    basicTypeTable.put(BasicType.BYTE, IRT.BasicTypeRef.BYTE);
+    basicTypeTable.put(BasicType.SHORT, IRT.BasicTypeRef.SHORT);
+    basicTypeTable.put(BasicType.CHAR, IRT.BasicTypeRef.CHAR);
+    basicTypeTable.put(BasicType.INT, IRT.BasicTypeRef.INT);
+    basicTypeTable.put(BasicType.LONG, IRT.BasicTypeRef.LONG);
+    basicTypeTable.put(BasicType.FLOAT, IRT.BasicTypeRef.FLOAT);
+    basicTypeTable.put(BasicType.DOUBLE, IRT.BasicTypeRef.DOUBLE);
+    basicTypeTable.put(BasicType.BOOLEAN, IRT.BasicTypeRef.BOOLEAN);
+    basicTypeTable.put(BasicType.VOID, IRT.BasicTypeRef.VOID);
+
+
+    c2t.put(byte.class, IRT.BasicTypeRef.BYTE);
+    c2t.put(short.class, IRT.BasicTypeRef.SHORT);
+    c2t.put(char.class, IRT.BasicTypeRef.CHAR);
+    c2t.put(int.class, IRT.BasicTypeRef.INT);
+    c2t.put(long.class, IRT.BasicTypeRef.LONG);
+    c2t.put(float.class, IRT.BasicTypeRef.FLOAT);
+    c2t.put(double.class, IRT.BasicTypeRef.DOUBLE);
+    c2t.put(boolean.class, IRT.BasicTypeRef.BOOLEAN);
+    c2t.put(void.class, IRT.BasicTypeRef.VOID);
+  }
   
   private ClassTable table;
-  
+
   public OnionTypeBridge(ClassTable table) {
     this.table = table;
   }
@@ -64,11 +66,10 @@ public class OnionTypeBridge {
     if(klass.isArray()){
       int dimension = 0;
       Class component = null;
-      while(true){
+      do {
         dimension++;
-        component = klass.getComponentType();
-        if(component.getComponentType() == null) break;
-      }
+        component = component.getComponentType();
+      } while (component.getComponentType() != null);
       IRT.TypeRef componentType = toOnionType(component);
       return table.loadArray(componentType, dimension);
     }

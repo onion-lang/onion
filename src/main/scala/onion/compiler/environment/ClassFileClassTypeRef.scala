@@ -91,7 +91,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   }
 
   private def requireMethodTable {
-    if (methods == null) {
+    if (methods_ == null) {
       methods_ = new MultiTable[IRT.MethodRef]
       for (method <- javaClass.getMethods) {
         if (!(method.getName == CONSTRUCTOR_NAME)) methods_.add(translate(method))

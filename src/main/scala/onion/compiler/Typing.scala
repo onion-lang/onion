@@ -135,7 +135,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       node.setSourceFile(Paths.nameOf(unit_.sourceFile))
       node.setResolutionComplete(true)
       table_.classes.add(node)
-      node.addDefaultConstructor()
+      node.addDefaultConstructor
       put(unit, node)
       add(node.name, new NameMapper(list))
     }

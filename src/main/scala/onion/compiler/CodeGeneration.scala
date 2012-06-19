@@ -783,10 +783,10 @@ class CodeGeneration(config: CompilerConfig) {
   def codeBlock(node: IRT.StatementBlock, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
     if (node.getStatements.length > 0) {
-      start = codeStatement(node.getStatements()(0), code)
+      start = codeStatement(node.getStatements(0), code)
       var i: Int = 1
       while (i < node.getStatements.length) {
-        codeStatement(node.getStatements()(i), code)
+        codeStatement(node.getStatements(i), code)
         i += 1;
       }
     } else {

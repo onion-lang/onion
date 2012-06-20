@@ -7,9 +7,6 @@ import java.util
 /**
  * Created by IntelliJ IDEA.
  * User: Mizushima
- * Date: 2010/12/05
- * Time: 21:20:19
- * To change this template use File | Settings | File Templates.
  */
 object IRT {
 
@@ -17,8 +14,7 @@ object IRT {
    * This interface represents an internal representation node of onion program.
    * @author Kota Mizushima
    */
-  abstract trait Node {
-  }
+  abstract trait Node
 
   /**
    * @author Kota Mizushima
@@ -204,9 +200,7 @@ object IRT {
       this(null, target, destination)
     }
 
-    def `type`: IRT.TypeRef = {
-      return destination
-    }
+    def `type`: IRT.TypeRef = destination
   }
 
   /**
@@ -233,7 +227,7 @@ object IRT {
      * @return
      */
     def newInterface(location: Location, modifier: Int, name: String, interfaces: Array[IRT.ClassTypeRef]): IRT.ClassDefinition = {
-      return new IRT.ClassDefinition(location, true, modifier, name, null, interfaces)
+      new IRT.ClassDefinition(location, true, modifier, name, null, interfaces)
     }
 
     /**
@@ -245,7 +239,7 @@ object IRT {
      * @return
      */
     def newClass(location: Location, modifier: Int, name: String, superClass: IRT.ClassTypeRef, interfaces: Array[IRT.ClassTypeRef]): IRT.ClassDefinition = {
-      return new IRT.ClassDefinition(location, false, modifier, name, superClass, interfaces)
+      new IRT.ClassDefinition(location, false, modifier, name, superClass, interfaces)
     }
 
     /**
@@ -254,9 +248,7 @@ object IRT {
      * @param name
      * @return
      */
-    def newClass(modifier: Int, name: String): IRT.ClassDefinition = {
-      return new IRT.ClassDefinition(null, false, modifier, name, null, null)
-    }
+    def newClass(modifier: Int, name: String): IRT.ClassDefinition =  new IRT.ClassDefinition(null, false, modifier, name, null, null)
   }
 
   class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: IRT.ClassTypeRef, var interfaces: Array[IRT.ClassTypeRef])
@@ -304,21 +296,13 @@ object IRT {
       constructors_.add(ConstructorDefinition.newDefaultConstructor(this))
     }
 
-    def methods(name: String): Array[IRT.MethodRef] = {
-      return (methods_.get(name).toArray(new Array[IRT.MethodRef](0))).asInstanceOf[Array[IRT.MethodRef]]
-    }
+    def methods(name: String): Array[IRT.MethodRef] = (methods_.get(name).toArray(new Array[IRT.MethodRef](0))).asInstanceOf[Array[IRT.MethodRef]]
 
-    def field(name: String): IRT.FieldRef = {
-      return fields_.get(name)
-    }
+    def field(name: String): IRT.FieldRef = fields_.get(name)
 
-    def setSourceFile(sourceFile: String) {
-      this.sourceFile = sourceFile
-    }
+    def setSourceFile(sourceFile: String): Unit = this.sourceFile = sourceFile
 
-    def getSourceFile: String = {
-      return sourceFile
-    }
+    def getSourceFile: String = sourceFile
   }
 
   /**
@@ -330,7 +314,7 @@ object IRT {
       val init: IRT.Super = new IRT.Super(`type`.superClass, new Array[IRT.TypeRef](0), new Array[IRT.Term](0))
       val node: IRT.ConstructorDefinition = new IRT.ConstructorDefinition(Modifier.PUBLIC, `type`, new Array[IRT.TypeRef](0), block, init)
       node.frame = new LocalFrame(null)
-      return node
+      node
     }
   }
 
@@ -340,9 +324,7 @@ object IRT {
       this(null, modifier, classType, arguments, block, superInitializer)
     }
 
-    def name: String = {
-      return "new"
-    }
+    def name: String =  "new"
 
     def getArgs: Array[IRT.TypeRef] = arguments
 
@@ -385,7 +367,7 @@ object IRT {
       if (`type` eq BasicTypeRef.DOUBLE) return new IRT.DoubleValue(0.0)
       if (`type` eq BasicTypeRef.BOOLEAN) return new IRT.BoolValue(false)
       if (`type`.isObjectType) return new IRT.NullValue
-      return null
+      null
     }
   }
 
@@ -424,9 +406,7 @@ object IRT {
       this(null, target, field)
     }
 
-    def `type`: IRT.TypeRef = {
-      return field.`type`
-    }
+    def `type`: IRT.TypeRef = field.`type`
   }
 
   class SetField(location: Location, val target: IRT.Term, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
@@ -434,9 +414,7 @@ object IRT {
       this(null, target, field, value)
     }
 
-    def `type`: IRT.TypeRef = {
-      return field.`type`
-    }
+    def `type`: IRT.TypeRef = field.`type`
   }
 
   class FloatValue (location: Location, val value: Float)  extends Term(location) {
@@ -466,9 +444,7 @@ object IRT {
       this(null, target, checked)
     }
 
-    def `type`: IRT.TypeRef = {
-      return BasicTypeRef.BOOLEAN
-    }
+    def `type`: IRT.TypeRef = BasicTypeRef.BOOLEAN
   }
 
   class IntValue(location: Location, val value: Int)  extends Term(location) {
@@ -484,9 +460,7 @@ object IRT {
       this(null, elements, `type`)
     }
 
-    def getElements: Array[IRT.Term] = {
-      return elements
-    }
+    def getElements: Array[IRT.Term] = elements
   }
 
   class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef)  extends Term(location) {
@@ -513,26 +487,19 @@ object IRT {
    * @author Kota Mizushima
    */
   class NewClosure(location: Location, val `type`: IRT.ClassTypeRef, method: IRT.MethodRef, block: IRT.ActionStatement) extends Term(location) {
+    private var frame: LocalFrame = null
 
     def this(`type`: IRT.ClassTypeRef, method: IRT.MethodRef, block: IRT.ActionStatement) {
       this(null, `type`, method, block)
     }
 
-    def getModifier: Int = {
-      return method.modifier
-    }
+    def getModifier: Int = method.modifier
 
-    def getClassType: IRT.ClassTypeRef = {
-      return `type`
-    }
+    def getClassType: IRT.ClassTypeRef = `type`
 
-    def getMethod: IRT.MethodRef = {
-      return method
-    }
+    def getMethod: IRT.MethodRef = method
 
-    def getName: String = {
-      return method.name
-    }
+    def getName: String = method.name
 
     def getArguments: Array[IRT.TypeRef] = method.arguments
 
@@ -540,15 +507,10 @@ object IRT {
 
     def getBlock: IRT.ActionStatement = block
 
-    def setFrame(frame: LocalFrame) {
-      this.frame = frame
-    }
+    def setFrame(frame: LocalFrame): Unit = this.frame = frame
 
-    def getFrame: LocalFrame = {
-      return frame
-    }
+    def getFrame: LocalFrame = frame
 
-    private var frame: LocalFrame = null
   }
 
   /**
@@ -559,9 +521,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = {
-      return BasicTypeRef.LONG
-    }
+    def `type`: IRT.TypeRef = BasicTypeRef.LONG
   }
 
   /**
@@ -577,13 +537,9 @@ object IRT {
    * @author Kota Mizushima
    */
   class Member(modifier: Int, classType: IRT.TypeRef) extends Node {
-    def getClassType: IRT.TypeRef = {
-      return classType
-    }
+    def getClassType: IRT.TypeRef = classType
 
-    def getModifier: Int = {
-      return modifier
-    }
+    def getModifier: Int = modifier
   }
 
   /**
@@ -591,37 +547,23 @@ object IRT {
    */
   class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val name: String, val arguments: Array[IRT.TypeRef], val returnType: IRT.TypeRef, var block: IRT.StatementBlock)
     extends Node with MethodRef {
-
-    def affiliation: IRT.ClassTypeRef = {
-      return classType
-    }
-
-    def getBlock: IRT.StatementBlock = {
-      return block
-    }
-
-    def setBlock(block: IRT.StatementBlock) {
-      this.block = block
-    }
-
-    def setClosure(closure: Boolean) {
-      this.closure = closure
-    }
-
-    def hasClosure: Boolean = {
-      return closure
-    }
-
-    def setFrame(frame: LocalFrame) {
-      this.frame = frame
-    }
-
-    def getFrame: LocalFrame = {
-      return frame
-    }
-
     private var closure: Boolean = false
     private var frame: LocalFrame = null
+
+    def affiliation: IRT.ClassTypeRef = classType
+
+    def getBlock: IRT.StatementBlock = block
+
+    def setBlock(block: IRT.StatementBlock): Unit =  this.block = block
+
+    def setClosure(closure: Boolean): Unit =  this.closure = closure
+
+    def hasClosure: Boolean = closure
+
+    def setFrame(frame: LocalFrame): Unit =  this.frame = frame
+
+    def getFrame: LocalFrame = frame
+
   }
 
   /**
@@ -632,9 +574,7 @@ object IRT {
       this(null, constructor, parameters)
     }
 
-    def `type`: IRT.TypeRef = {
-      return constructor.affiliation
-    }
+    def `type`: IRT.TypeRef = constructor.affiliation
   }
 
   class NewArray(location: Location, val arrayType: IRT.ArrayTypeRef, val parameters: Array[IRT.Term]) extends Term(location) {
@@ -642,9 +582,7 @@ object IRT {
       this(null, arrayType, parameters)
     }
 
-    def `type`: IRT.TypeRef = {
-      return arrayType
-    }
+    def `type`: IRT.TypeRef = arrayType
   }
 
   class NOP(location: Location) extends ActionStatement(location) {
@@ -681,9 +619,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = {
-      return BasicTypeRef.SHORT
-    }
+    def `type`: IRT.TypeRef = BasicTypeRef.SHORT
   }
 
   abstract class ActionStatement(val location: Location)
@@ -694,9 +630,7 @@ object IRT {
       this(null, target, field)
     }
 
-    def `type`: IRT.TypeRef = {
-      return field.`type`
-    }
+    def `type`: IRT.TypeRef = field.`type`
   }
 
   /**
@@ -707,9 +641,7 @@ object IRT {
       this(null, target, field, value)
     }
 
-    def `type`: IRT.TypeRef = {
-      return field.`type`
-    }
+    def `type`: IRT.TypeRef = field.`type`
   }
 
   /**
@@ -787,26 +719,17 @@ object IRT {
     private var methodRefFinder: IRT.MethodRefFinder = new IRT.MethodRefFinder
     private var fieldRefFinder: IRT.FieldRefFinder = new IRT.FieldRefFinder
 
-    def findField(name: String): IRT.FieldRef = {
-      return fieldRefFinder.find(this, name)
-    }
+    def findField(name: String): IRT.FieldRef = fieldRefFinder.find(this, name)
 
     def findMethod(name: String, params: Array[IRT.Term]): Array[IRT.MethodRef] = {
-      return methodRefFinder.find(this, name, params)
+      methodRefFinder.find(this, name, params)
     }
 
-    def isBasicType: Boolean = {
-      return false
-    }
+    def isBasicType: Boolean =  false
 
-    def isNullType: Boolean = {
-      return false
-    }
+    def isNullType: Boolean =  false
 
-    def isObjectType: Boolean = {
-      return true
-    }
-
+    def isObjectType: Boolean =  true
   }
 
   /**
@@ -817,41 +740,23 @@ object IRT {
     val interfaces: Array[IRT.ClassTypeRef] = Array[IRT.ClassTypeRef](table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
     var name: String = Strings.repeat("[", dimension) + component.name
 
-    def base: IRT.TypeRef = {
-      return if (dimension == 1) component else table.loadArray(component, dimension - 1)
-    }
+    def base: IRT.TypeRef =  if (dimension == 1) component else table.loadArray(component, dimension - 1)
 
-    def isInterface: Boolean = {
-      return false
-    }
+    def isInterface: Boolean = false
 
-    def modifier: Int = {
-      return 0
-    }
+    def modifier: Int = 0
 
-    def methods: Array[IRT.MethodRef] = {
-      return superClass.methods
-    }
+    def methods: Array[IRT.MethodRef] = superClass.methods
 
-    def methods(name: String): Array[IRT.MethodRef] = {
-      return superClass.methods(name)
-    }
+    def methods(name: String): Array[IRT.MethodRef] =  superClass.methods(name)
 
-    def fields: Array[IRT.FieldRef] = {
-      return superClass.fields
-    }
+    def fields: Array[IRT.FieldRef] = superClass.fields
 
-    def field(name: String): IRT.FieldRef = {
-      return superClass.field(name)
-    }
+    def field(name: String): IRT.FieldRef = superClass.field(name)
 
-    def isArrayType: Boolean = {
-      return true
-    }
+    def isArrayType: Boolean =  true
 
-    def isClassType: Boolean = {
-      return false
-    }
+    def isClassType: Boolean =  false
   }
 
   object BasicTypeRef {
@@ -917,11 +822,11 @@ object IRT {
       if (isAmbiguous(constructor1, constructor2)) {
         return selected.toArray(new Array[IRT.ConstructorRef](0))
       }
-     return Array[IRT.ConstructorRef](constructor1)
+      Array[IRT.ConstructorRef](constructor1)
     }
 
     private def isAmbiguous(constructor1: IRT.ConstructorRef, constructor2: IRT.ConstructorRef): Boolean = {
-      return sorter.compare(constructor1, constructor2) >= 0
+      sorter.compare(constructor1, constructor2) >= 0
     }
 
     private def isAllSuperType(arg1: Array[IRT.TypeRef], arg2: Array[IRT.TypeRef]): Boolean = {
@@ -996,9 +901,7 @@ object IRT {
   }
 
   class FieldRefComparator extends Comparator[IRT.FieldRef] {
-    def compare(o1: IRT.FieldRef, o2: IRT.FieldRef): Int = {
-      return o1.name.compareTo(o2.name)
-    }
+    def compare(o1: IRT.FieldRef, o2: IRT.FieldRef): Int =  o1.name.compareTo(o2.name)
   }
 
   abstract trait MemberRef extends Named {
@@ -1042,9 +945,7 @@ object IRT {
       Array[IRT.MethodRef](method1)
     }
 
-    def isAmbiguous(method1: IRT.MethodRef, method2: IRT.MethodRef): Boolean = {
-      return sorter.compare(method1, method2) >= 0
-    }
+    def isAmbiguous(method1: IRT.MethodRef, method2: IRT.MethodRef): Boolean =  sorter.compare(method1, method2) >= 0
 
     private def find(methods: Set[IRT.MethodRef], target: IRT.ObjectTypeRef, name: String, params: Array[IRT.Term]) {
       if (target == null) return
@@ -1066,7 +967,7 @@ object IRT {
         val arg2: Array[IRT.TypeRef] = m2.arguments
         if (isAllSuperType(arg2, arg1)) return -1
         if (isAllSuperType(arg1, arg2)) return 1
-        return 0
+        0
       }
     }
     private final val matcher: IRT.ParameterMatcher = new IRT.StandardParameterMatcher
@@ -1104,25 +1005,15 @@ object IRT {
   class NullTypeRef private(name_ :String) extends TypeRef {
     def name: String = name_
 
-    def isArrayType: Boolean = {
-      return false
-    }
+    def isArrayType: Boolean = false
 
-    def isBasicType: Boolean = {
-      return false
-    }
+    def isBasicType: Boolean = false
 
-    def isClassType: Boolean = {
-      return false
-    }
+    def isClassType: Boolean = false
 
-    def isNullType: Boolean = {
-      return true
-    }
+    def isNullType: Boolean = true
 
-    def isObjectType: Boolean = {
-      return false
-    }
+    def isObjectType: Boolean = false
   }
 
   /**
@@ -1219,7 +1110,7 @@ object IRT {
         }
         return false
       }
-      return false
+      false
     }
 
     def isAssignable(left: IRT.TypeRef, right: IRT.TypeRef): Boolean = isSuperType(left, right)

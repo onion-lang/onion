@@ -421,9 +421,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }else {
         val init = new Super(superClass, matched(0).getArgs, params)
         val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], IRT.BasicTypeRef.VOID)
-        constructor.setSuperInitializer(init)
-        constructor.setBlock(block)
-        constructor.setFrame(context.getContextFrame)
+        constructor.superInitializer = init
+        constructor.block = block
+        constructor.frame = context.getContextFrame
       }
     }
     def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext) {

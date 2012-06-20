@@ -61,7 +61,7 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/04/17
    */
-  class Begin(location: Location, terms: Array[IRT.Term]) extends Term(location) {
+  class Begin(location: Location, val terms: Array[IRT.Term]) extends Term(location) {
     def this(terms: Array[IRT.Term]) {
       this(null, terms)
     }
@@ -81,8 +81,6 @@ object IRT {
     def this(expression1: IRT.Term, expression2: IRT.Term, expression3: IRT.Term) {
       this(Array[IRT.Term](expression1, expression2, expression3))
     }
-
-    def getExpressions: Array[IRT.Term] = terms
 
     def `type`: IRT.TypeRef = terms(terms.length - 1).`type`
   }
@@ -344,7 +342,7 @@ object IRT {
       val block: IRT.StatementBlock = new IRT.StatementBlock(new IRT.Return(null))
       val init: IRT.Super = new IRT.Super(`type`.superClass, new Array[IRT.TypeRef](0), new Array[IRT.Term](0))
       val node: IRT.ConstructorDefinition = new IRT.ConstructorDefinition(Modifier.PUBLIC, `type`, new Array[IRT.TypeRef](0), block, init)
-      node.setFrame(new LocalFrame(null))
+      node.frame = new LocalFrame(null)
       return node
     }
   }
@@ -363,29 +361,7 @@ object IRT {
 
     def affiliation: IRT.ClassTypeRef = classType
 
-    def getSuperInitializer: IRT.Super = superInitializer
-
-    def setSuperInitializer(superInitializer: IRT.Super) {
-      this.superInitializer = superInitializer
-    }
-
-    def setBlock(block: IRT.StatementBlock) {
-      this.block = block
-    }
-
-    def getBlock: IRT.StatementBlock = {
-      return block
-    }
-
-    def setFrame(frame: LocalFrame) {
-      this.frame = frame
-    }
-
-    def getFrame: LocalFrame = {
-      return frame
-    }
-
-    private var frame: LocalFrame = null
+    var frame: LocalFrame = null
   }
 
   /**
@@ -774,20 +750,7 @@ object IRT {
     }
   }
 
-  class Super(classType: IRT.ClassTypeRef, arguments: Array[IRT.TypeRef], terms: Array[IRT.Term])  extends Node {
-
-    def getClassType: IRT.ClassTypeRef = {
-      return classType
-    }
-
-    def getArguments: Array[IRT.TypeRef] = {
-      return arguments
-    }
-
-    def getExpressions: Array[IRT.Term] = {
-      return terms
-    }
-  }
+  class Super(val classType: IRT.ClassTypeRef, val arguments: Array[IRT.TypeRef], val terms: Array[IRT.Term]) extends Node
 
   class Synchronized(location: Location, val term: IRT.Term, val statement: IRT.ActionStatement)  extends ActionStatement(location) {
     def this(term: IRT.Term, statement: IRT.ActionStatement) {
@@ -830,17 +793,9 @@ object IRT {
 
   }
 
-  class UnaryTerm(location: Location, kind: Int, val `type`: IRT.TypeRef, operand: IRT.Term)  extends Term(location) {
+  class UnaryTerm(location: Location, val kind: Int, val `type`: IRT.TypeRef, val operand: IRT.Term)  extends Term(location) {
     def this(kind: Int, `type`: IRT.TypeRef, operand: IRT.Term) {
       this(null, kind, `type`, operand)
-    }
-
-    def getKind: Int = {
-      return kind
-    }
-
-    def getOperand: IRT.Term = {
-      return operand
     }
   }
 

@@ -444,7 +444,7 @@ class CodeGeneration(config: CompilerConfig) {
     val isStaticOld: Boolean = isStatic
     isStatic = false
     val code: CodeGeneration.CodeProxy = new CodeGeneration.CodeProxy(gen.getConstantPool)
-    val frame: LocalFrame = node.getFrame
+    val frame: LocalFrame = node.frame
     code.setFrame(frame)
     val args: Array[String] = new Array[String](node.getArgs.length)
 
@@ -474,13 +474,13 @@ class CodeGeneration(config: CompilerConfig) {
       code.setIndexTable(makeIndexTableFor(1, frame))
     }
     code.setMethod(method)
-    val init: IRT.Super = node.getSuperInitializer
-    classType = typeOf(init.getClassType).asInstanceOf[ObjectType]
-    arguments = typesOf(init.getArguments)
+    val init: IRT.Super = node.superInitializer
+    classType = typeOf(init.classType).asInstanceOf[ObjectType]
+    arguments = typesOf(init.arguments)
     code.append(InstructionConstants.ALOAD_0)
-    codeExpressions(init.getExpressions, code)
+    codeExpressions(init.terms, code)
     code.appendCallConstructor(classType, arguments)
-    codeBlock(node.getBlock, code)
+    codeBlock(node.block, code)
     method.setMaxLocals
     method.setMaxStack
     code.appendReturn(typeOf(IRT.BasicTypeRef.VOID))
@@ -1042,7 +1042,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeBegin(node: IRT.Begin, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
-    val terms: Array[IRT.Term] = node.getExpressions
+    val terms: Array[IRT.Term] = node.terms
     if (terms.length > 0) {
       start = codeExpression(terms(0), code)
       var i: Int = 1
@@ -1586,9 +1586,9 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeUnaryExpression(node: IRT.UnaryTerm, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    val start: InstructionHandle = codeExpression(node.getOperand, code)
-    val `type`: IRT.TypeRef = node.getOperand.`type`
-    node.getKind match {
+    val start: InstructionHandle = codeExpression(node.operand, code)
+    val `type`: IRT.TypeRef = node.operand.`type`
+    node.kind match {
       case PLUS =>
         plus(code, `type`)
       case MINUS =>

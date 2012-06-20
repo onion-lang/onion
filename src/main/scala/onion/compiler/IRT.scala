@@ -142,21 +142,17 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
-  class BoolValue(location: Location, value: Boolean) extends Term(location) {
+  class BoolValue(location: Location, val value: Boolean) extends Term(location) {
     def this(value: Boolean) {
       this(null, value)
     }
-
-    def getValue: Boolean = value
 
     def `type`: IRT.TypeRef = BasicTypeRef.BOOLEAN
   }
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class Break(location: Location) extends ActionStatement(location) {
     def this() {
@@ -168,12 +164,10 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/06/17
    */
-  class ByteValue(location: Location, value: Byte) extends Term(location) {
+  class ByteValue(location: Location, val value: Byte) extends Term(location) {
     def this(value: Byte) {
       this(null, value)
     }
-
-    def getValue: Byte = value
 
     def `type`: IRT.TypeRef = BasicTypeRef.BYTE
   }
@@ -205,18 +199,12 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/06/22
    */
-  class CallSuper(location: Location, target: IRT.Term, method: IRT.MethodRef, params: Array[IRT.Term]) extends Term(location) {
+  class CallSuper(location: Location, val target: IRT.Term, val method: IRT.MethodRef, val params: Array[IRT.Term]) extends Term(location) {
     def this(target: IRT.Term, method: IRT.MethodRef, params: Array[IRT.Term]) {
       this(null, target, method, params)
     }
 
     def `type`: IRT.TypeRef = method.returnType
-
-    def getTarget: IRT.Term = target
-
-    def getMethod: IRT.MethodRef = method
-
-    def getParams: Array[IRT.Term] = params
   }
 
   /**
@@ -241,8 +229,6 @@ object IRT {
     def this(value: Char) {
       this(null, value)
     }
-
-    def getValue: Char = value
 
     def `type`: IRT.TypeRef = BasicTypeRef.CHAR
   }
@@ -416,12 +402,10 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/06/17
    */
-  class DoubleValue(location: Location, value: Double) extends Term(location) {
+  class DoubleValue(location: Location, val value: Double) extends Term(location) {
     def this(value: Double) {
       this(null, value)
     }
-
-    def getValue: Double = value
 
     def `type`: IRT.TypeRef = BasicTypeRef.DOUBLE
   }
@@ -487,8 +471,7 @@ object IRT {
     }
   }
 
-  class SetField(location: Location, target: IRT.Term, field: IRT.FieldRef, value: IRT.Term) extends Term(location) {
-
+  class SetField(location: Location, val target: IRT.Term, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
     def this(target: IRT.Term, field: IRT.FieldRef, value: IRT.Term) {
       this(null, target, field, value)
     }
@@ -496,20 +479,12 @@ object IRT {
     def `type`: IRT.TypeRef = {
       return field.`type`
     }
-
-    def getObject: IRT.Term = target
-
-    def getField: IRT.FieldRef = field
-
-    def getValue: IRT.Term = value
   }
 
   class FloatValue (location: Location, val value: Float)  extends Term(location) {
     def this(value: Float) {
       this(null, value)
     }
-
-    def getValue: Float = value
 
     def `type`: IRT.TypeRef = BasicTypeRef.FLOAT
   }
@@ -543,8 +518,6 @@ object IRT {
       this(null, value)
     }
 
-    def getValue: Int =  return value
-
     def `type`: IRT.TypeRef =  BasicTypeRef.INT
   }
 
@@ -575,18 +548,6 @@ object IRT {
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef, value: IRT.Term) {
       this(null, frame, index, `type`, value)
-    }
-
-    def getFrame: Int = {
-      return frame
-    }
-
-    def getIndex: Int = {
-      return index
-    }
-
-    def getValue: IRT.Term = {
-      return value
     }
   }
 
@@ -637,13 +598,9 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/06/17
    */
-  class LongValue (location: Location, value: Long) extends Term(location) {
+  class LongValue (location: Location, val value: Long) extends Term(location) {
     def this(value: Long) {
       this(null, value)
-    }
-
-    def getValue: Long = {
-      return value
     }
 
     def `type`: IRT.TypeRef = {
@@ -770,13 +727,9 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/06/17
    */
-  class ShortValue(location: Location, value: Short) extends Term(location) {
+  class ShortValue(location: Location, val value: Short) extends Term(location) {
     def this(value: Short) {
       this(null, value)
-    }
-
-    def getValue: Short = {
-      return value
     }
 
     def `type`: IRT.TypeRef = {

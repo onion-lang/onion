@@ -716,9 +716,9 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeSuperCall(node: IRT.CallSuper, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    val start: InstructionHandle = codeExpression(node.getTarget, code)
-    codeExpressions(node.getParams, code)
-    val method: IRT.MethodRef = node.getMethod
+    val start: InstructionHandle = codeExpression(node.target, code)
+    codeExpressions(node.params, code)
+    val method: IRT.MethodRef = node.method
     code.appendInvoke(method.affiliation.name, method.name, typeOf(method.returnType), typesOf(method.arguments), Constants.INVOKESPECIAL)
     return start
   }
@@ -1067,31 +1067,31 @@ class CodeGeneration(config: CompilerConfig) {
   def codeLocalAssign(node: IRT.SetLocal, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
     val `type`: Type = typeOf(node.`type`)
-    if (node.getFrame == 0 && !code.getFrame.isClosed) {
-      start = codeExpression(node.getValue, code)
+    if (node.frame == 0 && !code.getFrame.isClosed) {
+      start = codeExpression(node.value, code)
       if (isWideType(node.`type`)) {
         code.append(InstructionConstants.DUP2)
       }
       else {
         code.append(InstructionConstants.DUP)
       }
-      code.appendStore(`type`, code.getIndexTable(node.getIndex))
+      code.appendStore(`type`, code.getIndexTable(node.index))
     } else {
-      if (node.getFrame == 0 && code.getFrame.isClosed) {
+      if (node.frame == 0 && code.getFrame.isClosed) {
         val index: Int = code.getFrameObjectIndex
         start = code.appendLoad(new ArrayType("java.lang.Object", 1), index)
-        code.appendConstant(new Integer(code.index(node.getIndex)))
+        code.appendConstant(new Integer(code.index(node.index)))
       }
       else {
         start = code.appendThis
-        code.appendGetField(code.getMethod.getClassName, FRAME_PREFIX + node.getFrame, new ArrayType("java.lang.Object", 1))
-        code.appendConstant(new Integer(node.getIndex))
+        code.appendGetField(code.getMethod.getClassName, FRAME_PREFIX + node.frame, new ArrayType("java.lang.Object", 1))
+        code.appendConstant(new JInteger(node.index))
       }
       if (node.isBasicType) {
         val boxed: ObjectType = code.boxing(`type`)
         code.appendNew(boxed)
         code.appendDup(1)
-        codeExpression(node.getValue, code)
+        codeExpression(node.value, code)
         code.appendInvoke(boxed.getClassName, "<init>", Type.VOID, Array[Type](`type`), Constants.INVOKESPECIAL)
         code.appendDup_2(1)
         code.appendArrayStore(Type.OBJECT)
@@ -1099,7 +1099,7 @@ class CodeGeneration(config: CompilerConfig) {
         code.appendInvoke(boxed.getClassName, method, `type`, new Array[Type](0), Constants.INVOKEVIRTUAL)
       }
       else {
-        codeExpression(node.getValue, code)
+        codeExpression(node.value, code)
         code.appendDup_2(1)
         code.appendArrayStore(Type.OBJECT)
       }
@@ -1554,7 +1554,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeChar(node: IRT.CharacterValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    return code.appendConstant(new JCharacter(node.getValue))
+    return code.appendConstant(new JCharacter(node.value))
   }
 
   def codeString(node: IRT.StringValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
@@ -1562,23 +1562,23 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeInteger(node: IRT.IntValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    return code.appendConstant(new JInteger(node.getValue))
+    return code.appendConstant(new JInteger(node.value))
   }
 
   def codeLong(node: IRT.LongValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    return code.appendConstant(new JLong(node.getValue))
+    return code.appendConstant(new JLong(node.value))
   }
 
   def codeFloat(node: IRT.FloatValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    return code.appendConstant(new JFloat(node.getValue))
+    return code.appendConstant(new JFloat(node.value))
   }
 
   def codeDouble(node: IRT.DoubleValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    return code.appendConstant(new JDouble(node.getValue))
+    return code.appendConstant(new JDouble(node.value))
   }
 
   def codeBoolean(node: IRT.BoolValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    return code.appendConstant(JBoolean.valueOf(node.getValue))
+    return code.appendConstant(JBoolean.valueOf(node.value))
   }
 
   def codeNull(node: IRT.NullValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
@@ -1686,16 +1686,16 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeFieldAssign(node: IRT.SetField, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    val start: InstructionHandle = codeExpression(node.getObject, code)
-    codeExpression(node.getValue, code)
-    if (isWideType(node.getValue.`type`)) {
+    val start: InstructionHandle = codeExpression(node.target, code)
+    codeExpression(node.value, code)
+    if (isWideType(node.value.`type`)) {
       code.append(InstructionConstants.DUP2_X1)
     }
     else {
       code.append(InstructionConstants.DUP_X1)
     }
-    val symbol: IRT.ClassTypeRef = node.getObject.`type`.asInstanceOf[IRT.ClassTypeRef]
-    code.appendPutField(symbol.name, node.getField.name, typeOf(node.`type`))
+    val symbol: IRT.ClassTypeRef = node.target.`type`.asInstanceOf[IRT.ClassTypeRef]
+    code.appendPutField(symbol.name, node.field.name, typeOf(node.`type`))
     return start
   }
 

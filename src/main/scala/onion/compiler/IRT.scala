@@ -16,21 +16,17 @@ object IRT {
   /**
    * This interface represents an internal representation node of onion program.
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   abstract trait Node {
   }
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/07/06
    */
-  class ArrayLength(location: Location, target: IRT.Term) extends Term(location) {
+  class ArrayLength(location: Location, val target: IRT.Term) extends Term(location) {
     def this(target: IRT.Term) {
       this(null, target)
     }
-
-    def getTarget: IRT.Term = target
 
     def `type`: IRT.TypeRef = BasicTypeRef.INT
   }
@@ -39,14 +35,10 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/06/21
    */
-  class RefArray(location: Location, target: IRT.Term, index: IRT.Term) extends Term(location) {
+  class RefArray(location: Location, val target: IRT.Term, val index: IRT.Term) extends Term(location) {
     def this(target: IRT.Term, index: IRT.Term) {
       this(null, target, index)
     }
-
-    def getIndex: IRT.Term = index
-
-    def getObject: IRT.Term = target
 
     def `type`: IRT.TypeRef = (target.`type`.asInstanceOf[IRT.ArrayTypeRef]).base
   }
@@ -136,16 +128,16 @@ object IRT {
    * @author Kota Mizushima
    *         Date: 2005/04/17
    */
-  class StatementBlock(location: Location, statements: IRT.ActionStatement*) extends ActionStatement(location) {
-    def this(statements: IRT.ActionStatement*) {
-      this(null: Location, statements: _*)
+  class StatementBlock(location: Location, newStatements : IRT.ActionStatement*) extends ActionStatement(location) {
+    def this(newStatements: IRT.ActionStatement*) {
+      this(null: Location, newStatements : _*)
     }
 
-    def this(statements: util.List[IRT.ActionStatement]) {
-      this(statements.toArray(new Array[IRT.ActionStatement](0)): _*)
+    def this(newStatements: util.List[IRT.ActionStatement]) {
+      this(newStatements.toArray(new Array[IRT.ActionStatement](0)): _*)
     }
 
-    def getStatements: Array[IRT.ActionStatement] = statements.toArray
+    def statements: Array[IRT.ActionStatement] = newStatements.toArray
   }
 
   /**

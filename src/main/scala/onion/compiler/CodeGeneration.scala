@@ -782,11 +782,11 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeBlock(node: IRT.StatementBlock, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
-    if (node.getStatements.length > 0) {
-      start = codeStatement(node.getStatements(0), code)
+    if (node.statements.length > 0) {
+      start = codeStatement(node.statements(0), code)
       var i: Int = 1
-      while (i < node.getStatements.length) {
-        codeStatement(node.getStatements(i), code)
+      while (i < node.statements.length) {
+        codeStatement(node.statements(i), code)
         i += 1;
       }
     } else {
@@ -1169,15 +1169,15 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeArrayRef(node: IRT.RefArray, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    val targetType: IRT.ArrayTypeRef = node.getObject.`type`.asInstanceOf[IRT.ArrayTypeRef]
-    val start: InstructionHandle = codeExpression(node.getObject, code)
-    codeExpression(node.getIndex, code)
+    val targetType: IRT.ArrayTypeRef = node.target.`type`.asInstanceOf[IRT.ArrayTypeRef]
+    val start: InstructionHandle = codeExpression(node.target, code)
+    codeExpression(node.index, code)
     code.appendArrayLoad(typeOf(targetType.base))
     return start
   }
 
   def codeArrayLengthNode(node: IRT.ArrayLength, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    val start: InstructionHandle = codeExpression(node.getTarget, code)
+    val start: InstructionHandle = codeExpression(node.target, code)
     code.append(InstructionConstants.ARRAYLENGTH)
     return start
   }

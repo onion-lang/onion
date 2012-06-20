@@ -701,7 +701,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class SetStaticField(location: Location, val target: IRT.ObjectTypeRef, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
     def this(target: IRT.ObjectTypeRef, field: IRT.FieldRef, value: IRT.Term) {
@@ -715,7 +714,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class StringValue(location: Location, val value: String, val `type`: IRT.TypeRef) extends Term(location) {
     def this(value: String, `type`: IRT.TypeRef) {
@@ -784,7 +782,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/07/15
    */
   abstract class AbstractObjectTypeRef() extends ObjectTypeRef {
     private var methodRefFinder: IRT.MethodRefFinder = new IRT.MethodRefFinder
@@ -814,7 +811,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class ArrayTypeRef(val component: IRT.TypeRef, val dimension: Int, table: ClassTable) extends AbstractObjectTypeRef {
     val superClass: IRT.ClassTypeRef = table.load("java.lang.Object")
@@ -957,7 +953,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/07/12
    */
   class ConstructorRefComparator extends Comparator[IRT.ConstructorRef] {
     def compare(c1: IRT.ConstructorRef, c2: IRT.ConstructorRef): Int = {
@@ -1016,7 +1011,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/30
    */
   object MethodRefFinder {
     private def isAllSuperType(arg1: Array[IRT.TypeRef], arg2: Array[IRT.TypeRef]): Boolean = {
@@ -1133,7 +1127,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/22
    */
   abstract trait ObjectTypeRef extends TypeRef {
     def isInterface: Boolean
@@ -1157,7 +1150,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/30
    */
   abstract trait ParameterMatcher {
     def matches(arguments: Array[IRT.TypeRef], parameters: Array[IRT.Term]): Boolean
@@ -1165,7 +1157,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/30
    */
   class StandardParameterMatcher extends ParameterMatcher {
     def matches(arguments: Array[IRT.TypeRef], parameters: Array[IRT.Term]): Boolean = {

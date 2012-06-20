@@ -33,7 +33,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/21
    */
   class RefArray(location: Location, val target: IRT.Term, val index: IRT.Term) extends Term(location) {
     def this(target: IRT.Term, index: IRT.Term) {
@@ -45,7 +44,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/21
    */
   class SetArray(location: Location, val target: IRT.Term, val index: IRT.Term, val value: IRT.Term) extends Term(location) {
     def this(target: IRT.Term, index: IRT.Term, value: IRT.Term) {
@@ -59,7 +57,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class Begin(location: Location, val terms: Array[IRT.Term]) extends Term(location) {
     def this(terms: Array[IRT.Term]) {
@@ -87,7 +84,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   object BinaryTerm {
 
@@ -124,7 +120,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class StatementBlock(location: Location, newStatements : IRT.ActionStatement*) extends ActionStatement(location) {
     def this(newStatements: IRT.ActionStatement*) {
@@ -160,7 +155,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class ByteValue(location: Location, val value: Byte) extends Term(location) {
     def this(value: Byte) {
@@ -172,7 +166,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/22
    */
   class Call(location: Location, val target: IRT.Term, val method: IRT.MethodRef, val parameters: Array[IRT.Term]) extends Term(location) {
     def this(target: IRT.Term, method: IRT.MethodRef, parameters: Array[IRT.Term]) {
@@ -184,7 +177,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/22
    */
   class CallStatic(location: Location, val target: IRT.ObjectTypeRef, val method: IRT.MethodRef, val parameters: Array[IRT.Term]) extends Term(location) {
     def this(target: IRT.ObjectTypeRef, method: IRT.MethodRef, parameters: Array[IRT.Term]) {
@@ -195,7 +187,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/22
    */
   class CallSuper(location: Location, val target: IRT.Term, val method: IRT.MethodRef, val params: Array[IRT.Term]) extends Term(location) {
     def this(target: IRT.Term, method: IRT.MethodRef, params: Array[IRT.Term]) {
@@ -207,7 +198,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class AsInstanceOf(location: Location, val target: IRT.Term, val destination: IRT.TypeRef) extends Term(location) {
     def this(target: IRT.Term, destination: IRT.TypeRef) {
@@ -221,7 +211,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class CharacterValue(location: Location, val value: Char) extends Term(location) {
     def this(value: Char) {
@@ -234,7 +223,6 @@ object IRT {
   /**
    * This class represents class or interface definitions of internal language.
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   object ClassDefinition {
     /**
@@ -335,7 +323,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   object ConstructorDefinition {
     def newDefaultConstructor(`type`: IRT.ClassTypeRef): IRT.ConstructorDefinition = {
@@ -366,7 +353,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class Continue(location: Location) extends IRT.ActionStatement(location) {
     def this() {
@@ -376,7 +362,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class DoubleValue(location: Location, val value: Double) extends Term(location) {
     def this(value: Double) {
@@ -388,7 +373,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   object Term {
     def defaultValue(`type`: IRT.TypeRef): IRT.Term = {
@@ -427,7 +411,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class FieldDefinition(val location: Location, val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.TypeRef)
     extends Node with FieldRef {
@@ -435,7 +418,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class RefField(location: Location, val target: IRT.Term, val field: IRT.FieldRef)  extends Term(location) {
     def this(target: IRT.Term, field: IRT.FieldRef) {
@@ -529,7 +511,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class NewClosure(location: Location, val `type`: IRT.ClassTypeRef, method: IRT.MethodRef, block: IRT.ActionStatement) extends Term(location) {
 
@@ -572,7 +553,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class LongValue (location: Location, val value: Long) extends Term(location) {
     def this(value: Long) {
@@ -586,7 +566,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class ConditionalLoop(location: Location, val condition: IRT.Term, val stmt: IRT.ActionStatement) extends ActionStatement(location) {
     def this(condition: IRT.Term, stmt: IRT.ActionStatement) {
@@ -596,7 +575,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class Member(modifier: Int, classType: IRT.TypeRef) extends Node {
     def getClassType: IRT.TypeRef = {
@@ -610,7 +588,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val name: String, val arguments: Array[IRT.TypeRef], val returnType: IRT.TypeRef, var block: IRT.StatementBlock)
     extends Node with MethodRef {
@@ -649,7 +626,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/22
    */
   class NewObject(location: Location, val constructor: IRT.ConstructorRef, val parameters: Array[IRT.Term]) extends Term(location) {
     def this(constructor: IRT.ConstructorRef, parameters: Array[IRT.Term]) {
@@ -679,7 +655,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class NullValue(location: Location) extends Term(location) {
     def this() {
@@ -691,7 +666,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/04/17
    */
   class Return(location: Location, val term: IRT.Term) extends ActionStatement(location) {
     def this(term: IRT.Term) {
@@ -701,7 +675,6 @@ object IRT {
 
   /**
    * @author Kota Mizushima
-   *         Date: 2005/06/17
    */
   class ShortValue(location: Location, val value: Short) extends Term(location) {
     def this(value: Short) {

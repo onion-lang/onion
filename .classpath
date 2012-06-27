@@ -10,6 +10,8 @@
   <classpathentry path="C:\Users\Mizushima\.ivy2\cache\junit\junit\jars\junit-3.8.1.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\Users\Mizushima\.ivy2\cache\org.scala-tools.testing\test-interface\jars\test-interface-0.5.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\Users\Mizushima\.ivy2\cache\net.java.dev.javacc\javacc\jars\javacc-4.0.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\org.specs2\specs2_2.9.1\jars\specs2_2.9.1-1.11.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\org.specs2\specs2-scalaz-core_2.9.1\jars\specs2-scalaz-core_2.9.1-6.0.1.jar" kind="lib"></classpathentry>
   <classpathentry path="org.eclipse.jdt.launching.JRE_CONTAINER" kind="con"></classpathentry>
   <classpathentry path="bin" kind="output"></classpathentry>
 </classpath>

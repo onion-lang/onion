@@ -1,16 +1,15 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src/main/parser"/>
-	<classpathentry kind="src" path="src/main/resources"/>
-	<classpathentry kind="src" path="src/test/java"/>
-	<classpathentry kind="src" path="src/main/onion_lib"/>
-	<classpathentry kind="src" path="src/main/java"/>
-	<classpathentry kind="src" path="src/test/scala"/>
-	<classpathentry kind="src" path="src/main/scala"/>
-	<classpathentry kind="src" path="src/test/resources"/>
-	<classpathentry kind="con" path="ch.epfl.lamp.sdt.launching.SCALA_CONTAINER"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="lib/bcel/bcel.jar"/>
-	<classpathentry kind="lib" path="lib/junit/junit.jar"/>
-	<classpathentry kind="output" path="build"/>
+  <classpathentry output="target\scala-2.9.1\classes" path="src\main\scala" kind="src"></classpathentry>
+  <classpathentry output="target\scala-2.9.1\classes" path="src\main\java" kind="src"></classpathentry>
+  <classpathentry output="target\scala-2.9.1\test-classes" path="src\test\scala" kind="src"></classpathentry>
+  <classpathentry output="target\scala-2.9.1\test-classes" path="src\test\java" kind="src"></classpathentry>
+  <classpathentry path="org.scala-ide.sdt.launching.SCALA_CONTAINER" kind="con"></classpathentry>
+  <classpathentry path="org.scala-ide.sdt.launching.SCALA_COMPILER_CONTAINER" kind="con"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\org.apache.bcel\bcel\jars\bcel-5.2.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\jakarta-regexp\jakarta-regexp\jars\jakarta-regexp-1.4.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\junit\junit\jars\junit-3.8.1.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\org.scala-tools.testing\test-interface\jars\test-interface-0.5.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\Users\Mizushima\.ivy2\cache\net.java.dev.javacc\javacc\jars\javacc-4.0.jar" kind="lib"></classpathentry>
+  <classpathentry path="org.eclipse.jdt.launching.JRE_CONTAINER" kind="con"></classpathentry>
+  <classpathentry path="bin" kind="output"></classpathentry>
 </classpath>

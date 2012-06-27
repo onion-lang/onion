@@ -69,7 +69,7 @@ public class TestCommandLineParser extends TestCase {
     List arguments;
     
     result = testTarget1.parse(new String[]{"foo", "-sourcepath", "src", "hoge", "-d"});
-    assertEquals(result.getStatus(), ParseResult.SUCCEED);
+    assertEquals(result.getStatus(), ParseResult$.MODULE$.SUCCEED());
     options = ((ParseSuccess)result).getOptions();
     noArgumentOptions = ((ParseSuccess)result).getNoArgumentOptions();
     arguments = ((ParseSuccess)result).getArguments();
@@ -78,7 +78,7 @@ public class TestCommandLineParser extends TestCase {
     checkList(arguments, new String[]{"foo", "hoge"});
     
     result = testTarget2.parse(new String[]{"-classpath", "-sourcepath", "src", "-d"});
-    assertEquals(result.getStatus(), ParseResult.FAILURE);
+    assertEquals(result.getStatus(), ParseResult$.MODULE$.FAILURE());
     String[] invalidOptions = ((ParseFailure)result).getInvalidOptions();
     String[] lackedOptions = ((ParseFailure)result).getLackedOptions();
     assertEquals(invalidOptions.length, 1);
@@ -87,7 +87,7 @@ public class TestCommandLineParser extends TestCase {
     assertEquals(lackedOptions[0], "-d");
     
     result = testTarget3.parse(new String[]{"foo", "-sourcepath", "src", "-d"});
-    assertEquals(result.getStatus(), ParseResult.SUCCEED);
+    assertEquals(result.getStatus(), ParseResult$.MODULE$.SUCCEED());
     options = ((ParseSuccess)result).getOptions();
     noArgumentOptions = ((ParseSuccess)result).getNoArgumentOptions();
     arguments = ((ParseSuccess)result).getArguments();

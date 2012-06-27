@@ -770,6 +770,16 @@ object IRT {
     final val BOOLEAN: IRT.BasicTypeRef = new IRT.BasicTypeRef("boolean")
     final val VOID: IRT.BasicTypeRef = new IRT.BasicTypeRef("void")
   }
+  
+  final val BASIC_TYPE_REF_BYTE = BasicTypeRef.BYTE
+  final val BASIC_TYPE_REF_SHORT = BasicTypeRef.SHORT
+  final val BASIC_TYPE_REF_CHAR = BasicTypeRef.CHAR
+  final val BASIC_TYPE_REF_INT = BasicTypeRef.INT
+  final val BASIC_TYPE_REF_LONG = BasicTypeRef.LONG
+  final val BASIC_TYPE_REF_FLOAT = BasicTypeRef.FLOAT
+  final val BASIC_TYPE_REF_DOUBLE = BasicTypeRef.DOUBLE
+  final val BASIC_TYPE_REF_BOOLEAN = BasicTypeRef.BOOLEAN
+  final val BASIC_TYPE_REF_VOID = BasicTypeRef.VOID
 
   class BasicTypeRef private(name_ : String) extends TypeRef {
     import BasicTypeRef._

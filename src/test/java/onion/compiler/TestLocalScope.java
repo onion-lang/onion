@@ -29,10 +29,10 @@ public class TestLocalScope extends TestCase {
   protected void setUp() throws Exception {
     scope = new LocalScope(null);
     bindings = new LocalBinding[]{
-      new LocalBinding(0, IRT.BasicTypeRef.INT),
-      new LocalBinding(1, IRT.BasicTypeRef.DOUBLE),
-      new LocalBinding(2, IRT.BasicTypeRef.LONG),
-      new LocalBinding(3, IRT.BasicTypeRef.DOUBLE)
+      new LocalBinding(0, IRT.BASIC_TYPE_REF_INT()),
+      new LocalBinding(1, IRT.BASIC_TYPE_REF_DOUBLE()),
+      new LocalBinding(2, IRT.BASIC_TYPE_REF_LONG()),
+      new LocalBinding(3, IRT.BASIC_TYPE_REF_DOUBLE())
     };
     names = new String[]{"hoge", "foo", "bar", "hogehoge"};
     names2 = new String[]{"a", "b", "c", "d"};

@@ -92,6 +92,8 @@ class LocalContext {
     contextFrame.closeScope
   }
 
+  def open[A](block: => A): A = contextFrame.open(block)
+
   def lookup(name: String): ClosureLocalBinding = {
     return contextFrame.lookup(name)
   }

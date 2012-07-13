@@ -29,6 +29,15 @@ class LocalFrame(val parent: LocalFrame) {
     allScopes.add(scope)
   }
 
+  def open[A](block: => A): A = {
+    try {
+      scope = new LocalScope(scope)
+      allScopes.add(scope)
+    } finally {
+      scope = scope.parent
+    }
+  }
+
   /**
    * Closes the current scope.
    */

@@ -49,7 +49,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         return table_.load(name);
       }else {
         for(item <- imports) {
-          val qname = item `match` name
+          val qname = item matches name
           if(qname != null) {
             val mappedType = forName(qname, true)
             if(mappedType != null) return mappedType

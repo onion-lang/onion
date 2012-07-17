@@ -33,6 +33,7 @@ class LocalFrame(val parent: LocalFrame) {
     try {
       scope = new LocalScope(scope)
       allScopes.add(scope)
+      block
     } finally {
       scope = scope.parent
     }

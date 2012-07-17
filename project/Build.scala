@@ -58,7 +58,7 @@ object Build extends Build {
     name := "onion",
     organization := "org.onion_lang",
     version := "1.0",
-    scalaVersion := "2.9.1",
+    scalaVersion := "2.9.2",
     scalacOptions ++= Seq("-encoding", "utf8"),
     javacOptions ++= Seq("-sourcepath", "src.lib", "-source", "1.5"),
     libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ ),

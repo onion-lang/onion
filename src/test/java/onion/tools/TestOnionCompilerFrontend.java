@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 
-import onion.compiler.util.*;
+import onion.compiler.toolbox.*;
 import onion.tools.OnionCompilerFrontend;
 
 

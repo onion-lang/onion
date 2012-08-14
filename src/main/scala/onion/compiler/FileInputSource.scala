@@ -9,7 +9,7 @@ package onion.compiler
 
 import java.io.IOException
 import java.io.Reader
-import onion.compiler.util.Inputs
+import onion.compiler.toolbox.Inputs
 
 class FileInputSource(val file: String) extends InputSource {
   def openReader: Reader = {

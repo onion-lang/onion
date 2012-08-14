@@ -1,8 +1,5 @@
 package onion.compiler
 
-import pass.CodeGeneration
-import onion.compiler.IRT.ClassDefinition
-
 /**
  * Created by IntelliJ IDEA.
  * User: Mizushima

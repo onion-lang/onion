@@ -37,7 +37,7 @@ class ImportItem(val simpleName: String, val fullyQualifiedName: String) {
    * @param simpleName
    * @return fqcn.  if simpleName is not matched, then return null.
    */
-  def `match`(simpleName: String): String = {
+  def matches(simpleName: String): String = {
     if (onDemand) {
       fullyQualifiedName.replaceAll("\\*", simpleName)
     } else if (this.simpleName == simpleName) {

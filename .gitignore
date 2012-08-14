@@ -5,3 +5,6 @@ src/main/parser/onion
 target/
 .idea/
 .idea_modules/
+.cache
+
+.settings

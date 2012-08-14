@@ -12,7 +12,8 @@ import _root_.scala.collection.Iterator
 import java.io.BufferedReader
 import java.io.IOException
 import java.text.MessageFormat
-import onion.compiler.util._
+import onion.compiler.toolbox._
+import onion.compiler.exceptions.CompilationException
 
 /**
  * @author Kota Mizushima

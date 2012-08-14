@@ -7,7 +7,8 @@
  * ************************************************************** */
 package onion.compiler
 
-import onion.compiler.util.SymbolGenerator
+import onion.compiler.toolbox.SymbolGenerator
+import toolbox.SymbolGenerator
 
 /**
  * @author Kota Mizushima
@@ -90,6 +91,8 @@ class LocalContext {
   def closeScope(): Unit = {
     contextFrame.closeScope
   }
+
+  def open[A](block: => A): A = contextFrame.open(block)
 
   def lookup(name: String): ClosureLocalBinding = {
     return contextFrame.lookup(name)

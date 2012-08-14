@@ -9,7 +9,7 @@ package onion.compiler;
 
 
 
-import onion.compiler.util.Systems
+import onion.compiler.toolbox.Systems
 import java.util.{HashSet, HashMap, _}
 import scala.collection.JavaConverters._
 ;
@@ -78,7 +78,7 @@ class LocalScope(val parent: LocalScope) {
   }
 
   override def toString(): String = {
-    val separator = Systems.getLineSeparator()
+    val separator = Systems.getLineSeparator
     val string = new StringBuffer()
     string.append("[")
     string.append(separator)

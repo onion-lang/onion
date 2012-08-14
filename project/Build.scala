@@ -58,7 +58,7 @@ object Build extends Build {
     name := "onion",
     organization := "org.onion_lang",
     version := "1.0",
-    scalaVersion := "2.9.1",
+    scalaVersion := "2.9.2",
     scalacOptions ++= Seq("-encoding", "utf8"),
     javacOptions ++= Seq("-sourcepath", "src.lib", "-source", "1.5"),
     libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ ),
@@ -66,7 +66,8 @@ object Build extends Build {
       "org.apache.bcel" % "bcel" % "5.2",
       "junit" % "junit" % "3.8.1" % "test",
       "org.scala-tools.testing" % "test-interface" % "0.5" % "test",
-      "net.java.dev.javacc" % "javacc" % "4.0" % "test"
+      "net.java.dev.javacc" % "javacc" % "4.0" % "test",
+      "org.specs2" %% "specs2" % "1.11" % "test"
     ),
     sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
       javacc(cp, dir, s.log) 

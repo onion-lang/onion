@@ -8,11 +8,11 @@ completely except Parser, using JavaCC.
 
 ## Usage of tools
 ### onionc
-  
+
 #### Usage:
 
     onionc [options] source files...
-   
+
 ###  Available options:
 + classpath <classpath> Set classpath of source files in compilation.
 + encoding <encoding> Set encoding of source files.
@@ -27,23 +27,23 @@ is compiled, class files is generated in:
   Unix-like OS : org/onion_lang
   Windows: org\onion_lang
 .
-    
+
 ### onion
-    
+
 #### Usage:
     onionc [options] source files... [command line arguments]
-    
+
 #### Available optionsÅF
 + -classpath <classpath> Set classpath of source files in compilation.
 + -encoding <encoding> Set encoding of source files.
 + -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
-    
+
 Onionc compiles source files into in-memory classfiles and execute them.  The entry
 point is:
   If there is explicit class definitions and they have main methods,
   The main method of the class on the top.  Otherwise, the first statement
   in the toplevel is the entry point.
-    
+
 ## Limitations
 
 + Some compilation-time checks is not implemented  (e.g.

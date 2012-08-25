@@ -816,16 +816,7 @@ AST.Expression primary() : {
 | LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
 | t=<ID>                                                            {return new AST.Id(p(t), c(t));}
 | t="[" es=terms() "]"                                              {return new AST.ListLiteral(p(t), es);}
-| t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
-    String mname;
-    if(ty == null) {
-      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true));
-      mname = "call";      
-    }else {
-      mname = n.image;
-    }
-    return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
-  }
+| e=anonymous_function()                                            {return e;}
 | t="new" ty=type() (
     "[" (es=terms()) "]"                                            {return new AST.NewArray(p(t), ty, es);}
   | ["(" (es=terms()) ")"]                                          {return new AST.NewObject(p(t), ty, es);}
@@ -843,6 +834,23 @@ AST.Expression primary() : {
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
   [arg=term() {append(args, arg);} ("," arg=term() {append(args, arg);})*] {
     return toList(args);
+  }
+}
+
+AST.ClosureExpression anonymous_function() :{
+  Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  AST.BlockStatement body;
+}{
+ t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
+    String mname;
+    if(ty == null) {
+      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true));
+      mname = "call";
+    }else {
+      mname = n.image;
+    }
+    return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
   }
 }
 

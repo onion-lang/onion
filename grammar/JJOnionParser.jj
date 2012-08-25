@@ -790,16 +790,16 @@ AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
 }
 
 AST.Expression primary_suffix() : {
-  Token t, n; AST.Expression e, a; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
+  Token t, n; AST.Expression e, a = null; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
   AST.TypeNode type;
 }{
   e=primary()
-( t="[" a=term() "]"                             {e = new AST.Indexing(p(t), e, a);}
-| LOOKAHEAD(3) t="." n=<ID> "(" args=terms() ")" {e = new AST.MethodCall(p(t), e, c(n), args);}
-| t="." n=<ID>                                         {e = new AST.MemberSelection(p(t), e, c(n));}
-| t="$" type=type()                                    {e = new AST.Cast(p(t), e, type);}
-| t="++"                                               {e = new AST.PostIncrement(p(t), e);}
-| t="--"                                               {e = new AST.PostDecrement(p(t), e);}
+( t="[" a=term() "]"                                                      {e = new AST.Indexing(p(t), e, a);}
+| LOOKAHEAD(3) t="." n=<ID> "(" args=terms() ")" [a=anonymous_function()] {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);}
+| t="." n=<ID>                                                            {e = new AST.MemberSelection(p(t), e, c(n));}
+| t="$" type=type()                                                       {e = new AST.Cast(p(t), e, type);}
+| t="++"                                                                  {e = new AST.PostIncrement(p(t), e);}
+| t="--"                                                                  {e = new AST.PostDecrement(p(t), e);}
 )* {return e;}
 }
 

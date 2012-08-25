@@ -64,15 +64,12 @@ object Build extends Build {
     libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ ),
     libraryDependencies ++= Seq(
       "org.apache.bcel" % "bcel" % "5.2",
-      "junit" % "junit" % "3.8.1" % "test",
-      "org.scala-tools.testing" % "test-interface" % "0.5" % "test",
       "net.java.dev.javacc" % "javacc" % "4.0" % "test",
       "org.specs2" %% "specs2" % "1.11" % "test"
     ),
     sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
       javacc(cp, dir, s.log) 
     },
-    testFrameworks += new TestFramework("framework.JUnitFramework"),
     packageOptions in (Compile, packageBin) <<= (mainClass, packageOptions in (Compile, packageBin)) map { (main, opts) =>
       opts ++ main.map(Package.MainClass(_))
     },

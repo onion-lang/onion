@@ -790,16 +790,16 @@ AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
 }
 
 AST.Expression primary_suffix() : {
-  Token t, n; AST.Expression e, a; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
+  Token t, n; AST.Expression e, a = null; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
   AST.TypeNode type;
 }{
   e=primary()
-( t="[" a=term() "]"                             {e = new AST.Indexing(p(t), e, a);}
-| LOOKAHEAD(3) t="." n=<ID> "(" args=terms() ")" {e = new AST.MethodCall(p(t), e, c(n), args);}
-| t="." n=<ID>                                         {e = new AST.MemberSelection(p(t), e, c(n));}
-| t="$" type=type()                                    {e = new AST.Cast(p(t), e, type);}
-| t="++"                                               {e = new AST.PostIncrement(p(t), e);}
-| t="--"                                               {e = new AST.PostDecrement(p(t), e);}
+( t="[" a=term() "]"                                                      {e = new AST.Indexing(p(t), e, a);}
+| LOOKAHEAD(3) t="." n=<ID> "(" args=terms() ")" [a=anonymous_function()] {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);}
+| t="." n=<ID>                                                            {e = new AST.MemberSelection(p(t), e, c(n));}
+| t="$" type=type()                                                       {e = new AST.Cast(p(t), e, type);}
+| t="++"                                                                  {e = new AST.PostIncrement(p(t), e);}
+| t="--"                                                                  {e = new AST.PostDecrement(p(t), e);}
 )* {return e;}
 }
 
@@ -816,16 +816,7 @@ AST.Expression primary() : {
 | LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
 | t=<ID>                                                            {return new AST.Id(p(t), c(t));}
 | t="[" es=terms() "]"                                              {return new AST.ListLiteral(p(t), es);}
-| t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
-    String mname;
-    if(ty == null) {
-      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true));
-      mname = "call";      
-    }else {
-      mname = n.image;
-    }
-    return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
-  }
+| e=anonymous_function()                                            {return e;}
 | t="new" ty=type() (
     "[" (es=terms()) "]"                                            {return new AST.NewArray(p(t), ty, es);}
   | ["(" (es=terms()) ")"]                                          {return new AST.NewObject(p(t), ty, es);}
@@ -843,6 +834,23 @@ AST.Expression primary() : {
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
   [arg=term() {append(args, arg);} ("," arg=term() {append(args, arg);})*] {
     return toList(args);
+  }
+}
+
+AST.ClosureExpression anonymous_function() :{
+  Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  AST.BlockStatement body;
+}{
+ t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
+    String mname;
+    if(ty == null) {
+      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true));
+      mname = "call";
+    }else {
+      mname = n.image;
+    }
+    return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
   }
 }
 

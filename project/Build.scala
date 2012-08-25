@@ -32,7 +32,7 @@ object Build extends Build {
     IO.copyDirectory(file("bin"), out / "bin")
     IO.copyDirectory(file("example"), out / "example")
     IO.copyFile(artifact, out / "onion.jar")
-    IO.copyFile(file("README.markdown"), out / "README.markdown")
+    IO.copyFile(file("README.md"), out / "README.md")
     val files = (out ***).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))
     IO.zip(files, target / "onion-dist.zip")
   }

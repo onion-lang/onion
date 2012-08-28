@@ -4,7 +4,8 @@ import org.specs2.mutable.Specification
 import org.specs2.mutable.BeforeAfter
 
 class LocalScopeSpecification extends Specification {
-  
+  sequential
+
   trait fixture extends BeforeAfter {
     val scope = new LocalScope(null)
     val bindings = Array[LocalBinding](
@@ -15,6 +16,11 @@ class LocalScopeSpecification extends Specification {
     )
     val names = Array("hoge", "foo", "bar", "hogehoge")
     val names2 = Array("a", "b", "c", "d")
+
+    def before = {
+      putAll(scope, names, bindings)
+    }
+    def after = null
   }
   
   private def putAll(scope: LocalScope, names: Array[String], bindings: Array[LocalBinding]): Boolean = {
@@ -25,5 +31,11 @@ class LocalScopeSpecification extends Specification {
       }
     }
     contains;
+  }
+
+  """LocalScope""" should {
+    "can have LocalBindings" in new fixture {
+      scope.entries.size() must_== 4
+    }
   }
 }

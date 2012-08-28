@@ -19,7 +19,7 @@ import java.lang.{Iterable => JIterable}
  */
 class CompilationException(val problems_ : JList[CompileError]) extends RuntimeException with JIterable[CompileError] {
 
-  def problems(): JList[CompileError] = Collections.unmodifiableList(problems)
+  def problems(): JList[CompileError] = Collections.unmodifiableList(problems_)
 
   def size(): Int = problems.size();
 

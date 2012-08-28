@@ -24,27 +24,27 @@ class SemanticErrorReporter(threshold: Int) {
   private var errorCount: Int = 0
 
   private def format(string: String): String = {
-    return MessageFormat.format(string, new Array[AnyRef](0))
+    return MessageFormat.format(string)
   }
 
   private def format(string: String, arg: String): String = {
-    return MessageFormat.format(string, Array[AnyRef](arg))
+    return MessageFormat.format(string, arg)
   }
 
   private def format(string: String, arg1: String, arg2: String): String = {
-    return MessageFormat.format(string, Array[AnyRef](arg1, arg2))
+    return MessageFormat.format(string, arg1, arg2)
   }
 
   private def format(string: String, arg1: String, arg2: String, arg3: String): String = {
-    return MessageFormat.format(string, Array[AnyRef](arg1, arg2, arg3))
+    return MessageFormat.format(string, arg1, arg2, arg3)
   }
 
   private def format(string: String, arg1: String, arg2: String, arg3: String, arg4: String): String = {
-    return MessageFormat.format(string, Array[AnyRef](arg1, arg2, arg3, arg4))
+    return MessageFormat.format(string, arg1, arg2, arg3, arg4)
   }
 
   private def format(string: String, args: Array[String]): String = {
-    return MessageFormat.format(string, args.asInstanceOf[Array[AnyRef]])
+    return MessageFormat.format(string, args.asInstanceOf[Array[AnyRef]]:_*)
   }
 
   private def message(property: String): String = {

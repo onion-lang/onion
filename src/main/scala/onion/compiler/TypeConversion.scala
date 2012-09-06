@@ -18,7 +18,7 @@ import org.apache.bcel.generic.Type
  * @author Kota Mizushima
  *         Date: 2005/06/28
  */
-object OnionTypeBridge {
+object TypeConversion {
   private final val basicTypeTable: Map[BasicType, IRT.BasicTypeRef] = new HashMap[BasicType, IRT.BasicTypeRef]
   private final val c2t: Map[Class[_], IRT.BasicTypeRef] = new HashMap[Class[_], IRT.BasicTypeRef]
 
@@ -43,8 +43,8 @@ object OnionTypeBridge {
   c2t.put(classOf[Unit], IRT.BasicTypeRef.VOID)
 }
 
-class OnionTypeBridge(table: ClassTable) {
-  import OnionTypeBridge._
+class TypeConversion(table: ClassTable) {
+  import TypeConversion._
 
   def toOnionType(klass: Class[_]): IRT.TypeRef = {
     val returnType: IRT.TypeRef = c2t.get(klass).asInstanceOf[IRT.TypeRef]

@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005, Kota Mizushima, All rights reserved.       *
+ * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.       *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -17,11 +17,11 @@ import java.lang.Iterable
  *
  */
 class ImportList extends Iterable[ImportItem] {
-  private var items = new ArrayList[ImportItem]
+  private val items_ = new ArrayList[ImportItem]
 
-  def add(item: ImportItem): Unit =  items.add(item)
-  def get(index: Int): ImportItem = items.get(index)
-  def getItems: Array[ImportItem] = items.toArray(new Array[ImportItem](0)).asInstanceOf[Array[ImportItem]]
-  def size: Int =  items.size
-  def iterator: Iterator[ImportItem] = items.iterator
+  def add(item: ImportItem): Unit =  items_.add(item)
+  def apply(index: Int): ImportItem = items_.get(index)
+  def items: Array[ImportItem] = items_.toArray(new Array[ImportItem](0)).asInstanceOf[Array[ImportItem]]
+  def size: Int =  items_.size
+  def iterator: Iterator[ImportItem] = items_.iterator
 }

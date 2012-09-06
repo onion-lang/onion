@@ -17,7 +17,7 @@ import java.lang.Iterable
  *
  */
 class ImportList extends Iterable[ImportItem] {
-  private var items_ = new ArrayList[ImportItem]
+  private val items_ = new ArrayList[ImportItem]
 
   def add(item: ImportItem): Unit =  items_.add(item)
   def apply(index: Int): ImportItem = items_.get(index)

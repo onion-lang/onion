@@ -1607,7 +1607,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
   private def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
-  private def classpath(paths: Array[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.getPathSeparator).append(path)}.toString
+  private def classpath(paths: Array[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString
   private def typesOf(arguments: List[AST.Argument]): Option[List[TypeRef]] = {
     val result = arguments.map{arg => mapFrom(arg.typeRef)}
     if(result.forall(_ != null)) Some(result) else None

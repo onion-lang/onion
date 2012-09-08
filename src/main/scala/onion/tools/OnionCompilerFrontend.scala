@@ -36,7 +36,7 @@ import onion.tools.option.ParseSuccess
 object OnionCompilerFrontend {
   private def conf(option: String, requireArg: Boolean): OptionConf = new OptionConf(option, requireArg)
 
-  private def pathArray(path: String): Array[String] = path.split(Systems.getPathSeparator)
+  private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
 
   private def printerr(message: String): Unit = System.err.println(message)
 
@@ -73,34 +73,29 @@ class OnionCompilerFrontend {
       printUsage
       return -1
     }
-    val result: ParseSuccess = parseCommandLine(commandLine)
-    if (result == null) return -1
-    val config: CompilerConfig = createConfig(result)
-    val params: Array[String] = result.getArguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
-    if (params.length == 0) {
-      printUsage
-      return -1
-    }
-    if (config == null) return -1
-    val classes: Array[CompiledClass] = compile(config, params)
-    if (classes == null) return -1
-    return if (generateFiles(classes)) 0 else -1
-  }
-
-  private def getSimpleName(fqcn: String): String = {
-    val index: Int = fqcn.lastIndexOf(".")
-    if (index < 0) {
-      return fqcn
-    }
-    else {
-      return fqcn.substring(index + 1, fqcn.length)
+    val result: Option[ParseSuccess] = parseCommandLine(commandLine)
+    result match {
+      case None => -1
+      case Some(success) =>
+        val config: CompilerConfig = createConfig(success)
+        val params: Array[String] = success.getArguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
+        if (params.length == 0) {
+          printUsage
+          return -1
+        }
+        if (config == null) return -1
+        val classes: Array[CompiledClass] = compile(config, params)
+        if (classes == null) return -1
+        if (generateFiles(classes)) 0 else -1
     }
   }
 
-  private def getOutputPath(outDir: String, fqcn: String): String = {
-    val name: String = getSimpleName(fqcn)
-    return outDir + Systems.getFileSeparator + name + ".class"
+  private def simpleNameOf(fqcn: String): String = {
+    val index = fqcn.lastIndexOf(".")
+    if (fqcn.lastIndexOf(".") < 0)  fqcn else fqcn.substring(index + 1, fqcn.length)
   }
+
+  private def outputPathOf(outDir: String, fqcn: String): String = outDir + Systems.fileSeparator + simpleNameOf(fqcn)+ ".class"
 
   private def generateFiles(binaries: Array[CompiledClass]): Boolean = {
     val generated: java.util.List[File] = new java.util.ArrayList[File]
@@ -110,7 +105,7 @@ class OnionCompilerFrontend {
       val binary: CompiledClass = binaries(i)
       val outDir: String = binary.getOutputPath
       new File(outDir).mkdirs
-      val outPath: String = getOutputPath(outDir, binary.getClassName)
+      val outPath: String = outputPathOf(outDir, binary.getClassName)
       val targetFile: File = new File(outPath)
       try {
         if (!targetFile.exists) targetFile.createNewFile
@@ -145,25 +140,18 @@ class OnionCompilerFrontend {
     printerr("  -maxErrorReport <number>    set number of errors reported")
   }
 
-  private def parseCommandLine(commandLine: Array[String]): ParseSuccess = {
+  private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
     val result: ParseResult = commandLineParser.parse(commandLine)
-    if (result.getStatus == ParseResult.FAILURE) {
-      val failure: ParseFailure = result.asInstanceOf[ParseFailure]
-      val lackedOptions: Array[String] = failure.getLackedOptions
-      val invalidOptions: Array[String] = failure.getInvalidOptions
-      var i: Int = 0
-      while (i < invalidOptions.length) {
-        printerr(Messages.get("error.command.invalidArgument", invalidOptions(i)))
-        i += 1
-      }
-      i = 0
-      while (i < lackedOptions.length) {
-        printerr(Messages.get("error.command..noArgument", lackedOptions(i)))
-        i += 1
-      }
-      return null
+    result match {
+      case success: ParseSuccess => Some(success)
+      case failure: ParseFailure =>
+        val failure = result.asInstanceOf[ParseFailure]
+        val lackedOptions = failure.getLackedOptions
+        val invalidOptions = failure.getInvalidOptions
+        invalidOptions.foreach{opt => printerr(Messages.get("error.command.invalidArgument", opt)) }
+        lackedOptions.foreach{opt => printerr(Messages.get("error.command..noArgument", opt)) }
+        None
     }
-    return result.asInstanceOf[ParseSuccess]
   }
 
   private def createConfig(result: ParseSuccess): CompilerConfig = {

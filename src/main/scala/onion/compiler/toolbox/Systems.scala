@@ -12,20 +12,14 @@ package onion.compiler.toolbox
  *         Date: 2005/06/26
  */
 object Systems {
-  def getLineSeparator: String = System.getProperty("line.separator")
+  lazy val lineSeparator: String = System.getProperty("line.separator")
 
-  def getLineSeparator(count: Int): String = {
-    val separator: String = getLineSeparator
-    val separators: StringBuffer = new StringBuffer
-    var i: Int = 0
-    while (i < count) {
-      separators.append(separator)
-      i += 1
-    }
-    new String(separators)
+  def lineSeparatorTimes(count: Int): String = {
+    val separator = lineSeparator
+    List.fill(count)(separator).mkString("")
   }
 
-  def getPathSeparator: String = System.getProperty("path.separator")
+  lazy val pathSeparator: String = System.getProperty("path.separator")
 
-  def getFileSeparator: String = System.getProperty("file.separator")
+  lazy val fileSeparator: String = System.getProperty("file.separator")
 }

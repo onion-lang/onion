@@ -30,7 +30,7 @@ object ScriptRunner {
   }
 
   private def pathArray(path: String): Array[String] = {
-    return path.split(Systems.getPathSeparator)
+    return path.split(Systems.pathSeparator)
   }
 
   private def printerr(message: String) {

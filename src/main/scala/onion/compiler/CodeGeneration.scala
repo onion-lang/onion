@@ -373,7 +373,7 @@ class CodeGeneration(config: CompilerConfig) {
     compiledClasses.clear
     var base: String = config.getOutputDirectory
     base = if (base != null) base else "."
-    base += Systems.getFileSeparator
+    base += Systems.fileSeparator
     for (klass <- classes) codeClass(klass)
     val classFiles: List[CompiledClass] = new ArrayList[CompiledClass]
     import scala.collection.JavaConversions._
@@ -387,7 +387,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def getOutputDir(base: String, fqcn: String): String = {
     val packageName: String = getPackageName(fqcn)
-    return base + packageName.replaceAll(".", Systems.getFileSeparator)
+    return base + packageName.replaceAll(".", Systems.fileSeparator)
   }
 
   private def getPackageName(fqcn: String): String = {

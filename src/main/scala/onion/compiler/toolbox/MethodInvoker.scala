@@ -55,12 +55,7 @@ object MethodInvoker {
   }
 
   private def getMethod(target: Class[_], name: String, args: Array[AnyRef]): Method = {
-    val argsClasses: Array[Class[_]] = new Array[Class[_]](args.length)
-    var i: Int = 0
-    while (i < args.length) {
-      argsClasses(i) = args(i).getClass
-      i += 1
-    }
+    val argsClasses = args.map {_.getClass()}
     target.getMethod(name, argsClasses:_*)
   }
 }

@@ -36,7 +36,7 @@ import onion.tools.option.ParseSuccess
 object OnionCompilerFrontend {
   private def conf(option: String, requireArg: Boolean): OptionConf = new OptionConf(option, requireArg)
 
-  private def pathArray(path: String): Array[String] = path.split(Systems.getPathSeparator)
+  private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
 
   private def printerr(message: String): Unit = System.err.println(message)
 
@@ -99,7 +99,7 @@ class OnionCompilerFrontend {
 
   private def getOutputPath(outDir: String, fqcn: String): String = {
     val name: String = getSimpleName(fqcn)
-    return outDir + Systems.getFileSeparator + name + ".class"
+    return outDir + Systems.fileSeparator + name + ".class"
   }
 
   private def generateFiles(binaries: Array[CompiledClass]): Boolean = {

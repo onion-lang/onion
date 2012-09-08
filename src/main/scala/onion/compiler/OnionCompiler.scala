@@ -72,10 +72,10 @@ class OnionCompiler(val config: CompilerConfig) {
         }
       }
       message.append(MessageFormat.format("{0}:{1}: {2}", sourceFile, lineNum, error.getMessage))
-      message.append(Systems.getLineSeparator)
+      message.append(Systems.lineSeparator)
       message.append("\t\t")
       message.append(line)
-      message.append(Systems.getLineSeparator)
+      message.append(Systems.lineSeparator)
       message.append("\t\t")
       if (location != null) {
         message.append(getCursor(location.column))

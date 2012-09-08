@@ -90,20 +90,12 @@ class OnionCompilerFrontend {
     }
   }
 
-  private def getSimpleName(fqcn: String): String = {
-    val index: Int = fqcn.lastIndexOf(".")
-    if (index < 0) {
-      return fqcn
-    }
-    else {
-      return fqcn.substring(index + 1, fqcn.length)
-    }
+  private def simpleNameOf(fqcn: String): String = {
+    val index = fqcn.lastIndexOf(".")
+    if (fqcn.lastIndexOf(".") < 0)  fqcn else fqcn.substring(index + 1, fqcn.length)
   }
 
-  private def getOutputPath(outDir: String, fqcn: String): String = {
-    val name: String = getSimpleName(fqcn)
-    return outDir + Systems.fileSeparator + name + ".class"
-  }
+  private def outputPathOf(outDir: String, fqcn: String): String = outDir + Systems.fileSeparator + simpleNameOf(fqcn)+ ".class"
 
   private def generateFiles(binaries: Array[CompiledClass]): Boolean = {
     val generated: java.util.List[File] = new java.util.ArrayList[File]
@@ -113,7 +105,7 @@ class OnionCompilerFrontend {
       val binary: CompiledClass = binaries(i)
       val outDir: String = binary.getOutputPath
       new File(outDir).mkdirs
-      val outPath: String = getOutputPath(outDir, binary.getClassName)
+      val outPath: String = outputPathOf(outDir, binary.getClassName)
       val targetFile: File = new File(outPath)
       try {
         if (!targetFile.exists) targetFile.createNewFile

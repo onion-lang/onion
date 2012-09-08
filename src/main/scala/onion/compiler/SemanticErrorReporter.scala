@@ -2,7 +2,7 @@ package onion.compiler
 
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005, Kota Mizushima, All rights reserved.       *
+ * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *

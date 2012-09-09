@@ -44,7 +44,7 @@ object Build extends Build {
       "javacc" ::
       "-UNICODE_INPUT=true" ::
       "-JAVA_UNICODE_ESCAPE=true" ::
-      "-OUTPUT_DIRECTORY=" + output.toString ::
+      "-OUTPUT_DIRECTORY=" + output.toString + "/onion/compiler/parser" ::
       "grammar/JJOnionParser.jj" :: Nil,
       log
     ) match {

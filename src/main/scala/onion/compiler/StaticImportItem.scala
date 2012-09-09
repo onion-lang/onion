@@ -19,13 +19,13 @@ class StaticImportItem(val name: String, val fqcn: Boolean) {
   def getName: String = name
 
   /**
-   * returns whether getName() is FQCN or not.
+   * returns whether name() is FQCN or not.
    * @return
    */
   def isFqcn: Boolean = fqcn
 
   /**
-   * matches getName() with name.
+   * matches name() with name.
    * @param name
    * @return if name is matched, then return true.
    */

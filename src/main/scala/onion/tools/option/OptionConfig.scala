@@ -11,10 +11,12 @@ package onion.tools.option
  * @author Kota Mizushima
  *         Date: 2005/04/08
  */
-class ParseFailure(lackedOptions: Array[String], invalidOptions: Array[String]) extends ParseResult {
-  def getStatus: Int = ParseResult.FAILURE
+class OptionConfig(optionName: String, val hasArgument_ : Boolean) {
+  def getOptionName: String = {
+    return optionName
+  }
 
-  def getLackedOptions: Array[String] = lackedOptions
-
-  def getInvalidOptions: Array[String] = invalidOptions
+  def hasArgument: Boolean = {
+    return hasArgument_
+  }
 }

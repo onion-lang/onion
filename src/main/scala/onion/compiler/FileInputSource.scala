@@ -11,15 +11,8 @@ import java.io.IOException
 import java.io.Reader
 import onion.compiler.toolbox.Inputs
 
-class FileInputSource(val file: String) extends InputSource {
-  def openReader: Reader = {
-    if (reader == null) reader = Inputs.newReader(file)
-    return reader
-  }
+class FileInputSource(val name: String) extends InputSource {
+  private lazy val reader: Reader = Inputs.newReader(name)
 
-  def getName: String = {
-    return file
-  }
-
-  private var reader: Reader = null
+  def openReader: Reader = reader
 }

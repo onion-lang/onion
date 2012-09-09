@@ -14,7 +14,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
 import onion.compiler.toolbox.Systems
 import onion.tools.option.CommandLineParser
-import onion.tools.option.OptionConf
+import onion.tools.option.OptionConfig
 import onion.tools.option.ParseFailure
 import onion.tools.option.ParseResult
 import onion.tools.option.ParseSuccess
@@ -25,8 +25,8 @@ import onion.tools.option.ParseSuccess
  *
  */
 object ScriptRunner {
-  private def conf(optionName: String, requireArgument: Boolean): OptionConf = {
-    return new OptionConf(optionName, requireArgument)
+  private def conf(optionName: String, requireArgument: Boolean): OptionConfig = {
+    return new OptionConfig(optionName, requireArgument)
   }
 
   private def pathArray(path: String): Array[String] = {
@@ -60,7 +60,7 @@ object ScriptRunner {
 
 class ScriptRunner {
   import ScriptRunner._
-  private val commandLineParser = new CommandLineParser(Array[OptionConf](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(MAX_ERROR, true)))
+  private val commandLineParser = new CommandLineParser(Array[OptionConfig](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(MAX_ERROR, true)))
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {

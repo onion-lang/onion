@@ -23,7 +23,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
 import onion.compiler.toolbox.Systems
 import onion.tools.option.CommandLineParser
-import onion.tools.option.OptionConf
+import onion.tools.option.OptionConfig
 import onion.tools.option.ParseFailure
 import onion.tools.option.ParseResult
 import onion.tools.option.ParseSuccess
@@ -34,7 +34,7 @@ import onion.tools.option.ParseSuccess
  *
  */
 object OnionCompilerFrontend {
-  private def conf(option: String, requireArg: Boolean): OptionConf = new OptionConf(option, requireArg)
+  private def conf(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
 
   private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
 
@@ -66,7 +66,7 @@ class OnionCompilerFrontend {
 
   import OnionCompilerFrontend._
 
-  private val commandLineParser = new CommandLineParser(Array[OptionConf](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(OUTPUT, true), conf(MAX_ERROR, true)))
+  private val commandLineParser = new CommandLineParser(Array[OptionConfig](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(OUTPUT, true), conf(MAX_ERROR, true)))
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {

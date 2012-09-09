@@ -11,5 +11,5 @@ import java.io.Reader
 
 trait InputSource {
   def openReader: Reader
-  def getName: String
+  def name: String
 }

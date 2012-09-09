@@ -10,7 +10,6 @@ package onion.compiler
 import java.io.IOException
 import java.io.Reader
 
-class StreamInputSource(var reader: Reader, name: String) extends InputSource {
+class StreamInputSource(var reader: Reader, val name: String) extends InputSource {
   def openReader: Reader = reader
-  def getName: String =  name
 }

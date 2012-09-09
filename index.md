@@ -1,3 +1,7 @@
+---
+title: Programming Language Onion
+layout: default
+ ---
 # Onion - statically typed object-oriented programming language on JVM
 
 Onion is an object-oriented and statically typed programming language. Source

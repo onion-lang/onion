@@ -53,11 +53,11 @@ class OnionCompiler(val config: CompilerConfig) {
   }
 
   private def printError(error: CompileError): Unit = {
-    var location: Location = error.getLocation
-    var sourceFile: String = error.getSourceFile
+    var location: Location = error.location
+    var sourceFile: String = error.sourceFile
     var message: StringBuffer = new StringBuffer
     if (sourceFile == null) {
-      message.append(MessageFormat.format("{0}", error.getMessage))
+      message.append(MessageFormat.format("{0}", error.message))
     }
     else {
       var line: String = null
@@ -71,7 +71,7 @@ class OnionCompiler(val config: CompilerConfig) {
           e.printStackTrace
         }
       }
-      message.append(MessageFormat.format("{0}:{1}: {2}", sourceFile, lineNum, error.getMessage))
+      message.append(MessageFormat.format("{0}:{1}: {2}", sourceFile, lineNum, error.message))
       message.append(Systems.lineSeparator)
       message.append("\t\t")
       message.append(line)

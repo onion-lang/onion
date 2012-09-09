@@ -465,7 +465,7 @@ object IRT {
 
   class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef)  extends Term(location) {
     def this(bind: ClosureLocalBinding) {
-      this(null, bind.getFrameIndex, bind.getIndex, bind.getType)
+      this(null, bind.frameIndex, bind.getIndex, bind.getType)
     }
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef) {
@@ -475,7 +475,7 @@ object IRT {
 
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef, val value: IRT.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: IRT.Term) {
-      this(null, bind.getFrameIndex, bind.getIndex, bind.getType, value)
+      this(null, bind.frameIndex, bind.getIndex, bind.getType, value)
     }
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef, value: IRT.Term) {

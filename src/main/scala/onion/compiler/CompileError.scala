@@ -11,8 +11,4 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-class CompileError(val sourceFile: String, val location: Location, val message: String) {
-  def getSourceFile: String = sourceFile
-  def getLocation: Location = location
-  def getMessage: String =  message
-}
+case class CompileError(val sourceFile: String, val location: Location, val message: String)

@@ -14,10 +14,6 @@ package onion.compiler.exceptions
  * Date: 2005/09/15
  */
 class ScriptException(message: String, cause: Throwable) extends RuntimeException(message, cause) {
-  def this() {
-    this("", null)
-  }
-
   /**
    * @param cause
    */

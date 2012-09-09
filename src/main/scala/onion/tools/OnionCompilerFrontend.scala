@@ -23,7 +23,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
 import onion.compiler.toolbox.Systems
 import onion.tools.option.CommandLineParser
-import onion.tools.option.OptionConf
+import onion.tools.option.OptionConfig
 import onion.tools.option.ParseFailure
 import onion.tools.option.ParseResult
 import onion.tools.option.ParseSuccess
@@ -34,7 +34,7 @@ import onion.tools.option.ParseSuccess
  *
  */
 object OnionCompilerFrontend {
-  private def conf(option: String, requireArg: Boolean): OptionConf = new OptionConf(option, requireArg)
+  private def conf(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
 
   private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
 
@@ -66,7 +66,7 @@ class OnionCompilerFrontend {
 
   import OnionCompilerFrontend._
 
-  private val commandLineParser = new CommandLineParser(Array[OptionConf](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(OUTPUT, true), conf(MAX_ERROR, true)))
+  private val commandLineParser = new CommandLineParser(Array[OptionConfig](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(OUTPUT, true), conf(MAX_ERROR, true)))
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {
@@ -77,16 +77,21 @@ class OnionCompilerFrontend {
     result match {
       case None => -1
       case Some(success) =>
-        val config: CompilerConfig = createConfig(success)
+        val config: Option[CompilerConfig] = createConfig(success)
         val params: Array[String] = success.getArguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
         if (params.length == 0) {
           printUsage
           return -1
         }
-        if (config == null) return -1
-        val classes: Array[CompiledClass] = compile(config, params)
-        if (classes == null) return -1
-        if (generateFiles(classes)) 0 else -1
+        config match {
+          case None => -1
+          case Some(config) =>
+            val classes = compile(config, params)
+            (for (cs <- classes) yield {
+              val succeed = generateFiles(cs)
+              if (succeed) 0 else -1
+            }).getOrElse(-1)
+        }
     }
   }
 
@@ -154,63 +159,55 @@ class OnionCompilerFrontend {
     }
   }
 
-  private def createConfig(result: ParseSuccess): CompilerConfig = {
+  private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
     val option: Map[_, _] = result.getOptions
     val noargOption: Map[_, _] = result.getNoArgumentOptions
-    val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
-    val encoding: String = checkEncoding(option.get(ENCODING).asInstanceOf[String])
-    val outputDirectory: String = checkOutputDirectory(option.get(OUTPUT).asInstanceOf[String])
-    val maxErrorReport: Integer = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
-    if (encoding == null || maxErrorReport == null || outputDirectory == null) {
-      return null
+    val classpath: Array[String] = checkClasspath(Option(option.get(CLASSPATH).asInstanceOf[String]))
+    val encoding: Option[String] = checkEncoding(Option(option.get(ENCODING).asInstanceOf[String]))
+    val outputDirectory: String = checkOutputDirectory(Option(option.get(OUTPUT).asInstanceOf[String]))
+    val maxErrorReport: Option[Int] = checkMaxErrorReport(Option(option.get(MAX_ERROR).asInstanceOf[String]))
+    for (e <- encoding; m <- maxErrorReport) yield {
+      new CompilerConfig(classpath, "", e, outputDirectory, m)
     }
-    return new CompilerConfig(classpath, "", encoding, outputDirectory, maxErrorReport.intValue)
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): Array[CompiledClass] = {
-    val compiler: OnionCompiler = new OnionCompiler(config)
-    return compiler.compile(fileNames)
+  private def compile(config: CompilerConfig, fileNames: Array[String]): Option[Array[CompiledClass]] = {
+    Option(new OnionCompiler(config).compile(fileNames))
   }
 
-  private def checkClasspath(classpath: String): Array[String] = {
-    if (classpath == null) return DEFAULT_CLASSPATH
-    val paths: Array[String] = pathArray(classpath)
-    return paths
+  private def checkClasspath(classpath: Option[String]): Array[String] = {
+    (for (c <- classpath) yield pathArray(c)).getOrElse(DEFAULT_CLASSPATH)
   }
 
-  private def checkOutputDirectory(outputDirectory: String): String = {
-    if (outputDirectory == null) return DEFAULT_OUTPUT
-    return outputDirectory
-  }
+  private def checkOutputDirectory(outputDirectory: Option[String]): String = outputDirectory.getOrElse(DEFAULT_OUTPUT)
 
-  private def checkEncoding(encoding: String): String = {
-    if (encoding == null) return DEFAULT_ENCODING
+  private def checkEncoding(encoding: Option[String]): Option[String] = {
     try {
-      "".getBytes(encoding)
-      return encoding
-    }
-    catch {
+      (for (e <- encoding) yield {
+        "".getBytes(e)
+        e
+      }).orElse(Some(DEFAULT_ENCODING))
+    } catch {
       case e: UnsupportedEncodingException => {
         printerr(Messages.get("error.command.invalidEncoding", ENCODING))
-        return null
+        None
       }
     }
   }
 
-  private def checkMaxErrorReport(maxErrorReport: String): Integer = {
-    if (maxErrorReport == null) return new Integer(DEFAULT_MAX_ERROR)
+  private def checkMaxErrorReport(maxErrorReport: Option[String]): Option[Int] = {
     try {
-      val value: Int = Integer.parseInt(maxErrorReport)
-      if (value > 0) {
-        return new Integer(value)
+      maxErrorReport match {
+        case Some(m) =>
+          val value = Integer.parseInt(m)
+          if (value > 0) Some(value) else None
+        case None => Some(DEFAULT_MAX_ERROR)
       }
+    } catch {
+      case e: NumberFormatException =>
+        printerr(Messages.get("error.command.requireNaturalNumber", MAX_ERROR))
+        None
     }
-    catch {
-      case e: NumberFormatException => {
-      }
-    }
-    printerr(Messages.get("error.command.requireNaturalNumber", MAX_ERROR))
-    return null
   }
 
 }

@@ -2,23 +2,19 @@
 title: Programming Language Onion
 layout: default
 ---
-# Onion - statically typed object-oriented programming language on JVM
-
 Onion is an object-oriented and statically typed programming language. Source
 codes of Onion compiles into JVM class files (in memory / file).
 
 Originally, Onion was written in Java.  Recently, It has been rewritten in Scala
 completely except Parser, using JavaCC.
 
-## Usage of tools
+# Tools
 
-### onionc
-
-#### Usage:
+## onionc
 
     onionc [options] source files...
 
-###  Available options:
+##  Available options:
 + classpath <classpath> Set classpath of source files in compilation.
 + encoding <encoding> Set encoding of source files.
 + -d <output directory> Set output directory of results.
@@ -33,23 +29,23 @@ is compiled, class files is generated in:
   Windows: org\onion_lang
 .
 
-### onion
+## onion
 
-#### Usage:
     onionc [options] source files... [command line arguments]
 
-#### Available optionsÅF
+## Available options:
 + -classpath <classpath> Set classpath of source files in compilation.
 + -encoding <encoding> Set encoding of source files.
 + -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
 
 Onionc compiles source files into in-memory classfiles and execute them.  The entry
 point is:
-  If there is explicit class definitions and they have main methods,
-  The main method of the class on the top.  Otherwise, the first statement
-  in the toplevel is the entry point.
 
-## Limitations
+    If there is explicit class definitions and they have main methods,
+    The main method of the class on the top.  Otherwise, the first statement
+    in the toplevel is the entry point.
+
+# Limitations
 
 + Some compilation-time checks is not implemented  (e.g.
   checking that abstract methods are implemented, checking that
@@ -60,6 +56,10 @@ point is:
   compiled and executed property.
 + There are some features that is supported partially.
   For example, finally clause in try-catch is not supported yet.
+
+# License
+
+This software is distributed under modified BSD License.
 
 This software includes softwares developed by 
 Apache Software Foundation (http://www.apache.org/).

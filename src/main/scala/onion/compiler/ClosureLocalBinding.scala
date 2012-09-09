@@ -14,10 +14,6 @@ package onion.compiler
  */
 class ClosureLocalBinding(var frameIndex: Int, index: Int, `type`: IRT.TypeRef) extends LocalBinding(index, `type`) {
 
-  def setFrameIndex(frameIndex: Int) {
-    this.frameIndex = frameIndex
-  }
-
   def getFrameIndex: Int = {
     return frameIndex
   }

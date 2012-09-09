@@ -29,7 +29,7 @@ class CommandLineParser(confs: Array[OptionConfig]) {
     while (i < cmdline.length) {
       if (cmdline(i).startsWith("-")) {
         val param: String = cmdline(i)
-        val conf: OptionConfig = getConf(param)
+        val conf: OptionConfig = getConfig(param)
         if (conf == null) {
           invalidOptNames.add(param)
           i += 1
@@ -56,7 +56,7 @@ class CommandLineParser(confs: Array[OptionConfig]) {
       new ParseFailure(lackedOptNames.toArray(new Array[String](0)), invalidOptNames.toArray(new Array[String](0)))
   }
 
-  private def getConf(optionName: String): OptionConfig = {
+  private def getConfig(optionName: String): OptionConfig = {
     {
       var i: Int = 0
       while (i < confs.length) {

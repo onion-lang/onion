@@ -33,7 +33,7 @@ is compiled, class files is generated in:
 #### Usage:
     onionc [options] source files... [command line arguments]
 
-#### Available optionsÅF
+#### Available optionsÔøΩF
 + -classpath <classpath> Set classpath of source files in compilation.
 + -encoding <encoding> Set encoding of source files.
 + -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
@@ -55,6 +55,12 @@ point is:
   compiled and executed property.
 + There are some features that is supported partially.
   For example, finally clause in try-catch is not supported yet.
+
+## BuildHive (Jenkins)
+
+Onion uses BuildHive, Jenkins hosting service, for CI.  See the followings:
+
+https://buildhive.cloudbees.com/view/My%20Repositories/job/kmizu/job/onion/
 
 This software includes softwares developed by 
 Apache Software Foundation (http://www.apache.org/).

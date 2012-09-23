@@ -24,32 +24,30 @@ class SemanticErrorReporter(threshold: Int) {
   private var errorCount: Int = 0
 
   private def format(string: String): String = {
-    return MessageFormat.format(string)
+    MessageFormat.format(string)
   }
 
   private def format(string: String, arg: String): String = {
-    return MessageFormat.format(string, arg)
+    MessageFormat.format(string, arg)
   }
 
   private def format(string: String, arg1: String, arg2: String): String = {
-    return MessageFormat.format(string, arg1, arg2)
+    MessageFormat.format(string, arg1, arg2)
   }
 
   private def format(string: String, arg1: String, arg2: String, arg3: String): String = {
-    return MessageFormat.format(string, arg1, arg2, arg3)
+    MessageFormat.format(string, arg1, arg2, arg3)
   }
 
   private def format(string: String, arg1: String, arg2: String, arg3: String, arg4: String): String = {
-    return MessageFormat.format(string, arg1, arg2, arg3, arg4)
+    MessageFormat.format(string, arg1, arg2, arg3, arg4)
   }
 
   private def format(string: String, args: Array[String]): String = {
-    return MessageFormat.format(string, args.asInstanceOf[Array[AnyRef]]:_*)
+    MessageFormat.format(string, args.asInstanceOf[Array[AnyRef]]:_*)
   }
 
-  private def message(property: String): String = {
-    return Messages.get(property)
-  }
+  private[this] def message(property: String): String = Messages(property)
 
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
     var expected: IRT.TypeRef = items(0).asInstanceOf[IRT.TypeRef]

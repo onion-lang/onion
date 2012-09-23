@@ -46,7 +46,7 @@ class OnionCompiler(val config: CompilerConfig) {
       case ex: CompilationException => {
         ex.problems
         for (error <- ex.problems().asScala) printError(error)
-        System.err.println(Messages.get("error.count", ex.size))
+        System.err.println(Messages.apply("error.count", ex.size))
         return null
       }
     }

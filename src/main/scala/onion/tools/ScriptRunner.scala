@@ -109,7 +109,7 @@ class ScriptRunner {
       }
       i = 0
       while (i < lackedOptions.length) {
-        printerr(Messages.get("error.command..noArgument", lackedOptions(i)))
+        printerr(Messages.apply("error.command..noArgument", lackedOptions(i)))
         i += 1;
       }
       return null
@@ -147,7 +147,7 @@ class ScriptRunner {
     }
     catch {
       case e: UnsupportedEncodingException => {
-        System.err.println(Messages.get("error.command.invalidEncoding", ENCODING))
+        System.err.println(Messages.apply("error.command.invalidEncoding", ENCODING))
         return null
       }
     }
@@ -166,7 +166,7 @@ class ScriptRunner {
       case e: NumberFormatException => {
       }
     }
-    printerr(Messages.get("error.command.requireNaturalNumber", MAX_ERROR))
+    printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
     return null
   }
 

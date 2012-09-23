@@ -30,11 +30,11 @@ class Parsing(config: CompilerConfig) extends AnyRef
         buffer += parse(source(i).openReader, source(i).name)
       } catch {
         case e: IOException =>
-          problems += new CompileError(null, null, Messages.get("error.parsing.read_error", source(i).name))
+          problems += new CompileError(null, null, Messages("error.parsing.read_error", source(i).name))
         case e: ParseException =>
           val error = e.currentToken.next
           val expected = e.tokenImage(e.expectedTokenSequences(0)(0))
-          problems += new CompileError(source(i).name, new Location(error.beginLine, error.beginColumn), Messages.get("error.parsing.syntax_error", error.image, expected))
+          problems += new CompileError(source(i).name, new Location(error.beginLine, error.beginColumn), Messages("error.parsing.syntax_error", error.image, expected))
       }
     }
     if(problems.length > 0) throw new CompilationException(problems)

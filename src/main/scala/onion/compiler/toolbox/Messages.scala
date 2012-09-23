@@ -15,15 +15,13 @@ import java.util.ResourceBundle
  * Date: 2005/06/17
  */
 object Messages {
-  private val ERROR_MESSAGES: ResourceBundle = ResourceBundle.getBundle("errorMessage")
+  private[this] val ERROR_MESSAGES: ResourceBundle = ResourceBundle.getBundle("errorMessage")
 
-  def get(property: String): String =  ERROR_MESSAGES.getString(property)
+  def apply(property: String): String =  ERROR_MESSAGES.getString(property)
 
-  def get(property: String, arguments: Array[Any]): String =  MessageFormat.format(get(property), arguments.map(_.asInstanceOf[AnyRef]):_*)
+  def apply(property: String, arguments: Array[Any]): String =  MessageFormat.format(apply(property), arguments.map(_.asInstanceOf[AnyRef]):_*)
 
-  def get(property: String, arg1: Any): String = MessageFormat.format(get(property), arg1.asInstanceOf[AnyRef])
+  def apply(property: String, arg1: Any): String = MessageFormat.format(apply(property), arg1.asInstanceOf[AnyRef])
 
-  def get(property: String, arg1: Any, arg2: AnyRef): String =  MessageFormat.format(get(property), arg1.asInstanceOf[AnyRef], arg2)
-
-  def get(property: String, arg1: Any, arg2: AnyRef, arg3: AnyRef): String =  MessageFormat.format(get(property), arg1.asInstanceOf[AnyRef] ,arg2, arg3)
+  def apply(property: String, arg1: Any, arg2: Any): String =  MessageFormat.format(apply(property), arg1.asInstanceOf[AnyRef], arg2.asInstanceOf[AnyRef])
 }

@@ -153,8 +153,8 @@ class OnionCompilerFrontend {
         val failure = result.asInstanceOf[ParseFailure]
         val lackedOptions = failure.getLackedOptions
         val invalidOptions = failure.getInvalidOptions
-        invalidOptions.foreach{opt => printerr(Messages.get("error.command.invalidArgument", opt)) }
-        lackedOptions.foreach{opt => printerr(Messages.get("error.command..noArgument", opt)) }
+        invalidOptions.foreach{opt => printerr(Messages.apply("error.command.invalidArgument", opt)) }
+        lackedOptions.foreach{opt => printerr(Messages.apply("error.command..noArgument", opt)) }
         None
     }
   }
@@ -189,7 +189,7 @@ class OnionCompilerFrontend {
       }).orElse(Some(DEFAULT_ENCODING))
     } catch {
       case e: UnsupportedEncodingException => {
-        printerr(Messages.get("error.command.invalidEncoding", ENCODING))
+        printerr(Messages.apply("error.command.invalidEncoding", ENCODING))
         None
       }
     }
@@ -205,7 +205,7 @@ class OnionCompilerFrontend {
       }
     } catch {
       case e: NumberFormatException =>
-        printerr(Messages.get("error.command.requireNaturalNumber", MAX_ERROR))
+        printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
         None
     }
   }

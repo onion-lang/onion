@@ -33,16 +33,16 @@ is compiled, class files is generated in:
 #### Usage:
     onionc [options] source files... [command line arguments]
 
-#### Available options�F
-+ -classpath <classpath> Set classpath of source files in compilation.
-+ -encoding <encoding> Set encoding of source files.
-+ -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
+#### Available options
++ -classpath <classpath> classpath of source files in compilation.
++ -encoding <encoding> encoding of source files.
++ -maxErrorReports <error count> the maximum number of comiplation errors reported.
 
 Onionc compiles source files into in-memory classfiles and execute them.  The entry
 point is:
-  If there is explicit class definitions and they have main methods,
-  The main method of the class on the top.  Otherwise, the first statement
-  in the toplevel is the entry point.
++ If there is explicit class definitions and they have main methods,
++ The main method of the class on the top.
++ Otherwise, the first statement in the toplevel is the entry point.
 
 ## Limitations
 

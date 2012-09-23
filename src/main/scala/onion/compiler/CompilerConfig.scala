@@ -7,7 +7,6 @@
  * ************************************************************** */
 package onion.compiler
 
-import onion.compiler.toolbox.ArrayUtil
 
 /**
  * @author Kota Mizushima
@@ -41,6 +40,10 @@ class CompilerConfig(val classPath: Array[String], val superClass: String, val e
 
   override def equals(obj : Any): Boolean = {
     val another = obj.asInstanceOf[CompilerConfig]
-    encoding == another.encoding && superClass == another.superClass && ArrayUtil.equals(classPath.asInstanceOf[Array[AnyRef]], another.classPath.asInstanceOf[Array[AnyRef]]) && outputDirectory == another.outputDirectory && maxErrorReports == another.maxErrorReports
+    (  encoding == another.encoding
+    && superClass == another.superClass
+    && (classPath.asInstanceOf[Array[AnyRef]] sameElements another.classPath.asInstanceOf[Array[AnyRef]])
+    && outputDirectory == another.outputDirectory
+    && maxErrorReports == another.maxErrorReports)
   }
 }

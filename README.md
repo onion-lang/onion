@@ -46,15 +46,14 @@ point is:
 
 ## Limitations
 
-+ Some compilation-time checks is not implemented  (e.g.
-  checking that abstract methods are implemented, checking that
-  final methods are not overriden).  It maybe that the code compiled
-  successfully will be rejected by class file verifier.
-+	Currently, qualitiy of onionc implementation is not high.  The comiler
-  crashes in some codes.  The source-codes in example directory is
-  compiled and executed property.
-+ There are some features that is supported partially.
-  For example, finally clause in try-catch is not supported yet.
++ Some compilation-time checks is not implemented.  For example,
+  It is not checked that abstract methods are implemented. It maybe that
+  the code compiled successfully will be rejected by class file verifiers.
++ Currently, onionc has edge cases.  The compiler crashes sometimes.
+  The source codes in example directory compiles and can be executed
+  properly.
++ There are some partially supported features.  For example, finally clause
+  in try-catch is not supported yet.
 
 ## BuildHive (Jenkins)
 

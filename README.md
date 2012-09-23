@@ -40,9 +40,9 @@ is compiled, class files is generated in:
 
 Onionc compiles source files into in-memory classfiles and execute them.  The entry
 point is:
-+ If there is explicit class definitions and they have main methods,
-+ The main method of the class on the top.
-+ Otherwise, the first statement in the toplevel is the entry point.
+1. A main method if there is an explicit class definition and it have the main method.
+2. The main method of the class on the top.
+3. Otherwise, the first statement on the top.
 
 ## Limitations
 

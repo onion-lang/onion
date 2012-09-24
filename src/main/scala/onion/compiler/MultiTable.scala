@@ -44,5 +44,5 @@ class MultiTable[E <: Named] extends Iterable[E] {
     list
   }
 
-  def iterator: Iterator[E] =  return values.iterator
+  def iterator: Iterator[E] = values.iterator
 }

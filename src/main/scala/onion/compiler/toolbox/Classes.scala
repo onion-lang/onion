@@ -20,7 +20,7 @@ object Classes {
   def getInterfaceMethods(`type`: IRT.ClassTypeRef): Set[IRT.MethodRef] = {
     val methods: Set[IRT.MethodRef] = new TreeSet[IRT.MethodRef](new IRT.MethodRefComparator)
     collectInterfaceMethods(`type`, methods)
-    return methods
+    methods
   }
 
   private def collectInterfaceMethods(`type`: IRT.ClassTypeRef, set: Set[IRT.MethodRef]) {

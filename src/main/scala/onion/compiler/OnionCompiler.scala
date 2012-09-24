@@ -35,19 +35,19 @@ class OnionCompiler(val config: CompilerConfig) {
         })
       }
     }
-    return compile(srcs)
+    compile(srcs)
   }
 
   def compile(srcs: Array[InputSource]): Array[CompiledClass] = {
     try {
-      return (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs)).asInstanceOf[Array[CompiledClass]]
+      (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs)).asInstanceOf[Array[CompiledClass]]
     }
     catch {
       case ex: CompilationException => {
         ex.problems
         for (error <- ex.problems().asScala) printError(error)
         System.err.println(Messages.apply("error.count", ex.size))
-        return null
+        null
       }
     }
   }
@@ -84,9 +84,7 @@ class OnionCompiler(val config: CompilerConfig) {
     System.err.println(new String(message))
   }
 
-  private def getCursor(column: Int): String = {
-    return Strings.repeat(" ", column - 1) + "^"
-  }
+  private def getCursor(column: Int): String =  Strings.repeat(" ", column - 1) + "^"
 
   private def getLine(sourceFile: String, lineNumber: Int): String = {
     var reader: BufferedReader = Inputs.newReader(sourceFile)

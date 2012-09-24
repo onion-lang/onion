@@ -47,7 +47,7 @@ class LocalFrame(val parent: LocalFrame) {
   }
 
   private[compiler] def getScope: LocalScope = {
-    return scope
+    scope
   }
 
   def entries: Array[LocalBinding] = {
@@ -71,7 +71,7 @@ class LocalFrame(val parent: LocalFrame) {
       def compare(b1: LocalBinding, b2: LocalBinding): Int = {
         val i1 = b1.getIndex
         val i2 = b2.getIndex
-        return if (i1 < i2) -1 else if (i1 > i2) 1 else 0
+        if (i1 < i2) -1 else if (i1 > i2) 1 else 0
       }
     })
     binds

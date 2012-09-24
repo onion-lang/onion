@@ -11,6 +11,6 @@ package onion.compiler
  * @author Kota Mizushima
  */
 class LocalBinding(val index: Int, val `type`: IRT.TypeRef) {
-  def getIndex: Int =  return index
+  def getIndex: Int = index
   def getType: IRT.TypeRef = `type`
 }

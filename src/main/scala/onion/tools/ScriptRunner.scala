@@ -26,12 +26,10 @@ import onion.tools.option.ParseSuccess
  */
 object ScriptRunner {
   private def conf(optionName: String, requireArgument: Boolean): OptionConfig = {
-    return new OptionConfig(optionName, requireArgument)
+    new OptionConfig(optionName, requireArgument)
   }
 
-  private def pathArray(path: String): Array[String] = {
-    return path.split(Systems.pathSeparator)
-  }
+  private def pathArray(path: String): Array[String] =  path.split(Systems.pathSeparator)
 
   private def printerr(message: String) {
     System.err.println(message)
@@ -85,7 +83,7 @@ class ScriptRunner {
       i += 1
     }
     val shell: OnionShell = new OnionShell(classOf[OnionClassLoader].getClassLoader, config.getClassPath)
-    return shell.run(classes, scriptParams)
+    shell.run(classes, scriptParams)
   }
 
   protected def printUsage {
@@ -114,7 +112,7 @@ class ScriptRunner {
       }
       return null
     }
-    return result.asInstanceOf[ParseSuccess]
+    result.asInstanceOf[ParseSuccess]
   }
 
   private def createConfig(result: ParseSuccess): CompilerConfig = {
@@ -126,29 +124,29 @@ class ScriptRunner {
     if (encoding == null || maxErrorReport == null) {
       return null
     }
-    return new CompilerConfig(classpath, "", encoding, ".", maxErrorReport.intValue)
+    new CompilerConfig(classpath, "", encoding, ".", maxErrorReport.intValue)
   }
 
   private def compile(config: CompilerConfig, fileNames: Array[String]): Array[CompiledClass] = {
-    return new OnionCompiler(config).compile(fileNames)
+    new OnionCompiler(config).compile(fileNames)
   }
 
   private def checkClasspath(classpath: String): Array[String] = {
     if (classpath == null) return DEFAULT_CLASSPATH
     val paths: Array[String] = pathArray(classpath)
-    return paths
+    paths
   }
 
   private def checkEncoding(encoding: String): String = {
     if (encoding == null) return System.getProperty("file.encoding")
     try {
       "".getBytes(encoding)
-      return encoding
+      encoding
     }
     catch {
       case e: UnsupportedEncodingException => {
         System.err.println(Messages.apply("error.command.invalidEncoding", ENCODING))
-        return null
+        null
       }
     }
   }
@@ -167,7 +165,7 @@ class ScriptRunner {
       }
     }
     printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
-    return null
+    null
   }
 
 }

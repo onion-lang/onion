@@ -71,7 +71,7 @@ class CommandLineParser(confs: Array[OptionConfig]) {
         })
       }
     }
-    return null
+    null
   }
 
 }

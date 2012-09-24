@@ -29,12 +29,10 @@ object ClassFileClassTypeRef {
     modifier |= (if (isOn(src, ACC_SYNCHRONIZED)) Modifier.SYNCHRONIZED else modifier)
     modifier |= (if (isOn(src, ACC_ABSTRACT)) Modifier.ABSTRACT else modifier)
     modifier |= (if (isOn(src, ACC_FINAL)) Modifier.FINAL else modifier)
-    return modifier
+    modifier
   }
 
-  private def isOn(modifier: Int, flag: Int): Boolean = {
-    return (modifier & flag) != 0
-  }
+  private def isOn(modifier: Int, flag: Int): Boolean =  (modifier & flag) != 0
 
   private final val CONSTRUCTOR_NAME: String = "<init>"
 }
@@ -49,24 +47,18 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   private var fields_ : OrderedTable[IRT.FieldRef] = null
   private var constructors_ : List[IRT.ConstructorRef] = null
 
-  def isInterface: Boolean = {
-    return (javaClass.getModifiers & ACC_INTERFACE) != 0
-  }
+  def isInterface: Boolean = (javaClass.getModifiers & ACC_INTERFACE) != 0
 
-  def modifier: Int = {
-    return modifier_
-  }
+  def modifier: Int = modifier_
 
-  def name: String = {
-    return javaClass.getClassName
-  }
+  def name: String = javaClass.getClassName
 
   def superClass: IRT.ClassTypeRef = {
     val superClass: IRT.ClassTypeRef = table.load(javaClass.getSuperclassName)
     if (superClass eq this) {
       return null
     }
-    return superClass
+    superClass
   }
 
   def interfaces: Array[IRT.ClassTypeRef] = {
@@ -77,17 +69,17 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
       interfaces(i) = table.load(interfaceNames(i))
       i += 1
     }
-    return interfaces
+    interfaces
   }
 
   def methods: Array[IRT.MethodRef] = {
     requireMethodTable
-    return methods_.values.toArray(new Array[IRT.MethodRef](0))
+    methods_.values.toArray(new Array[IRT.MethodRef](0))
   }
 
   def methods(name: String): Array[IRT.MethodRef] = {
     requireMethodTable
-    return methods_.get(name).toArray(new Array[IRT.MethodRef](0))
+    methods_.get(name).toArray(new Array[IRT.MethodRef](0))
   }
 
   private def requireMethodTable {
@@ -101,12 +93,12 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   def fields: Array[IRT.FieldRef] = {
     requireFieldTable
-    return fields_.values.toArray(new Array[IRT.FieldRef](0))
+    fields_.values.toArray(new Array[IRT.FieldRef](0))
   }
 
   def field(name: String): IRT.FieldRef = {
     requireFieldTable
-    return fields_.get(name)
+    fields_.get(name)
   }
 
   private def requireFieldTable {
@@ -127,7 +119,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
         }
       }
     }
-    return constructors_.toArray(new Array[IRT.ConstructorRef](0))
+    constructors_.toArray(new Array[IRT.ConstructorRef](0))
   }
 
   private def translate(method: Method): IRT.MethodRef = {
@@ -139,12 +131,12 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
       i += 1
     }
     val returnSymbol: IRT.TypeRef = bridge.toOnionType(method.getReturnType)
-    return new ClassFileMethodRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols, returnSymbol)
+    new ClassFileMethodRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols, returnSymbol)
   }
 
   private def translate(field: Field): IRT.FieldRef = {
     val symbol: IRT.TypeRef = bridge.toOnionType(field.getType)
-    return new ClassFileFieldRef(toOnionModifier(field.getModifiers), this, field.getName, symbol)
+    new ClassFileFieldRef(toOnionModifier(field.getModifiers), this, field.getName, symbol)
   }
 
   private def translateConstructor(method: Method): IRT.ConstructorRef = {
@@ -155,7 +147,6 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
       argumentSymbols(i) = bridge.toOnionType(arguments(i))
       i += 1
     }
-    return new ClassFileConstructorRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols)
+    new ClassFileConstructorRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols)
   }
-
 }

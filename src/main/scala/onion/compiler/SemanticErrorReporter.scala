@@ -74,7 +74,7 @@ class SemanticErrorReporter(threshold: Int) {
         }
       }
     }
-    return new String(buffer)
+    new String(buffer)
   }
 
   private def reportIncompatibleOperandType(position: Location, items: Array[AnyRef]): Unit = {
@@ -274,9 +274,7 @@ class SemanticErrorReporter(threshold: Int) {
     }
   }
 
-  def getProblems: Array[CompileError] = {
-    return problems.toArray(new Array[CompileError](0)).asInstanceOf[Array[CompileError]]
-  }
+  def getProblems: Array[CompileError] = problems.toArray(new Array[CompileError](0)).asInstanceOf[Array[CompileError]]
 
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile

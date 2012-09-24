@@ -31,7 +31,7 @@ class ClassTable(private val classPath: String) {
     if (array != null) return array
     array = new IRT.ArrayTypeRef(component, dimension, this)
     arrayClasses.put(arrayName, array)
-    return array
+    array
   }
 
   def load(className: String): IRT.ClassTypeRef = {
@@ -58,7 +58,7 @@ class ClassTable(private val classPath: String) {
 
   def lookup(className: String): IRT.ClassTypeRef = {
     val ref = classes.get(className)
-    return if ((ref != null)) ref else classFiles.get(className)
+    if ((ref != null)) ref else classFiles.get(className)
   }
 
 }

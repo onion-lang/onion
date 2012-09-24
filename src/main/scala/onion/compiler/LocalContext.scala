@@ -37,15 +37,14 @@ class LocalContext {
   }
 
   def newName: String = {
-    return generator.generate
+    generator.generate
   }
 
   def returnType: IRT.TypeRef = {
     if (isMethod) {
-      return method.returnType
-    }
-    else {
-      return IRT.BasicTypeRef.VOID
+      method.returnType
+    } else {
+      IRT.BasicTypeRef.VOID
     }
   }
 
@@ -69,15 +68,14 @@ class LocalContext {
 
   def depth: Int = {
     if (contextFrame == null) {
-      return -1
-    }
-    else {
-      return contextFrame.depth
+      -1
+    } else {
+      contextFrame.depth
     }
   }
 
   def getContextFrame: LocalFrame = {
-    return contextFrame
+    contextFrame
   }
 
   def setContextFrame(frame: LocalFrame): Unit = {
@@ -95,21 +93,21 @@ class LocalContext {
   def open[A](block: => A): A = contextFrame.open(block)
 
   def lookup(name: String): ClosureLocalBinding = {
-    return contextFrame.lookup(name)
+    contextFrame.lookup(name)
   }
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
-    return contextFrame.lookupOnlyCurrentScope(name)
+    contextFrame.lookupOnlyCurrentScope(name)
   }
 
   def add(name: String, `type` : IRT.TypeRef): Int = {
-    return contextFrame.add(name, `type`)
+    contextFrame.add(name, `type`)
   }
 
   def add(`type` : IRT.TypeRef): String = {
     var name: String = newName
     contextFrame.add(name, `type`)
-    return name
+    name
   }
 
 }

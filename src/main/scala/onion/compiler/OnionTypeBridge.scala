@@ -68,7 +68,7 @@ class OnionTypeBridge(table: ClassTable) {
       val componentType: IRT.TypeRef = toOnionType(component)
       return table.loadArray(componentType, dimension)
     }
-    return null
+    null
   }
 
   def toOnionType(`type`: Type): IRT.TypeRef = {
@@ -91,6 +91,6 @@ class OnionTypeBridge(table: ClassTable) {
         return table.loadArray(component, arrType.getDimensions)
       }
     }
-    return null
+    null
   }
 }

@@ -29,12 +29,10 @@ object ReflectionalClassTypeRef {
     modifier |= (if (isOn(src, java.lang.reflect.Modifier.SYNCHRONIZED)) Modifier.SYNCHRONIZED else modifier)
     modifier |= (if (isOn(src, java.lang.reflect.Modifier.ABSTRACT)) Modifier.ABSTRACT else modifier)
     modifier |= (if (isOn(src, java.lang.reflect.Modifier.FINAL)) Modifier.FINAL else modifier)
-    return modifier
+    modifier
   }
 
-  private def isOn(modifier: Int, flag: Int): Boolean = {
-    return (modifier & flag) != 0
-  }
+  private def isOn(modifier: Int, flag: Int): Boolean =  (modifier & flag) != 0
 
   private final val CONSTRUCTOR_NAME: String = "<init>"
 }
@@ -47,9 +45,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   private var fields_ : OrderedTable[IRT.FieldRef] = null
   private var constructors_ : List[IRT.ConstructorRef] = null
 
-  def isInterface: Boolean = {
-    return (klass.getModifiers & java.lang.reflect.Modifier.INTERFACE) != 0
-  }
+  def isInterface: Boolean = (klass.getModifiers & java.lang.reflect.Modifier.INTERFACE) != 0
 
   def modifier: Int = modifier_
 
@@ -137,7 +133,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   }
 
   private def translate(field: Field): IRT.FieldRef = {
-    return new ClassFileFieldRef(toOnionModifier(field.getModifiers), this, field.getName, bridge.toOnionType(field.getType))
+    new ClassFileFieldRef(toOnionModifier(field.getModifiers), this, field.getName, bridge.toOnionType(field.getType))
   }
 
   private def translate(constructor: Constructor[_]): IRT.ConstructorRef = {

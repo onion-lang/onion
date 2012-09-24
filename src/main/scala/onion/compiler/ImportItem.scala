@@ -43,7 +43,7 @@ class ImportItem(val simpleName: String, val fullyQualifiedName: String) {
     } else if (this.simpleName == simpleName) {
       fullyQualifiedName
     } else {
-      return null
+      null
     }
   }
 

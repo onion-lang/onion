@@ -46,7 +46,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     private def forName(name: String, qualified: Boolean): ClassTypeRef = {
       if(qualified) {
-        return table_.load(name);
+        table_.load(name);
       }else {
         for(item <- imports) {
           val qname = item matches name
@@ -55,7 +55,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             if(mappedType != null) return mappedType
           }
         }
-        return null
+        null
       }
     }
   }
@@ -259,7 +259,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val newVisit = visit + node
         if(loop(node.superClass, newVisit)) return true
         for(interface <- node.interfaces) if(loop(interface, newVisit)) return true
-        return false
+        false
       }
       loop(start, Set[ClassTypeRef]())
     }
@@ -518,7 +518,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         return null
       }
       value = processAssignable(node.right, field.`type`, value)
-      return if (value != null) new SetField(new This(selfClass), field, value) else null
+      if (value != null) new SetField(new This(selfClass), field, value) else null
     }
     def processArrayAssign(node: AST.Assignment, context: LocalContext): Term = {
       var value = typed(node.right, context).getOrElse(null)
@@ -652,7 +652,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
       if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
       if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
-      return new BinaryTerm(kind, resultType, left, right)
+      new BinaryTerm(kind, resultType, left, right)
     }
     def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
       val left: Term = typed(node.left, context).getOrElse(null)
@@ -664,7 +664,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
         return null
       }
-      return Array[Term](left, right)
+      Array[Term](left, right)
     }
     def processRefEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
       var left: Term = typed(node.left, context).getOrElse(null)
@@ -1596,7 +1596,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   def topClass: String = {
     val module = unit_.module
     val moduleName = if (module != null) module.name else null
-    return createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
+    createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
   }
   private def put(astNode: AST.Node, kernelNode: Node) {
     ast2ixt_(astNode) = kernelNode
@@ -1616,7 +1616,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): TypeRef = {
     val mappedType = mapper.map(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, AST.toString(typeNode.desc))
-    return mappedType
+    mappedType
   }
   private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
     val params = Array[Term](new AsInstanceOf(rhs, rootClass))
@@ -1631,16 +1631,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def indexref(bind: ClosureLocalBinding, value: Term): Term = new RefArray(new RefLocal(bind), value)
   private def assign(bind: ClosureLocalBinding, value: Term): ActionStatement = new ExpressionActionStatement(new SetLocal(bind, value))
   private def ref(bind: ClosureLocalBinding): Term = new RefLocal(bind)
-  private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String): MethodRef = {
-    return findMethod(node, target, name, new Array[Term](0))
-  }
+  private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String): MethodRef =  findMethod(node, target, name, new Array[Term](0))
   private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String, params: Array[Term]): MethodRef = {
     val methods = target.findMethod(name, params)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
       return null
     }
-    return methods(0)
+    methods(0)
   }
   private def hasSamePackage(a: ClassTypeRef, b: ClassTypeRef): Boolean = {
     var name1 = a.name
@@ -1651,7 +1649,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     else name1 = ""
     index = name2.lastIndexOf(".")
     name2 = if(index >= 0) name2.substring(0, index) else ""
-    return name1 == name2
+    name1 == name2
   }
   private def isAccessible(target: ClassTypeRef, context: ClassTypeRef): Boolean = {
     if (hasSamePackage(target, context))  true else (target.modifier & AST.M_INTERNAL) == 0
@@ -1672,7 +1670,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       field = findField(interface, name)
       if (field != null) return field
     }
-    return null
+    null
   }
   private def isAccessible(node: AST.Node, target: ObjectTypeRef, context: ClassTypeRef): Boolean = {
     if (target.isArrayType) {
@@ -1689,7 +1687,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         return false
       }
     }
-    return true
+    true
   }
   private def hasNumericType(term: Term): Boolean =  return numeric(term.`type`)
   private def numeric(symbol: TypeRef): Boolean = {
@@ -1699,7 +1697,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     for(i <- 0 until params.length) {
       if (arguments(i) != params(i).`type`) params(i) = new AsInstanceOf(params(i), arguments(i))
     }
-    return params
+    params
   }
   private def types(terms: Array[Term]): Array[TypeRef] = terms.map{term => term.`type`}
   private def typeNames(types: Array[TypeRef]): Array[String] = types.map{t => t.name}
@@ -1740,7 +1738,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     if ((left eq IRT.BasicTypeRef.LONG) || (right eq IRT.BasicTypeRef.LONG)) {
       return IRT.BasicTypeRef.LONG
     }
-    return IRT.BasicTypeRef.INT
+    IRT.BasicTypeRef.INT
   }
   private def processNumericExpression(kind: Int, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
     var left = lt
@@ -1752,7 +1750,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     var resultType: TypeRef = promote(left.`type`, right.`type`)
     if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
     if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
-    return new BinaryTerm(kind, resultType, left, right)
+    new BinaryTerm(kind, resultType, left, right)
   }
   private def promoteInteger(typeRef: TypeRef): TypeRef = {
     if (typeRef == IRT.BasicTypeRef.BYTE || typeRef == IRT.BasicTypeRef.SHORT || typeRef == IRT.BasicTypeRef.CHAR || typeRef == IRT.BasicTypeRef.INT) {
@@ -1761,7 +1759,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     if (typeRef == IRT.BasicTypeRef.LONG) {
       return IRT.BasicTypeRef.LONG
     }
-    return null
+    null
   }
   private def addArgument(arg: AST.Argument, context: LocalContext): TypeRef = {
     val name = arg.name

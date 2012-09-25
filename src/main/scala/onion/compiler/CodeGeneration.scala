@@ -335,14 +335,12 @@ class CodeGeneration(config: CompilerConfig) {
 
   def process(classes: Array[IRT.ClassDefinition]): Array[CompiledClass] = {
     compiledClasses.clear
-    var base: String = config.getOutputDirectory
-    base = if (base != null) base else "."
-    base += Systems.fileSeparator
+    val base =  (if (config.outputDirectory != null) config.outputDirectory else ".") + Systems.fileSeparator
     for (klass <- classes) codeClass(klass)
     val classFiles: List[CompiledClass] = new ArrayList[CompiledClass]
     import scala.collection.JavaConversions._
     for (o <- compiledClasses) {
-      val clazz: JavaClass = o.asInstanceOf[JavaClass]
+      val clazz: JavaClass = o
       val outDir: String = getOutputDir(base, clazz.getClassName)
       classFiles.add(new CompiledClass(clazz.getClassName, outDir, clazz.getBytes))
     }

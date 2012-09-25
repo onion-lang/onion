@@ -59,7 +59,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
   }
-  private val table_  = new ClassTable(classpath(config.getClassPath))
+  private val table_  = new ClassTable(classpath(config.classPath))
   private val ast2ixt_ = Map[AST.Node, Node]()
   private var ixt2ast_ = Map[Node, AST.Node]()
   private var mappers_  = Map[String, NameMapper]()
@@ -69,7 +69,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private var staticImportedList_ : StaticImportList = _
   private var definition_ : ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
-  private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.getMaxErrorReports)
+  private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   def newEnvironment(source: Array[AST.CompilationUnit]) = new TypingEnvironment
   def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[ClassDefinition] = {
     for(unit <- source) processHeader(unit)

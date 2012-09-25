@@ -69,7 +69,7 @@ class ScriptRunner {
     if (result == null) return -1
     val config: CompilerConfig = createConfig(result)
     if (config == null) return -1
-    val params: Array[String] = result.getArguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
+    val params: Array[String] = result.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
     if (params.length == 0) {
       printUsage
       return -1
@@ -82,7 +82,7 @@ class ScriptRunner {
       scriptParams(i - 1) = params(i)
       i += 1
     }
-    val shell: OnionShell = new OnionShell(classOf[OnionClassLoader].getClassLoader, config.getClassPath)
+    val shell: OnionShell = new OnionShell(classOf[OnionClassLoader].getClassLoader, config.classPath)
     shell.run(classes, scriptParams)
   }
 
@@ -97,10 +97,10 @@ class ScriptRunner {
 
   private def parseCommandLine(commandLine: Array[String]): ParseSuccess = {
     val result: ParseResult = commandLineParser.parse(commandLine)
-    if (result.getStatus == ParseResult.FAILURE) {
+    if (result.status == ParseResult.FAILURE) {
       val failure: ParseFailure = result.asInstanceOf[ParseFailure]
-      val lackedOptions: Array[String] = failure.getLackedOptions
-      val invalidOptions: Array[String] = failure.getInvalidOptions
+      val lackedOptions: Array[String] = failure.lackedOptions
+      val invalidOptions: Array[String] = failure.invalidOptions
       var i: Int = 0
       while (i < invalidOptions.length) {
         i += 1;
@@ -116,8 +116,8 @@ class ScriptRunner {
   }
 
   private def createConfig(result: ParseSuccess): CompilerConfig = {
-    val option: Map[_, _] = result.getOptions
-    val noargOption: Map[_, _] = result.getNoArgumentOptions
+    val option: Map[_, _] = result.options
+    val noargOption: Map[_, _] = result.noArgumentOptions
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
     val encoding: String = checkEncoding(option.get(ENCODING).asInstanceOf[String])
     val maxErrorReport: Integer = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])

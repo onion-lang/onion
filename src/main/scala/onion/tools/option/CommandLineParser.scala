@@ -57,19 +57,12 @@ class CommandLineParser(confs: Array[OptionConfig]) {
   }
 
   private def getConfig(optionName: String): OptionConfig = {
-    {
-      var i: Int = 0
-      while (i < confs.length) {
-        {
-          if (confs(i).getOptionName == optionName) {
-            return confs(i)
-          }
-        }
-        ({
-          i += 1;
-          i
-        })
+    var i: Int = 0
+    while (i < confs.length) {
+      if (confs(i).optionName == optionName) {
+        return confs(i)
       }
+      i += 1;
     }
     null
   }

@@ -41,7 +41,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   import ClassFileClassTypeRef._
 
-  private var bridge: OnionTypeBridge = new OnionTypeBridge(table)
+  private var bridge: OnionTypeConversion = new OnionTypeConversion(table)
   private var modifier_ : Int = toOnionModifier(javaClass.getModifiers)
   private var methods_ : MultiTable[IRT.MethodRef] = null
   private var fields_ : OrderedTable[IRT.FieldRef] = null

@@ -14,28 +14,8 @@ package onion.compiler
  */
 class CompilerConfig(val classPath: Array[String], val superClass: String, val encoding: String, val outputDirectory: String, val maxErrorReports: Int) extends AnyRef with Cloneable {
 
-  override def clone: AnyRef = {
-    new CompilerConfig(classPath.clone.asInstanceOf[Array[String]], superClass, encoding, outputDirectory, maxErrorReports)
-  }
-
-  def getClassPath: Array[String] = {
-    classPath.clone.asInstanceOf[Array[String]]
-  }
-
-  def getSuperClass: String = {
-    superClass
-  }
-
-  def getEncoding: String = {
-    encoding
-  }
-
-  def getOutputDirectory: String = {
-    outputDirectory
-  }
-
-  def getMaxErrorReports: Int = {
-    maxErrorReports
+  override def clone: CompilerConfig = {
+    new CompilerConfig(classPath.clone(), superClass, encoding, outputDirectory, maxErrorReports)
   }
 
   override def equals(obj : Any): Boolean = {

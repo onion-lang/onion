@@ -34,20 +34,17 @@ import onion.tools.option.ParseSuccess
  *
  */
 object OnionCompilerFrontend {
-  private def conf(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
+  private def config(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
 
   private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
 
-  private def printerr(message: String): Unit = System.err.println(message)
+  private def printError(message: String): Unit = System.err.println(message)
 
   def main(args: Array[String]): Unit = {
     try {
       new OnionCompilerFrontend().run(args)
-    }
-    catch {
-      case e: ScriptException => {
-        throw e.getCause
-      }
+    } catch {
+      case e: ScriptException => throw e.getCause
     }
   }
 
@@ -66,7 +63,7 @@ class OnionCompilerFrontend {
 
   import OnionCompilerFrontend._
 
-  private val commandLineParser = new CommandLineParser(Array[OptionConfig](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(OUTPUT, true), conf(MAX_ERROR, true)))
+  private val commandLineParser = new CommandLineParser(Array[OptionConfig](config(CLASSPATH, true), config(SCRIPT_SUPER_CLASS, true), config(ENCODING, true), config(OUTPUT, true), config(MAX_ERROR, true)))
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {
@@ -78,7 +75,7 @@ class OnionCompilerFrontend {
       case None => -1
       case Some(success) =>
         val config: Option[CompilerConfig] = createConfig(success)
-        val params: Array[String] = success.getArguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
+        val params: Array[String] = success.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
         if (params.length == 0) {
           printUsage
           return -1
@@ -136,13 +133,13 @@ class OnionCompilerFrontend {
   }
 
   protected def printUsage {
-    printerr("Usage: onionc [-options] source_file ...")
-    printerr("options: ")
-    printerr("  -super <super class>        specify script's super class")
-    printerr("  -d <path>                   specify output directory")
-    printerr("  -classpath <path>           specify classpath")
-    printerr("  -encoding <encoding>        specify source file encoding")
-    printerr("  -maxErrorReport <number>    set number of errors reported")
+    printError("Usage: onionc [-options] source_file ...")
+    printError("options: ")
+    printError("  -super <super class>        specify script's super class")
+    printError("  -d <path>                   specify output directory")
+    printError("  -classpath <path>           specify classpath")
+    printError("  -encoding <encoding>        specify source file encoding")
+    printError("  -maxErrorReport <number>    set number of errors reported")
   }
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
@@ -151,17 +148,17 @@ class OnionCompilerFrontend {
       case success: ParseSuccess => Some(success)
       case failure: ParseFailure =>
         val failure = result.asInstanceOf[ParseFailure]
-        val lackedOptions = failure.getLackedOptions
-        val invalidOptions = failure.getInvalidOptions
-        invalidOptions.foreach{opt => printerr(Messages.apply("error.command.invalidArgument", opt)) }
-        lackedOptions.foreach{opt => printerr(Messages.apply("error.command..noArgument", opt)) }
+        val lackedOptions = failure.lackedOptions
+        val invalidOptions = failure.invalidOptions
+        invalidOptions.foreach{opt => printError(Messages.apply("error.command.invalidArgument", opt)) }
+        lackedOptions.foreach{opt => printError(Messages.apply("error.command..noArgument", opt)) }
         None
     }
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
-    val option: Map[_, _] = result.getOptions
-    val noargOption: Map[_, _] = result.getNoArgumentOptions
+    val option: Map[_, _] = result.options
+    val noargOption: Map[_, _] = result.noArgumentOptions
     val classpath: Array[String] = checkClasspath(Option(option.get(CLASSPATH).asInstanceOf[String]))
     val encoding: Option[String] = checkEncoding(Option(option.get(ENCODING).asInstanceOf[String]))
     val outputDirectory: String = checkOutputDirectory(Option(option.get(OUTPUT).asInstanceOf[String]))
@@ -189,7 +186,7 @@ class OnionCompilerFrontend {
       }).orElse(Some(DEFAULT_ENCODING))
     } catch {
       case e: UnsupportedEncodingException => {
-        printerr(Messages.apply("error.command.invalidEncoding", ENCODING))
+        printError(Messages.apply("error.command.invalidEncoding", ENCODING))
         None
       }
     }
@@ -205,7 +202,7 @@ class OnionCompilerFrontend {
       }
     } catch {
       case e: NumberFormatException =>
-        printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
+        printError(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
         None
     }
   }

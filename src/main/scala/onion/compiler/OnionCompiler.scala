@@ -27,14 +27,12 @@ class OnionCompiler(val config: CompilerConfig) {
 
   def compile(srcs: Array[InputSource]): Array[CompiledClass] = {
     try {
-      (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs)).asInstanceOf[Array[CompiledClass]]
-    }
-    catch {
-      case e: CompilationException => {
+      (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs))
+    } catch {
+      case e: CompilationException =>
         for (error <- e.problems().asScala) printError(error)
         System.err.println(Messages("error.count", e.size))
         null
-      }
     }
   }
 

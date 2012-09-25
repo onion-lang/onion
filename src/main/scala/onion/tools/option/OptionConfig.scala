@@ -11,6 +11,4 @@ package onion.tools.option
  * @author Kota Mizushima
  *         Date: 2005/04/08
  */
-class OptionConfig(val optionName: String, val hasArgument : Boolean) {
-  def getOptionName: String = optionName
-}
+case class OptionConfig(val optionName: String, val hasArgument : Boolean)

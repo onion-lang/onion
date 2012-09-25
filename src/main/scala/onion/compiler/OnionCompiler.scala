@@ -22,44 +22,28 @@ import onion.compiler.exceptions.CompilationException
 class OnionCompiler(val config: CompilerConfig) {
 
   def compile(fileNames: Array[String]): Array[CompiledClass] = {
-    var srcs: Array[InputSource] = new Array[InputSource](fileNames.length)
-
-    {
-      var i: Int = 0
-      while (i < srcs.length) {
-        {
-          srcs(i) = new FileInputSource(fileNames(i))
-        }
-        ({
-          i += 1; i
-        })
-      }
-    }
-    compile(srcs)
+    compile(fileNames.map {new FileInputSource(_)}:Array[InputSource])
   }
 
   def compile(srcs: Array[InputSource]): Array[CompiledClass] = {
     try {
-      (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs)).asInstanceOf[Array[CompiledClass]]
-    }
-    catch {
-      case ex: CompilationException => {
-        ex.problems
-        for (error <- ex.problems().asScala) printError(error)
-        System.err.println(Messages.apply("error.count", ex.size))
+      (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs))
+    } catch {
+      case e: CompilationException =>
+        for (error <- e.problems().asScala) printError(error)
+        System.err.println(Messages("error.count", e.size))
         null
-      }
     }
   }
 
   private def printError(error: CompileError): Unit = {
-    var location: Location = error.location
-    var sourceFile: String = error.sourceFile
-    var message: StringBuffer = new StringBuffer
+    val location = error.location
+    val sourceFile = error.sourceFile
+    val message = new StringBuffer
+
     if (sourceFile == null) {
       message.append(MessageFormat.format("{0}", error.message))
-    }
-    else {
+    } else {
       var line: String = null
       var lineNum: String = null
       try {
@@ -77,9 +61,7 @@ class OnionCompiler(val config: CompilerConfig) {
       message.append(line)
       message.append(Systems.lineSeparator)
       message.append("\t\t")
-      if (location != null) {
-        message.append(getCursor(location.column))
-      }
+      if (location != null)  message.append(getCursor(location.column))
     }
     System.err.println(new String(message))
   }
@@ -87,14 +69,13 @@ class OnionCompiler(val config: CompilerConfig) {
   private def getCursor(column: Int): String =  Strings.repeat(" ", column - 1) + "^"
 
   private def getLine(sourceFile: String, lineNumber: Int): String = {
-    var reader: BufferedReader = Inputs.newReader(sourceFile)
+    val reader = Inputs.newReader(sourceFile)
     try {
       val line = Iterator.continually(reader.readLine()).takeWhile(_ != null).zipWithIndex.map{ case (e, i) => (e, i + 1)}.find{
         case (e, i) => i == lineNumber
       }
       line.get._1
-    }
-    finally {
+    } finally {
       reader.close
     }
   }

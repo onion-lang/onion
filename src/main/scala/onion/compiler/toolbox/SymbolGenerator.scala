@@ -12,15 +12,13 @@ package onion.compiler.toolbox
  *         Date: 2005/07/07
  */
 class SymbolGenerator(val prefix: String) {
-  private var count: Int = 0
+  private var count_ : Int = 0
 
-  def getPrefix: String = prefix
-
-  def getCount: Int = count
+  def count: Int = count_
 
   def generate: String = {
-    val newSymbol: String = prefix + count
-    count += 1
+    val newSymbol: String = prefix + count_
+    count_ += 1
     newSymbol
   }
 }

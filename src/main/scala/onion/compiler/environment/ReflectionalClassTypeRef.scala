@@ -39,7 +39,7 @@ object ReflectionalClassTypeRef {
 
 class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.AbstractClassTypeRef {
   import ReflectionalClassTypeRef._
-  private val bridge: OnionTypeBridge = new OnionTypeBridge(table)
+  private val bridge: OnionTypeConversion = new OnionTypeConversion(table)
   private val modifier_ : Int = toOnionModifier(klass.getModifiers)
   private var methods_ : MultiTable[IRT.MethodRef] = null
   private var fields_ : OrderedTable[IRT.FieldRef] = null

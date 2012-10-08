@@ -16,8 +16,8 @@ import java.net.URLClassLoader
  * @author Kota Mizushima
  * Date: 2005/07/19
  */
-class OnionClassLoader @throws(classOf[MalformedURLException]) (parent: ClassLoader, classPath: Array[String], classes: Array[CompiledClass]) extends
-  URLClassLoader(classPath.map(cp => new File(cp).toURI().toURL()), parent) {
+class OnionClassLoader @throws(classOf[MalformedURLException]) (parent: ClassLoader, classPath: Seq[String], classes: Array[CompiledClass]) extends
+  URLClassLoader(classPath.map(cp => new File(cp).toURI().toURL()).toArray, parent) {
 
   classes.map(k => (k.className, k.content)).foreach{ case (className, content) =>
     defineClass(className, content, 0, content.length)

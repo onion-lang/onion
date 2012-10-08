@@ -12,7 +12,6 @@ import java.util._
 import onion.compiler.environment.ClassFileClassTypeRef
 import onion.compiler.environment.ClassFileTable
 import onion.compiler.environment.ReflectionalClassTypeRef
-import onion.compiler.toolbox.Strings
 import org.apache.bcel.classfile.JavaClass
 
 /**

@@ -66,7 +66,7 @@ class OnionCompiler(val config: CompilerConfig) {
     System.err.println(new String(message))
   }
 
-  private def getCursor(column: Int): String =  Strings.repeat(" ", column - 1) + "^"
+  private def getCursor(column: Int): String =  " " * (column - 1) + "^"
 
   private def getLine(sourceFile: String, lineNumber: Int): String = {
     val reader = Inputs.newReader(sourceFile)

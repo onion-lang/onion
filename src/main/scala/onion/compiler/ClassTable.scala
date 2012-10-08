@@ -26,7 +26,7 @@ class ClassTable(private val classPath: String) {
   private val table = new ClassFileTable(classPath)
 
   def loadArray(component: IRT.TypeRef, dimension: Int): IRT.ArrayTypeRef = {
-    val arrayName = Strings.repeat("[", dimension) + component.name
+    val arrayName = "[" * dimension + component.name
     var array: IRT.ArrayTypeRef = arrayClasses.get(arrayName)
     if (array != null) return array
     array = new IRT.ArrayTypeRef(component, dimension, this)

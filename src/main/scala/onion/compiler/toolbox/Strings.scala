@@ -15,6 +15,4 @@ object Strings {
   def join(array: Array[String], separator: String): String = array.mkString(separator)
 
   def append(strings1: Array[String], strings2: Array[String]): Array[String] = strings1 ++ strings2
-
-  def repeat(source: String, times: Int): String = Iterator.range(0, times).map {x => source}.mkString
 }

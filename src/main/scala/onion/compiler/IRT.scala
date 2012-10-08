@@ -738,7 +738,7 @@ object IRT {
   class ArrayTypeRef(val component: IRT.TypeRef, val dimension: Int, table: ClassTable) extends AbstractObjectTypeRef {
     val superClass: IRT.ClassTypeRef = table.load("java.lang.Object")
     val interfaces: Array[IRT.ClassTypeRef] = Array[IRT.ClassTypeRef](table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
-    var name: String = Strings.repeat("[", dimension) + component.name
+    var name: String = "[" * dimension + component.name
 
     def base: IRT.TypeRef =  if (dimension == 1) component else table.loadArray(component, dimension - 1)
 

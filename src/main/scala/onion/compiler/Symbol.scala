@@ -16,7 +16,7 @@ import collection.mutable.HashMap
  */
 final object Symbol {
   private val symbols = new HashMap[String, Symbol]
-  def intern(name: String): Symbol = {
+  def apply(name: String): Symbol = {
     symbols.get(name) match {
       case Some(symbol) => symbol
       case None =>
@@ -33,7 +33,6 @@ final object Symbol {
  * @param name
  */
 final class Symbol private (val name: String) extends AnyRef {
-  def getName: String = name
   override def equals(obj: Any): Boolean = this eq obj.asInstanceOf[AnyRef]
   override def hashCode(): Int = super.hashCode()
 }

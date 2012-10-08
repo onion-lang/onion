@@ -12,7 +12,5 @@ package onion.compiler.toolbox
  *         Date: 2005/06/22
  */
 object Strings {
-  def join(array: Array[String], separator: String): String = array.mkString(separator)
-
   def append(strings1: Array[String], strings2: Array[String]): Array[String] = strings1 ++ strings2
 }

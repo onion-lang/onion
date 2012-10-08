@@ -21,15 +21,13 @@ import onion.compiler.Modifier
  */
 object ReflectionalClassTypeRef {
   private def toOnionModifier(src: Int): Int = {
-    var modifier: Int = 0
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.PRIVATE)) Modifier.PRIVATE else modifier)
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.PROTECTED)) Modifier.PROTECTED else modifier)
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.PUBLIC)) Modifier.PUBLIC else modifier)
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.STATIC)) Modifier.STATIC else modifier)
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.SYNCHRONIZED)) Modifier.SYNCHRONIZED else modifier)
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.ABSTRACT)) Modifier.ABSTRACT else modifier)
-    modifier |= (if (isOn(src, java.lang.reflect.Modifier.FINAL)) Modifier.FINAL else modifier)
-    modifier
+    ( (if (isOn(src, java.lang.reflect.Modifier.PRIVATE)) Modifier.PRIVATE else 0)
+    | (if (isOn(src, java.lang.reflect.Modifier.PROTECTED)) Modifier.PROTECTED else 0)
+    | (if (isOn(src, java.lang.reflect.Modifier.PUBLIC)) Modifier.PUBLIC else 0)
+    | (if (isOn(src, java.lang.reflect.Modifier.STATIC)) Modifier.STATIC else 0)
+    | (if (isOn(src, java.lang.reflect.Modifier.SYNCHRONIZED)) Modifier.SYNCHRONIZED else 0)
+    | (if (isOn(src, java.lang.reflect.Modifier.ABSTRACT)) Modifier.ABSTRACT else 0)
+    | (if (isOn(src, java.lang.reflect.Modifier.FINAL)) Modifier.FINAL else 0))
   }
 
   private def isOn(modifier: Int, flag: Int): Boolean =  (modifier & flag) != 0

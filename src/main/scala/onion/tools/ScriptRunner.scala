@@ -7,6 +7,7 @@
  * ************************************************************** */
 package onion.tools
 
+import java.lang.{Integer => JInteger}
 import java.io.UnsupportedEncodingException
 import java.util.Map
 import onion.compiler._
@@ -120,7 +121,7 @@ class ScriptRunner {
     val noargOption: Map[_, _] = result.noArgumentOptions
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
     val encoding: String = checkEncoding(option.get(ENCODING).asInstanceOf[String])
-    val maxErrorReport: Integer = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
+    val maxErrorReport: JInteger = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
     if (encoding == null || maxErrorReport == null) {
       return null
     }
@@ -151,21 +152,18 @@ class ScriptRunner {
     }
   }
 
-  private def checkMaxErrorReport(maxErrorReport: String): Integer = {
-    if (maxErrorReport == null) return new Integer(DEFAULT_MAX_ERROR)
-    var value: Int = 0
-    try {
-      value = Integer.parseInt(maxErrorReport)
-      if (value > 0) {
-        return new Integer(value)
-      }
+  private def checkMaxErrorReport(maxErrorReport: String): JInteger = {
+    if (maxErrorReport == null) return JInteger.valueOf(DEFAULT_MAX_ERROR)
+    val value: Option[Int] = (try {
+      Some(Integer.parseInt(maxErrorReport))
+    } catch {
+      case e: NumberFormatException => None
+    })
+    value match {
+      case Some(v) if v > 0 => JInteger.valueOf(v)
+      case None =>
+        printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
+        null
     }
-    catch {
-      case e: NumberFormatException => {
-      }
-    }
-    printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
-    null
   }
-
 }

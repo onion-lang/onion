@@ -496,7 +496,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def appendInitialCode(code: CodeGeneration.CodeProxy, frame: LocalFrame, arguments: Array[Type], origin: Int) {
     val frameObjectIndex: Int = code.getFrameObjectIndex
-    code.appendConstant(new Integer(frame.entries.length))
+    code.appendConstant(JInteger.valueOf(frame.entries.length))
     code.appendNewArray(Type.OBJECT, 1.asInstanceOf[Short])
     code.appendDup(1)
     code.appendStore(new ArrayType(Type.OBJECT, 1), frameObjectIndex)
@@ -505,7 +505,7 @@ class CodeGeneration(config: CompilerConfig) {
     while (i < arguments.length) {
       val arg: Type = arguments(i)
       code.appendDup(1)
-      code.appendConstant(new Integer(i))
+      code.appendConstant(JInteger.valueOf(i))
       if (arguments(i).isInstanceOf[BasicType]) {
         val boxed: ObjectType = code.boxing(arg)
         code.appendNew(boxed)
@@ -1040,7 +1040,7 @@ class CodeGeneration(config: CompilerConfig) {
       if (node.frame == 0 && code.getFrame.isClosed) {
         val index: Int = code.getFrameObjectIndex
         start = code.appendLoad(new ArrayType("java.lang.Object", 1), index)
-        code.appendConstant(new Integer(code.index(node.index)))
+        code.appendConstant(JInteger.valueOf(code.index(node.index)))
       }
       else {
         start = code.appendThis
@@ -1077,12 +1077,12 @@ class CodeGeneration(config: CompilerConfig) {
       if (node.frame == 0 && code.getFrame.isClosed) {
         val index: Int = code.getFrameObjectIndex
         start = code.appendLoad(new ArrayType("java.lang.Object", 1), index)
-        code.appendConstant(new Integer(code.index(node.index)))
+        code.appendConstant(JInteger.valueOf(code.index(node.index)))
       }
       else {
         start = code.appendThis
         code.appendGetField(code.getMethod.getClassName, FRAME_PREFIX + node.frame, new ArrayType("java.lang.Object", 1))
-        code.appendConstant(new Integer(node.index))
+        code.appendConstant(JInteger.valueOf(node.index))
       }
       code.appendArrayLoad(Type.OBJECT)
       if (node.isBasicType) {

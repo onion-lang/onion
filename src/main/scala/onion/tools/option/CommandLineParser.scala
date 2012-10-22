@@ -16,33 +16,36 @@ import java.util.Map
  * @author Kota Mizushima
  *         Date: 2005/04/08
  */
-class CommandLineParser(confs: Array[OptionConfig]) {
+class CommandLineParser(val configs: Array[OptionConfig]) {
 
   def parse(cmdline: Array[String]): ParseResult = {
-    val noArgOpts: Map[String, AnyRef] = new HashMap[String, AnyRef]
-    val opts: Map[String, String] = new HashMap[String, String]
-    val args: List[String] = new ArrayList[String]
-    val lackedOptNames: List[String] = new ArrayList[String]
-    val invalidOptNames: List[String] = new ArrayList[String]
-    var i: Int = 0
-    i = 0
+    val noArgOpts = new HashMap[String, AnyRef]
+    val opts = new HashMap[String, String]
+    val args = new ArrayList[String]
+    val lackedOptNames = new ArrayList[String]
+    val invalidOptNames = new ArrayList[String]
+    var i = 0
+
     while (i < cmdline.length) {
       if (cmdline(i).startsWith("-")) {
-        val param: String = cmdline(i)
-        val conf: OptionConfig = getConfig(param)
-        if (conf == null) {
-          invalidOptNames.add(param)
-          i += 1
-        } else if (conf.hasArgument) {
-          if (i + 1 >= cmdline.length) {
-            lackedOptNames.add(param)
-          } else {
-            opts.put(param, cmdline(i + 1))
-          }
-          i += 2
-        } else {
-          noArgOpts.put(param, new AnyRef)
-          i += 1
+        val param = cmdline(i)
+        val config: Option[OptionConfig] = configs.find(_.optionName == param)
+        config match {
+          case None =>
+            invalidOptNames.add(param)
+            i += 1
+          case Some(config) =>
+            if (config.hasArgument) {
+              if (i + 1 >= cmdline.length) {
+                lackedOptNames.add(param)
+              } else {
+                opts.put(param, cmdline(i + 1))
+              }
+              i += 2
+            } else {
+              noArgOpts.put(param, new AnyRef)
+              i += 1
+            }
         }
       } else {
         args.add(cmdline(i))
@@ -55,16 +58,4 @@ class CommandLineParser(confs: Array[OptionConfig]) {
     else
       new ParseFailure(lackedOptNames.toArray(new Array[String](0)), invalidOptNames.toArray(new Array[String](0)))
   }
-
-  private def getConfig(optionName: String): OptionConfig = {
-    var i: Int = 0
-    while (i < confs.length) {
-      if (confs(i).optionName == optionName) {
-        return confs(i)
-      }
-      i += 1;
-    }
-    null
-  }
-
 }

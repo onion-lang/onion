@@ -17,11 +17,9 @@ import java.lang.{Iterable => JIterable}
  * @author Kota Mizushima
  * Exception thrown when compilation errors occured.
  */
-class CompilationException(val problems_ : JList[CompileError]) extends RuntimeException with JIterable[CompileError] {
+class CompilationException(val problems : JList[CompileError]) extends RuntimeException with JIterable[CompileError] {
 
-  def problems(): JList[CompileError] = Collections.unmodifiableList(problems_)
-
-  def size(): Int = problems.size();
+  def size(): Int = problems.size()
 
   def iterator(): JIterator[CompileError] = problems.iterator()
 }

@@ -1,0 +1,6 @@
+class Hello {
+public:
+  static main(args :String[]){
+    System::out.println("Hello");
+  }
+}

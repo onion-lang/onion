@@ -10,6 +10,9 @@ codes of Onion compiles into JVM class files (in memory / file).
 Originally, Onion was written in Java.  Recently, It has been rewritten in Scala
 completely except Parser, using JavaCC.
 
+Old document is available from [the site](http://sourceforge.jp/projects/onion-language/howto/usage "Old document")
+although they have several differences from current Onion (0.2-M1).
+
 # Tools
 
 ## onionc

@@ -2,7 +2,7 @@
 title: Programming Language Onion
 layout: default
 ---
-<div class="messages">
+<div align="center">
   <img src="img/onion.png" alt="Programming Language Onion">
 </div>
 

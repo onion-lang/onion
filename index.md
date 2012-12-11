@@ -2,6 +2,10 @@
 title: Programming Language Onion
 layout: default
 ---
+<div align="center">
+  <img src="img/onion.png" alt="Programming Language Onion">
+</div>
+
 # Introducion
 
 Onion is an object-oriented and statically typed programming language. Source

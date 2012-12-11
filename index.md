@@ -11,7 +11,7 @@ Originally, Onion was written in Java.  Recently, It has been rewritten in Scala
 completely except Parser, using JavaCC.
 
 Old document is available from [the site](http://sourceforge.jp/projects/onion-language/howto/usage "Old document")
-although they have several differences from current Onion (0.2-M1).
+although they have several differences from current Onion ([Onion-0.2-M1](http://onionlang.github.com/onion/downloads/onion-0.2-M1.zip "Onion 0.2 M1")).
 
 # Tools
 

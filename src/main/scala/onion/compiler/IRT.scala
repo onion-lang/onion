@@ -464,7 +464,7 @@ object IRT {
 
   class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef)  extends Term(location) {
     def this(bind: ClosureLocalBinding) {
-      this(null, bind.frameIndex, bind.getIndex, bind.getType)
+      this(null, bind.frameIndex, bind.index, bind.vtype)
     }
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef) {
@@ -474,7 +474,7 @@ object IRT {
 
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef, val value: IRT.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: IRT.Term) {
-      this(null, bind.frameIndex, bind.getIndex, bind.getType, value)
+      this(null, bind.frameIndex, bind.index, bind.vtype, value)
     }
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef, value: IRT.Term) {
@@ -769,7 +769,7 @@ object IRT {
     final val BOOLEAN: IRT.BasicTypeRef = new IRT.BasicTypeRef("boolean")
     final val VOID: IRT.BasicTypeRef = new IRT.BasicTypeRef("void")
   }
-  
+
   final val BASIC_TYPE_REF_BYTE = BasicTypeRef.BYTE
   final val BASIC_TYPE_REF_SHORT = BasicTypeRef.SHORT
   final val BASIC_TYPE_REF_CHAR = BasicTypeRef.CHAR

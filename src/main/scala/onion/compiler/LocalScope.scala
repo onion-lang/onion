@@ -86,7 +86,7 @@ class LocalScope(val parent: LocalScope) {
       string.append("  ")
       string.append(name)
       string.append(":")
-      string.append(bindings.get(name).getType)
+      string.append(bindings.get(name).vtype)
       string.append(separator);
     }
     string.append("]");

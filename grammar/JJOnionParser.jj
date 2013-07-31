@@ -13,7 +13,7 @@ PARSER_BEGIN(JJOnionParser)
 package onion.compiler.parser;
 import onion.compiler.AST;
 import onion.compiler.Location;
-import onion.compiler.OnionParser;
+import onion.compiler.Parser;
 import onion.compiler.toolbox.*;
 import scala.Tuple2;
 import scala.collection.immutable.*;
@@ -22,7 +22,7 @@ import scala.collection.mutable.Buffer;
 import scala.Option;
 import static onion.compiler.AST.append;
 
-public class JJOnionParser implements OnionParser {
+public class JJOnionParser implements Parser {
   private int mset; // used for semantic lookahead
 
   private boolean no(int m, int mset) {
@@ -754,7 +754,7 @@ AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type
     | t="<"  b=bit_shift() {a = new AST.LessThan(p(t), a, b);}
     | t=">"  b=bit_shift() {a = new AST.GreaterThan(p(t), a, b);}
     | t="is" type = type() {a = new AST.IsInstance(p(t), a, type);}
-    ) 
+    )
   )* {return a;}
 }
 

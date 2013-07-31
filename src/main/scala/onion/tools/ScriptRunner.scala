@@ -83,7 +83,7 @@ class ScriptRunner {
       scriptParams(i - 1) = params(i)
       i += 1
     }
-    val shell: OnionShell = new OnionShell(classOf[OnionClassLoader].getClassLoader, config.classPath)
+    val shell: Shell = new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath)
     shell.run(classes, scriptParams)
   }
 

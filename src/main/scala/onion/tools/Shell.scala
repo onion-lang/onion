@@ -15,7 +15,7 @@ import java.net.MalformedURLException
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
 
-class OnionShell (classLoader: ClassLoader, classpath: Seq[String]) {
+class Shell (classLoader: ClassLoader, classpath: Seq[String]) {
 
   def run(script: String, fileName: String, args: Array[String]): Int = {
     val compiler: OnionCompiler = new OnionCompiler(new CompilerConfig(classpath, null, "Shift_JIS", "", 10))

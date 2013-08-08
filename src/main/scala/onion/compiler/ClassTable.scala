@@ -18,7 +18,7 @@ import org.apache.bcel.classfile.JavaClass
  * @author Kota Mizushima
  * Date: 2005/06/22
  */
-class ClassTable(private val classPath: String) {
+class ClassTable(classPath: String) {
   val classes = new OrderedTable[IRT.ClassDefinition]
   private val classFiles = new HashMap[String, IRT.ClassTypeRef]
   private val arrayClasses = new HashMap[String, IRT.ArrayTypeRef]

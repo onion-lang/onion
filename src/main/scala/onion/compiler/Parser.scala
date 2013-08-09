@@ -7,4 +7,4 @@
  * ************************************************************** */
 package onion.compiler
 
-trait OnionParser
+trait Parser

@@ -10,15 +10,15 @@ def fact(n :int) :int {
 
 reader = new BufferedReader(new InputStreamReader(System::in));
 
-while (line = input("ŠKæ‚ğ‹‚ß‚½‚¢”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B> ", reader)) != null {
+while (line = input("éšä¹—ã‚’æ±‚ã‚ãŸã„æ•°ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚> ", reader)) != null {
   try {
     number = Integer::parseInt(line);
     if(number < 0){
-      System::out.println("³‚Ì®”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B");
+      System::out.println("æ­£ã®æ•´æ•°ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚");
     }else{
       System::out.println("fact(" + number + ") = " + fact(number));
     }
   }catch e :NumberFormatException {
-    System::out.println("®”‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B");
+    System::out.println("æ•´æ•°ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚");
   }
 }

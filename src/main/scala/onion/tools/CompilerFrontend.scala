@@ -33,7 +33,7 @@ import onion.tools.option.ParseSuccess
  * @author Kota Mizushima
  *
  */
-object OnionCompilerFrontend {
+object CompilerFrontend {
   private def config(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
 
   private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
@@ -42,7 +42,7 @@ object OnionCompilerFrontend {
 
   def main(args: Array[String]): Unit = {
     try {
-      new OnionCompilerFrontend().run(args)
+      new CompilerFrontend().run(args)
     } catch {
       case e: ScriptException => throw e.getCause
     }
@@ -59,9 +59,9 @@ object OnionCompilerFrontend {
   private final val DEFAULT_MAX_ERROR: Int = 10
 }
 
-class OnionCompilerFrontend {
+class CompilerFrontend {
 
-  import OnionCompilerFrontend._
+  import CompilerFrontend._
 
   private val commandLineParser = new CommandLineParser(Array[OptionConfig](config(CLASSPATH, true), config(SCRIPT_SUPER_CLASS, true), config(ENCODING, true), config(OUTPUT, true), config(MAX_ERROR, true)))
 

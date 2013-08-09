@@ -40,12 +40,14 @@ object Build extends Build {
   private def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
     Fork.java(None, 
       "-cp" :: 
-      Path.makeString(classpath.map(_.data)) :: 
-      "javacc" ::
-      "-UNICODE_INPUT=true" ::
-      "-JAVA_UNICODE_ESCAPE=true" ::
-      "-OUTPUT_DIRECTORY=" + output.toString + "/onion/compiler/parser" ::
-      "grammar/JJOnionParser.jj" :: Nil,
+      Path.makeString(classpath.map(_.data)) ::
+      List(
+        "javacc",
+        "-UNICODE_INPUT=true",
+        "-JAVA_UNICODE_ESCAPE=true",
+        "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
+        "grammar/JJOnionParser.jj"
+      ),
       log
     ) match {
       case exitCode if exitCode != 0 => sys.error("Nonzero exit code returned from javacc: " + exitCode)
@@ -65,6 +67,7 @@ object Build extends Build {
     libraryDependencies ++= Seq(
       "org.apache.bcel" % "bcel" % "5.2",
       "net.java.dev.javacc" % "javacc" % "4.0" % "test",
+      "org.scalatest" %% "scalatest" % "1.9.1" % "test",
       "org.specs2" %% "specs2" % "1.13" % "test"
     ),
     sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>

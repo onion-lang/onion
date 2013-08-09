@@ -17,15 +17,15 @@ class ClosureLocalBinding(val frameIndex: Int, index: Int, `type`: IRT.TypeRef) 
     other match {
       case bind: ClosureLocalBinding =>
         if (frame != bind.frame) return false
-        if (getIndex != bind.getIndex) return false
-        if (getType ne bind.getType) return false
+        if (index != bind.index) return false
+        if (vtype ne bind.vtype) return false
         true
       case _ =>
         false
     }
   }
 
-  override def hashCode: Int = frame + getIndex + getType.hashCode
+  override def hashCode: Int = frame + index + vtype.hashCode
 
   private var frame: Int = 0
 }

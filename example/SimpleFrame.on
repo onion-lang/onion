@@ -12,7 +12,7 @@ public:
 		@text.setText(button.getLabel);
 	}
 
-	new:("ƒtƒŒ[ƒ€‚P"){
+	new:("ãƒ•ãƒ¬ãƒ¼ãƒ ï¼‘"){
 		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE);
 		setSize(800, 600);
 		pane = getContentPane();

@@ -38,7 +38,7 @@ public:
 				if @operator != null {
 					if @operator == "/" {
 						if @right == 0L{
-							setValue("0�Ŋ��邱�Ƃ͂ł��܂���B");
+							setValue("0で割ることはできません。");
 							@left = 0L;
 							@right = 0L;
 							@isError = true;
@@ -62,7 +62,7 @@ public:
 		}
 	}
 
-	new:("�ȈՓd��") {
+	new:("簡易電卓") {
 		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE);
 		setSize(800, 600);
 		@text		= new JTextField;

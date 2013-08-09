@@ -479,8 +479,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       var rightType: TypeRef = value.`type`
       if (bind != null) {
         frame = bind.frameIndex
-        index = bind.getIndex
-        leftType = bind.getType
+        index = bind.index
+        leftType = bind.vtype
       } else {
         frame = 0
         if (rightType.isNullType) {
@@ -1222,8 +1222,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             var mHasNext: MethodRef = findMethod(node.collection, iteratorType, "hasNext")
             init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0))))
             var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-            if (elementVar.getType != rootClass) {
-              next = new AsInstanceOf(next, elementVar.getType)
+            if (elementVar.vtype != rootClass) {
+              next = new AsInstanceOf(next, elementVar.vtype)
             }
             block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
             new StatementBlock(init, block)
@@ -1245,7 +1245,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           if(update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
           new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
         }
-      case node@AST.IfStatement(loc, _, _, _) => 
+      case node@AST.IfStatement(loc, _, _, _) =>
         openScope(context) {
           val conditionOpt = typed(node.condition, context)
           val expected = BasicTypeRef.BOOLEAN
@@ -1335,7 +1335,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           report(UNIMPLEMENTED_FEATURE, node)
           new Synchronized(node.location, lock, block)
         }
-      case node@AST.ThrowStatement(loc, target) => null
+      case node@AST.ThrowStatement(loc, target) =>
         val expressionOpt = typed(target, context)
         for(expression <- expressionOpt) {
           val expected = load("java.lang.Throwable")

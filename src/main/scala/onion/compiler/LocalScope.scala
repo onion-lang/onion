@@ -26,11 +26,7 @@ class LocalScope(val parent: LocalScope) {
    * Gets registered binding objects.
    * @return Set object which element is LocalBinding object
    */
-  def entries: Set[LocalBinding] = {
-    val entries = new HashSet[LocalBinding]
-    entries.addAll(bindings.values())
-    entries
-  }
+  def entries: Set[LocalBinding] =  new HashSet[LocalBinding](bindings.values())
 
   /**
    * Tests if this scope contains entry for the given name.
@@ -47,10 +43,11 @@ class LocalScope(val parent: LocalScope) {
    */
   def put(name: String, binding: LocalBinding): Boolean = {
     if(bindings.containsKey(name)){
-      return true
+      true
+    } else {
+      bindings.put(name, binding)
+      false
     }
-    bindings.put(name, binding)
-    false
   }
 
   /**
@@ -67,29 +64,21 @@ class LocalScope(val parent: LocalScope) {
    * @return the LocalBinding object if found, null otherwise
    */
   def lookup(name: String): LocalBinding = {
-    var table = this;
-    while(table != null){
-      if(table.contains(name)){
-        return table.get(name);
+    def find(table: LocalScope): LocalBinding = {
+      if (table == null) {
+        null
+      } else if(table.contains(name)) {
+        table.get(name)
+      } else {
+        find(table.parent)
       }
-      table = table.parent
     }
-    null;
+    find(this)
   }
 
   override def toString(): String = {
     val separator = Systems.lineSeparator
-    val string = new StringBuffer()
-    string.append("[")
-    string.append(separator)
-    for(name <- bindings.keySet().asScala) {
-      string.append("  ")
-      string.append(name)
-      string.append(":")
-      string.append(bindings.get(name).vtype)
-      string.append(separator);
-    }
-    string.append("]");
-    new String(string)
+    val lines = (for(name <- bindings.keySet().asScala) yield (s"  ${name}:${bindings.get(name).vtype}"))
+    lines.mkString(s"[${separator}", separator, "]")
   }
 }

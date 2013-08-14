@@ -2,13 +2,6 @@ package onion.compiler
 
 
 /**
- * Created with IntelliJ IDEA.
- * User: Mizushima
- * Date: 12/05/20
- * Time: 9:34
- * To change this template use File | Settings | File Templates.
- */
-/**
  * @author Kota Mizushima
  *         Date: 2005/06/28
  */

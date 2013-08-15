@@ -1,3 +1,5 @@
-permalink: pretty
-markdown:  rdiscount
-auto: false
+name: Programming Language Onion
+safe: true
+lsi: false
+pygments: true
+markdown: rdiscount

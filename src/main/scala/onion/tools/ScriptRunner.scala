@@ -10,6 +10,7 @@ package onion.tools
 import java.lang.{Integer => JInteger}
 import java.io.UnsupportedEncodingException
 import java.util.Map
+import java.lang.System.err
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
@@ -68,14 +69,14 @@ class ScriptRunner {
     }
     val result: ParseSuccess = parseCommandLine(commandLine)
     if (result == null) return -1
-    val config: CompilerConfig = createConfig(result)
-    if (config == null) return -1
+    val config: Option[CompilerConfig] = createConfig(result)
+    if (config.isEmpty) return -1
     val params: Array[String] = result.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
     if (params.length == 0) {
       printUsage
       return -1
     }
-    val classes: Array[CompiledClass] = compile(config, Array[String](params(0)))
+    val classes: Array[CompiledClass] = compile(config.get, Array[String](params(0)))
     if (classes == null) return -1
     val scriptParams: Array[String] = new Array[String](params.length - 1)
     var i: Int = 1
@@ -83,8 +84,7 @@ class ScriptRunner {
       scriptParams(i - 1) = params(i)
       i += 1
     }
-    val shell: Shell = new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath)
-    shell.run(classes, scriptParams)
+    new Shell(classOf[OnionClassLoader].getClassLoader, config.get.classPath).run(classes, scriptParams)
   }
 
   protected def printUsage {
@@ -116,16 +116,17 @@ class ScriptRunner {
     result.asInstanceOf[ParseSuccess]
   }
 
-  private def createConfig(result: ParseSuccess): CompilerConfig = {
+  private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
     val option: Map[_, _] = result.options
     val noargOption: Map[_, _] = result.noArgumentOptions
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
-    val encoding: String = checkEncoding(option.get(ENCODING).asInstanceOf[String])
-    val maxErrorReport: JInteger = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
-    if (encoding == null || maxErrorReport == null) {
-      return null
-    }
-    new CompilerConfig(classpath, "", encoding, ".", maxErrorReport.intValue)
+    val encodingOpt = checkEncoding(option.get(ENCODING).asInstanceOf[String])
+
+    val maxErrorReport = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
+    for(
+      encoding <- checkEncoding(option.get(ENCODING).asInstanceOf[String]);
+      maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
+    ) yield (new CompilerConfig(classpath, "", encoding, ".", maxErrorReport))
   }
 
   private def compile(config: CompilerConfig, fileNames: Array[String]): Array[CompiledClass] = {
@@ -138,32 +139,30 @@ class ScriptRunner {
     paths
   }
 
-  private def checkEncoding(encoding: String): String = {
-    if (encoding == null) return System.getProperty("file.encoding")
+  private def checkEncoding(encoding: String): Option[String] = {
+    if (encoding == null) return Some(System.getProperty("file.encoding"))
     try {
       "".getBytes(encoding)
-      encoding
-    }
-    catch {
-      case e: UnsupportedEncodingException => {
-        System.err.println(Messages.apply("error.command.invalidEncoding", ENCODING))
-        null
-      }
+      Some(encoding)
+    } catch {
+      case e: UnsupportedEncodingException =>
+        err.println(Messages.apply("error.command.invalidEncoding", ENCODING))
+        None
     }
   }
 
-  private def checkMaxErrorReport(maxErrorReport: String): JInteger = {
-    if (maxErrorReport == null) return JInteger.valueOf(DEFAULT_MAX_ERROR)
+  private def checkMaxErrorReport(maxErrorReport: String): Option[Int] = {
+    if (maxErrorReport == null) return Some(DEFAULT_MAX_ERROR)
     val value: Option[Int] = (try {
       Some(Integer.parseInt(maxErrorReport))
     } catch {
       case e: NumberFormatException => None
     })
     value match {
-      case Some(v) if v > 0 => JInteger.valueOf(v)
+      case Some(v) if v > 0 => Some(v)
       case None =>
-        printerr(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
-        null
+        err.println(Messages("error.command.requireNaturalNumber", MAX_ERROR))
+        None
     }
   }
 }

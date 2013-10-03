@@ -60,7 +60,7 @@ object ScriptRunner {
 
 class ScriptRunner {
   import ScriptRunner._
-  private val commandLineParser = new CommandLineParser(Array[OptionConfig](conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(MAX_ERROR, true)))
+  private[this] val parser = new CommandLineParser(conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(MAX_ERROR, true))
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {
@@ -97,7 +97,7 @@ class ScriptRunner {
   }
 
   private def parseCommandLine(commandLine: Array[String]): ParseSuccess = {
-    val result: ParseResult = commandLineParser.parse(commandLine)
+    val result: ParseResult = parser.parse(commandLine)
     if (result.status == ParseResult.FAILURE) {
       val failure: ParseFailure = result.asInstanceOf[ParseFailure]
       val lackedOptions: Array[String] = failure.lackedOptions

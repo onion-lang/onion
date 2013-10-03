@@ -63,7 +63,7 @@ class CompilerFrontend {
 
   import CompilerFrontend._
 
-  private val commandLineParser = new CommandLineParser(Array[OptionConfig](config(CLASSPATH, true), config(SCRIPT_SUPER_CLASS, true), config(ENCODING, true), config(OUTPUT, true), config(MAX_ERROR, true)))
+  private val commandLineParser = new CommandLineParser(config(CLASSPATH, true), config(SCRIPT_SUPER_CLASS, true), config(ENCODING, true), config(OUTPUT, true), config(MAX_ERROR, true))
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {

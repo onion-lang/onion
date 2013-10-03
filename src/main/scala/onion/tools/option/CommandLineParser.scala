@@ -16,7 +16,7 @@ import java.util.Map
  * @author Kota Mizushima
  *         Date: 2005/04/08
  */
-class CommandLineParser(val configs: Array[OptionConfig]) {
+class CommandLineParser(val configs: OptionConfig*) {
 
   def parse(cmdline: Array[String]): ParseResult = {
     val noArgOpts = new HashMap[String, AnyRef]
@@ -29,7 +29,7 @@ class CommandLineParser(val configs: Array[OptionConfig]) {
     while (i < cmdline.length) {
       if (cmdline(i).startsWith("-")) {
         val param = cmdline(i)
-        val config: Option[OptionConfig] = configs.find(_.optionName == param)
+        val config: Option[OptionConfig] = (configs:Seq[OptionConfig]).find(_.optionName == param)
         config match {
           case None =>
             invalidOptNames.add(param)

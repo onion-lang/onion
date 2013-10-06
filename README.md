@@ -1,10 +1,10 @@
-## Onion - statically typed object-oriented programming language on JVM
+## Onion - A Statically Typed Programming Language on JVM
 
-Onion is an object-oriented and statically typed programming language. Source
-codes of Onion compiles into JVM class files (in memory / file).
+Onion is an object-oriented and statically typed programming language. Source codes of Onion 
+compiles into JVM class files as in-memory or real files.
 
-Originally, Onion was written in Java.  Recently, It has been rewritten in Scala
-completely except Parser, using JavaCC.
+Originally, Onion was written in Java.  It has been rewritten in Scala completely except Parser,
+using JavaCC.
 
 ## Tools
 

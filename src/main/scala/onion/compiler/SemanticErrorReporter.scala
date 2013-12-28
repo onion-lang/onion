@@ -16,7 +16,7 @@ import onion.compiler.exceptions.CompilationException
 
 /**
  * @author Kota Mizushima
- * Date: 2005/06/23
+ *
  */
 class SemanticErrorReporter(threshold: Int) {
   private val problems = new ArrayList[CompileError]

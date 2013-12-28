@@ -9,6 +9,6 @@ package onion.tools.option
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/04/08
+ *
  */
 case class OptionConfig(optionName: String, hasArgument : Boolean)

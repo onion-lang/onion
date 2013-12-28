@@ -9,7 +9,7 @@ package onion.compiler.toolbox
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/26
+ *
  */
 object Systems {
   lazy val lineSeparator: String = System.getProperty("line.separator")

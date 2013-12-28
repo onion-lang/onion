@@ -1,12 +1,5 @@
 package onion.compiler
 
-/**
- * Created by IntelliJ IDEA.
- * User: Mizushima
- * Date: 11/05/17
- * Time: 0:09
- * To change this template use File | Settings | File Templates.
- */
 object SemanticErrorConstants {
   final val INCOMPATIBLE_TYPE: Int = 0
   final val INCOMPATIBLE_OPERAND_TYPE: Int = 1

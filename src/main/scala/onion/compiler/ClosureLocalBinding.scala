@@ -3,7 +3,7 @@ package onion.compiler
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/28
+ *
  */
 class ClosureLocalBinding(val frameIndex: Int, index: Int, `type`: IRT.TypeRef) extends LocalBinding(index, `type`) {
   override def equals(other: Any): Boolean = {

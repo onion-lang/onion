@@ -11,7 +11,7 @@ package onion.compiler.exceptions
  * This class represents an exception while script is running.
  *
  * @author Kota Mizushima
- * Date: 2005/09/15
+ *
  */
 class ScriptException(message: String, cause: Throwable) extends RuntimeException(message, cause) {
   /**

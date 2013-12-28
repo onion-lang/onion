@@ -14,7 +14,7 @@ import onion.compiler.IRT
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/07/12
+ *
  */
 object Classes {
   def getInterfaceMethods(`type`: IRT.ClassTypeRef): Set[IRT.MethodRef] = {

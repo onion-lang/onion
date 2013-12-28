@@ -12,7 +12,7 @@ import onion.compiler.ClassTable
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/07/10
+ *
  */
 object Boxing {
   private final val TABLE: Array[Array[AnyRef]] = Array(Array(IRT.BasicTypeRef.BOOLEAN, "java.lang.Boolean"), Array(IRT.BasicTypeRef.BYTE, "java.lang.Byte"), Array(IRT.BasicTypeRef.SHORT, "java.lang.Short"), Array(IRT.BasicTypeRef.CHAR, "java.lang.Character"), Array(IRT.BasicTypeRef.INT, "java.lang.Integer"), Array(IRT.BasicTypeRef.LONG, "java.lang.Long"), Array(IRT.BasicTypeRef.FLOAT, "java.lang.Float"), Array(IRT.BasicTypeRef.DOUBLE, "java.lang.Double"))

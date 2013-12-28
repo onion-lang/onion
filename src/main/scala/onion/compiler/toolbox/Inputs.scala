@@ -14,7 +14,7 @@ import java.io.IOException
 /**
  * Utility class for IO.
  * @author Kota Mizushima
- *         Date: 2005/04/19
+ *
  */
 object Inputs {
   def newReader(path: String): BufferedReader = new BufferedReader(new FileReader(new File(path)))

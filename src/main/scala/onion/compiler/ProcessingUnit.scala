@@ -1,13 +1,5 @@
 package onion.compiler
 
-/**
- * Created by IntelliJ IDEA.
- * User: Mizushima
- * Date: 2010/12/05
- * Time: 23:27:53
- * To change this template use File | Settings | File Templates.
- */
-
 trait ProcessingUnit[A, B] {self =>
   type Environment
   def newEnvironment(source: A): Environment

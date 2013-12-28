@@ -17,7 +17,7 @@ import onion.compiler.IRT.BinaryTerm.Constants._
 import onion.compiler.IRT.UnaryTerm.Constants._
 
 /**
- * @author Kota Mizushima Date: 2005/04/10
+ * @author Kota Mizushima
  */
 object CodeGeneration {
   def translateIxTypeToVmType(`type`: IRT.TypeRef): Type = {

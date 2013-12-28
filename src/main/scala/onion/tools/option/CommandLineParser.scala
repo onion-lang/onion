@@ -14,7 +14,7 @@ import java.util.Map
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/04/08
+ *
  */
 class CommandLineParser(val configs: OptionConfig*) {
 

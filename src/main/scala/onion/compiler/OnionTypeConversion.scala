@@ -16,7 +16,7 @@ import org.apache.bcel.generic.Type
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/28
+ *
  */
 object OnionTypeConversion {
   private final val basicTypeTable: Map[BasicType, IRT.BasicTypeRef] = new HashMap[BasicType, IRT.BasicTypeRef]

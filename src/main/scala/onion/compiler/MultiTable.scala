@@ -5,13 +5,6 @@ import java.util.Iterator
 import java.lang.Iterable
 import scala.collection.JavaConverters._
 
-/**
- * Created by IntelliJ IDEA.
- * User: Mizushima
- * Date: 2010/12/07
- * Time: 2:48:39
- * To change this template use File | Settings | File Templates.
- */
 class MultiTable[E <: Named] extends Iterable[E] {
   private final val mapping = new HashMap[String, List[E]]
 

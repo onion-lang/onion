@@ -12,7 +12,7 @@ import toolbox.SymbolGenerator
 
 /**
  * @author Kota Mizushima
- * Date: 2005/06/28
+ *
  */
 class LocalContext {
   private var contextFrame = new LocalFrame(null)

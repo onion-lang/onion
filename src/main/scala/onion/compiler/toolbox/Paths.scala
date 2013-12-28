@@ -11,7 +11,7 @@ import java.io.File
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/17
+ *        
  */
 object Paths {
   def nameOf(path: String): String = new File(path).getName

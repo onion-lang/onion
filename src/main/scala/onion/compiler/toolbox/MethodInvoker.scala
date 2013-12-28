@@ -12,7 +12,7 @@ import java.lang.reflect.Method
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/09/15
+ *
  */
 object MethodInvoker {
   def call(target: AnyRef, name: String, args: Array[AnyRef]): AnyRef = {

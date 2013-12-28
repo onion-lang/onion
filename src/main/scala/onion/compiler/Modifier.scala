@@ -9,7 +9,7 @@ package onion.compiler;
 
 /**
 * @author Kota Mizushima
-* Date: 2005/04/10
+*
 */
 object Modifier {
 

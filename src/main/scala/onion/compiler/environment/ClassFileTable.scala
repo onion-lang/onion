@@ -18,7 +18,7 @@ import org.apache.bcel.util.ClassPath
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/21
+ *
  */
 class ClassFileTable(classPathString: String) {
   private val repository: Repository = org.apache.bcel.Repository.getRepository()

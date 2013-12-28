@@ -11,6 +11,6 @@ import onion.compiler.IRT
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/27
+ *
  */
 class ClassFileFieldRef(val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.TypeRef) extends IRT.FieldRef

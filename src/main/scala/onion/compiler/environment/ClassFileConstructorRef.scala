@@ -11,7 +11,6 @@ import onion.compiler.IRT
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/27
  */
 class ClassFileConstructorRef(val modifier: Int, val classType: IRT.ClassTypeRef, val name: String, val args: Array[IRT.TypeRef]) extends IRT.ConstructorRef {
   def getArgs: Array[IRT.TypeRef] = args

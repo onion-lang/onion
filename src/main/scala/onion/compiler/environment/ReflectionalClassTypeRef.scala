@@ -17,7 +17,7 @@ import onion.compiler.Modifier
 
 /**
  * @author Kota Mizushima
- *         Date: 2006/1/10
+ *
  */
 object ReflectionalClassTypeRef {
   private def toOnionModifier(src: Int): Int = {

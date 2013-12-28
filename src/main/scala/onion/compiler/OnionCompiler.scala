@@ -17,7 +17,7 @@ import onion.compiler.exceptions.CompilationException
 
 /**
  * @author Kota Mizushima
- * Date: 2005/04/08
+ *
  */
 class OnionCompiler(val config: CompilerConfig) {
 

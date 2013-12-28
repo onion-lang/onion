@@ -10,7 +10,7 @@ package onion.compiler
 
 /**
  * @author Kota Mizushima
- * Date: 2005/04/08
+ *
  */
 case class CompilerConfig(classPath: Seq[String], superClass: String, encoding: String, outputDirectory: String, maxErrorReports: Int) extends AnyRef with Cloneable {
   override def clone: CompilerConfig = {

@@ -9,7 +9,7 @@ package onion.compiler
 
 /**
  * @author Kota Mizushima
- * Date: 2005/04/15
+ *
  */
 class StaticImportItem(val name: String, val fqcn: Boolean) {
 

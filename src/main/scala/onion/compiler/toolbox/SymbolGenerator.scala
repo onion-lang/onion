@@ -9,7 +9,7 @@ package onion.compiler.toolbox
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/07/07
+ *
  */
 class SymbolGenerator(val prefix: String) {
   private var count_ : Int = 0

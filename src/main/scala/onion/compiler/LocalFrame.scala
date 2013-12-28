@@ -12,7 +12,7 @@ import scala.collection.JavaConverters._
 
 /**
  * @author Kota Mizushima
- * Date: 2005/06/28
+ *
  */
 class LocalFrame(val parent: LocalFrame) {
   var scope = new LocalScope(null)

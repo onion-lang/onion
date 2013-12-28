@@ -9,13 +9,6 @@ import _root_.onion.compiler.SemanticErrorConstants._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 
-/**
- * Created by IntelliJ IDEA.
- * User: Mizushima
- * Date: 2010/12/05
- * Time: 10:46:42
- * To change this template use File | Settings | File Templates.
- */
 class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AST.CompilationUnit], Array[ClassDefinition]] {
   class TypingEnvironment
   type Continuable = Boolean

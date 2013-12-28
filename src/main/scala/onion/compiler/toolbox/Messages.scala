@@ -12,7 +12,7 @@ import java.util.ResourceBundle
 
 /**
  * @author Kota Mizushima
- * Date: 2005/06/17
+ *
  */
 object Messages {
   private[this] val ERROR_MESSAGES: ResourceBundle = ResourceBundle.getBundle("errorMessage")

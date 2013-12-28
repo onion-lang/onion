@@ -16,7 +16,7 @@ import org.apache.bcel.classfile.JavaClass
 
 /**
  * @author Kota Mizushima
- * Date: 2005/06/22
+ *
  */
 class ClassTable(classPath: String) {
   val classes = new OrderedTable[IRT.ClassDefinition]

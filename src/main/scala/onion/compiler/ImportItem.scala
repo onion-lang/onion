@@ -9,7 +9,7 @@ package onion.compiler
 
 /**
  * @author Kota Mizushima
- * Date: 2005/04/15
+ *
  */
 case class ImportItem(simpleName : String, fqcn: String) {
   val isOnDemand: Boolean  = simpleName == "*"

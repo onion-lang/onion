@@ -7,14 +7,6 @@ import _root_.onion.compiler.toolbox.Messages
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.parser.{JJOnionParser, ParseException}
 
-/**
- * Created by IntelliJ IDEA.
- * User: Mizushima
- * Date: 2010/12/05
- * Time: 23:55:48
- * To change this template use File | Settings | File Templates.
- */
-
 class Parsing(config: CompilerConfig) extends AnyRef
   with ProcessingUnit[Array[InputSource], Array[AST.CompilationUnit]] {
   type Environment = Null

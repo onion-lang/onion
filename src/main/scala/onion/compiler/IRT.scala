@@ -4,8 +4,8 @@ import java.util._
 import java.util
 
 /**
- * Created by IntelliJ IDEA.
- * User: Mizushima
+
+
  */
 object IRT {
 

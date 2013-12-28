@@ -17,7 +17,7 @@ import org.apache.bcel.generic.Type
 
 /**
  * @author Kota Mizushima
- *         Date: 2005/06/22
+ *
  */
 object ClassFileClassTypeRef {
   private def toOnionModifier(src: Int): Int = {

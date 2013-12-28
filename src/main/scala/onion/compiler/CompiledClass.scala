@@ -10,6 +10,6 @@ import scala.reflect.BeanProperty
 
 /**
  * @author Kota Mizushima
- * Date: 2005/04/09
+ *
  */
 case class CompiledClass(@BeanProperty className: String, @BeanProperty outputPath: String, @BeanProperty content: Array[Byte])

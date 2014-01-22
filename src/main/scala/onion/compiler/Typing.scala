@@ -39,7 +39,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     private def forName(name: String, qualified: Boolean): ClassTypeRef = {
       if(qualified) {
-        table_.load(name);
+        table_.load(name)
       }else {
         for(item <- imports) {
           val qname = item matches name
@@ -464,12 +464,12 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processLocalAssign(node: AST.Assignment, context: LocalContext): Term = {
       var value: Term = typed(node.right, context).getOrElse(null)
       if (value == null) return null
-      val id: AST.Id = node.left.asInstanceOf[AST.Id]
-      val bind: ClosureLocalBinding = context.lookup(id.name)
-      var frame: Int = 0
-      var index: Int = 0
+      val id = node.left.asInstanceOf[AST.Id]
+      val bind = context.lookup(id.name)
+      var frame = 0
+      var index = 0
       var leftType: TypeRef = null
-      var rightType: TypeRef = value.`type`
+      val rightType: TypeRef = value.`type`
       if (bind != null) {
         frame = bind.frameIndex
         index = bind.index
@@ -487,7 +487,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (value != null) new SetLocal(frame, index, leftType, value) else null
     }
     def processThisFieldAssign(node: AST.Assignment, context: LocalContext): Term = {
-      var value: Term = typed(node.right, context).getOrElse(null)
+      var value = typed(node.right, context).getOrElse(null)
       if (value == null) return null
       val ref = node.left.asInstanceOf[AST.UnqualifiedFieldReference]
       var selfClass: ClassTypeRef = null
@@ -501,7 +501,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           selfClass = context.constructor.affiliation
         }
       }
-      var field: FieldRef = findField(selfClass, ref.name)
+      val field: FieldRef = findField(selfClass, ref.name)
       if (field == null) {
         report(FIELD_NOT_FOUND, ref, selfClass, ref.name)
         return null
@@ -524,8 +524,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         return null
       }
       if (target.isArrayType) {
-        val targetType = (target.`type`.asInstanceOf[ArrayTypeRef])
-        if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
+        val targetType = target.`type`.asInstanceOf[ArrayTypeRef]
+        if (!(index.isBasicType && index.`type`.asInstanceOf[BasicTypeRef].isInteger)) {
           report(INCOMPATIBLE_TYPE, indexing.right, IRT.BasicTypeRef.INT, index.`type`)
           return null
         }
@@ -546,7 +546,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {
       typed(node.right, context)
       report(UNIMPLEMENTED_FEATURE, node)
-      return null
+      null
     }
     def processEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
       var left: Term = typed(node.left, context).getOrElse(null)
@@ -560,7 +560,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
       if (left.isBasicType && right.isBasicType) {
         if (hasNumericType(left) && hasNumericType(right)) {
-          var resultType: TypeRef = promote(leftType, rightType)
+          val resultType = promote(leftType, rightType)
           if (resultType != left.`type`) left = new AsInstanceOf(left, resultType)
           if (resultType != right.`type`) right = new AsInstanceOf(right, resultType)
         }
@@ -579,7 +579,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       var right: Term = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
       if (!left.`type`.isBasicType) {
-        var params: Array[Term] = Array[Term](right)
+        val params = Array[Term](right)
         tryFindMethod(node, left.`type`.asInstanceOf[ObjectTypeRef], "add", params) match {
           case Left(_) =>
             report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
@@ -598,7 +598,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
         return null
       }
-      var leftResultType: TypeRef = promoteInteger(leftType)
+      val leftResultType = promoteInteger(leftType)
       if (leftResultType != leftType) {
         left = new AsInstanceOf(left, leftResultType)
       }
@@ -611,20 +611,20 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       var left: Term = typed(node.left, context).getOrElse(null)
       var right: Term = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
-      var leftType: TypeRef = left.`type`
-      var rightType: TypeRef = right.`type`
+      val leftType = left.`type`
+      val rightType = right.`type`
       if ((!numeric(left.`type`)) || (!numeric(right.`type`))) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
         return null
       }
-      var resultType: TypeRef = promote(leftType, rightType)
+      val resultType = promote(leftType, rightType)
       if (leftType != resultType)  left = new AsInstanceOf(left, resultType)
       if (rightType != resultType)  right = new AsInstanceOf(right, resultType)
       return Array[Term](left, right)
     }
     def processBitExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
-      var left: Term = typed(node.left, context).getOrElse(null)
-      var right: Term = typed(node.right, context).getOrElse(null)
+      var left = typed(node.left, context).getOrElse(null)
+      var right = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
       if ((!left.isBasicType) || (!right.isBasicType)) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
@@ -648,8 +648,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       new BinaryTerm(kind, resultType, left, right)
     }
     def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
-      val left: Term = typed(node.left, context).getOrElse(null)
-      val right: Term = typed(node.right, context).getOrElse(null)
+      val left = typed(node.left, context).getOrElse(null)
+      val right = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
       val leftType: TypeRef = left.`type`
       val rightType: TypeRef = right.`type`
@@ -660,11 +660,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       Array[Term](left, right)
     }
     def processRefEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
-      var left: Term = typed(node.left, context).getOrElse(null)
-      var right: Term = typed(node.right, context).getOrElse(null)
+      var left = typed(node.left, context).getOrElse(null)
+      var right = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
-      val leftType: TypeRef = left.`type`
-      val rightType: TypeRef = right.`type`
+      val leftType = left.`type`
+      val rightType = right.`type`
       if ((left.isBasicType && (!right.isBasicType)) || ((!left.isBasicType) && (right.isBasicType))) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
         return null
@@ -692,8 +692,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
-        var left: Term = typed(node.left, context).getOrElse(null)
-        var right: Term = typed(node.right, context).getOrElse(null)
+        var left = typed(node.left, context).getOrElse(null)
+        var right = typed(node.right, context).getOrElse(null)
         if (left == null || right == null) return None
         if (left.isBasicType && right.isBasicType) {
           return Option(processNumericExpression(ADD, node, left, right))
@@ -702,8 +702,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           if (left.`type` == IRT.BasicTypeRef.VOID) {
             report(IS_NOT_BOXABLE_TYPE, node.left, left.`type`)
             return None
-          }
-          else {
+          } else {
             left = Boxing.boxing(table_, left)
           }
         }
@@ -716,30 +715,30 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             right = Boxing.boxing(table_, right)
           }
         }
-        val toStringL: MethodRef = findMethod(node.left, left.`type`.asInstanceOf[ObjectTypeRef], "toString")
-        val toStringR: MethodRef = findMethod(node.right, right.`type`.asInstanceOf[ObjectTypeRef], "toString")
+        val toStringL = findMethod(node.left, left.`type`.asInstanceOf[ObjectTypeRef], "toString")
+        val toStringR = findMethod(node.right, right.`type`.asInstanceOf[ObjectTypeRef], "toString")
         left = new Call(left, toStringL, new Array[Term](0))
         right = new Call(right, toStringR, new Array[Term](0))
         val concat: MethodRef = findMethod(node, left.`type`.asInstanceOf[ObjectTypeRef], "concat", Array[Term](right))
         Some(new Call(left, concat, Array[Term](right)))
       case node@AST.Subtraction(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
-        var right= typed(node.right, context).getOrElse(null)
+        val right = typed(node.right, context).getOrElse(null)
         if (left == null || right == null) return None
         Option(processNumericExpression(SUBTRACT, node, left, right))
       case node@AST.Multiplication(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
-        var right= typed(node.right, context).getOrElse(null)
+        val right = typed(node.right, context).getOrElse(null)
         if (left == null || right == null) return None
         Option(processNumericExpression(MULTIPLY, node, left, right))
       case node@AST.Division(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
-        var right= typed(node.right, context).getOrElse(null)
+        val right = typed(node.right, context).getOrElse(null)
         if (left == null || right == null) return None
         Option(processNumericExpression(DIVIDE, node, left, right))
       case node@AST.Modulo(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
-        var right= typed(node.right, context).getOrElse(null)
+        val right = typed(node.right, context).getOrElse(null)
         if (left == null || right == null) return None
         Option(processNumericExpression(MOD, node, left, right))
       case node@AST.Assignment(loc, l, r) =>
@@ -808,7 +807,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val index = typed(node.right, context).getOrElse(null)
         if (target == null || index == null) return None
         if (target.isArrayType) {
-          if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
+          if (!(index.isBasicType && index.`type`.asInstanceOf[BasicTypeRef].isInteger)) {
             report(INCOMPATIBLE_TYPE, node, BasicTypeRef.INT, index.`type`)
             return None
           }
@@ -819,7 +818,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           return None
         }
         if (target.isArrayType) {
-          if (!(index.isBasicType && (index.`type`.asInstanceOf[BasicTypeRef]).isInteger)) {
+          if (!(index.isBasicType && index.`type`.asInstanceOf[BasicTypeRef].isInteger)) {
             report(INCOMPATIBLE_TYPE, node.right, BasicTypeRef.INT, index.`type`)
             return None
           }
@@ -886,7 +885,6 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
         val args = node.args
         val name = node.mname
-        val argTypes: Array[TypeRef] = new Array[TypeRef](args.length)
         openFrame(context){
           openClosure(context) {
             val argTypes = args.map{arg => addArgument(arg, context)}.toArray
@@ -963,7 +961,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
         tryFindMethod(node, targetType, getterBoolean(name), new Array[Term](0)) match {
           case Right(method) =>
-            return Some(new Call(target, method, new Array[Term](0)))
+            Some(new Call(target, method, new Array[Term](0)))
           case Left(_) =>
             if (field == null) {
               report(FIELD_NOT_FOUND, node, targetType, node.name)
@@ -982,18 +980,18 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val methods = targetType.findMethod(name, params)
         if (methods.length == 0) {
           report(METHOD_NOT_FOUND, node, targetType, name, types(params))
-          return None
+          None
         } else if (methods.length > 1) {
           report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))
-          return None
+          None
         } else if ((methods(0).modifier & AST.M_STATIC) != 0) {
           report(ILLEGAL_METHOD_CALL, node, methods(0).affiliation, name, methods(0).arguments)
-          return None
+          None
         } else {
           Some(new Call(target, methods(0), doCastInsertion(methods(0).arguments, params)))
         }
       case node@AST.Negate(loc, target) =>
-        var term = typed(node.target, context).getOrElse(null)
+        val term = typed(node.target, context).getOrElse(null)
         if (term == null) return None
         if (!hasNumericType(term)) {
           report(INCOMPATIBLE_OPERAND_TYPE, node, "-", Array[TypeRef](term.`type`))
@@ -1002,7 +1000,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         Some(new UnaryTerm(MINUS, term.`type`, term))
       case node@AST.NewArray(loc, _, _) =>
         val typeRef = mapFrom(node.typeRef, mapper_)
-        var parameters = typedTerms(node.args.toArray, context)
+        val parameters = typedTerms(node.args.toArray, context)
         if(typeRef == null || parameters == null) return None
         val resultType = loadArray(typeRef, parameters.length)
         Some(new NewArray(resultType, parameters))
@@ -1013,10 +1011,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val constructors = typeRef.findConstructor(parameters)
         if (constructors.length == 0) {
           report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters))
-          return None
+          None
         }else if (constructors.length > 1) {
           report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](constructors(0).affiliation, constructors(0).getArgs), Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs))
-          return None
+          None
         }else {
           Some(new NewObject(constructors(0), parameters))
         }
@@ -1048,10 +1046,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             val varIndex = context.add(context.newName, operand.`type`)
             new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(SUBTRACT, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
           case ref: RefField =>
-            var varIndex: Int = context.add(context.newName, ref.target.`type`)
+            val varIndex = context.add(context.newName, ref.target.`type`)
             new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(SUBTRACT, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
           case _ =>
-            report(LVALUE_REQUIRED, target);
+            report(LVALUE_REQUIRED, target)
             null
         })
       case node@AST.PostIncrement(loc, target) =>
@@ -1066,7 +1064,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             val varIndex = context.add(context.newName, operand.`type`)
             new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(ADD, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
           case ref: RefField =>
-            var varIndex: Int = context.add(context.newName, ref.target.`type`)
+            val varIndex = context.add(context.newName, ref.target.`type`)
             new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(ADD, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
           case _ =>
             report(LVALUE_REQUIRED, target);
@@ -1177,7 +1175,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             result = translate(elseStatement, context)
           }
           for(i <- 0 until size) {
-            result = new IfStatement(expressions.pop, statements.pop, result)
+            result = new IfStatement(expressions.pop(), statements.pop(), result)
           }
           return result
         }
@@ -1209,10 +1207,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
           else {
             val iteratorType = load("java.util.Iterator")
-            var iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
-            var mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectTypeRef], "iterator")
-            var mNext: MethodRef = findMethod(node.collection, iteratorType, "next")
-            var mHasNext: MethodRef = findMethod(node.collection, iteratorType, "hasNext")
+            val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
+            val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectTypeRef], "iterator")
+            val mNext = findMethod(node.collection, iteratorType, "next")
+            val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
             init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0))))
             var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
             if (elementVar.vtype != rootClass) {
@@ -1260,7 +1258,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val index = context.add(name, lhsType)
         var local: SetLocal = null
         if (init != null) {
-          var valueNode = typed(init, context)
+          val valueNode = typed(init, context)
           valueNode match {
             case None => return new NOP(loc)
             case Some(v) =>
@@ -1278,7 +1276,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         if(node.result == null) {
           val expected  = BasicTypeRef.VOID
           if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
-          return new Return(loc, null)
+          new Return(loc, null)
         } else {
           val returnedOpt= typed(node.result, context)
           if (returnedOpt == null) return new Return(loc, null)
@@ -1369,7 +1367,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     def defaultValue(typeRef: TypeRef): Term = Term.defaultValue(typeRef)
     def addReturnNode(node: ActionStatement, returnType: TypeRef): StatementBlock = {
-      return new StatementBlock(node, new Return(defaultValue(returnType)))
+      new StatementBlock(node, new Return(defaultValue(returnType)))
     }
     def createMain(top: ClassTypeRef, ref: MethodRef, name: String, args: Array[TypeRef], ret: TypeRef): MethodDefinition = {
       val method = new MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
@@ -1397,18 +1395,19 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     val method = new MethodDefinition(node.location, AST.M_PUBLIC, klass, "start", Array[TypeRef](argsType), BasicTypeRef.VOID, null)
     context.add("args", argsType)
     for (element <- toplevels) {
-      if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass;
-      if(element.isInstanceOf[AST.Statement]){
-        context.setMethod(method)
-        statements += translate(element.asInstanceOf[AST.Statement], context)
-      }else {
-        element match {
-          case node: AST.ClassDeclaration => processClassDeclaration(node, context)
-          case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
-          case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
-          case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
-          case _ =>
-        }
+      if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass
+      element match {
+        case node: AST.Statement =>
+          context.setMethod(method)
+          statements += translate(node, context)
+        case _ =>
+          element match {
+            case node: AST.ClassDeclaration => processClassDeclaration(node, context)
+            case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
+            case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
+            case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
+            case _ =>
+          }
       }
     }
     if (klass != null) {
@@ -1546,7 +1545,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       generateMethods()
     }
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
-      var clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+      val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       if (clazz == null) return
       methods.clear()
       fields.clear()
@@ -1600,7 +1599,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
   private def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
-  private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString
+  private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
   private def typesOf(arguments: List[AST.Argument]): Option[List[TypeRef]] = {
     val result = arguments.map{arg => mapFrom(arg.typeRef)}
     if(result.forall(_ != null)) Some(result) else None
@@ -1667,7 +1666,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   }
   private def isAccessible(node: AST.Node, target: ObjectTypeRef, context: ClassTypeRef): Boolean = {
     if (target.isArrayType) {
-      val component = (target.asInstanceOf[ArrayTypeRef]).component
+      val component = target.asInstanceOf[ArrayTypeRef].component
       if (!component.isBasicType) {
         if (!isAccessible(component.asInstanceOf[ClassTypeRef], definition_)) {
           report(CLASS_NOT_ACCESSIBLE, node, target, context)
@@ -1682,9 +1681,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     true
   }
-  private def hasNumericType(term: Term): Boolean =  return numeric(term.`type`)
+  private def hasNumericType(term: Term): Boolean =  numeric(term.`type`)
   private def numeric(symbol: TypeRef): Boolean = {
-    (symbol.isBasicType) && (symbol == BasicTypeRef.BYTE || symbol == BasicTypeRef.SHORT || symbol == BasicTypeRef.CHAR || symbol == BasicTypeRef.INT || symbol == BasicTypeRef.LONG || symbol == BasicTypeRef.FLOAT || symbol == BasicTypeRef.DOUBLE)
+    symbol.isBasicType && (symbol == BasicTypeRef.BYTE || symbol == BasicTypeRef.SHORT || symbol == BasicTypeRef.CHAR || symbol == BasicTypeRef.INT || symbol == BasicTypeRef.LONG || symbol == BasicTypeRef.FLOAT || symbol == BasicTypeRef.DOUBLE)
   }
   private def doCastInsertion(arguments: Array[TypeRef], params: Array[Term]): Array[Term] = {
     for(i <- 0 until params.length) {
@@ -1740,7 +1739,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
       return null
     }
-    var resultType: TypeRef = promote(left.`type`, right.`type`)
+    val resultType = promote(left.`type`, right.`type`)
     if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
     if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
     new BinaryTerm(kind, resultType, left, right)
@@ -1756,7 +1755,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   }
   private def addArgument(arg: AST.Argument, context: LocalContext): TypeRef = {
     val name = arg.name
-    var binding = context.lookupOnlyCurrentScope(name)
+    val binding = context.lookupOnlyCurrentScope(name)
     if (binding != null) {
       report(DUPLICATE_LOCAL_VARIABLE, arg, name)
       return null

@@ -23,7 +23,7 @@ using JavaCC.
 * -d <output directory> Set output directory of results.
 * -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
 
-Onionc compiles source files into class files in the directorys corresponding to module names
+`onionc` compiles source files into class files in the directorys corresponding to module names
 of source files rooted by "-d" option.  If "-d" is not specified, the value of "-d" is specified as the current directory.
 
 For example, if source files which module name is "org.onion_lang" is compiled, class files are generated under:
@@ -44,7 +44,7 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 * -encoding <encoding> encoding of source files.
 * -maxErrorReports <error count> the maximum number of comiplation errors reported.
 
-onionc compiles source files into in-memory classfiles and execute them.  The entry point is:
+`onion` compiles source files into in-memory class files and execute them.  The entry point is:
 
 1. A main method if there is an explicit class definition and it have the main method.
 2. The main method of the class on the top.
@@ -53,15 +53,14 @@ onionc compiles source files into in-memory classfiles and execute them.  The en
 ## Limitations
 
 * Some compilation-time checks is not implemented yet.  For example,
-  It't not checked that abstract methods are implemented. Codes compiled 
-  successfully, maybe rejected by class file verifiers sometimes.  If you
-  find the problem, reporting it helps me.
+  It's not checked that abstract methods are implemented. Compiled
+  codes maybe rejected by class file verifiers sometimes.  If you
+  find the problem, reporting it to help me.
 
-* Currently, onionc has edge cases.  The compiler crashes sometimes.
-  The source codes in example directory compiles and can be executed
-  properly.
+* Currently, `onionc` has edge cases.  The compiler crashes sometimes.
+  The source codes in example directory compiles and is executed correctly.
 
-* There are some partially supported features.  For example, finally clause
+* There are some partially supported features.  For example, `finally` clause
   in try-catch is not supported yet.
 
 ## BuildHive (Jenkins)

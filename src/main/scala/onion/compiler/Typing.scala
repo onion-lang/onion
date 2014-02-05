@@ -608,44 +608,43 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       new BinaryTerm(kind, IRT.BasicTypeRef.BOOLEAN, left, right)
     }
     def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
-      var left: Term = typed(node.left, context).getOrElse(null)
-      var right: Term = typed(node.right, context).getOrElse(null)
+      val left = typed(node.left, context).getOrElse(null)
+      val right = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
       val leftType = left.`type`
       val rightType = right.`type`
       if ((!numeric(left.`type`)) || (!numeric(right.`type`))) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
-        return null
+        null
+      } else {
+        val resultType = promote(leftType, rightType)
+        val newLeft = if (leftType != resultType)  new AsInstanceOf(left, resultType) else left
+        val newRight = if(rightType != resultType) new AsInstanceOf(right, resultType) else right
+        Array[Term](newLeft, newRight)
       }
-      val resultType = promote(leftType, rightType)
-      if (leftType != resultType)  left = new AsInstanceOf(left, resultType)
-      if (rightType != resultType)  right = new AsInstanceOf(right, resultType)
-      return Array[Term](left, right)
     }
     def processBitExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
-      var left = typed(node.left, context).getOrElse(null)
-      var right = typed(node.right, context).getOrElse(null)
+      val left = typed(node.left, context).getOrElse(null)
+      val right = typed(node.right, context).getOrElse(null)
       if (left == null || right == null) return null
       if ((!left.isBasicType) || (!right.isBasicType)) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
         return null
       }
-      var leftType: BasicTypeRef = left.`type`.asInstanceOf[BasicTypeRef]
-      var rightType: BasicTypeRef = right.`type`.asInstanceOf[BasicTypeRef]
+      val leftType = left.`type`.asInstanceOf[BasicTypeRef]
+      val rightType = right.`type`.asInstanceOf[BasicTypeRef]
       var resultType: TypeRef = null
       if (leftType.isInteger && rightType.isInteger) {
         resultType = promote(leftType, rightType)
-      }
-      else if (leftType.isBoolean && rightType.isBoolean) {
+      } else if (leftType.isBoolean && rightType.isBoolean) {
         resultType = IRT.BasicTypeRef.BOOLEAN
-      }
-      else {
+      } else {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](leftType, rightType))
         return null
       }
-      if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
-      if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
-      new BinaryTerm(kind, resultType, left, right)
+      val newLeft = if (left.`type` != resultType) new AsInstanceOf(left, resultType) else left
+      val newRight = if (right.`type` != resultType) new AsInstanceOf(right, resultType) else right
+      new BinaryTerm(kind, resultType, newLeft, newRight)
     }
     def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
       val left = typed(node.left, context).getOrElse(null)
@@ -655,9 +654,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       val rightType: TypeRef = right.`type`
       if ((leftType != IRT.BasicTypeRef.BOOLEAN) || (rightType != IRT.BasicTypeRef.BOOLEAN)) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[TypeRef](left.`type`, right.`type`))
-        return null
+        null
+      } else {
+        Array[Term](left, right)
       }
-      Array[Term](left, right)
     }
     def processRefEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
       var left = typed(node.left, context).getOrElse(null)
@@ -724,23 +724,19 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.Subtraction(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
         val right = typed(node.right, context).getOrElse(null)
-        if (left == null || right == null) return None
-        Option(processNumericExpression(SUBTRACT, node, left, right))
+        if (left == null || right == null) None else Option(processNumericExpression(SUBTRACT, node, left, right))
       case node@AST.Multiplication(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
         val right = typed(node.right, context).getOrElse(null)
-        if (left == null || right == null) return None
-        Option(processNumericExpression(MULTIPLY, node, left, right))
+        if (left == null || right == null) None else Option(processNumericExpression(MULTIPLY, node, left, right))
       case node@AST.Division(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
         val right = typed(node.right, context).getOrElse(null)
-        if (left == null || right == null) return None
-        Option(processNumericExpression(DIVIDE, node, left, right))
+        if (left == null || right == null) None else Option(processNumericExpression(DIVIDE, node, left, right))
       case node@AST.Modulo(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
         val right = typed(node.right, context).getOrElse(null)
-        if (left == null || right == null) return None
-        Option(processNumericExpression(MOD, node, left, right))
+        if (left == null || right == null) None else Option(processNumericExpression(MOD, node, left, right))
       case node@AST.Assignment(loc, l, r) =>
         node.left match {
           case _ : AST.Id =>

@@ -72,7 +72,7 @@ object Build extends Build {
       "org.specs2" %% "specs2" % "2.3.12" % "test"
     ),
     sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
-      javacc(cp, dir, s.log) 
+      javacc(cp, dir / "java", s.log) 
     },
     packageOptions in (Compile, packageBin) <<= (mainClass, packageOptions in (Compile, packageBin)) map { (main, opts) =>
       opts ++ main.map(Package.MainClass(_))

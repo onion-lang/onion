@@ -77,10 +77,7 @@ object Build extends Build {
       if(!targetDir.isDirectory) {
         javacc(cp, dir / "java", s.log)
       } else {
-        val generatedFiles = targetDir.listFiles(new FilenameFilter {
-          override def accept(dir: File, name: String): Boolean = name.endsWith(".java")
-        })
-        Seq(generatedFiles:_*)
+        Seq()
       }
     },
     packageOptions in (Compile, packageBin) <<= (mainClass, packageOptions in (Compile, packageBin)) map { (main, opts) =>

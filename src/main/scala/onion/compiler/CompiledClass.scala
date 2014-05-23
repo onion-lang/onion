@@ -6,7 +6,7 @@
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
 package onion.compiler;
-import scala.reflect.BeanProperty
+import scala.beans.BeanProperty
 
 /**
  * @author Kota Mizushima

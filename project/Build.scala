@@ -66,6 +66,7 @@ object Build extends Build {
     libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ ),
     libraryDependencies ++= Seq(
       "org.apache.bcel" % "bcel" % "5.2",
+      "org.ow2.asm" % "asm" % "5.0.2",
       "net.java.dev.javacc" % "javacc" % "4.0" % "test",
       "org.scalatest" %% "scalatest" % "1.9.1" % "test",
       "org.specs2" %% "specs2" % "1.13" % "test"

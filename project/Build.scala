@@ -1,3 +1,4 @@
+import java.io.FilenameFilter
 import sbt._
 import Keys._
 import classpath._
@@ -72,7 +73,15 @@ object Build extends Build {
       "org.specs2" %% "specs2" % "2.3.12" % "test"
     ),
     sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
-      javacc(cp, dir / "java", s.log) 
+      val targetDir = dir / "java" / "onion" / "compiler" / "parser"
+      if(!targetDir.isDirectory) {
+        javacc(cp, dir / "java", s.log)
+      } else {
+        val generatedFiles = targetDir.listFiles(new FilenameFilter {
+          override def accept(dir: File, name: String): Boolean = name.endsWith(".java")
+        })
+        Seq(generatedFiles:_*)
+      }
     },
     packageOptions in (Compile, packageBin) <<= (mainClass, packageOptions in (Compile, packageBin)) map { (main, opts) =>
       opts ++ main.map(Package.MainClass(_))

@@ -52,20 +52,7 @@ class LocalFrame(val parent: LocalFrame) {
 
   def entries: Array[LocalBinding] = {
     val entries: Set[LocalBinding] = entrySet
-    val binds: Array[LocalBinding] = new Array[LocalBinding](entries.size)
-    val iterator: Iterator[LocalBinding] = entries.iterator
-
-    {
-      var i: Int = 0
-      while (i < binds.length) {
-        {
-          binds(i) = iterator.next
-        }
-        ({
-          i += 1; i
-        })
-      }
-    }
+    val binds: Array[LocalBinding] = entries.toArray(new Array[LocalBinding](0))
 
     Arrays.sort(binds, new Comparator[LocalBinding] {
       def compare(b1: LocalBinding, b2: LocalBinding): Int = {

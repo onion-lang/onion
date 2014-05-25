@@ -354,7 +354,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
       new AsInstanceOf(node.location, b, a)
     }
-    def openClosure[A](context: LocalContext)(block: => A): A = try {
+    def openClosure[A](context: LocalContext)(block: => A): A = {
       val tmp = context.isClosure
       try {
         context.setClosure(true)
@@ -373,7 +373,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       context.openFrame()
       block
     } finally {
-      context.closeFrame
+      context.closeFrame()
     }
     def processMethodDeclaration(node: AST.MethodDeclaration) {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
@@ -1299,10 +1299,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           val cases = node.cases
           val nodes = Buffer[Term]()
           val thens = Buffer[ActionStatement]()
-          for((expressions, then)<- cases) {
+          for((expressions, thenClause)<- cases) {
             val bind = context.lookup(name)
             nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
-            thens += translate(then, context)
+            thens += translate(thenClause, context)
           }
           var branches: ActionStatement = if(node.elseBlock != null) {
             translate(node.elseBlock, context)

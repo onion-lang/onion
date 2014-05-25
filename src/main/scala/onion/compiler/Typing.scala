@@ -43,8 +43,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }else {
         for(item <- imports) {
           val qname = item matches name
-          if(qname != null) {
-            val mappedType = forName(qname, true)
+          if(qname.isDefined) {
+            val mappedType = forName(qname.get, true)
             if(mappedType != null) return mappedType
           }
         }

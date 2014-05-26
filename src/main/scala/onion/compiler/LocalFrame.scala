@@ -16,7 +16,7 @@ import scala.collection.JavaConverters._
  */
 class LocalFrame(val parent: LocalFrame) {
   var scope = new LocalScope(null)
-  private var allScopes: List[LocalScope] = new ArrayList[LocalScope]
+  private val allScopes: List[LocalScope] = new ArrayList[LocalScope]
   allScopes.add(scope)
   private var maxIndex: Int = 0
   private var closed: Boolean = false

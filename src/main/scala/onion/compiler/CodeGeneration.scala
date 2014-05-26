@@ -887,17 +887,9 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def nameOf(symbol: IRT.ClassTypeRef): String = {
-    symbol.name
-  }
+  private def nameOf(symbol: IRT.ClassTypeRef): String = symbol.name
 
-  private def namesOf(symbols: Array[IRT.ClassTypeRef]): Array[String] = {
-    val names: List[String] = new ArrayList[String]
-    for (symbol <- symbols) {
-      names.add(nameOf(symbol))
-    }
-    names.toArray(new Array[String](0))
-  }
+  private def namesOf(symbols: Array[IRT.ClassTypeRef]): Array[String] = symbols.map{s => nameOf(s)}
 
   def codeExpression(node: IRT.Term, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null

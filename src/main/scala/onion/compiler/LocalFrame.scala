@@ -24,7 +24,7 @@ class LocalFrame(val parent: LocalFrame) {
   /**
    * Opens a new scope.
    */
-  def openScope: Unit = {
+  def openScope(): Unit = {
     scope = new LocalScope(scope)
     allScopes.add(scope)
   }
@@ -42,7 +42,7 @@ class LocalFrame(val parent: LocalFrame) {
   /**
    * Closes the current scope.
    */
-  def closeScope: Unit = {
+  def closeScope(): Unit = {
     scope = scope.parent
   }
 

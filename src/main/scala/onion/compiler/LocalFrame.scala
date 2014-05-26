@@ -68,9 +68,7 @@ class LocalFrame(val parent: LocalFrame) {
     val bind = scope.get(name)
     if (bind != null) return -1
     val index = maxIndex
-    ({
-      maxIndex += 1; maxIndex
-    })
+    maxIndex += 1
     scope.put(name, new LocalBinding(index, `type`))
     index
   }
@@ -83,9 +81,7 @@ class LocalFrame(val parent: LocalFrame) {
       if (binding != null) {
         return new ClosureLocalBinding(frameIndex, binding.index, binding.vtype)
       }
-      ({
-        frameIndex += 1; frameIndex
-      })
+      frameIndex += 1
       frame = frame.parent
     }
     null
@@ -119,9 +115,7 @@ class LocalFrame(val parent: LocalFrame) {
     var frame: LocalFrame = this
     var depth: Int = -1
     while (frame != null) {
-      ({
-        depth += 1; depth
-      })
+      depth += 1
       frame = frame.parent
     }
     depth

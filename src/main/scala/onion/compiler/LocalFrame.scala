@@ -16,10 +16,10 @@ import scala.collection.JavaConverters._
  */
 class LocalFrame(val parent: LocalFrame) {
   var scope = new LocalScope(null)
+  var closed: Boolean = false
   private val allScopes: List[LocalScope] = new ArrayList[LocalScope]
   allScopes.add(scope)
   private var maxIndex: Int = 0
-  private var closed: Boolean = false
 
   /**
    * Opens a new scope.
@@ -98,17 +98,9 @@ class LocalFrame(val parent: LocalFrame) {
   def setAllClosed(closed: Boolean): Unit = {
     var frame: LocalFrame = this
     while (frame != null) {
-      frame.setClosed(closed)
+      frame.closed = closed
       frame = frame.parent
     }
-  }
-
-  def setClosed(closed: Boolean): Unit = {
-    this.closed = closed
-  }
-
-  def isClosed: Boolean = {
-    closed
   }
 
   def depth: Int = {

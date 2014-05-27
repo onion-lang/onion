@@ -17,17 +17,10 @@ import scala.collection.JavaConverters._
 class LocalFrame(val parent: LocalFrame) {
   var scope = new LocalScope(null)
   var closed: Boolean = false
+
   private val allScopes: List[LocalScope] = new ArrayList[LocalScope]
   allScopes.add(scope)
   private var maxIndex: Int = 0
-
-  /**
-   * Opens a new scope.
-   */
-  def openScope(): Unit = {
-    scope = new LocalScope(scope)
-    allScopes.add(scope)
-  }
 
   def open[A](block: => A): A = {
     try {
@@ -37,17 +30,6 @@ class LocalFrame(val parent: LocalFrame) {
     } finally {
       scope = scope.parent
     }
-  }
-
-  /**
-   * Closes the current scope.
-   */
-  def closeScope(): Unit = {
-    scope = scope.parent
-  }
-
-  private[compiler] def getScope: LocalScope = {
-    scope
   }
 
   def entries: Array[LocalBinding] = {

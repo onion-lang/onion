@@ -82,12 +82,7 @@ class LocalContext {
     this.contextFrame = frame
   }
 
-  def openScope[A](body: => A): A = try {
-    contextFrame.openScope()
-    body
-  } finally {
-    contextFrame.closeScope()
-  }
+  def openScope[A](body: => A): A = contextFrame.open(body)
 
   def open[A](block: => A): A = contextFrame.open(block)
 

@@ -771,37 +771,28 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeStatement(node: IRT.ActionStatement, code: CodeGeneration.CodeProxy): InstructionHandle = {
-    var start: InstructionHandle = null
-    if (node.isInstanceOf[IRT.StatementBlock]) {
-      start = codeBlock(node.asInstanceOf[IRT.StatementBlock], code)
+    node match {
+      case node1: IRT.StatementBlock =>
+        codeBlock(node1, code)
+      case node1: IRT.ExpressionActionStatement =>
+        codeExpressionStatement(node1, code)
+      case node1: IRT.IfStatement =>
+        codeIf(node1, code)
+      case node1: IRT.ConditionalLoop =>
+        codeLoop(node1, code)
+      case node1: IRT.NOP =>
+        codeEmpty(node1, code)
+      case node1: IRT.Return =>
+        codeReturn(node1, code)
+      case node1: IRT.Synchronized =>
+        codeSynchronized(node1, code)
+      case node1: IRT.Throw =>
+        codeThrowNode(node1, code)
+      case node1: IRT.Try =>
+        codeTry(node1, code)
+      case _ =>
+        code.append(InstructionConstants.NOP)
     }
-    else if (node.isInstanceOf[IRT.ExpressionActionStatement]) {
-      start = codeExpressionStatement(node.asInstanceOf[IRT.ExpressionActionStatement], code)
-    }
-    else if (node.isInstanceOf[IRT.IfStatement]) {
-      start = codeIf(node.asInstanceOf[IRT.IfStatement], code)
-    }
-    else if (node.isInstanceOf[IRT.ConditionalLoop]) {
-      start = codeLoop(node.asInstanceOf[IRT.ConditionalLoop], code)
-    }
-    else if (node.isInstanceOf[IRT.NOP]) {
-      start = codeEmpty(node.asInstanceOf[IRT.NOP], code)
-    }
-    else if (node.isInstanceOf[IRT.Return]) {
-      start = codeReturn(node.asInstanceOf[IRT.Return], code)
-    }
-    else if (node.isInstanceOf[IRT.Synchronized]) {
-      start = codeSynchronized(node.asInstanceOf[IRT.Synchronized], code)
-    }
-    else if (node.isInstanceOf[IRT.Throw]) {
-      start = codeThrowNode(node.asInstanceOf[IRT.Throw], code)
-    }
-    else if (node.isInstanceOf[IRT.Try]) {
-      start = codeTry(node.asInstanceOf[IRT.Try], code)
-    } else {
-      start = code.append(InstructionConstants.NOP)
-    }
-    start
   }
 
   def codeReturn(node: IRT.Return, code: CodeGeneration.CodeProxy): InstructionHandle = {

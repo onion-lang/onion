@@ -61,7 +61,7 @@ object Build extends Build {
     name := "onion",
     organization := "org.onion_lang",
     version := "1.0",
-    scalaVersion := "2.11.0",
+    scalaVersion := "2.11.1",
     unmanagedSourceDirectories in Compile <<= (Seq(javaSource in Compile) ++ Seq(scalaSource in Compile) ++ Seq(sourceManaged in Compile)).join,
     scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials"),
     javacOptions ++= Seq("-sourcepath", "src.lib", "-source", "1.5"),

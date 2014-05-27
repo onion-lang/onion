@@ -29,7 +29,7 @@ class Shell (classLoader: ClassLoader, classpath: Seq[String]) {
       val loader = new OnionClassLoader(classLoader, classpath, classes)
       Thread.currentThread.setContextClassLoader(loader)
       val main = findFirstMainMethod(loader, classes)
-      main.map{m => m.invoke(null, args); 0}.getOrElse(-1)
+      main.fold(-1){m => m.invoke(null, args); 0}
     } catch {
       case _: ClassNotFoundException | _: IllegalAccessException | _: MalformedURLException => -1
       case e: InvocationTargetException => throw new ScriptException(e.getCause)

@@ -426,7 +426,7 @@ class CodeGeneration(config: CompilerConfig) {
     val modifier: Int = toJavaModifier(node.modifier)
     var arguments: Array[Type] = typesOf(node.getArgs)
     val method: MethodGen = new MethodGen(modifier, Type.VOID, arguments, args, "<init>", classType.getClassName, code.getCode, gen.getConstantPool)
-    if (frame.isClosed) {
+    if (frame.closed) {
       val frameObjectIndexLocal = frameObjectIndex(1, node.getArgs)
       code.setFrameObjectIndex(frameObjectIndexLocal)
       code.setIndexTable(makeIndexTableForClosureFrame(frame))
@@ -465,7 +465,7 @@ class CodeGeneration(config: CompilerConfig) {
     val method: MethodGen = new MethodGen(modifier, returned, arguments, argNames, name, className, code.getCode, gen.getConstantPool)
     code.setMethod(method)
     if (!Modifier.isAbstract(node.modifier)) {
-      if (frame.isClosed) {
+      if (frame.closed) {
         var origin: Int = 0
         if (Modifier.isStatic(node.modifier)) {
           code.setFrameObjectIndex(frameObjectIndex(0, node.arguments))
@@ -575,7 +575,7 @@ class CodeGeneration(config: CompilerConfig) {
     method = new MethodGen(Constants.ACC_PUBLIC, typeOf(node.getReturnType), arguments, names(arguments.length), node.getName, closureName, closureCode.getCode, gen.getConstantPool)
     closureCode.setMethod(method)
     closureCode.setFrame(frame)
-    if (frame.isClosed) {
+    if (frame.closed) {
       val frameObjectIndexLocal = frameObjectIndex(1, node.getArguments)
       closureCode.setFrameObjectIndex(frameObjectIndexLocal)
       closureCode.setIndexTable(makeIndexTableForClosureFrame(frame))
@@ -839,7 +839,7 @@ class CodeGeneration(config: CompilerConfig) {
         {
           val bind: ClosureLocalBinding = node.catchTypes(i)
           val index: Int = code.getIndexTable(bind.index)
-          val `type`: ObjectType = typeOf(bind.vtype).asInstanceOf[ObjectType]
+          val `type`: ObjectType = typeOf(bind.tp).asInstanceOf[ObjectType]
           val target: InstructionHandle = code.appendStore(`type`, index)
           code.addExceptionHandler(start, to, target, `type`)
           codeStatement(node.catchStatements(i), code)
@@ -887,17 +887,9 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def nameOf(symbol: IRT.ClassTypeRef): String = {
-    symbol.name
-  }
+  private def nameOf(symbol: IRT.ClassTypeRef): String = symbol.name
 
-  private def namesOf(symbols: Array[IRT.ClassTypeRef]): Array[String] = {
-    val names: List[String] = new ArrayList[String]
-    for (symbol <- symbols) {
-      names.add(nameOf(symbol))
-    }
-    names.toArray(new Array[String](0))
-  }
+  private def namesOf(symbols: Array[IRT.ClassTypeRef]): Array[String] = symbols.map{s => nameOf(s)}
 
   def codeExpression(node: IRT.Term, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
@@ -1027,7 +1019,7 @@ class CodeGeneration(config: CompilerConfig) {
   def codeLocalAssign(node: IRT.SetLocal, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
     val `type`: Type = typeOf(node.`type`)
-    if (node.frame == 0 && !code.getFrame.isClosed) {
+    if (node.frame == 0 && !code.getFrame.closed) {
       start = codeExpression(node.value, code)
       if (isWideType(node.`type`)) {
         code.append(InstructionConstants.DUP2)
@@ -1037,7 +1029,7 @@ class CodeGeneration(config: CompilerConfig) {
       }
       code.appendStore(`type`, code.getIndexTable(node.index))
     } else {
-      if (node.frame == 0 && code.getFrame.isClosed) {
+      if (node.frame == 0 && code.getFrame.closed) {
         val index: Int = code.getFrameObjectIndex
         start = code.appendLoad(new ArrayType("java.lang.Object", 1), index)
         code.appendConstant(JInteger.valueOf(code.index(node.index)))
@@ -1070,11 +1062,11 @@ class CodeGeneration(config: CompilerConfig) {
   def codeLocalRef(node: IRT.RefLocal, code: CodeGeneration.CodeProxy): InstructionHandle = {
     var start: InstructionHandle = null
     val `type`: Type = typeOf(node.`type`)
-    if (node.frame == 0 && !code.getFrame.isClosed) {
+    if (node.frame == 0 && !code.getFrame.closed) {
       start = code.appendLoad(`type`, code.index(node.index))
     }
     else {
-      if (node.frame == 0 && code.getFrame.isClosed) {
+      if (node.frame == 0 && code.getFrame.closed) {
         val index: Int = code.getFrameObjectIndex
         start = code.appendLoad(new ArrayType("java.lang.Object", 1), index)
         code.appendConstant(JInteger.valueOf(code.index(node.index)))
@@ -1732,7 +1724,7 @@ class CodeGeneration(config: CompilerConfig) {
     var i: Int = 0
     while (i < bindings.length) {
       indexTable(i) = maxIndex
-      if (isWideType(bindings(i).vtype)) {
+      if (isWideType(bindings(i).tp)) {
         maxIndex += 2
       } else {
         maxIndex += 1

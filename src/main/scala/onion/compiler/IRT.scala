@@ -254,8 +254,8 @@ object IRT {
     extends IRT.AbstractClassTypeRef() with Node with Named {
 
     def constructors: Array[IRT.ConstructorRef] = constructors_.toArray(new Array[IRT.ConstructorRef](0))
-    def methods: Array[IRT.MethodRef] = methods_.values.toArray(new Array[IRT.MethodRef](0))
-    def fields: Array[IRT.FieldRef] = fields_.values.toArray(new Array[IRT.FieldRef](0))
+    def methods: Array[IRT.MethodRef] = methods_.values.toArray
+    def fields: Array[IRT.FieldRef] = fields_.values.toArray
 
     var fields_ : OrderedTable[IRT.FieldRef] = new OrderedTable[IRT.FieldRef]
     var methods_ : MultiTable[IRT.MethodRef] = new MultiTable[IRT.MethodRef]
@@ -295,9 +295,9 @@ object IRT {
       constructors_.add(ConstructorDefinition.newDefaultConstructor(this))
     }
 
-    def methods(name: String): Array[IRT.MethodRef] = (methods_.get(name).toArray(new Array[IRT.MethodRef](0))).asInstanceOf[Array[IRT.MethodRef]]
+    def methods(name: String): Array[IRT.MethodRef] = methods_.get(name).toArray
 
-    def field(name: String): IRT.FieldRef = fields_.get(name)
+    def field(name: String): IRT.FieldRef = fields_.get(name).getOrElse(null)
 
     def setSourceFile(sourceFile: String): Unit = this.sourceFile = sourceFile
 
@@ -464,7 +464,7 @@ object IRT {
 
   class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef)  extends Term(location) {
     def this(bind: ClosureLocalBinding) {
-      this(null, bind.frameIndex, bind.index, bind.vtype)
+      this(null, bind.frameIndex, bind.index, bind.tp)
     }
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef) {
@@ -474,7 +474,7 @@ object IRT {
 
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef, val value: IRT.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: IRT.Term) {
-      this(null, bind.frameIndex, bind.index, bind.vtype, value)
+      this(null, bind.frameIndex, bind.index, bind.tp, value)
     }
 
     def this(frame: Int, index: Int, `type`: IRT.TypeRef, value: IRT.Term) {

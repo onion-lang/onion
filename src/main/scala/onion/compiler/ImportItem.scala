@@ -19,13 +19,13 @@ case class ImportItem(simpleName : String, fqcn: String) {
    * @param simpleName
    * @return fqcn.  if simpleName is not matched, then return null.
    */
-  def matches(simpleName: String): String = {
+  def matches(simpleName: String): Option[String] = {
     if (isOnDemand) {
-      fqcn.replaceAll("\\*", simpleName)
+      Some(fqcn.replaceAll("\\*", simpleName))
     } else if (this.simpleName == simpleName) {
-      fqcn
+      Some(fqcn)
     } else {
-      null
+      None
     }
   }
 

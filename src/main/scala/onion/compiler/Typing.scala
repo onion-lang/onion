@@ -43,8 +43,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }else {
         for(item <- imports) {
           val qname = item matches name
-          if(qname != null) {
-            val mappedType = forName(qname, true)
+          if(qname.isDefined) {
+            val mappedType = forName(qname.get, true)
             if(mappedType != null) return mappedType
           }
         }
@@ -53,8 +53,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   private val table_  = new ClassTable(classpath(config.classPath))
-  private val ast2ixt_ = Map[AST.Node, Node]()
-  private var ixt2ast_ = Map[Node, AST.Node]()
+  private val ast2ixt_ = Map[AST.Node, IRT.Node]()
+  private var ixt2ast_ = Map[IRT.Node, AST.Node]()
   private var mappers_  = Map[String, NameMapper]()
   private var access_ : Int = _
   private var mapper_ : NameMapper = _
@@ -354,7 +354,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
       new AsInstanceOf(node.location, b, a)
     }
-    def openClosure[A](context: LocalContext)(block: => A): A = try {
+    def openClosure[A](context: LocalContext)(block: => A): A = {
       val tmp = context.isClosure
       try {
         context.setClosure(true)
@@ -373,7 +373,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       context.openFrame()
       block
     } finally {
-      context.closeFrame
+      context.closeFrame()
     }
     def processMethodDeclaration(node: AST.MethodDeclaration) {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
@@ -473,7 +473,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (bind != null) {
         frame = bind.frameIndex
         index = bind.index
-        leftType = bind.vtype
+        leftType = bind.tp
       } else {
         frame = 0
         if (rightType.isNullType) {
@@ -1209,8 +1209,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
             init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0))))
             var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-            if (elementVar.vtype != rootClass) {
-              next = new AsInstanceOf(next, elementVar.vtype)
+            if (elementVar.tp != rootClass) {
+              next = new AsInstanceOf(next, elementVar.tp)
             }
             block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
             new StatementBlock(init, block)
@@ -1299,10 +1299,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           val cases = node.cases
           val nodes = Buffer[Term]()
           val thens = Buffer[ActionStatement]()
-          for((expressions, then)<- cases) {
+          for((expressions, thenClause)<- cases) {
             val bind = context.lookup(name)
             nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
-            thens += translate(then, context)
+            thens += translate(thenClause, context)
           }
           var branches: ActionStatement = if(node.elseBlock != null) {
             translate(node.elseBlock, context)
@@ -1580,7 +1580,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   def loadArray(base: TypeRef, dimension: Int): ArrayTypeRef = table_.loadArray(base, dimension)
   def rootClass: ClassTypeRef = table_.rootClass
   def problems: Array[CompileError] = reporter_.getProblems
-  def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray(new Array[ClassDefinition](0))
+  def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray
   def topClass: String = {
     val module = unit_.module
     val moduleName = if (module != null) module.name else null

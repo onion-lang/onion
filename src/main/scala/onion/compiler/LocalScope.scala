@@ -82,7 +82,7 @@ class LocalScope(val parent: LocalScope) {
 
   override def toString(): String = {
     val separator = Systems.lineSeparator
-    val lines = (for(name <- bindings.keySet) yield (s"  ${name}:${bindings(name).vtype}"))
+    val lines = (for(name <- bindings.keySet) yield (s"  ${name}:${bindings(name).tp}"))
     lines.mkString(s"[${separator}", separator, "]")
   }
 }

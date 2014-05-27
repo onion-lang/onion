@@ -10,9 +10,7 @@ package onion.compiler;
 
 
 import onion.compiler.toolbox.Systems
-import java.util.Set
-import scala.collection.mutable.{HashMap, HashSet}
-import scala.collection.JavaConverters._
+import scala.collection.mutable
 ;
 
 /**
@@ -20,16 +18,15 @@ import scala.collection.JavaConverters._
  * @author Kota Mizushima
  */
 class LocalScope(val parent: LocalScope) {
-  private val bindings = new HashMap[String, LocalBinding]
+  private val bindings = mutable.HashMap[String, LocalBinding]()
 
 
   /**
    * Gets registered binding objects.
    * @return Set object which element is LocalBinding object
    */
-  def entries: Set[LocalBinding] = {
-    val set = new HashSet[LocalBinding]()
-    (set ++= bindings.values).asJava
+  def entries: mutable.Set[LocalBinding] = {
+    mutable.HashSet[LocalBinding]() ++ bindings.values
   }
 
   /**
@@ -82,7 +79,7 @@ class LocalScope(val parent: LocalScope) {
 
   override def toString(): String = {
     val separator = Systems.lineSeparator
-    val lines = (for(name <- bindings.keySet) yield (s"  ${name}:${bindings(name).tp}"))
+    val lines = for(name <- bindings.keySet) yield s"  ${name}:${bindings(name).tp}"
     lines.mkString(s"[${separator}", separator, "]")
   }
 }

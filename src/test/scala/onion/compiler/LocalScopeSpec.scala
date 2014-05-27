@@ -34,9 +34,9 @@ class LocalScopeSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter 
     contains
   }
 
-  feature("LocalScope") {
-    scenario("can have LocalBindings") {
-      assert(scope.entries.size() === 4)
+  feature("a LocalScope") {
+    scenario("have 4 LocalBindings") {
+      assert(scope.entries.size === 4)
     }
   }
 }

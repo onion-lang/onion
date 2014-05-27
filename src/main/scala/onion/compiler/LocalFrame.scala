@@ -79,7 +79,7 @@ class LocalFrame(val parent: LocalFrame) {
     while (frame != null) {
       val binding = frame.scope.lookup(name)
       if (binding != null) {
-        return new ClosureLocalBinding(frameIndex, binding.index, binding.vtype)
+        return new ClosureLocalBinding(frameIndex, binding.index, binding.tp)
       }
       frameIndex += 1
       frame = frame.parent
@@ -90,7 +90,7 @@ class LocalFrame(val parent: LocalFrame) {
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     val binding = scope.get(name)
     if (binding != null) {
-      return new ClosureLocalBinding(0, binding.index, binding.vtype)
+      return new ClosureLocalBinding(0, binding.index, binding.tp)
     }
     null
   }

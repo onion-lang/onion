@@ -473,7 +473,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (bind != null) {
         frame = bind.frameIndex
         index = bind.index
-        leftType = bind.vtype
+        leftType = bind.tp
       } else {
         frame = 0
         if (rightType.isNullType) {
@@ -1209,8 +1209,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
             init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0))))
             var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-            if (elementVar.vtype != rootClass) {
-              next = new AsInstanceOf(next, elementVar.vtype)
+            if (elementVar.tp != rootClass) {
+              next = new AsInstanceOf(next, elementVar.tp)
             }
             block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
             new StatementBlock(init, block)

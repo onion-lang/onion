@@ -839,7 +839,7 @@ class CodeGeneration(config: CompilerConfig) {
         {
           val bind: ClosureLocalBinding = node.catchTypes(i)
           val index: Int = code.getIndexTable(bind.index)
-          val `type`: ObjectType = typeOf(bind.vtype).asInstanceOf[ObjectType]
+          val `type`: ObjectType = typeOf(bind.tp).asInstanceOf[ObjectType]
           val target: InstructionHandle = code.appendStore(`type`, index)
           code.addExceptionHandler(start, to, target, `type`)
           codeStatement(node.catchStatements(i), code)
@@ -1724,7 +1724,7 @@ class CodeGeneration(config: CompilerConfig) {
     var i: Int = 0
     while (i < bindings.length) {
       indexTable(i) = maxIndex
-      if (isWideType(bindings(i).vtype)) {
+      if (isWideType(bindings(i).tp)) {
         maxIndex += 2
       } else {
         maxIndex += 1

@@ -5,4 +5,4 @@ import scala.collection.mutable
 /**
  * @author Kota Mizushima
  */
-class UnorderedTable[E <: Named] extends AbstractTable[E](new mutable.HashMap[String, E])
+class UnOrderedTable[E <: Named] extends AbstractTable[E](new mutable.HashMap[String, E])

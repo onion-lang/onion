@@ -84,8 +84,6 @@ class LocalContext {
 
   def openScope[A](body: => A): A = contextFrame.open(body)
 
-  def open[A](block: => A): A = contextFrame.open(block)
-
   def lookup(name: String): ClosureLocalBinding = {
     contextFrame.lookup(name)
   }
@@ -99,7 +97,7 @@ class LocalContext {
   }
 
   def add(`type` : IRT.TypeRef): String = {
-    var name: String = newName
+    val name = newName
     contextFrame.add(name, `type`)
     name
   }

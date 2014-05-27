@@ -56,8 +56,10 @@ class ClassTable(classPath: String) {
   def rootClass: IRT.ClassTypeRef = load("java.lang.Object")
 
   def lookup(className: String): IRT.ClassTypeRef = {
-    val ref = classes.get(className)
-    if ((ref != null)) ref else classFiles.get(className)
+    classes.get(className) match {
+      case Some(ref) => ref
+      case None => classFiles.get(className)
+    }
   }
 
 }

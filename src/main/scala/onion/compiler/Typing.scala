@@ -1580,7 +1580,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   def loadArray(base: TypeRef, dimension: Int): ArrayTypeRef = table_.loadArray(base, dimension)
   def rootClass: ClassTypeRef = table_.rootClass
   def problems: Array[CompileError] = reporter_.getProblems
-  def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray(new Array[ClassDefinition](0))
+  def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray
   def topClass: String = {
     val module = unit_.module
     val moduleName = if (module != null) module.name else null

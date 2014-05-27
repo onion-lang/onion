@@ -1,41 +1,37 @@
 package onion.compiler
 
-import java.util._
-import java.util.Iterator
-import java.lang.Iterable
-import scala.collection.JavaConverters._
+import scala.collection.Iterable
+import scala.collection.Iterator
+import scala.collection.mutable
 
 class MultiTable[E <: Named] extends Iterable[E] {
-  private final val mapping = new HashMap[String, List[E]]
+  private[this] final val mapping = new mutable.HashMap[String, mutable.Buffer[E]]
 
   def add(entry: E): Boolean = {
-    var value: List[E] = mapping.get(entry.name)
-    if (value == null) {
-      value = new ArrayList[E]
-      value.add(entry)
-      mapping.put(entry.name, value)
-      false
-    }
-    else {
-      value.add(entry)
-      true
+    mapping.get(entry.name) match {
+      case Some(v) =>
+        v += entry
+        true
+      case None =>
+        val v = mutable.Buffer[E]()
+        v += entry
+        mapping(entry.name) = v
+        false
     }
   }
 
-  def get(key: String): List[E] = {
-    var values: List[E] = mapping.get(key)
-    if (values == null) {
-      values = new ArrayList[E]
-      mapping.put(key, values)
-    }
-    values
+  def get(key: String): Seq[E] = {
+    (mapping.get(key) match {
+      case None =>
+        val v = mutable.Buffer[E]()
+        mapping(key) = v
+        v
+      case Some(v) =>
+        v
+    }).toList
   }
 
-  def values: List[E] = {
-    val list = new ArrayList[E]
-    for (value <- mapping.values.asScala) list.addAll(value)
-    list
-  }
+  def values: Seq[E] =  mapping.values.toList.flatten
 
   def iterator: Iterator[E] = values.iterator
 }

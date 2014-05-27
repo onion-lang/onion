@@ -1,8 +1,8 @@
 package onion.compiler
 
-import java.util.HashMap
+import scala.collection.mutable
 
 /**
  * @author Kota Mizushima
  */
-class UnorderedTable[E <: Named] extends AbstractTable[E](new HashMap[String, E])
+class UnorderedTable[E <: Named] extends AbstractTable[E](new mutable.HashMap[String, E])

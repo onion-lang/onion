@@ -1,14 +1,10 @@
 package onion.compiler
 
-import java.util.ArrayList
-import java.util.Iterator
-import java.util.List
-import java.util.Map
-import java.lang.Iterable
+import scala.collection.mutable
 
-class AbstractTable[E <: Named](protected val mapping: Map[String, E]) extends Iterable[E] {
-  def add(entry: E): Unit =  mapping.put(entry.name, entry)
-  def get(key: String): E =  mapping.get(key)
-  def values: List[E] =  new ArrayList[E](mapping.values)
+class AbstractTable[E <: Named](protected val mapping: mutable.Map[String, E]) extends Iterable[E] {
+  def add(entry: E): Unit =  mapping(entry.name) = entry
+  def get(key: String): Option[E] =  mapping.get(key)
+  def values: Seq[E] =  mapping.values.toList
   def iterator: Iterator[E] =  mapping.values.iterator
 }

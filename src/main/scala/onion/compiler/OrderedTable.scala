@@ -1,5 +1,5 @@
 package onion.compiler
 
-import java.util.LinkedHashMap
+import scala.collection.mutable
 
-class OrderedTable[E <: Named] extends AbstractTable[E](new LinkedHashMap[String, E])
+class OrderedTable[E <: Named] extends AbstractTable[E](new mutable.LinkedHashMap[String, E])

@@ -16,7 +16,7 @@ import toolbox.SymbolGenerator
  */
 class LocalContext {
   private var contextFrame = new LocalFrame(null)
-  private var generator = new SymbolGenerator("symbol#")
+  private val generator = new SymbolGenerator("symbol#")
   var isClosure: Boolean = false
   var isStatic: Boolean = false
   var isGlobal: Boolean = false

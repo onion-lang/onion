@@ -69,9 +69,9 @@ object Build extends Build {
     libraryDependencies ++= Seq(
       "org.apache.bcel" % "bcel" % "5.2",
       "org.ow2.asm" % "asm" % "5.0.2",
-      "net.java.dev.javacc" % "javacc" % "4.0" % "test",
-      "org.scalatest" %% "scalatest" % "2.1.6" % "test",
-      "org.specs2" %% "specs2" % "2.3.12" % "test"
+      "net.java.dev.javacc" % "javacc" % "4.0",
+      "junit" % "junit" % "4.7" % "test",
+      "org.scalatest" %% "scalatest" % "2.1.6" % "test"
     ),
     sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
       val targetDir = dir / "java" / "onion" / "compiler" / "parser"

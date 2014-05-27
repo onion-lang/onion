@@ -70,37 +70,30 @@ object CodeGeneration {
     IRT.BasicTypeRef.VOID -> Type.VOID
   )
 
-  class CodeProxy {
-    def this(pool: ConstantPoolGen) {
-      this()
-      this.code = new InstructionList
-      this.factory = new InstructionFactory(pool)
-    }
+  class Proxy(pool: ConstantPoolGen) {
+    private val code: InstructionList = new InstructionList()
+    private val factory: InstructionFactory = new InstructionFactory(pool)
+    private var frame: LocalFrame = null
+    private var frameObjectIndex: Int = 0
+    private var indexTable: Array[Int] = null
+    private var method: MethodGen = null
 
     def setFrame(frame: LocalFrame) {
       this.frame = frame
     }
-
     def getFrame: LocalFrame = frame
-
     def getFrameObjectIndex: Int = frameObjectIndex
-
     def setFrameObjectIndex(frameObjectIndex: Int) {
       this.frameObjectIndex = frameObjectIndex
     }
-
     def setIndexTable(indexTable: Array[Int]) {
       this.indexTable = indexTable.clone.asInstanceOf[Array[Int]]
     }
-
     def index(index: Int): Int = indexTable(index)
-
     def getIndexTable: Array[Int] = indexTable.clone.asInstanceOf[Array[Int]]
-
     def setMethod(method: MethodGen) {
       this.method = method
     }
-
     def getMethod: MethodGen = {
       method
     }
@@ -117,40 +110,30 @@ object CodeGeneration {
       appendInvoke(`type`.getClassName, "<init>", Type.VOID, params, Constants.INVOKESPECIAL)
     }
 
-    def appendDefaultValue(`type`: Type): InstructionHandle = {
-      var start: InstructionHandle = null
-      if (`type`.isInstanceOf[BasicType]) {
-        if (`type` eq Type.BOOLEAN) {
-          start = appendConstant(JBoolean.valueOf(false))
-        }
-        else if (`type` eq Type.BYTE) {
-          start = appendConstant(new JByte(0.asInstanceOf[Byte]))
-        }
-        else if (`type` eq Type.SHORT) {
-          start = appendConstant(new JShort(0.asInstanceOf[Short]))
-        }
-        else if (`type` eq Type.CHAR) {
-          start = appendConstant(new JCharacter(0.asInstanceOf[Char]))
-        }
-        else if (`type` eq Type.INT) {
-          start = appendConstant(new JInteger(0))
-        }
-        else if (`type` eq Type.LONG) {
-          start = appendConstant(new JLong(0))
-        }
-        else if (`type` eq Type.FLOAT) {
-          start = appendConstant(new JFloat(0.0f))
-        }
-        else if (`type` eq Type.DOUBLE) {
-          start = appendConstant(new JDouble(0.0))
-        }
-        else {
-          start = append(InstructionConstants.NOP)
+    def appendDefaultValue(tp: Type): InstructionHandle = {
+      if (tp.isInstanceOf[BasicType]) {
+        if (tp eq Type.BOOLEAN) {
+          appendConstant(JBoolean.valueOf(false))
+        } else if (tp eq Type.BYTE) {
+          appendConstant(new JByte(0.asInstanceOf[Byte]))
+        } else if (tp eq Type.SHORT) {
+          appendConstant(new JShort(0.asInstanceOf[Short]))
+        } else if (tp eq Type.CHAR) {
+          appendConstant(new JCharacter(0.asInstanceOf[Char]))
+        } else if (tp eq Type.INT) {
+          appendConstant(new JInteger(0))
+        } else if (tp eq Type.LONG) {
+          appendConstant(new JLong(0))
+        } else if (tp eq Type.FLOAT) {
+          appendConstant(new JFloat(0.0f))
+        } else if (tp eq Type.DOUBLE) {
+          appendConstant(new JDouble(0.0))
+        } else {
+          append(InstructionConstants.NOP)
         }
       } else {
-        start = appendNull(`type`)
+        appendNull(tp)
       }
-      start
     }
 
     def boxing(`type`: Type): ObjectType = {
@@ -311,12 +294,6 @@ object CodeGeneration {
 
     def update: Unit =  code.update
 
-    private var code: InstructionList = null
-    private var factory: InstructionFactory = null
-    private var frame: LocalFrame = null
-    private var frameObjectIndex: Int = 0
-    private var indexTable: Array[Int] = null
-    private var method: MethodGen = null
     private final val BOXING_TABLE = Map(
       Type.BOOLEAN -> new ObjectType("java.lang.Boolean"),
       Type.BYTE -> new ObjectType("java.lang.Byte"),
@@ -387,7 +364,7 @@ class CodeGeneration(config: CompilerConfig) {
     compiledClasses.add(gen.getJavaClass)
   }
 
-  def codeExpressions(nodes: Array[IRT.Term], code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeExpressions(nodes: Array[IRT.Term], code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     if (nodes.length > 0) {
       start = codeExpression(nodes(0), code)
@@ -405,7 +382,7 @@ class CodeGeneration(config: CompilerConfig) {
   def codeConstructor(gen: ClassGen, node: IRT.ConstructorDefinition) {
     val isStaticOld: Boolean = isStatic
     isStatic = false
-    val code: CodeGeneration.CodeProxy = new CodeGeneration.CodeProxy(gen.getConstantPool)
+    val code: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
     val frame: LocalFrame = node.frame
     code.setFrame(frame)
     val args: Array[String] = new Array[String](node.getArgs.length)
@@ -453,7 +430,7 @@ class CodeGeneration(config: CompilerConfig) {
   def codeMethod(gen: ClassGen, node: IRT.MethodDefinition) {
     val isStaticOld: Boolean = isStatic
     isStatic = Modifier.isStatic(node.modifier)
-    val code: CodeGeneration.CodeProxy = new CodeGeneration.CodeProxy(gen.getConstantPool)
+    val code: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
     val frame: LocalFrame = node.getFrame
     code.setFrame(frame)
     val modifier: Int = toJavaModifier(node.modifier)
@@ -494,7 +471,7 @@ class CodeGeneration(config: CompilerConfig) {
     isStatic = isStaticOld
   }
 
-  private def appendInitialCode(code: CodeGeneration.CodeProxy, frame: LocalFrame, arguments: Array[Type], origin: Int) {
+  private def appendInitialCode(code: CodeGeneration.Proxy, frame: LocalFrame, arguments: Array[Type], origin: Int) {
     val frameObjectIndex: Int = code.getFrameObjectIndex
     code.appendConstant(JInteger.valueOf(frame.entries.length))
     code.appendNewArray(Type.OBJECT, 1.asInstanceOf[Short])
@@ -535,7 +512,7 @@ class CodeGeneration(config: CompilerConfig) {
           val name: String = method.name
           val args: Array[Type] = typesOf(method.arguments)
           val argNames: Array[String] = names(args.length)
-          val code: CodeGeneration.CodeProxy = new CodeGeneration.CodeProxy(gen.getConstantPool)
+          val code: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
           val mgen: MethodGen = new MethodGen(Constants.ACC_PUBLIC, returnType, args, argNames, name, gen.getClassName, code.getCode, gen.getConstantPool)
           code.appendDefaultValue(returnType)
           code.appendReturn(returnType)
@@ -551,7 +528,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def codeClosure(node: IRT.NewClosure, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeClosure(node: IRT.NewClosure, code: CodeGeneration.Proxy): InstructionHandle = {
     val classType: IRT.ClassTypeRef = node.getClassType
     val closureName: String = generator.generate
     val arguments: Array[Type] = typesOf(node.getArguments)
@@ -571,7 +548,7 @@ class CodeGeneration(config: CompilerConfig) {
     val types: Array[Type] = closureArguments(depth)
     var method: MethodGen = createClosureConstructor(closureName, types, gen.getConstantPool)
     gen.addMethod(method.getMethod)
-    val closureCode: CodeGeneration.CodeProxy = new CodeGeneration.CodeProxy(gen.getConstantPool)
+    val closureCode: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
     method = new MethodGen(Constants.ACC_PUBLIC, typeOf(node.getReturnType), arguments, names(arguments.length), node.getName, closureName, closureCode.getCode, gen.getConstantPool)
     closureCode.setMethod(method)
     closureCode.setFrame(frame)
@@ -659,7 +636,7 @@ class CodeGeneration(config: CompilerConfig) {
     arguments
   }
 
-  private def codeList(node: IRT.ListLiteral, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  private def codeList(node: IRT.ListLiteral, code: CodeGeneration.Proxy): InstructionHandle = {
     val listType: ObjectType = typeOf(node.`type`).asInstanceOf[ObjectType]
     val start: InstructionHandle = code.appendNew("java.util.ArrayList")
     code.appendDup(1)
@@ -676,7 +653,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeSuperCall(node: IRT.CallSuper, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeSuperCall(node: IRT.CallSuper, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     codeExpressions(node.params, code)
     val method: IRT.MethodRef = node.method
@@ -713,7 +690,7 @@ class CodeGeneration(config: CompilerConfig) {
         i += 1;
       }
     }
-    val code: CodeGeneration.CodeProxy = new CodeGeneration.CodeProxy(pool)
+    val code: CodeGeneration.Proxy = new CodeGeneration.Proxy(pool)
     val constructor: MethodGen = new MethodGen(Constants.ACC_PUBLIC, Type.VOID, complementOuterThis(types), argNames, "<init>", className, code.getCode, pool)
     code.appendThis
     code.appendCallConstructor(Type.OBJECT, new Array[Type](0))
@@ -741,7 +718,7 @@ class CodeGeneration(config: CompilerConfig) {
     gen.addField(field.getField)
   }
 
-  def codeBlock(node: IRT.StatementBlock, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeBlock(node: IRT.StatementBlock, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     if (node.statements.length > 0) {
       start = codeStatement(node.statements(0), code)
@@ -756,7 +733,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeExpressionStatement(node: IRT.ExpressionActionStatement, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeExpressionStatement(node: IRT.ExpressionActionStatement, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.term, code)
     val `type`: IRT.TypeRef = node.term.`type`
     if (`type` ne IRT.BasicTypeRef.VOID) {
@@ -770,7 +747,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeStatement(node: IRT.ActionStatement, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeStatement(node: IRT.ActionStatement, code: CodeGeneration.Proxy): InstructionHandle = {
     node match {
       case node1: IRT.StatementBlock =>
         codeBlock(node1, code)
@@ -795,7 +772,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def codeReturn(node: IRT.Return, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeReturn(node: IRT.Return, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     if (node.term != null) {
       start = codeExpression(node.term, code)
@@ -808,17 +785,17 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeSynchronized(node: IRT.Synchronized, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeSynchronized(node: IRT.Synchronized, code: CodeGeneration.Proxy): InstructionHandle = {
     null
   }
 
-  def codeThrowNode(node: IRT.Throw, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeThrowNode(node: IRT.Throw, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.term, code)
     code.append(InstructionConstants.ATHROW)
     start
   }
 
-  def codeTry(node: IRT.Try, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeTry(node: IRT.Try, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeStatement(node.tryStatement, code)
     val to: BranchHandle = code.append(new GOTO(null))
     val length: Int = node.catchTypes.length
@@ -852,11 +829,11 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeEmpty(node: IRT.NOP, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeEmpty(node: IRT.NOP, code: CodeGeneration.Proxy): InstructionHandle = {
     code.append(InstructionConstants.NOP)
   }
 
-  def codeIf(node: IRT.IfStatement, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeIf(node: IRT.IfStatement, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.getCondition, code)
     val toThen: BranchHandle = code.append(new IFNE(null))
     if (node.getElseStatement != null) {
@@ -868,7 +845,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeLoop(node: IRT.ConditionalLoop, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeLoop(node: IRT.ConditionalLoop, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.condition, code)
     val branch: BranchHandle = code.append(new IFEQ(null))
     codeStatement(node.stmt, code)
@@ -882,7 +859,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def namesOf(symbols: Array[IRT.ClassTypeRef]): Array[String] = symbols.map{s => nameOf(s)}
 
-  def codeExpression(node: IRT.Term, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeExpression(node: IRT.Term, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     if (node.isInstanceOf[IRT.BinaryTerm]) {
       start = codeBinaryExpression(node.asInstanceOf[IRT.BinaryTerm], code)
@@ -983,7 +960,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeBegin(node: IRT.Begin, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeBegin(node: IRT.Begin, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     val terms: Array[IRT.Term] = node.terms
     if (terms.length > 0) {
@@ -1007,7 +984,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeLocalAssign(node: IRT.SetLocal, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeLocalAssign(node: IRT.SetLocal, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     val `type`: Type = typeOf(node.`type`)
     if (node.frame == 0 && !code.getFrame.closed) {
@@ -1050,7 +1027,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeLocalRef(node: IRT.RefLocal, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeLocalRef(node: IRT.RefLocal, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     val `type`: Type = typeOf(node.`type`)
     if (node.frame == 0 && !code.getFrame.closed) {
@@ -1081,14 +1058,14 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeStaticFieldRef(node: IRT.RefStaticField, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeStaticFieldRef(node: IRT.RefStaticField, code: CodeGeneration.Proxy): InstructionHandle = {
     val classType: String = node.field.affiliation.name
     val name: String = node.field.name
     val `type`: Type = typeOf(node.`type`)
     code.appendGetStatic(classType, name, `type`)
   }
 
-  def codeMethodCall(node: IRT.Call, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeMethodCall(node: IRT.Call, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     var i: Int = 0
     while (i < node.parameters.length) {
@@ -1111,7 +1088,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeArrayRef(node: IRT.RefArray, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeArrayRef(node: IRT.RefArray, code: CodeGeneration.Proxy): InstructionHandle = {
     val targetType: IRT.ArrayTypeRef = node.target.`type`.asInstanceOf[IRT.ArrayTypeRef]
     val start: InstructionHandle = codeExpression(node.target, code)
     codeExpression(node.index, code)
@@ -1119,13 +1096,13 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeArrayLengthNode(node: IRT.ArrayLength, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeArrayLengthNode(node: IRT.ArrayLength, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     code.append(InstructionConstants.ARRAYLENGTH)
     start
   }
 
-  def codeArrayAssignment(node: IRT.SetArray, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeArrayAssignment(node: IRT.SetArray, code: CodeGeneration.Proxy): InstructionHandle = {
     val targetType: IRT.ArrayTypeRef = node.`object`.`type`.asInstanceOf[IRT.ArrayTypeRef]
     val start: InstructionHandle = codeExpression(node.`object`, code)
     code.appendDup(1)
@@ -1135,7 +1112,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeNew(node: IRT.NewObject, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeNew(node: IRT.NewObject, code: CodeGeneration.Proxy): InstructionHandle = {
     val `type`: IRT.ClassTypeRef = node.constructor.affiliation
     val start: InstructionHandle = code.appendNew(typeOf(`type`).asInstanceOf[ObjectType])
     code.append(InstructionConstants.DUP)
@@ -1152,14 +1129,14 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeNewArray(node: IRT.NewArray, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeNewArray(node: IRT.NewArray, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpressions(node.parameters, code)
     val `type`: IRT.ArrayTypeRef = node.arrayType
     code.appendNewArray(typeOf(`type`.component), node.parameters.length.asInstanceOf[Short])
     start
   }
 
-  def codeStaticMethodCall(node: IRT.CallStatic, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeStaticMethodCall(node: IRT.CallStatic, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
     if (node.parameters.length > 0) {
       start = codeExpression(node.parameters(0), code)
@@ -1180,7 +1157,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeBinaryExpression(node: IRT.BinaryTerm, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeBinaryExpression(node: IRT.BinaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
     if (node.kind == LOGICAL_AND) {
       return codeLogicalAnd(node, code)
     }
@@ -1234,7 +1211,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def bitShiftR2(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def bitShiftR2(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(InstructionConstants.ISHR)
     }
@@ -1246,7 +1223,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitShiftL2(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def bitShiftL2(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(InstructionConstants.ISHL)
     }
@@ -1258,7 +1235,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitShiftR3(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def bitShiftR3(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(InstructionConstants.IUSHR)
     }
@@ -1270,7 +1247,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def codeLogicalAnd(node: IRT.BinaryTerm, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeLogicalAnd(node: IRT.BinaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.lhs, code)
     var b1: BranchHandle = null
     var b2: BranchHandle = null
@@ -1287,7 +1264,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeLogicalOr(node: IRT.BinaryTerm, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeLogicalOr(node: IRT.BinaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.lhs, code)
     var b1: BranchHandle = null
     var b2: BranchHandle = null
@@ -1304,7 +1281,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def codeElvis(node: IRT.BinaryTerm, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeElvis(node: IRT.BinaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.lhs, code)
     code.appendDup(1)
     code.appendNull(typeOf(node.`type`))
@@ -1316,7 +1293,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def bitAnd(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def bitAnd(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
       code.append(new IAND)
     }
@@ -1328,7 +1305,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitOr(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def bitOr(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
       code.append(new IOR)
     }
@@ -1340,7 +1317,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def xor(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def xor(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
       code.append(new IXOR)
     }
@@ -1352,7 +1329,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def eq(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def eq(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     var b1: BranchHandle = null
     if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.CHAR) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
       b1 = code.append(new IF_ICMPEQ(null))
@@ -1374,7 +1351,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def noteq(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def noteq(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     var b1: BranchHandle = null
     if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.CHAR) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
       b1 = code.append(new IF_ICMPNE(null))
@@ -1397,7 +1374,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def gt(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def gt(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     var b1: BranchHandle = null
     if (`type` eq IRT.BasicTypeRef.INT) {
       b1 = code.append(new IF_ICMPGT(null))
@@ -1420,7 +1397,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def gte(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def gte(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     var comparation: BranchHandle = null
     if (`type` eq IRT.BasicTypeRef.INT) {
       comparation = code.append(new IF_ICMPGE(null))
@@ -1443,7 +1420,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, comparation)
   }
 
-  def lte(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def lte(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     var b1: BranchHandle = null
     if (`type` eq IRT.BasicTypeRef.INT) {
       b1 = code.append(new IF_ICMPLE(null))
@@ -1466,7 +1443,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def lt(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  def lt(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     var comparation: BranchHandle = null
     if (`type` eq IRT.BasicTypeRef.INT) {
       comparation = code.append(new IF_ICMPLT(null))
@@ -1489,46 +1466,46 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, comparation)
   }
 
-  private def processBranch(code: CodeGeneration.CodeProxy, b1: BranchHandle) {
+  private def processBranch(code: CodeGeneration.Proxy, b1: BranchHandle) {
     code.append(InstructionConstants.ICONST_0)
     val b2: BranchHandle = code.append(new GOTO(null))
     b1.setTarget(code.append(InstructionConstants.ICONST_1))
     b2.setTarget(code.append(InstructionConstants.NOP))
   }
 
-  def codeChar(node: IRT.CharacterValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeChar(node: IRT.CharacterValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(new JCharacter(node.value))
   }
 
-  def codeString(node: IRT.StringValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeString(node: IRT.StringValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(node.value)
   }
 
-  def codeInteger(node: IRT.IntValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeInteger(node: IRT.IntValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(new JInteger(node.value))
   }
 
-  def codeLong(node: IRT.LongValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeLong(node: IRT.LongValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(new JLong(node.value))
   }
 
-  def codeFloat(node: IRT.FloatValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeFloat(node: IRT.FloatValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(new JFloat(node.value))
   }
 
-  def codeDouble(node: IRT.DoubleValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeDouble(node: IRT.DoubleValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(new JDouble(node.value))
   }
 
-  def codeBoolean(node: IRT.BoolValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeBoolean(node: IRT.BoolValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendConstant(JBoolean.valueOf(node.value))
   }
 
-  def codeNull(node: IRT.NullValue, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeNull(node: IRT.NullValue, code: CodeGeneration.Proxy): InstructionHandle = {
     code.append(InstructionConstants.ACONST_NULL)
   }
 
-  def codeUnaryExpression(node: IRT.UnaryTerm, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeUnaryExpression(node: IRT.UnaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.operand, code)
     val `type`: IRT.TypeRef = node.operand.`type`
     node.kind match {
@@ -1546,13 +1523,13 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def plus(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def plus(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if ((`type` ne IRT.BasicTypeRef.INT) && (`type` ne IRT.BasicTypeRef.LONG) && (`type` ne IRT.BasicTypeRef.FLOAT) && (`type` ne IRT.BasicTypeRef.DOUBLE)) {
       throw new RuntimeException
     }
   }
 
-  private def minus(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def minus(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(InstructionConstants.INEG)
     } else if (`type` eq IRT.BasicTypeRef.LONG) {
@@ -1566,7 +1543,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def not(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def not(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.BOOLEAN) {
       val b1: BranchHandle = code.append(new IFNE(null))
       var b2: BranchHandle = null
@@ -1579,7 +1556,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def bitNot(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def bitNot(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(new ICONST(-1))
       code.append(new IXOR)
@@ -1591,37 +1568,37 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def codeCast(node: IRT.AsInstanceOf, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeCast(node: IRT.AsInstanceOf, code: CodeGeneration.Proxy): InstructionHandle = {
     val target: IRT.Term = node.target
     val start: InstructionHandle = codeExpression(target, code)
     code.appendCast(typeOf(target.`type`), typeOf(node.destination))
     start
   }
 
-  def codeIsInstance(node: IRT.InstanceOf, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeIsInstance(node: IRT.InstanceOf, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     code.appendInstanceOf(typeOf(node.checked).asInstanceOf[ReferenceType])
     start
   }
 
-  def codeSelf(node: IRT.This, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeSelf(node: IRT.This, code: CodeGeneration.Proxy): InstructionHandle = {
     code.append(InstructionConstants.ALOAD_0)
   }
 
-  def codeOuterThis(node: IRT.OuterThis, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeOuterThis(node: IRT.OuterThis, code: CodeGeneration.Proxy): InstructionHandle = {
     code.appendThis
     code.appendGetField(currentClosureName, OUTER_THIS, Type.OBJECT)
     code.appendCast(Type.OBJECT, typeOf(node.`type`))
   }
 
-  def codeFieldRef(node: IRT.RefField, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeFieldRef(node: IRT.RefField, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     val symbol: IRT.ClassTypeRef = node.target.`type`.asInstanceOf[IRT.ClassTypeRef]
     code.appendGetField(symbol.name, node.field.name, typeOf(node.`type`))
     start
   }
 
-  def codeFieldAssign(node: IRT.SetField, code: CodeGeneration.CodeProxy): InstructionHandle = {
+  def codeFieldAssign(node: IRT.SetField, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     codeExpression(node.value, code)
     if (isWideType(node.value.`type`)) {
@@ -1634,7 +1611,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def add(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def add(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(new IADD)
     } else if (`type` eq IRT.BasicTypeRef.LONG) {
@@ -1646,7 +1623,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def sub(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def sub(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(new ISUB)
     } else if (`type` eq IRT.BasicTypeRef.LONG) {
@@ -1658,7 +1635,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def mul(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def mul(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(new IMUL)
     } else if (`type` eq IRT.BasicTypeRef.LONG) {
@@ -1670,7 +1647,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def div(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def div(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(new IDIV)
     } else if (`type` eq IRT.BasicTypeRef.LONG) {
@@ -1682,7 +1659,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def mod(code: CodeGeneration.CodeProxy, `type`: IRT.TypeRef) {
+  private def mod(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
     if (`type` eq IRT.BasicTypeRef.INT) {
       code.append(new IREM)
     } else if (`type` eq IRT.BasicTypeRef.LONG) {

@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.tools
 
-import java.lang.{Integer => JInteger}
+import System.err
 import java.io.UnsupportedEncodingException
 import java.util.Map
 import java.lang.System.err
@@ -30,10 +30,6 @@ object ScriptRunner {
   private def conf(optionName: String, requireArgument: Boolean) = OptionConfig(optionName, requireArgument)
 
   private def pathArray(path: String): Array[String] =  path.split(Systems.pathSeparator)
-
-  private def printerr(message: String) {
-    System.err.println(message)
-  }
 
   def main(args: Array[String]) {
     try {
@@ -85,13 +81,13 @@ class ScriptRunner {
     new Shell(classOf[OnionClassLoader].getClassLoader, config.get.classPath).run(classes, scriptParams)
   }
 
-  protected def printUsage {
-    printerr("Usage: onion [-options] <source file> <command line arguments>")
-    printerr("options: ")
-    printerr("  -super <super class>        specify script's super class")
-    printerr("  -classpath <class path>     specify classpath")
-    printerr("  -encoding <encoding>        specify source file encoding")
-    printerr("  -maxErrorReport <number>    set number of errors reported")
+  protected def printUsage(): Unit = {
+    err.println("Usage: onion [-options] <source file> <command line arguments>")
+    err.println("options: ")
+    err.println("  -super <super class>        specify script's super class")
+    err.println("  -classpath <class path>     specify classpath")
+    err.println("  -encoding <encoding>        specify source file encoding")
+    err.println("  -maxErrorReport <number>    set number of errors reported")
   }
 
   private def parseCommandLine(commandLine: Array[String]): ParseSuccess = {
@@ -102,12 +98,12 @@ class ScriptRunner {
       val invalidOptions: Array[String] = failure.invalidOptions
       var i: Int = 0
       while (i < invalidOptions.length) {
-        i += 1;
+        i += 1
       }
       i = 0
       while (i < lackedOptions.length) {
-        printerr(Messages.apply("error.command..noArgument", lackedOptions(i)))
-        i += 1;
+        err.println(Messages("error.command..noArgument", lackedOptions(i)))
+        i += 1
       }
       return null
     }

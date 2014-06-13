@@ -27,9 +27,7 @@ import onion.tools.option.ParseSuccess
  *
  */
 object ScriptRunner {
-  private def conf(optionName: String, requireArgument: Boolean): OptionConfig = {
-    new OptionConfig(optionName, requireArgument)
-  }
+  private def conf(optionName: String, requireArgument: Boolean) = OptionConfig(optionName, requireArgument)
 
   private def pathArray(path: String): Array[String] =  path.split(Systems.pathSeparator)
 

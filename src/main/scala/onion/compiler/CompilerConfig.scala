@@ -12,8 +12,4 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-case class CompilerConfig(classPath: Seq[String], superClass: String, encoding: String, outputDirectory: String, maxErrorReports: Int) extends AnyRef with Cloneable {
-  override def clone: CompilerConfig = {
-    CompilerConfig(classPath.toSeq, superClass, encoding, outputDirectory, maxErrorReports)
-  }
-}
+case class CompilerConfig(classPath: Seq[String], superClass: String, encoding: String, outputDirectory: String, maxErrorReports: Int)

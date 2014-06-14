@@ -95,19 +95,13 @@ class ScriptRunner {
     if (result.status == ParseResult.FAILURE) {
       val failure: ParseFailure = result.asInstanceOf[ParseFailure]
       val lackedOptions: Array[String] = failure.lackedOptions
-      val invalidOptions: Array[String] = failure.invalidOptions
-      var i: Int = 0
-      while (i < invalidOptions.length) {
-        i += 1
+      lackedOptions.zipWithIndex.foreach{ case (_, i) =>
+        err.println(Messages.apply("error.command..noArgument", lackedOptions(i)))
       }
-      i = 0
-      while (i < lackedOptions.length) {
-        err.println(Messages("error.command..noArgument", lackedOptions(i)))
-        i += 1
-      }
-      return null
+      null
+    } else {
+      result.asInstanceOf[ParseSuccess]
     }
-    result.asInstanceOf[ParseSuccess]
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {

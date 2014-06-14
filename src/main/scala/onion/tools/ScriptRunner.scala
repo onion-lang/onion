@@ -61,11 +61,12 @@ class ScriptRunner {
       printUsage
       return -1
     }
-    val result: ParseSuccess = parseCommandLine(commandLine)
-    if (result == null) return -1
-    val config: Option[CompilerConfig] = createConfig(result)
+    val result: Option[ParseSuccess] = parseCommandLine(commandLine)
+    if (result.isEmpty) return -1
+    val success: ParseSuccess = result.get
+    val config: Option[CompilerConfig] = createConfig(success)
     if (config.isEmpty) return -1
-    val params: Array[String] = result.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
+    val params: Array[String] = success.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
     if (params.length == 0) {
       printUsage
       return -1
@@ -90,17 +91,15 @@ class ScriptRunner {
     err.println("  -maxErrorReport <number>    set number of errors reported")
   }
 
-  private def parseCommandLine(commandLine: Array[String]): ParseSuccess = {
-    val result: ParseResult = parser.parse(commandLine)
-    if (result.status == ParseResult.FAILURE) {
-      val failure: ParseFailure = result.asInstanceOf[ParseFailure]
-      val lackedOptions: Array[String] = failure.lackedOptions
-      lackedOptions.zipWithIndex.foreach{ case (_, i) =>
-        err.println(Messages.apply("error.command..noArgument", lackedOptions(i)))
-      }
-      null
-    } else {
-      result.asInstanceOf[ParseSuccess]
+  private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
+    parser.parse(commandLine) match {
+      case succ@ParseSuccess(_, _, _) =>
+        Some(succ)
+      case fail@ParseFailure(lackedOptions, _) =>
+        lackedOptions.zipWithIndex.foreach{ case (_, i) =>
+          err.println(Messages.apply("error.command..noArgument", lackedOptions(i)))
+        }
+        None
     }
   }
 

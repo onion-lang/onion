@@ -58,7 +58,7 @@ class ScriptRunner {
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {
-      printUsage
+      printUsage()
       return -1
     }
     val result: Option[ParseSuccess] = parseCommandLine(commandLine)
@@ -68,7 +68,7 @@ class ScriptRunner {
     if (config.isEmpty) return -1
     val params: Array[String] = success.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
     if (params.length == 0) {
-      printUsage
+      printUsage()
       return -1
     }
     val classes: Array[CompiledClass] = compile(config.get, Array[String](params(0)))

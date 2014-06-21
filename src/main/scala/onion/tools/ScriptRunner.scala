@@ -66,7 +66,7 @@ class ScriptRunner {
     val success: ParseSuccess = result.get
     val config: Option[CompilerConfig] = createConfig(success)
     if (config.isEmpty) return -1
-    val params: Array[String] = success.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
+    val params: Array[String] = success.arguments.toArray(new Array[String](0))
     if (params.length == 0) {
       printUsage()
       return -1

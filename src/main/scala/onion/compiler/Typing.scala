@@ -363,12 +363,6 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         context.setClosure(tmp)
       }
     }
-    def openScope[A](context: LocalContext)(block: => A): A = try {
-      context.openScope()
-      block
-    } finally {
-      context.closeScope()
-    }
     def openFrame[A](context: LocalContext)(block: => A): A = try {
       context.openFrame()
       block
@@ -1144,14 +1138,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     def translate(node: AST.Statement, context: LocalContext): ActionStatement = node match {
       case AST.BlockStatement(loc, elements) =>
-        openScope(context){
+        context.openScope {
           new StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
         }
       case node@AST.BreakStatement(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
         new Break(loc)
       case node@AST.BranchStatement(loc, _, _) =>
-        openScope(context) {
+        context.openScope {
           val size = node.clauses.size
           val expressions = new Stack[Term]
           val statements = new Stack[ActionStatement]
@@ -1183,7 +1177,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.ExpressionStatement(loc, body) =>
         typed(body, context).map{e =>  new ExpressionActionStatement(loc, e)}.getOrElse(new NOP(loc))
       case node@AST.ForeachStatement(loc, _, _, _) =>
-        openScope(context) {
+        context.openScope {
           val collection = typed(node.collection, context).getOrElse(null)
           val arg = node.arg
           addArgument(arg, context)
@@ -1217,7 +1211,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
         }
       case node@AST.ForStatement(loc, _, _, _, _) =>
-        openScope(context) {
+        context.openScope {
           val init = Option(node.init).map{init => translate(init, context)}.getOrElse(new NOP(loc))
           val condition = (for(c <- Option(node.condition)) yield {
             val conditionOpt = typed(c, context)
@@ -1233,7 +1227,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
         }
       case node@AST.IfStatement(loc, _, _, _) =>
-        openScope(context) {
+        context.openScope {
           val conditionOpt = typed(node.condition, context)
           val expected = BasicTypeRef.BOOLEAN
           for(condition <- conditionOpt if condition.`type` != expected) {
@@ -1316,7 +1310,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
         new StatementBlock(condition.location, new ExpressionActionStatement(condition.location, new SetLocal(0, index, condition.`type`, condition)), statement)
       case node@AST.SynchronizedStatement(loc, _, _) =>
-        openScope(context) {
+        context.openScope {
           val lock = typed(node.condition, context).getOrElse(null)
           val block = translate(node.block, context)
           report(UNIMPLEMENTED_FEATURE, node)
@@ -1338,7 +1332,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val catchBlocks = new Array[ActionStatement](recClauses.length)
         for(i <- 0 until recClauses.length) {
           val (argument, body) = recClauses(i)
-          openScope(context) {
+          context.openScope {
             val argType = addArgument(argument, context)
             val expected = load("java.lang.Throwable")
             if (!TypeRules.isSuperType(expected, argType)) {
@@ -1350,7 +1344,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
         new Try(loc, tryStatement, binds, catchBlocks)
       case node@AST.WhileStatement(loc, _, _) =>
-        openScope(context) {
+        context.openScope {
           val conditionOpt = typed(node.condition, context)
           val expected = BasicTypeRef.BOOLEAN
           for(condition <- conditionOpt) {

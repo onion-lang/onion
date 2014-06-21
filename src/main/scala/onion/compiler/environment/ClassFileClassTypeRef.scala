@@ -43,9 +43,34 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   private var bridge: OnionTypeConversion = new OnionTypeConversion(table)
   private var modifier_ : Int = toOnionModifier(javaClass.getModifiers)
-  private var methods_ : MultiTable[IRT.MethodRef] = null
-  private var fields_ : OrderedTable[IRT.FieldRef] = null
-  private var constructors_ : List[IRT.ConstructorRef] = null
+
+
+  private lazy val methods_ : MultiTable[IRT.MethodRef] = {
+    val methods = new MultiTable[IRT.MethodRef]
+    for (method <- javaClass.getMethods) {
+      if (!(method.getName == CONSTRUCTOR_NAME)) methods.add(translate(method))
+    }
+    methods
+  }
+
+
+  private lazy val fields_ : OrderedTable[IRT.FieldRef] = {
+    val fields = new OrderedTable[IRT.FieldRef]
+    for (field <- javaClass.getFields) {
+      fields.add(translate(field))
+    }
+    fields
+  }
+
+  private lazy val constructors_ : List[IRT.ConstructorRef] = {
+    val constructors = new ArrayList[IRT.ConstructorRef]
+    for (method <- javaClass.getMethods) {
+      if (method.getName == CONSTRUCTOR_NAME) {
+        constructors_.add(translateConstructor(method))
+      }
+    }
+    constructors
+  }
 
   def isInterface: Boolean = (javaClass.getModifiers & ACC_INTERFACE) != 0
 
@@ -72,53 +97,15 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
     interfaces
   }
 
-  def methods: Array[IRT.MethodRef] = {
-    requireMethodTable
-    methods_.values.toArray
-  }
+  def methods: Array[IRT.MethodRef] =  methods_.values.toArray
 
-  def methods(name: String): Array[IRT.MethodRef] = {
-    requireMethodTable
-    methods_.get(name).toArray
-  }
+  def methods(name: String): Array[IRT.MethodRef] =  methods_.get(name).toArray
 
-  private def requireMethodTable {
-    if (methods_ == null) {
-      methods_ = new MultiTable[IRT.MethodRef]
-      for (method <- javaClass.getMethods) {
-        if (!(method.getName == CONSTRUCTOR_NAME)) methods_.add(translate(method))
-      }
-    }
-  }
+  def fields: Array[IRT.FieldRef] =  fields_.values.toArray
 
-  def fields: Array[IRT.FieldRef] = {
-    requireFieldTable
-    fields_.values.toArray
-  }
-
-  def field(name: String): IRT.FieldRef = {
-    requireFieldTable
-    fields_.get(name).getOrElse(null)
-  }
-
-  private def requireFieldTable {
-    if (fields_ == null) {
-      fields_ = new OrderedTable[IRT.FieldRef]
-      for (field <- javaClass.getFields) {
-        fields_.add(translate(field))
-      }
-    }
-  }
+  def field(name: String): IRT.FieldRef = fields_.get(name).getOrElse(null)
 
   def constructors: Array[IRT.ConstructorRef] = {
-    if (constructors_ == null) {
-      constructors_ = new ArrayList[IRT.ConstructorRef]
-      for (method <- javaClass.getMethods) {
-        if (method.getName == CONSTRUCTOR_NAME) {
-          constructors_.add(translateConstructor(method))
-        }
-      }
-    }
     constructors_.toArray(new Array[IRT.ConstructorRef](0))
   }
 

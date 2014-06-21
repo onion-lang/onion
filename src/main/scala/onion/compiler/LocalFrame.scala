@@ -7,8 +7,8 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.util._
-import scala.collection.JavaConverters._
+import java.util
+import scala.collection.mutable
 
 /**
  * @author Kota Mizushima
@@ -17,44 +17,25 @@ import scala.collection.JavaConverters._
 class LocalFrame(val parent: LocalFrame) {
   var scope = new LocalScope(null)
   var closed: Boolean = false
-  private val allScopes: List[LocalScope] = new ArrayList[LocalScope]
-  allScopes.add(scope)
+
+  private val allScopes: mutable.Buffer[LocalScope] = mutable.Buffer[LocalScope]()
   private var maxIndex: Int = 0
 
-  /**
-   * Opens a new scope.
-   */
-  def openScope(): Unit = {
-    scope = new LocalScope(scope)
-    allScopes.add(scope)
-  }
+  allScopes += scope
 
   def open[A](block: => A): A = {
     try {
       scope = new LocalScope(scope)
-      allScopes.add(scope)
+      allScopes += scope
       block
     } finally {
       scope = scope.parent
     }
   }
 
-  /**
-   * Closes the current scope.
-   */
-  def closeScope(): Unit = {
-    scope = scope.parent
-  }
-
-  private[compiler] def getScope: LocalScope = {
-    scope
-  }
-
   def entries: Array[LocalBinding] = {
-    val entries: Set[LocalBinding] = entrySet
-    val binds: Array[LocalBinding] = entries.toArray(new Array[LocalBinding](0))
-
-    Arrays.sort(binds, new Comparator[LocalBinding] {
+    val binds: Array[LocalBinding] = entrySet.toArray
+    util.Arrays.sort(binds, new util.Comparator[LocalBinding] {
       def compare(b1: LocalBinding, b2: LocalBinding): Int = {
         val i1 = b1.index
         val i2 = b2.index
@@ -113,12 +94,10 @@ class LocalFrame(val parent: LocalFrame) {
     depth
   }
 
-  private def entrySet: Set[LocalBinding] = {
-    val entries = new HashSet[LocalBinding]
-    for (s <- allScopes.asScala) {
-      entries.addAll(s.entries)
-    }
-    entries
+  private def entrySet: mutable.Set[LocalBinding] = {
+    val entries = new mutable.HashSet[LocalBinding]()
+    entries ++=  null
+    mutable.Set[LocalBinding]() ++ (for (s1 <- allScopes; s2 <- s1.entries) yield s2)
   }
 
 }

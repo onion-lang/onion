@@ -9,16 +9,14 @@ class ClosureLocalBinding(val frameIndex: Int, index: Int, `type`: IRT.TypeRef) 
   override def equals(other: Any): Boolean = {
     other match {
       case bind: ClosureLocalBinding =>
-        if (frame != bind.frame) return false
-        if (index != bind.index) return false
-        if (tp ne bind.tp) return false
-        true
+        if (frameIndex != bind.frameIndex) false
+        if (index != bind.index) false
+        if (tp ne bind.tp) false
+        else true
       case _ =>
         false
     }
   }
 
-  override def hashCode: Int = frame + index + tp.hashCode
-
-  private var frame: Int = 0
+  override def hashCode: Int = frameIndex + index + tp.hashCode
 }

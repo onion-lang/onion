@@ -15,11 +15,11 @@ import scala.collection.mutable
  *
  */
 class ImportList extends Iterable[ImportItem] {
-  private var items = mutable.Buffer[ImportItem]()
+  private[this] val buffer = mutable.Buffer[ImportItem]()
 
-  def add(item: ImportItem): Unit =  items += item
-  def get(index: Int): ImportItem = items(index)
-  def getItems: Array[ImportItem] = items.toArray
-  override def size: Int = items.size
-  def iterator: Iterator[ImportItem] = items.iterator
+  def add(item: ImportItem): Unit = buffer += item
+  def get(index: Int): ImportItem = buffer(index)
+  def items: Array[ImportItem] = buffer.toArray
+  override def size: Int = buffer.size
+  def iterator: Iterator[ImportItem] = buffer.iterator
 }

@@ -29,7 +29,7 @@ class CommandLineParser(val configs: OptionConfig*) {
     while (i < cmdline.length) {
       if (cmdline(i).startsWith("-")) {
         val param = cmdline(i)
-        val config: Option[OptionConfig] = (configs:Seq[OptionConfig]).find(_.optionName == param)
+        val config: Option[OptionConfig] = configs.find(_.optionName == param)
         config match {
           case None =>
             invalidOptNames.add(param)

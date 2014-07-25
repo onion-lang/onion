@@ -56,7 +56,7 @@ class LocalScope(val parent: LocalScope) {
    * @param name
    * @return the LocalBinding object if registered, null otherwise
    */
-  def get(name: String): LocalBinding = bindings(name)
+  def get(name: String): Option[LocalBinding] = bindings.get(name)
 
   /**
    * Finds the registered binding object from this scope and its ancestors
@@ -69,7 +69,7 @@ class LocalScope(val parent: LocalScope) {
       if (table == null) {
         null
       } else if(table.contains(name)) {
-        table.get(name)
+        table.get(name).get
       } else {
         find(table.parent)
       }

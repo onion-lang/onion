@@ -47,11 +47,14 @@ class LocalFrame(val parent: LocalFrame) {
 
   def add(name: String, `type` : IRT.TypeRef): Int = {
     val bind = scope.get(name)
-    if (bind != null) return -1
-    val index = maxIndex
-    maxIndex += 1
-    scope.put(name, new LocalBinding(index, `type`))
-    index
+    bind match {
+      case Some(_) => -1
+      case None =>
+        val index = maxIndex
+        maxIndex += 1
+        scope.put(name, new LocalBinding(index, `type`))
+        index
+    }
   }
 
   def lookup(name: String): ClosureLocalBinding = {
@@ -69,8 +72,7 @@ class LocalFrame(val parent: LocalFrame) {
   }
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
-    val binding = scope.get(name)
-    if (binding != null) {
+    for(binding <- scope.get(name)) {
       return new ClosureLocalBinding(0, binding.index, binding.tp)
     }
     null

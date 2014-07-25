@@ -13,10 +13,7 @@ import onion.compiler._
 import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
 import onion.compiler.toolbox.Systems
-import onion.tools.option.CommandLineParser
-import onion.tools.option.OptionConfig
-import onion.tools.option.ParseFailure
-import onion.tools.option.ParseSuccess
+import onion.tools.option._
 
 /**
  *
@@ -90,7 +87,7 @@ class ScriptRunner {
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
     parser.parse(commandLine) match {
-      case succ@ParseSuccess(_, _, _) =>
+      case succ@ParseSuccess( _, _) =>
         Some(succ)
       case fail@ParseFailure(lackedOptions, _) =>
         lackedOptions.zipWithIndex.foreach{ case (_, i) =>
@@ -101,8 +98,7 @@ class ScriptRunner {
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
-    val option: Map[String, String] = result.options.toMap
-    val noargOption: Map[String, AnyRef] = result.noArgumentOptions.toMap
+    val option: Map[String, CommandLineParam] = result.options.toMap
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
     val encodingOpt = checkEncoding(option.get(ENCODING).asInstanceOf[String])
 

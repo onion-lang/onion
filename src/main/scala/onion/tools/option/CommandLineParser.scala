@@ -16,11 +16,10 @@ import scala.collection.mutable
 class CommandLineParser(val configs: OptionConfig*) {
 
   def parse(cmdline: Array[String]): ParseResult = {
-    val noArgOpts = mutable.Map[String, AnyRef]()
-    val opts = mutable.Map[String, String]()
+    val opts = mutable.Map[String, CommandLineParam]()
     val args = mutable.Buffer[String]()
-    val lackedOptNames = mutable.Buffer[String]()
-    val invalidOptNames = mutable.Buffer[String]()
+    val lackedOptNames = mutable.Buffer[ValuedParam]()
+    val invalidOptNames = mutable.Buffer[ValuedParam]()
     var i = 0
 
     while (i < cmdline.length) {
@@ -29,18 +28,18 @@ class CommandLineParser(val configs: OptionConfig*) {
         val config: Option[OptionConfig] = configs.find(_.optionName == param)
         config match {
           case None =>
-            invalidOptNames += param
+            invalidOptNames += ValuedParam(param)
             i += 1
           case Some(config) =>
             if (config.hasArgument) {
               if (i + 1 >= cmdline.length) {
-                lackedOptNames += param
+                lackedOptNames += ValuedParam(param)
               } else {
-                opts(param) = cmdline(i + 1)
+                opts(param) = ValuedParam(cmdline(i + 1))
               }
               i += 2
             } else {
-              noArgOpts(param) = new AnyRef
+              opts(param) = NoValuedParam
               i += 1
             }
         }
@@ -51,7 +50,7 @@ class CommandLineParser(val configs: OptionConfig*) {
     }
 
     if (lackedOptNames.size == 0 && invalidOptNames.size == 0)
-      new ParseSuccess(noArgOpts, opts, args.toArray)
+      new ParseSuccess(opts, args.toArray)
     else
       new ParseFailure(lackedOptNames.toArray, invalidOptNames.toArray)
   }

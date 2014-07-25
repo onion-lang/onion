@@ -18,11 +18,7 @@ import onion.compiler.CompilerConfig
 import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
 import onion.compiler.toolbox.Systems
-import onion.tools.option.CommandLineParser
-import onion.tools.option.OptionConfig
-import onion.tools.option.ParseFailure
-import onion.tools.option.ParseResult
-import onion.tools.option.ParseSuccess
+import onion.tools.option._
 
 /**
  *
@@ -153,8 +149,7 @@ class CompilerFrontend {
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
-    val option: Map[String, String] = result.options.toMap
-    val noargOption: Map[String, AnyRef] = result.noArgumentOptions.toMap
+    val option: Map[String, CommandLineParam] = result.options.toMap
     val classpath: Array[String] = checkClasspath(Option(option.get(CLASSPATH).asInstanceOf[String]))
     val encoding: Option[String] = checkEncoding(Option(option.get(ENCODING).asInstanceOf[String]))
     val outputDirectory: String = checkOutputDirectory(Option(option.get(OUTPUT).asInstanceOf[String]))

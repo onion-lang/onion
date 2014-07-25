@@ -66,7 +66,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
     val constructors = new ArrayList[IRT.ConstructorRef]
     for (method <- javaClass.getMethods) {
       if (method.getName == CONSTRUCTOR_NAME) {
-        constructors_.add(translateConstructor(method))
+        constructors.add(translateConstructor(method))
       }
     }
     constructors

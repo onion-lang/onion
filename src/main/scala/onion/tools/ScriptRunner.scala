@@ -133,11 +133,11 @@ class ScriptRunner {
 
   private def checkMaxErrorReport(maxErrorReport: String): Option[Int] = {
     if (maxErrorReport == null) return Some(DEFAULT_MAX_ERROR)
-    val value: Option[Int] = (try {
+    val value: Option[Int] = try {
       Some(Integer.parseInt(maxErrorReport))
     } catch {
       case e: NumberFormatException => None
-    })
+    }
     value match {
       case Some(v) if v > 0 => Some(v)
       case None =>

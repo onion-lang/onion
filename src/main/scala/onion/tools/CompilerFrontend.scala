@@ -12,10 +12,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.UnsupportedEncodingException
-import java.util.ArrayList
-import java.util.Iterator
-import java.util.List
-import java.util.Map
 import onion.compiler.CompiledClass
 import onion.compiler.OnionCompiler
 import onion.compiler.CompilerConfig
@@ -75,7 +71,7 @@ class CompilerFrontend {
       case None => -1
       case Some(success) =>
         val config: Option[CompilerConfig] = createConfig(success)
-        val params: Array[String] = success.arguments.toArray(new Array[String](0)).asInstanceOf[Array[String]]
+        val params: Array[String] = success.arguments.toArray
         if (params.length == 0) {
           printUsage
           return -1
@@ -120,9 +116,9 @@ class CompilerFrontend {
         }
       } catch {
         case e: IOException =>
-          val it: Iterator[_] = generated.iterator
+          val it = generated.iterator
           while (it.hasNext) {
-            (it.next.asInstanceOf[File]).delete
+            it.next.delete
           }
           return false
       }
@@ -157,8 +153,8 @@ class CompilerFrontend {
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
-    val option: Map[_, _] = result.options
-    val noargOption: Map[_, _] = result.noArgumentOptions
+    val option: Map[String, String] = result.options.toMap
+    val noargOption: Map[String, AnyRef] = result.noArgumentOptions.toMap
     val classpath: Array[String] = checkClasspath(Option(option.get(CLASSPATH).asInstanceOf[String]))
     val encoding: Option[String] = checkEncoding(Option(option.get(ENCODING).asInstanceOf[String]))
     val outputDirectory: String = checkOutputDirectory(Option(option.get(OUTPUT).asInstanceOf[String]))

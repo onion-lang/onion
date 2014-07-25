@@ -7,9 +7,7 @@
  * ************************************************************** */
 package onion.tools
 
-import System.err
 import java.io.UnsupportedEncodingException
-import java.util.Map
 import java.lang.System.err
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
@@ -18,7 +16,6 @@ import onion.compiler.toolbox.Systems
 import onion.tools.option.CommandLineParser
 import onion.tools.option.OptionConfig
 import onion.tools.option.ParseFailure
-import onion.tools.option.ParseResult
 import onion.tools.option.ParseSuccess
 
 /**
@@ -66,7 +63,7 @@ class ScriptRunner {
     val success: ParseSuccess = result.get
     val config: Option[CompilerConfig] = createConfig(success)
     if (config.isEmpty) return -1
-    val params: Array[String] = success.arguments.toArray(new Array[String](0))
+    val params: Array[String] = success.arguments.toArray
     if (params.length == 0) {
       printUsage()
       return -1
@@ -104,8 +101,8 @@ class ScriptRunner {
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
-    val option: Map[_, _] = result.options
-    val noargOption: Map[_, _] = result.noArgumentOptions
+    val option: Map[String, String] = result.options.toMap
+    val noargOption: Map[String, AnyRef] = result.noArgumentOptions.toMap
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
     val encodingOpt = checkEncoding(option.get(ENCODING).asInstanceOf[String])
 

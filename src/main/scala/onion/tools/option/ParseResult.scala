@@ -1,11 +1,11 @@
 package onion.tools.option
-import java.util.{List, Map}
+import scala.collection.mutable.{Map, Seq}
 
 sealed trait ParseResult {
   def status: Int
 }
 
-case class ParseSuccess(noArgumentOptions: Map[_, _], options: Map[_, _], arguments: List[_]) extends ParseResult {
+case class ParseSuccess(noArgumentOptions: Map[String, AnyRef], options: Map[String, String], arguments: Array[String]) extends ParseResult {
   def status: Int = ParseResult.SUCCEED
 }
 

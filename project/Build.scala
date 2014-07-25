@@ -91,7 +91,7 @@ object Build extends Build {
       distTask(t, out, p, cp)
     },
     distPath in dist <<= target(_ / "dist" ),
-    mainClass := Some("onion.tools.OnionCompilerFrontend")
+    mainClass := Some("onion.tools.CompilerFrontend")
   )
 
 }

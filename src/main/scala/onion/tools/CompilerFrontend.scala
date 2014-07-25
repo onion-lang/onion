@@ -150,10 +150,18 @@ class CompilerFrontend {
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
     val option: Map[String, CommandLineParam] = result.options.toMap
-    val classpath: Array[String] = checkClasspath(Option(option.get(CLASSPATH).asInstanceOf[String]))
-    val encoding: Option[String] = checkEncoding(Option(option.get(ENCODING).asInstanceOf[String]))
-    val outputDirectory: String = checkOutputDirectory(Option(option.get(OUTPUT).asInstanceOf[String]))
-    val maxErrorReport: Option[Int] = checkMaxErrorReport(Option(option.get(MAX_ERROR).asInstanceOf[String]))
+    val classpath: Array[String] = checkClasspath(
+      option.get(CLASSPATH).collect{ case ValuedParam(value) => value }
+    )
+    val encoding: Option[String] = checkEncoding(
+      option.get(ENCODING).collect{ case ValuedParam(value) => value }
+    )
+    val outputDirectory: String = checkOutputDirectory(
+      option.get(OUTPUT).collect{ case ValuedParam(value) => value}
+    )
+    val maxErrorReport: Option[Int] = checkMaxErrorReport(
+      option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
+    )
     for (e <- encoding; m <- maxErrorReport) yield {
       new CompilerConfig(classpath, "", e, outputDirectory, m)
     }

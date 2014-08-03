@@ -1597,7 +1597,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def mapFrom(typeNode: AST.TypeNode): TypeRef = mapFrom(typeNode, mapper_)
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): TypeRef = {
     val mappedType = mapper.map(typeNode)
-    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, AST.toString(typeNode.desc))
+    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
     mappedType
   }
   private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {

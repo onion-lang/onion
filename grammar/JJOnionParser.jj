@@ -20,6 +20,7 @@ import scala.collection.immutable.*;
 import scala.collection.mutable.ArrayBuffer;
 import scala.collection.mutable.Buffer;
 import scala.Option;
+import scala.Option$;
 import static onion.compiler.AST.append;
 
 public class JJOnionParser implements Parser {
@@ -32,6 +33,10 @@ public class JJOnionParser implements Parser {
   private boolean la(String s) {
     Token t = getToken(1);
     return t != null && t.image.equals(s);
+  }
+
+  private <T> Option<T> option(T value) {
+    return Option$.MODULE$.apply(value);
   }
 
   /*
@@ -61,6 +66,8 @@ public class JJOnionParser implements Parser {
   private static String c(Token t) {
     return t.image;
   }
+
+
 
   /*
    * converience method to create substring
@@ -446,17 +453,19 @@ AST.MemberDeclaration member_decl(int mset) :{AST.MemberDeclaration m;}{
 
 AST.ClassDeclaration class_decl(int mset) : {
   Token t1, t2; AST.TypeNode ty1 = null, ty2 = null;
-  AST.AccessSection sec1 = null, sec2 = null;
+  AST.AccessSection sec1 = null;
+  AST.AccessSection sec2 = null;
+  Option<AST.AccessSection> sec3 = null;
   ArrayBuffer<AST.TypeNode> ty2s = new ArrayBuffer<AST.TypeNode>();
   ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
 }{
   t1="class" t2=<ID> [":" ty1=class_type()]
   ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{"
-    [sec1=default_section()]
+    [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
   "}" {
     return new AST.ClassDeclaration(
-      p(t1), mset, t2.image, ty1, toList(ty2s), sec1, toList(sec2s)
+      p(t1), mset, t2.image, ty1, toList(ty2s), sec3, toList(sec2s)
     );
   }
 }

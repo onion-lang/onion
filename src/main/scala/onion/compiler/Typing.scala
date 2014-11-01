@@ -1,4 +1,7 @@
 package onion.compiler
+
+import onion.compiler.AST.AccessSection
+
 import _root_.scala.collection.JavaConversions._
 import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
@@ -142,9 +145,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       mapper_ = find(definition_.name)
       constructTypeHierarchy(definition_, MutableSet[ClassTypeRef]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
-      if(node.defaultSection != null) {
-        access_ = node.defaultSection.modifiers
-        for(member <- node.defaultSection.members) member match {
+      for(defaultSection <- node.defaultSection) {
+        access_ = defaultSection.modifiers
+        for(member <- defaultSection.members) member match {
           case node: AST.FieldDeclaration => processFieldDeclaration(node)
           case node: AST.MethodDeclaration => processMethodDeclaration(node)
           case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
@@ -416,7 +419,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext) {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
-      for(section <- Option(node.defaultSection); member <- section.members) {
+      for(section <- node.defaultSection; member <- section.members) {
         member match {
           case member: AST.FieldDeclaration =>
           case member: AST.MethodDeclaration =>
@@ -1530,7 +1533,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       constructors.clear()
       definition_ = clazz
       mapper_ = find(clazz.name)
-      if (node.defaultSection != null) processAccessSection(node.defaultSection)
+      for(defaultSection <- node.defaultSection) {
+        processAccessSection(defaultSection)
+      }
       for (section <- node.sections) processAccessSection(section)
       generateMethods()
     }
@@ -1597,7 +1602,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def mapFrom(typeNode: AST.TypeNode): TypeRef = mapFrom(typeNode, mapper_)
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): TypeRef = {
     val mappedType = mapper.map(typeNode)
-    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, AST.toString(typeNode.desc))
+    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
     mappedType
   }
   private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {

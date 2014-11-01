@@ -7,19 +7,13 @@
  * ************************************************************** */
 package onion.tools
 
-import System.err
 import java.io.UnsupportedEncodingException
-import java.util.Map
 import java.lang.System.err
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Messages
 import onion.compiler.toolbox.Systems
-import onion.tools.option.CommandLineParser
-import onion.tools.option.OptionConfig
-import onion.tools.option.ParseFailure
-import onion.tools.option.ParseResult
-import onion.tools.option.ParseSuccess
+import onion.tools.option._
 
 /**
  *
@@ -66,7 +60,7 @@ class ScriptRunner {
     val success: ParseSuccess = result.get
     val config: Option[CompilerConfig] = createConfig(success)
     if (config.isEmpty) return -1
-    val params: Array[String] = success.arguments.toArray(new Array[String](0))
+    val params: Array[String] = success.arguments.toArray
     if (params.length == 0) {
       printUsage()
       return -1
@@ -93,7 +87,7 @@ class ScriptRunner {
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
     parser.parse(commandLine) match {
-      case succ@ParseSuccess(_, _, _) =>
+      case succ@ParseSuccess( _, _) =>
         Some(succ)
       case fail@ParseFailure(lackedOptions, _) =>
         lackedOptions.zipWithIndex.foreach{ case (_, i) =>
@@ -104,8 +98,7 @@ class ScriptRunner {
   }
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
-    val option: Map[_, _] = result.options
-    val noargOption: Map[_, _] = result.noArgumentOptions
+    val option: Map[String, CommandLineParam] = result.options.toMap
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
     val encodingOpt = checkEncoding(option.get(ENCODING).asInstanceOf[String])
 
@@ -140,11 +133,11 @@ class ScriptRunner {
 
   private def checkMaxErrorReport(maxErrorReport: String): Option[Int] = {
     if (maxErrorReport == null) return Some(DEFAULT_MAX_ERROR)
-    val value: Option[Int] = (try {
+    val value: Option[Int] = try {
       Some(Integer.parseInt(maxErrorReport))
     } catch {
       case e: NumberFormatException => None
-    })
+    }
     value match {
       case Some(v) if v > 0 => Some(v)
       case None =>

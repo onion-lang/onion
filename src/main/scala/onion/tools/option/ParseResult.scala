@@ -1,15 +1,15 @@
 package onion.tools.option
-import java.util.{List, Map}
+import scala.collection.mutable.{Map, Seq}
 
 sealed trait ParseResult {
   def status: Int
 }
 
-case class ParseSuccess(noArgumentOptions: Map[_, _], options: Map[_, _], arguments: List[_]) extends ParseResult {
+case class ParseSuccess(options: Map[String, CommandLineParam], arguments: Array[String]) extends ParseResult {
   def status: Int = ParseResult.SUCCEED
 }
 
-case class ParseFailure(lackedOptions: Array[String], invalidOptions: Array[String]) extends ParseResult {
+case class ParseFailure(lackedOptions: Array[ValuedParam], invalidOptions: Array[ValuedParam]) extends ParseResult {
   def status: Int = ParseResult.FAILURE
 }
 

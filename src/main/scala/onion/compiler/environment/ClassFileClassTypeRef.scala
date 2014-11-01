@@ -7,13 +7,13 @@
  * ************************************************************** */
 package onion.compiler.environment
 
-import java.util.ArrayList
-import java.util.List
 import onion.compiler._
 import onion.compiler.Modifier
 import org.apache.bcel.Constants._
 import org.apache.bcel.classfile._
 import org.apache.bcel.generic.Type
+
+import scala.collection.mutable
 
 /**
  * @author Kota Mizushima
@@ -62,11 +62,11 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
     fields
   }
 
-  private lazy val constructors_ : List[IRT.ConstructorRef] = {
-    val constructors = new ArrayList[IRT.ConstructorRef]
+  private lazy val constructors_ : Seq[IRT.ConstructorRef] = {
+    val constructors = mutable.Buffer[IRT.ConstructorRef]()
     for (method <- javaClass.getMethods) {
       if (method.getName == CONSTRUCTOR_NAME) {
-        constructors_.add(translateConstructor(method))
+        constructors += translateConstructor(method)
       }
     }
     constructors
@@ -106,7 +106,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   def field(name: String): IRT.FieldRef = fields_.get(name).getOrElse(null)
 
   def constructors: Array[IRT.ConstructorRef] = {
-    constructors_.toArray(new Array[IRT.ConstructorRef](0))
+    constructors_.toArray
   }
 
   private def translate(method: Method): IRT.MethodRef = {

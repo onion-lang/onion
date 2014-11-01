@@ -13,19 +13,21 @@ object AST {
   val M_PROTECTED = 256
   val M_PRIVATE = 512
   val M_FORWARDED = 1024
-  def toString(descriptor: TypeDescriptor): String = descriptor match {
-    case PrimitiveType(kind) => kind.toString
-    case ReferenceType(name, _) => name
-    case ParameterizedType(component, params) => toString(component) + params.map(toString(_)).mkString("[", ",", "]")
-    case ArrayType(component) => toString(component) + "[]"
-  }
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A) { buffer += element }
   abstract sealed class TypeDescriptor
-  case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor
-  case class ReferenceType(name: String, qualified: Boolean) extends TypeDescriptor
-  case class ParameterizedType(component: TypeDescriptor, params: List[TypeDescriptor]) extends TypeDescriptor
-  case class ArrayType(component: TypeDescriptor) extends TypeDescriptor
+  case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
+    override def toString: String = kind.toString
+  }
+  case class ReferenceType(name: String, qualified: Boolean) extends TypeDescriptor {
+    override def toString: String = name
+  }
+  case class ParameterizedType(component: TypeDescriptor, params: List[TypeDescriptor]) extends TypeDescriptor {
+    override def toString: String = component.toString + params.map(_.toString).mkString("[", ",", "]")
+  }
+  case class ArrayType(component: TypeDescriptor) extends TypeDescriptor {
+    override def toString: String = s"${component.toString}[]"
+  }
   abstract sealed class PrimitiveTypeKind(val name: String) {
     override def toString: String = name
   }
@@ -152,6 +154,6 @@ object AST {
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
-  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: AccessSection, sections: List[AccessSection]) extends TypeDeclaration
+  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) extends TypeDeclaration
   case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) extends TypeDeclaration
 }

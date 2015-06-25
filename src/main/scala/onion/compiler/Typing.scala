@@ -399,10 +399,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       val matched = superClass.findConstructor(params)
       if (matched.length == 0) {
         report(CONSTRUCTOR_NOT_FOUND, node, superClass, types(params))
-        return
       }else if (matched.length > 1) {
         report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, types(params)), Array[AnyRef](superClass, types(params)))
-        return
       }else {
         val init = new Super(superClass, matched(0).getArgs, params)
         val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], IRT.BasicTypeRef.VOID)

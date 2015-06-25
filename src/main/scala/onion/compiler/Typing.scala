@@ -366,12 +366,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         context.setClosure(tmp)
       }
     }
-    def openFrame[A](context: LocalContext)(block: => A): A = try {
-      context.openFrame()
-      block
-    } finally {
-      context.closeFrame()
-    }
+    def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
     def processMethodDeclaration(node: AST.MethodDeclaration) {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return

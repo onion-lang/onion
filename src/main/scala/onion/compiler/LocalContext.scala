@@ -58,11 +58,10 @@ class LocalContext {
     this.isMethod = false
   }
 
-  def openFrame(): Unit = {
+  def openFrame[A](block: => A): A = try {
     contextFrame = new LocalFrame(contextFrame)
-  }
-
-  def closeFrame(): Unit = {
+    block
+  } finally {
     contextFrame = contextFrame.parent
   }
 

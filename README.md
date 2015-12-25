@@ -65,8 +65,4 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 
 ## BuildHive (Jenkins)
 
-Onion uses BuildHive, Jenkins hosting service, for CI.  
-See [the link](https://buildhive.cloudbees.com/view/My%20Repositories/job/kmizu/job/onion/).
-
-
 This software includes softwares developed by [Apache Software Foundation](http://www.apache.org/).

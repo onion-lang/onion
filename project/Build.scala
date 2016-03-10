@@ -11,7 +11,7 @@ object Build extends Build {
   lazy val root = Project(
     id = "onion", 
     base = file("."), 
-    settings = assemblySettings ++ onionSettigns
+    settings = assemblySettings ++ onionSettings
   )
 
   lazy val dist = TaskKey[Unit]("onion-dist")
@@ -57,7 +57,7 @@ object Build extends Build {
     (output ** "*.java").get
   }
 
-  lazy val onionSettigns = Defaults.defaultSettings ++ Seq(
+  lazy val onionSettings = Defaults.defaultSettings ++ Seq(
     unmanagedSourceDirectories in Compile <<= (Seq(javaSource in Compile) ++ Seq(scalaSource in Compile) ++ Seq(sourceManaged in Compile)).join,
     scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials"),
     javacOptions ++= Seq("-sourcepath", "src.lib", "-source", "1.5"),

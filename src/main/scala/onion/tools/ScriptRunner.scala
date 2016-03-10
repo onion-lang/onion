@@ -55,25 +55,32 @@ class ScriptRunner {
       printUsage()
       return -1
     }
-    val result: Option[ParseSuccess] = parseCommandLine(commandLine)
-    if (result.isEmpty) return -1
-    val success: ParseSuccess = result.get
-    val config: Option[CompilerConfig] = createConfig(success)
-    if (config.isEmpty) return -1
-    val params: Array[String] = success.arguments.toArray
-    if (params.length == 0) {
-      printUsage()
-      return -1
+    parser.parse(commandLine) match {
+      case failure@ParseFailure(_, _) =>
+        printFailure(failure)
+        return -1
+      case success@ParseSuccess(_, _) =>
+        val config = createConfig(success)
+        if (config.isEmpty) return -1
+        createConfig(success) match {
+          case None => return - 1
+          case Some (config) =>
+            val params = success.arguments
+            if(params.length == 0) {
+              printUsage()
+              return -1
+            }
+            val scriptParams: Array[String] = new Array[String](params.length - 1)
+            val classes = compile(config, Array(params(0)))
+            if(classes == null) return -1
+            var i: Int = 1
+            while (i < params.length) {
+              scriptParams(i - 1) = params(i)
+              i += 1
+            }
+            new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptParams)
+        }
     }
-    val classes: Array[CompiledClass] = compile(config.get, Array[String](params(0)))
-    if (classes == null) return -1
-    val scriptParams: Array[String] = new Array[String](params.length - 1)
-    var i: Int = 1
-    while (i < params.length) {
-      scriptParams(i - 1) = params(i)
-      i += 1
-    }
-    new Shell(classOf[OnionClassLoader].getClassLoader, config.get.classPath).run(classes, scriptParams)
   }
 
   protected def printUsage(): Unit = {
@@ -85,15 +92,9 @@ class ScriptRunner {
     err.println("  -maxErrorReport <number>    set number of errors reported")
   }
 
-  private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
-    parser.parse(commandLine) match {
-      case succ@ParseSuccess( _, _) =>
-        Some(succ)
-      case fail@ParseFailure(lackedOptions, _) =>
-        lackedOptions.zipWithIndex.foreach{ case (_, i) =>
-          err.println(Messages.apply("error.command..noArgument", lackedOptions(i)))
-        }
-        None
+  private def printFailure(failure: ParseFailure): Unit = {
+    failure.lackedOptions.zipWithIndex.foreach{ case (lackedOption, i) =>
+      err.println(Messages("error.command.noArgument", lackedOption))
     }
   }
 

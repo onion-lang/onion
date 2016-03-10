@@ -93,22 +93,16 @@ class CompilerFrontend {
 
   private def generateFiles(binaries: Array[CompiledClass]): Boolean = {
     val generated: java.util.List[File] = new java.util.ArrayList[File]
-
-    var i: Int = 0
-    while (i < binaries.length) {
-      val binary: CompiledClass = binaries(i)
-      val outDir: String = binary.getOutputPath
+    for(binary <- binaries) {
+      val outDir: String = binary.outputPath
       new File(outDir).mkdirs
-      val outPath: String = outputPathOf(outDir, binary.getClassName)
+      val outPath: String = outputPathOf(outDir, binary.className)
       val targetFile: File = new File(outPath)
       try {
         if (!targetFile.exists) targetFile.createNewFile
         generated.add(targetFile)
-        val out: BufferedOutputStream = new BufferedOutputStream(new FileOutputStream(targetFile))
-        try {
-          out.write(binary.getContent)
-        } finally {
-          out.close
+        using(new BufferedOutputStream(new FileOutputStream(targetFile))){out =>
+          out.write(binary.content)
         }
       } catch {
         case e: IOException =>
@@ -118,9 +112,7 @@ class CompilerFrontend {
           }
           return false
       }
-      i += 1
     }
-
     true
   }
 
@@ -135,11 +127,10 @@ class CompilerFrontend {
   }
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {
-    val result: ParseResult = commandLineParser.parse(commandLine)
+    val result = commandLineParser.parse(commandLine)
     result match {
       case success: ParseSuccess => Some(success)
       case failure: ParseFailure =>
-        val failure = result.asInstanceOf[ParseFailure]
         val lackedOptions = failure.lackedOptions
         val invalidOptions = failure.invalidOptions
         invalidOptions.foreach{opt => printError(Messages.apply("error.command.invalidArgument", opt)) }

@@ -6,10 +6,10 @@ import {
 class Delegation <: List {
 	forward @n :List;
 public:
-	new {
+	def new {
 		@n = new ArrayList;
 	}
-	static main(args: String[]){
+	static def main(args: String[]){
 		list = new Delegation;
 		list << "a";
 		list << "b";

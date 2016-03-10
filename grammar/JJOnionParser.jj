@@ -448,7 +448,7 @@ AST.MemberDeclaration member_decl(int mset) :{AST.MemberDeclaration m;}{
   m=field_decl(mset)         {return m;}
 | m=method_decl(mset)        {return m;}
 | m=delegate_decl(mset)      {return m;}
-| m=constructor_decl(mset)   {return m;}
+| LOOKAHEAD(2) m=constructor_decl(mset)   {return m;}
 }
 
 AST.ClassDeclaration class_decl(int mset) : {
@@ -496,7 +496,7 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
   List<AST.Expression> params = (List<AST.Expression>)AST.NIL();
   AST.BlockStatement block;
 }{
-  t = "new" ["(" args = args() ")"] [":" "(" params = terms() ")"] block = block() {
+  "def" t = "new" ["(" args = args() ")"] [":" "(" params = terms() ")"] block = block() {
     return new AST.ConstructorDeclaration(p(t), mset, args, params, block);
   }
 }
@@ -507,7 +507,7 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.TypeNode ty = null;
   AST.BlockStatement b = null;
 }{
-  ["def"] t=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";" ) {
+  "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";" ) {
     return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
   }
 }
@@ -517,7 +517,7 @@ AST.MethodDeclaration interface_method_decl() : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty  = null;
 }{
-  n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {
+  "def" n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {
     return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), n.image, args, ty, null);
   }
 }

@@ -1,5 +1,5 @@
 interface Counter {
-  count :int;
+  def count :int;
 }
 
 def counter(begin :int, up :int) :Counter {

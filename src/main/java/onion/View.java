@@ -24,6 +24,7 @@ public class View {
         map.clear();
       }
 
+      @SuppressWarnings("unchecked")
       public boolean contains(Object o) {
         if(o == null || !(o instanceof Map.Entry<?, ?>)) return false;
         Map.Entry<A, B> m = (Map.Entry<A, B>)o;
@@ -44,6 +45,7 @@ public class View {
         return map.entrySet().iterator();
       }
 
+      @SuppressWarnings("unchecked")
       public boolean remove(Object o) {
         if(!(o instanceof Map.Entry<?, ?>)) return false;
         map.remove(((Map.Entry<A, B>) o).getKey());
@@ -56,8 +58,10 @@ public class View {
       }
 
       public boolean retainAll(Collection<?> c) {
-        // TODO Auto-generated method stub
-        return false;
+        for(Object o:c) {
+          if(!contains(o)) remove(o);
+        }
+        return true;
       }
 
       public int size() {
@@ -68,6 +72,7 @@ public class View {
         return map.entrySet().toArray();
       }
 
+      @SuppressWarnings("unchecked")
       public <T> T[] toArray(T[] a) {
         return map.entrySet().toArray(a);
       }      

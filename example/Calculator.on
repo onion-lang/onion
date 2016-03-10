@@ -11,9 +11,9 @@ class Calculator : JFrame <: ActionListener {
 	@operator	:String;
 	@isError	:boolean;
 public:
-	setValue(value : long) { @text.setText(Long::toString(value)); }
-	setValue(value : String) { @text.setText(value); }
-	actionPerformed(event : ActionEvent) {
+	def setValue(value : long) { @text.setText(Long::toString(value)); }
+	def setValue(value : String) { @text.setText(value); }
+	def actionPerformed(event : ActionEvent) {
 		label = event.source$JButton.label;
 		try{
 			if @isError && !(label == "C") {
@@ -62,7 +62,7 @@ public:
 		}
 	}
 
-	new:("簡易電卓") {
+	def new:("簡易電卓") {
 		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE);
 		setSize(800, 600);
 		@text		= new JTextField;
@@ -90,7 +90,7 @@ public:
 		pane.add(center, BorderLayout::CENTER);
 	}
 
-	static main(args :String[]){
+	static def main(args :String[]){
 		UIManager::setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
 		frame = new Calculator;
 		frame.pack;

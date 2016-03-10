@@ -7,12 +7,12 @@ import{
 class SimpleFrame : JFrame <: ActionListener {
 	@text: JTextField;
 public:
-	actionPerformed(event : ActionEvent){
+	def actionPerformed(event : ActionEvent){
 		button = event.getSource$JButton;
 		@text.setText(button.getLabel);
 	}
 
-	new:("フレーム１"){
+	def new:("フレーム１"){
 		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE);
 		setSize(800, 600);
 		pane = getContentPane();

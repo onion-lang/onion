@@ -40,7 +40,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case AST.ParameterizedType(base, _)     => map(base)
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
     }
-    private def forName(name: String, qualified: Boolean): ClassTypeRef = {
+    private def forName(name: String, qualified: Boolean): ClassType = {
       if(qualified) {
         table_.load(name)
       }else {
@@ -127,7 +127,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         count += 1
     }
     if (count > 0) {
-      val node = ClassDefinition.newClass(unit.location, 0, topClass, table_.rootClass, new Array[ClassTypeRef](0))
+      val node = ClassDefinition.newClass(unit.location, 0, topClass, table_.rootClass, new Array[ClassType](0))
       node.setSourceFile(Paths.nameOf(unit_.sourceFile))
       node.setResolutionComplete(true)
       table_.classes.add(node)
@@ -143,7 +143,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       nconstructors = 0
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
-      constructTypeHierarchy(definition_, MutableSet[ClassTypeRef]())
+      constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
       for(defaultSection <- node.defaultSection) {
         access_ = defaultSection.modifiers
@@ -168,7 +168,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
-      constructTypeHierarchy(definition_, MutableSet[ClassTypeRef]())
+      constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
       for(method <- node.methods) processInterfaceMethodDeclaration(method)
     }
@@ -238,7 +238,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return
-      if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectTypeRef]).isInterface)) {
+      if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectType]).isInterface)) {
         report(INTERFACE_REQUIRED, node, typeRef)
         return
       }
@@ -249,7 +249,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       definition_.add(field)
     }
     def cyclic(start: ClassDefinition): Boolean = {
-      def loop(node: ClassTypeRef, visit: Set[ClassTypeRef]): Boolean = {
+      def loop(node: ClassType, visit: Set[ClassType]): Boolean = {
         if(node == null) return false
         if(visit.contains(node)) return true
         val newVisit = visit + node
@@ -257,10 +257,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         for(interface <- node.interfaces) if(loop(interface, newVisit)) return true
         false
       }
-      loop(start, Set[ClassTypeRef]())
+      loop(start, Set[ClassType]())
     }
-    def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassTypeRef = {
-      val typeRef = if(node == null) table_.rootClass else mapFrom(node, mapper).asInstanceOf[ClassTypeRef]
+    def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassType = {
+      val typeRef = if(node == null) table_.rootClass else mapFrom(node, mapper).asInstanceOf[ClassType]
       if (typeRef == null) return null
       val isInterface = typeRef.isInterface
       if (((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))) {
@@ -272,15 +272,15 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
       typeRef
     }
-    def constructTypeHierarchy(node: ClassTypeRef, visit: MutableSet[ClassTypeRef]) {
+    def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]) {
       if(node == null || visit.contains(node)) return
       visit += node
       node match {
         case node: ClassDefinition =>
           if (node.isResolutionComplete) return
-          val interfaces = Buffer[ClassTypeRef]()
+          val interfaces = Buffer[ClassType]()
           val resolver = find(node.name)
-          var superClass: ClassTypeRef = null
+          var superClass: ClassType = null
           if (node.isInterface) {
             val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
             superClass = rootClass
@@ -480,7 +480,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       var value = typed(node.right, context).getOrElse(null)
       if (value == null) return null
       val ref = node.left.asInstanceOf[AST.UnqualifiedFieldReference]
-      var selfClass: ClassTypeRef = null
+      var selfClass: ClassType = null
       if (context.isGlobal) {
         selfClass = loadTopClass
       } else {
@@ -514,7 +514,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         return null
       }
       if (target.isArrayType) {
-        val targetType = target.`type`.asInstanceOf[ArrayTypeRef]
+        val targetType = target.`type`.asInstanceOf[ArrayType]
         if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
           report(INCOMPATIBLE_TYPE, indexing.right, IRT.BasicType.INT, index.`type`)
           return null
@@ -524,7 +524,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         new SetArray(target, index, value)
       }else {
         val params = Array[Term](index, value)
-        tryFindMethod(node, target.`type`.asInstanceOf[ObjectTypeRef], "set", Array[Term](index, value)) match {
+        tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "set", Array[Term](index, value)) match {
           case Left(_) =>
             report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
             null
@@ -570,7 +570,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       if (left == null || right == null) return null
       if (!left.`type`.isBasicType) {
         val params = Array[Term](right)
-        tryFindMethod(node, left.`type`.asInstanceOf[ObjectTypeRef], "add", params) match {
+        tryFindMethod(node, left.`type`.asInstanceOf[ObjectType], "add", params) match {
           case Left(_) =>
             report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
             return null
@@ -705,11 +705,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             right = Boxing.boxing(table_, right)
           }
         }
-        val toStringL = findMethod(node.left, left.`type`.asInstanceOf[ObjectTypeRef], "toString")
-        val toStringR = findMethod(node.right, right.`type`.asInstanceOf[ObjectTypeRef], "toString")
+        val toStringL = findMethod(node.left, left.`type`.asInstanceOf[ObjectType], "toString")
+        val toStringR = findMethod(node.right, right.`type`.asInstanceOf[ObjectType], "toString")
         left = new Call(left, toStringL, new Array[Term](0))
         right = new Call(right, toStringR, new Array[Term](0))
-        val concat: MethodRef = findMethod(node, left.`type`.asInstanceOf[ObjectTypeRef], "concat", Array[Term](right))
+        val concat: Method = findMethod(node, left.`type`.asInstanceOf[ObjectType], "concat", Array[Term](right))
         Some(new Call(left, concat, Array[Term](right)))
       case node@AST.Subtraction(loc, left, right) =>
         val left = typed(node.left, context).getOrElse(null)
@@ -811,7 +811,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           return new Some(new RefArray(target, index))
         }
         val params = Array(index)
-        tryFindMethod(node, target.`type`.asInstanceOf[ObjectTypeRef], "get", Array[Term](index)) match {
+        tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", Array[Term](index)) match {
           case Left(_) =>
             report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
             None
@@ -868,7 +868,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           else Some(new AsInstanceOf(term, destination))
         }
       case node@AST.ClosureExpression(loc, _, _, _, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         val args = node.args
         val name = node.mname
         openFrame(context){
@@ -919,7 +919,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
           return None
         }
-        val targetType = target.`type`.asInstanceOf[ObjectTypeRef]
+        val targetType = target.`type`.asInstanceOf[ObjectType]
         if (!isAccessible(node, targetType, contextClass)) return None
         val name = node.name
         if (target.`type`.isArrayType) {
@@ -961,7 +961,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         if (target == null) return None
         val params = typedTerms(node.args.toArray, context)
         if (params == null) return None
-        val targetType = target.`type`.asInstanceOf[ObjectTypeRef]
+        val targetType = target.`type`.asInstanceOf[ObjectType]
         val name = node.name
         val methods = targetType.findMethod(name, params)
         if (methods.length == 0) {
@@ -991,7 +991,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val resultType = loadArray(typeRef, parameters.length)
         Some(new NewArray(resultType, parameters))
       case node@AST.NewObject(loc, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         val parameters = typedTerms(node.args.toArray, context)
         if (parameters == null || typeRef == null) return None
         val constructors = typeRef.findConstructor(parameters)
@@ -1093,7 +1093,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
         }
       case node@AST.StaticMemberSelection(loc, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         if (typeRef == null) return None
         val field = findField(typeRef, node.name)
         if (field == null) {
@@ -1103,7 +1103,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           Some(new RefStaticField(typeRef,field))
         }
       case node@AST.StaticMethodCall(loc, _, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassTypeRef]
+        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         val parameters = typedTerms(node.args.toArray, context)
         if (typeRef == null || parameters == null) {
           None
@@ -1194,7 +1194,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           else {
             val iteratorType = load("java.util.Iterator")
             val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
-            val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectTypeRef], "iterator")
+            val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
             val mNext = findMethod(node.collection, iteratorType, "next")
             val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
             init = new StatementBlock(new ExpressionActionStatement(new SetLocal(collectionVar, collection)), assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0))))
@@ -1355,7 +1355,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     def addReturnNode(node: ActionStatement, returnType: Type): StatementBlock = {
       new StatementBlock(node, new Return(defaultValue(returnType)))
     }
-    def createMain(top: ClassTypeRef, ref: MethodRef, name: String, args: Array[Type], ret: Type): MethodDefinition = {
+    def createMain(top: ClassType, ref: Method, name: String, args: Array[Type], ret: Type): MethodDefinition = {
       val method = new MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
       val frame = new LocalFrame(null)
       val params = new Array[Term](args.length)
@@ -1405,11 +1405,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
   }
   def processDuplication(node: AST.CompilationUnit) {
-    val methods = new JTreeSet[MethodRef](new MethodRefComparator)
-    val fields = new JTreeSet[FieldRef](new FieldRefComparator)
-    val constructors = new JTreeSet[ConstructorRef](new ConstructorRefComparator)
-    val variables = new JTreeSet[FieldRef](new FieldRefComparator)
-    val functions = new JTreeSet[MethodRef](new MethodRefComparator)
+    val methods = new JTreeSet[Method](new MethodComparator)
+    val fields = new JTreeSet[FieldRef](new FieldComparator)
+    val constructors = new JTreeSet[ConstructorRef](new ConstructorComparator)
+    val variables = new JTreeSet[FieldRef](new FieldComparator)
+    val functions = new JTreeSet[Method](new MethodComparator)
     def processFieldDeclaration(node: AST.FieldDeclaration) {
       val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return
@@ -1456,9 +1456,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def generateMethods() {
-      val generated = new JTreeSet[MethodRef](new MethodRefComparator)
-      val methodSet = new JTreeSet[MethodRef](new MethodRefComparator)
-      def makeDelegationMethod(delegated: FieldRef, delegator: MethodRef): MethodDefinition = {
+      val generated = new JTreeSet[Method](new MethodComparator)
+      val methodSet = new JTreeSet[Method](new MethodComparator)
+      def makeDelegationMethod(delegated: FieldRef, delegator: Method): MethodDefinition = {
         val args = delegator.arguments
         val params = new Array[Term](args.length)
         val frame = new LocalFrame(null)
@@ -1473,7 +1473,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         node
       }
       def generateDelegationMethods(node: FieldDefinition) {
-        val typeRef = node.`type`.asInstanceOf[ClassTypeRef]
+        val typeRef = node.`type`.asInstanceOf[ClassType]
         val src = Classes.getInterfaceMethods(typeRef)
         for (method <- src) {
           if (!methodSet.contains(method)) {
@@ -1567,10 +1567,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     report_(items.toArray)
   }
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
-  def load(name: String): ClassTypeRef = table_.load(name)
-  def loadTopClass: ClassTypeRef = table_.load(topClass)
-  def loadArray(base: Type, dimension: Int): ArrayTypeRef = table_.loadArray(base, dimension)
-  def rootClass: ClassTypeRef = table_.rootClass
+  def load(name: String): ClassType = table_.load(name)
+  def loadTopClass: ClassType = table_.load(topClass)
+  def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
+  def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = reporter_.getProblems
   def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray
   def topClass: String = {
@@ -1600,7 +1600,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   }
   private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
     val params = Array[Term](new AsInstanceOf(rhs, rootClass))
-    val target = lhs.`type`.asInstanceOf[ObjectTypeRef]
+    val target = lhs.`type`.asInstanceOf[ObjectType]
     val methods = target.findMethod("equals", params)
     var node: Term = new Call(lhs, methods(0), params)
     if (kind == BinaryTerm.Constants.NOT_EQUAL) {
@@ -1611,8 +1611,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private def indexref(bind: ClosureLocalBinding, value: Term): Term = new RefArray(new RefLocal(bind), value)
   private def assign(bind: ClosureLocalBinding, value: Term): ActionStatement = new ExpressionActionStatement(new SetLocal(bind, value))
   private def ref(bind: ClosureLocalBinding): Term = new RefLocal(bind)
-  private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String): MethodRef =  findMethod(node, target, name, new Array[Term](0))
-  private def findMethod(node: AST.Node, target: ObjectTypeRef, name: String, params: Array[Term]): MethodRef = {
+  private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =  findMethod(node, target, name, new Array[Term](0))
+  private def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method = {
     val methods = target.findMethod(name, params)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
@@ -1620,7 +1620,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     methods(0)
   }
-  private def hasSamePackage(a: ClassTypeRef, b: ClassTypeRef): Boolean = {
+  private def hasSamePackage(a: ClassType, b: ClassType): Boolean = {
     var name1 = a.name
     var name2 = b.name
     var index: Int = 0
@@ -1631,16 +1631,16 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     name2 = if(index >= 0) name2.substring(0, index) else ""
     name1 == name2
   }
-  private def isAccessible(target: ClassTypeRef, context: ClassTypeRef): Boolean = {
+  private def isAccessible(target: ClassType, context: ClassType): Boolean = {
     if (hasSamePackage(target, context))  true else (target.modifier & AST.M_INTERNAL) == 0
   }
-  private def isAccessible(member: MemberRef, context: ClassTypeRef): Boolean = {
+  private def isAccessible(member: MemberRef, context: ClassType): Boolean = {
     val targetType = member.affiliation
     if (targetType == context) return true
     val modifier = member.modifier
     if (TypeRules.isSuperType(targetType, context)) (modifier & AST.M_PROTECTED) != 0 || (modifier & AST.M_PUBLIC) != 0 else (AST.M_PUBLIC & modifier) != 0
   }
-  private def findField(target: ObjectTypeRef, name: String): FieldRef = {
+  private def findField(target: ObjectType, name: String): FieldRef = {
     if(target == null) return null
     var field = target.field(name)
     if(field != null) return field
@@ -1652,17 +1652,17 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     null
   }
-  private def isAccessible(node: AST.Node, target: ObjectTypeRef, context: ClassTypeRef): Boolean = {
+  private def isAccessible(node: AST.Node, target: ObjectType, context: ClassType): Boolean = {
     if (target.isArrayType) {
-      val component = target.asInstanceOf[ArrayTypeRef].component
+      val component = target.asInstanceOf[ArrayType].component
       if (!component.isBasicType) {
-        if (!isAccessible(component.asInstanceOf[ClassTypeRef], definition_)) {
+        if (!isAccessible(component.asInstanceOf[ClassType], definition_)) {
           report(CLASS_NOT_ACCESSIBLE, node, target, context)
           return false
         }
       }
     } else {
-      if (!isAccessible(target.asInstanceOf[ClassTypeRef], context)) {
+      if (!isAccessible(target.asInstanceOf[ClassType], context)) {
         report(CLASS_NOT_ACCESSIBLE, node, target, context)
         return false
       }
@@ -1681,7 +1681,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   }
   private def types(terms: Array[Term]): Array[Type] = terms.map{ term => term.`type`}
   private def typeNames(types: Array[Type]): Array[String] = types.map{ t => t.name}
-  private def tryFindMethod(node: AST.Node, target: ObjectTypeRef, name: String, params: Array[Term]): Either[Continuable, MethodRef] = {
+  private def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Continuable, Method] = {
     val methods = target.findMethod(name, params)
     if (methods.length > 0) {
       if (methods.length > 1) {
@@ -1697,7 +1697,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       Left(true)
     }
   }
-  private def matches(argTypes: Array[Type], name: String, methods: Array[MethodRef]): MethodRef = {
+  private def matches(argTypes: Array[Type], name: String, methods: Array[Method]): Method = {
     methods.find{m =>  name == m.name && equals(argTypes, m.arguments)}.getOrElse(null)
   }
   private def equals(ltype: Array[Type], rtype: Array[Type]): Boolean = {

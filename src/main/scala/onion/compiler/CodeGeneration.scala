@@ -24,7 +24,7 @@ object CodeGeneration {
     if (`type`.isBasicType) {
       BASIC_TYPE_MAPPING(`type`.asInstanceOf[IRT.BasicType])
     } else if (`type`.isArrayType) {
-      val arrayType: IRT.ArrayTypeRef = `type`.asInstanceOf[IRT.ArrayTypeRef]
+      val arrayType: IRT.ArrayType = `type`.asInstanceOf[IRT.ArrayType]
       new ArrayType(translateIxTypeToVmType(arrayType.component), arrayType.dimension)
     } else if (`type`.isClassType) {
       new ObjectType(`type`.name)
@@ -353,7 +353,7 @@ class CodeGeneration(config: CompilerConfig) {
     for (ref <- constructors) {
       codeConstructor(gen, (ref.asInstanceOf[IRT.ConstructorDefinition]))
     }
-    val methods: Array[IRT.MethodRef] = node.methods
+    val methods: Array[IRT.Method] = node.methods
     for (ref <- methods) {
       codeMethod(gen, (ref.asInstanceOf[IRT.MethodDefinition]))
     }
@@ -502,12 +502,12 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def implementsMethods(gen: ClassGen, methods: Array[IRT.MethodRef]) {
+  private def implementsMethods(gen: ClassGen, methods: Array[IRT.Method]) {
     {
       var i: Int = 0
       while (i < methods.length) {
         {
-          val method: IRT.MethodRef = methods(i)
+          val method: IRT.Method = methods(i)
           val returnType: Type = typeOf(method.returnType)
           val name: String = method.name
           val args: Array[Type] = typesOf(method.arguments)
@@ -529,13 +529,13 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeClosure(node: IRT.NewClosure, code: CodeGeneration.Proxy): InstructionHandle = {
-    val classType: IRT.ClassTypeRef = node.getClassType
+    val classType: IRT.ClassType = node.getClassType
     val closureName: String = generator.generate
     val arguments: Array[Type] = typesOf(node.getArguments)
     val gen: ClassGen = new ClassGen(closureName, "java.lang.Object", "<generated>", Constants.ACC_PUBLIC, Array[String](classType.name))
     val methods: Set[_] = Classes.getInterfaceMethods(classType)
     methods.remove(node.getMethod)
-    implementsMethods(gen, methods.toArray(new Array[IRT.MethodRef](0)).asInstanceOf[Array[IRT.MethodRef]])
+    implementsMethods(gen, methods.toArray(new Array[IRT.Method](0)).asInstanceOf[Array[IRT.Method]])
     val frame: LocalFrame = node.getFrame
     val depth: Int = frame.depth
     var i: Int = 1
@@ -656,7 +656,7 @@ class CodeGeneration(config: CompilerConfig) {
   def codeSuperCall(node: IRT.CallSuper, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
     codeExpressions(node.params, code)
-    val method: IRT.MethodRef = node.method
+    val method: IRT.Method = node.method
     code.appendInvoke(method.affiliation.name, method.name, typeOf(method.returnType), typesOf(method.arguments), Constants.INVOKESPECIAL)
     start
   }
@@ -855,9 +855,9 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def nameOf(symbol: IRT.ClassTypeRef): String = symbol.name
+  private def nameOf(symbol: IRT.ClassType): String = symbol.name
 
-  private def namesOf(symbols: Array[IRT.ClassTypeRef]): Array[String] = symbols.map{s => nameOf(s)}
+  private def namesOf(symbols: Array[IRT.ClassType]): Array[String] = symbols.map{ s => nameOf(s)}
 
   def codeExpression(node: IRT.Term, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
@@ -1072,7 +1072,7 @@ class CodeGeneration(config: CompilerConfig) {
       codeExpression(node.parameters(i), code)
       i += 1;
     }
-    val classType: IRT.ObjectTypeRef = node.target.`type`.asInstanceOf[IRT.ObjectTypeRef]
+    val classType: IRT.ObjectType = node.target.`type`.asInstanceOf[IRT.ObjectType]
     var kind: Short = 0
     if (classType.isInterface) {
       kind = Constants.INVOKEINTERFACE
@@ -1089,7 +1089,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeArrayRef(node: IRT.RefArray, code: CodeGeneration.Proxy): InstructionHandle = {
-    val targetType: IRT.ArrayTypeRef = node.target.`type`.asInstanceOf[IRT.ArrayTypeRef]
+    val targetType: IRT.ArrayType = node.target.`type`.asInstanceOf[IRT.ArrayType]
     val start: InstructionHandle = codeExpression(node.target, code)
     codeExpression(node.index, code)
     code.appendArrayLoad(typeOf(targetType.base))
@@ -1103,7 +1103,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeArrayAssignment(node: IRT.SetArray, code: CodeGeneration.Proxy): InstructionHandle = {
-    val targetType: IRT.ArrayTypeRef = node.`object`.`type`.asInstanceOf[IRT.ArrayTypeRef]
+    val targetType: IRT.ArrayType = node.`object`.`type`.asInstanceOf[IRT.ArrayType]
     val start: InstructionHandle = codeExpression(node.`object`, code)
     code.appendDup(1)
     codeExpression(node.index, code)
@@ -1113,7 +1113,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeNew(node: IRT.NewObject, code: CodeGeneration.Proxy): InstructionHandle = {
-    val `type`: IRT.ClassTypeRef = node.constructor.affiliation
+    val `type`: IRT.ClassType = node.constructor.affiliation
     val start: InstructionHandle = code.appendNew(typeOf(`type`).asInstanceOf[ObjectType])
     code.append(InstructionConstants.DUP)
     var i: Int = 0
@@ -1131,7 +1131,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeNewArray(node: IRT.NewArray, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpressions(node.parameters, code)
-    val `type`: IRT.ArrayTypeRef = node.arrayType
+    val `type`: IRT.ArrayType = node.arrayType
     code.appendNewArray(typeOf(`type`.component), node.parameters.length.asInstanceOf[Short])
     start
   }
@@ -1593,7 +1593,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeFieldRef(node: IRT.RefField, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
-    val symbol: IRT.ClassTypeRef = node.target.`type`.asInstanceOf[IRT.ClassTypeRef]
+    val symbol: IRT.ClassType = node.target.`type`.asInstanceOf[IRT.ClassType]
     code.appendGetField(symbol.name, node.field.name, typeOf(node.`type`))
     start
   }
@@ -1606,7 +1606,7 @@ class CodeGeneration(config: CompilerConfig) {
     } else {
       code.append(InstructionConstants.DUP_X1)
     }
-    val symbol: IRT.ClassTypeRef = node.target.`type`.asInstanceOf[IRT.ClassTypeRef]
+    val symbol: IRT.ClassType = node.target.`type`.asInstanceOf[IRT.ClassType]
     code.appendPutField(symbol.name, node.field.name, typeOf(node.`type`))
     start
   }

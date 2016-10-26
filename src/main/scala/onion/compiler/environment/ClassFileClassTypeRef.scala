@@ -37,7 +37,7 @@ object ClassFileClassTypeRef {
   private final val CONSTRUCTOR_NAME: String = "<init>"
 }
 
-class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT.AbstractClassTypeRef {
+class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT.AbstractClassType {
 
   import ClassFileClassTypeRef._
 
@@ -45,8 +45,8 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   private var modifier_ : Int = toOnionModifier(javaClass.getModifiers)
 
 
-  private lazy val methods_ : MultiTable[IRT.MethodRef] = {
-    val methods = new MultiTable[IRT.MethodRef]
+  private lazy val methods_ : MultiTable[IRT.Method] = {
+    val methods = new MultiTable[IRT.Method]
     for (method <- javaClass.getMethods) {
       if (!(method.getName == CONSTRUCTOR_NAME)) methods.add(translate(method))
     }
@@ -78,17 +78,17 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   def name: String = javaClass.getClassName
 
-  def superClass: IRT.ClassTypeRef = {
-    val superClass: IRT.ClassTypeRef = table.load(javaClass.getSuperclassName)
+  def superClass: IRT.ClassType = {
+    val superClass: IRT.ClassType = table.load(javaClass.getSuperclassName)
     if (superClass eq this) {
       return null
     }
     superClass
   }
 
-  def interfaces: Array[IRT.ClassTypeRef] = {
+  def interfaces: Array[IRT.ClassType] = {
     val interfaceNames: Array[String] = javaClass.getInterfaceNames
-    val interfaces: Array[IRT.ClassTypeRef] = new Array[IRT.ClassTypeRef](interfaceNames.length)
+    val interfaces: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaceNames.length)
     var i: Int = 0
     while (i < interfaces.length) {
       interfaces(i) = table.load(interfaceNames(i))
@@ -97,9 +97,9 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
     interfaces
   }
 
-  def methods: Array[IRT.MethodRef] =  methods_.values.toArray
+  def methods: Array[IRT.Method] =  methods_.values.toArray
 
-  def methods(name: String): Array[IRT.MethodRef] =  methods_.get(name).toArray
+  def methods(name: String): Array[IRT.Method] =  methods_.get(name).toArray
 
   def fields: Array[IRT.FieldRef] =  fields_.values.toArray
 
@@ -109,7 +109,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
     constructors_.toArray
   }
 
-  private def translate(method: Method): IRT.MethodRef = {
+  private def translate(method: Method): IRT.Method = {
     val arguments: Array[Type] = method.getArgumentTypes
     val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
     var i: Int = 0

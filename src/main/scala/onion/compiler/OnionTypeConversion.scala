@@ -50,7 +50,7 @@ class OnionTypeConversion(table: ClassTable) {
     val returnType: IRT.Type = c2t.get(klass).asInstanceOf[IRT.Type]
     if (returnType != null) return returnType
     if (!klass.isArray) {
-      val symbol: IRT.ClassTypeRef = table.load(klass.getName)
+      val symbol: IRT.ClassType = table.load(klass.getName)
       if (symbol != null) {
         return symbol
       }
@@ -76,7 +76,7 @@ class OnionTypeConversion(table: ClassTable) {
     if (returnType != null) return returnType
     if (`type`.isInstanceOf[ObjectType]) {
       val objType: ObjectType = `type`.asInstanceOf[ObjectType]
-      val symbol: IRT.ClassTypeRef = table.load(objType.getClassName)
+      val symbol: IRT.ClassType = table.load(objType.getClassName)
       if (symbol != null) {
         return symbol
       }

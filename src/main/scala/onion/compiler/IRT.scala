@@ -34,7 +34,7 @@ object IRT {
       this(null, target, index)
     }
 
-    def `type`: IRT.Type = (target.`type`.asInstanceOf[IRT.ArrayTypeRef]).base
+    def `type`: IRT.Type = (target.`type`.asInstanceOf[IRT.ArrayType]).base
   }
 
   /**
@@ -162,8 +162,8 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class Call(location: Location, val target: IRT.Term, val method: IRT.MethodRef, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(target: IRT.Term, method: IRT.MethodRef, parameters: Array[IRT.Term]) {
+  class Call(location: Location, val target: IRT.Term, val method: IRT.Method, val parameters: Array[IRT.Term]) extends Term(location) {
+    def this(target: IRT.Term, method: IRT.Method, parameters: Array[IRT.Term]) {
       this(null, target, method, parameters)
     }
 
@@ -173,8 +173,8 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class CallStatic(location: Location, val target: IRT.ObjectTypeRef, val method: IRT.MethodRef, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(target: IRT.ObjectTypeRef, method: IRT.MethodRef, parameters: Array[IRT.Term]) {
+  class CallStatic(location: Location, val target: IRT.ObjectType, val method: IRT.Method, val parameters: Array[IRT.Term]) extends Term(location) {
+    def this(target: IRT.ObjectType, method: IRT.Method, parameters: Array[IRT.Term]) {
       this(null, target, method, parameters)
     }
     def `type`: IRT.Type = method.returnType
@@ -183,8 +183,8 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class CallSuper(location: Location, val target: IRT.Term, val method: IRT.MethodRef, val params: Array[IRT.Term]) extends Term(location) {
-    def this(target: IRT.Term, method: IRT.MethodRef, params: Array[IRT.Term]) {
+  class CallSuper(location: Location, val target: IRT.Term, val method: IRT.Method, val params: Array[IRT.Term]) extends Term(location) {
+    def this(target: IRT.Term, method: IRT.Method, params: Array[IRT.Term]) {
       this(null, target, method, params)
     }
 
@@ -225,7 +225,7 @@ object IRT {
      * @param interfaces
      * @return
      */
-    def newInterface(location: Location, modifier: Int, name: String, interfaces: Array[IRT.ClassTypeRef]): IRT.ClassDefinition = {
+    def newInterface(location: Location, modifier: Int, name: String, interfaces: Array[IRT.ClassType]): IRT.ClassDefinition = {
       new IRT.ClassDefinition(location, true, modifier, name, null, interfaces)
     }
 
@@ -237,7 +237,7 @@ object IRT {
      * @param interfaces
      * @return
      */
-    def newClass(location: Location, modifier: Int, name: String, superClass: IRT.ClassTypeRef, interfaces: Array[IRT.ClassTypeRef]): IRT.ClassDefinition = {
+    def newClass(location: Location, modifier: Int, name: String, superClass: IRT.ClassType, interfaces: Array[IRT.ClassType]): IRT.ClassDefinition = {
       new IRT.ClassDefinition(location, false, modifier, name, superClass, interfaces)
     }
 
@@ -250,28 +250,28 @@ object IRT {
     def newClass(modifier: Int, name: String): IRT.ClassDefinition =  new IRT.ClassDefinition(null, false, modifier, name, null, null)
   }
 
-  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: IRT.ClassTypeRef, var interfaces: Array[IRT.ClassTypeRef])
-    extends IRT.AbstractClassTypeRef() with Node with Named {
+  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: IRT.ClassType, var interfaces: Array[IRT.ClassType])
+    extends IRT.AbstractClassType() with Node with Named {
 
     def constructors: Array[IRT.ConstructorRef] = constructors_.toArray(new Array[IRT.ConstructorRef](0))
-    def methods: Array[IRT.MethodRef] = methods_.values.toArray
+    def methods: Array[IRT.Method] = methods_.values.toArray
     def fields: Array[IRT.FieldRef] = fields_.values.toArray
 
-    var fields_ : OrderedTable[IRT.FieldRef] = new OrderedTable[IRT.FieldRef]
-    var methods_ : MultiTable[IRT.MethodRef] = new MultiTable[IRT.MethodRef]
+    var fields_ : OrderedTable[IRT.FieldRef]     = new OrderedTable[IRT.FieldRef]
+    var methods_ : MultiTable[IRT.Method]        = new MultiTable[IRT.Method]
     var constructors_ : List[IRT.ConstructorRef] = new ArrayList[IRT.ConstructorRef]
-    var isResolutionComplete: Boolean = false
+    var isResolutionComplete: Boolean            = false
     private var sourceFile: String = null
 
     def this() {
-      this(null: Location, false, 0, null: String, null: IRT.ClassTypeRef, null)
+      this(null: Location, false, 0, null: String, null: IRT.ClassType, null)
     }
 
-    def setSuperClass(superClass: IRT.ClassTypeRef) {
+    def setSuperClass(superClass: IRT.ClassType) {
       this.superClass = superClass
     }
 
-    def setInterfaces(interfaces: Array[IRT.ClassTypeRef]) {
+    def setInterfaces(interfaces: Array[IRT.ClassType]) {
       this.interfaces = interfaces
     }
 
@@ -279,7 +279,7 @@ object IRT {
       this.isResolutionComplete = isInResolution
     }
 
-    def add(method: IRT.MethodRef) {
+    def add(method: IRT.Method) {
       methods_.add(method)
     }
 
@@ -295,7 +295,7 @@ object IRT {
       constructors_.add(ConstructorDefinition.newDefaultConstructor(this))
     }
 
-    def methods(name: String): Array[IRT.MethodRef] = methods_.get(name).toArray
+    def methods(name: String): Array[IRT.Method] = methods_.get(name).toArray
 
     def field(name: String): IRT.FieldRef = fields_.get(name).getOrElse(null)
 
@@ -308,7 +308,7 @@ object IRT {
    * @author Kota Mizushima
    */
   object ConstructorDefinition {
-    def newDefaultConstructor(`type`: IRT.ClassTypeRef): IRT.ConstructorDefinition = {
+    def newDefaultConstructor(`type`: IRT.ClassType): IRT.ConstructorDefinition = {
       val block: IRT.StatementBlock = new IRT.StatementBlock(new IRT.Return(null))
       val init: IRT.Super = new IRT.Super(`type`.superClass, new Array[IRT.Type](0), new Array[IRT.Term](0))
       val node: IRT.ConstructorDefinition = new IRT.ConstructorDefinition(Modifier.PUBLIC, `type`, new Array[IRT.Type](0), block, init)
@@ -317,9 +317,9 @@ object IRT {
     }
   }
 
-  class ConstructorDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val arguments: Array[IRT.Type], var block: IRT.StatementBlock, var superInitializer: IRT.Super) extends
+  class ConstructorDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassType, val arguments: Array[IRT.Type], var block: IRT.StatementBlock, var superInitializer: IRT.Super) extends
   Node with IRT.ConstructorRef {
-    def this(modifier: Int, classType: IRT.ClassTypeRef, arguments: Array[IRT.Type], block: IRT.StatementBlock, superInitializer: IRT.Super) {
+    def this(modifier: Int, classType: IRT.ClassType, arguments: Array[IRT.Type], block: IRT.StatementBlock, superInitializer: IRT.Super) {
       this(null, modifier, classType, arguments, block, superInitializer)
     }
 
@@ -327,7 +327,7 @@ object IRT {
 
     def getArgs: Array[IRT.Type] = arguments
 
-    def affiliation: IRT.ClassTypeRef = classType
+    def affiliation: IRT.ClassType = classType
 
     var frame: LocalFrame = null
   }
@@ -393,7 +393,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class FieldDefinition(val location: Location, val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.Type)
+  class FieldDefinition(val location: Location, val modifier: Int, val affiliation: IRT.ClassType, val name: String, val `type`: IRT.Type)
     extends Node with FieldRef {
   }
 
@@ -485,18 +485,18 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class NewClosure(location: Location, val `type`: IRT.ClassTypeRef, method: IRT.MethodRef, block: IRT.ActionStatement) extends Term(location) {
+  class NewClosure(location: Location, val `type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) extends Term(location) {
     private var frame: LocalFrame = null
 
-    def this(`type`: IRT.ClassTypeRef, method: IRT.MethodRef, block: IRT.ActionStatement) {
+    def this(`type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) {
       this(null, `type`, method, block)
     }
 
     def getModifier: Int = method.modifier
 
-    def getClassType: IRT.ClassTypeRef = `type`
+    def getClassType: IRT.ClassType = `type`
 
-    def getMethod: IRT.MethodRef = method
+    def getMethod: IRT.Method = method
 
     def getName: String = method.name
 
@@ -544,12 +544,12 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val name: String, val arguments: Array[IRT.Type], val returnType: IRT.Type, var block: IRT.StatementBlock)
-    extends Node with MethodRef {
+  class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassType, val name: String, val arguments: Array[IRT.Type], val returnType: IRT.Type, var block: IRT.StatementBlock)
+    extends Node with Method {
     private var closure: Boolean = false
     private var frame: LocalFrame = null
 
-    def affiliation: IRT.ClassTypeRef = classType
+    def affiliation: IRT.ClassType = classType
 
     def getBlock: IRT.StatementBlock = block
 
@@ -576,8 +576,8 @@ object IRT {
     def `type`: IRT.Type = constructor.affiliation
   }
 
-  class NewArray(location: Location, val arrayType: IRT.ArrayTypeRef, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(arrayType: IRT.ArrayTypeRef, parameters: Array[IRT.Term]) {
+  class NewArray(location: Location, val arrayType: IRT.ArrayType, val parameters: Array[IRT.Term]) extends Term(location) {
+    def this(arrayType: IRT.ArrayType, parameters: Array[IRT.Term]) {
       this(null, arrayType, parameters)
     }
 
@@ -598,7 +598,7 @@ object IRT {
       this(null)
     }
 
-    def `type`: IRT.Type = NullTypeRef.NULL
+    def `type`: IRT.Type = NullType.NULL
   }
 
   /**
@@ -623,9 +623,9 @@ object IRT {
 
   abstract class ActionStatement(val location: Location)
 
-  class RefStaticField(location: Location, val target: IRT.ClassTypeRef, val field: IRT.FieldRef)  extends Term(location) {
+  class RefStaticField(location: Location, val target: IRT.ClassType, val field: IRT.FieldRef)  extends Term(location) {
 
-    def this(target: IRT.ClassTypeRef, field: IRT.FieldRef) {
+    def this(target: IRT.ClassType, field: IRT.FieldRef) {
       this(null, target, field)
     }
 
@@ -635,8 +635,8 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class SetStaticField(location: Location, val target: IRT.ObjectTypeRef, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
-    def this(target: IRT.ObjectTypeRef, field: IRT.FieldRef, value: IRT.Term) {
+  class SetStaticField(location: Location, val target: IRT.ObjectType, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
+    def this(target: IRT.ObjectType, field: IRT.FieldRef, value: IRT.Term) {
       this(null, target, field, value)
     }
 
@@ -652,7 +652,7 @@ object IRT {
     }
   }
 
-  class Super(val classType: IRT.ClassTypeRef, val arguments: Array[IRT.Type], val terms: Array[IRT.Term]) extends Node
+  class Super(val classType: IRT.ClassType, val arguments: Array[IRT.Type], val terms: Array[IRT.Term]) extends Node
 
   class Synchronized(location: Location, val term: IRT.Term, val statement: IRT.ActionStatement)  extends ActionStatement(location) {
     def this(term: IRT.Term, statement: IRT.ActionStatement) {
@@ -660,14 +660,14 @@ object IRT {
     }
   }
 
-  class OuterThis(location: Location, val `type`: IRT.ClassTypeRef)  extends Term(location) {
-    def this(classType: IRT.ClassTypeRef) {
+  class OuterThis(location: Location, val `type`: IRT.ClassType)  extends Term(location) {
+    def this(classType: IRT.ClassType) {
       this(null, classType)
     }
   }
 
-  class This(location: Location, val `type`: IRT.ClassTypeRef) extends Term(location) {
-    def this(classType: IRT.ClassTypeRef) {
+  class This(location: Location, val `type`: IRT.ClassType) extends Term(location) {
+    def this(classType: IRT.ClassType) {
       this(null, classType)
     }
   }
@@ -701,8 +701,8 @@ object IRT {
     }
   }
 
-  abstract class AbstractClassTypeRef() extends AbstractObjectTypeRef with ClassTypeRef {
-    private val constructorRefFinder: IRT.ConstructorRefFinder = new IRT.ConstructorRefFinder()
+  abstract class AbstractClassType extends AbstractObjectType with ClassType {
+    private val constructorRefFinder: IRT.ConstructorFinder = new IRT.ConstructorFinder()
 
     def findConstructor(params: Array[IRT.Term]): Array[IRT.ConstructorRef] = constructorRefFinder.find(this, params)
 
@@ -714,13 +714,13 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  abstract class AbstractObjectTypeRef() extends ObjectTypeRef {
-    private var methodRefFinder: IRT.MethodRefFinder = new IRT.MethodRefFinder
-    private var fieldRefFinder: IRT.FieldRefFinder = new IRT.FieldRefFinder
+  abstract class AbstractObjectType extends ObjectType {
+    private var methodRefFinder: IRT.MethodFinder = new IRT.MethodFinder
+    private var fieldRefFinder: IRT.FieldFinder   = new IRT.FieldFinder
 
     def findField(name: String): IRT.FieldRef = fieldRefFinder.find(this, name)
 
-    def findMethod(name: String, params: Array[IRT.Term]): Array[IRT.MethodRef] = {
+    def findMethod(name: String, params: Array[IRT.Term]): Array[IRT.Method] = {
       methodRefFinder.find(this, name, params)
     }
 
@@ -734,10 +734,10 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class ArrayTypeRef(val component: IRT.Type, val dimension: Int, table: ClassTable) extends AbstractObjectTypeRef {
-    val superClass: IRT.ClassTypeRef = table.load("java.lang.Object")
-    val interfaces: Array[IRT.ClassTypeRef] = Array[IRT.ClassTypeRef](table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
-    var name: String = "[" * dimension + component.name
+  class ArrayType(val component: IRT.Type, val dimension: Int, table: ClassTable) extends AbstractObjectType {
+    val superClass: IRT.ClassType        = table.load("java.lang.Object")
+    val interfaces: Array[IRT.ClassType] = Array[IRT.ClassType](table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
+    var name: String                     = "[" * dimension + component.name
 
     def base: IRT.Type =  if (dimension == 1) component else table.loadArray(component, dimension - 1)
 
@@ -745,9 +745,9 @@ object IRT {
 
     def modifier: Int = 0
 
-    def methods: Array[IRT.MethodRef] = superClass.methods
+    def methods: Array[IRT.Method] = superClass.methods
 
-    def methods(name: String): Array[IRT.MethodRef] =  superClass.methods(name)
+    def methods(name: String): Array[IRT.Method] =  superClass.methods(name)
 
     def fields: Array[IRT.FieldRef] = superClass.fields
 
@@ -803,15 +803,15 @@ object IRT {
   final val BASIC_TYPE_BOOLEAN = BasicType.BOOLEAN
   final val BASIC_TYPE_VOID = BasicType.VOID
 
-  abstract trait ClassTypeRef extends ObjectTypeRef {
+  abstract sealed trait ClassType extends ObjectType {
     def constructors: Array[IRT.ConstructorRef]
 
     def findConstructor(params: Array[IRT.Term]): Array[IRT.ConstructorRef]
   }
 
-  class ConstructorRefFinder {
-    def find(target: IRT.ClassTypeRef, args: Array[IRT.Term]): Array[IRT.ConstructorRef] = {
-      val constructors: Set[IRT.ConstructorRef] = new TreeSet[IRT.ConstructorRef](new IRT.ConstructorRefComparator)
+  class ConstructorFinder {
+    def find(target: IRT.ClassType, args: Array[IRT.Term]): Array[IRT.ConstructorRef] = {
+      val constructors: Set[IRT.ConstructorRef] = new TreeSet[IRT.ConstructorRef](new IRT.ConstructorComparator)
       if (target == null) return new Array[IRT.ConstructorRef](0)
       val cs: Array[IRT.ConstructorRef] = target.constructors
       var i: Int = 0
@@ -860,7 +860,7 @@ object IRT {
   }
 
   abstract trait ConstructorRef extends MemberRef {
-    def affiliation: IRT.ClassTypeRef
+    def affiliation: IRT.ClassType
 
     def getArgs: Array[IRT.Type]
   }
@@ -868,7 +868,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class ConstructorRefComparator extends Comparator[IRT.ConstructorRef] {
+  class ConstructorComparator extends Comparator[IRT.ConstructorRef] {
     def compare(c1: IRT.ConstructorRef, c2: IRT.ConstructorRef): Int = {
       val args1: Array[IRT.Type] = c1.getArgs
       val args2: Array[IRT.Type] = c2.getArgs
@@ -885,14 +885,14 @@ object IRT {
     }
   }
 
-  class FieldRefFinder {
-    def find(target: IRT.ObjectTypeRef, name: String): IRT.FieldRef = {
+  class FieldFinder {
+    def find(target: IRT.ObjectType, name: String): IRT.FieldRef = {
       if (target == null) return null
       var field: IRT.FieldRef = target.field(name)
       if (field != null) return field
       field = find(target.superClass, name)
       if (field != null) return field
-      val interfaces: Array[IRT.ClassTypeRef] = target.interfaces
+      val interfaces: Array[IRT.ClassType] = target.interfaces
       for (anInterface <- target.interfaces) {
         field = find(anInterface, name)
         if (field != null) return field
@@ -904,19 +904,19 @@ object IRT {
   abstract trait FieldRef extends MemberRef {
     def modifier: Int
 
-    def affiliation: IRT.ClassTypeRef
+    def affiliation: IRT.ClassType
 
     def `type`: IRT.Type
   }
 
-  class FieldRefComparator extends Comparator[IRT.FieldRef] {
+  class FieldComparator extends Comparator[IRT.FieldRef] {
     def compare(o1: IRT.FieldRef, o2: IRT.FieldRef): Int =  o1.name.compareTo(o2.name)
   }
 
   abstract trait MemberRef extends Named {
     def modifier: Int
 
-    def affiliation: IRT.ClassTypeRef
+    def affiliation: IRT.ClassType
 
     def name: String
   }
@@ -924,7 +924,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  object MethodRefFinder {
+  object MethodFinder {
     private def isAllSuperType(arg1: Array[IRT.Type], arg2: Array[IRT.Type]): Boolean = {
       var i: Int = 0
       while (i < arg1.length) {
@@ -935,43 +935,43 @@ object IRT {
     }
   }
 
-  class MethodRefFinder {
-    import MethodRefFinder._
-    def find(target: IRT.ObjectTypeRef, name: String, arguments: Array[IRT.Term]): Array[IRT.MethodRef] = {
-      val methods: Set[IRT.MethodRef] = new TreeSet[IRT.MethodRef](new IRT.MethodRefComparator)
+  class MethodFinder {
+    import MethodFinder._
+    def find(target: IRT.ObjectType, name: String, arguments: Array[IRT.Term]): Array[IRT.Method] = {
+      val methods: Set[IRT.Method] = new TreeSet[IRT.Method](new IRT.MethodComparator)
       find(methods, target, name, arguments)
-      val selectedMethods: List[IRT.MethodRef] = new ArrayList[IRT.MethodRef]
+      val selectedMethods: List[IRT.Method] = new ArrayList[IRT.Method]
       selectedMethods.addAll(methods)
       Collections.sort(selectedMethods, sorter)
       if (selectedMethods.size < 2) {
-        return selectedMethods.toArray(new Array[IRT.MethodRef](0)).asInstanceOf[Array[IRT.MethodRef]]
+        return selectedMethods.toArray(new Array[IRT.Method](0)).asInstanceOf[Array[IRT.Method]]
       }
-      val method1: IRT.MethodRef = selectedMethods.get(0)
-      val method2: IRT.MethodRef = selectedMethods.get(1)
+      val method1: IRT.Method = selectedMethods.get(0)
+      val method2: IRT.Method = selectedMethods.get(1)
       if (isAmbiguous(method1, method2)) {
-        return selectedMethods.toArray(new Array[IRT.MethodRef](0)).asInstanceOf[Array[IRT.MethodRef]]
+        return selectedMethods.toArray(new Array[IRT.Method](0)).asInstanceOf[Array[IRT.Method]]
       }
-      Array[IRT.MethodRef](method1)
+      Array[IRT.Method](method1)
     }
 
-    def isAmbiguous(method1: IRT.MethodRef, method2: IRT.MethodRef): Boolean =  sorter.compare(method1, method2) >= 0
+    def isAmbiguous(method1: IRT.Method, method2: IRT.Method): Boolean =  sorter.compare(method1, method2) >= 0
 
-    private def find(methods: Set[IRT.MethodRef], target: IRT.ObjectTypeRef, name: String, params: Array[IRT.Term]) {
+    private def find(methods: Set[IRT.Method], target: IRT.ObjectType, name: String, params: Array[IRT.Term]) {
       if (target == null) return
-      val ms: Array[IRT.MethodRef] = target.methods(name)
+      val ms: Array[IRT.Method] = target.methods(name)
       for (m <- target.methods(name)) {
         if (matcher.matches(m.arguments, params)) methods.add(m)
       }
-      val superClass: IRT.ClassTypeRef = target.superClass
+      val superClass: IRT.ClassType = target.superClass
       find(methods, superClass, name, params)
-      val interfaces: Array[IRT.ClassTypeRef] = target.interfaces
+      val interfaces: Array[IRT.ClassType] = target.interfaces
       for (anInterface <- interfaces) {
         find(methods, anInterface, name, params)
       }
     }
 
-    private final val sorter: Comparator[IRT.MethodRef] = new Comparator[IRT.MethodRef] {
-      def compare(m1: IRT.MethodRef, m2: IRT.MethodRef): Int = {
+    private final val sorter: Comparator[IRT.Method] = new Comparator[IRT.Method] {
+      def compare(m1: IRT.Method, m2: IRT.Method): Int = {
         val arg1: Array[IRT.Type] = m1.arguments
         val arg2: Array[IRT.Type] = m2.arguments
         if (isAllSuperType(arg2, arg1)) return -1
@@ -979,19 +979,19 @@ object IRT {
         0
       }
     }
-    private final val matcher: IRT.ParameterMatcher = new IRT.StandardParameterMatcher
+    private final val matcher: IRT.ParameterMatcher  = new IRT.StandardParameterMatcher
   }
 
-  abstract trait MethodRef extends MemberRef {
-    def affiliation: IRT.ClassTypeRef
+  abstract trait Method extends MemberRef {
+    def affiliation: IRT.ClassType
 
     def arguments: Array[IRT.Type]
 
     def returnType: IRT.Type
   }
 
-  class MethodRefComparator extends Comparator[IRT.MethodRef] {
-    def compare(m1: IRT.MethodRef, m2: IRT.MethodRef): Int = {
+  class MethodComparator extends Comparator[IRT.Method] {
+    def compare(m1: IRT.Method, m2: IRT.Method): Int = {
       var result: Int = m1.name.compareTo(m2.name)
       if (result != 0) return result
       val args1: Array[IRT.Type] = m1.arguments
@@ -1007,13 +1007,11 @@ object IRT {
     }
   }
 
-  object NullTypeRef {
-    var NULL: IRT.NullTypeRef = new IRT.NullTypeRef("null")
+  object NullType {
+    val NULL: IRT.NullType = new IRT.NullType("null")
   }
 
-  class NullTypeRef private(name_ :String) extends Type {
-    def name: String = name_
-
+  class NullType (val name: String) extends Type {
     def isArrayType: Boolean = false
 
     def isBasicType: Boolean = false
@@ -1028,24 +1026,24 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  abstract trait ObjectTypeRef extends Type {
+  abstract sealed trait ObjectType extends Type {
     def isInterface: Boolean
 
     def modifier: Int
 
-    def superClass: IRT.ClassTypeRef
+    def superClass: IRT.ClassType
 
-    def interfaces: Array[IRT.ClassTypeRef]
+    def interfaces: Array[IRT.ClassType]
 
-    def methods: Array[IRT.MethodRef]
+    def methods: Array[IRT.Method]
 
-    def methods(name: String): Array[IRT.MethodRef]
+    def methods(name: String): Array[IRT.Method]
 
     def fields: Array[IRT.FieldRef]
 
     def field(name: String): IRT.FieldRef
 
-    def findMethod(name: String, params: Array[IRT.Term]): Array[IRT.MethodRef]
+    def findMethod(name: String, params: Array[IRT.Term]): Array[IRT.Method]
   }
 
   /**
@@ -1100,10 +1098,10 @@ object IRT {
       }
       if (left.isClassType) {
         if (right.isClassType) {
-          return isSuperTypeForClass(left.asInstanceOf[IRT.ClassTypeRef], right.asInstanceOf[IRT.ClassTypeRef])
+          return isSuperTypeForClass(left.asInstanceOf[IRT.ClassType], right.asInstanceOf[IRT.ClassType])
         }
         if (right.isArrayType) {
-          return left eq (right.asInstanceOf[IRT.ArrayTypeRef]).superClass
+          return left eq (right.asInstanceOf[IRT.ArrayType]).superClass
         }
         if (right.isNullType) {
           return true
@@ -1112,7 +1110,7 @@ object IRT {
       }
       if (left.isArrayType) {
         if (right.isArrayType) {
-          return isSuperTypeForArray(left.asInstanceOf[IRT.ArrayTypeRef], right.asInstanceOf[IRT.ArrayTypeRef])
+          return isSuperTypeForArray(left.asInstanceOf[IRT.ArrayType], right.asInstanceOf[IRT.ArrayType])
         }
         if (right.isNullType) {
           return true
@@ -1124,9 +1122,9 @@ object IRT {
 
     def isAssignable(left: IRT.Type, right: IRT.Type): Boolean = isSuperType(left, right)
 
-    private def isSuperTypeForArray(left: IRT.ArrayTypeRef, right: IRT.ArrayTypeRef): Boolean = isSuperType(left.base, right.base)
+    private def isSuperTypeForArray(left: IRT.ArrayType, right: IRT.ArrayType): Boolean = isSuperType(left.base, right.base)
 
-    private def isSuperTypeForClass(left: IRT.ClassTypeRef, right: IRT.ClassTypeRef): Boolean = {
+    private def isSuperTypeForClass(left: IRT.ClassType, right: IRT.ClassType): Boolean = {
       if (right == null) return false
       if (left eq right) return true
       if (isSuperTypeForClass(left, right.superClass)) return true

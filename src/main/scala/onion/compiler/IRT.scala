@@ -13,7 +13,7 @@ object IRT {
    * This interface represents an internal representation node of onion program.
    * @author Kota Mizushima
    */
-  abstract sealed class Node
+  abstract sealed trait Node
 
   /**
    * @author Kota Mizushima

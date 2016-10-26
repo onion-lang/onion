@@ -117,13 +117,14 @@ class CompilerFrontend {
   }
 
   protected def printUsage {
-    printError("Usage: onionc [-options] source_file ...")
-    printError("options: ")
-    printError("  -super <super class>        specify script's super class")
-    printError("  -d <path>                   specify output directory")
-    printError("  -classpath <path>           specify classpath")
-    printError("  -encoding <encoding>        specify source file encoding")
-    printError("  -maxErrorReport <number>    set number of errors reported")
+    printError(
+      """Usage: onionc [-options] source_file ...
+        |options:
+        | -super <super class>        specify script's super class
+        | -d <path>                   specify output directory
+        | -classpath <path>           specify classpath
+        | -encoding <encoding>        specify source file encoding
+        | -maxErrorReport <number>    set number of errors reported""".stripMargin)
   }
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {

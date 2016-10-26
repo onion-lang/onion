@@ -84,12 +84,12 @@ class ScriptRunner {
   }
 
   protected def printUsage(): Unit = {
-    err.println("Usage: onion [-options] <source file> <command line arguments>")
-    err.println("options: ")
-    err.println("  -super <super class>        specify script's super class")
-    err.println("  -classpath <class path>     specify classpath")
-    err.println("  -encoding <encoding>        specify source file encoding")
-    err.println("  -maxErrorReport <number>    set number of errors reported")
+    err.println("""Usage: onion [-options] <source file> <command line arguments>
+                  |options:
+                  |-super <super class>        specify script's super class
+                  | -classpath <class path>     specify classpath
+                  | -encoding <encoding>        specify source file encoding
+                  | -maxErrorReport <number>    set number of errors reported""".stripMargin)
   }
 
   private def printFailure(failure: ParseFailure): Unit = {

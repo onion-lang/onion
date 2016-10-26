@@ -17,10 +17,10 @@ import toolbox.SymbolGenerator
 class LocalContext {
   private var contextFrame = new LocalFrame(null)
   private val generator = new SymbolGenerator("symbol#")
-  var isClosure: Boolean = false
-  var isStatic: Boolean = false
-  var isGlobal: Boolean = false
-  var method: IRT.MethodRef = null
+  var isClosure: Boolean                     = false
+  var isStatic: Boolean                      = false
+  var isGlobal: Boolean                      = false
+  var method: IRT.Method                     = null
   var constructor: IRT.ConstructorDefinition = null
   private var isMethod: Boolean = false
 
@@ -48,7 +48,7 @@ class LocalContext {
     }
   }
 
-  def setMethod(method: IRT.MethodRef): Unit = {
+  def setMethod(method: IRT.Method): Unit = {
     this.method = method
     this.isMethod = true
   }

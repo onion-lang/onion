@@ -17,7 +17,7 @@ import onion.compiler.ClassTable
 object Boxing {
   private final val TABLE: Array[Array[AnyRef]] = Array(Array(IRT.BasicType.BOOLEAN, "java.lang.Boolean"), Array(IRT.BasicType.BYTE, "java.lang.Byte"), Array(IRT.BasicType.SHORT, "java.lang.Short"), Array(IRT.BasicType.CHAR, "java.lang.Character"), Array(IRT.BasicType.INT, "java.lang.Integer"), Array(IRT.BasicType.LONG, "java.lang.Long"), Array(IRT.BasicType.FLOAT, "java.lang.Float"), Array(IRT.BasicType.DOUBLE, "java.lang.Double"))
 
-  private def boxedType(table: ClassTable, `type`: IRT.BasicType): IRT.ClassTypeRef = {
+  private def boxedType(table: ClassTable, `type`: IRT.BasicType): IRT.ClassType = {
     for (row <- TABLE) {
       if (row(0) eq `type`) return table.load(row(1).asInstanceOf[String])
     }
@@ -29,7 +29,7 @@ object Boxing {
     if ((!`type`.isBasicType) || (`type` eq IRT.BasicType.VOID)) {
       throw new IllegalArgumentException("node type must be boxable type")
     }
-    val aBoxedType: IRT.ClassTypeRef = boxedType(table, `type`.asInstanceOf[IRT.BasicType])
+    val aBoxedType: IRT.ClassType = boxedType(table, `type`.asInstanceOf[IRT.BasicType])
     val cs: Array[IRT.ConstructorRef] = aBoxedType.constructors
     var i: Int = 0
 

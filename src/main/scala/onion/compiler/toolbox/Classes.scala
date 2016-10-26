@@ -17,16 +17,16 @@ import onion.compiler.IRT
  *
  */
 object Classes {
-  def getInterfaceMethods(`type`: IRT.ClassTypeRef): Set[IRT.MethodRef] = {
-    val methods: Set[IRT.MethodRef] = new TreeSet[IRT.MethodRef](new IRT.MethodRefComparator)
+  def getInterfaceMethods(`type`: IRT.ClassType): Set[IRT.Method] = {
+    val methods: Set[IRT.Method] = new TreeSet[IRT.Method](new IRT.MethodComparator)
     collectInterfaceMethods(`type`, methods)
     methods
   }
 
-  private def collectInterfaceMethods(`type`: IRT.ClassTypeRef, set: Set[IRT.MethodRef]) {
-    val methods: Array[IRT.MethodRef] = `type`.methods
+  private def collectInterfaceMethods(`type`: IRT.ClassType, set: Set[IRT.Method]) {
+    val methods: Array[IRT.Method] = `type`.methods
     set.addAll(Arrays.asList(methods:_*))
-    val interfaces: Array[IRT.ClassTypeRef] = `type`.interfaces
+    val interfaces: Array[IRT.ClassType] = `type`.interfaces
     for (anInterface <- interfaces) {
       collectInterfaceMethods(anInterface, set)
     }

@@ -20,21 +20,21 @@ import org.apache.bcel.classfile.JavaClass
  */
 class ClassTable(classPath: String) {
   val classes = new OrderedTable[IRT.ClassDefinition]
-  private val classFiles = new HashMap[String, IRT.ClassTypeRef]
-  private val arrayClasses = new HashMap[String, IRT.ArrayTypeRef]
+  private val classFiles = new HashMap[String, IRT.ClassType]
+  private val arrayClasses = new HashMap[String, IRT.ArrayType]
   private val table = new ClassFileTable(classPath)
 
-  def loadArray(component: IRT.Type, dimension: Int): IRT.ArrayTypeRef = {
+  def loadArray(component: IRT.Type, dimension: Int): IRT.ArrayType = {
     val arrayName = "[" * dimension + component.name
-    var array: IRT.ArrayTypeRef = arrayClasses.get(arrayName)
+    var array: IRT.ArrayType = arrayClasses.get(arrayName)
     if (array != null) return array
-    array = new IRT.ArrayTypeRef(component, dimension, this)
+    array = new IRT.ArrayType(component, dimension, this)
     arrayClasses.put(arrayName, array)
     array
   }
 
-  def load(className: String): IRT.ClassTypeRef = {
-    var clazz: IRT.ClassTypeRef = lookup(className)
+  def load(className: String): IRT.ClassType = {
+    var clazz: IRT.ClassType = lookup(className)
     if (clazz == null) {
       val javaClass = table.load(className)
       if (javaClass != null) {
@@ -53,9 +53,9 @@ class ClassTable(classPath: String) {
     clazz
   }
 
-  def rootClass: IRT.ClassTypeRef = load("java.lang.Object")
+  def rootClass: IRT.ClassType = load("java.lang.Object")
 
-  def lookup(className: String): IRT.ClassTypeRef = {
+  def lookup(className: String): IRT.ClassType = {
     classes.get(className) match {
       case Some(ref) => ref
       case None => classFiles.get(className)

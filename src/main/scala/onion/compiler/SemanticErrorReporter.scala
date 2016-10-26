@@ -106,10 +106,10 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportAmbiguousMethod(position: Location, items: Array[AnyRef]): Unit = {
     var item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
     var item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
-    var target1: String = (item1(0).asInstanceOf[IRT.ObjectTypeRef]).name
+    var target1: String = (item1(0).asInstanceOf[IRT.ObjectType]).name
     var name1: String = item1(1).asInstanceOf[String]
     var args1: String = names(item1(2).asInstanceOf[Array[IRT.Type]])
-    var target2: String = (item2(0).asInstanceOf[IRT.ObjectTypeRef]).name
+    var target2: String = (item2(0).asInstanceOf[IRT.ObjectType]).name
     var name2: String = item2(1).asInstanceOf[String]
     var args2: String = names(item2(2).asInstanceOf[Array[IRT.Type]])
     problem(position, format(message("error.semantic.ambiguousMethod"), Array[String](target1, name1, args2, target2, name2, args2)))
@@ -144,15 +144,15 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportMethodNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.methodNotAccessible"), (items(0).asInstanceOf[IRT.ObjectTypeRef]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[IRT.Type]])), (items(3).asInstanceOf[IRT.ClassTypeRef]).name))
+    problem(position, format(message("error.semantic.methodNotAccessible"), (items(0).asInstanceOf[IRT.ObjectType]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[IRT.Type]])), (items(3).asInstanceOf[IRT.ClassType]).name))
   }
 
   private def reportFieldNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.fieldNotAccessible"), (items(0).asInstanceOf[IRT.ClassTypeRef]).name, items(1).asInstanceOf[String], (items(2).asInstanceOf[IRT.ClassTypeRef]).name))
+    problem(position, format(message("error.semantic.fieldNotAccessible"), (items(0).asInstanceOf[IRT.ClassType]).name, items(1).asInstanceOf[String], (items(2).asInstanceOf[IRT.ClassType]).name))
   }
 
   private def reportClassNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.classNotAccessible"), (items(0).asInstanceOf[IRT.ClassTypeRef]).name, (items(1).asInstanceOf[IRT.ClassTypeRef]).name))
+    problem(position, format(message("error.semantic.classNotAccessible"), (items(0).asInstanceOf[IRT.ClassType]).name, (items(1).asInstanceOf[IRT.ClassType]).name))
   }
 
   private def reportCyclicInheritance(position: Location, items: Array[AnyRef]): Unit = {
@@ -179,9 +179,9 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportAmbiguousConstructor(position: Location, items: Array[AnyRef]): Unit = {
     var item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
     var item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
-    var target1: String = (item1(0).asInstanceOf[IRT.ObjectTypeRef]).name
+    var target1: String = (item1(0).asInstanceOf[IRT.ObjectType]).name
     var args1: String = names(item1(1).asInstanceOf[Array[IRT.Type]])
-    var target2: String = (item2(0).asInstanceOf[IRT.ObjectTypeRef]).name
+    var target2: String = (item2(0).asInstanceOf[IRT.ObjectType]).name
     var args2: String = names(item2(1).asInstanceOf[Array[IRT.Type]])
     problem(position, format(message("error.semantic.ambiguousConstructor"), target1, args2, target2, args2))
   }

@@ -35,12 +35,12 @@ object ReflectionalClassTypeRef {
   private final val CONSTRUCTOR_NAME: String = "<init>"
 }
 
-class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.AbstractClassTypeRef {
+class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.AbstractClassType {
   import ReflectionalClassTypeRef._
-  private val bridge: OnionTypeConversion = new OnionTypeConversion(table)
-  private val modifier_ : Int = toOnionModifier(klass.getModifiers)
-  private var methods_ : MultiTable[IRT.MethodRef] = null
-  private var fields_ : OrderedTable[IRT.FieldRef] = null
+  private val bridge: OnionTypeConversion              = new OnionTypeConversion(table)
+  private val modifier_ : Int                          = toOnionModifier(klass.getModifiers)
+  private var methods_ : MultiTable[IRT.Method]        = null
+  private var fields_ : OrderedTable[IRT.FieldRef]     = null
   private var constructors_ : List[IRT.ConstructorRef] = null
 
   def isInterface: Boolean = (klass.getModifiers & java.lang.reflect.Modifier.INTERFACE) != 0
@@ -49,17 +49,17 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
 
   def name: String = klass.getName
 
-  def superClass: IRT.ClassTypeRef = {
+  def superClass: IRT.ClassType = {
     val superKlass: Class[_] = klass.getSuperclass
     if (superKlass == null) return table.rootClass
-    val superClass: IRT.ClassTypeRef = table.load(superKlass.getName)
+    val superClass: IRT.ClassType = table.load(superKlass.getName)
     if (superClass eq this) return null
     superClass
   }
 
-  def interfaces: Array[IRT.ClassTypeRef] = {
+  def interfaces: Array[IRT.ClassType] = {
     val interfaces: Array[Class[_]] = klass.getInterfaces
-    val interfaceSyms: Array[IRT.ClassTypeRef] = new Array[IRT.ClassTypeRef](interfaces.length)
+    val interfaceSyms: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaces.length)
     var i: Int = 0
     while (i < interfaces.length) {
       interfaceSyms(i) = table.load(interfaces(i).getName)
@@ -68,19 +68,19 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
     interfaceSyms
   }
 
-  def methods: Array[IRT.MethodRef] = {
+  def methods: Array[IRT.Method] = {
     requireMethodTable
     methods_.values.toArray
   }
 
-  def methods(name: String): Array[IRT.MethodRef] = {
+  def methods(name: String): Array[IRT.Method] = {
     requireMethodTable
     methods_.get(name).toArray
   }
 
   private def requireMethodTable {
     if (methods_ == null) {
-      methods_ = new MultiTable[IRT.MethodRef]
+      methods_ = new MultiTable[IRT.Method]
       for (method <- klass.getMethods) {
         if (!(method.getName == CONSTRUCTOR_NAME)) {
           methods_.add(translate(method))
@@ -118,7 +118,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
     constructors_.toArray(new Array[IRT.ConstructorRef](0))
   }
 
-  private def translate(method: Method): IRT.MethodRef = {
+  private def translate(method: Method): IRT.Method = {
     val arguments: Array[Class[_]] = method.getParameterTypes
     val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
     var i: Int = 0

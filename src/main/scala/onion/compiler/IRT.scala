@@ -701,7 +701,7 @@ object IRT {
     }
   }
 
-  abstract sealed class AbstractClassType extends AbstractObjectType with ClassType {
+  abstract class AbstractClassType extends AbstractObjectType with ClassType {
     private val constructorRefFinder: IRT.ConstructorFinder = new IRT.ConstructorFinder()
 
     def findConstructor(params: Array[IRT.Term]): Array[IRT.ConstructorRef] = constructorRefFinder.find(this, params)

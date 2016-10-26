@@ -10,4 +10,4 @@ package onion.compiler
 /**
  * @author Kota Mizushima
  */
-case class LocalBinding(index: Int, tp: IRT.TypeRef)
+case class LocalBinding(index: Int, tp: IRT.Type)

@@ -19,35 +19,35 @@ import org.apache.bcel.generic.Type
  *
  */
 object OnionTypeConversion {
-  private final val basicTypeTable: Map[BasicType, IRT.BasicTypeRef] = new HashMap[BasicType, IRT.BasicTypeRef]
-  private final val c2t: Map[Class[_], IRT.BasicTypeRef] = new HashMap[Class[_], IRT.BasicTypeRef]
+  private final val basicTypeTable: Map[BasicType, IRT.BasicType] = new HashMap[BasicType, IRT.BasicType]
+  private final val c2t: Map[Class[_], IRT.BasicType]             = new HashMap[Class[_], IRT.BasicType]
 
-  basicTypeTable.put(Type.BYTE, IRT.BasicTypeRef.BYTE)
-  basicTypeTable.put(Type.SHORT, IRT.BasicTypeRef.SHORT)
-  basicTypeTable.put(Type.CHAR, IRT.BasicTypeRef.CHAR)
-  basicTypeTable.put(Type.INT, IRT.BasicTypeRef.INT)
-  basicTypeTable.put(Type.LONG, IRT.BasicTypeRef.LONG)
-  basicTypeTable.put(Type.FLOAT, IRT.BasicTypeRef.FLOAT)
-  basicTypeTable.put(Type.DOUBLE, IRT.BasicTypeRef.DOUBLE)
-  basicTypeTable.put(Type.BOOLEAN, IRT.BasicTypeRef.BOOLEAN)
-  basicTypeTable.put(Type.VOID, IRT.BasicTypeRef.VOID)
+  basicTypeTable.put(Type.BYTE, IRT.BasicType.BYTE)
+  basicTypeTable.put(Type.SHORT, IRT.BasicType.SHORT)
+  basicTypeTable.put(Type.CHAR, IRT.BasicType.CHAR)
+  basicTypeTable.put(Type.INT, IRT.BasicType.INT)
+  basicTypeTable.put(Type.LONG, IRT.BasicType.LONG)
+  basicTypeTable.put(Type.FLOAT, IRT.BasicType.FLOAT)
+  basicTypeTable.put(Type.DOUBLE, IRT.BasicType.DOUBLE)
+  basicTypeTable.put(Type.BOOLEAN, IRT.BasicType.BOOLEAN)
+  basicTypeTable.put(Type.VOID, IRT.BasicType.VOID)
 
-  c2t.put(classOf[Byte], IRT.BasicTypeRef.BYTE)
-  c2t.put(classOf[Short], IRT.BasicTypeRef.SHORT)
-  c2t.put(classOf[Char], IRT.BasicTypeRef.CHAR)
-  c2t.put(classOf[Int], IRT.BasicTypeRef.INT)
-  c2t.put(classOf[Long], IRT.BasicTypeRef.LONG)
-  c2t.put(classOf[Float], IRT.BasicTypeRef.FLOAT)
-  c2t.put(classOf[Double], IRT.BasicTypeRef.DOUBLE)
-  c2t.put(classOf[Boolean], IRT.BasicTypeRef.BOOLEAN)
-  c2t.put(classOf[Unit], IRT.BasicTypeRef.VOID)
+  c2t.put(classOf[Byte], IRT.BasicType.BYTE)
+  c2t.put(classOf[Short], IRT.BasicType.SHORT)
+  c2t.put(classOf[Char], IRT.BasicType.CHAR)
+  c2t.put(classOf[Int], IRT.BasicType.INT)
+  c2t.put(classOf[Long], IRT.BasicType.LONG)
+  c2t.put(classOf[Float], IRT.BasicType.FLOAT)
+  c2t.put(classOf[Double], IRT.BasicType.DOUBLE)
+  c2t.put(classOf[Boolean], IRT.BasicType.BOOLEAN)
+  c2t.put(classOf[Unit], IRT.BasicType.VOID)
 }
 
 class OnionTypeConversion(table: ClassTable) {
   import OnionTypeConversion._
 
-  def toOnionType(klass: Class[_]): IRT.TypeRef = {
-    val returnType: IRT.TypeRef = c2t.get(klass).asInstanceOf[IRT.TypeRef]
+  def toOnionType(klass: Class[_]): IRT.Type = {
+    val returnType: IRT.Type = c2t.get(klass).asInstanceOf[IRT.Type]
     if (returnType != null) return returnType
     if (!klass.isArray) {
       val symbol: IRT.ClassTypeRef = table.load(klass.getName)
@@ -65,14 +65,14 @@ class OnionTypeConversion(table: ClassTable) {
         dimension += 1
         component = component.getComponentType
       } while (component.getComponentType != null)
-      val componentType: IRT.TypeRef = toOnionType(component)
+      val componentType: IRT.Type = toOnionType(component)
       return table.loadArray(componentType, dimension)
     }
     null
   }
 
-  def toOnionType(`type`: Type): IRT.TypeRef = {
-    val returnType: IRT.TypeRef = basicTypeTable.get(`type`).asInstanceOf[IRT.TypeRef]
+  def toOnionType(`type`: Type): IRT.Type = {
+    val returnType: IRT.Type = basicTypeTable.get(`type`).asInstanceOf[IRT.Type]
     if (returnType != null) return returnType
     if (`type`.isInstanceOf[ObjectType]) {
       val objType: ObjectType = `type`.asInstanceOf[ObjectType]
@@ -86,7 +86,7 @@ class OnionTypeConversion(table: ClassTable) {
     }
     if (`type`.isInstanceOf[ArrayType]) {
       val arrType: ArrayType = `type`.asInstanceOf[ArrayType]
-      val component: IRT.TypeRef = toOnionType(arrType.getBasicType)
+      val component: IRT.Type = toOnionType(arrType.getBasicType)
       if (component != null) {
         return table.loadArray(component, arrType.getDimensions)
       }

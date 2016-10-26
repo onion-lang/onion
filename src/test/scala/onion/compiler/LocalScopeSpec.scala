@@ -11,10 +11,10 @@ class LocalScopeSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter 
   before {
     scope = new LocalScope(null)
     val bindings = Array[LocalBinding](
-      new LocalBinding(0, IRT.BASIC_TYPE_REF_INT),
-      new LocalBinding(1, IRT.BASIC_TYPE_REF_DOUBLE),
-      new LocalBinding(2, IRT.BASIC_TYPE_REF_LONG),
-      new LocalBinding(3, IRT.BASIC_TYPE_REF_DOUBLE)
+      new LocalBinding(0, IRT.BASIC_TYPE_INT),
+      new LocalBinding(1, IRT.BASIC_TYPE_DOUBLE),
+      new LocalBinding(2, IRT.BASIC_TYPE_LONG),
+      new LocalBinding(3, IRT.BASIC_TYPE_DOUBLE)
     )
     val names = Array("hoge", "foo", "bar", "hogehoge")
     putAll(scope, names, bindings)

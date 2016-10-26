@@ -20,9 +20,9 @@ import onion.compiler.IRT.UnaryTerm.Constants._
  * @author Kota Mizushima
  */
 object CodeGeneration {
-  def translateIxTypeToVmType(`type`: IRT.TypeRef): Type = {
+  def translateIxTypeToVmType(`type`: IRT.Type): Type = {
     if (`type`.isBasicType) {
-      BASIC_TYPE_MAPPING(`type`.asInstanceOf[IRT.BasicTypeRef])
+      BASIC_TYPE_MAPPING(`type`.asInstanceOf[IRT.BasicType])
     } else if (`type`.isArrayType) {
       val arrayType: IRT.ArrayTypeRef = `type`.asInstanceOf[IRT.ArrayTypeRef]
       new ArrayType(translateIxTypeToVmType(arrayType.component), arrayType.dimension)
@@ -45,7 +45,7 @@ object CodeGeneration {
     modifier
   }
 
-  private val unboxingMethods = Map(
+  private val unboxingMethods                                    = Map(
     "java.lang.Byte" -> "byteValue",
     "java.lang.Short" -> "shortValue",
     "java.lang.Character" -> "charValue",
@@ -55,19 +55,19 @@ object CodeGeneration {
     "java.lang.Double" -> "doubleValue",
     "java.lang.Boolean" -> "booleanValue"
   )
-  private final val FRAME_PREFIX: String = "frame"
-  private final val OUTER_THIS: String = "outer$"
-  private final val CLOSURE_CLASS_SUFFIX: String = "Closure"
-  private final val BASIC_TYPE_MAPPING: Map[IRT.BasicTypeRef, Type] = Map(
-    IRT.BasicTypeRef.BYTE -> Type.BYTE,
-    IRT.BasicTypeRef.SHORT ->	Type.SHORT,
-    IRT.BasicTypeRef.CHAR -> Type.CHAR,
-    IRT.BasicTypeRef.INT ->	Type.INT,
-    IRT.BasicTypeRef.LONG -> 	Type.LONG,
-    IRT.BasicTypeRef.FLOAT ->	Type.FLOAT,
-    IRT.BasicTypeRef.DOUBLE -> Type.DOUBLE,
-    IRT.BasicTypeRef.BOOLEAN ->	Type.BOOLEAN,
-    IRT.BasicTypeRef.VOID -> Type.VOID
+  private final val FRAME_PREFIX: String                         = "frame"
+  private final val OUTER_THIS: String                           = "outer$"
+  private final val CLOSURE_CLASS_SUFFIX: String                 = "Closure"
+  private final val BASIC_TYPE_MAPPING: Map[IRT.BasicType, Type] = Map(
+    IRT.BasicType.BYTE -> Type.BYTE,
+    IRT.BasicType.SHORT ->	Type.SHORT,
+    IRT.BasicType.CHAR -> Type.CHAR,
+    IRT.BasicType.INT ->	Type.INT,
+    IRT.BasicType.LONG -> 	Type.LONG,
+    IRT.BasicType.FLOAT ->	Type.FLOAT,
+    IRT.BasicType.DOUBLE -> Type.DOUBLE,
+    IRT.BasicType.BOOLEAN ->	Type.BOOLEAN,
+    IRT.BasicType.VOID -> Type.VOID
   )
 
   class Proxy(pool: ConstantPoolGen) {
@@ -422,7 +422,7 @@ class CodeGeneration(config: CompilerConfig) {
     codeBlock(node.block, code)
     method.setMaxLocals
     method.setMaxStack
-    code.appendReturn(typeOf(IRT.BasicTypeRef.VOID))
+    code.appendReturn(typeOf(IRT.BasicType.VOID))
     gen.addMethod(method.getMethod)
     isStatic = isStaticOld
   }
@@ -735,8 +735,8 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeExpressionStatement(node: IRT.ExpressionActionStatement, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.term, code)
-    val `type`: IRT.TypeRef = node.term.`type`
-    if (`type` ne IRT.BasicTypeRef.VOID) {
+    val `type`: IRT.Type = node.term.`type`
+    if (`type` ne IRT.BasicType.VOID) {
       if (isWideType(`type`)) {
         code.append(InstructionConstants.POP2)
       }
@@ -967,8 +967,8 @@ class CodeGeneration(config: CompilerConfig) {
       start = codeExpression(terms(0), code)
       var i: Int = 1
       while (i < terms.length) {
-        val `type`: IRT.TypeRef = terms(i - 1).`type`
-        if (`type` ne IRT.BasicTypeRef.VOID) {
+        val `type`: IRT.Type = terms(i - 1).`type`
+        if (`type` ne IRT.BasicType.VOID) {
           if (isWideType(`type`)) {
             code.append(InstructionConstants.POP2)
           } else {
@@ -1211,11 +1211,11 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def bitShiftR2(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  def bitShiftR2(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.ISHR)
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(InstructionConstants.LSHR)
     }
     else {
@@ -1223,11 +1223,11 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitShiftL2(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  def bitShiftL2(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.ISHL)
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(InstructionConstants.LSHL)
     }
     else {
@@ -1235,11 +1235,11 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitShiftR3(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  def bitShiftR3(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.IUSHR)
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(InstructionConstants.LUSHR)
     }
     else {
@@ -1293,11 +1293,11 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def bitAnd(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
+  def bitAnd(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.BOOLEAN)) {
       code.append(new IAND)
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LAND)
     }
     else {
@@ -1305,11 +1305,11 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitOr(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
+  def bitOr(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.BOOLEAN)) {
       code.append(new IOR)
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LOR)
     }
     else {
@@ -1317,11 +1317,11 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def xor(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
+  def xor(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.BOOLEAN)) {
       code.append(new IXOR)
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LXOR)
     }
     else {
@@ -1329,19 +1329,19 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def eq(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
+  def eq(code: CodeGeneration.Proxy, `type`: IRT.Type) {
     var b1: BranchHandle = null
-    if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.CHAR) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
+    if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.CHAR) || (`type` eq IRT.BasicType.BOOLEAN)) {
       b1 = code.append(new IF_ICMPEQ(null))
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCMP)
       b1 = code.append(new IFEQ(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FCMPL)
       b1 = code.append(new IFEQ(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(new DCMPL)
       b1 = code.append(new IFEQ(null))
     }
@@ -1351,20 +1351,20 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def noteq(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
+  def noteq(code: CodeGeneration.Proxy, `type`: IRT.Type) {
     var b1: BranchHandle = null
-    if ((`type` eq IRT.BasicTypeRef.INT) || (`type` eq IRT.BasicTypeRef.CHAR) || (`type` eq IRT.BasicTypeRef.BOOLEAN)) {
+    if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.CHAR) || (`type` eq IRT.BasicType.BOOLEAN)) {
       b1 = code.append(new IF_ICMPNE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCMP)
       b1 = code.append(new IFNE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FCMPL)
       b1 = code.append(new IFNE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(new DCMPL)
       b1 = code.append(new IFNE(null))
     }
@@ -1374,20 +1374,20 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def gt(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
+  def gt(code: CodeGeneration.Proxy, `type`: IRT.Type) {
     var b1: BranchHandle = null
-    if (`type` eq IRT.BasicTypeRef.INT) {
+    if (`type` eq IRT.BasicType.INT) {
       b1 = code.append(new IF_ICMPGT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCMP)
       b1 = code.append(new IFGT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FCMPL)
       b1 = code.append(new IFGT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(new DCMPL)
       b1 = code.append(new IFGT(null))
     }
@@ -1397,20 +1397,20 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def gte(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
+  def gte(code: CodeGeneration.Proxy, `type`: IRT.Type) {
     var comparation: BranchHandle = null
-    if (`type` eq IRT.BasicTypeRef.INT) {
+    if (`type` eq IRT.BasicType.INT) {
       comparation = code.append(new IF_ICMPGE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCMP)
       comparation = code.append(new IFGE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FCMPL)
       comparation = code.append(new IFGE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(new DCMPL)
       comparation = code.append(new IFGE(null))
     }
@@ -1420,20 +1420,20 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, comparation)
   }
 
-  def lte(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
+  def lte(code: CodeGeneration.Proxy, `type`: IRT.Type) {
     var b1: BranchHandle = null
-    if (`type` eq IRT.BasicTypeRef.INT) {
+    if (`type` eq IRT.BasicType.INT) {
       b1 = code.append(new IF_ICMPLE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCMP)
       b1 = code.append(new IFLT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FCMPL)
       b1 = code.append(new IFLE(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(new DCMPL)
       b1 = code.append(new IFLE(null))
     }
@@ -1443,20 +1443,20 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def lt(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
+  def lt(code: CodeGeneration.Proxy, `type`: IRT.Type) {
     var comparation: BranchHandle = null
-    if (`type` eq IRT.BasicTypeRef.INT) {
+    if (`type` eq IRT.BasicType.INT) {
       comparation = code.append(new IF_ICMPLT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.LONG) {
+    else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCMP)
       comparation = code.append(new IFLT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FCMPL)
       comparation = code.append(new IFLT(null))
     }
-    else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(new DCMPL)
       comparation = code.append(new IFLT(null))
     }
@@ -1507,7 +1507,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeUnaryExpression(node: IRT.UnaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.operand, code)
-    val `type`: IRT.TypeRef = node.operand.`type`
+    val `type`: IRT.Type = node.operand.`type`
     node.kind match {
       case PLUS =>
         plus(code, `type`)
@@ -1523,28 +1523,28 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def plus(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if ((`type` ne IRT.BasicTypeRef.INT) && (`type` ne IRT.BasicTypeRef.LONG) && (`type` ne IRT.BasicTypeRef.FLOAT) && (`type` ne IRT.BasicTypeRef.DOUBLE)) {
+  private def plus(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if ((`type` ne IRT.BasicType.INT) && (`type` ne IRT.BasicType.LONG) && (`type` ne IRT.BasicType.FLOAT) && (`type` ne IRT.BasicType.DOUBLE)) {
       throw new RuntimeException
     }
   }
 
-  private def minus(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def minus(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.INEG)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(InstructionConstants.LNEG)
-    } else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    } else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(InstructionConstants.FNEG)
-    } else if (`type` eq IRT.BasicTypeRef.DOUBLE) {
+    } else if (`type` eq IRT.BasicType.DOUBLE) {
       code.append(InstructionConstants.DNEG)
     } else {
       throw new RuntimeException
     }
   }
 
-  private def not(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.BOOLEAN) {
+  private def not(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.BOOLEAN) {
       val b1: BranchHandle = code.append(new IFNE(null))
       var b2: BranchHandle = null
       code.append(new ICONST(1))
@@ -1556,11 +1556,11 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def bitNot(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def bitNot(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(new ICONST(-1))
       code.append(new IXOR)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LCONST(-1))
       code.append(new LXOR)
     } else {
@@ -1611,67 +1611,67 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def add(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def add(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(new IADD)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LADD)
-    } else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    } else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FADD)
     } else {
       code.append(new DADD)
     }
   }
 
-  private def sub(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def sub(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(new ISUB)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LSUB)
-    } else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    } else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FSUB)
     } else {
       code.append(new DSUB)
     }
   }
 
-  private def mul(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def mul(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(new IMUL)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LMUL)
-    } else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    } else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FMUL)
     } else {
       code.append(new DMUL)
     }
   }
 
-  private def div(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def div(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(new IDIV)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LDIV)
-    } else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    } else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FDIV)
     } else {
       code.append(new DDIV)
     }
   }
 
-  private def mod(code: CodeGeneration.Proxy, `type`: IRT.TypeRef) {
-    if (`type` eq IRT.BasicTypeRef.INT) {
+  private def mod(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+    if (`type` eq IRT.BasicType.INT) {
       code.append(new IREM)
-    } else if (`type` eq IRT.BasicTypeRef.LONG) {
+    } else if (`type` eq IRT.BasicType.LONG) {
       code.append(new LREM)
-    } else if (`type` eq IRT.BasicTypeRef.FLOAT) {
+    } else if (`type` eq IRT.BasicType.FLOAT) {
       code.append(new FREM)
     } else {
       code.append(new DREM)
     }
   }
 
-  private def frameObjectIndex(origin: Int, arguments: Array[IRT.TypeRef]): Int = {
+  private def frameObjectIndex(origin: Int, arguments: Array[IRT.Type]): Int = {
     var maxIndex: Int = origin
     var i: Int = 0
     while (i < arguments.length) {
@@ -1715,15 +1715,15 @@ class CodeGeneration(config: CompilerConfig) {
     indexTable
   }
 
-  private def isWideType(symbol: IRT.TypeRef): Boolean = {
-    ((symbol eq IRT.BasicTypeRef.DOUBLE) || (symbol eq IRT.BasicTypeRef.LONG))
+  private def isWideType(symbol: IRT.Type): Boolean = {
+    ((symbol eq IRT.BasicType.DOUBLE) || (symbol eq IRT.BasicType.LONG))
   }
 
-  private def typeOf(`type`: IRT.TypeRef): Type = {
+  private def typeOf(`type`: IRT.Type): Type = {
     translateIxTypeToVmType(`type`)
   }
 
-  private def typesOf(types: Array[IRT.TypeRef]): Array[Type] = {
+  private def typesOf(types: Array[IRT.Type]): Array[Type] = {
     val destinationTypes: Array[Type] = new Array[Type](types.length)
 
     var i: Int = 0

@@ -111,24 +111,24 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   private def translate(method: Method): IRT.MethodRef = {
     val arguments: Array[Type] = method.getArgumentTypes
-    val argumentSymbols: Array[IRT.TypeRef] = new Array[IRT.TypeRef](arguments.length)
+    val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
     var i: Int = 0
     while (i < arguments.length) {
       argumentSymbols(i) = bridge.toOnionType(arguments(i))
       i += 1
     }
-    val returnSymbol: IRT.TypeRef = bridge.toOnionType(method.getReturnType)
+    val returnSymbol: IRT.Type = bridge.toOnionType(method.getReturnType)
     new ClassFileMethodRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols, returnSymbol)
   }
 
   private def translate(field: Field): IRT.FieldRef = {
-    val symbol: IRT.TypeRef = bridge.toOnionType(field.getType)
+    val symbol: IRT.Type = bridge.toOnionType(field.getType)
     new ClassFileFieldRef(toOnionModifier(field.getModifiers), this, field.getName, symbol)
   }
 
   private def translateConstructor(method: Method): IRT.ConstructorRef = {
     val arguments: Array[Type] = method.getArgumentTypes
-    val argumentSymbols: Array[IRT.TypeRef] = new Array[IRT.TypeRef](arguments.length)
+    val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
     var i: Int = 0
     while (i < arguments.length) {
       argumentSymbols(i) = bridge.toOnionType(arguments(i))

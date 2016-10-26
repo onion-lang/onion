@@ -45,7 +45,7 @@ class LocalFrame(val parent: LocalFrame) {
     binds
   }
 
-  def add(name: String, `type` : IRT.TypeRef): Int = {
+  def add(name: String, `type` : IRT.Type): Int = {
     val bind = scope.get(name)
     bind match {
       case Some(_) => -1

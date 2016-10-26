@@ -40,11 +40,11 @@ class LocalContext {
     generator.generate
   }
 
-  def returnType: IRT.TypeRef = {
+  def returnType: IRT.Type = {
     if (isMethod) {
       method.returnType
     } else {
-      IRT.BasicTypeRef.VOID
+      IRT.BasicType.VOID
     }
   }
 
@@ -91,11 +91,11 @@ class LocalContext {
     contextFrame.lookupOnlyCurrentScope(name)
   }
 
-  def add(name: String, `type` : IRT.TypeRef): Int = {
+  def add(name: String, `type` : IRT.Type): Int = {
     contextFrame.add(name, `type`)
   }
 
-  def add(`type` : IRT.TypeRef): String = {
+  def add(`type` : IRT.Type): String = {
     val name = newName
     contextFrame.add(name, `type`)
     name

@@ -24,7 +24,7 @@ class ClassTable(classPath: String) {
   private val arrayClasses = new HashMap[String, IRT.ArrayTypeRef]
   private val table = new ClassFileTable(classPath)
 
-  def loadArray(component: IRT.TypeRef, dimension: Int): IRT.ArrayTypeRef = {
+  def loadArray(component: IRT.Type, dimension: Int): IRT.ArrayTypeRef = {
     val arrayName = "[" * dimension + component.name
     var array: IRT.ArrayTypeRef = arrayClasses.get(arrayName)
     if (array != null) return array

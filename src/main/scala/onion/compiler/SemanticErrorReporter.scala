@@ -50,12 +50,12 @@ class SemanticErrorReporter(threshold: Int) {
   private[this] def message(property: String): String = Messages(property)
 
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
-    var expected: IRT.TypeRef = items(0).asInstanceOf[IRT.TypeRef]
-    var detected: IRT.TypeRef = items(1).asInstanceOf[IRT.TypeRef]
+    var expected: IRT.Type = items(0).asInstanceOf[IRT.Type]
+    var detected: IRT.Type = items(1).asInstanceOf[IRT.Type]
     problem(position, format(message("error.semantic.incompatibleType"), expected.name, detected.name))
   }
 
-  private def names(types: Array[IRT.TypeRef]): String = {
+  private def names(types: Array[IRT.Type]): String = {
     var buffer: StringBuffer = new StringBuffer
 
     if (types.length > 0) {
@@ -79,7 +79,7 @@ class SemanticErrorReporter(threshold: Int) {
 
   private def reportIncompatibleOperandType(position: Location, items: Array[AnyRef]): Unit = {
     var operator: String = items(0).asInstanceOf[String]
-    var operands: Array[IRT.TypeRef] = items(1).asInstanceOf[Array[IRT.TypeRef]]
+    var operands: Array[IRT.Type] = items(1).asInstanceOf[Array[IRT.Type]]
     problem(position, format(message("error.semantic.incompatibleOperandType"), items(0).asInstanceOf[String], names(operands)))
   }
 
@@ -96,11 +96,11 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportFieldNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.fieldNotFound"), (items(0).asInstanceOf[IRT.TypeRef]).name, items(1).asInstanceOf[String]))
+    problem(position, format(message("error.semantic.fieldNotFound"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String]))
   }
 
   private def reportMethodNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.methodNotFound"), (items(0).asInstanceOf[IRT.TypeRef]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[IRT.TypeRef]]))))
+    problem(position, format(message("error.semantic.methodNotFound"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[IRT.Type]]))))
   }
 
   private def reportAmbiguousMethod(position: Location, items: Array[AnyRef]): Unit = {
@@ -108,10 +108,10 @@ class SemanticErrorReporter(threshold: Int) {
     var item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
     var target1: String = (item1(0).asInstanceOf[IRT.ObjectTypeRef]).name
     var name1: String = item1(1).asInstanceOf[String]
-    var args1: String = names(item1(2).asInstanceOf[Array[IRT.TypeRef]])
+    var args1: String = names(item1(2).asInstanceOf[Array[IRT.Type]])
     var target2: String = (item2(0).asInstanceOf[IRT.ObjectTypeRef]).name
     var name2: String = item2(1).asInstanceOf[String]
-    var args2: String = names(item2(2).asInstanceOf[Array[IRT.TypeRef]])
+    var args2: String = names(item2(2).asInstanceOf[Array[IRT.Type]])
     problem(position, format(message("error.semantic.ambiguousMethod"), Array[String](target1, name1, args2, target2, name2, args2)))
   }
 
@@ -124,11 +124,11 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportDuplicateField(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedField"), (items(0).asInstanceOf[IRT.TypeRef]).name, items(1).asInstanceOf[String]))
+    problem(position, format(message("error.semantic.duplicatedField"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String]))
   }
 
   private def reportDuplicateMethod(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedMethod"), (items(0).asInstanceOf[IRT.TypeRef]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.TypeRef]])))
+    problem(position, format(message("error.semantic.duplicatedMethod"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.Type]])))
   }
 
   private def reportDuplicateGlobalVariable(position: Location, items: Array[AnyRef]): Unit = {
@@ -136,15 +136,15 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportDuplicateFunction(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedGlobalVariable"), items(0).asInstanceOf[String], names(items(1).asInstanceOf[Array[IRT.TypeRef]])))
+    problem(position, format(message("error.semantic.duplicatedGlobalVariable"), items(0).asInstanceOf[String], names(items(1).asInstanceOf[Array[IRT.Type]])))
   }
 
   private def reportDuplicateConstructor(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedConstructor"), (items(0).asInstanceOf[IRT.TypeRef]).name, names(items(1).asInstanceOf[Array[IRT.TypeRef]])))
+    problem(position, format(message("error.semantic.duplicatedConstructor"), (items(0).asInstanceOf[IRT.Type]).name, names(items(1).asInstanceOf[Array[IRT.Type]])))
   }
 
   private def reportMethodNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.methodNotAccessible"), (items(0).asInstanceOf[IRT.ObjectTypeRef]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[IRT.TypeRef]])), (items(3).asInstanceOf[IRT.ClassTypeRef]).name))
+    problem(position, format(message("error.semantic.methodNotAccessible"), (items(0).asInstanceOf[IRT.ObjectTypeRef]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[IRT.Type]])), (items(3).asInstanceOf[IRT.ClassTypeRef]).name))
   }
 
   private def reportFieldNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
@@ -171,8 +171,8 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportConstructorNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    var `type` : String = (items(0).asInstanceOf[IRT.TypeRef]).name
-    var args: String = names((items(1).asInstanceOf[Array[IRT.TypeRef]]))
+    var `type` : String = (items(0).asInstanceOf[IRT.Type]).name
+    var args: String = names((items(1).asInstanceOf[Array[IRT.Type]]))
     problem(position, format(message("error.semantic.constructorNotFound"), `type`, args))
   }
 
@@ -180,14 +180,14 @@ class SemanticErrorReporter(threshold: Int) {
     var item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
     var item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
     var target1: String = (item1(0).asInstanceOf[IRT.ObjectTypeRef]).name
-    var args1: String = names(item1(1).asInstanceOf[Array[IRT.TypeRef]])
+    var args1: String = names(item1(1).asInstanceOf[Array[IRT.Type]])
     var target2: String = (item2(0).asInstanceOf[IRT.ObjectTypeRef]).name
-    var args2: String = names(item2(1).asInstanceOf[Array[IRT.TypeRef]])
+    var args2: String = names(item2(1).asInstanceOf[Array[IRT.Type]])
     problem(position, format(message("error.semantic.ambiguousConstructor"), target1, args2, target2, args2))
   }
 
   private def reportInterfaceRequied(position: Location, items: Array[AnyRef]): Unit = {
-    var `type` : IRT.TypeRef = items(0).asInstanceOf[IRT.TypeRef]
+    var `type` : IRT.Type = items(0).asInstanceOf[IRT.Type]
     problem(position, format(message("error.semantic.interfaceRequired"), `type`.name))
   }
 
@@ -196,11 +196,11 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportDuplicateGeneratedMethod(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicateGeneratedMethod"), (items(0).asInstanceOf[IRT.TypeRef]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.TypeRef]])))
+    problem(position, format(message("error.semantic.duplicateGeneratedMethod"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.Type]])))
   }
 
   private def reportIsNotBoxableType(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.isNotBoxableType"), (items(0).asInstanceOf[IRT.TypeRef]).name))
+    problem(position, format(message("error.semantic.isNotBoxableType"), (items(0).asInstanceOf[IRT.Type]).name))
   }
 
   private def problem(position: Location, message: String): Unit = {

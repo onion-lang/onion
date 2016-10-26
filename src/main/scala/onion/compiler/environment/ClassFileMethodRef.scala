@@ -13,6 +13,6 @@ import onion.compiler.IRT
  * @author Kota Mizushima
  *
  */
-class ClassFileMethodRef(val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val arguments_ : Array[IRT.TypeRef], val returnType: IRT.TypeRef) extends IRT.MethodRef {
-  val arguments: Array[IRT.TypeRef] = arguments_.clone()
+class ClassFileMethodRef(val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val arguments_ : Array[IRT.Type], val returnType: IRT.Type) extends IRT.MethodRef {
+  val arguments: Array[IRT.Type] = arguments_.clone()
 }

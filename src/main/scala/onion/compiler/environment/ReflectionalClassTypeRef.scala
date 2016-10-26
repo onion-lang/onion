@@ -120,13 +120,13 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
 
   private def translate(method: Method): IRT.MethodRef = {
     val arguments: Array[Class[_]] = method.getParameterTypes
-    val argumentRefs: Array[IRT.TypeRef] = new Array[IRT.TypeRef](arguments.length)
+    val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
     var i: Int = 0
     while (i < arguments.length) {
       argumentRefs(i) = bridge.toOnionType(arguments(i))
       i += 1;
     }
-    val returnRef: IRT.TypeRef = bridge.toOnionType(method.getReturnType)
+    val returnRef: IRT.Type = bridge.toOnionType(method.getReturnType)
     new ClassFileMethodRef(toOnionModifier(method.getModifiers), this, method.getName, argumentRefs, returnRef)
   }
 
@@ -136,7 +136,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
 
   private def translate(constructor: Constructor[_]): IRT.ConstructorRef = {
     val arguments: Array[Class[_]] = constructor.getParameterTypes
-    val argumentRefs: Array[IRT.TypeRef] = new Array[IRT.TypeRef](arguments.length)
+    val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
     var i: Int = 0
     while (i < arguments.length) {
       argumentRefs(i) = bridge.toOnionType(arguments(i))

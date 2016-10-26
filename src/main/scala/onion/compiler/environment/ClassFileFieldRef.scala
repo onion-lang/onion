@@ -13,4 +13,4 @@ import onion.compiler.IRT
  * @author Kota Mizushima
  *
  */
-class ClassFileFieldRef(val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.TypeRef) extends IRT.FieldRef
+class ClassFileFieldRef(val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.Type) extends IRT.FieldRef

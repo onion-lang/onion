@@ -13,7 +13,7 @@ object IRT {
    * This interface represents an internal representation node of onion program.
    * @author Kota Mizushima
    */
-  abstract trait Node
+  abstract sealed class Node
 
   /**
    * @author Kota Mizushima
@@ -23,7 +23,7 @@ object IRT {
       this(null, target)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.INT
+    def `type`: IRT.Type = BasicType.INT
   }
 
   /**
@@ -34,7 +34,7 @@ object IRT {
       this(null, target, index)
     }
 
-    def `type`: IRT.TypeRef = (target.`type`.asInstanceOf[IRT.ArrayTypeRef]).base
+    def `type`: IRT.Type = (target.`type`.asInstanceOf[IRT.ArrayTypeRef]).base
   }
 
   /**
@@ -45,7 +45,7 @@ object IRT {
       this(null, target, index, value)
     }
 
-    def `type`: IRT.TypeRef = value.`type`
+    def `type`: IRT.Type = value.`type`
 
     def `object`: IRT.Term = target
   }
@@ -74,7 +74,7 @@ object IRT {
       this(Array[IRT.Term](expression1, expression2, expression3))
     }
 
-    def `type`: IRT.TypeRef = terms(terms.length - 1).`type`
+    def `type`: IRT.Type = terms(terms.length - 1).`type`
   }
 
   /**
@@ -107,8 +107,8 @@ object IRT {
 
   }
 
-  class BinaryTerm(location: Location, val kind: Int, val `type`: IRT.TypeRef, val lhs: IRT.Term, val rhs: IRT.Term) extends Term(location) {
-    def this(kind: Int, `type`: IRT.TypeRef, lhs: IRT.Term, rhs: IRT.Term) {
+  class BinaryTerm(location: Location, val kind: Int, val `type`: IRT.Type, val lhs: IRT.Term, val rhs: IRT.Term) extends Term(location) {
+    def this(kind: Int, `type`: IRT.Type, lhs: IRT.Term, rhs: IRT.Term) {
       this(null, kind, `type`, lhs, rhs)
     }
   }
@@ -136,7 +136,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.BOOLEAN
+    def `type`: IRT.Type = BasicType.BOOLEAN
   }
 
   /**
@@ -156,7 +156,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.BYTE
+    def `type`: IRT.Type = BasicType.BYTE
   }
 
   /**
@@ -167,7 +167,7 @@ object IRT {
       this(null, target, method, parameters)
     }
 
-    def `type`: IRT.TypeRef = method.returnType
+    def `type`: IRT.Type = method.returnType
   }
 
   /**
@@ -177,7 +177,7 @@ object IRT {
     def this(target: IRT.ObjectTypeRef, method: IRT.MethodRef, parameters: Array[IRT.Term]) {
       this(null, target, method, parameters)
     }
-    def `type`: IRT.TypeRef = method.returnType
+    def `type`: IRT.Type = method.returnType
   }
 
   /**
@@ -188,18 +188,18 @@ object IRT {
       this(null, target, method, params)
     }
 
-    def `type`: IRT.TypeRef = method.returnType
+    def `type`: IRT.Type = method.returnType
   }
 
   /**
    * @author Kota Mizushima
    */
-  class AsInstanceOf(location: Location, val target: IRT.Term, val destination: IRT.TypeRef) extends Term(location) {
-    def this(target: IRT.Term, destination: IRT.TypeRef) {
+  class AsInstanceOf(location: Location, val target: IRT.Term, val destination: IRT.Type) extends Term(location) {
+    def this(target: IRT.Term, destination: IRT.Type) {
       this(null, target, destination)
     }
 
-    def `type`: IRT.TypeRef = destination
+    def `type`: IRT.Type = destination
   }
 
   /**
@@ -210,7 +210,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.CHAR
+    def `type`: IRT.Type = BasicType.CHAR
   }
 
   /**
@@ -310,22 +310,22 @@ object IRT {
   object ConstructorDefinition {
     def newDefaultConstructor(`type`: IRT.ClassTypeRef): IRT.ConstructorDefinition = {
       val block: IRT.StatementBlock = new IRT.StatementBlock(new IRT.Return(null))
-      val init: IRT.Super = new IRT.Super(`type`.superClass, new Array[IRT.TypeRef](0), new Array[IRT.Term](0))
-      val node: IRT.ConstructorDefinition = new IRT.ConstructorDefinition(Modifier.PUBLIC, `type`, new Array[IRT.TypeRef](0), block, init)
+      val init: IRT.Super = new IRT.Super(`type`.superClass, new Array[IRT.Type](0), new Array[IRT.Term](0))
+      val node: IRT.ConstructorDefinition = new IRT.ConstructorDefinition(Modifier.PUBLIC, `type`, new Array[IRT.Type](0), block, init)
       node.frame = new LocalFrame(null)
       node
     }
   }
 
-  class ConstructorDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val arguments: Array[IRT.TypeRef], var block: IRT.StatementBlock, var superInitializer: IRT.Super) extends
+  class ConstructorDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val arguments: Array[IRT.Type], var block: IRT.StatementBlock, var superInitializer: IRT.Super) extends
   Node with IRT.ConstructorRef {
-    def this(modifier: Int, classType: IRT.ClassTypeRef, arguments: Array[IRT.TypeRef], block: IRT.StatementBlock, superInitializer: IRT.Super) {
+    def this(modifier: Int, classType: IRT.ClassTypeRef, arguments: Array[IRT.Type], block: IRT.StatementBlock, superInitializer: IRT.Super) {
       this(null, modifier, classType, arguments, block, superInitializer)
     }
 
     def name: String =  "new"
 
-    def getArgs: Array[IRT.TypeRef] = arguments
+    def getArgs: Array[IRT.Type] = arguments
 
     def affiliation: IRT.ClassTypeRef = classType
 
@@ -349,29 +349,29 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.DOUBLE
+    def `type`: IRT.Type = BasicType.DOUBLE
   }
 
   /**
    * @author Kota Mizushima
    */
   object Term {
-    def defaultValue(`type`: IRT.TypeRef): IRT.Term = {
-      if (`type` eq BasicTypeRef.CHAR) return new IRT.CharacterValue(0.asInstanceOf[Char])
-      if (`type` eq BasicTypeRef.BYTE) return new IRT.ByteValue(0.asInstanceOf[Byte])
-      if (`type` eq BasicTypeRef.SHORT) return new IRT.ShortValue(0.asInstanceOf[Short])
-      if (`type` eq BasicTypeRef.INT) return new IRT.IntValue(0)
-      if (`type` eq BasicTypeRef.LONG) return new IRT.LongValue(0)
-      if (`type` eq BasicTypeRef.FLOAT) return new IRT.FloatValue(0.0f)
-      if (`type` eq BasicTypeRef.DOUBLE) return new IRT.DoubleValue(0.0)
-      if (`type` eq BasicTypeRef.BOOLEAN) return new IRT.BoolValue(false)
+    def defaultValue(`type`: IRT.Type): IRT.Term = {
+      if (`type` eq BasicType.CHAR) return new IRT.CharacterValue(0.asInstanceOf[Char])
+      if (`type` eq BasicType.BYTE) return new IRT.ByteValue(0.asInstanceOf[Byte])
+      if (`type` eq BasicType.SHORT) return new IRT.ShortValue(0.asInstanceOf[Short])
+      if (`type` eq BasicType.INT) return new IRT.IntValue(0)
+      if (`type` eq BasicType.LONG) return new IRT.LongValue(0)
+      if (`type` eq BasicType.FLOAT) return new IRT.FloatValue(0.0f)
+      if (`type` eq BasicType.DOUBLE) return new IRT.DoubleValue(0.0)
+      if (`type` eq BasicType.BOOLEAN) return new IRT.BoolValue(false)
       if (`type`.isObjectType) return new IRT.NullValue
       null
     }
   }
 
   abstract class Term(val location: Location) extends Node {
-    def `type`: IRT.TypeRef
+    def `type`: IRT.Type
 
     def isBasicType: Boolean = `type`.isBasicType
 
@@ -393,7 +393,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class FieldDefinition(val location: Location, val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.TypeRef)
+  class FieldDefinition(val location: Location, val modifier: Int, val affiliation: IRT.ClassTypeRef, val name: String, val `type`: IRT.Type)
     extends Node with FieldRef {
   }
 
@@ -405,7 +405,7 @@ object IRT {
       this(null, target, field)
     }
 
-    def `type`: IRT.TypeRef = field.`type`
+    def `type`: IRT.Type = field.`type`
   }
 
   class SetField(location: Location, val target: IRT.Term, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
@@ -413,7 +413,7 @@ object IRT {
       this(null, target, field, value)
     }
 
-    def `type`: IRT.TypeRef = field.`type`
+    def `type`: IRT.Type = field.`type`
   }
 
   class FloatValue (location: Location, val value: Float)  extends Term(location) {
@@ -421,7 +421,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.FLOAT
+    def `type`: IRT.Type = BasicType.FLOAT
   }
 
   class IfStatement(location: Location, val condition: IRT.Term, val thenStatement: IRT.ActionStatement, val elseStatement: IRT.ActionStatement)
@@ -438,12 +438,12 @@ object IRT {
     def getElseStatement: IRT.ActionStatement = elseStatement
   }
 
-  class InstanceOf(location: Location, val target: IRT.Term, val checked: IRT.TypeRef)  extends Term(location) {
-    def this(target: IRT.Term, checked: IRT.TypeRef) {
+  class InstanceOf(location: Location, val target: IRT.Term, val checked: IRT.Type)  extends Term(location) {
+    def this(target: IRT.Term, checked: IRT.Type) {
       this(null, target, checked)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.BOOLEAN
+    def `type`: IRT.Type = BasicType.BOOLEAN
   }
 
   class IntValue(location: Location, val value: Int)  extends Term(location) {
@@ -451,33 +451,33 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef =  BasicTypeRef.INT
+    def `type`: IRT.Type =  BasicType.INT
   }
 
-  class ListLiteral(location: Location, val elements: Array[IRT.Term], val `type`: IRT.TypeRef)  extends Term(location) {
-    def this(elements: Array[IRT.Term], `type`: IRT.TypeRef) {
+  class ListLiteral(location: Location, val elements: Array[IRT.Term], val `type`: IRT.Type)  extends Term(location) {
+    def this(elements: Array[IRT.Term], `type`: IRT.Type) {
       this(null, elements, `type`)
     }
 
     def getElements: Array[IRT.Term] = elements
   }
 
-  class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef)  extends Term(location) {
+  class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.Type)  extends Term(location) {
     def this(bind: ClosureLocalBinding) {
       this(null, bind.frameIndex, bind.index, bind.tp)
     }
 
-    def this(frame: Int, index: Int, `type`: IRT.TypeRef) {
+    def this(frame: Int, index: Int, `type`: IRT.Type) {
       this(null, frame, index, `type`)
     }
   }
 
-  class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.TypeRef, val value: IRT.Term) extends Term(location) {
+  class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.Type, val value: IRT.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: IRT.Term) {
       this(null, bind.frameIndex, bind.index, bind.tp, value)
     }
 
-    def this(frame: Int, index: Int, `type`: IRT.TypeRef, value: IRT.Term) {
+    def this(frame: Int, index: Int, `type`: IRT.Type, value: IRT.Term) {
       this(null, frame, index, `type`, value)
     }
   }
@@ -500,9 +500,9 @@ object IRT {
 
     def getName: String = method.name
 
-    def getArguments: Array[IRT.TypeRef] = method.arguments
+    def getArguments: Array[IRT.Type] = method.arguments
 
-    def getReturnType: IRT.TypeRef =  method.returnType
+    def getReturnType: IRT.Type =  method.returnType
 
     def getBlock: IRT.ActionStatement = block
 
@@ -520,7 +520,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.LONG
+    def `type`: IRT.Type = BasicType.LONG
   }
 
   /**
@@ -535,8 +535,8 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class Member(modifier: Int, classType: IRT.TypeRef) extends Node {
-    def getClassType: IRT.TypeRef = classType
+  class Member(modifier: Int, classType: IRT.Type) extends Node {
+    def getClassType: IRT.Type = classType
 
     def getModifier: Int = modifier
   }
@@ -544,7 +544,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val name: String, val arguments: Array[IRT.TypeRef], val returnType: IRT.TypeRef, var block: IRT.StatementBlock)
+  class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassTypeRef, val name: String, val arguments: Array[IRT.Type], val returnType: IRT.Type, var block: IRT.StatementBlock)
     extends Node with MethodRef {
     private var closure: Boolean = false
     private var frame: LocalFrame = null
@@ -573,7 +573,7 @@ object IRT {
       this(null, constructor, parameters)
     }
 
-    def `type`: IRT.TypeRef = constructor.affiliation
+    def `type`: IRT.Type = constructor.affiliation
   }
 
   class NewArray(location: Location, val arrayType: IRT.ArrayTypeRef, val parameters: Array[IRT.Term]) extends Term(location) {
@@ -581,7 +581,7 @@ object IRT {
       this(null, arrayType, parameters)
     }
 
-    def `type`: IRT.TypeRef = arrayType
+    def `type`: IRT.Type = arrayType
   }
 
   class NOP(location: Location) extends ActionStatement(location) {
@@ -598,7 +598,7 @@ object IRT {
       this(null)
     }
 
-    def `type`: IRT.TypeRef = NullTypeRef.NULL
+    def `type`: IRT.Type = NullTypeRef.NULL
   }
 
   /**
@@ -618,7 +618,7 @@ object IRT {
       this(null, value)
     }
 
-    def `type`: IRT.TypeRef = BasicTypeRef.SHORT
+    def `type`: IRT.Type = BasicType.SHORT
   }
 
   abstract class ActionStatement(val location: Location)
@@ -629,7 +629,7 @@ object IRT {
       this(null, target, field)
     }
 
-    def `type`: IRT.TypeRef = field.`type`
+    def `type`: IRT.Type = field.`type`
   }
 
   /**
@@ -640,19 +640,19 @@ object IRT {
       this(null, target, field, value)
     }
 
-    def `type`: IRT.TypeRef = field.`type`
+    def `type`: IRT.Type = field.`type`
   }
 
   /**
    * @author Kota Mizushima
    */
-  class StringValue(location: Location, val value: String, val `type`: IRT.TypeRef) extends Term(location) {
-    def this(value: String, `type`: IRT.TypeRef) {
+  class StringValue(location: Location, val value: String, val `type`: IRT.Type) extends Term(location) {
+    def this(value: String, `type`: IRT.Type) {
       this(null, value, `type`)
     }
   }
 
-  class Super(val classType: IRT.ClassTypeRef, val arguments: Array[IRT.TypeRef], val terms: Array[IRT.Term]) extends Node
+  class Super(val classType: IRT.ClassTypeRef, val arguments: Array[IRT.Type], val terms: Array[IRT.Term]) extends Node
 
   class Synchronized(location: Location, val term: IRT.Term, val statement: IRT.ActionStatement)  extends ActionStatement(location) {
     def this(term: IRT.Term, statement: IRT.ActionStatement) {
@@ -695,8 +695,8 @@ object IRT {
 
   }
 
-  class UnaryTerm(location: Location, val kind: Int, val `type`: IRT.TypeRef, val operand: IRT.Term)  extends Term(location) {
-    def this(kind: Int, `type`: IRT.TypeRef, operand: IRT.Term) {
+  class UnaryTerm(location: Location, val kind: Int, val `type`: IRT.Type, val operand: IRT.Term)  extends Term(location) {
+    def this(kind: Int, `type`: IRT.Type, operand: IRT.Term) {
       this(null, kind, `type`, operand)
     }
   }
@@ -734,12 +734,12 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class ArrayTypeRef(val component: IRT.TypeRef, val dimension: Int, table: ClassTable) extends AbstractObjectTypeRef {
+  class ArrayTypeRef(val component: IRT.Type, val dimension: Int, table: ClassTable) extends AbstractObjectTypeRef {
     val superClass: IRT.ClassTypeRef = table.load("java.lang.Object")
     val interfaces: Array[IRT.ClassTypeRef] = Array[IRT.ClassTypeRef](table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
     var name: String = "[" * dimension + component.name
 
-    def base: IRT.TypeRef =  if (dimension == 1) component else table.loadArray(component, dimension - 1)
+    def base: IRT.Type =  if (dimension == 1) component else table.loadArray(component, dimension - 1)
 
     def isInterface: Boolean = false
 
@@ -758,30 +758,20 @@ object IRT {
     def isClassType: Boolean =  false
   }
 
-  object BasicTypeRef {
-    final val BYTE: IRT.BasicTypeRef = new IRT.BasicTypeRef("byte")
-    final val SHORT: IRT.BasicTypeRef = new IRT.BasicTypeRef("short")
-    final val CHAR: IRT.BasicTypeRef = new IRT.BasicTypeRef("char")
-    final val INT: IRT.BasicTypeRef = new IRT.BasicTypeRef("int")
-    final val LONG: IRT.BasicTypeRef = new IRT.BasicTypeRef("long")
-    final val FLOAT: IRT.BasicTypeRef = new IRT.BasicTypeRef("float")
-    final val DOUBLE: IRT.BasicTypeRef = new IRT.BasicTypeRef("double")
-    final val BOOLEAN: IRT.BasicTypeRef = new IRT.BasicTypeRef("boolean")
-    final val VOID: IRT.BasicTypeRef = new IRT.BasicTypeRef("void")
+  object BasicType {
+    final val BYTE: IRT.BasicType    = new IRT.BasicType("byte")
+    final val SHORT: IRT.BasicType   = new IRT.BasicType("short")
+    final val CHAR: IRT.BasicType    = new IRT.BasicType("char")
+    final val INT: IRT.BasicType     = new IRT.BasicType("int")
+    final val LONG: IRT.BasicType    = new IRT.BasicType("long")
+    final val FLOAT: IRT.BasicType   = new IRT.BasicType("float")
+    final val DOUBLE: IRT.BasicType  = new IRT.BasicType("double")
+    final val BOOLEAN: IRT.BasicType = new IRT.BasicType("boolean")
+    final val VOID: IRT.BasicType    = new IRT.BasicType("void")
   }
 
-  final val BASIC_TYPE_REF_BYTE = BasicTypeRef.BYTE
-  final val BASIC_TYPE_REF_SHORT = BasicTypeRef.SHORT
-  final val BASIC_TYPE_REF_CHAR = BasicTypeRef.CHAR
-  final val BASIC_TYPE_REF_INT = BasicTypeRef.INT
-  final val BASIC_TYPE_REF_LONG = BasicTypeRef.LONG
-  final val BASIC_TYPE_REF_FLOAT = BasicTypeRef.FLOAT
-  final val BASIC_TYPE_REF_DOUBLE = BasicTypeRef.DOUBLE
-  final val BASIC_TYPE_REF_BOOLEAN = BasicTypeRef.BOOLEAN
-  final val BASIC_TYPE_REF_VOID = BasicTypeRef.VOID
-
-  class BasicTypeRef private(name_ : String) extends TypeRef {
-    import BasicTypeRef._
+  class BasicType private(name_ : String) extends Type {
+    import BasicType._
     def name: String = name_
 
     def isNumeric: Boolean = isInteger && isReal
@@ -802,6 +792,16 @@ object IRT {
 
     def isObjectType: Boolean = false
   }
+
+  final val BASIC_TYPE_BYTE = BasicType.BYTE
+  final val BASIC_TYPE_SHORT = BasicType.SHORT
+  final val BASIC_TYPE_CHAR = BasicType.CHAR
+  final val BASIC_TYPE_INT = BasicType.INT
+  final val BASIC_TYPE_LONG = BasicType.LONG
+  final val BASIC_TYPE_FLOAT = BasicType.FLOAT
+  final val BASIC_TYPE_DOUBLE = BasicType.DOUBLE
+  final val BASIC_TYPE_BOOLEAN = BasicType.BOOLEAN
+  final val BASIC_TYPE_VOID = BasicType.VOID
 
   abstract trait ClassTypeRef extends ObjectTypeRef {
     def constructors: Array[IRT.ConstructorRef]
@@ -838,7 +838,7 @@ object IRT {
       sorter.compare(constructor1, constructor2) >= 0
     }
 
-    private def isAllSuperType(arg1: Array[IRT.TypeRef], arg2: Array[IRT.TypeRef]): Boolean = {
+    private def isAllSuperType(arg1: Array[IRT.Type], arg2: Array[IRT.Type]): Boolean = {
       var i: Int = 0
       while (i < arg1.length) {
         if (!TypeRules.isSuperType(arg1(i), arg2(i))) return false
@@ -849,8 +849,8 @@ object IRT {
 
     private final val sorter: Comparator[IRT.ConstructorRef] = new Comparator[IRT.ConstructorRef] {
       def compare(c1: IRT.ConstructorRef, c2: IRT.ConstructorRef): Int = {
-        val arg1: Array[IRT.TypeRef] = c1.getArgs
-        val arg2: Array[IRT.TypeRef] = c2.getArgs
+        val arg1: Array[IRT.Type] = c1.getArgs
+        val arg2: Array[IRT.Type] = c2.getArgs
         if (isAllSuperType(arg2, arg1)) return -1
         if (isAllSuperType(arg1, arg2)) return 1
         0
@@ -862,7 +862,7 @@ object IRT {
   abstract trait ConstructorRef extends MemberRef {
     def affiliation: IRT.ClassTypeRef
 
-    def getArgs: Array[IRT.TypeRef]
+    def getArgs: Array[IRT.Type]
   }
 
   /**
@@ -870,8 +870,8 @@ object IRT {
    */
   class ConstructorRefComparator extends Comparator[IRT.ConstructorRef] {
     def compare(c1: IRT.ConstructorRef, c2: IRT.ConstructorRef): Int = {
-      val args1: Array[IRT.TypeRef] = c1.getArgs
-      val args2: Array[IRT.TypeRef] = c2.getArgs
+      val args1: Array[IRT.Type] = c1.getArgs
+      val args2: Array[IRT.Type] = c2.getArgs
       val result: Int = args1.length - args2.length
       if (result != 0) {
         return result
@@ -906,7 +906,7 @@ object IRT {
 
     def affiliation: IRT.ClassTypeRef
 
-    def `type`: IRT.TypeRef
+    def `type`: IRT.Type
   }
 
   class FieldRefComparator extends Comparator[IRT.FieldRef] {
@@ -925,7 +925,7 @@ object IRT {
    * @author Kota Mizushima
    */
   object MethodRefFinder {
-    private def isAllSuperType(arg1: Array[IRT.TypeRef], arg2: Array[IRT.TypeRef]): Boolean = {
+    private def isAllSuperType(arg1: Array[IRT.Type], arg2: Array[IRT.Type]): Boolean = {
       var i: Int = 0
       while (i < arg1.length) {
         if (!TypeRules.isSuperType(arg1(i), arg2(i))) return false
@@ -972,8 +972,8 @@ object IRT {
 
     private final val sorter: Comparator[IRT.MethodRef] = new Comparator[IRT.MethodRef] {
       def compare(m1: IRT.MethodRef, m2: IRT.MethodRef): Int = {
-        val arg1: Array[IRT.TypeRef] = m1.arguments
-        val arg2: Array[IRT.TypeRef] = m2.arguments
+        val arg1: Array[IRT.Type] = m1.arguments
+        val arg2: Array[IRT.Type] = m2.arguments
         if (isAllSuperType(arg2, arg1)) return -1
         if (isAllSuperType(arg1, arg2)) return 1
         0
@@ -985,17 +985,17 @@ object IRT {
   abstract trait MethodRef extends MemberRef {
     def affiliation: IRT.ClassTypeRef
 
-    def arguments: Array[IRT.TypeRef]
+    def arguments: Array[IRT.Type]
 
-    def returnType: IRT.TypeRef
+    def returnType: IRT.Type
   }
 
   class MethodRefComparator extends Comparator[IRT.MethodRef] {
     def compare(m1: IRT.MethodRef, m2: IRT.MethodRef): Int = {
       var result: Int = m1.name.compareTo(m2.name)
       if (result != 0) return result
-      val args1: Array[IRT.TypeRef] = m1.arguments
-      val args2: Array[IRT.TypeRef] = m2.arguments
+      val args1: Array[IRT.Type] = m1.arguments
+      val args2: Array[IRT.Type] = m2.arguments
       result = args1.length - args2.length
       if (result != 0) return result
       var i: Int = 0
@@ -1011,7 +1011,7 @@ object IRT {
     var NULL: IRT.NullTypeRef = new IRT.NullTypeRef("null")
   }
 
-  class NullTypeRef private(name_ :String) extends TypeRef {
+  class NullTypeRef private(name_ :String) extends Type {
     def name: String = name_
 
     def isArrayType: Boolean = false
@@ -1028,7 +1028,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  abstract trait ObjectTypeRef extends TypeRef {
+  abstract trait ObjectTypeRef extends Type {
     def isInterface: Boolean
 
     def modifier: Int
@@ -1052,16 +1052,16 @@ object IRT {
    * @author Kota Mizushima
    */
   abstract trait ParameterMatcher {
-    def matches(arguments: Array[IRT.TypeRef], parameters: Array[IRT.Term]): Boolean
+    def matches(arguments: Array[IRT.Type], parameters: Array[IRT.Term]): Boolean
   }
 
   /**
    * @author Kota Mizushima
    */
   class StandardParameterMatcher extends ParameterMatcher {
-    def matches(arguments: Array[IRT.TypeRef], parameters: Array[IRT.Term]): Boolean = {
+    def matches(arguments: Array[IRT.Type], parameters: Array[IRT.Term]): Boolean = {
       if (arguments.length != parameters.length) return false
-      val parameterTypes: Array[IRT.TypeRef] = new Array[IRT.TypeRef](parameters.length)
+      val parameterTypes: Array[IRT.Type] = new Array[IRT.Type](parameters.length)
       var i: Int = 0
       while (i < parameters.length) {
         parameterTypes(i) = parameters(i).`type`
@@ -1076,7 +1076,7 @@ object IRT {
     }
   }
 
-  abstract trait TypeRef {
+  abstract sealed class Type {
     def name: String
 
     def isBasicType: Boolean
@@ -1091,10 +1091,10 @@ object IRT {
   }
 
   object TypeRules {
-    def isSuperType(left: IRT.TypeRef, right: IRT.TypeRef): Boolean = {
+    def isSuperType(left: IRT.Type, right: IRT.Type): Boolean = {
       if (left.isBasicType) {
         if (right.isBasicType) {
-          return isSuperTypeForBasic(left.asInstanceOf[IRT.BasicTypeRef], right.asInstanceOf[IRT.BasicTypeRef])
+          return isSuperTypeForBasic(left.asInstanceOf[IRT.BasicType], right.asInstanceOf[IRT.BasicType])
         }
         return false
       }
@@ -1122,7 +1122,7 @@ object IRT {
       false
     }
 
-    def isAssignable(left: IRT.TypeRef, right: IRT.TypeRef): Boolean = isSuperType(left, right)
+    def isAssignable(left: IRT.Type, right: IRT.Type): Boolean = isSuperType(left, right)
 
     private def isSuperTypeForArray(left: IRT.ArrayTypeRef, right: IRT.ArrayTypeRef): Boolean = isSuperType(left.base, right.base)
 
@@ -1138,25 +1138,25 @@ object IRT {
       false
     }
 
-    private def isSuperTypeForBasic(left: IRT.BasicTypeRef, right: IRT.BasicTypeRef): Boolean = {
-      if (left eq BasicTypeRef.DOUBLE) {
-        return ((right eq BasicTypeRef.CHAR) || (right eq BasicTypeRef.BYTE) || (right eq BasicTypeRef.SHORT) || (right eq BasicTypeRef.INT) || (right eq BasicTypeRef.LONG) || (right eq BasicTypeRef.FLOAT) || (right eq BasicTypeRef.DOUBLE))
+    private def isSuperTypeForBasic(left: IRT.BasicType, right: IRT.BasicType): Boolean = {
+      if (left eq BasicType.DOUBLE) {
+        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT) || (right eq BasicType.DOUBLE))
       }
-      if (left eq BasicTypeRef.FLOAT) {
-        return ((right eq BasicTypeRef.CHAR) || (right eq BasicTypeRef.BYTE) || (right eq BasicTypeRef.SHORT) || (right eq BasicTypeRef.INT) || (right eq BasicTypeRef.LONG) || (right eq BasicTypeRef.FLOAT))
+      if (left eq BasicType.FLOAT) {
+        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT))
       }
-      if (left eq BasicTypeRef.LONG) {
-        return ((right eq BasicTypeRef.CHAR) || (right eq BasicTypeRef.BYTE) || (right eq BasicTypeRef.SHORT) || (right eq BasicTypeRef.INT) || (right eq BasicTypeRef.LONG))
+      if (left eq BasicType.LONG) {
+        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG))
       }
-      if (left eq BasicTypeRef.INT) {
-        return ((right eq BasicTypeRef.CHAR) || (right eq BasicTypeRef.BYTE) || (right eq BasicTypeRef.SHORT) || (right eq BasicTypeRef.INT))
+      if (left eq BasicType.INT) {
+        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT))
       }
-      if (left eq BasicTypeRef.SHORT) {
-        return  ((right eq BasicTypeRef.BYTE) || (right eq BasicTypeRef.SHORT));
+      if (left eq BasicType.SHORT) {
+        return  ((right eq BasicType.BYTE) || (right eq BasicType.SHORT));
       }
-      if ((left eq BasicTypeRef.BOOLEAN) && (right eq BasicTypeRef.BOOLEAN)) return true
-      if ((left eq BasicTypeRef.BYTE) && (right eq BasicTypeRef.BYTE)) return true
-      if ((left eq BasicTypeRef.CHAR) && (right eq BasicTypeRef.CHAR)) return true
+      if ((left eq BasicType.BOOLEAN) && (right eq BasicType.BOOLEAN)) return true
+      if ((left eq BasicType.BYTE) && (right eq BasicType.BYTE)) return true
+      if ((left eq BasicType.CHAR) && (right eq BasicType.CHAR)) return true
       false
     }
   }

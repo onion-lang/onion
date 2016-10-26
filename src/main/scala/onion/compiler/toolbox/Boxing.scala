@@ -15,9 +15,9 @@ import onion.compiler.ClassTable
  *
  */
 object Boxing {
-  private final val TABLE: Array[Array[AnyRef]] = Array(Array(IRT.BasicTypeRef.BOOLEAN, "java.lang.Boolean"), Array(IRT.BasicTypeRef.BYTE, "java.lang.Byte"), Array(IRT.BasicTypeRef.SHORT, "java.lang.Short"), Array(IRT.BasicTypeRef.CHAR, "java.lang.Character"), Array(IRT.BasicTypeRef.INT, "java.lang.Integer"), Array(IRT.BasicTypeRef.LONG, "java.lang.Long"), Array(IRT.BasicTypeRef.FLOAT, "java.lang.Float"), Array(IRT.BasicTypeRef.DOUBLE, "java.lang.Double"))
+  private final val TABLE: Array[Array[AnyRef]] = Array(Array(IRT.BasicType.BOOLEAN, "java.lang.Boolean"), Array(IRT.BasicType.BYTE, "java.lang.Byte"), Array(IRT.BasicType.SHORT, "java.lang.Short"), Array(IRT.BasicType.CHAR, "java.lang.Character"), Array(IRT.BasicType.INT, "java.lang.Integer"), Array(IRT.BasicType.LONG, "java.lang.Long"), Array(IRT.BasicType.FLOAT, "java.lang.Float"), Array(IRT.BasicType.DOUBLE, "java.lang.Double"))
 
-  private def boxedType(table: ClassTable, `type`: IRT.BasicTypeRef): IRT.ClassTypeRef = {
+  private def boxedType(table: ClassTable, `type`: IRT.BasicType): IRT.ClassTypeRef = {
     for (row <- TABLE) {
       if (row(0) eq `type`) return table.load(row(1).asInstanceOf[String])
     }
@@ -25,16 +25,16 @@ object Boxing {
   }
 
   def boxing(table: ClassTable, node: IRT.Term): IRT.Term = {
-    val `type`: IRT.TypeRef = node.`type`
-    if ((!`type`.isBasicType) || (`type` eq IRT.BasicTypeRef.VOID)) {
+    val `type`: IRT.Type = node.`type`
+    if ((!`type`.isBasicType) || (`type` eq IRT.BasicType.VOID)) {
       throw new IllegalArgumentException("node type must be boxable type")
     }
-    val aBoxedType: IRT.ClassTypeRef = boxedType(table, `type`.asInstanceOf[IRT.BasicTypeRef])
+    val aBoxedType: IRT.ClassTypeRef = boxedType(table, `type`.asInstanceOf[IRT.BasicType])
     val cs: Array[IRT.ConstructorRef] = aBoxedType.constructors
     var i: Int = 0
 
     while (i < cs.length) {
-      val args: Array[IRT.TypeRef] = cs(i).getArgs
+      val args: Array[IRT.Type] = cs(i).getArgs
       if ((args.length == 1) && (args(i) eq `type`)) {
         return new IRT.NewObject(cs(i), Array[IRT.Term](node))
       }

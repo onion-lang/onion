@@ -5,13 +5,13 @@ import {
 
 class ExampleBean <: Serializable {
   @name :String;
-  @value :int;
+  @value :Int;
   
 public:
   def new {
   }
   
-  def new(name :String, value :int){
+  def new(name :String, value :Int){
     @name = name;
     @value = value;
   }
@@ -24,11 +24,11 @@ public:
   	@name = name; 
   }
   
-  def setValue(value :int) {
+  def setValue(value :Int) {
   	@value = value;
   }
   
-  def getValue :int {
+  def getValue :Int {
   	return @value;
   }
   

@@ -3,7 +3,7 @@ def input(prompt :String, reader :BufferedReader) :String {
   return reader.readLine;
 }
 
-def fact(n :int) :int {
+def fact(n :int): Int {
   if n < 2 { return 1; }
   else { return n * fact(n - 1); }
 }
@@ -12,7 +12,7 @@ reader = new BufferedReader(new InputStreamReader(System::in));
 
 while (line = input("階乗を求めたい数を入力してください。> ", reader)) != null {
   try {
-    number = Integer::parseInt(line);
+    number = JInteger::parseInt(line);
     if(number < 0){
       System::out.println("正の整数を入力してください。");
     }else{

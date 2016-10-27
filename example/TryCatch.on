@@ -11,7 +11,7 @@ for i = 0; i < 10; i++ {
     else:
       throw new Exception;
     }
-  } catch e: IOException {
+  }catch e: IOException {
     System::out.println("IOException!");
   }catch e: RuntimeException {
     System::out.println("RuntimeException!");

@@ -149,22 +149,22 @@ TOKEN:
 {
   <K_ABSTRACT:     "abstract"     >
 | <K_AND:          "and"          >
-| <K_BOOLEAN:      "boolean"      >
+| <K_BOOLEAN:      "boolean" | "Boolean" >
 | <K_BREAK:        "break"        >
-| <K_BYTE:         "byte"         >
+| <K_BYTE:         "byte"  | "Byte" >
 | <K_CASE:         "case"         >
-| <K_CHAR:         "char"         >
+| <K_CHAR:         "char"  | "Char"  >
 | <K_CLASS:        "class"        >
 | <K_BRANCH:       "branch"       >
 | <K_CONST:        "const"        >
 | <K_CONTINUE:     "continue"     >
 | <K_DEF:          "def"          >
-| <K_DOUBLE:       "double"       >
+| <K_DOUBLE:       "double" | "Double"  >
 | <K_ELSE:         "else"         >
 | <K_FALSE:        "false"        >
 | <K_FINALLY:      "finally"      >
 | <K_FINAL:        "final"        >
-| <K_FLOAT:        "float"        >
+| <K_FLOAT:        "float"  | "Float" >
 | <K_FOR:          "for"          >
 | <K_FOREACH:      "foreach"      >
 | <K_FORWARD:      "forward"      >
@@ -172,11 +172,11 @@ TOKEN:
 | <K_IF:           "if"           >
 | <K_IMPORT:       "import"       >
 | <K_INHERITED:    "inherited"    >
-| <K_INT:          "int"          >
+| <K_INT:          "int" | "Int"  >
 | <K_INTERFACE:    "interface"    >
 | <K_INTERNAL:     "internal"     >
-| <K_IS:           "is"           >
-| <K_LONG:         "long"         >
+| <K_IS:           "is"            >
+| <K_LONG:         "long" | "Long">
 | <K_MODULE:       "module"       >
 | <K_NEW:          "new"          >
 | <K_NULL:         "null"         >
@@ -190,7 +190,7 @@ TOKEN:
 | <K_RETURN:       "return"       >
 | <K_SELECT:       "select"       >
 | <K_SELF:         "self"         >
-| <K_SHORT:        "short"        >
+| <K_SHORT:        "short" | "Short" >
 | <K_STATIC:       "static"       >
 | <K_SUPER:        "super"        >
 | <K_SYNCHRONIZED: "synchronized" >
@@ -199,7 +199,7 @@ TOKEN:
 | <K_TRUE:         "true"         >
 | <K_TRY:          "try"          >
 | <K_VAR:          "var"          >
-| <K_VOID:         "void"         >
+| <K_VOID:         "void" | "Unit" >
 | <K_VOLATILE:     "volatile"     >
 | <K_WHEN:         "when"         >
 | <K_WHILE:        "while"        >
@@ -525,14 +525,14 @@ AST.MethodDeclaration interface_method_decl() : {
 AST.TypeNode basic_type() : {
   Token t = null; AST.PrimitiveTypeKind kind = null;
 }{
-( t="byte"     {kind = AST.K_BYTE();}
-| t="short"    {kind = AST.K_SHORT();}
-| t="char"     {kind = AST.K_CHAR();}
-| t="int"      {kind = AST.K_INT();}
-| t="long"     {kind = AST.K_LONG();}
-| t="float"    {kind = AST.K_FLOAT();}
-| t="double"   {kind = AST.K_DOUBLE();}
-| t="boolean"  {kind = AST.K_BOOLEAN();}
+( t=<K_BYTE>     {kind = AST.K_BYTE();}
+| t=<K_SHORT>    {kind = AST.K_SHORT();}
+| t=<K_CHAR>     {kind = AST.K_CHAR();}
+| t=<K_INT>      {kind = AST.K_INT();}
+| t=<K_LONG>     {kind = AST.K_LONG();}
+| t=<K_FLOAT>    {kind = AST.K_FLOAT();}
+| t=<K_DOUBLE>   {kind = AST.K_DOUBLE();}
+| t=<K_BOOLEAN>  {kind = AST.K_BOOLEAN();}
 ) {return new AST.TypeNode(p(t), new AST.PrimitiveType(kind));}
 }
 
@@ -546,7 +546,7 @@ AST.TypeNode raw_type() :{AST.TypeNode c;}{
 }
 
 AST.TypeNode void_type() :{Token t;}{
-  t="void" {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()));}
+  t=<K_VOID> {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()));}
 }
 
 AST.TypeNode type() : {

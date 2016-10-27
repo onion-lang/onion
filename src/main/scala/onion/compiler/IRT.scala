@@ -257,9 +257,9 @@ object IRT {
     def methods: Array[IRT.Method] = methods_.values.toArray
     def fields: Array[IRT.FieldRef] = fields_.values.toArray
 
-    var fields_ : OrderedTable[IRT.FieldRef]     = new OrderedTable[IRT.FieldRef]
-    var methods_ : MultiTable[IRT.Method]        = new MultiTable[IRT.Method]
-    var constructors_ : List[IRT.ConstructorRef] = new ArrayList[IRT.ConstructorRef]
+    val fields_ : OrderedTable[IRT.FieldRef]     = new OrderedTable[IRT.FieldRef]
+    val methods_ : MultiTable[IRT.Method]        = new MultiTable[IRT.Method]
+    val constructors_ : List[IRT.ConstructorRef] = new ArrayList[IRT.ConstructorRef]
     var isResolutionComplete: Boolean            = false
     private var sourceFile: String = null
 

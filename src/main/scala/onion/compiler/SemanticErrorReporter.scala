@@ -50,36 +50,28 @@ class SemanticErrorReporter(threshold: Int) {
   private[this] def message(property: String): String = Messages(property)
 
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
-    var expected: IRT.Type = items(0).asInstanceOf[IRT.Type]
-    var detected: IRT.Type = items(1).asInstanceOf[IRT.Type]
+    val expected: IRT.Type = items(0).asInstanceOf[IRT.Type]
+    val detected: IRT.Type = items(1).asInstanceOf[IRT.Type]
     problem(position, format(message("error.semantic.incompatibleType"), expected.name, detected.name))
   }
 
   private def names(types: Array[IRT.Type]): String = {
-    var buffer: StringBuffer = new StringBuffer
-
+    val buffer = new StringBuffer
     if (types.length > 0) {
       buffer.append(types(0).name)
-
-      {
-        var i: Int = 1
-        while (i < types.length) {
-          {
-            buffer.append(", ")
-            buffer.append(types(i).name)
-          }
-          ({
-            i += 1; i
-          })
-        }
+      var i: Int = 1
+      while (i < types.length) {
+        buffer.append(", ")
+        buffer.append(types(i).name)
+        i += 1
       }
     }
     new String(buffer)
   }
 
   private def reportIncompatibleOperandType(position: Location, items: Array[AnyRef]): Unit = {
-    var operator: String = items(0).asInstanceOf[String]
-    var operands: Array[IRT.Type] = items(1).asInstanceOf[Array[IRT.Type]]
+    val operator: String = items(0).asInstanceOf[String]
+    val operands: Array[IRT.Type] = items(1).asInstanceOf[Array[IRT.Type]]
     problem(position, format(message("error.semantic.incompatibleOperandType"), items(0).asInstanceOf[String], names(operands)))
   }
 
@@ -104,14 +96,14 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportAmbiguousMethod(position: Location, items: Array[AnyRef]): Unit = {
-    var item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
-    var item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
-    var target1: String = (item1(0).asInstanceOf[IRT.ObjectType]).name
-    var name1: String = item1(1).asInstanceOf[String]
-    var args1: String = names(item1(2).asInstanceOf[Array[IRT.Type]])
-    var target2: String = (item2(0).asInstanceOf[IRT.ObjectType]).name
-    var name2: String = item2(1).asInstanceOf[String]
-    var args2: String = names(item2(2).asInstanceOf[Array[IRT.Type]])
+    val item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
+    val item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
+    val target1: String = (item1(0).asInstanceOf[IRT.ObjectType]).name
+    val name1: String = item1(1).asInstanceOf[String]
+    val args1: String = names(item1(2).asInstanceOf[Array[IRT.Type]])
+    val target2: String = (item2(0).asInstanceOf[IRT.ObjectType]).name
+    val name2: String = item2(1).asInstanceOf[String]
+    val args2: String = names(item2(2).asInstanceOf[Array[IRT.Type]])
     problem(position, format(message("error.semantic.ambiguousMethod"), Array[String](target1, name1, args2, target2, name2, args2)))
   }
 
@@ -171,23 +163,23 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportConstructorNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    var `type` : String = (items(0).asInstanceOf[IRT.Type]).name
-    var args: String = names((items(1).asInstanceOf[Array[IRT.Type]]))
+    val `type` : String = (items(0).asInstanceOf[IRT.Type]).name
+    val args: String = names((items(1).asInstanceOf[Array[IRT.Type]]))
     problem(position, format(message("error.semantic.constructorNotFound"), `type`, args))
   }
 
   private def reportAmbiguousConstructor(position: Location, items: Array[AnyRef]): Unit = {
-    var item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
-    var item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
-    var target1: String = (item1(0).asInstanceOf[IRT.ObjectType]).name
-    var args1: String = names(item1(1).asInstanceOf[Array[IRT.Type]])
-    var target2: String = (item2(0).asInstanceOf[IRT.ObjectType]).name
-    var args2: String = names(item2(1).asInstanceOf[Array[IRT.Type]])
+    val item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
+    val item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
+    val target1: String = (item1(0).asInstanceOf[IRT.ObjectType]).name
+    val args1: String = names(item1(1).asInstanceOf[Array[IRT.Type]])
+    val target2: String = (item2(0).asInstanceOf[IRT.ObjectType]).name
+    val args2: String = names(item2(1).asInstanceOf[Array[IRT.Type]])
     problem(position, format(message("error.semantic.ambiguousConstructor"), target1, args2, target2, args2))
   }
 
   private def reportInterfaceRequied(position: Location, items: Array[AnyRef]): Unit = {
-    var `type` : IRT.Type = items(0).asInstanceOf[IRT.Type]
+    val `type` : IRT.Type = items(0).asInstanceOf[IRT.Type]
     problem(position, format(message("error.semantic.interfaceRequired"), `type`.name))
   }
 

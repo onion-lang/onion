@@ -445,9 +445,9 @@ AST.AccessSection access_section() :{
 }
 
 AST.MemberDeclaration member_decl(int mset) :{AST.MemberDeclaration m;}{
-  m=field_decl(mset)         {return m;}
-| m=method_decl(mset)        {return m;}
-| m=delegate_decl(mset)      {return m;}
+  LOOKAHEAD(2) m=field_decl(mset)         {return m;}
+| LOOKAHEAD(2) m=method_decl(mset)        {return m;}
+| LOOKAHEAD(2) m=delegate_decl(mset)      {return m;}
 | LOOKAHEAD(2) m=constructor_decl(mset)   {return m;}
 }
 

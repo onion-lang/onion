@@ -8,7 +8,7 @@ object AST {
   val M_ABSTRACT = 8
   val M_VOLATILE = 16
   val M_STATIC = 32
-  val M_INHERITED = 64
+  val M_OVERRIDE = 64
   val M_PUBLIC = 128
   val M_PROTECTED = 256
   val M_PRIVATE = 512

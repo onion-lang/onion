@@ -149,39 +149,37 @@ TOKEN:
 {
   <K_ABSTRACT:     "abstract"     >
 | <K_AND:          "and"          >
-| <K_BOOLEAN:      "boolean" | "Boolean" >
+| <K_BOOLEAN:      "Boolean" >
 | <K_BREAK:        "break"        >
-| <K_BYTE:         "byte"  | "Byte" >
+| <K_BYTE:         "Byte" >
 | <K_CASE:         "case"         >
-| <K_CHAR:         "char"  | "Char"  >
+| <K_CHAR:         "Char"  >
 | <K_CLASS:        "class"        >
 | <K_BRANCH:       "branch"       >
 | <K_CONST:        "const"        >
-| <K_CONTINUE:     "continue"     >
+| <K_CONTINUE:     "continue"    >
 | <K_DEF:          "def"          >
-| <K_DOUBLE:       "double" | "Double"  >
+| <K_DOUBLE:       "Double"      >
 | <K_ELSE:         "else"         >
 | <K_FALSE:        "false"        >
 | <K_FINALLY:      "finally"      >
 | <K_FINAL:        "final"        >
-| <K_FLOAT:        "float"  | "Float" >
+| <K_FLOAT:        "Float" >
 | <K_FOR:          "for"          >
 | <K_FOREACH:      "foreach"      >
 | <K_FORWARD:      "forward"      >
 | <K_GOTO:         "goto"         >
 | <K_IF:           "if"           >
 | <K_IMPORT:       "import"       >
-| <K_INHERITED:    "inherited"    >
-| <K_INT:          "int" | "Int"  >
+| <K_INT:          "Int"  >
 | <K_INTERFACE:    "interface"    >
 | <K_INTERNAL:     "internal"     >
 | <K_IS:           "is"            >
-| <K_LONG:         "long" | "Long">
+| <K_LONG:         "Long"         >
 | <K_MODULE:       "module"       >
 | <K_NEW:          "new"          >
 | <K_NULL:         "null"         >
 | <K_OR:           "or"           >
-| <K_OTHER:        "other"        >
 | <K_OVERRIDE:     "override"     >
 | <K_PRIVATE:      "private"      >
 | <K_PROTECTED:    "protected"    >
@@ -190,7 +188,7 @@ TOKEN:
 | <K_RETURN:       "return"       >
 | <K_SELECT:       "select"       >
 | <K_SELF:         "self"         >
-| <K_SHORT:        "short" | "Short" >
+| <K_SHORT:        "Short"        >
 | <K_STATIC:       "static"       >
 | <K_SUPER:        "super"        >
 | <K_SYNCHRONIZED: "synchronized" >
@@ -404,7 +402,7 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
   | t = "abstract"     {mset = AST.M_ABSTRACT();}
   | t = "synchronized" {mset = AST.M_SYNCHRONIZED();}
   | t = "static"       {mset = AST.M_STATIC();}
-  | t = "inherited"    {mset = AST.M_INHERITED();}
+  | t = "override"    {mset = AST.M_OVERRIDE();}
   )
   ( LOOKAHEAD(1,{no(AST.M_FINAL(), mset)})        t = "final"        { mset |= AST.M_FINAL(); }
   | LOOKAHEAD(1,{no(AST.M_INTERNAL(), mset)})     t = "internal"     { mset |= AST.M_INTERNAL(); }
@@ -412,7 +410,7 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
   | LOOKAHEAD(1,{no(AST.M_ABSTRACT(), mset)})     t = "abstract"     { mset |= AST.M_ABSTRACT(); }
   | LOOKAHEAD(1,{no(AST.M_SYNCHRONIZED(), mset)}) t = "synchronized" { mset |= AST.M_SYNCHRONIZED(); }
   | LOOKAHEAD(1,{no(AST.M_STATIC(), mset)})       t = "static"       { mset |= AST.M_STATIC(); }
-  | LOOKAHEAD(1,{no(AST.M_INHERITED(), mset)})    t = "inherited"    { mset |= AST.M_INHERITED(); }
+  | LOOKAHEAD(1,{no(AST.M_OVERRIDE(), mset)})    t = "override"    { mset |= AST.M_OVERRIDE(); }
   )* {return mset;}
 }
 

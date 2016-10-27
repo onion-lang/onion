@@ -1,4 +1,4 @@
-def countLines(file: File): int {
+def countLines(file: File): Int {
   reader = new BufferedReader(new FileReader(file));
   count = 0;
   for line: String = null; (line = reader.readLine) != null; {

@@ -29,7 +29,6 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
       val loader = new OnionClassLoader(classLoader, classpath, classes)
       Thread.currentThread.setContextClassLoader(loader)
       val main = findFirstMainMethod(loader, classes)
-      println(main.get)
       main match {
         case Some(method) => Shell.Success(method.invoke(null, args))
         case None => Shell.Failure(-1)

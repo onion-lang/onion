@@ -15,23 +15,27 @@ import java.net.MalformedURLException
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
 
-class Shell (classLoader: ClassLoader, classpath: Seq[String]) {
-
-  def run(script: String, fileName: String, args: Array[String]): Int = {
-    val compiler: OnionCompiler = new OnionCompiler(new CompilerConfig(classpath, null, "Shift_JIS", "", 10))
+class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
+  private val config = new CompilerConfig(classpath, null, "Shift_JIS", "", 10)
+  def run(script: String, fileName: String, args: Array[String]): Shell.Result = {
+    val compiler: OnionCompiler = new OnionCompiler(config)
     Thread.currentThread.setContextClassLoader(classLoader)
     val classes: Array[CompiledClass] = compiler.compile(Array[InputSource](new StreamInputSource(new StringReader(script), fileName)))
     run(classes, args)
   }
 
-  def run(classes: Array[CompiledClass], args: Array[String]): Int = {
+  def run(classes: Array[CompiledClass], args: Array[String]): Shell.Result = {
     try {
       val loader = new OnionClassLoader(classLoader, classpath, classes)
       Thread.currentThread.setContextClassLoader(loader)
       val main = findFirstMainMethod(loader, classes)
-      main.fold(-1){m => m.invoke(null, args); 0}
+      println(main.get)
+      main match {
+        case Some(method) => Shell.Success(method.invoke(null, args))
+        case None => Shell.Failure(-1)
+      }
     } catch {
-      case _: ClassNotFoundException | _: IllegalAccessException | _: MalformedURLException => -1
+      case _: ClassNotFoundException | _: IllegalAccessException | _: MalformedURLException => Shell.Failure(-1)
       case e: InvocationTargetException => throw new ScriptException(e.getCause)
     }
   }
@@ -54,3 +58,13 @@ class Shell (classLoader: ClassLoader, classpath: Seq[String]) {
   }
 
 }
+
+object Shell {
+  def apply(classpath: Seq[String]): Shell = {
+    new Shell(classOf[OnionClassLoader].getClassLoader, classpath)
+  }
+  sealed abstract class Result
+  case class Success(value: Any) extends Result
+  case class Failure(code: Int) extends Result
+}
+

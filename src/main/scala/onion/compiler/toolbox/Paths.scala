@@ -18,6 +18,9 @@ object Paths {
 
   def cutExtension(path: String): String = {
     val name = nameOf(path)
-    name.substring(0, name.lastIndexOf('.'))
+    name.lastIndexOf('.') match {
+      case n if n < 0 => name
+      case n => name.substring(0, n)
+    }
   }
 }

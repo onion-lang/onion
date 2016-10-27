@@ -11,6 +11,7 @@ import _root_.scala.collection.JavaConverters._
 import _root_.scala.collection.Iterator
 import java.io.BufferedReader
 import java.io.IOException
+import java.io.FileNotFoundException
 import java.text.MessageFormat
 import onion.compiler.toolbox._
 import onion.compiler.exceptions.CompilationException
@@ -47,7 +48,7 @@ class OnionCompiler(val config: CompilerConfig) {
       var line: String = null
       var lineNum: String = null
       try {
-        line = if (location != null) getLine(sourceFile, location.line) else ""
+        line = if (location != null && sourceFile != null) getLine(sourceFile, location.line) else ""
         lineNum = if (location != null) Integer.toString(location.line) else ""
       }
       catch {
@@ -69,14 +70,18 @@ class OnionCompiler(val config: CompilerConfig) {
   private def getCursor(column: Int): String =  " " * (column - 1) + "^"
 
   private def getLine(sourceFile: String, lineNumber: Int): String = {
-    val reader = Inputs.newReader(sourceFile)
     try {
-      val line = Iterator.continually(reader.readLine()).takeWhile(_ != null).zipWithIndex.map{ case (e, i) => (e, i + 1)}.find{
-        case (e, i) => i == lineNumber
+      val reader = Inputs.newReader(sourceFile)
+      try {
+        val line = Iterator.continually(reader.readLine()).takeWhile(_ != null).zipWithIndex.map { case (e, i) => (e, i + 1) }.find {
+          case (e, i) => i == lineNumber
+        }
+        line.get._1
+      } finally {
+        reader.close
       }
-      line.get._1
-    } finally {
-      reader.close
+    } catch {
+      case e:FileNotFoundException => ""
     }
   }
 }

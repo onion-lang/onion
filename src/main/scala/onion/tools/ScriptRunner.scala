@@ -76,7 +76,10 @@ class ScriptRunner {
             for(i <- 1 until params.length) {
               scriptParams(i - 1) = params(i)
             }
-            new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptParams)
+            new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptParams) match {
+              case Shell.Success(_) => 0
+              case Shell.Failure(code) => code
+            }
         }
     }
   }

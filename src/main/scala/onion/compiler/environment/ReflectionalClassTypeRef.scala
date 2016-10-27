@@ -60,10 +60,8 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   def interfaces: Array[IRT.ClassType] = {
     val interfaces: Array[Class[_]] = klass.getInterfaces
     val interfaceSyms: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaces.length)
-    var i: Int = 0
-    while (i < interfaces.length) {
+    for(i <- 0 until interfaces.length) {
       interfaceSyms(i) = table.load(interfaces(i).getName)
-      i += 1;
     }
     interfaceSyms
   }
@@ -121,10 +119,8 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   private def translate(method: Method): IRT.Method = {
     val arguments: Array[Class[_]] = method.getParameterTypes
     val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    var i: Int = 0
-    while (i < arguments.length) {
+    for(i <- 0 until arguments.length) {
       argumentRefs(i) = bridge.toOnionType(arguments(i))
-      i += 1;
     }
     val returnRef: IRT.Type = bridge.toOnionType(method.getReturnType)
     new ClassFileMethodRef(toOnionModifier(method.getModifiers), this, method.getName, argumentRefs, returnRef)
@@ -137,10 +133,8 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   private def translate(constructor: Constructor[_]): IRT.ConstructorRef = {
     val arguments: Array[Class[_]] = constructor.getParameterTypes
     val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    var i: Int = 0
-    while (i < arguments.length) {
+    for(i <- 0 until arguments.length) {
       argumentRefs(i) = bridge.toOnionType(arguments(i))
-      i += 1;
     }
     new ClassFileConstructorRef(toOnionModifier(constructor.getModifiers), this, "<init>", argumentRefs)
   }

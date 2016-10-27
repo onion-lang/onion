@@ -41,8 +41,8 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   import ClassFileClassTypeRef._
 
-  private var bridge: OnionTypeConversion = new OnionTypeConversion(table)
-  private var modifier_ : Int = toOnionModifier(javaClass.getModifiers)
+  private val bridge    : OnionTypeConversion = new OnionTypeConversion(table)
+  private val modifier_ : Int                 = toOnionModifier(javaClass.getModifiers)
 
 
   private lazy val methods_ : MultiTable[IRT.Method] = {
@@ -89,10 +89,8 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   def interfaces: Array[IRT.ClassType] = {
     val interfaceNames: Array[String] = javaClass.getInterfaceNames
     val interfaces: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaceNames.length)
-    var i: Int = 0
-    while (i < interfaces.length) {
+    for(i <- 0 until interfaces.length) {
       interfaces(i) = table.load(interfaceNames(i))
-      i += 1
     }
     interfaces
   }
@@ -112,10 +110,8 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   private def translate(method: Method): IRT.Method = {
     val arguments: Array[Type] = method.getArgumentTypes
     val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    var i: Int = 0
-    while (i < arguments.length) {
+    for(i <- 0 until arguments.length) {
       argumentSymbols(i) = bridge.toOnionType(arguments(i))
-      i += 1
     }
     val returnSymbol: IRT.Type = bridge.toOnionType(method.getReturnType)
     new ClassFileMethodRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols, returnSymbol)
@@ -129,10 +125,8 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   private def translateConstructor(method: Method): IRT.ConstructorRef = {
     val arguments: Array[Type] = method.getArgumentTypes
     val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    var i: Int = 0
-    while (i < arguments.length) {
+    for(i <- 0 until arguments.length) {
       argumentSymbols(i) = bridge.toOnionType(arguments(i))
-      i += 1
     }
     new ClassFileConstructorRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols)
   }

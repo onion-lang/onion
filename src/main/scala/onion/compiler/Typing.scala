@@ -57,8 +57,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   }
   private val table_  = new ClassTable(classpath(config.classPath))
   private val ast2ixt_ = Map[AST.Node, IRT.Node]()
-  private var ixt2ast_ = Map[IRT.Node, AST.Node]()
-  private var mappers_  = Map[String, NameMapper]()
+  private val ixt2ast_ = Map[IRT.Node, AST.Node]()
+  private val mappers_  = Map[String, NameMapper]()
   private var access_ : Int = _
   private var mapper_ : NameMapper = _
   private var importedList_ : ImportList = _

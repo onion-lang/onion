@@ -365,18 +365,15 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeExpressions(nodes: Array[IRT.Term], code: CodeGeneration.Proxy): InstructionHandle = {
-    var start: InstructionHandle = null
     if (nodes.length > 0) {
-      start = codeExpression(nodes(0), code)
-      var i: Int = 1
-      while (i < nodes.length) {
+      val start = codeExpression(nodes(0), code)
+      for(i <- 1 until nodes.length) {
         codeExpression(nodes(i), code)
-        i += 1;
       }
+      start
     } else {
-      start = code.append(InstructionConstants.NOP)
+      code.append(InstructionConstants.NOP)
     }
-    start
   }
 
   def codeConstructor(gen: ClassGen, node: IRT.ConstructorDefinition) {
@@ -387,17 +384,8 @@ class CodeGeneration(config: CompilerConfig) {
     code.setFrame(frame)
     val args: Array[String] = new Array[String](node.getArgs.length)
 
-    {
-      var i: Int = 0
-      while (i < args.length) {
-        {
-          args(i) = "arg" + i
-        }
-        ({
-          i += 1;
-          i
-        })
-      }
+    for(i <- 0 until args.length) {
+      args(i) = "arg" + i
     }
     var classType: ObjectType = typeOf(node.affiliation).asInstanceOf[ObjectType]
     val modifier: Int = toJavaModifier(node.modifier)

@@ -73,10 +73,8 @@ class ScriptRunner {
             val scriptParams: Array[String] = new Array[String](params.length - 1)
             val classes = compile(config, Array(params(0)))
             if(classes == null) return -1
-            var i: Int = 1
-            while (i < params.length) {
+            for(i <- 1 until params.length) {
               scriptParams(i - 1) = params(i)
-              i += 1
             }
             new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptParams)
         }

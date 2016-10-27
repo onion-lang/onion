@@ -31,14 +31,11 @@ object Boxing {
     }
     val aBoxedType: IRT.ClassType = boxedType(table, `type`.asInstanceOf[IRT.BasicType])
     val cs: Array[IRT.ConstructorRef] = aBoxedType.constructors
-    var i: Int = 0
-
-    while (i < cs.length) {
+    for(i <- 0 until cs.length) {
       val args: Array[IRT.Type] = cs(i).getArgs
       if ((args.length == 1) && (args(i) eq `type`)) {
         return new IRT.NewObject(cs(i), Array[IRT.Term](node))
       }
-      i += 1
     }
     throw new RuntimeException("couldn't find matched constructor")
   }

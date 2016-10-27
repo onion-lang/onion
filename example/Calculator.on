@@ -6,12 +6,12 @@ import{
 
 class Calculator : JFrame <: ActionListener {
 	@text			:JTextField;
-	@left			:long;
-	@right		:long;
-	@operator	:String;
-	@isError	:boolean;
+	@left			:Long;
+	@right		    :Long;
+	@operator	    :String;
+	@isError	    :Boolean;
 public:
-	def setValue(value : long) { @text.setText(Long::toString(value)); }
+	def setValue(value : Long) { @text.setText(JLong::toString(value)); }
 	def setValue(value : String) { @text.setText(value); }
 	def actionPerformed(event : ActionEvent) {
 		label = event.source$JButton.label;
@@ -19,7 +19,7 @@ public:
 			if @isError && !(label == "C") {
 				return;
 			}
-			input = Long::parseLong(label);
+			input = JLong::parseLong(label);
 			if @operator != null {
 				@right = @right * 10 + input;
 				setValue(@right);
@@ -32,7 +32,7 @@ public:
 				@left = 0;
 				@right = 0;
 				@operator	= null;
-				@text.setText(Long::toString(0));
+				@text.setText(JLong::toString(0));
 				@isError = false;
 			}else{
 				if @operator != null {

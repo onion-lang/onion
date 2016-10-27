@@ -29,11 +29,11 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
       val resultFib5 = shell.run(
         """
           |class Fib {
-          |  static def fib(n: int): int {
+          |  static def fib(n: Int): Int {
           |    if n < 2 { return 1; } else { return n * fib(n - 1); }
           |  }
           |public:
-          |  static def main(args: String[]): int {
+          |  static def main(args: String[]): Int {
           |    return fib(5);
           |  }
           |}

@@ -1,12 +1,12 @@
 interface Counter {
-  def count :int;
+  def count :Int;
 }
 
-def counter(begin :int, up :int) :Counter {
+def counter(begin :Int, up :Int) :Counter {
   return #Counter.count { return begin = begin + up; };
 }
 
-def printCounter(counter :Counter, times :int) {
+def printCounter(counter :Counter, times :Int) {
   for i = 0 ; i < times; i = i + 1 {
     System::out.println(counter.count);
   }

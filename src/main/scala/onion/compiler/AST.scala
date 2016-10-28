@@ -61,69 +61,69 @@ object AST {
   abstract sealed class Toplevel extends Node
   abstract sealed class Expression extends Node
   abstract sealed class BinaryExpression(val symbol: String) extends Expression {
-    def left: Expression
-    def right: Expression
+    def lhs: Expression
+    def rhs: Expression
   }
   abstract sealed class UnaryExpression(val symbol: String) extends Expression {
-    def target: Expression
+    def term: Expression
   }
-  case class Addition(location: Location, left: Expression, right: Expression) extends BinaryExpression("+")
-  case class AdditionAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("+=")
-  case class Assignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("=")
-  case class BitAnd(location: Location, left: Expression, right: Expression) extends BinaryExpression("&")
-  case class BitOr(location: Location, left: Expression, right: Expression) extends BinaryExpression("|")
+  case class Addition(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("+")
+  case class AdditionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("+=")
+  case class Assignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("=")
+  case class BitAnd(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&")
+  case class BitOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("|")
   case class BooleanLiteral(location: Location, value: Boolean) extends Expression
   case class Cast(location: Location, src: Expression, to: TypeNode) extends Expression
   case class CharacterLiteral(location: Location, value: Char) extends Expression
   case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
   case class CurrentInstance(location: Location) extends Expression
-  case class Division(location: Location, left: Expression, right: Expression) extends BinaryExpression("/")
-  case class DivisionAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("/=")
+  case class Division(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/")
+  case class DivisionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/=")
   case class DoubleLiteral(location: Location, value: Double) extends Expression
-  case class Elvis(location: Location, left: Expression, right: Expression) extends BinaryExpression(":?")
-  case class Equal(location: Location, left: Expression, right: Expression) extends BinaryExpression("==")
+  case class Elvis(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(":?")
+  case class Equal(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("==")
   case class FloatLiteral(location: Location, value: Float) extends Expression
-  case class GreaterOrEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression(">=")
-  case class GreaterThan(location: Location, left: Expression, right: Expression) extends BinaryExpression(">")
+  case class GreaterOrEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">=")
+  case class GreaterThan(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">")
   case class Id(location: Location, name: String) extends Expression
-  case class Indexing(location: Location, left: Expression, right: Expression) extends BinaryExpression("[]")
+  case class Indexing(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("[]")
   case class IntegerLiteral(location: Location, value: Int) extends Expression
   case class IsInstance(location: Location, target: Expression, typeRef: TypeNode) extends Expression
-  case class LessOrEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("<=")
-  case class LessThan(location: Location, left: Expression, right: Expression) extends BinaryExpression("<")
+  case class LessOrEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<=")
+  case class LessThan(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<")
   case class ListLiteral(location: Location, elements: List[Expression]) extends Expression
-  case class LogicalAnd(location: Location, left: Expression, right: Expression) extends BinaryExpression("&&")
-  case class LogicalOr(location: Location, left: Expression, right: Expression) extends BinaryExpression("||")
-  case class LogicalRightShift(location: Location, left: Expression, right: Expression) extends BinaryExpression(">>>")
+  case class LogicalAnd(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&&")
+  case class LogicalOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("||")
+  case class LogicalRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>>")
   case class LongLiteral(location: Location, value: Long) extends Expression
-  case class MathLeftShift(location: Location, left: Expression, right: Expression) extends BinaryExpression("<<")
-  case class MathRightShift(location: Location, left: Expression, right: Expression) extends BinaryExpression(">>")
+  case class MathLeftShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<")
+  case class MathRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>")
   case class MemberSelection(location: Location, target: Expression/*nullable*/, name: String) extends Expression
   case class MethodCall(location: Location, target: Expression/*nullable*/, name: String, args: List[Expression]) extends Expression
-  case class Modulo(location: Location, left: Expression, right: Expression) extends BinaryExpression("%")
-  case class ModuloAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("%=")
-  case class Multiplication(location: Location, left: Expression, right: Expression) extends BinaryExpression("*")
-  case class MultiplicationAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("*=")
-  case class Negate(location: Location, target: Expression) extends UnaryExpression("-")
+  case class Modulo(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("%")
+  case class ModuloAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("%=")
+  case class Multiplication(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("*")
+  case class MultiplicationAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("*=")
+  case class Negate(location: Location, term: Expression) extends UnaryExpression("-")
   case class NewArray(location: Location, typeRef: TypeNode, args: List[Expression]) extends Expression
   case class NewObject(location: Location, typeRef: TypeNode, args: List[Expression]) extends Expression
-  case class Not(location: Location, target: Expression) extends UnaryExpression("!")
-  case class NotEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("!=")
+  case class Not(location: Location, term: Expression) extends UnaryExpression("!")
+  case class NotEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("!=")
   case class NullLiteral(location: Location) extends Expression
-  case class Posit(location: Location, target: Expression) extends UnaryExpression("+")
-  case class PostDecrement(location: Location, target: Expression) extends UnaryExpression("--")
-  case class PostIncrement(location: Location, target: Expression) extends UnaryExpression("++")
-  case class ReferenceEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("===")
-  case class ReferenceNotEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("!==")
+  case class Posit(location: Location, term: Expression) extends UnaryExpression("+")
+  case class PostDecrement(location: Location, term: Expression) extends UnaryExpression("--")
+  case class PostIncrement(location: Location, term: Expression) extends UnaryExpression("++")
+  case class ReferenceEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("===")
+  case class ReferenceNotEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("!==")
   case class UnqualifiedFieldReference(location: Location, name: String) extends Expression
   case class UnqualifiedMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
   case class StaticMemberSelection(location: Location, typeRef: TypeNode, name: String) extends Expression
   case class StaticMethodCall(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) extends Expression
   case class StringLiteral(location: Location, value: String) extends Expression
-  case class Subtraction(location: Location, left: Expression, right: Expression) extends BinaryExpression("-")
-  case class SubtractionAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("-=")
+  case class Subtraction(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-")
+  case class SubtractionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-=")
   case class SuperMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
-  case class XOR(location: Location, left: Expression, right: Expression) extends BinaryExpression("^")
+  case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
 
   abstract sealed class Statement extends Toplevel
   case class BlockExpression(location: Location, elements: List[Statement]) extends Statement

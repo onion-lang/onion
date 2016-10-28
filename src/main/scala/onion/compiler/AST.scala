@@ -75,7 +75,7 @@ object AST {
   case class BooleanLiteral(location: Location, value: Boolean) extends Expression
   case class Cast(location: Location, src: Expression, to: TypeNode) extends Expression
   case class CharacterLiteral(location: Location, value: Char) extends Expression
-  case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockStatement) extends Expression
+  case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
   case class CurrentInstance(location: Location) extends Expression
   case class Division(location: Location, left: Expression, right: Expression) extends BinaryExpression("/")
   case class DivisionAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("/=")
@@ -90,7 +90,7 @@ object AST {
   case class IntegerLiteral(location: Location, value: Int) extends Expression
   case class IsInstance(location: Location, target: Expression, typeRef: TypeNode) extends Expression
   case class LessOrEqual(location: Location, left: Expression, right: Expression) extends BinaryExpression("<=")
-  case class LessThan(location: Location, left: Expression, right: Expression) extends BinaryExpression("<")  
+  case class LessThan(location: Location, left: Expression, right: Expression) extends BinaryExpression("<")
   case class ListLiteral(location: Location, elements: List[Expression]) extends Expression
   case class LogicalAnd(location: Location, left: Expression, right: Expression) extends BinaryExpression("&&")
   case class LogicalOr(location: Location, left: Expression, right: Expression) extends BinaryExpression("||")
@@ -123,34 +123,34 @@ object AST {
   case class Subtraction(location: Location, left: Expression, right: Expression) extends BinaryExpression("-")
   case class SubtractionAssignment(location: Location, left: Expression, right: Expression) extends BinaryExpression("-=")
   case class SuperMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
-  case class XOR(location: Location, left: Expression, right: Expression) extends BinaryExpression("^")  
-  
+  case class XOR(location: Location, left: Expression, right: Expression) extends BinaryExpression("^")
+
   abstract sealed class Statement extends Toplevel
-  case class BlockStatement(location: Location, elements: List[Statement]) extends Statement
-  case class BreakStatement(location: Location) extends Statement
-  case class BranchStatement(location: Location, clauses: List[(Expression, BlockStatement)], elseBlock: BlockStatement/*nullable*/) extends Statement
-  case class ContinueStatement(location: Location) extends Statement
-  case class EmptyStatement(location: Location) extends Statement
-  case class ExpressionStatement(location: Location, body: Expression) extends Statement
-  case class ForeachStatement(location: Location, arg: Argument, collection: Expression, statement: BlockStatement) extends Statement
-  case class ForStatement(location: Location, init: Statement, condition: Expression/*nullable*/, update: Expression/*nullable*/, block: BlockStatement) extends Statement
-  case class IfStatement(location: Location, condition: Expression, thenBlock: BlockStatement, elseBlock: BlockStatement/*nullable*/) extends Statement
+  case class BlockExpression(location: Location, elements: List[Statement]) extends Statement
+  case class BreakExpression(location: Location) extends Statement
+  case class BranchExpression(location: Location, clauses: List[(Expression, BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends Statement
+  case class ContinueExpression(location: Location) extends Statement
+  case class EmptyExpression(location: Location) extends Statement
+  case class ExpressionBox(location: Location, body: Expression) extends Statement
+  case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends Statement
+  case class ForExpression(location: Location, init: Statement, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends Statement
+  case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends Statement
   case class LocalVariableDeclaration(location: Location, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Statement
-  case class ReturnStatement(location: Location, result: Expression/*nullable*/) extends Statement
-  case class SelectStatement(location: Location, condition: Expression, cases: List[(List[Expression], BlockStatement)], elseBlock: BlockStatement/*nullable*/) extends Statement
-  case class SynchronizedStatement(location: Location, condition: Expression, block: BlockStatement) extends Statement
-  case class ThrowStatement(location: Location, target: Expression) extends Statement
-  case class TryStatement(location: Location, tryBlock: BlockStatement, recClauses: List[(Argument, BlockStatement)], finBlock: BlockStatement/*nullable*/) extends Statement
-  case class WhileStatement(location: Location, condition: Expression, block: BlockStatement) extends Statement
-  
-  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockStatement) extends Toplevel
+  case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends Statement
+  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Expression], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends Statement
+  case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends Statement
+  case class ThrowExpression(location: Location, target: Expression) extends Statement
+  case class TryExpression(location: Location, tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends Statement
+  case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends Statement
+
+  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) extends Toplevel
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
-  
-  abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String } 
-  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockStatement) extends MemberDeclaration
+
+  abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
+  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) extends MemberDeclaration
   case class FieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends MemberDeclaration
   case class DelegatedFieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression) extends MemberDeclaration
-  case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockStatement) extends MemberDeclaration { val name = "new" }
+  case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockExpression) extends MemberDeclaration {val name = "new" }
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }

@@ -1141,14 +1141,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }
     }
     def translate(node: AST.Statement, context: LocalContext): ActionStatement = node match {
-      case AST.BlockStatement(loc, elements) =>
+      case AST.BlockExpression(loc, elements) =>
         context.openScope {
           new StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
         }
-      case node@AST.BreakStatement(loc) =>
+      case node@AST.BreakExpression(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
         new Break(loc)
-      case node@AST.BranchStatement(loc, _, _) =>
+      case node@AST.BranchExpression(loc, _, _) =>
         context.openScope {
           val size = node.clauses.size
           val expressions = new Stack[Term]
@@ -1173,14 +1173,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
           return result
         }
-      case node@AST.ContinueStatement(loc) =>
+      case node@AST.ContinueExpression(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
         new Continue(loc)
-      case node@AST.EmptyStatement(loc) =>
+      case node@AST.EmptyExpression(loc) =>
         new NOP(loc)
-      case node@AST.ExpressionStatement(loc, body) =>
+      case node@AST.ExpressionBox(loc, body) =>
         typed(body, context).map{e =>  new ExpressionActionStatement(loc, e)}.getOrElse(new NOP(loc))
-      case node@AST.ForeachStatement(loc, _, _, _) =>
+      case node@AST.ForeachExpression(loc, _, _, _) =>
         context.openScope {
           val collection = typed(node.collection, context).getOrElse(null)
           val arg = node.arg
@@ -1214,7 +1214,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             new StatementBlock(init, block)
           }
         }
-      case node@AST.ForStatement(loc, _, _, _, _) =>
+      case node@AST.ForExpression(loc, _, _, _, _) =>
         context.openScope {
           val init = Option(node.init).map{init => translate(init, context)}.getOrElse(new NOP(loc))
           val condition = (for(c <- Option(node.condition)) yield {
@@ -1230,7 +1230,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           if(update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
           new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
         }
-      case node@AST.IfStatement(loc, _, _, _) =>
+      case node@AST.IfExpression(loc, _, _, _) =>
         context.openScope {
           val conditionOpt = typed(node.condition, context)
           val expected = BasicType.BOOLEAN
@@ -1265,7 +1265,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           local = new SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
         }
         new ExpressionActionStatement(local)
-      case node@AST.ReturnStatement(loc, _) =>
+      case node@AST.ReturnExpression(loc, _) =>
         val returnType = context.returnType
         if(node.result == null) {
           val expected  = BasicType.VOID
@@ -1285,7 +1285,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             }
           }).getOrElse(new Return(loc, null))
         }
-      case node@AST.SelectStatement(loc, _, _, _) =>
+      case node@AST.SelectExpression(loc, _, _, _) =>
         val conditionOpt = typed(node.condition, context)
         if(conditionOpt == None) return new NOP(loc)
         val condition = conditionOpt.get
@@ -1313,14 +1313,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           branches
         }
         new StatementBlock(condition.location, new ExpressionActionStatement(condition.location, new SetLocal(0, index, condition.`type`, condition)), statement)
-      case node@AST.SynchronizedStatement(loc, _, _) =>
+      case node@AST.SynchronizedExpression(loc, _, _) =>
         context.openScope {
           val lock = typed(node.condition, context).getOrElse(null)
           val block = translate(node.block, context)
           report(UNIMPLEMENTED_FEATURE, node)
           new Synchronized(node.location, lock, block)
         }
-      case node@AST.ThrowStatement(loc, target) =>
+      case node@AST.ThrowExpression(loc, target) =>
         val expressionOpt = typed(target, context)
         for(expression <- expressionOpt) {
           val expected = load("java.lang.Throwable")
@@ -1330,7 +1330,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
         }
         new Throw(loc, expressionOpt.getOrElse(null))
-      case node@AST.TryStatement(loc, tryBlock, recClauses, finBlock) =>
+      case node@AST.TryExpression(loc, tryBlock, recClauses, finBlock) =>
         val tryStatement = translate(tryBlock, context)
         val binds = new Array[ClosureLocalBinding](recClauses.length)
         val catchBlocks = new Array[ActionStatement](recClauses.length)
@@ -1347,7 +1347,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
         }
         new Try(loc, tryStatement, binds, catchBlocks)
-      case node@AST.WhileStatement(loc, _, _) =>
+      case node@AST.WhileExpression(loc, _, _) =>
         context.openScope {
           val conditionOpt = typed(node.condition, context)
           val expected = BasicType.BOOLEAN

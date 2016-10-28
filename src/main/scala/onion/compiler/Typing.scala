@@ -900,7 +900,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             var block = translate(node.body, context)
             block = addReturnNode(block, method.returnType)
             val result = new NewClosure(typeRef, method, block)
-            result.setFrame(context.getContextFrame)
+            result.frame_=(context.getContextFrame)
             Some(result)
           }
         }

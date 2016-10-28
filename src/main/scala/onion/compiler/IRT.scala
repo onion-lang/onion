@@ -485,31 +485,22 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  class NewClosure(location: Location, val `type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) extends Term(location) {
-    private var frame: LocalFrame = null
+  class NewClosure(location: Location, val `type`: IRT.ClassType, val method: IRT.Method, val block: IRT.ActionStatement) extends Term(location) {
+    var frame: LocalFrame = null
 
     def this(`type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) {
       this(null, `type`, method, block)
     }
 
-    def getModifier: Int = method.modifier
+    def modifier: Int = method.modifier
 
-    def getClassType: IRT.ClassType = `type`
+    def classType: IRT.ClassType = `type`
 
-    def getMethod: IRT.Method = method
+    def name: String = method.name
 
-    def getName: String = method.name
+    def arguments: Array[IRT.Type] = method.arguments
 
-    def getArguments: Array[IRT.Type] = method.arguments
-
-    def getReturnType: IRT.Type =  method.returnType
-
-    def getBlock: IRT.ActionStatement = block
-
-    def setFrame(frame: LocalFrame): Unit = this.frame = frame
-
-    def getFrame: LocalFrame = frame
-
+    def returnType: IRT.Type =  method.returnType
   }
 
   /**

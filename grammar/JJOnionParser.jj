@@ -387,11 +387,11 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
   (ty=interface_decl(modifiers) | ty=class_decl(modifiers)) {return ty;}
 }
 
-AST.BlockExpression block():{Token t; List<AST.Statement> statements = (List<AST.Statement>)AST.NIL(); AST.BlockExpression s;}{
+AST.BlockExpression block():{Token t; List<AST.CompoundExpression> statements = (List<AST.CompoundExpression>)AST.NIL(); AST.BlockExpression s;}{
   t="{" [statements=statements()] "}" {return new AST.BlockExpression(p(t), statements);}
 }
 
-List<AST.Statement> statements():{ AST.Statement s; ArrayBuffer<AST.Statement> statements = new ArrayBuffer<AST.Statement>(); }{
+List<AST.CompoundExpression> statements():{ AST.CompoundExpression s; ArrayBuffer<AST.CompoundExpression> statements = new ArrayBuffer<AST.CompoundExpression>(); }{
   (s=statement() { append(statements, s); })+ {return toList(statements);}
 }
 
@@ -596,7 +596,7 @@ AST.FieldDeclaration field_decl(int modifiers):{
   }
 }
 
-AST.Statement statement():{AST.Statement s;}{
+AST.CompoundExpression statement():{AST.CompoundExpression s;}{
   LOOKAHEAD(2)
   s=local_var_statement()    {return s;}
 | s=if_statement()           {return s;}
@@ -655,7 +655,7 @@ AST.IfExpression if_statement() :{Token t; AST.Expression e; AST.BlockExpression
 AST.BranchExpression branch_statement() : {
   Token t, t2; AST.Expression e;
   ArrayBuffer<Tuple2<AST.Expression, AST.BlockExpression>> es = new ArrayBuffer<Tuple2<AST.Expression, AST.BlockExpression>>();
-  List<AST.Statement> ss = null; AST.BlockExpression elseBlock = null;
+  List<AST.CompoundExpression> ss = null; AST.BlockExpression elseBlock = null;
 }{
   t="branch" "{"
     (("case" e=term() ":" ss=statements()) {append(es, new Tuple2<AST.Expression, AST.BlockExpression>(e, new AST.BlockExpression(e.location(), ss)));})+
@@ -666,7 +666,7 @@ AST.BranchExpression branch_statement() : {
 AST.SelectExpression select_statement() :{
   Token t1, t2; AST.Expression e1, e2;
   ArrayBuffer<AST.Expression> es = new ArrayBuffer<AST.Expression>();
-  List<AST.Statement> ss = null;
+  List<AST.CompoundExpression> ss = null;
   ArrayBuffer<Tuple2<List<AST.Expression>, AST.BlockExpression>> branches = new ArrayBuffer<Tuple2<List<AST.Expression>, AST.BlockExpression>>();
   AST.BlockExpression elseBlock = null ;
 }{
@@ -698,7 +698,7 @@ AST.ForeachExpression foreach_statement() :{Token t; AST.Argument a; AST.Express
   }
 }
 
-AST.ForExpression for_statement() :{Token t; AST.Statement s; AST.Expression e1 = null, e2 = null; AST.BlockExpression b;}{
+AST.ForExpression for_statement() :{Token t; AST.CompoundExpression s; AST.Expression e1 = null, e2 = null; AST.BlockExpression b;}{
   t="for" (LOOKAHEAD(2) s=local_var_statement() | s=exp_statement() | s=empty_statement())
   [e1=term()] ";" [e2=term()] b=block() {
   	return new AST.ForExpression(p(t), s, e1, e2, b);

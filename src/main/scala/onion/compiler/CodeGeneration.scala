@@ -517,14 +517,14 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeClosure(node: IRT.NewClosure, code: CodeGeneration.Proxy): InstructionHandle = {
-    val classType: IRT.ClassType = node.getClassType
+    val classType: IRT.ClassType = node.classType
     val closureName: String = generator.generate
-    val arguments: Array[Type] = typesOf(node.getArguments)
+    val arguments: Array[Type] = typesOf(node.arguments)
     val gen: ClassGen = new ClassGen(closureName, "java.lang.Object", "<generated>", Constants.ACC_PUBLIC, Array[String](classType.name))
     val methods: Set[_] = Classes.getInterfaceMethods(classType)
-    methods.remove(node.getMethod)
+    methods.remove(node.method)
     implementsMethods(gen, methods.toArray(new Array[IRT.Method](0)).asInstanceOf[Array[IRT.Method]])
-    val frame: LocalFrame = node.getFrame
+    val frame: LocalFrame = node.frame
     val depth: Int = frame.depth
     var i: Int = 1
     while (i <= depth) {
@@ -537,11 +537,11 @@ class CodeGeneration(config: CompilerConfig) {
     var method: MethodGen = createClosureConstructor(closureName, types, gen.getConstantPool)
     gen.addMethod(method.getMethod)
     val closureCode: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
-    method = new MethodGen(Constants.ACC_PUBLIC, typeOf(node.getReturnType), arguments, names(arguments.length), node.getName, closureName, closureCode.getCode, gen.getConstantPool)
+    method = new MethodGen(Constants.ACC_PUBLIC, typeOf(node.returnType), arguments, names(arguments.length), node.name, closureName, closureCode.getCode, gen.getConstantPool)
     closureCode.setMethod(method)
     closureCode.setFrame(frame)
     if (frame.closed) {
-      val frameObjectIndexLocal = frameObjectIndex(1, node.getArguments)
+      val frameObjectIndexLocal = frameObjectIndex(1, node.arguments)
       closureCode.setFrameObjectIndex(frameObjectIndexLocal)
       closureCode.setIndexTable(makeIndexTableForClosureFrame(frame))
       appendInitialCode(closureCode, frame, arguments, 1)
@@ -553,7 +553,7 @@ class CodeGeneration(config: CompilerConfig) {
     val currentClosureNameOld: String = currentClosureName
     isClosure = true
     currentClosureName = closureName
-    codeStatement(node.getBlock, closureCode)
+    codeStatement(node.block, closureCode)
     isClosure = isClosureOld
     currentClosureName = currentClosureNameOld
     method.setMaxLocals

@@ -125,23 +125,23 @@ object AST {
   case class SuperMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
 
-  abstract sealed class Statement extends Toplevel
-  case class BlockExpression(location: Location, elements: List[Statement]) extends Statement
-  case class BreakExpression(location: Location) extends Statement
-  case class BranchExpression(location: Location, clauses: List[(Expression, BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends Statement
-  case class ContinueExpression(location: Location) extends Statement
-  case class EmptyExpression(location: Location) extends Statement
-  case class ExpressionBox(location: Location, body: Expression) extends Statement
-  case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends Statement
-  case class ForExpression(location: Location, init: Statement, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends Statement
-  case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends Statement
-  case class LocalVariableDeclaration(location: Location, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Statement
-  case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends Statement
-  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Expression], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends Statement
-  case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends Statement
-  case class ThrowExpression(location: Location, target: Expression) extends Statement
-  case class TryExpression(location: Location, tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends Statement
-  case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends Statement
+  abstract sealed class CompoundExpression extends Toplevel
+  case class BlockExpression(location: Location, elements: List[CompoundExpression]) extends CompoundExpression
+  case class BreakExpression(location: Location) extends CompoundExpression
+  case class BranchExpression(location: Location, clauses: List[(Expression, BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
+  case class ContinueExpression(location: Location) extends CompoundExpression
+  case class EmptyExpression(location: Location) extends CompoundExpression
+  case class ExpressionBox(location: Location, body: Expression) extends CompoundExpression
+  case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends CompoundExpression
+  case class ForExpression(location: Location, init: CompoundExpression, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends CompoundExpression
+  case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
+  case class LocalVariableDeclaration(location: Location, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends CompoundExpression
+  case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends CompoundExpression
+  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Expression], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
+  case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
+  case class ThrowExpression(location: Location, target: Expression) extends CompoundExpression
+  case class TryExpression(location: Location, tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends CompoundExpression
+  case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
 
   case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) extends Toplevel
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel

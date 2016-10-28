@@ -1140,7 +1140,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             None
         }
     }
-    def translate(node: AST.Statement, context: LocalContext): ActionStatement = node match {
+    def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
       case AST.BlockExpression(loc, elements) =>
         context.openScope {
           new StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
@@ -1391,7 +1391,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     for (element <- toplevels) {
       if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass
       element match {
-        case node: AST.Statement =>
+        case node: AST.CompoundExpression =>
           context.setMethod(method)
           statements += translate(node, context)
         case _ =>

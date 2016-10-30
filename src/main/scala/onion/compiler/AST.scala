@@ -128,7 +128,6 @@ object AST {
   abstract sealed class CompoundExpression extends Toplevel
   case class BlockExpression(location: Location, elements: List[CompoundExpression]) extends CompoundExpression
   case class BreakExpression(location: Location) extends CompoundExpression
-  case class BranchExpression(location: Location, clauses: List[(Expression, BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
   case class ContinueExpression(location: Location) extends CompoundExpression
   case class EmptyExpression(location: Location) extends CompoundExpression
   case class ExpressionBox(location: Location, body: Expression) extends CompoundExpression

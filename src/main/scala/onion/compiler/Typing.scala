@@ -1148,31 +1148,6 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       case node@AST.BreakExpression(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
         new Break(loc)
-      case node@AST.BranchExpression(loc, _, _) =>
-        context.openScope {
-          val size = node.clauses.size
-          val expressions = new Stack[Term]
-          val statements = new Stack[ActionStatement]
-          for((expression, statement) <- node.clauses) {
-            val typedExpression = typed(expression, context).getOrElse(null)
-            if (typedExpression != null && typedExpression.`type` != BasicType.BOOLEAN) {
-              val expect = BasicType.BOOLEAN
-              val actual = typedExpression.`type`
-              report(INCOMPATIBLE_TYPE, expression, expect, actual)
-            }
-            expressions.push(typedExpression)
-            statements.push(translate(statement, context))
-          }
-          val elseStatement = node.elseBlock
-          var result: ActionStatement = null
-          if (elseStatement != null) {
-            result = translate(elseStatement, context)
-          }
-          for(i <- 0 until size) {
-            result = new IfStatement(expressions.pop(), statements.pop(), result)
-          }
-          return result
-        }
       case node@AST.ContinueExpression(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
         new Continue(loc)

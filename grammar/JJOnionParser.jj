@@ -155,7 +155,6 @@ TOKEN:
 | <K_CASE:         "case"         >
 | <K_CHAR:         "Char"  >
 | <K_CLASS:        "class"        >
-| <K_BRANCH:       "branch"       >
 | <K_CONST:        "const"        >
 | <K_CONTINUE:     "continue"    >
 | <K_DEF:          "def"          >
@@ -603,7 +602,6 @@ AST.CompoundExpression statement():{AST.CompoundExpression s;}{
 | s=while_statement()        {return s;}
 | s=for_statement()          {return s;}
 | s=select_statement()       {return s;}
-| s=branch_statement()       {return s;}
 | s=block()                  {return s;}
 | s=try_statement()          {return s;}
 | s=throw_statement()        {return s;}
@@ -650,17 +648,6 @@ AST.EmptyExpression empty_statement() :{Token t;}{
 
 AST.IfExpression if_statement() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null;}{
   t="if" e=term() b1=block() [LOOKAHEAD(2) "else" b2=block()] {return new AST.IfExpression(p(t), e, b1, b2);}
-}
-
-AST.BranchExpression branch_statement() : {
-  Token t, t2; AST.Expression e;
-  ArrayBuffer<Tuple2<AST.Expression, AST.BlockExpression>> es = new ArrayBuffer<Tuple2<AST.Expression, AST.BlockExpression>>();
-  List<AST.CompoundExpression> ss = null; AST.BlockExpression elseBlock = null;
-}{
-  t="branch" "{"
-    (("case" e=term() ":" ss=statements()) {append(es, new Tuple2<AST.Expression, AST.BlockExpression>(e, new AST.BlockExpression(e.location(), ss)));})+
-    [t2="else" ":" ss=statements() {elseBlock = new AST.BlockExpression(p(t2), ss);}]
-  "}" { return new AST.BranchExpression(p(t), toList(es), elseBlock); }
 }
 
 AST.SelectExpression select_statement() :{

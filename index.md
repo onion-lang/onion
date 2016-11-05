@@ -3,7 +3,7 @@ title: Programming Language Onion
 layout: default
 ---
 
-<div class="container body">
+<div class="container">
 
 [Onion](https://github.com/onion-lang/onion) is an object-oriented and statically typed
 programming language for JVM.  Compiled codes doesn't require any runtime library unless

@@ -2,7 +2,7 @@ package onion.compiler
 
 import onion.compiler.AST.AccessSection
 
-import _root_.scala.collection.JavaConversions._
+import _root_.scala.collection.JavaConverters._
 import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.IRT._
@@ -1381,7 +1381,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     if (klass != null) {
       statements += new Return(null)
-      method.setBlock(new StatementBlock(statements))
+      method.setBlock(new StatementBlock(statements.asJava))
       method.setFrame(context.getContextFrame)
       klass.add(method)
       klass.add(createMain(klass, method, "main", Array[Type](argsType), BasicType.VOID))
@@ -1458,7 +1458,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       def generateDelegationMethods(node: FieldDefinition) {
         val typeRef = node.`type`.asInstanceOf[ClassType]
         val src = Classes.getInterfaceMethods(typeRef)
-        for (method <- src) {
+        for (method <- src.asScala) {
           if (!methodSet.contains(method)) {
             if (generated.contains(method)) {
               report(DUPLICATE_GENERATED_METHOD, node.location, method.affiliation, method.name, method.arguments)
@@ -1471,7 +1471,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
           }
         }
       }
-      for (node <- fields) {
+      for (node <- fields.asScala) {
         if ((AST.M_FORWARDED & node.modifier) != 0) generateDelegationMethods(node.asInstanceOf[FieldDefinition])
       }
     }

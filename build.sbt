@@ -25,7 +25,7 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
   val map = libs.map(source => (source.asFile, libdir / source.getName))
   IO.copy(map)
   IO.copyDirectory(file("bin"), out / "bin")
-  IO.copyDirectory(file("example"), out / "example")
+  IO.copyDirectory(file("run"), out / "run")
   IO.copyFile(artifact, out / "onion.jar")
   IO.copyFile(file("README.md"), out / "README.md")
   val files = (out ***).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))
@@ -53,7 +53,7 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
 
 lazy val onionSettings = Seq(
   version := "0.2-SNAPSHOT",
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.0",
   name := "onion",
   organization := "org.onion_lang",
   unmanagedSourceDirectories in Compile <<= (Seq(javaSource in Compile) ++ Seq(scalaSource in Compile) ++ Seq(sourceManaged in Compile)).join,

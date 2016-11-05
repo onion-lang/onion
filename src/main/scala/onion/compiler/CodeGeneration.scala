@@ -346,14 +346,14 @@ class CodeGeneration(config: CompilerConfig) {
     val className: String = node.name
     generator = new SymbolGenerator(className + CLOSURE_CLASS_SUFFIX)
     val superClass: String = node.superClass.name
-    val interfaces: Array[String] = namesOf(node.interfaces)
+    val interfaces = namesOf(node.interfaces)
     val file: String = node.getSourceFile
-    val gen: ClassGen = new ClassGen(className, superClass, file, modifier, interfaces)
+    val gen: ClassGen = new ClassGen(className, superClass, file, modifier, interfaces.toArray)
     val constructors: Array[IRT.ConstructorRef] = node.constructors
     for (ref <- constructors) {
       codeConstructor(gen, (ref.asInstanceOf[IRT.ConstructorDefinition]))
     }
-    val methods: Array[IRT.Method] = node.methods
+    val methods = node.methods
     for (ref <- methods) {
       codeMethod(gen, (ref.asInstanceOf[IRT.MethodDefinition]))
     }
@@ -845,7 +845,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def nameOf(symbol: IRT.ClassType): String = symbol.name
 
-  private def namesOf(symbols: Array[IRT.ClassType]): Array[String] = symbols.map{ s => nameOf(s)}
+  private def namesOf(symbols: Seq[IRT.ClassType]): Seq[String] = symbols.map{ s => nameOf(s)}
 
   def codeExpression(node: IRT.Term, code: CodeGeneration.Proxy): InstructionHandle = {
     var start: InstructionHandle = null
@@ -1674,7 +1674,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   private def makeIndexTableFor(origin: Int, frame: LocalFrame): Array[Int] = {
-    val bindings: Array[LocalBinding] = frame.entries
+    val bindings: Seq[LocalBinding] = frame.entries
     val indexTable: Array[Int] = new Array[Int](bindings.length)
     var maxIndex: Int = origin
     var i: Int = 0
@@ -1691,7 +1691,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   private def makeIndexTableForClosureFrame(frame: LocalFrame): Array[Int] = {
-    val bindings: Array[LocalBinding] = frame.entries
+    val bindings: Seq[LocalBinding] = frame.entries
     val indexTable: Array[Int] = new Array[Int](bindings.length)
     var maxIndex: Int = 0
     var i: Int = 0

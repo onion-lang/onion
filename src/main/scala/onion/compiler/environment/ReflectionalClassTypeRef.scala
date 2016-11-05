@@ -57,18 +57,18 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
     superClass
   }
 
-  def interfaces: Array[IRT.ClassType] = {
+  def interfaces: Seq[IRT.ClassType] = {
     val interfaces: Array[Class[_]] = klass.getInterfaces
     val interfaceSyms: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaces.length)
-    for(i <- 0 until interfaces.length) {
+    for(i <- interfaces.indices) {
       interfaceSyms(i) = table.load(interfaces(i).getName)
     }
     interfaceSyms
   }
 
-  def methods: Array[IRT.Method] = {
+  def methods: Seq[IRT.Method] = {
     requireMethodTable
-    methods_.values.toArray
+    methods_.values
   }
 
   def methods(name: String): Array[IRT.Method] = {

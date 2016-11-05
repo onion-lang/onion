@@ -17,7 +17,7 @@ def process(file: File, callback: Function1) {
   }
 }
 lines = 0;
-foreach file: File in [new File("src"), new File("src.scala"), new File("grammar")] {
+foreach file: File in [new File("src"), new File("run")] {
   process(file, #(file: Object){
     f = file$File;
     if f.name.endsWith(".scala") || f.name.endsWith(".java") || f.name.endsWith(".jj") {

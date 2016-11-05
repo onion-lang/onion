@@ -86,16 +86,16 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
     superClass
   }
 
-  def interfaces: Array[IRT.ClassType] = {
-    val interfaceNames: Array[String] = javaClass.getInterfaceNames
+  override def interfaces: Seq[IRT.ClassType] = {
+    val interfaceNames: Seq[String] = javaClass.getInterfaceNames
     val interfaces: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaceNames.length)
-    for(i <- 0 until interfaces.length) {
+    for(i <- interfaces.indices) {
       interfaces(i) = table.load(interfaceNames(i))
     }
     interfaces
   }
 
-  def methods: Array[IRT.Method] =  methods_.values.toArray
+  def methods: Seq[IRT.Method] =  methods_.values
 
   def methods(name: String): Array[IRT.Method] =  methods_.get(name).toArray
 

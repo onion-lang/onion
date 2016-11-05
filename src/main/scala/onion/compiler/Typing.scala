@@ -1680,7 +1680,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       Left(true)
     }
   }
-  private def matches(argTypes: Array[Type], name: String, methods: Array[Method]): Method = {
+  private def matches(argTypes: Array[Type], name: String, methods: Seq[Method]): Method = {
     methods.find{m =>  name == m.name && equals(argTypes, m.arguments)}.getOrElse(null)
   }
   private def equals(ltype: Array[Type], rtype: Array[Type]): Boolean = {

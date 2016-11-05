@@ -3,7 +3,7 @@ def input(prompt :String, reader :BufferedReader) :String {
   return reader.readLine;
 }
 
-def fact(n :int): Int {
+def fact(n :Int): Int {
   if n < 2 { return 1; }
   else { return n * fact(n - 1); }
 }

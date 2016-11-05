@@ -8,6 +8,7 @@
 package onion.compiler
 
 import java.util
+import java.util.Arrays
 import scala.collection.mutable
 
 /**
@@ -33,16 +34,14 @@ class LocalFrame(val parent: LocalFrame) {
     }
   }
 
-  def entries: Array[LocalBinding] = {
+  def entries: Seq[LocalBinding] = {
     val binds: Array[LocalBinding] = entrySet.toArray
-    util.Arrays.sort(binds, new util.Comparator[LocalBinding] {
-      def compare(b1: LocalBinding, b2: LocalBinding): Int = {
-        val i1 = b1.index
-        val i2 = b2.index
-        if (i1 < i2) -1 else if (i1 > i2) 1 else 0
-      }
+    Arrays.sort(binds, (b1: LocalBinding, b2: LocalBinding) => {
+      val i1 = b1.index
+      val i2 = b2.index
+      if (i1 < i2) -1 else if (i1 > i2) 1 else 0
     })
-    binds
+    binds.toSeq
   }
 
   def add(name: String, `type` : IRT.Type): Int = {

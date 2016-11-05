@@ -1,8 +1,11 @@
 package onion.compiler
 
 import collection.mutable.ArrayBuffer
-import collection.JavaConversions._
-import java.io.{Reader, IOException}
+import collection.JavaConverters._
+import java.io.{IOException, Reader}
+import java.util.Arrays.ArrayList
+import java.util.Collections
+
 import _root_.onion.compiler.toolbox.Messages
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.parser.{JJOnionParser, ParseException}
@@ -29,7 +32,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           problems += new CompileError(source(i).name, new Location(error.beginLine, error.beginColumn), Messages("error.parsing.syntax_error", error.image, expected))
       }
     }
-    if(problems.length > 0) throw new CompilationException(problems)
+    if(problems.length > 0) throw new CompilationException(problems.asJava)
     buffer.toArray
   }
 

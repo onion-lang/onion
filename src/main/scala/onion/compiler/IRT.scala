@@ -250,11 +250,11 @@ object IRT {
     def newClass(modifier: Int, name: String): IRT.ClassDefinition =  new IRT.ClassDefinition(null, false, modifier, name, null, null)
   }
 
-  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: IRT.ClassType, var interfaces: Array[IRT.ClassType])
+  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: IRT.ClassType, var interfaces: Seq[IRT.ClassType])
     extends IRT.AbstractClassType() with Node with Named {
 
     def constructors: Array[IRT.ConstructorRef] = constructors_.toArray(new Array[IRT.ConstructorRef](0))
-    def methods: Array[IRT.Method] = methods_.values.toArray
+    def methods: Seq[IRT.Method] = methods_.values.toSeq
     def fields: Array[IRT.FieldRef] = fields_.values.toArray
 
     val fields_ : OrderedTable[IRT.FieldRef]     = new OrderedTable[IRT.FieldRef]
@@ -727,7 +727,7 @@ object IRT {
    */
   class ArrayType(val component: IRT.Type, val dimension: Int, table: ClassTable) extends AbstractObjectType {
     val superClass: IRT.ClassType        = table.load("java.lang.Object")
-    val interfaces: Array[IRT.ClassType] = Array[IRT.ClassType](table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
+    val interfaces: Seq[IRT.ClassType] = Seq(table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
     var name: String                     = "[" * dimension + component.name
 
     def base: IRT.Type =  if (dimension == 1) component else table.loadArray(component, dimension - 1)
@@ -736,7 +736,7 @@ object IRT {
 
     def modifier: Int = 0
 
-    def methods: Array[IRT.Method] = superClass.methods
+    def methods: Seq[IRT.Method] = superClass.methods
 
     def methods(name: String): Array[IRT.Method] =  superClass.methods(name)
 
@@ -883,7 +883,7 @@ object IRT {
       if (field != null) return field
       field = find(target.superClass, name)
       if (field != null) return field
-      val interfaces: Array[IRT.ClassType] = target.interfaces
+      val interfaces = target.interfaces
       for (anInterface <- target.interfaces) {
         field = find(anInterface, name)
         if (field != null) return field
@@ -955,7 +955,7 @@ object IRT {
       }
       val superClass: IRT.ClassType = target.superClass
       find(methods, superClass, name, params)
-      val interfaces: Array[IRT.ClassType] = target.interfaces
+      val interfaces = target.interfaces
       for (anInterface <- interfaces) {
         find(methods, anInterface, name, params)
       }
@@ -1024,9 +1024,9 @@ object IRT {
 
     def superClass: IRT.ClassType
 
-    def interfaces: Array[IRT.ClassType]
+    def interfaces: Seq[IRT.ClassType]
 
-    def methods: Array[IRT.Method]
+    def methods: Seq[IRT.Method]
 
     def methods(name: String): Array[IRT.Method]
 

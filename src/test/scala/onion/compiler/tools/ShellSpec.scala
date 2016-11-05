@@ -44,6 +44,7 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
       def factorial(n: Int): Int = if(n < 2) 1 else n * factorial(n - 1)
       assertResult(Shell.Success(factorial(5)))(resultFac5)
     }
+
     scenario("shows result of cat using foreach") {
       val resultCat = shell.run(
         """
@@ -65,5 +66,20 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
       def cat(list: List[String]): String = list.mkString
       assertResult(Shell.Success(cat(List("A", "B", "C", "D"))))(resultCat)
     }
+
+    scenario("a function with body is a expression") {
+      val resultExpressionBody = shell.run(
+        """
+          |class ExpressionBody {
+          |public:
+          |  static def main(args: String[]): String = "ExpressionBody";
+          |}
+        """.stripMargin,
+         "None",
+         Array()
+      )
+      assertResult(Shell.Success("ExpressionBody"))(resultExpressionBody)
+    }
+
   }
 }

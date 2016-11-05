@@ -40,9 +40,18 @@ public class JJOnionParser implements Parser {
   }
 
   /*
-   * workaround for Scala types beging used from Java
+   * workaround for Scala types being used from Java
    */
   private static <A> List<A> toList(Buffer<A> buffer) {
+    return (List<A>)buffer.toList();
+  }
+
+  /*
+   * workaround for Scala types being used from Java
+   */
+  private static <A> List<A> asList(A element) {
+    ArrayBuffer<A> buffer = new ArrayBuffer<A>();
+    append(buffer, element);
     return (List<A>)buffer.toList();
   }
 
@@ -66,8 +75,6 @@ public class JJOnionParser implements Parser {
   private static String c(Token t) {
     return t.image;
   }
-
-
 
   /*
    * converience method to create substring
@@ -201,6 +208,7 @@ TOKEN:
 | <K_WHEN:         "when"         >
 | <K_WHILE:        "while"        >
 }
+
 
 /*
 * OPERATORS
@@ -376,10 +384,19 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty = null;
   AST.BlockExpression b = null;
+  AST.Expression e = null;
 }{
-  t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";") {
-    return new AST.FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
-  }
+  t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()]
+  (  (b=block() | ";") {
+       return new AST.FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
+     }
+  |  ("=" e=term() ";") {
+       return new AST.FunctionDeclaration(
+         p(t1), modifiers, t1.image, args, ty,
+         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)))
+       );
+     }
+  )
 }
 
 AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
@@ -503,10 +520,19 @@ AST.MethodDeclaration method_decl(int mset) : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty = null;
   AST.BlockExpression b = null;
+  AST.Expression e = null;
 }{
-  "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()] (b=block() | ";" ) {
-    return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
-  }
+  "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()]
+  (  (b=block() | ";" ) {
+       return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
+     }
+  |  ("=" e=term() ";") {
+       return new AST.MethodDeclaration(
+         p(t), mset, t.image, args, ty,
+         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)))
+       );
+     }
+  )
 }
 
 AST.MethodDeclaration interface_method_decl() : {

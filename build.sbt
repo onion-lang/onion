@@ -68,8 +68,9 @@ lazy val onionSettings = Seq(
     "org.scalatest" %% "scalatest" % "3.0.0" % "test"
   ),
   sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
-    val targetDir = dir / "java" / "onion" / "compiler" / "parser"
-    if(!targetDir.isDirectory) {
+    val parser = dir / "java" / "onion" / "compiler" / "parser" / "JJOnionParser.java"
+    val grammar = new java.io.File("grammar") / "JJOnionParser.jj"
+    if(grammar.lastModified() > parser.lastModified()) {
       javacc(cp, dir / "java", s.log)
     } else {
       Seq()

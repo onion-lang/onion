@@ -2,15 +2,15 @@ package onion.compiler.tools
 
 
 import onion.tools.Shell
-import org.scalatest.{BeforeAndAfter, FeatureSpec, GivenWhenThen}
+import org.scalatest._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
-  feature("Shell") {
+class ShellSpec extends FunSpec with DiagrammedAssertions {
+  describe("Shell") {
     val shell = Shell(Seq())
-    scenario("shows 'Hello, World'") {
+    it("shows 'Hello, World'") {
       val resultHelloWorld = shell.run(
         """
           |class HelloWorld {
@@ -23,9 +23,9 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
         "None",
         Array()
       )
-      assertResult(Shell.Success("Hello, World"))(resultHelloWorld)
+      assert(Shell.Success("Hello, World") == resultHelloWorld)
     }
-    scenario("shows result of fib(5)") {
+    it("shows result of fib(5)") {
       val resultFac5 = shell.run(
         """
           |class Fib {
@@ -42,10 +42,11 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
         Array()
       )
       def factorial(n: Int): Int = if(n < 2) 1 else n * factorial(n - 1)
-      assertResult(Shell.Success(factorial(5)))(resultFac5)
+      val answer = factorial(5)
+      assert(Shell.Success(answer) == resultFac5)
     }
 
-    scenario("shows result of cat using foreach") {
+    it("shows result of cat using foreach") {
       val resultCat = shell.run(
         """
           |class Cat {
@@ -64,10 +65,11 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
          Array()
       )
       def cat(list: List[String]): String = list.mkString
-      assertResult(Shell.Success(cat(List("A", "B", "C", "D"))))(resultCat)
+      val answer = cat(List("A", "B", "C", "D"))
+      assert(Shell.Success(answer) == resultCat)
     }
 
-    scenario("a function with body is a expression") {
+    it("a function with body is a expression") {
       val resultExpressionBody = shell.run(
         """
           |class ExpressionBody {
@@ -78,7 +80,7 @@ class ShellSpec extends FeatureSpec with GivenWhenThen with BeforeAndAfter{
          "None",
          Array()
       )
-      assertResult(Shell.Success("ExpressionBody"))(resultExpressionBody)
+      assert(Shell.Success("ExpressionBody") == resultExpressionBody)
     }
 
   }

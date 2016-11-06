@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -73,10 +73,10 @@ object CodeGeneration {
   class Proxy(pool: ConstantPoolGen) {
     private val code: InstructionList = new InstructionList()
     private val factory: InstructionFactory = new InstructionFactory(pool)
-    private var frame: LocalFrame = null
+    private var frame: LocalFrame = _
     private var frameObjectIndex: Int = 0
-    private var indexTable: Array[Int] = null
-    private var method: MethodGen = null
+    private var indexTable: Array[Int] = _
+    private var method: MethodGen = _
 
     def setFrame(frame: LocalFrame) {
       this.frame = frame

@@ -1,7 +1,7 @@
 package onion.compiler;
 /* ************************************************************** *
 * *
-* Copyright (c) 2005-2012, Kota Mizushima, All rights reserved. *
+* Copyright (c) 2016-, Kota Mizushima, All rights reserved. *
 * *
 * *
 * This software is distributed under the modified BSD License. *
@@ -26,51 +26,51 @@ object Modifier {
   final val FORWARDED = 1024
 
   def check(modifier: Int, bitFlag: Int): Boolean = {
-     (modifier & bitFlag) != 0;
+     (modifier & bitFlag) != 0
   }
 
   def isInternal(modifier: Int): Boolean = {
-     check(modifier, INTERNAL);
+     check(modifier, INTERNAL)
   }
 
   def isStatic(modifier: Int): Boolean = {
-     check(modifier, STATIC);
+     check(modifier, STATIC)
   }
 
   def isSynchronized(modifier: Int): Boolean = {
-     check(modifier, SYNCHRONIZED);
+     check(modifier, SYNCHRONIZED)
   }
 
   def isFinal(modifier: Int): Boolean = {
-     check(modifier, FINAL);
+     check(modifier, FINAL)
   }
 
   def isAbstract(modifier: Int): Boolean = {
-     check(modifier, ABSTRACT);
+     check(modifier, ABSTRACT)
   }
 
   def isVolatile(modifier: Int): Boolean = {
-     check(modifier, VOLATILE);
+     check(modifier, VOLATILE)
   }
 
   def isInherited(modifier: Int): Boolean = {
-     check(modifier, INHERITED);
+     check(modifier, INHERITED)
   }
 
   def isPublic(modifier: Int): Boolean = {
-     check(modifier, PUBLIC);
+     check(modifier, PUBLIC)
   }
 
   def isProtected(modifier: Int): Boolean = {
-     check(modifier, PROTECTED);
+     check(modifier, PROTECTED)
   }
 
   def isPrivate(modifier: Int): Boolean = {
-     check(modifier, PRIVATE);
+     check(modifier, PRIVATE)
   }
 
   def isForwarded(modifier: Int): Boolean = {
-     check(modifier, FORWARDED);
+     check(modifier, FORWARDED)
   }
 
 }

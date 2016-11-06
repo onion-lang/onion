@@ -13,7 +13,7 @@ object IRT {
    * This interface represents an internal representation node of onion program.
    * @author Kota Mizushima
    */
-  abstract sealed trait Node
+  sealed trait Node
 
   /**
    * @author Kota Mizushima
@@ -297,7 +297,7 @@ object IRT {
 
     def methods(name: String): Array[IRT.Method] = methods_.get(name).toArray
 
-    def field(name: String): IRT.FieldRef = fields_.get(name).getOrElse(null)
+    def field(name: String): IRT.FieldRef = fields_.get(name).orNull
 
     def setSourceFile(sourceFile: String): Unit = this.sourceFile = sourceFile
 
@@ -329,7 +329,7 @@ object IRT {
 
     def affiliation: IRT.ClassType = classType
 
-    var frame: LocalFrame = null
+    var frame: LocalFrame = _
   }
 
   /**
@@ -486,7 +486,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class NewClosure(location: Location, val `type`: IRT.ClassType, val method: IRT.Method, val block: IRT.ActionStatement) extends Term(location) {
-    var frame: LocalFrame = null
+    var frame: LocalFrame = _
 
     def this(`type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) {
       this(null, `type`, method, block)
@@ -538,7 +538,7 @@ object IRT {
   class MethodDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassType, val name: String, val arguments: Array[IRT.Type], val returnType: IRT.Type, var block: IRT.StatementBlock)
     extends Node with Method {
     private var closure: Boolean = false
-    private var frame: LocalFrame = null
+    private var frame: LocalFrame = _
 
     def affiliation: IRT.ClassType = classType
 
@@ -850,7 +850,7 @@ object IRT {
     private final val matcher: IRT.ParameterMatcher = new IRT.StandardParameterMatcher
   }
 
-  abstract trait ConstructorRef extends MemberRef {
+  trait ConstructorRef extends MemberRef {
     def affiliation: IRT.ClassType
 
     def getArgs: Array[IRT.Type]
@@ -892,7 +892,7 @@ object IRT {
     }
   }
 
-  abstract trait FieldRef extends MemberRef {
+  trait FieldRef extends MemberRef {
     def modifier: Int
 
     def affiliation: IRT.ClassType
@@ -904,7 +904,7 @@ object IRT {
     def compare(o1: IRT.FieldRef, o2: IRT.FieldRef): Int =  o1.name.compareTo(o2.name)
   }
 
-  abstract trait MemberRef extends Named {
+  trait MemberRef extends Named {
     def modifier: Int
 
     def affiliation: IRT.ClassType
@@ -973,7 +973,7 @@ object IRT {
     private final val matcher: IRT.ParameterMatcher  = new IRT.StandardParameterMatcher
   }
 
-  abstract trait Method extends MemberRef {
+  trait Method extends MemberRef {
     def affiliation: IRT.ClassType
 
     def arguments: Array[IRT.Type]
@@ -1017,7 +1017,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  abstract sealed trait ObjectType extends Type {
+  sealed trait ObjectType extends Type {
     def isInterface: Boolean
 
     def modifier: Int
@@ -1040,7 +1040,7 @@ object IRT {
   /**
    * @author Kota Mizushima
    */
-  abstract trait ParameterMatcher {
+  trait ParameterMatcher {
     def matches(arguments: Array[IRT.Type], parameters: Array[IRT.Term]): Boolean
   }
 
@@ -1092,7 +1092,7 @@ object IRT {
           return isSuperTypeForClass(left.asInstanceOf[IRT.ClassType], right.asInstanceOf[IRT.ClassType])
         }
         if (right.isArrayType) {
-          return left eq (right.asInstanceOf[IRT.ArrayType]).superClass
+          return left eq right.asInstanceOf[IRT.ArrayType].superClass
         }
         if (right.isNullType) {
           return true

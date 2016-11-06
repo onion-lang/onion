@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -9,7 +9,6 @@ package onion.compiler.toolbox
 
 import java.io._
 import java.io.BufferedReader
-import java.io.IOException
 
 /**
  * Utility class for IO.

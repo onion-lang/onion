@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -31,7 +31,7 @@ object Boxing {
     }
     val aBoxedType: IRT.ClassType = boxedType(table, `type`.asInstanceOf[IRT.BasicType])
     val cs: Array[IRT.ConstructorRef] = aBoxedType.constructors
-    for(i <- 0 until cs.length) {
+    for(i <- cs.indices) {
       val args: Array[IRT.Type] = cs(i).getArgs
       if ((args.length == 1) && (args(i) eq `type`)) {
         return new IRT.NewObject(cs(i), Array[IRT.Term](node))

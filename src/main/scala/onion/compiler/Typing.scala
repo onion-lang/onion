@@ -79,9 +79,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   def processHeader(unit: AST.CompilationUnit) {
     unit_ = unit
     val module = unit.module
-    val imports = unit.imports
     val moduleName = if (module != null) module.name else null
-    val builtinImports = Buffer[ImportItem](
+    val imports = Buffer[ImportItem](
       ImportItem("*", "java.lang.*"),
       ImportItem("*", "java.io.*"),
       ImportItem("*", "java.util.*"),
@@ -98,9 +97,9 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       ImportItem("*", "onion.*"),
       ImportItem("*", if (moduleName != null) moduleName + ".*" else "*")
     )
-    if(imports != null) {
-      for((key, value) <- imports.mapping) {
-        builtinImports.append(ImportItem(key, value))
+    if(unit.imports != null) {
+      for((key, value) <- unit.imports.mapping) {
+        imports.append(ImportItem(key, value))
       }
     }
     val staticList = new StaticImportList
@@ -118,7 +117,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }else {
           table_.classes.add(node)
           put(declaration, node)
-          add(node.name, new NameMapper(builtinImports))
+          add(node.name, new NameMapper(imports))
         }
       case declaration: AST.InterfaceDeclaration =>
         val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
@@ -128,7 +127,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }else{
           table_.classes.add(node)
           put(declaration, node)
-          add(node.name, new NameMapper(builtinImports))
+          add(node.name, new NameMapper(imports))
         }
       case otherwise =>
         count += 1
@@ -140,7 +139,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       table_.classes.add(node)
       node.addDefaultConstructor
       put(unit, node)
-      add(node.name, new NameMapper(builtinImports))
+      add(node.name, new NameMapper(imports))
     }
   }
   def processOutline(unit: AST.CompilationUnit) {

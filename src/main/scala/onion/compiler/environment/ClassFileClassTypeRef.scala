@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -101,7 +101,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
 
   def fields: Array[IRT.FieldRef] =  fields_.values.toArray
 
-  def field(name: String): IRT.FieldRef = fields_.get(name).getOrElse(null)
+  def field(name: String): IRT.FieldRef = fields_.get(name).orNull
 
   def constructors: Array[IRT.ConstructorRef] = {
     constructors_.toArray
@@ -110,7 +110,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   private def translate(method: Method): IRT.Method = {
     val arguments: Array[Type] = method.getArgumentTypes
     val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    for(i <- 0 until arguments.length) {
+    for(i <- arguments.indices) {
       argumentSymbols(i) = bridge.toOnionType(arguments(i))
     }
     val returnSymbol: IRT.Type = bridge.toOnionType(method.getReturnType)
@@ -125,7 +125,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   private def translateConstructor(method: Method): IRT.ConstructorRef = {
     val arguments: Array[Type] = method.getArgumentTypes
     val argumentSymbols: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    for(i <- 0 until arguments.length) {
+    for(i <- arguments.indices) {
       argumentSymbols(i) = bridge.toOnionType(arguments(i))
     }
     new ClassFileConstructorRef(toOnionModifier(method.getModifiers), this, method.getName, argumentSymbols)

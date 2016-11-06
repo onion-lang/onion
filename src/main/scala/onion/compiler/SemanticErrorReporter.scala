@@ -2,7 +2,7 @@ package onion.compiler
 
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -11,7 +11,7 @@ package onion.compiler
 import java.text.MessageFormat
 import java.util.ArrayList
 import java.util.List
-import onion.compiler.toolbox.Messages
+import onion.compiler.toolbox.Message
 import onion.compiler.exceptions.CompilationException
 
 /**
@@ -47,7 +47,7 @@ class SemanticErrorReporter(threshold: Int) {
     MessageFormat.format(string, args.asInstanceOf[Array[AnyRef]]:_*)
   }
 
-  private[this] def message(property: String): String = Messages(property)
+  private[this] def message(property: String): String = Message(property)
 
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
     val expected: IRT.Type = items(0).asInstanceOf[IRT.Type]

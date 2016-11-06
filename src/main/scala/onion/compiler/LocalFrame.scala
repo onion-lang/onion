@@ -1,14 +1,13 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
 package onion.compiler
 
-import java.util
-import java.util.Arrays
+import java.util.{Arrays => JArrays}
 import scala.collection.mutable
 
 /**
@@ -36,7 +35,7 @@ class LocalFrame(val parent: LocalFrame) {
 
   def entries: Seq[LocalBinding] = {
     val binds: Array[LocalBinding] = entrySet.toArray
-    Arrays.sort(binds, (b1: LocalBinding, b2: LocalBinding) => {
+    JArrays.sort(binds, (b1: LocalBinding, b2: LocalBinding) => {
       val i1 = b1.index
       val i2 = b2.index
       if (i1 < i2) -1 else if (i1 > i2) 1 else 0
@@ -51,7 +50,7 @@ class LocalFrame(val parent: LocalFrame) {
       case None =>
         val index = maxIndex
         maxIndex += 1
-        scope.put(name, new LocalBinding(index, `type`))
+        scope.put(name, LocalBinding(index, `type`))
         index
     }
   }

@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -14,7 +14,7 @@ import java.util.ResourceBundle
  * @author Kota Mizushima
  *
  */
-object Messages {
+object Message {
   private[this] val ERROR_MESSAGES: ResourceBundle = ResourceBundle.getBundle("errorMessage")
 
   def apply(property: String): String =  ERROR_MESSAGES.getString(property)

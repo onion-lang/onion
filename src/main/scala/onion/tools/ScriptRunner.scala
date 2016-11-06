@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -11,7 +11,7 @@ import java.io.UnsupportedEncodingException
 import java.lang.System.err
 import onion.compiler._
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.toolbox.Messages
+import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
 
@@ -95,7 +95,7 @@ class ScriptRunner {
 
   private def printFailure(failure: ParseFailure): Unit = {
     failure.lackedOptions.zipWithIndex.foreach{ case (lackedOption, i) =>
-      err.println(Messages("error.command.noArgument", lackedOption))
+      err.println(Message("error.command.noArgument", lackedOption))
     }
   }
 
@@ -128,7 +128,7 @@ class ScriptRunner {
       Some(encoding)
     } catch {
       case e: UnsupportedEncodingException =>
-        err.println(Messages.apply("error.command.invalidEncoding", ENCODING))
+        err.println(Message.apply("error.command.invalidEncoding", ENCODING))
         None
     }
   }
@@ -143,7 +143,7 @@ class ScriptRunner {
     value match {
       case Some(v) if v > 0 => Some(v)
       case None =>
-        err.println(Messages("error.command.requireNaturalNumber", MAX_ERROR))
+        err.println(Message("error.command.requireNaturalNumber", MAX_ERROR))
         None
     }
   }

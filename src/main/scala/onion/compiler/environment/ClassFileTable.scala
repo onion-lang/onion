@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -43,17 +43,15 @@ class ClassFileTable(classPathString: String) {
       val fileName: String = new File(classFile.getPath).getName
       val parser: ClassParser = new ClassParser(input, fileName)
       val javaClass: JavaClass = parser.parse
-      input.close
+      input.close()
       repository.storeClass(javaClass)
       javaClass
     }
     catch {
-      case e: IOException => {
+      case e: IOException =>
         null
-      }
-      case e: ClassFormatException => {
+      case e: ClassFormatException =>
         null
-      }
     }
   }
 }

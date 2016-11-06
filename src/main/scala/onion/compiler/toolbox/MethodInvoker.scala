@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -19,18 +19,14 @@ object MethodInvoker {
     try {
       getMethod(target.getClass, name, args).invoke(target, args)
     } catch {
-      case e: NoSuchMethodException => {
+      case e: NoSuchMethodException =>
         throw new InvocationException(e)
-      }
-      case e: IllegalArgumentException => {
+      case e: IllegalArgumentException =>
         throw new InvocationException(e)
-      }
-      case e: IllegalAccessException => {
+      case e: IllegalAccessException =>
         throw new InvocationException(e)
-      }
-      case e: InvocationTargetException => {
+      case e: InvocationTargetException =>
         throw new InvocationException(e)
-      }
     }
   }
 
@@ -39,18 +35,14 @@ object MethodInvoker {
       getMethod(target, name, args).invoke(null, args)
     }
     catch {
-      case e: NoSuchMethodException => {
+      case e: NoSuchMethodException =>
         throw new InvocationException(e)
-      }
-      case e: IllegalArgumentException => {
+      case e: IllegalArgumentException =>
         throw new InvocationException(e)
-      }
-      case e: IllegalAccessException => {
+      case e: IllegalAccessException =>
         throw new InvocationException(e)
-      }
-      case e: InvocationTargetException => {
+      case e: InvocationTargetException =>
         throw new InvocationException(e)
-      }
     }
   }
 

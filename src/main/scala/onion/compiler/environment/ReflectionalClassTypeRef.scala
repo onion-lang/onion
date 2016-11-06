@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -39,9 +39,9 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   import ReflectionalClassTypeRef._
   private val bridge: OnionTypeConversion              = new OnionTypeConversion(table)
   private val modifier_ : Int                          = toOnionModifier(klass.getModifiers)
-  private var methods_ : MultiTable[IRT.Method]        = null
-  private var fields_ : OrderedTable[IRT.FieldRef]     = null
-  private var constructors_ : List[IRT.ConstructorRef] = null
+  private var methods_ : MultiTable[IRT.Method]        = _
+  private var fields_ : OrderedTable[IRT.FieldRef]     = _
+  private var constructors_ : List[IRT.ConstructorRef] = _
 
   def isInterface: Boolean = (klass.getModifiers & java.lang.reflect.Modifier.INTERFACE) != 0
 
@@ -94,7 +94,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
 
   def field(name: String): IRT.FieldRef = {
     requireFieldTable
-    fields_.get(name).getOrElse(null)
+    fields_.get(name).orNull
   }
 
   private def requireFieldTable {
@@ -119,7 +119,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   private def translate(method: Method): IRT.Method = {
     val arguments: Array[Class[_]] = method.getParameterTypes
     val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    for(i <- 0 until arguments.length) {
+    for(i <- arguments.indices) {
       argumentRefs(i) = bridge.toOnionType(arguments(i))
     }
     val returnRef: IRT.Type = bridge.toOnionType(method.getReturnType)
@@ -133,7 +133,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   private def translate(constructor: Constructor[_]): IRT.ConstructorRef = {
     val arguments: Array[Class[_]] = constructor.getParameterTypes
     val argumentRefs: Array[IRT.Type] = new Array[IRT.Type](arguments.length)
-    for(i <- 0 until arguments.length) {
+    for(i <- arguments.indices) {
       argumentRefs(i) = bridge.toOnionType(arguments(i))
     }
     new ClassFileConstructorRef(toOnionModifier(constructor.getModifiers), this, "<init>", argumentRefs)

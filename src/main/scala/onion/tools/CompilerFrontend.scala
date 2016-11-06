@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -16,7 +16,7 @@ import onion.compiler.CompiledClass
 import onion.compiler.OnionCompiler
 import onion.compiler.CompilerConfig
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.toolbox.Messages
+import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
 
@@ -134,8 +134,8 @@ class CompilerFrontend {
       case failure: ParseFailure =>
         val lackedOptions = failure.lackedOptions
         val invalidOptions = failure.invalidOptions
-        invalidOptions.foreach{opt => printError(Messages.apply("error.command.invalidArgument", opt)) }
-        lackedOptions.foreach{opt => printError(Messages.apply("error.command..noArgument", opt)) }
+        invalidOptions.foreach{opt => printError(Message.apply("error.command.invalidArgument", opt)) }
+        lackedOptions.foreach{opt => printError(Message.apply("error.command..noArgument", opt)) }
         None
     }
   }
@@ -177,7 +177,7 @@ class CompilerFrontend {
       }).orElse(Some(DEFAULT_ENCODING))
     } catch {
       case e: UnsupportedEncodingException => {
-        printError(Messages.apply("error.command.invalidEncoding", ENCODING))
+        printError(Message.apply("error.command.invalidEncoding", ENCODING))
         None
       }
     }
@@ -193,7 +193,7 @@ class CompilerFrontend {
       }
     } catch {
       case e: NumberFormatException =>
-        printError(Messages.apply("error.command.requireNaturalNumber", MAX_ERROR))
+        printError(Message.apply("error.command.requireNaturalNumber", MAX_ERROR))
         None
     }
   }

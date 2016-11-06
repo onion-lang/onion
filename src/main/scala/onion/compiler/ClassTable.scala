@@ -1,18 +1,16 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
 package onion.compiler
 
-import environment.{ReflectionalClassTypeRef, ClassFileTable, ClassFileClassTypeRef}
-import java.util._
+import java.util.{HashMap => JHashMap}
 import onion.compiler.environment.ClassFileClassTypeRef
 import onion.compiler.environment.ClassFileTable
 import onion.compiler.environment.ReflectionalClassTypeRef
-import org.apache.bcel.classfile.JavaClass
 
 /**
  * @author Kota Mizushima
@@ -20,8 +18,8 @@ import org.apache.bcel.classfile.JavaClass
  */
 class ClassTable(classPath: String) {
   val classes = new OrderedTable[IRT.ClassDefinition]
-  private val classFiles = new HashMap[String, IRT.ClassType]
-  private val arrayClasses = new HashMap[String, IRT.ArrayType]
+  private val classFiles = new JHashMap[String, IRT.ClassType]
+  private val arrayClasses = new JHashMap[String, IRT.ArrayType]
   private val table = new ClassFileTable(classPath)
 
   def loadArray(component: IRT.Type, dimension: Int): IRT.ArrayType = {

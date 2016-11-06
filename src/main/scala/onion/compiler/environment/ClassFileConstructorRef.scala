@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -14,5 +14,5 @@ import onion.compiler.IRT
  */
 class ClassFileConstructorRef(val modifier: Int, val classType: IRT.ClassType, val name: String, val args: Array[IRT.Type]) extends IRT.ConstructorRef {
   def getArgs: Array[IRT.Type] = args
-  def affiliation(): IRT.ClassType = classType
+  def affiliation: IRT.ClassType = classType
 }

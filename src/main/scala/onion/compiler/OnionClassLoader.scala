@@ -1,6 +1,6 @@
 /* ************************************************************** *
  *                                                                *
- * Copyright (c) 2005-2012, Kota Mizushima, All rights reserved.  *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
  *                                                                *
  *                                                                *
  * This software is distributed under the modified BSD License.   *
@@ -17,7 +17,7 @@ import java.net.URLClassLoader
  *
  */
 class OnionClassLoader @throws(classOf[MalformedURLException]) (parent: ClassLoader, classPath: Seq[String], classes: Array[CompiledClass]) extends
-  URLClassLoader(classPath.map(cp => new File(cp).toURI().toURL()).toArray, parent) {
+  URLClassLoader(classPath.map(cp => new File(cp).toURI.toURL).toArray, parent) {
 
   classes.map(k => (k.className, k.content)).foreach{ case (className, content) =>
     defineClass(className, content, 0, content.length)

@@ -540,9 +540,34 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
     def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {
-      typed(node.rhs, context)
-      report(UNIMPLEMENTED_FEATURE, node)
-      null
+      node match {
+        case target@AST.Assignment(loc, node@AST.MemberSelection(_, _, _), expression) =>
+          val contextClass = definition_
+          val target = typed(node.target, context).getOrElse(null)
+          if (target == null) return null
+          if (target.`type`.isBasicType || target.`type`.isNullType) {
+            report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
+            return null
+          }
+          val targetType = target.`type`.asInstanceOf[ObjectType]
+          if (!isAccessible(node, targetType, contextClass)) return null
+          val name = node.name
+          val field: FieldRef = findField(targetType, name)
+          val value: Term = typed(expression, context).getOrElse(null)
+          if (field != null && isAccessible(field, definition_)) {
+            val term = processAssignable(expression, field.`type`, value)
+            return new SetField(target, field, term)
+          }
+          tryFindMethod(node, targetType, setter(name), Array[Term](value)) match {
+            case Right(method) =>
+              new Call(target, method, Array[Term](value))
+            case Left(_) =>
+              null
+          }
+        case _ =>
+          report(UNIMPLEMENTED_FEATURE, node)
+          null
+      }
     }
     def processEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
       var left: Term = typed(node.lhs, context).getOrElse(null)
@@ -939,6 +964,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         if (field != null && isAccessible(field, definition_)) {
           return Some(new RefField(target, field))
         }
+
         tryFindMethod(node, targetType, name, new Array[Term](0)) match {
           case Right(method) =>
             return Some(new Call(target, method, new Array[Term](0)))
@@ -962,6 +988,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
             }
             None
         }
+
       case node@AST.MethodCall(loc, target, name, args) =>
         val target = typed(node.target, context).getOrElse(null)
         if (target == null) return None

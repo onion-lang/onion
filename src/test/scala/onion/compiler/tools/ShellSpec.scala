@@ -6,7 +6,6 @@ import org.scalatest._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class ShellSpec extends FunSpec with DiagrammedAssertions {
   describe("Shell") {
     val shell = Shell(Seq())

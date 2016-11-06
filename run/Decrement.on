@@ -1,4 +1,0 @@
-list = ["A", "B", "C", "D", "E"];
-for i = list.size - 1; i >= 0; i-- {
-  System::out.println(list[i]);
-}

@@ -49,6 +49,12 @@ class SemanticErrorReporter(threshold: Int) {
 
   private[this] def message(property: String): String = Message(property)
 
+  private def reportIllegalMethodCall(position: Location, items: Array[AnyRef]): Unit = {
+    val receiver = items(0).asInstanceOf[IRT.ClassType].name
+    val methodName= items(1).asInstanceOf[String]
+    problem(position, format(message("error.semantic.illegalMethodCall"), receiver, methodName))
+  }
+
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
     val expected: IRT.Type = items(0).asInstanceOf[IRT.Type]
     val detected: IRT.Type = items(1).asInstanceOf[IRT.Type]
@@ -199,66 +205,66 @@ class SemanticErrorReporter(threshold: Int) {
     problems.add(new CompileError(sourceFile, position, message))
   }
 
-  def report(error: Int, position: Location, items: Array[AnyRef]): Unit = {
-    ({
-      errorCount += 1; errorCount
-    })
+  def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
+    errorCount += 1
     error match {
-      case SemanticErrorConstants.INCOMPATIBLE_TYPE =>
+      case SemanticError.ILLEGAL_METHOD_CALL =>
+        reportIllegalMethodCall(position, items)
+      case SemanticError.INCOMPATIBLE_TYPE =>
         reportIncompatibleType(position, items)
-      case SemanticErrorConstants.INCOMPATIBLE_OPERAND_TYPE =>
+      case SemanticError.INCOMPATIBLE_OPERAND_TYPE =>
         reportIncompatibleOperandType(position, items)
-      case SemanticErrorConstants.VARIABLE_NOT_FOUND =>
+      case SemanticError.VARIABLE_NOT_FOUND =>
         reportVariableNotFound(position, items)
-      case SemanticErrorConstants.CLASS_NOT_FOUND =>
+      case SemanticError.CLASS_NOT_FOUND =>
         reportClassNotFound(position, items)
-      case SemanticErrorConstants.FIELD_NOT_FOUND =>
+      case SemanticError.FIELD_NOT_FOUND =>
         reportFieldNotFound(position, items)
-      case SemanticErrorConstants.METHOD_NOT_FOUND =>
+      case SemanticError.METHOD_NOT_FOUND =>
         reportMethodNotFound(position, items)
-      case SemanticErrorConstants.AMBIGUOUS_METHOD =>
+      case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
-      case SemanticErrorConstants.DUPLICATE_LOCAL_VARIABLE =>
+      case SemanticError.DUPLICATE_LOCAL_VARIABLE =>
         reportDuplicateLocalVariable(position, items)
-      case SemanticErrorConstants.DUPLICATE_CLASS =>
+      case SemanticError.DUPLICATE_CLASS =>
         reportDuplicateClass(position, items)
-      case SemanticErrorConstants.DUPLICATE_FIELD =>
+      case SemanticError.DUPLICATE_FIELD =>
         reportDuplicateField(position, items)
-      case SemanticErrorConstants.DUPLICATE_METHOD =>
+      case SemanticError.DUPLICATE_METHOD =>
         reportDuplicateMethod(position, items)
-      case SemanticErrorConstants.DUPLICATE_GLOBAL_VARIABLE =>
+      case SemanticError.DUPLICATE_GLOBAL_VARIABLE =>
         reportDuplicateGlobalVariable(position, items)
-      case SemanticErrorConstants.DUPLICATE_FUNCTION =>
+      case SemanticError.DUPLICATE_FUNCTION =>
         reportDuplicateFunction(position, items)
-      case SemanticErrorConstants.METHOD_NOT_ACCESSIBLE =>
+      case SemanticError.METHOD_NOT_ACCESSIBLE =>
         reportMethodNotAccessible(position, items)
-      case SemanticErrorConstants.FIELD_NOT_ACCESSIBLE =>
+      case SemanticError.FIELD_NOT_ACCESSIBLE =>
         reportFieldNotAccessible(position, items)
-      case SemanticErrorConstants.CLASS_NOT_ACCESSIBLE =>
+      case SemanticError.CLASS_NOT_ACCESSIBLE =>
         reportClassNotAccessible(position, items)
-      case SemanticErrorConstants.CYCLIC_INHERITANCE =>
+      case SemanticError.CYCLIC_INHERITANCE =>
         reportCyclicInheritance(position, items)
-      case SemanticErrorConstants.CYCLIC_DELEGATION =>
+      case SemanticError.CYCLIC_DELEGATION =>
         reportCyclicDelegation(position, items)
-      case SemanticErrorConstants.ILLEGAL_INHERITANCE =>
+      case SemanticError.ILLEGAL_INHERITANCE =>
         reportIllegalInheritance(position, items)
-      case SemanticErrorConstants.CANNOT_RETURN_VALUE =>
+      case SemanticError.CANNOT_RETURN_VALUE =>
         reportCannotReturnValue(position, items)
-      case SemanticErrorConstants.CONSTRUCTOR_NOT_FOUND =>
+      case SemanticError.CONSTRUCTOR_NOT_FOUND =>
         reportConstructorNotFound(position, items)
-      case SemanticErrorConstants.AMBIGUOUS_CONSTRUCTOR =>
+      case SemanticError.AMBIGUOUS_CONSTRUCTOR =>
         reportAmbiguousConstructor(position, items)
-      case SemanticErrorConstants.INTERFACE_REQUIRED =>
+      case SemanticError.INTERFACE_REQUIRED =>
         reportInterfaceRequied(position, items)
-      case SemanticErrorConstants.UNIMPLEMENTED_FEATURE =>
+      case SemanticError.UNIMPLEMENTED_FEATURE =>
         reportUnimplementedFeature(position, items)
-      case SemanticErrorConstants.DUPLICATE_CONSTRUCTOR =>
+      case SemanticError.DUPLICATE_CONSTRUCTOR =>
         reportDuplicateConstructor(position, items)
-      case SemanticErrorConstants.DUPLICATE_GENERATED_METHOD =>
+      case SemanticError.DUPLICATE_GENERATED_METHOD =>
         reportDuplicateGeneratedMethod(position, items)
-      case SemanticErrorConstants.IS_NOT_BOXABLE_TYPE =>
+      case SemanticError.IS_NOT_BOXABLE_TYPE =>
         reportIsNotBoxableType(position, items)
-      case SemanticErrorConstants.LVALUE_REQUIRED =>
+      case SemanticError.LVALUE_REQUIRED =>
         reportLValueRequired(position, items)
     }
     if (errorCount >= threshold) {

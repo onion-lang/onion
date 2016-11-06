@@ -8,7 +8,7 @@ import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.IRT._
 import _root_.onion.compiler.IRT.BinaryTerm.Constants._
 import _root_.onion.compiler.IRT.UnaryTerm.Constants._
-import _root_.onion.compiler.SemanticErrorConstants._
+import _root_.onion.compiler.SemanticError._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 
@@ -113,7 +113,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null, null)
         node.setSourceFile(Paths.nameOf(unit.sourceFile))
         if (table_.lookup(node.name) != null) {
-          report(DUPLICATE_CLASS, declaration, node.name)
+          report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
         }else {
           table_.classes.add(node)
           put(declaration, node)
@@ -123,7 +123,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
         node.setSourceFile(Paths.nameOf(unit.sourceFile))
         if (table_.lookup(node.name) != null) {
-          report(DUPLICATE_CLASS, declaration, node.name)
+          report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
         }else{
           table_.classes.add(node)
           put(declaration, node)
@@ -1564,10 +1564,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       }
     }
   }
-  def report(error: Int, node: AST.Node, items: AnyRef*) {
+  def report(error: SemanticError, node: AST.Node, items: AnyRef*) {
     report(error, node.location, items:_*)
   }
-  def report(error: Int, location: Location, items: AnyRef*) {
+  def report(error: SemanticError, location: Location, items: AnyRef*) {
     def report_(items: Array[AnyRef]) {
       reporter_.setSourceFile(unit_.sourceFile)
       reporter_.report(error, location, items)

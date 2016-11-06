@@ -82,25 +82,25 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     val imports = unit.imports
     val moduleName = if (module != null) module.name else null
     val builtinImports = Buffer[ImportItem](
-      new ImportItem("*", "java.lang.*"),
-      new ImportItem("*", "java.io.*"),
-      new ImportItem("*", "java.util.*"),
-      new ImportItem("*", "javax.swing.*"),
-      new ImportItem("*", "java.awt.event.*"),
-      new ImportItem("JByte", "java.lang.Byte"),
-      new ImportItem("JShort", "java.lang.Short"),
-      new ImportItem("JCharacter", "java.lang.Character"),
-      new ImportItem("JInteger", "java.lang.Integer"),
-      new ImportItem("JLong", "java.lang.Long"),
-      new ImportItem("JFloat", "java.lang.Float"),
-      new ImportItem("JDouble", "java.lang.Double"),
-      new ImportItem("JBoolean", "java.lang.Boolean"),
-      new ImportItem("*", "onion.*"),
-      new ImportItem("*", if (moduleName != null) moduleName + ".*" else "*")
+      ImportItem("*", "java.lang.*"),
+      ImportItem("*", "java.io.*"),
+      ImportItem("*", "java.util.*"),
+      ImportItem("*", "javax.swing.*"),
+      ImportItem("*", "java.awt.event.*"),
+      ImportItem("JByte", "java.lang.Byte"),
+      ImportItem("JShort", "java.lang.Short"),
+      ImportItem("JCharacter", "java.lang.Character"),
+      ImportItem("JInteger", "java.lang.Integer"),
+      ImportItem("JLong", "java.lang.Long"),
+      ImportItem("JFloat", "java.lang.Float"),
+      ImportItem("JDouble", "java.lang.Double"),
+      ImportItem("JBoolean", "java.lang.Boolean"),
+      ImportItem("*", "onion.*"),
+      ImportItem("*", if (moduleName != null) moduleName + ".*" else "*")
     )
     if(imports != null) {
       for((key, value) <- imports.mapping) {
-        builtinImports.append(new ImportItem(key, value))
+        builtinImports.append(ImportItem(key, value))
       }
     }
     val staticList = new StaticImportList

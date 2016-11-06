@@ -24,7 +24,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     }
     loop(descriptor, 0)
   }
-  private class NameMapper(imports: ImportList) {
+  private class NameMapper(imports: Seq[ImportItem]) {
     def map(typeNode: AST.TypeNode): Type = map(typeNode.desc)
     def map(descriptor : AST.TypeDescriptor): Type = descriptor match {
       case AST.PrimitiveType(AST.KChar)       => BasicType.CHAR
@@ -61,7 +61,6 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private val mappers_  = Map[String, NameMapper]()
   private var access_ : Int = _
   private var mapper_ : NameMapper = _
-  private var importedList_ : ImportList = _
   private var staticImportedList_ : StaticImportList = _
   private var definition_ : ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
@@ -82,32 +81,32 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     val module = unit.module
     val imports = unit.imports
     val moduleName = if (module != null) module.name else null
-    val list = new ImportList
-    list.add(new ImportItem("*", "java.lang.*"))
-    list.add(new ImportItem("*", "java.io.*"))
-    list.add(new ImportItem("*", "java.util.*"))
-    list.add(new ImportItem("*", "javax.swing.*"))
-    list.add(new ImportItem("*", "java.awt.event.*"))
-    list.add(new ImportItem("JByte", "java.lang.Byte"))
-    list.add(new ImportItem("JShort", "java.lang.Short"))
-    list.add(new ImportItem("JCharacter", "java.lang.Character"))
-    list.add(new ImportItem("JInteger", "java.lang.Integer"))
-    list.add(new ImportItem("JLong", "java.lang.Long"))
-    list.add(new ImportItem("JFloat", "java.lang.Float"))
-    list.add(new ImportItem("JDouble", "java.lang.Double"))
-    list.add(new ImportItem("JBoolean", "java.lang.Boolean"))
-    list.add(new ImportItem("*", "onion.*"))
-    list.add(new ImportItem("*", if (moduleName != null) moduleName + ".*" else "*"))
+    val builtinImports = Buffer[ImportItem](
+      new ImportItem("*", "java.lang.*"),
+      new ImportItem("*", "java.io.*"),
+      new ImportItem("*", "java.util.*"),
+      new ImportItem("*", "javax.swing.*"),
+      new ImportItem("*", "java.awt.event.*"),
+      new ImportItem("JByte", "java.lang.Byte"),
+      new ImportItem("JShort", "java.lang.Short"),
+      new ImportItem("JCharacter", "java.lang.Character"),
+      new ImportItem("JInteger", "java.lang.Integer"),
+      new ImportItem("JLong", "java.lang.Long"),
+      new ImportItem("JFloat", "java.lang.Float"),
+      new ImportItem("JDouble", "java.lang.Double"),
+      new ImportItem("JBoolean", "java.lang.Boolean"),
+      new ImportItem("*", "onion.*"),
+      new ImportItem("*", if (moduleName != null) moduleName + ".*" else "*")
+    )
     if(imports != null) {
       for((key, value) <- imports.mapping) {
-        list.add(new ImportItem(key, value))
+        builtinImports.append(new ImportItem(key, value))
       }
     }
     val staticList = new StaticImportList
     staticList.add(new StaticImportItem("java.lang.System", true))
     staticList.add(new StaticImportItem("java.lang.Runtime", true))
     staticList.add(new StaticImportItem("java.lang.Math", true))
-    importedList_ = list
     staticImportedList_ = staticList
     var count = 0
     for(top <- unit.toplevels) top match {
@@ -119,7 +118,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }else {
           table_.classes.add(node)
           put(declaration, node)
-          add(node.name, new NameMapper(importedList_))
+          add(node.name, new NameMapper(builtinImports))
         }
       case declaration: AST.InterfaceDeclaration =>
         val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
@@ -129,7 +128,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
         }else{
           table_.classes.add(node)
           put(declaration, node)
-          add(node.name, new NameMapper(importedList_))
+          add(node.name, new NameMapper(builtinImports))
         }
       case otherwise =>
         count += 1
@@ -141,7 +140,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
       table_.classes.add(node)
       node.addDefaultConstructor
       put(unit, node)
-      add(node.name, new NameMapper(list))
+      add(node.name, new NameMapper(builtinImports))
     }
   }
   def processOutline(unit: AST.CompilationUnit) {

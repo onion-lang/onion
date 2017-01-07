@@ -59,7 +59,7 @@ lazy val onionSettings = Seq(
   unmanagedSourceDirectories in Compile := {
     (Seq((javaSource in Compile).value) ++ Seq((scalaSource in Compile).value) ++ Seq((sourceManaged in Compile).value))
   },
-  scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials", "-Ystatistics"),
+  scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials"),
   javacOptions ++= Seq("-sourcepath", "src.lib", "-Xlint:unchecked", "-source", "1.8"),
   libraryDependencies += {
     val version = scalaVersion.value

@@ -53,13 +53,18 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
 
 lazy val onionSettings = Seq(
   version := "0.2-SNAPSHOT",
-  scalaVersion := "2.12.0",
+  scalaVersion := "2.12.1",
   name := "onion",
   organization := "org.onion_lang",
-  unmanagedSourceDirectories in Compile <<= (Seq(javaSource in Compile) ++ Seq(scalaSource in Compile) ++ Seq(sourceManaged in Compile)).join,
-  scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials"),
+  unmanagedSourceDirectories in Compile := {
+    (Seq((javaSource in Compile).value) ++ Seq((scalaSource in Compile).value) ++ Seq((sourceManaged in Compile).value))
+  },
+  scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials", "-Ystatistics"),
   javacOptions ++= Seq("-sourcepath", "src.lib", "-Xlint:unchecked", "-source", "1.8"),
-  libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ ),
+  libraryDependencies += {
+    val version = scalaVersion.value
+    "org.scala-lang" % "scala-compiler" % version
+  },
   libraryDependencies ++= Seq(
     "org.apache.bcel" % "bcel" % "6.0",
     "org.ow2.asm" % "asm" % "5.0.2",
@@ -67,7 +72,10 @@ lazy val onionSettings = Seq(
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.0.0" % "test"
   ),
-  sourceGenerators in Compile <+= (externalDependencyClasspath in Test, sourceManaged in Compile, streams) map { (cp, dir, s) =>
+  sourceGenerators in Compile += Def.task {
+    val cp = (externalDependencyClasspath in Compile).value
+    val dir = (sourceManaged in Compile).value
+    val s = streams.value
     val parser = dir / "java" / "onion" / "compiler" / "parser" / "JJOnionParser.java"
     val grammar = new java.io.File("grammar") / "JJOnionParser.jj"
     if(grammar.lastModified() > parser.lastModified()) {
@@ -75,20 +83,28 @@ lazy val onionSettings = Seq(
     } else {
       Seq()
     }
+  }.taskValue,
+  packageOptions in (Compile, packageBin) := {
+    val main = mainClass.value
+    val opts = (packageOptions in (Compile, packageBin)).value
+    opts ++ main.map{m => Package.MainClass(m)}
   },
-  packageOptions in (Compile, packageBin) <<= (mainClass, packageOptions in (Compile, packageBin)) map { (main, opts) =>
-    opts ++ main.map{m =>
-      println(m)
-      Package.MainClass(m)
-    }
-  },
-  packageOptions in (Compile, packageBin) <<= (packageOptions in (Compile, packageBin), artifactPath in (Compile, packageBin), dependencyClasspath in Runtime) map { (opts, a, cp) =>
+  packageOptions in (Compile, packageBin) := {
+    val opts = (packageOptions in (Compile, packageBin)).value
+    val a = (artifactPath in (Compile, packageBin)).value
+    val cp = (dependencyClasspath in Runtime).value
     opts :+ manifestExtra(a, cp)
   },
-  dist <<= (target, distPath in dist, packageBin in Compile, fullClasspath in Runtime) map { (t, out, p, cp) =>
+  dist := {
+    val t = target.value
+    val out = (distPath in dist).value
+    val p = (packageBin in Compile).value
+    val cp = (fullClasspath in Runtime).value
     distTask(t, out, p, cp)
   },
-  distPath in dist <<= target(_ / "dist" ),
+  distPath in dist := {
+    target.value / "dist"
+  },
   mainClass := Some("onion.tools.CompilerFrontend"),
   assemblyJarName in assembly := "onion.jar"
 )

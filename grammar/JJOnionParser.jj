@@ -23,6 +23,7 @@ import scala.Option;
 import scala.Option$;
 import static onion.compiler.AST.append;
 
+@SuppressWarnings("unchecked")
 public class JJOnionParser implements Parser {
   private int mset; // used for semantic lookahead
 

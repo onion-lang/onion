@@ -8,19 +8,15 @@
 package onion.compiler.exceptions
 
 import onion.compiler.CompileError
-import java.util.Collections
-import java.util.{Iterator => JIterator}
-import java.util.{List => JList}
-import java.lang.{Iterable => JIterable}
 
 /**
  * @author Kota Mizushima
  * Exception thrown when compilation errors occured.
  */
-class CompilationException(val problems : JList[CompileError]) extends RuntimeException with JIterable[CompileError] {
+class CompilationException(val problems : Seq[CompileError]) extends RuntimeException with Iterable[CompileError] {
 
-  def size(): Int = problems.size()
+  override def size: Int = problems.size
 
-  def iterator(): JIterator[CompileError] = problems.iterator()
+  override def iterator(): Iterator[CompileError] = problems.iterator
 }
 

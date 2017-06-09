@@ -32,7 +32,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           problems += CompileError(source(i).name, new Location(error.beginLine, error.beginColumn), Message("error.parsing.syntax_error", error.image, expected))
       }
     }
-    if(problems.nonEmpty) throw new CompilationException(problems.asJava)
+    if(problems.nonEmpty) throw new CompilationException(problems)
     buffer.toArray
   }
 

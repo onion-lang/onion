@@ -31,7 +31,7 @@ class OnionCompiler(val config: CompilerConfig) {
       (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs))
     } catch {
       case e: CompilationException =>
-        for (error <- e.problems.asScala) printError(error)
+        for (error <- e.problems) printError(error)
         System.err.println(Message("error.count", e.size))
         null
     }

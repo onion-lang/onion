@@ -9,8 +9,7 @@ package onion.compiler
  * ************************************************************** */
 
 import java.text.MessageFormat
-import java.util.ArrayList
-import java.util.List
+import scala.collection.mutable.Buffer
 import onion.compiler.toolbox.Message
 import onion.compiler.exceptions.CompilationException
 
@@ -19,7 +18,7 @@ import onion.compiler.exceptions.CompilationException
  *
  */
 class SemanticErrorReporter(threshold: Int) {
-  private val problems = new ArrayList[CompileError]
+  private val problems = Buffer[CompileError]()
   private var sourceFile: String = null
   private var errorCount: Int = 0
 
@@ -202,7 +201,7 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def problem(position: Location, message: String): Unit = {
-    problems.add(new CompileError(sourceFile, position, message))
+    problems.append(new CompileError(sourceFile, position, message))
   }
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
@@ -272,7 +271,7 @@ class SemanticErrorReporter(threshold: Int) {
     }
   }
 
-  def getProblems: Array[CompileError] = problems.toArray(new Array[CompileError](0)).asInstanceOf[Array[CompileError]]
+  def getProblems: Array[CompileError] = problems.toArray
 
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile

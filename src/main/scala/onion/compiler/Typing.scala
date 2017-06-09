@@ -72,7 +72,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
     for(unit <- source) processTyping(unit)
     for(unit <- source) processDuplication(unit)
     val problems = reporter_.getProblems
-    if (problems.length > 0) throw new CompilationException(Arrays.asList(problems:_*))
+    if (problems.length > 0) throw new CompilationException(problems.toSeq)
     table_.classes.values.toList.toArray
   }
 

@@ -115,19 +115,19 @@ object CodeGeneration {
         if (tp eq Type.BOOLEAN) {
           appendConstant(JBoolean.valueOf(false))
         } else if (tp eq Type.BYTE) {
-          appendConstant(new JByte(0.asInstanceOf[Byte]))
+          appendConstant(JByte.valueOf(0.asInstanceOf[Byte]))
         } else if (tp eq Type.SHORT) {
-          appendConstant(new JShort(0.asInstanceOf[Short]))
+          appendConstant(JShort.valueOf(0.asInstanceOf[Short]))
         } else if (tp eq Type.CHAR) {
-          appendConstant(new JCharacter(0.asInstanceOf[Char]))
+          appendConstant(JCharacter.valueOf(0.asInstanceOf[Char]))
         } else if (tp eq Type.INT) {
-          appendConstant(new JInteger(0))
+          appendConstant(JInteger.valueOf(0))
         } else if (tp eq Type.LONG) {
-          appendConstant(new JLong(0))
+          appendConstant(JLong.valueOf(0L))
         } else if (tp eq Type.FLOAT) {
-          appendConstant(new JFloat(0.0f))
+          appendConstant(JFloat.valueOf(0.0f))
         } else if (tp eq Type.DOUBLE) {
-          appendConstant(new JDouble(0.0))
+          appendConstant(JDouble.valueOf(0.0))
         } else {
           append(InstructionConstants.NOP)
         }
@@ -310,7 +310,7 @@ object CodeGeneration {
 class CodeGeneration(config: CompilerConfig) {
   import CodeGeneration._
 
-  def process(classes: Array[IRT.ClassDefinition]): Array[CompiledClass] = {
+  def process(classes: Seq[IRT.ClassDefinition]): Seq[CompiledClass] = {
     compiledClasses.clear
     val base =  (if (config.outputDirectory != null) config.outputDirectory else ".") + Systems.fileSeparator
     for (klass <- classes) codeClass(klass)
@@ -321,7 +321,7 @@ class CodeGeneration(config: CompilerConfig) {
       val outDir: String = getOutputDir(base, clazz.getClassName)
       classFiles.add(new CompiledClass(clazz.getClassName, outDir, clazz.getBytes))
     }
-    classFiles.toArray(new Array[CompiledClass](0))
+    classFiles.asScala.toSeq
   }
 
   private def getOutputDir(base: String, fqcn: String): String = {
@@ -993,7 +993,7 @@ class CodeGeneration(config: CompilerConfig) {
       else {
         start = code.appendThis
         code.appendGetField(code.getMethod.getClassName, FRAME_PREFIX + node.frame, new ArrayType("java.lang.Object", 1))
-        code.appendConstant(new JInteger(node.index))
+        code.appendConstant(JInteger.valueOf(node.index))
       }
       if (node.isBasicType) {
         val boxed: ObjectType = code.boxing(`type`)
@@ -1462,7 +1462,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeChar(node: IRT.CharacterValue, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.appendConstant(new JCharacter(node.value))
+    code.appendConstant(JCharacter.valueOf(node.value))
   }
 
   def codeString(node: IRT.StringValue, code: CodeGeneration.Proxy): InstructionHandle = {
@@ -1470,19 +1470,19 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeInteger(node: IRT.IntValue, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.appendConstant(new JInteger(node.value))
+    code.appendConstant(JInteger.valueOf(node.value))
   }
 
   def codeLong(node: IRT.LongValue, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.appendConstant(new JLong(node.value))
+    code.appendConstant(JLong.valueOf(node.value))
   }
 
   def codeFloat(node: IRT.FloatValue, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.appendConstant(new JFloat(node.value))
+    code.appendConstant(JFloat.valueOf(node.value))
   }
 
   def codeDouble(node: IRT.DoubleValue, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.appendConstant(new JDouble(node.value))
+    code.appendConstant(JDouble.valueOf(node.value))
   }
 
   def codeBoolean(node: IRT.BoolValue, code: CodeGeneration.Proxy): InstructionHandle = {

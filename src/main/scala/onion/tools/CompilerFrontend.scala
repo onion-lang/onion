@@ -91,7 +91,7 @@ class CompilerFrontend {
 
   private def outputPathOf(outDir: String, fqcn: String): String = outDir + Systems.fileSeparator + simpleNameOf(fqcn)+ ".class"
 
-  private def generateFiles(binaries: Array[CompiledClass]): Boolean = {
+  private def generateFiles(binaries: Seq[CompiledClass]): Boolean = {
     val generated: java.util.List[File] = new java.util.ArrayList[File]
     for(binary <- binaries) {
       val outDir: String = binary.outputPath
@@ -159,7 +159,7 @@ class CompilerFrontend {
     }
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): Option[Array[CompiledClass]] = {
+  private def compile(config: CompilerConfig, fileNames: Array[String]): Option[Seq[CompiledClass]] = {
     Option(new OnionCompiler(config).compile(fileNames))
   }
 

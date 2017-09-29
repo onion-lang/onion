@@ -22,13 +22,13 @@ import onion.compiler.exceptions.CompilationException
  */
 class OnionCompiler(val config: CompilerConfig) {
 
-  def compile(fileNames: Array[String]): Array[CompiledClass] = {
-    compile(fileNames.map {new FileInputSource(_)}:Array[InputSource])
+  def compile(fileNames: Array[String]): Seq[CompiledClass] = {
+    compile(fileNames.map{new FileInputSource(_)}.toSeq)
   }
 
-  def compile(srcs: Array[InputSource]): Array[CompiledClass] = {
+  def compile(srcs: Seq[InputSource]): Seq[CompiledClass] = {
     try {
-      (new Parsing(config).andThen(new Typing(config)).andThen(new Generating(config)).process(srcs))
+      (new Parsing(config) andThen new Typing(config) andThen new Generating(config)).process(srcs)
     } catch {
       case e: CompilationException =>
         for (error <- e.problems) printError(error)

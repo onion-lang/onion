@@ -163,6 +163,7 @@ TOKEN:
 | <K_CASE:         "case"         >
 | <K_CHAR:         "Char"  >
 | <K_CLASS:        "class"        >
+| <K_RECORD:       "record"       >
 | <K_CONST:        "const"        >
 | <K_CONTINUE:     "continue"    >
 | <K_DEF:          "def"          >
@@ -401,7 +402,7 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
 }
 
 AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
-  (ty=interface_decl(modifiers) | ty=class_decl(modifiers)) {return ty;}
+  (ty=interface_decl(modifiers) | ty=class_decl(modifiers) | ty=record_decl(modifiers)) {return ty;}
 }
 
 AST.BlockExpression block():{Token t; List<AST.CompoundExpression> statements = (List<AST.CompoundExpression>)AST.NIL(); AST.BlockExpression s;}{
@@ -481,6 +482,16 @@ AST.ClassDeclaration class_decl(int mset) : {
   "}" {
     return new AST.ClassDeclaration(
       p(t1), mset, t2.image, ty1, toList(ty2s), sec3, toList(sec2s)
+    );
+  }
+}
+
+AST.RecordDeclaration record_decl(int mset) : {
+  Token t1, t2; List<AST.Argument> args;
+}{
+  t1="record" t2=<ID> "(" args=args() ")" {
+    return new AST.RecordDeclaration(
+      p(t1), mset, t2.image, args
     );
   }
 }

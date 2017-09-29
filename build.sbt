@@ -1,6 +1,6 @@
 import sbt._
+import sbt.internal.inc.classpath._
 import Keys._
-import classpath._
 import java.util.jar.{Attributes, Manifest}
 
 lazy val root = Project(
@@ -28,22 +28,24 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
   IO.copyDirectory(file("run"), out / "run")
   IO.copyFile(artifact, out / "onion.jar")
   IO.copyFile(file("README.md"), out / "README.md")
-  val files = (out ***).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))
+  val files = (out ** AllPassFilter).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))
   IO.zip(files, target / "onion-dist.zip")
 }
 
 def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
-  Fork.java(None,
+  Fork.java(
+    ForkOptions().withOutputStrategy(
+      OutputStrategy.LoggedOutput(log)
+    ),
     "-cp" ::
-      Path.makeString(classpath.map(_.data)) ::
-      List(
-        "javacc",
-        "-UNICODE_INPUT=true",
-        "-JAVA_UNICODE_ESCAPE=true",
-        "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
-        "grammar/JJOnionParser.jj"
-      ),
-    log
+    Path.makeString(classpath.map(_.data)) ::
+    List(
+      "javacc",
+      "-UNICODE_INPUT=true",
+      "-JAVA_UNICODE_ESCAPE=true",
+      "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
+      "grammar/JJOnionParser.jj"
+    )
   ) match {
     case exitCode if exitCode != 0 => sys.error("Nonzero exit code returned from javacc: " + exitCode)
     case 0 =>

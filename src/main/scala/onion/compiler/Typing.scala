@@ -12,7 +12,7 @@ import _root_.onion.compiler.SemanticError._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 
-class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AST.CompilationUnit], Array[ClassDefinition]] {
+class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
   type Continuable = Boolean
   type Environment = TypingEnvironment
@@ -65,15 +65,15 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[AS
   private var definition_ : ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
-  def newEnvironment(source: Array[AST.CompilationUnit]) = new TypingEnvironment
-  def doProcess(source: Array[AST.CompilationUnit], environment: TypingEnvironment): Array[ClassDefinition] = {
+  def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
+  def doProcess(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
     for(unit <- source) processOutline(unit)
     for(unit <- source) processTyping(unit)
     for(unit <- source) processDuplication(unit)
     val problems = reporter_.getProblems
     if (problems.length > 0) throw new CompilationException(problems.toSeq)
-    table_.classes.values.toList.toArray
+    table_.classes.values.toSeq
   }
 
   def processHeader(unit: AST.CompilationUnit) {

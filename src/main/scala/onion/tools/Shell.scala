@@ -20,11 +20,11 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
   def run(script: String, fileName: String, args: Array[String]): Shell.Result = {
     val compiler: OnionCompiler = new OnionCompiler(config)
     Thread.currentThread.setContextClassLoader(classLoader)
-    val classes: Array[CompiledClass] = compiler.compile(Array[InputSource](new StreamInputSource(new StringReader(script), fileName)))
+    val classes: Seq[CompiledClass] = compiler.compile(Array[InputSource](new StreamInputSource(new StringReader(script), fileName)))
     run(classes, args)
   }
 
-  def run(classes: Array[CompiledClass], args: Array[String]): Shell.Result = {
+  def run(classes: Seq[CompiledClass], args: Array[String]): Shell.Result = {
     try {
       val loader = new OnionClassLoader(classLoader, classpath, classes)
       Thread.currentThread.setContextClassLoader(loader)
@@ -39,7 +39,7 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
     }
   }
 
-  private def findFirstMainMethod(loader: OnionClassLoader, classes: Array[CompiledClass]): Option[Method] = {
+  private def findFirstMainMethod(loader: OnionClassLoader, classes: Seq[CompiledClass]): Option[Method] = {
     for (i <- 0 until classes.length) {
       val className = classes(i).getClassName
       val clazz = Class.forName(className, true, loader)

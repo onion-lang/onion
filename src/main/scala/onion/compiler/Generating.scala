@@ -1,14 +1,14 @@
 package onion.compiler
 
-class Generating(config: CompilerConfig) extends AnyRef with ProcessingUnit[Array[IRT.ClassDefinition], Array[CompiledClass]] {
+class Generating(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[IRT.ClassDefinition], Seq[CompiledClass]] {
   class CodeGeneratingEnvironment
   type Environment = CodeGeneratingEnvironment
-  def newEnvironment(source: Array[IRT.ClassDefinition]): CodeGeneratingEnvironment = {
+  def newEnvironment(source: Seq[IRT.ClassDefinition]): CodeGeneratingEnvironment = {
     new CodeGeneratingEnvironment
   }
 
   private val generator = new CodeGeneration(config)
-  def doProcess(source: Array[IRT.ClassDefinition], environment: CodeGeneratingEnvironment): Array[CompiledClass] = {
+  def doProcess(source: Seq[IRT.ClassDefinition], environment: CodeGeneratingEnvironment): Seq[CompiledClass] = {
     generator.process(source)
   }
 }

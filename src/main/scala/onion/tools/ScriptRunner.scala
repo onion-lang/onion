@@ -111,7 +111,7 @@ class ScriptRunner {
     ) yield (new CompilerConfig(classpath, "", encoding, ".", maxErrorReport))
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): Array[CompiledClass] = {
+  private def compile(config: CompilerConfig, fileNames: Array[String]): Seq[CompiledClass] = {
     new OnionCompiler(config).compile(fileNames)
   }
 

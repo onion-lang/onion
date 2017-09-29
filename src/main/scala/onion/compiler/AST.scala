@@ -153,6 +153,7 @@ object AST {
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument]) extends TypeDeclaration
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) extends TypeDeclaration
   case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) extends TypeDeclaration
 }

@@ -25,7 +25,7 @@ object ScriptRunner {
 
   private def pathArray(path: String): Array[String] =  path.split(Systems.pathSeparator)
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     try {
       new ScriptRunner().run(args)
     }
@@ -108,7 +108,7 @@ class ScriptRunner {
     for(
       encoding <- checkEncoding(option.get(ENCODING).asInstanceOf[String]);
       maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
-    ) yield (new CompilerConfig(classpath, "", encoding, ".", maxErrorReport))
+    ) yield (new CompilerConfig(classpath.toIndexedSeq, "", encoding, ".", maxErrorReport))
   }
 
   private def compile(config: CompilerConfig, fileNames: Array[String]): Seq[CompiledClass] = {

@@ -116,7 +116,7 @@ class CompilerFrontend {
     true
   }
 
-  protected def printUsage {
+  protected def printUsage(): Unit = {
     printError(
       """Usage: onionc [-options] source_file ...
         |options:
@@ -155,7 +155,7 @@ class CompilerFrontend {
       option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
     )
     for (e <- encoding; m <- maxErrorReport) yield {
-      new CompilerConfig(classpath, "", e, outputDirectory, m)
+      new CompilerConfig(classpath.toIndexedSeq, "", e, outputDirectory, m)
     }
   }
 

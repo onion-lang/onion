@@ -20,7 +20,7 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
   def run(script: String, fileName: String, args: Array[String]): Shell.Result = {
     val compiler: OnionCompiler = new OnionCompiler(config)
     Thread.currentThread.setContextClassLoader(classLoader)
-    val classes: Seq[CompiledClass] = compiler.compile(Array[InputSource](new StreamInputSource(new StringReader(script), fileName)))
+    val classes: Seq[CompiledClass] = compiler.compile(Seq(new StreamInputSource(new StringReader(script), fileName)))
     run(classes, args)
   }
 

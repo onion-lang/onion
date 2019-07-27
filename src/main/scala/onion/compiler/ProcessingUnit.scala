@@ -4,8 +4,8 @@ trait ProcessingUnit[A, B] {self =>
   type Environment
   def newEnvironment(source: A): Environment
   def doProcess(source: A, environment: Environment): B
-  def pre(source: A) {}
-  def post(source: A, result: B) {}
+  def pre(source: A): Unit = {}
+  def post(source: A, result: B): Unit = {}
 
   final def process(source: A): B = {
     pre(source)

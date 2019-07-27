@@ -2,7 +2,7 @@ package onion.compiler
 
 import onion.compiler.AST.AccessSection
 
-import _root_.scala.collection.JavaConverters._
+import _root_.scala.jdk.CollectionConverters._
 import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.IRT._
@@ -76,7 +76,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
     table_.classes.values.toSeq
   }
 
-  def processHeader(unit: AST.CompilationUnit) {
+  def processHeader(unit: AST.CompilationUnit): Unit = {
     unit_ = unit
     val module = unit.module
     val moduleName = if (module != null) module.name else null
@@ -142,10 +142,10 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       add(node.name, new NameMapper(imports.toSeq))
     }
   }
-  def processOutline(unit: AST.CompilationUnit) {
+  def processOutline(unit: AST.CompilationUnit): Unit = {
     var nconstructors = 0
     unit_ = unit
-    def processClassDeclaration(node: AST.ClassDeclaration) {
+    def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
       nconstructors = 0
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
@@ -171,14 +171,14 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       }
       if (nconstructors == 0) definition_.addDefaultConstructor
     }
-    def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
       constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
       for(method <- node.methods) processInterfaceMethodDeclaration(method)
     }
-    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration) {
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return
       val modifier = node.modifiers | AST.M_PUBLIC
@@ -188,7 +188,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       put(node, field)
       classType.add(field)
     }
-    def processFunctionDeclaration(node: AST.FunctionDeclaration) {
+    def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
       val argsOption = typesOf(node.args)
       val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
       for(args <- argsOption; returnType <- returnTypeOption) {
@@ -200,7 +200,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         classType.add(method)
       }
     }
-    def processFieldDeclaration(node: AST.FieldDeclaration) {
+    def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return; val modifier = node.modifiers | access_
       val name = node.name
@@ -208,7 +208,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       put(node, field)
       definition_.add(field)
     }
-    def processMethodDeclaration(node: AST.MethodDeclaration) {
+    def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val argsOption = typesOf(node.args)
       val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
       for(args <- argsOption; returnType <- returnTypeOption) {
@@ -220,7 +220,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         definition_.add(method)
       }
     }
-    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration) {
+    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val argsOption = typesOf(node.args)
       val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
       for(args <- argsOption; returnType <- returnTypeOption) {
@@ -231,7 +231,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         definition_.add(method)
       }
     }
-    def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
+    def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
       nconstructors += 1
       val argsOption = typesOf(node.args)
       for(args <- argsOption) {
@@ -241,7 +241,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         definition_.add(constructor)
       }
     }
-    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
+    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return
       if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectType]).isInterface)) {
@@ -278,7 +278,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       }
       typeRef
     }
-    def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]) {
+    def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]): Unit = {
       if(node == null || visit.contains(node)) return
       visit += node
       node match {
@@ -323,7 +323,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       }
     }
   }
-  def processTyping(node: AST.CompilationUnit) {
+  def processTyping(node: AST.CompilationUnit): Unit = {
     def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
       val expressions = new Array[Term](nodes.length)
       var error: Boolean = false
@@ -373,7 +373,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       }
     }
     def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
-    def processMethodDeclaration(node: AST.MethodDeclaration) {
+    def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return
       if (node.block == null) return
@@ -390,7 +390,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       method.setBlock(block)
       method.setFrame(context.getContextFrame)
     }
-    def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
+    def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
       val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
       if (constructor == null) return
       val context = new LocalContext
@@ -415,7 +415,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         constructor.frame = context.getContextFrame
       }
     }
-    def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext) {
+    def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
       for(section <- node.defaultSection; member <- section.members) {
@@ -439,8 +439,8 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         }
       }
     }
-    def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext) { () }
-    def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext) {
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit = { () }
+    def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
       val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (function == null) return
       val context = new LocalContext
@@ -456,7 +456,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       function.setBlock(block)
       function.setFrame(context.getContextFrame)
     }
-    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext){()}
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
     def processLocalAssign(node: AST.Assignment, context: LocalContext): Term = {
       var value: Term = typed(node.rhs, context).getOrElse(null)
       if (value == null) return null
@@ -1168,7 +1168,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
     def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
       case AST.BlockExpression(loc, elements) =>
         context.openScope {
-          new StatementBlock(elements.map{e => translate(e, context)}.toArray:_*)
+          new StatementBlock(elements.map{e => translate(e, context)}.toIndexedSeq:_*)
         }
       case node@AST.BreakExpression(loc) =>
         report(UNIMPLEMENTED_FEATURE, node)
@@ -1412,13 +1412,13 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       klass.add(createMain(klass, method, "main", Array[Type](argsType), BasicType.VOID))
     }
   }
-  def processDuplication(node: AST.CompilationUnit) {
+  def processDuplication(node: AST.CompilationUnit): Unit = {
     val methods = new JTreeSet[Method](new MethodComparator)
     val fields = new JTreeSet[FieldRef](new FieldComparator)
     val constructors = new JTreeSet[ConstructorRef](new ConstructorComparator)
     val variables = new JTreeSet[FieldRef](new FieldComparator)
     val functions = new JTreeSet[Method](new MethodComparator)
-    def processFieldDeclaration(node: AST.FieldDeclaration) {
+    def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
       val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return
       if (fields.contains(field)) {
@@ -1427,7 +1427,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         fields.add(field)
       }
     }
-    def processMethodDeclaration(node: AST.MethodDeclaration) {
+    def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return
       if (methods.contains(method)) {
@@ -1436,7 +1436,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         methods.add(method)
       }
     }
-    def processConstructorDeclaration(node: AST.ConstructorDeclaration) {
+    def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
       val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
       if (constructor == null) return
       if (constructors.contains(constructor)) {
@@ -1445,7 +1445,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         constructors.add(constructor)
       }
     }
-    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration) {
+    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
       val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return
       if (fields.contains(field)) {
@@ -1454,7 +1454,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         fields.add(field)
       }
     }
-    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration) {
+    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return
       if (methods.contains(method)) {
@@ -1463,7 +1463,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         methods.add(method)
       }
     }
-    def generateMethods() {
+    def generateMethods(): Unit = {
       val generated = new JTreeSet[Method](new MethodComparator)
       val methodSet = new JTreeSet[Method](new MethodComparator)
       def makeDelegationMethod(delegated: FieldRef, delegator: Method): MethodDefinition = {
@@ -1480,7 +1480,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         node.setFrame(frame)
         node
       }
-      def generateDelegationMethods(node: FieldDefinition) {
+      def generateDelegationMethods(node: FieldDefinition): Unit = {
         val typeRef = node.`type`.asInstanceOf[ClassType]
         val src = Classes.getInterfaceMethods(typeRef)
         for (method <- src.asScala) {
@@ -1500,7 +1500,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         if ((AST.M_FORWARDED & node.modifier) != 0) generateDelegationMethods(node.asInstanceOf[FieldDefinition])
       }
     }
-    def processAccessSection(node: AST.AccessSection) {
+    def processAccessSection(node: AST.AccessSection): Unit = {
       for(member <- node.members) member match {
         case node: AST.FieldDeclaration => processFieldDeclaration(node)
         case node: AST.MethodDeclaration => processMethodDeclaration(node)
@@ -1508,7 +1508,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
       }
     }
-    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration) {
+    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
       val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
       if (field == null) return
       if (variables.contains(field)) {
@@ -1517,7 +1517,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         variables.add(field)
       }
     }
-    def processFunctionDeclaration(node: AST.FunctionDeclaration) {
+    def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return
       if (functions.contains(method)) {
@@ -1526,7 +1526,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         functions.add(method)
       }
     }
-    def processClassDeclaration(node: AST.ClassDeclaration) {
+    def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
       val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       if (clazz == null) return
       methods.clear()
@@ -1540,7 +1540,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       for (section <- node.sections) processAccessSection(section)
       generateMethods()
     }
-    def processInterfaceDeclaration(node: AST.InterfaceDeclaration) {
+    def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
       val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       if (clazz == null) return
       methods.clear()
@@ -1564,11 +1564,11 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       }
     }
   }
-  def report(error: SemanticError, node: AST.Node, items: AnyRef*) {
+  def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit = {
     report(error, node.location, items:_*)
   }
-  def report(error: SemanticError, location: Location, items: AnyRef*) {
-    def report_(items: Array[AnyRef]) {
+  def report(error: SemanticError, location: Location, items: AnyRef*): Unit = {
+    def report_(items: Array[AnyRef]): Unit = {
       reporter_.setSourceFile(unit_.sourceFile)
       reporter_.report(error, location, items)
     }
@@ -1586,7 +1586,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
     val moduleName = if (module != null) module.name else null
     createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
   }
-  private def put(astNode: AST.Node, kernelNode: Node) {
+  private def put(astNode: AST.Node, kernelNode: Node): Unit = {
     ast2ixt_(astNode) = kernelNode
     ixt2ast_(kernelNode) = astNode
   }

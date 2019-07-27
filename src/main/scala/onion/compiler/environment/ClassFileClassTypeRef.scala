@@ -87,12 +87,12 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
   }
 
   override def interfaces: Seq[IRT.ClassType] = {
-    val interfaceNames: Seq[String] = javaClass.getInterfaceNames
+    val interfaceNames: Seq[String] = javaClass.getInterfaceNames.toIndexedSeq
     val interfaces: Array[IRT.ClassType] = new Array[IRT.ClassType](interfaceNames.length)
     for(i <- interfaces.indices) {
       interfaces(i) = table.load(interfaceNames(i))
     }
-    interfaces
+    interfaces.toIndexedSeq
   }
 
   def methods: Seq[IRT.Method] =  methods_.values

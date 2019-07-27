@@ -2,6 +2,7 @@ package onion.compiler
 
 import java.util._
 import java.util
+import scala.jdk.CollectionConverters._
 
 /**
 
@@ -122,7 +123,7 @@ object IRT {
     }
 
     def this(newStatements: util.List[IRT.ActionStatement]) {
-      this(newStatements.toArray(new Array[IRT.ActionStatement](0)): _*)
+      this(newStatements.asScala.toIndexedSeq: _*)
     }
 
     def statements: Array[IRT.ActionStatement] = newStatements.toArray
@@ -226,7 +227,7 @@ object IRT {
      * @return
      */
     def newInterface(location: Location, modifier: Int, name: String, interfaces: Array[IRT.ClassType]): IRT.ClassDefinition = {
-      new IRT.ClassDefinition(location, true, modifier, name, null, interfaces)
+      new IRT.ClassDefinition(location, true, modifier, name, null, if(interfaces != null) interfaces.toIndexedSeq else Seq())
     }
 
     /**
@@ -238,7 +239,7 @@ object IRT {
      * @return
      */
     def newClass(location: Location, modifier: Int, name: String, superClass: IRT.ClassType, interfaces: Array[IRT.ClassType]): IRT.ClassDefinition = {
-      new IRT.ClassDefinition(location, false, modifier, name, superClass, interfaces)
+      new IRT.ClassDefinition(location, false, modifier, name, superClass, if(interfaces != null) interfaces.toIndexedSeq else Seq())
     }
 
     /**
@@ -267,31 +268,31 @@ object IRT {
       this(null: Location, false, 0, null: String, null: IRT.ClassType, null)
     }
 
-    def setSuperClass(superClass: IRT.ClassType) {
+    def setSuperClass(superClass: IRT.ClassType):Unit = {
       this.superClass = superClass
     }
 
-    def setInterfaces(interfaces: Array[IRT.ClassType]) {
-      this.interfaces = interfaces
+    def setInterfaces(interfaces: Array[IRT.ClassType]):Unit = {
+      this.interfaces = interfaces.toIndexedSeq
     }
 
-    def setResolutionComplete(isInResolution: Boolean) {
+    def setResolutionComplete(isInResolution: Boolean):Unit = {
       this.isResolutionComplete = isInResolution
     }
 
-    def add(method: IRT.Method) {
+    def add(method: IRT.Method): Unit = {
       methods_.add(method)
     }
 
-    def add(field: IRT.FieldRef) {
+    def add(field: IRT.FieldRef):Unit = {
       fields_.add(field)
     }
 
-    def add(constructor: IRT.ConstructorRef) {
+    def add(constructor: IRT.ConstructorRef): Unit = {
       constructors_.add(constructor)
     }
 
-    def addDefaultConstructor {
+    def addDefaultConstructor: Unit = {
       constructors_.add(ConstructorDefinition.newDefaultConstructor(this))
     }
 
@@ -947,7 +948,7 @@ object IRT {
 
     def isAmbiguous(method1: IRT.Method, method2: IRT.Method): Boolean =  sorter.compare(method1, method2) >= 0
 
-    private def find(methods: Set[IRT.Method], target: IRT.ObjectType, name: String, params: Array[IRT.Term]) {
+    private def find(methods: Set[IRT.Method], target: IRT.ObjectType, name: String, params: Array[IRT.Term]): Unit = {
       if (target == null) return
       val ms: Array[IRT.Method] = target.methods(name)
       for (m <- target.methods(name)) {

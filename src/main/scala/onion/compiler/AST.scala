@@ -14,7 +14,9 @@ object AST {
   val M_PRIVATE = 512
   val M_FORWARDED = 1024
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
-  def append[A](buffer: scala.collection.mutable.Buffer[A], element: A) { buffer += element }
+  def append[A](buffer: scala.collection.mutable.Buffer[A], element: A): Unit = {
+    buffer += element
+  }
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString

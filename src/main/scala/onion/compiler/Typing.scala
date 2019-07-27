@@ -117,7 +117,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         }else {
           table_.classes.add(node)
           put(declaration, node)
-          add(node.name, new NameMapper(imports))
+          add(node.name, new NameMapper(imports.toSeq))
         }
       case declaration: AST.InterfaceDeclaration =>
         val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
@@ -127,7 +127,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
         }else{
           table_.classes.add(node)
           put(declaration, node)
-          add(node.name, new NameMapper(imports))
+          add(node.name, new NameMapper(imports.toSeq))
         }
       case otherwise =>
         count += 1
@@ -139,7 +139,7 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
       table_.classes.add(node)
       node.addDefaultConstructor
       put(unit, node)
-      add(node.name, new NameMapper(imports))
+      add(node.name, new NameMapper(imports.toSeq))
     }
   }
   def processOutline(unit: AST.CompilationUnit) {

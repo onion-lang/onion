@@ -6,9 +6,9 @@
  * This software is distributed under the modified BSD License.   *
  * ************************************************************** */
 package onion.compiler
-
 import java.lang.{Byte => JByte, Short => JShort, Character => JCharacter, Integer => JInteger, Long => JLong, Double => JDouble, Float => JFloat, Boolean => JBoolean }
 import java.util.{Map => JMap, HashMap => JHashMap, List, ArrayList, Set, Iterator}
+import scala.jdk.CollectionConverters._
 import onion.compiler.toolbox._
 import org.apache.bcel.Constants
 import org.apache.bcel.classfile.JavaClass
@@ -78,20 +78,20 @@ object CodeGeneration {
     private var indexTable: Array[Int] = _
     private var method: MethodGen = _
 
-    def setFrame(frame: LocalFrame) {
+    def setFrame(frame: LocalFrame): Unit = {
       this.frame = frame
     }
     def getFrame: LocalFrame = frame
     def getFrameObjectIndex: Int = frameObjectIndex
-    def setFrameObjectIndex(frameObjectIndex: Int) {
+    def setFrameObjectIndex(frameObjectIndex: Int): Unit = {
       this.frameObjectIndex = frameObjectIndex
     }
-    def setIndexTable(indexTable: Array[Int]) {
+    def setIndexTable(indexTable: Array[Int]): Unit = {
       this.indexTable = indexTable.clone.asInstanceOf[Array[Int]]
     }
     def index(index: Int): Int = indexTable(index)
     def getIndexTable: Array[Int] = indexTable.clone.asInstanceOf[Array[Int]]
-    def setMethod(method: MethodGen) {
+    def setMethod(method: MethodGen): Unit = {
       this.method = method
     }
     def getMethod: MethodGen = {
@@ -315,7 +315,6 @@ class CodeGeneration(config: CompilerConfig) {
     val base =  (if (config.outputDirectory != null) config.outputDirectory else ".") + Systems.fileSeparator
     for (klass <- classes) codeClass(klass)
     val classFiles: List[CompiledClass] = new ArrayList[CompiledClass]
-    import scala.collection.JavaConverters._
     for (o <- compiledClasses.asScala) {
       val clazz: JavaClass = o
       val outDir: String = getOutputDir(base, clazz.getClassName)
@@ -341,7 +340,7 @@ class CodeGeneration(config: CompilerConfig) {
     modifier
   }
 
-  def codeClass(node: IRT.ClassDefinition) {
+  def codeClass(node: IRT.ClassDefinition): Unit = {
     val modifier: Int = classModifier(node)
     val className: String = node.name
     generator = new SymbolGenerator(className + CLOSURE_CLASS_SUFFIX)
@@ -376,7 +375,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def codeConstructor(gen: ClassGen, node: IRT.ConstructorDefinition) {
+  def codeConstructor(gen: ClassGen, node: IRT.ConstructorDefinition): Unit = {
     val isStaticOld: Boolean = isStatic
     isStatic = false
     val code: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
@@ -415,7 +414,7 @@ class CodeGeneration(config: CompilerConfig) {
     isStatic = isStaticOld
   }
 
-  def codeMethod(gen: ClassGen, node: IRT.MethodDefinition) {
+  def codeMethod(gen: ClassGen, node: IRT.MethodDefinition): Unit = {
     val isStaticOld: Boolean = isStatic
     isStatic = Modifier.isStatic(node.modifier)
     val code: CodeGeneration.Proxy = new CodeGeneration.Proxy(gen.getConstantPool)
@@ -459,7 +458,7 @@ class CodeGeneration(config: CompilerConfig) {
     isStatic = isStaticOld
   }
 
-  private def appendInitialCode(code: CodeGeneration.Proxy, frame: LocalFrame, arguments: Array[Type], origin: Int) {
+  private def appendInitialCode(code: CodeGeneration.Proxy, frame: LocalFrame, arguments: Array[Type], origin: Int): Unit = {
     val frameObjectIndex: Int = code.getFrameObjectIndex
     code.appendConstant(JInteger.valueOf(frame.entries.length))
     code.appendNewArray(Type.OBJECT, 1.asInstanceOf[Short])
@@ -490,7 +489,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def implementsMethods(gen: ClassGen, methods: Array[IRT.Method]) {
+  private def implementsMethods(gen: ClassGen, methods: Array[IRT.Method]): Unit = {
     {
       var i: Int = 0
       while (i < methods.length) {
@@ -701,7 +700,7 @@ class CodeGeneration(config: CompilerConfig) {
     constructor
   }
 
-  def codeField(gen: ClassGen, node: IRT.FieldDefinition) {
+  def codeField(gen: ClassGen, node: IRT.FieldDefinition): Unit = {
     val field = new FieldGen(toJavaModifier(node.modifier), typeOf(node.`type`), node.name, gen.getConstantPool)
     gen.addField(field.getField)
   }
@@ -1199,7 +1198,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def bitShiftR2(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def bitShiftR2(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.ISHR)
     }
@@ -1211,7 +1210,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitShiftL2(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def bitShiftL2(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.ISHL)
     }
@@ -1223,7 +1222,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitShiftR3(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def bitShiftR3(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.IUSHR)
     }
@@ -1281,7 +1280,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  def bitAnd(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def bitAnd(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.BOOLEAN)) {
       code.append(new IAND)
     }
@@ -1293,7 +1292,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def bitOr(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def bitOr(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.BOOLEAN)) {
       code.append(new IOR)
     }
@@ -1305,7 +1304,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def xor(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def xor(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.BOOLEAN)) {
       code.append(new IXOR)
     }
@@ -1317,7 +1316,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  def eq(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def eq(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     var b1: BranchHandle = null
     if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.CHAR) || (`type` eq IRT.BasicType.BOOLEAN)) {
       b1 = code.append(new IF_ICMPEQ(null))
@@ -1339,7 +1338,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def noteq(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def noteq(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     var b1: BranchHandle = null
     if ((`type` eq IRT.BasicType.INT) || (`type` eq IRT.BasicType.CHAR) || (`type` eq IRT.BasicType.BOOLEAN)) {
       b1 = code.append(new IF_ICMPNE(null))
@@ -1362,7 +1361,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def gt(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def gt(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     var b1: BranchHandle = null
     if (`type` eq IRT.BasicType.INT) {
       b1 = code.append(new IF_ICMPGT(null))
@@ -1385,7 +1384,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def gte(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def gte(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     var comparation: BranchHandle = null
     if (`type` eq IRT.BasicType.INT) {
       comparation = code.append(new IF_ICMPGE(null))
@@ -1408,7 +1407,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, comparation)
   }
 
-  def lte(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def lte(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     var b1: BranchHandle = null
     if (`type` eq IRT.BasicType.INT) {
       b1 = code.append(new IF_ICMPLE(null))
@@ -1431,7 +1430,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, b1)
   }
 
-  def lt(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  def lt(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     var comparation: BranchHandle = null
     if (`type` eq IRT.BasicType.INT) {
       comparation = code.append(new IF_ICMPLT(null))
@@ -1454,7 +1453,7 @@ class CodeGeneration(config: CompilerConfig) {
     processBranch(code, comparation)
   }
 
-  private def processBranch(code: CodeGeneration.Proxy, b1: BranchHandle) {
+  private def processBranch(code: CodeGeneration.Proxy, b1: BranchHandle): Unit = {
     code.append(InstructionConstants.ICONST_0)
     val b2: BranchHandle = code.append(new GOTO(null))
     b1.setTarget(code.append(InstructionConstants.ICONST_1))
@@ -1511,13 +1510,13 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def plus(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def plus(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if ((`type` ne IRT.BasicType.INT) && (`type` ne IRT.BasicType.LONG) && (`type` ne IRT.BasicType.FLOAT) && (`type` ne IRT.BasicType.DOUBLE)) {
       throw new RuntimeException
     }
   }
 
-  private def minus(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def minus(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(InstructionConstants.INEG)
     } else if (`type` eq IRT.BasicType.LONG) {
@@ -1531,7 +1530,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def not(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def not(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.BOOLEAN) {
       val b1: BranchHandle = code.append(new IFNE(null))
       var b2: BranchHandle = null
@@ -1544,7 +1543,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def bitNot(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def bitNot(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(new ICONST(-1))
       code.append(new IXOR)
@@ -1599,7 +1598,7 @@ class CodeGeneration(config: CompilerConfig) {
     start
   }
 
-  private def add(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def add(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(new IADD)
     } else if (`type` eq IRT.BasicType.LONG) {
@@ -1611,7 +1610,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def sub(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def sub(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(new ISUB)
     } else if (`type` eq IRT.BasicType.LONG) {
@@ -1623,7 +1622,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def mul(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def mul(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(new IMUL)
     } else if (`type` eq IRT.BasicType.LONG) {
@@ -1635,7 +1634,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def div(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def div(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(new IDIV)
     } else if (`type` eq IRT.BasicType.LONG) {
@@ -1647,7 +1646,7 @@ class CodeGeneration(config: CompilerConfig) {
     }
   }
 
-  private def mod(code: CodeGeneration.Proxy, `type`: IRT.Type) {
+  private def mod(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
       code.append(new IREM)
     } else if (`type` eq IRT.BasicType.LONG) {

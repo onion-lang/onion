@@ -63,7 +63,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
     for(i <- interfaces.indices) {
       interfaceSyms(i) = table.load(interfaces(i).getName)
     }
-    interfaceSyms
+    interfaceSyms.toIndexedSeq
   }
 
   def methods: Seq[IRT.Method] = {
@@ -76,7 +76,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
     methods_.get(name).toArray
   }
 
-  private def requireMethodTable {
+  private def requireMethodTable(): Unit = {
     if (methods_ == null) {
       methods_ = new MultiTable[IRT.Method]
       for (method <- klass.getMethods) {
@@ -97,7 +97,7 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
     fields_.get(name).orNull
   }
 
-  private def requireFieldTable {
+  private def requireFieldTable(): Unit = {
     if (fields == null) {
       fields_ = new OrderedTable[IRT.FieldRef]
       for (field <- klass.getFields) {

@@ -23,7 +23,7 @@ object Classes {
     methods
   }
 
-  private def collectInterfaceMethods(`type`: IRT.ClassType, set: Set[IRT.Method]) {
+  private def collectInterfaceMethods(`type`: IRT.ClassType, set: Set[IRT.Method]): Unit = {
     val methods = `type`.methods
     set.addAll(Arrays.asList(methods:_*))
     val interfaces: Seq[IRT.ClassType] = `type`.interfaces

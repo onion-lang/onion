@@ -69,7 +69,7 @@ class ClassFileClassTypeRef(javaClass: JavaClass, table: ClassTable) extends IRT
         constructors += translateConstructor(method)
       }
     }
-    constructors
+    constructors.toSeq
   }
 
   def isInterface: Boolean = (javaClass.getModifiers & ACC_INTERFACE) != 0

@@ -54,8 +54,8 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
 }
 
 lazy val onionSettings = Seq(
-  version := "0.2-SNAPSHOT",
-  scalaVersion := "2.12.3",
+  version := "0.2.0-SNAPSHOT",
+  scalaVersion := "2.13.0",
   name := "onion",
   organization := "org.onion_lang",
   unmanagedSourceDirectories in Compile := {
@@ -70,9 +70,9 @@ lazy val onionSettings = Seq(
   libraryDependencies ++= Seq(
     "org.apache.bcel" % "bcel" % "6.0",
     "org.ow2.asm" % "asm" % "5.0.2",
-    "net.java.dev.javacc" % "javacc" % "4.0",
+    "net.java.dev.javacc" % "javacc" % "5.0",
     "junit" % "junit" % "4.7" % "test",
-    "org.scalatest" %% "scalatest" % "3.0.0" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.8" % "test"
   ),
   sourceGenerators in Compile += Def.task {
     val cp = (externalDependencyClasspath in Compile).value

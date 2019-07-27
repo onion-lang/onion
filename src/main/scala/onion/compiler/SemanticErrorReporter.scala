@@ -267,7 +267,7 @@ class SemanticErrorReporter(threshold: Int) {
         reportLValueRequired(position, items)
     }
     if (errorCount >= threshold) {
-      throw new CompilationException(problems)
+      throw new CompilationException(problems.toSeq)
     }
   }
 

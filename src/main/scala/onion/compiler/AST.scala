@@ -52,7 +52,7 @@ object AST {
   val K_DOUBLE = KDouble
   val K_BOOLEAN = KBoolean
   val K_VOID = KVoid
-  case class TypeNode(location: Location, desc: TypeDescriptor) extends Node
+  case class TypeNode(location: Location, desc: TypeDescriptor, isRelaxed: Boolean) extends Node
   abstract sealed class Node{ def location: Location }
   case class Argument(location: Location, name: String, typeRef: TypeNode) extends Node
   case class CompilationUnit(

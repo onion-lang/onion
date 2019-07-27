@@ -568,12 +568,12 @@ AST.TypeNode basic_type() : {
 | t=<K_FLOAT>    {kind = AST.K_FLOAT();}
 | t=<K_DOUBLE>   {kind = AST.K_DOUBLE();}
 | t=<K_BOOLEAN>  {kind = AST.K_BOOLEAN();}
-) {return new AST.TypeNode(p(t), new AST.PrimitiveType(kind));}
+) {return new AST.TypeNode(p(t), new AST.PrimitiveType(kind), false);}
 }
 
 AST.TypeNode class_type() : {Token n;}{
-  n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true));}
-| n=<ID>   {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, false));}
+  n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true), false);}
+| n=<ID>   {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, false), false);}
 }
 
 AST.TypeNode raw_type() :{AST.TypeNode c;}{
@@ -581,13 +581,15 @@ AST.TypeNode raw_type() :{AST.TypeNode c;}{
 }
 
 AST.TypeNode void_type() :{Token t;}{
-  t=<K_VOID> {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()));}
+  t=<K_VOID> {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()), false);}
 }
 
 AST.TypeNode type() : {
   int d = 0; ArrayBuffer<AST.TypeDescriptor> args = new ArrayBuffer<AST.TypeDescriptor>();
   AST.TypeNode arg, c;
+  boolean isRelaxed = false;
 }{
+  ("+" {isRelaxed = true;})?
   c=raw_type()
   [LOOKAHEAD(2) "<" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* ">" ]
   (LOOKAHEAD(2) "[" "]" {d++;})* {
@@ -595,7 +597,7 @@ AST.TypeNode type() : {
     for(int i = 0; i < d; i++) {
       desc = new AST.ArrayType(desc);
     }
-    return new AST.TypeNode(c.location(), desc);
+    return new AST.TypeNode(c.location(), desc, isRelaxed);
   }
 }
 
@@ -877,7 +879,7 @@ AST.ClosureExpression anonymous_function() :{
  t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
     String mname;
     if(ty == null) {
-      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true));
+      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
       mname = "call";
     }else {
       mname = n.image;

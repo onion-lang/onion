@@ -896,9 +896,23 @@ AST.Expression integer_literal() :{Token t; String s;}{
   t=<INTEGER> {
     s = t.image;
     if(s.endsWith("L")){
+      String content = chop(s);
+      long value;
+      if(content.matches("0[xX].*")) {
+        value = Long.parseLong(content.substring(2), 16);
+      } else {
+        value = Long.parseLong(content);
+      }
       return new AST.LongLiteral(p(t), Long.parseLong(chop(s)));
     }else{
-      return new AST.IntegerLiteral(p(t), Integer.parseInt(s));
+      String content = s;
+      int value;
+      if(content.matches("0[xX].*")) {
+        value = Integer.parseInt(content.substring(2), 16);
+      } else {
+        value = Integer.parseInt(content);
+      }
+      return new AST.IntegerLiteral(p(t), value);
     }
   }
 }

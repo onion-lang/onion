@@ -1558,7 +1558,18 @@ class CodeGeneration(config: CompilerConfig) {
   def codeCast(node: IRT.AsInstanceOf, code: CodeGeneration.Proxy): InstructionHandle = {
     val target: IRT.Term = node.target
     val start: InstructionHandle = codeExpression(target, code)
-    code.appendCast(typeOf(target.`type`), typeOf(node.destination))
+    val fromType = target.`type`
+    val toType: IRT.Type = node.destination
+    fromType match {
+      case IRT.BasicType.INT | IRT.BasicType.SHORT | IRT.BasicType.BYTE =>
+        if(toType != IRT.BasicType.INT) {
+          code.appendCast(typeOf(IRT.BasicType.INT), typeOf(toType));
+        }
+      case _ =>
+        if(fromType != toType) {
+          code.appendCast(typeOf(fromType), typeOf(toType))
+        }
+    }
     start
   }
 

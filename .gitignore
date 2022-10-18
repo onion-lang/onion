@@ -1,4 +1,5 @@
 build/
+.bsp/
 build.lib/
 project/boot
 src/main/parser/onion

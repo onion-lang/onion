@@ -1,4 +1,4 @@
-## Onion - A Statically Typed Programming Language on JVM [![Build Status](https://travis-ci.org/onion-lang/onion.png?branch=master)](https://travis-ci.org/onion-lang/onion)
+## Onion - A Statically Typed Programming Language on JVM [![Build Status](https://github.com/onion-lang/onion/actions/workflows/scala.yml/badge.svg?branch=master)]
 
 Onion is an object-oriented and statically typed programming language. Source codes of Onion 
 compiles into JVM class files as in-memory or real files.

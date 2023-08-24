@@ -81,25 +81,25 @@ class Typing(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.
     val module = unit.module
     val moduleName = if (module != null) module.name else null
     val imports = Buffer[ImportItem](
-      ImportItem("*", "java.lang.*"),
-      ImportItem("*", "java.io.*"),
-      ImportItem("*", "java.util.*"),
-      ImportItem("*", "javax.swing.*"),
-      ImportItem("*", "java.awt.event.*"),
-      ImportItem("JByte", "java.lang.Byte"),
-      ImportItem("JShort", "java.lang.Short"),
-      ImportItem("JCharacter", "java.lang.Character"),
-      ImportItem("JInteger", "java.lang.Integer"),
-      ImportItem("JLong", "java.lang.Long"),
-      ImportItem("JFloat", "java.lang.Float"),
-      ImportItem("JDouble", "java.lang.Double"),
-      ImportItem("JBoolean", "java.lang.Boolean"),
-      ImportItem("*", "onion.*"),
-      ImportItem("*", if (moduleName != null) moduleName + ".*" else "*")
+      ImportItem("*", Seq("java", "lang", "*")),
+      ImportItem("*", Seq("java", "io", "*")),
+      ImportItem("*", Seq("java", "util", "*")),
+      ImportItem("*", Seq("javax", "swing", "*")),
+      ImportItem("*", Seq("java", "awt", "event", "*")),
+      ImportItem("JByte", Seq("java", "lang", "Byte")),
+      ImportItem("JShort", Seq("java", "lang", "Short")),
+      ImportItem("JCharacter", Seq("java", "lang", "Character")),
+      ImportItem("JInteger", Seq("java", "lang", "Integer")),
+      ImportItem("JLong", Seq("java", "lang", "Long")),
+      ImportItem("JFloat", Seq("java", "lang", "Float")),
+      ImportItem("JDouble", Seq("java", "lang", "Double")),
+      ImportItem("JBoolean", Seq("java", "lang", "Boolean")),
+      ImportItem("*", Seq("onion", "*")),
+      ImportItem("*", if (moduleName != null) moduleName.split("\\.").appended("*")else Seq("*"))
     )
     if(unit.imports != null) {
       for((key, value) <- unit.imports.mapping) {
-        imports.append(ImportItem(key, value))
+        imports.append(ImportItem(key, value.split("\\.")))
       }
     }
     val staticList = new StaticImportList

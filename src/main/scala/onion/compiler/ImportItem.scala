@@ -11,7 +11,7 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-case class ImportItem(simpleName : String, fqcn: String) {
+case class ImportItem(simpleName : String, fqcn: Seq[String]) {
   val isOnDemand: Boolean  = simpleName == "*"
 
   /**
@@ -21,9 +21,10 @@ case class ImportItem(simpleName : String, fqcn: String) {
    */
   def matches(simpleName: String): Option[String] = {
     if (isOnDemand) {
-      Some(fqcn.replaceAll("\\*", simpleName))
+      if(fqcn.length == 0) None
+      else Some(fqcn.take(fqcn.length - 1).appended(simpleName).mkString("."))
     } else if (this.simpleName == simpleName) {
-      Some(fqcn)
+      Some(fqcn.mkString((".")))
     } else {
       None
     }

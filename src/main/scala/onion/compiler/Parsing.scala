@@ -11,10 +11,10 @@ import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.parser.{JJOnionParser, ParseException}
 
 class Parsing(config: CompilerConfig) extends AnyRef
-  with ProcessingUnit[Seq[InputSource], Seq[AST.CompilationUnit]] {
+  with Processor[Seq[InputSource], Seq[AST.CompilationUnit]] {
   type Environment = Null
   def newEnvironment(source: Seq[InputSource]): Null = null
-  def doProcess(source: Seq[InputSource], environment: Null): Seq[AST.CompilationUnit] = {
+  def processBody(source: Seq[InputSource], environment: Null): Seq[AST.CompilationUnit] = {
     def parse(reader: Reader, fileName: String): AST.CompilationUnit = {
       new JJOnionParser(reader).unit().copy(sourceFile = fileName)
     }

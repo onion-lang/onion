@@ -13,7 +13,7 @@ import onion.compiler.AST.{ClassDeclaration, InterfaceDeclaration, RecordDeclara
 import _root_.scala.collection.JavaConverters._
 import scala.collection.mutable.{Buffer, Map, Set => MutableSet}
 
-class Rewriting(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[AST.CompilationUnit], Seq[AST.CompilationUnit]] {
+class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[AST.CompilationUnit]] {
 
   class TypingEnvironment
 
@@ -21,7 +21,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with ProcessingUnit[Seq[A
 
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
 
-  def doProcess(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[AST.CompilationUnit] = {
+  def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[AST.CompilationUnit] = {
     val rewritten = Buffer.empty[AST.CompilationUnit]
     for (unit <- source) {
       rewritten += rewrite(unit)

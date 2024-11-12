@@ -95,11 +95,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       ImportItem("JDouble", Seq("java", "lang", "Double")),
       ImportItem("JBoolean", Seq("java", "lang", "Boolean")),
       ImportItem("*", Seq("onion", "*")),
-      ImportItem("*", if (moduleName != null) moduleName.split("\\.").appended("*")else Seq("*"))
+      ImportItem("*", if (moduleName != null) moduleName.split("\\.").toIndexedSeq.appended("*")else Seq("*"))
     )
     if(unit.imports != null) {
       for((key, value) <- unit.imports.mapping) {
-        imports.append(ImportItem(key, value.split("\\.")))
+        imports.append(ImportItem(key, value.split("\\.").toIndexedSeq))
       }
     }
     val staticList = new StaticImportList

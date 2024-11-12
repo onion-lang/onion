@@ -41,7 +41,7 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
 
   private def findFirstMainMethod(loader: OnionClassLoader, classes: Seq[CompiledClass]): Option[Method] = {
     for (i <- 0 until classes.length) {
-      val className = classes(i).getClassName
+      val className = classes(i).getClassName()
       val clazz = Class.forName(className, true, loader)
       try {
         val main = clazz.getMethod("main", classOf[Array[String]])

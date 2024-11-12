@@ -129,7 +129,7 @@ object CodeGeneration {
         } else if (tp eq Type.DOUBLE) {
           appendConstant(JDouble.valueOf(0.0))
         } else {
-          append(InstructionConstants.NOP)
+          append(InstructionConst.NOP)
         }
       } else {
         appendNull(tp)
@@ -371,7 +371,7 @@ class CodeGeneration(config: CompilerConfig) {
       }
       start
     } else {
-      code.append(InstructionConstants.NOP)
+      code.append(InstructionConst.NOP)
     }
   }
 
@@ -403,7 +403,7 @@ class CodeGeneration(config: CompilerConfig) {
     val init: IRT.Super = node.superInitializer
     classType = typeOf(init.classType).asInstanceOf[ObjectType]
     arguments = typesOf(init.arguments)
-    code.append(InstructionConstants.ALOAD_0)
+    code.append(InstructionConst.ALOAD_0)
     codeExpressions(init.terms, code)
     code.appendCallConstructor(classType, arguments)
     codeBlock(node.block, code)
@@ -694,7 +694,7 @@ class CodeGeneration(config: CompilerConfig) {
       code.appendPutField(className, FRAME_PREFIX + (i + 1), types(i))
       i += 1;
     }
-    code.append(InstructionConstants.RETURN)
+    code.append(InstructionConst.RETURN)
     constructor.setMaxLocals
     constructor.setMaxStack
     constructor
@@ -715,7 +715,7 @@ class CodeGeneration(config: CompilerConfig) {
         i += 1;
       }
     } else {
-      start = code.append(InstructionConstants.NOP)
+      start = code.append(InstructionConst.NOP)
     }
     start
   }
@@ -725,10 +725,10 @@ class CodeGeneration(config: CompilerConfig) {
     val `type`: IRT.Type = node.term.`type`
     if (`type` ne IRT.BasicType.VOID) {
       if (isWideType(`type`)) {
-        code.append(InstructionConstants.POP2)
+        code.append(InstructionConst.POP2)
       }
       else {
-        code.append(InstructionConstants.POP)
+        code.append(InstructionConst.POP)
       }
     }
     start
@@ -755,7 +755,7 @@ class CodeGeneration(config: CompilerConfig) {
       case node1: IRT.Try =>
         codeTry(node1, code)
       case _ =>
-        code.append(InstructionConstants.NOP)
+        code.append(InstructionConst.NOP)
     }
   }
 
@@ -767,7 +767,7 @@ class CodeGeneration(config: CompilerConfig) {
       code.appendReturn(`type`)
     }
     else {
-      start = code.append(InstructionConstants.RETURN)
+      start = code.append(InstructionConst.RETURN)
     }
     start
   }
@@ -778,7 +778,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeThrowNode(node: IRT.Throw, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.term, code)
-    code.append(InstructionConstants.ATHROW)
+    code.append(InstructionConst.ATHROW)
     start
   }
 
@@ -806,7 +806,7 @@ class CodeGeneration(config: CompilerConfig) {
         })
       }
     }
-    val end: InstructionHandle = code.append(InstructionConstants.NOP)
+    val end: InstructionHandle = code.append(InstructionConst.NOP)
     to.setTarget(end)
     var i: Int = 0
     while (i < catchEnds.length) {
@@ -817,7 +817,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeEmpty(node: IRT.NOP, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.append(InstructionConstants.NOP)
+    code.append(InstructionConst.NOP)
   }
 
   def codeIf(node: IRT.IfStatement, code: CodeGeneration.Proxy): InstructionHandle = {
@@ -837,7 +837,7 @@ class CodeGeneration(config: CompilerConfig) {
     val branch: BranchHandle = code.append(new IFEQ(null))
     codeStatement(node.stmt, code)
     code.append(new GOTO(start))
-    val end: InstructionHandle = code.append(InstructionConstants.NOP)
+    val end: InstructionHandle = code.append(InstructionConst.NOP)
     branch.setTarget(end)
     start
   }
@@ -957,16 +957,16 @@ class CodeGeneration(config: CompilerConfig) {
         val `type`: IRT.Type = terms(i - 1).`type`
         if (`type` ne IRT.BasicType.VOID) {
           if (isWideType(`type`)) {
-            code.append(InstructionConstants.POP2)
+            code.append(InstructionConst.POP2)
           } else {
-            code.append(InstructionConstants.POP)
+            code.append(InstructionConst.POP)
           }
           codeExpression(terms(i), code)
         }
         i += 1
       }
     } else {
-      start = code.append(InstructionConstants.NOP)
+      start = code.append(InstructionConst.NOP)
     }
     start
   }
@@ -977,10 +977,10 @@ class CodeGeneration(config: CompilerConfig) {
     if (node.frame == 0 && !code.getFrame.closed) {
       start = codeExpression(node.value, code)
       if (isWideType(node.`type`)) {
-        code.append(InstructionConstants.DUP2)
+        code.append(InstructionConst.DUP2)
       }
       else {
-        code.append(InstructionConstants.DUP)
+        code.append(InstructionConst.DUP)
       }
       code.appendStore(`type`, code.getIndexTable(node.index))
     } else {
@@ -1085,7 +1085,7 @@ class CodeGeneration(config: CompilerConfig) {
 
   def codeArrayLengthNode(node: IRT.ArrayLength, code: CodeGeneration.Proxy): InstructionHandle = {
     val start: InstructionHandle = codeExpression(node.target, code)
-    code.append(InstructionConstants.ARRAYLENGTH)
+    code.append(InstructionConst.ARRAYLENGTH)
     start
   }
 
@@ -1102,7 +1102,7 @@ class CodeGeneration(config: CompilerConfig) {
   def codeNew(node: IRT.NewObject, code: CodeGeneration.Proxy): InstructionHandle = {
     val `type`: IRT.ClassType = node.constructor.affiliation
     val start: InstructionHandle = code.appendNew(typeOf(`type`).asInstanceOf[ObjectType])
-    code.append(InstructionConstants.DUP)
+    code.append(InstructionConst.DUP)
     var i: Int = 0
     while (i < node.parameters.length) {
       codeExpression(node.parameters(i), code)
@@ -1133,7 +1133,7 @@ class CodeGeneration(config: CompilerConfig) {
         i += 1;
       }
     } else {
-      start = code.append(InstructionConstants.NOP)
+      start = code.append(InstructionConst.NOP)
     }
     val className: String = node.target.name
     val name: String = node.method.name
@@ -1200,10 +1200,10 @@ class CodeGeneration(config: CompilerConfig) {
 
   def bitShiftR2(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
-      code.append(InstructionConstants.ISHR)
+      code.append(InstructionConst.ISHR)
     }
     else if (`type` eq IRT.BasicType.LONG) {
-      code.append(InstructionConstants.LSHR)
+      code.append(InstructionConst.LSHR)
     }
     else {
       throw new RuntimeException
@@ -1212,10 +1212,10 @@ class CodeGeneration(config: CompilerConfig) {
 
   def bitShiftL2(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
-      code.append(InstructionConstants.ISHL)
+      code.append(InstructionConst.ISHL)
     }
     else if (`type` eq IRT.BasicType.LONG) {
-      code.append(InstructionConstants.LSHL)
+      code.append(InstructionConst.LSHL)
     }
     else {
       throw new RuntimeException
@@ -1224,10 +1224,10 @@ class CodeGeneration(config: CompilerConfig) {
 
   def bitShiftR3(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
-      code.append(InstructionConstants.IUSHR)
+      code.append(InstructionConst.IUSHR)
     }
     else if (`type` eq IRT.BasicType.LONG) {
-      code.append(InstructionConstants.LUSHR)
+      code.append(InstructionConst.LUSHR)
     }
     else {
       throw new RuntimeException
@@ -1242,12 +1242,12 @@ class CodeGeneration(config: CompilerConfig) {
     b1 = code.append(new IFEQ(null))
     codeExpression(node.rhs, code)
     b2 = code.append(new IFEQ(null))
-    code.append(InstructionConstants.ICONST_1)
+    code.append(InstructionConst.ICONST_1)
     b3 = code.append(new GOTO(null))
-    val failure: InstructionHandle = code.append(InstructionConstants.ICONST_0)
+    val failure: InstructionHandle = code.append(InstructionConst.ICONST_0)
     b1.setTarget(failure)
     b2.setTarget(failure)
-    b3.setTarget(code.append(InstructionConstants.NOP))
+    b3.setTarget(code.append(InstructionConst.NOP))
     start
   }
 
@@ -1259,9 +1259,9 @@ class CodeGeneration(config: CompilerConfig) {
     b1 = code.append(new IFNE(null))
     codeExpression(node.rhs, code)
     b2 = code.append(new IFNE(null))
-    code.append(InstructionConstants.ICONST_0)
+    code.append(InstructionConst.ICONST_0)
     b3 = code.append(new GOTO(null))
-    val success: InstructionHandle = code.append(InstructionConstants.ICONST_1)
+    val success: InstructionHandle = code.append(InstructionConst.ICONST_1)
     b1.setTarget(success)
     b2.setTarget(success)
     b3.setTarget(code.append(new NOP))
@@ -1454,10 +1454,10 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   private def processBranch(code: CodeGeneration.Proxy, b1: BranchHandle): Unit = {
-    code.append(InstructionConstants.ICONST_0)
+    code.append(InstructionConst.ICONST_0)
     val b2: BranchHandle = code.append(new GOTO(null))
-    b1.setTarget(code.append(InstructionConstants.ICONST_1))
-    b2.setTarget(code.append(InstructionConstants.NOP))
+    b1.setTarget(code.append(InstructionConst.ICONST_1))
+    b2.setTarget(code.append(InstructionConst.NOP))
   }
 
   def codeChar(node: IRT.CharacterValue, code: CodeGeneration.Proxy): InstructionHandle = {
@@ -1489,7 +1489,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeNull(node: IRT.NullValue, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.append(InstructionConstants.ACONST_NULL)
+    code.append(InstructionConst.ACONST_NULL)
   }
 
   def codeUnaryExpression(node: IRT.UnaryTerm, code: CodeGeneration.Proxy): InstructionHandle = {
@@ -1518,13 +1518,13 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def minus(code: CodeGeneration.Proxy, `type`: IRT.Type): Unit = {
     if (`type` eq IRT.BasicType.INT) {
-      code.append(InstructionConstants.INEG)
+      code.append(InstructionConst.INEG)
     } else if (`type` eq IRT.BasicType.LONG) {
-      code.append(InstructionConstants.LNEG)
+      code.append(InstructionConst.LNEG)
     } else if (`type` eq IRT.BasicType.FLOAT) {
-      code.append(InstructionConstants.FNEG)
+      code.append(InstructionConst.FNEG)
     } else if (`type` eq IRT.BasicType.DOUBLE) {
-      code.append(InstructionConstants.DNEG)
+      code.append(InstructionConst.DNEG)
     } else {
       throw new RuntimeException
     }
@@ -1580,7 +1580,7 @@ class CodeGeneration(config: CompilerConfig) {
   }
 
   def codeSelf(node: IRT.This, code: CodeGeneration.Proxy): InstructionHandle = {
-    code.append(InstructionConstants.ALOAD_0)
+    code.append(InstructionConst.ALOAD_0)
   }
 
   def codeOuterThis(node: IRT.OuterThis, code: CodeGeneration.Proxy): InstructionHandle = {
@@ -1600,9 +1600,9 @@ class CodeGeneration(config: CompilerConfig) {
     val start: InstructionHandle = codeExpression(node.target, code)
     codeExpression(node.value, code)
     if (isWideType(node.value.`type`)) {
-      code.append(InstructionConstants.DUP2_X1)
+      code.append(InstructionConst.DUP2_X1)
     } else {
-      code.append(InstructionConstants.DUP_X1)
+      code.append(InstructionConst.DUP_X1)
     }
     val symbol: IRT.ClassType = node.target.`type`.asInstanceOf[IRT.ClassType]
     code.appendPutField(symbol.name, node.field.name, typeOf(node.`type`))

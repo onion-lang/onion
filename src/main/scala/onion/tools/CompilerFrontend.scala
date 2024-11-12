@@ -59,7 +59,7 @@ class CompilerFrontend {
 
   def run(commandLine: Array[String]): Int = {
     if (commandLine.length == 0) {
-      printUsage
+      printUsage()
       return -1
     }
     val result: Option[ParseSuccess] = parseCommandLine(commandLine)
@@ -69,7 +69,7 @@ class CompilerFrontend {
         val config: Option[CompilerConfig] = createConfig(success)
         val params: Array[String] = success.arguments.toArray
         if (params.length == 0) {
-          printUsage
+          printUsage()
           return -1
         }
         config match {

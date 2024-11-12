@@ -67,12 +67,12 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   }
 
   def methods: Seq[IRT.Method] = {
-    requireMethodTable
+    requireMethodTable()
     methods_.values
   }
 
   def methods(name: String): Array[IRT.Method] = {
-    requireMethodTable
+    requireMethodTable()
     methods_.get(name).toArray
   }
 
@@ -88,12 +88,12 @@ class ReflectionalClassTypeRef(klass: Class[_], table: ClassTable) extends IRT.A
   }
 
   def fields: Array[IRT.FieldRef] = {
-    requireFieldTable
+    requireFieldTable()
     fields_.values.toArray
   }
 
   def field(name: String): IRT.FieldRef = {
-    requireFieldTable
+    requireFieldTable()
     fields_.get(name).orNull
   }
 

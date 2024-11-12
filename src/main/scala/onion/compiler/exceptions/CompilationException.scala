@@ -17,6 +17,6 @@ class CompilationException(val problems : Seq[CompileError]) extends RuntimeExce
 
   override def size: Int = problems.size
 
-  override def iterator(): Iterator[CompileError] = problems.iterator
+  override def iterator: Iterator[CompileError] = problems.iterator
 }
 

@@ -20,7 +20,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class ArrayLength(location: Location, val target: IRT.Term) extends Term(location) {
-    def this(target: IRT.Term) {
+    def this(target: IRT.Term) = {
       this(null, target)
     }
 
@@ -31,7 +31,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class RefArray(location: Location, val target: IRT.Term, val index: IRT.Term) extends Term(location) {
-    def this(target: IRT.Term, index: IRT.Term) {
+    def this(target: IRT.Term, index: IRT.Term) = {
       this(null, target, index)
     }
 
@@ -42,7 +42,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class SetArray(location: Location, val target: IRT.Term, val index: IRT.Term, val value: IRT.Term) extends Term(location) {
-    def this(target: IRT.Term, index: IRT.Term, value: IRT.Term) {
+    def this(target: IRT.Term, index: IRT.Term, value: IRT.Term) = {
       this(null, target, index, value)
     }
 
@@ -55,23 +55,23 @@ object IRT {
    * @author Kota Mizushima
    */
   class Begin(location: Location, val terms: Array[IRT.Term]) extends Term(location) {
-    def this(terms: Array[IRT.Term]) {
+    def this(terms: Array[IRT.Term]) = {
       this(null, terms)
     }
 
-    def this(expressions: List[_]) {
+    def this(expressions: List[_]) = {
       this(expressions.toArray(new Array[IRT.Term](0)).asInstanceOf[Array[IRT.Term]])
     }
 
-    def this(term: IRT.Term) {
+    def this(term: IRT.Term) = {
       this(Array[IRT.Term](term))
     }
 
-    def this(expression1: IRT.Term, expression2: IRT.Term) {
+    def this(expression1: IRT.Term, expression2: IRT.Term) = {
       this(Array[IRT.Term](expression1, expression2))
     }
 
-    def this(expression1: IRT.Term, expression2: IRT.Term, expression3: IRT.Term) {
+    def this(expression1: IRT.Term, expression2: IRT.Term, expression3: IRT.Term) = {
       this(Array[IRT.Term](expression1, expression2, expression3))
     }
 
@@ -109,7 +109,7 @@ object IRT {
   }
 
   class BinaryTerm(location: Location, val kind: Int, val `type`: IRT.Type, val lhs: IRT.Term, val rhs: IRT.Term) extends Term(location) {
-    def this(kind: Int, `type`: IRT.Type, lhs: IRT.Term, rhs: IRT.Term) {
+    def this(kind: Int, `type`: IRT.Type, lhs: IRT.Term, rhs: IRT.Term) = {
       this(null, kind, `type`, lhs, rhs)
     }
   }
@@ -118,11 +118,11 @@ object IRT {
    * @author Kota Mizushima
    */
   class StatementBlock(location: Location, newStatements : IRT.ActionStatement*) extends ActionStatement(location) {
-    def this(newStatements: IRT.ActionStatement*) {
+    def this(newStatements: IRT.ActionStatement*) = {
       this(null: Location, newStatements : _*)
     }
 
-    def this(newStatements: util.List[IRT.ActionStatement]) {
+    def this(newStatements: util.List[IRT.ActionStatement]) = {
       this(newStatements.asScala.toIndexedSeq: _*)
     }
 
@@ -133,7 +133,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class BoolValue(location: Location, val value: Boolean) extends Term(location) {
-    def this(value: Boolean) {
+    def this(value: Boolean) = {
       this(null, value)
     }
 
@@ -144,7 +144,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class Break(location: Location) extends ActionStatement(location) {
-    def this() {
+    def this() = {
       this(null)
     }
   }
@@ -153,7 +153,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class ByteValue(location: Location, val value: Byte) extends Term(location) {
-    def this(value: Byte) {
+    def this(value: Byte) = {
       this(null, value)
     }
 
@@ -164,7 +164,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class Call(location: Location, val target: IRT.Term, val method: IRT.Method, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(target: IRT.Term, method: IRT.Method, parameters: Array[IRT.Term]) {
+    def this(target: IRT.Term, method: IRT.Method, parameters: Array[IRT.Term]) = {
       this(null, target, method, parameters)
     }
 
@@ -175,7 +175,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class CallStatic(location: Location, val target: IRT.ObjectType, val method: IRT.Method, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(target: IRT.ObjectType, method: IRT.Method, parameters: Array[IRT.Term]) {
+    def this(target: IRT.ObjectType, method: IRT.Method, parameters: Array[IRT.Term]) = {
       this(null, target, method, parameters)
     }
     def `type`: IRT.Type = method.returnType
@@ -185,7 +185,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class CallSuper(location: Location, val target: IRT.Term, val method: IRT.Method, val params: Array[IRT.Term]) extends Term(location) {
-    def this(target: IRT.Term, method: IRT.Method, params: Array[IRT.Term]) {
+    def this(target: IRT.Term, method: IRT.Method, params: Array[IRT.Term]) = {
       this(null, target, method, params)
     }
 
@@ -196,7 +196,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class AsInstanceOf(location: Location, val target: IRT.Term, val destination: IRT.Type) extends Term(location) {
-    def this(target: IRT.Term, destination: IRT.Type) {
+    def this(target: IRT.Term, destination: IRT.Type) = {
       this(null, target, destination)
     }
 
@@ -207,7 +207,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class CharacterValue(location: Location, val value: Char) extends Term(location) {
-    def this(value: Char) {
+    def this(value: Char) = {
       this(null, value)
     }
 
@@ -264,7 +264,7 @@ object IRT {
     var isResolutionComplete: Boolean            = false
     private var sourceFile: String = null
 
-    def this() {
+    def this() = {
       this(null: Location, false, 0, null: String, null: IRT.ClassType, null)
     }
 
@@ -320,7 +320,7 @@ object IRT {
 
   class ConstructorDefinition(val location: Location, val modifier: Int, val classType: IRT.ClassType, val arguments: Array[IRT.Type], var block: IRT.StatementBlock, var superInitializer: IRT.Super) extends
   Node with IRT.ConstructorRef {
-    def this(modifier: Int, classType: IRT.ClassType, arguments: Array[IRT.Type], block: IRT.StatementBlock, superInitializer: IRT.Super) {
+    def this(modifier: Int, classType: IRT.ClassType, arguments: Array[IRT.Type], block: IRT.StatementBlock, superInitializer: IRT.Super) = {
       this(null, modifier, classType, arguments, block, superInitializer)
     }
 
@@ -337,7 +337,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class Continue(location: Location) extends IRT.ActionStatement(location) {
-    def this() {
+    def this() = {
       this(null)
     }
   }
@@ -346,7 +346,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class DoubleValue(location: Location, val value: Double) extends Term(location) {
-    def this(value: Double) {
+    def this(value: Double) = {
       this(null, value)
     }
 
@@ -386,7 +386,7 @@ object IRT {
   }
 
   class ExpressionActionStatement(location: Location, val term: IRT.Term) extends ActionStatement(location) {
-    def this(term: IRT.Term) {
+    def this(term: IRT.Term) = {
       this(null, term)
     }
   }
@@ -402,7 +402,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class RefField(location: Location, val target: IRT.Term, val field: IRT.FieldRef)  extends Term(location) {
-    def this(target: IRT.Term, field: IRT.FieldRef) {
+    def this(target: IRT.Term, field: IRT.FieldRef) = {
       this(null, target, field)
     }
 
@@ -410,7 +410,7 @@ object IRT {
   }
 
   class SetField(location: Location, val target: IRT.Term, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
-    def this(target: IRT.Term, field: IRT.FieldRef, value: IRT.Term) {
+    def this(target: IRT.Term, field: IRT.FieldRef, value: IRT.Term) = {
       this(null, target, field, value)
     }
 
@@ -418,7 +418,7 @@ object IRT {
   }
 
   class FloatValue (location: Location, val value: Float)  extends Term(location) {
-    def this(value: Float) {
+    def this(value: Float) = {
       this(null, value)
     }
 
@@ -428,7 +428,7 @@ object IRT {
   class IfStatement(location: Location, val condition: IRT.Term, val thenStatement: IRT.ActionStatement, val elseStatement: IRT.ActionStatement)
     extends ActionStatement(location) {
 
-    def this(condition: IRT.Term, thenStatement: IRT.ActionStatement, elseStatement: IRT.ActionStatement) {
+    def this(condition: IRT.Term, thenStatement: IRT.ActionStatement, elseStatement: IRT.ActionStatement) = {
       this(null, condition, thenStatement, elseStatement)
     }
 
@@ -440,7 +440,7 @@ object IRT {
   }
 
   class InstanceOf(location: Location, val target: IRT.Term, val checked: IRT.Type)  extends Term(location) {
-    def this(target: IRT.Term, checked: IRT.Type) {
+    def this(target: IRT.Term, checked: IRT.Type) = {
       this(null, target, checked)
     }
 
@@ -448,7 +448,7 @@ object IRT {
   }
 
   class IntValue(location: Location, val value: Int)  extends Term(location) {
-    def this(value: Int) {
+    def this(value: Int) = {
       this(null, value)
     }
 
@@ -456,7 +456,7 @@ object IRT {
   }
 
   class ListLiteral(location: Location, val elements: Array[IRT.Term], val `type`: IRT.Type)  extends Term(location) {
-    def this(elements: Array[IRT.Term], `type`: IRT.Type) {
+    def this(elements: Array[IRT.Term], `type`: IRT.Type) = {
       this(null, elements, `type`)
     }
 
@@ -464,21 +464,21 @@ object IRT {
   }
 
   class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.Type)  extends Term(location) {
-    def this(bind: ClosureLocalBinding) {
+    def this(bind: ClosureLocalBinding) = {
       this(null, bind.frameIndex, bind.index, bind.tp)
     }
 
-    def this(frame: Int, index: Int, `type`: IRT.Type) {
+    def this(frame: Int, index: Int, `type`: IRT.Type) = {
       this(null, frame, index, `type`)
     }
   }
 
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: IRT.Type, val value: IRT.Term) extends Term(location) {
-    def this(bind: ClosureLocalBinding, value: IRT.Term) {
+    def this(bind: ClosureLocalBinding, value: IRT.Term) = {
       this(null, bind.frameIndex, bind.index, bind.tp, value)
     }
 
-    def this(frame: Int, index: Int, `type`: IRT.Type, value: IRT.Term) {
+    def this(frame: Int, index: Int, `type`: IRT.Type, value: IRT.Term) = {
       this(null, frame, index, `type`, value)
     }
   }
@@ -489,7 +489,7 @@ object IRT {
   class NewClosure(location: Location, val `type`: IRT.ClassType, val method: IRT.Method, val block: IRT.ActionStatement) extends Term(location) {
     var frame: LocalFrame = _
 
-    def this(`type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) {
+    def this(`type`: IRT.ClassType, method: IRT.Method, block: IRT.ActionStatement) = {
       this(null, `type`, method, block)
     }
 
@@ -508,7 +508,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class LongValue (location: Location, val value: Long) extends Term(location) {
-    def this(value: Long) {
+    def this(value: Long) = {
       this(null, value)
     }
 
@@ -519,7 +519,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class ConditionalLoop(location: Location, val condition: IRT.Term, val stmt: IRT.ActionStatement) extends ActionStatement(location) {
-    def this(condition: IRT.Term, stmt: IRT.ActionStatement) {
+    def this(condition: IRT.Term, stmt: IRT.ActionStatement) = {
       this(null, condition, stmt)
     }
   }
@@ -561,7 +561,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class NewObject(location: Location, val constructor: IRT.ConstructorRef, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(constructor: IRT.ConstructorRef, parameters: Array[IRT.Term]) {
+    def this(constructor: IRT.ConstructorRef, parameters: Array[IRT.Term]) = {
       this(null, constructor, parameters)
     }
 
@@ -569,7 +569,7 @@ object IRT {
   }
 
   class NewArray(location: Location, val arrayType: IRT.ArrayType, val parameters: Array[IRT.Term]) extends Term(location) {
-    def this(arrayType: IRT.ArrayType, parameters: Array[IRT.Term]) {
+    def this(arrayType: IRT.ArrayType, parameters: Array[IRT.Term]) = {
       this(null, arrayType, parameters)
     }
 
@@ -577,7 +577,7 @@ object IRT {
   }
 
   class NOP(location: Location) extends ActionStatement(location) {
-    def this() {
+    def this() = {
       this(null)
     }
   }
@@ -586,7 +586,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class NullValue(location: Location) extends Term(location) {
-    def this() {
+    def this() = {
       this(null)
     }
 
@@ -597,7 +597,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class Return(location: Location, val term: IRT.Term) extends ActionStatement(location) {
-    def this(term: IRT.Term) {
+    def this(term: IRT.Term) = {
       this(null, term)
     }
   }
@@ -606,7 +606,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class ShortValue(location: Location, val value: Short) extends Term(location) {
-    def this(value: Short) {
+    def this(value: Short) = {
       this(null, value)
     }
 
@@ -617,7 +617,7 @@ object IRT {
 
   class RefStaticField(location: Location, val target: IRT.ClassType, val field: IRT.FieldRef)  extends Term(location) {
 
-    def this(target: IRT.ClassType, field: IRT.FieldRef) {
+    def this(target: IRT.ClassType, field: IRT.FieldRef) = {
       this(null, target, field)
     }
 
@@ -628,7 +628,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class SetStaticField(location: Location, val target: IRT.ObjectType, val field: IRT.FieldRef, val value: IRT.Term) extends Term(location) {
-    def this(target: IRT.ObjectType, field: IRT.FieldRef, value: IRT.Term) {
+    def this(target: IRT.ObjectType, field: IRT.FieldRef, value: IRT.Term) = {
       this(null, target, field, value)
     }
 
@@ -639,7 +639,7 @@ object IRT {
    * @author Kota Mizushima
    */
   class StringValue(location: Location, val value: String, val `type`: IRT.Type) extends Term(location) {
-    def this(value: String, `type`: IRT.Type) {
+    def this(value: String, `type`: IRT.Type) = {
       this(null, value, `type`)
     }
   }
@@ -647,31 +647,31 @@ object IRT {
   class Super(val classType: IRT.ClassType, val arguments: Array[IRT.Type], val terms: Array[IRT.Term]) extends Node
 
   class Synchronized(location: Location, val term: IRT.Term, val statement: IRT.ActionStatement)  extends ActionStatement(location) {
-    def this(term: IRT.Term, statement: IRT.ActionStatement) {
+    def this(term: IRT.Term, statement: IRT.ActionStatement) = {
       this(null, term, statement)
     }
   }
 
   class OuterThis(location: Location, val `type`: IRT.ClassType)  extends Term(location) {
-    def this(classType: IRT.ClassType) {
+    def this(classType: IRT.ClassType) = {
       this(null, classType)
     }
   }
 
   class This(location: Location, val `type`: IRT.ClassType) extends Term(location) {
-    def this(classType: IRT.ClassType) {
+    def this(classType: IRT.ClassType) = {
       this(null, classType)
     }
   }
 
   class Throw(location: Location, val term: IRT.Term)  extends ActionStatement(location) {
-    def this(term: IRT.Term) {
+    def this(term: IRT.Term) = {
       this(null, term)
     }
   }
 
   class Try(location: Location, var tryStatement: IRT.ActionStatement, var catchTypes: Array[ClosureLocalBinding], var catchStatements: Array[IRT.ActionStatement]) extends ActionStatement(location) {
-    def this(tryStatement: IRT.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[IRT.ActionStatement]) {
+    def this(tryStatement: IRT.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[IRT.ActionStatement]) = {
       this(null, tryStatement, catchTypes, catchStatements)
     }
   }
@@ -688,7 +688,7 @@ object IRT {
   }
 
   class UnaryTerm(location: Location, val kind: Int, val `type`: IRT.Type, val operand: IRT.Term)  extends Term(location) {
-    def this(kind: Int, `type`: IRT.Type, operand: IRT.Term) {
+    def this(kind: Int, `type`: IRT.Type, operand: IRT.Term) = {
       this(null, kind, `type`, operand)
     }
   }

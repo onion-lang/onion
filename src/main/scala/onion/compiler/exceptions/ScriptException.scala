@@ -17,7 +17,7 @@ class ScriptException(message: String, cause: Throwable) extends RuntimeExceptio
   /**
    * @param cause
    */
-  def this(cause: Throwable) {
+  def this(cause: Throwable) = {
     this("", cause)
   }
 }

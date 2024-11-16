@@ -9,7 +9,7 @@ class FunctionWithExpressionBodySpec extends AbstractShellSpec {
         """
           |class ExpressionBody {
           |public:
-          |  static def main(args: String[]): String = "ExpressionBody";
+          |  static def main(args: String[]): String = "ExpressionBody"
           |}
         """.stripMargin,
         "None",

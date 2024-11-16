@@ -8,32 +8,32 @@ class ExampleBean <: Serializable {
   @value :Int;
   
 public:
-  def new {
+  def this {
   }
   
-  def new(name :String, value :Int){
+  def this(name :String, value :Int){
     @name = name;
     @value = value;
   }
   
   def getName :String {
-  	return @name; 
+    return @name; 
   }
   
   def setName(name :String) {
-  	@name = name; 
+    @name = name; 
   }
   
   def setValue(value :Int) {
-  	@value = value;
+    @value = value;
   }
   
   def getValue :Int {
-  	return @value;
+    return @value;
   }
   
   def toString :String {
-  	return "ExampleBean(name = " + @name + ", value = " + @value + ")";
+    return "ExampleBean(name = " + @name + ", value = " + @value + ")";
   }
 }
 

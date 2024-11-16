@@ -63,7 +63,7 @@ class ScriptRunner {
         val config = createConfig(success)
         if (config.isEmpty) return -1
         createConfig(success) match {
-          case None => return - 1
+          case None => return -1
           case Some (config) =>
             val params = success.arguments
             if(params.length == 0) {
@@ -101,13 +101,10 @@ class ScriptRunner {
 
   private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
     val option: Map[String, CommandLineParam] = result.options.toMap
-    val classpath: Array[String] = checkClasspath(option.get(CLASSPATH).asInstanceOf[String])
-    val encodingOpt = checkEncoding(option.get(ENCODING).asInstanceOf[String])
-
-    val maxErrorReport = checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
+    val classpath: Array[String] = checkClasspath(option.get(CLASSPATH))
     for(
-      encoding <- checkEncoding(option.get(ENCODING).asInstanceOf[String]);
-      maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR).asInstanceOf[String])
+      encoding <- checkEncoding(option.get(ENCODING));
+      maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR))
     ) yield (new CompilerConfig(classpath.toIndexedSeq, "", encoding, ".", maxErrorReport))
   }
 
@@ -115,36 +112,44 @@ class ScriptRunner {
     new OnionCompiler(config).compile(fileNames)
   }
 
-  private def checkClasspath(classpath: String): Array[String] = {
-    if (classpath == null) return DEFAULT_CLASSPATH
-    val paths: Array[String] = pathArray(classpath)
-    paths
-  }
-
-  private def checkEncoding(encoding: String): Option[String] = {
-    if (encoding == null) return Some(System.getProperty("file.encoding"))
-    try {
-      "".getBytes(encoding)
-      Some(encoding)
-    } catch {
-      case e: UnsupportedEncodingException =>
-        err.println(Message.apply("error.command.invalidEncoding", ENCODING))
-        None
+  private def checkClasspath(optClasspath: Option[CommandLineParam]): Array[String] = {
+    optClasspath match {
+      case Some(ValuedParam(classpath)) => pathArray(classpath)
+      case Some(NoValuedParam) | None => DEFAULT_CLASSPATH
     }
   }
 
-  private def checkMaxErrorReport(maxErrorReport: String): Option[Int] = {
-    if (maxErrorReport == null) return Some(DEFAULT_MAX_ERROR)
-    val value: Option[Int] = try {
-      Some(Integer.parseInt(maxErrorReport))
-    } catch {
-      case e: NumberFormatException => None
+  private def checkEncoding(optEncoding: Option[CommandLineParam]): Option[String] = {
+    optEncoding match {
+      case None | Some(NoValuedParam) => 
+        Some(System.getProperty("file.encoding"))
+      case Some(ValuedParam(encoding)) => 
+        try {
+          "".getBytes(encoding)
+          Some(encoding)
+        } catch {
+          case e: UnsupportedEncodingException =>
+            err.println(Message.apply("error.command.invalidEncoding", ENCODING))
+            None
+        }
     }
-    value match {
-      case Some(v) if v > 0 => Some(v)
-      case None =>
-        err.println(Message("error.command.requireNaturalNumber", MAX_ERROR))
-        None
+  }
+
+  private def checkMaxErrorReport(optMaxErrorReport: Option[CommandLineParam]): Option[Int] = {
+    optMaxErrorReport match {
+      case None | Some(NoValuedParam) => Some(DEFAULT_MAX_ERROR)
+      case Some(ValuedParam(maxErrorReport)) => 
+        val value: Option[Int] = try {
+          Some(Integer.parseInt(maxErrorReport))
+        } catch {
+          case e: NumberFormatException => None
+        }
+        value match {
+          case Some(v) if v > 0 => Some(v)
+          case None =>
+            err.println(Message("error.command.requireNaturalNumber", MAX_ERROR))
+            None
+        }
     }
   }
 }

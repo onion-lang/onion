@@ -8,24 +8,27 @@ class BeanSpec extends AbstractShellSpec {
       val resultBean = shell.run(
         """
           | class Bean <: Serializable {
-          |  @value :Int;
+          |   @value :Int
           | public:
-          |   def new {
+          |   def this {
           |   }
           |
-          |   def new(value :Int){
-          |     @value = value;
+          |   def this(value :Int){
+          |     @value = value
           |   }
-          |   def getValue :Int = @value;
+          |
+          |   def getValue :Int = @value
+          |
           |   def setValue(value :Int) {
-          |     @value = value;
+          |     @value = value
           |   }
-          |   def toString :String = "Bean(value = " + @value + ")";
+          |
+          |   def toString :String = "Bean(value = " + @value + ")"
           |
           |   static def main(args: String[]): String {
-          |     bean = new Bean;
-          |     bean.value = 200; // The reference of setter functions!
-          |     return JInteger::toString(bean.value);
+          |     bean = new Bean
+          |     bean.value = 200 // The reference of setter functions!
+          |     return JInteger::toString(bean.value)
           |   }
           | }
         """.stripMargin,

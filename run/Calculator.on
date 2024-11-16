@@ -1,99 +1,98 @@
-import{
-	javax.swing.*;
-	java.awt.*;
-	java.awt.event.*;	
+import {
+	javax.swing.*
+	java.awt.*
+	java.awt.event.*
 }
 
 class Calculator : JFrame <: ActionListener {
-	@text			:JTextField;
-	@left			:Long;
-	@right		    :Long;
-	@operator	    :String;
-	@isError	    :Boolean;
+	@text			:JTextField
+	@left			:Long
+	@right		    :Long
+	@operator	    :String
+	@isError	    :Boolean
 public:
 	def setValue(value : Long) { @text.setText(JLong::toString(value)); }
 	def setValue(value : String) { @text.setText(value); }
 	def actionPerformed(event : ActionEvent) {
-		label = event.source$JButton.label;
+		label = event.source$JButton.label
 		try{
 			if @isError && !(label == "C") {
-				return;
+				return
 			}
-			input = JLong::parseLong(label);
+			input = JLong::parseLong(label)
 			if @operator != null {
-				@right = @right * 10 + input;
-				setValue(@right);
+				@right = @right * 10 + input
+				setValue(@right)
 			}else{
-				@left = @left * 10 + input;
-				setValue(@left);
+				@left = @left * 10 + input
+				setValue(@left)
 			}
 		}catch e :NumberFormatException{
 			if label == "C" {
-				@left = 0;
-				@right = 0;
-				@operator	= null;
-				@text.setText(JLong::toString(0));
-				@isError = false;
+				@left = 0
+				@right = 0
+				@operator	= null
+				@text.setText(JLong::toString(0))
+				@isError = false
 			}else{
 				if @operator != null {
 					if @operator == "/" {
 						if @right == 0L{
-							setValue("0で割ることはできません。");
-							@left = 0L;
-							@right = 0L;
-							@isError = true;
+							setValue("0で割ることはできません。")
+							@left = 0L
+							@right = 0L
+							@isError = true
 						}else{
-							@left = @left / @right; 
+							@left = @left / @right
 						}
-						setValue(@left);
+						setValue(@left)
 					}else{
 						select @operator {
-						case "+": @left = @left + @right;
-						case "-": @left = @left - @right;
-						case "*": @left = @left * @right;
-						case "/":  @left = @left / @right;
+						case "+": @left = @left + @right
+						case "-": @left = @left - @right
+						case "*": @left = @left * @right
+						case "/":  @left = @left / @right
 						}
-						setValue(@left);
+						setValue(@left)
 					}
 				}
-				@operator = label;
-				@right = 0;
+				@operator = label
+				@right = 0
 			}
 		}
 	}
 
-	def new:("簡易電卓") {
-		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE);
-		setSize(800, 600);
-		@text		= new JTextField;
-		@text.setHorizontalAlignment(JTextField::RIGHT);
-		pane		= getContentPane();
-		north		= new JPanel;
-		north.setLayout(new BorderLayout);
-		north.add(@text, BorderLayout::NORTH);
-		center	= new JPanel;
-		center.setLayout(new GridLayout(4, 5, 4, 3));
-		center.setFont(new Font(null, Font::PLAIN, 8));
-		labels	= [
+	def this:("簡易電卓") {
+		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE)
+		setSize(800, 600)
+		@text		= new JTextField
+		@text.setHorizontalAlignment(JTextField::RIGHT)
+		pane		= getContentPane()
+		north		= new JPanel
+		north.setLayout(new BorderLayout)
+		north.add(@text, BorderLayout::NORTH)
+		center= new JPanel
+		center.setLayout(new GridLayout(4, 5, 4, 3))
+		center.setFont(new Font(null, Font::PLAIN, 8))
+		labels = [
 			"7", "8", "9", "C",
 			"4", "5", "6", "*",
 			"1", "2", "3", "-",
 			"0", "=", "/", "+"
-		];
+		]
 		foreach label:String in labels {
-			button = new JButton(label$String);
-			button.addActionListener(self);
-			button.setPreferredSize(new Dimension(42, 28));
-			center.add(button);				
+			button = new JButton(label$String)
+			button.addActionListener(self)
+			button.setPreferredSize(new Dimension(42, 28))
+			center.add(button)				
 		}
-		pane.add(north, BorderLayout::NORTH);
-		pane.add(center, BorderLayout::CENTER);
+		pane.add(north, BorderLayout::NORTH)
+		pane.add(center, BorderLayout::CENTER)
 	}
 
 	static def main(args :String[]){
-		UIManager::setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
-		frame = new Calculator;
-		frame.pack;
-		frame.setVisible(true);
+		frame = new Calculator
+		frame.pack
+		frame.setVisible(true)
 	}
 }

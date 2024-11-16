@@ -10,12 +10,12 @@ class ForeachSpec extends AbstractShellSpec {
           |class Cat {
           |public:
           |  static def main(args: String[]): String {
-          |    list = ["A", "B", "C", "D"];
-          |    result = "";
+          |    list = ["A", "B", "C", "D"]
+          |    result = ""
           |    foreach s:String in list {
           |      result = result + s;
           |    }
-          |    return result;
+          |    return result
           |  }
           |}
         """.stripMargin,

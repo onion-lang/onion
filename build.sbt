@@ -11,6 +11,14 @@ lazy val dist = TaskKey[Unit]("onion-dist")
 
 lazy val distPath = SettingKey[File]("onion-dist-path")
 
+lazy val runScript = inputKey[Unit]("Runs the ScriptRunner with arguments")
+
+fullRunInputTask(
+  runScript,
+  Compile,
+  "onion.tools.ScriptRunner"
+)
+
 def isArchive(file: File): Boolean = {
   val fileName = file.getName
   val lc = fileName.toLowerCase
@@ -50,6 +58,7 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
       "javacc",
       "-UNICODE_INPUT=true",
       "-JAVA_UNICODE_ESCAPE=true",
+      "-BUILD_TOKEN_MANAGER=true",
       "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
       "grammar/JJOnionParser.jj"
     )
@@ -117,3 +126,5 @@ lazy val onionSettings = Seq(
   mainClass := Some("onion.tools.CompilerFrontend"),
   assembly / assemblyJarName := "onion.jar"
 )
+
+fork := true

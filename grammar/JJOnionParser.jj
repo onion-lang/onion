@@ -22,6 +22,7 @@ import scala.collection.mutable.Buffer;
 import scala.Option;
 import scala.Option$;
 import static onion.compiler.AST.append;
+import java.util.Stack;
 
 @SuppressWarnings("unchecked")
 public class JJOnionParser implements Parser {
@@ -126,26 +127,66 @@ public class JJOnionParser implements Parser {
     }
     return new String(b);
   }
+
+  private Stack<Integer> states = new Stack<Integer>();
+
+  private void enterState(int state) {
+    int oldState = token_source.curLexState;
+    states.push(oldState);
+    token_source.SwitchTo(state);
+  }
+
+  private void leaveState() {
+    token_source.SwitchTo(states.pop());
+  }
+
+  private void enterDefault() {
+    enterState(DEFAULT);
+  }
+
+  private void leaveDefault() {
+    leaveState();
+  }
+
+  private void enterSection() {
+    enterState(IN_STATEMENT);
+  }
+
+  private void leaveSection() {
+    leaveState();
+  }
 }
 PARSER_END(JJOnionParser)
 
-SKIP:
+<DEFAULT> SKIP:
 {
-" "
+  "\r\n"
 | "\t"
-| "\n"
+| "\f"
 | "\r"
-| "\r\n"
+| "\n"
+| " "
 }
 
+<IN_STATEMENT> SKIP:
+{
+  " "
+| "\t"
+| "\f"
+}
 
+<IN_STATEMENT> TOKEN:
+{
+  <EOL: ("\r\n" | "\r" | "\n")>
+}
 
 /*
 * COMMENTS
 */
+<DEFAULT, IN_STATEMENT>
 SPECIAL_TOKEN:
 {
-<MULTI_LINE_COMMENT: "/*" (~["*"])*  "*" ("*" | (~["*", "/"] (~["*"])* "*"))* "/">
+  <MULTI_LINE_COMMENT: "/*" (~["*"])*  "*" ("*" | (~["*", "/"] (~["*"])* "*"))* "/">
 | <LINE_COMMENT:       "//" (~["\r", "\n"])*>
 | <SHELL_COMMENT:      "#!" (~["\r", "\n"])*>
 }
@@ -153,6 +194,7 @@ SPECIAL_TOKEN:
 /*
 * KEYWORDS
 */
+<DEFAULT, IN_STATEMENT>
 TOKEN:
 {
   <K_ABSTRACT:     "abstract"     >
@@ -182,10 +224,11 @@ TOKEN:
 | <K_INT:          "Int"  >
 | <K_INTERFACE:    "interface"    >
 | <K_INTERNAL:     "internal"     >
-| <K_IS:           "is"            >
+| <K_IS:           "is"           >
 | <K_LONG:         "Long"         >
 | <K_MODULE:       "module"       >
 | <K_NEW:          "new"          >
+| <K_THIS:         "this"         >
 | <K_NULL:         "null"         >
 | <K_OR:           "or"           >
 | <K_OVERRIDE:     "override"     >
@@ -215,6 +258,7 @@ TOKEN:
 /*
 * OPERATORS
 */
+<DEFAULT, IN_STATEMENT>
 TOKEN : {
   <PLUS:           "+"            >
 | <MINUS:          "-"            >
@@ -269,6 +313,7 @@ TOKEN : {
 /*
  * LITERALS
  */
+<DEFAULT, IN_STATEMENT>
 TOKEN:
 {
   <INTEGER:
@@ -318,6 +363,7 @@ TOKEN:
 /*
  * ERROR TOKEN
  */
+<DEFAULT, IN_STATEMENT>
 TOKEN:{
   <ERROR: ~[]>
 }
@@ -334,7 +380,8 @@ AST.CompilationUnit unit() :{
 }
 
 AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new StringBuffer();}{
-  t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append(t2.image);})* ";" {
+  {enterSection();}
+  t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append(t2.image);})* eos() {
     return new AST.ModuleDeclaration(p(t1), new String(sb));
   }
 }
@@ -346,10 +393,10 @@ AST.ImportClause import_decl() :{
   ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
 }{
   t="import" "{"
-    ( {sb = new StringBuffer();}
+    ( {sb = new StringBuffer();enterSection();}
       ( LOOKAHEAD(2)
-        (n=<ID> {s = n.image;} "=" n=<ID> {sb.append(n.image);} ("." n=<ID> {sb.append("."); sb.append(n.image);})+ ";")
-      | ((LOOKAHEAD(2) n=<ID> "." {sb.append(n.image); sb.append(".");})+ (n=<ID> | n="*") ";" {
+        (n=<ID> {s = n.image;} "=" n=<ID> {sb.append(n.image);} ("." n=<ID> {sb.append("."); sb.append(n.image);})+ eos())
+      | ((LOOKAHEAD(2) n=<ID> "." {sb.append(n.image); sb.append(".");})+ (n=<ID> | n="*") eos() {
            s = n.image; sb.append(s);
          }
         )
@@ -374,7 +421,8 @@ AST.GlobalVariableDeclaration var_decl(int modifiers) : {
   AST.TypeNode ty = null;
   AST.Expression e = null;
 }{
-  t1="var" t2=<FID> [":" ty=type()] ["=" e=term()] ";" {
+  {enterSection();}
+  t1="var" t2=<FID> [":" ty=type()] ["=" e=term()] eos() {
     return new AST.GlobalVariableDeclaration(
       p(t1), modifiers, t2.image.substring(1), ty, e
     );
@@ -388,11 +436,12 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   AST.BlockExpression b = null;
   AST.Expression e = null;
 }{
+  {enterSection();}
   t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()]
-  (  (b=block() | ";") {
+  (  (b=block() {leaveSection();} | eos()) {
        return new AST.FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
      }
-  |  ("=" e=term() ";") {
+  |  ("=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, t1.image, args, ty,
          new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)))
@@ -522,7 +571,7 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
   List<AST.Expression> params = (List<AST.Expression>)AST.NIL();
   AST.BlockExpression block;
 }{
-  "def" t = "new" ["(" args = args() ")"] [":" "(" params = terms() ")"] block = block() {
+  "def" t="this" ["(" args = args() ")"] [":" "(" params = terms() ")"] block = block() {
     return new AST.ConstructorDeclaration(p(t), mset, args, params, block);
   }
 }
@@ -535,10 +584,10 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.Expression e = null;
 }{
   "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()]
-  (  (b=block() | ";" ) {
+  (  (b=block() | {enterSection();} eos() ) {
        return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
      }
-  |  ("=" e=term() ";") {
+  |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.MethodDeclaration(
          p(t), mset, t.image, args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)))
@@ -552,7 +601,8 @@ AST.MethodDeclaration interface_method_decl() : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty  = null;
 }{
-  "def" n=<ID> ["(" args=args() ")"] [":" ty=return_type()] ";" {
+  {enterSection();}
+  "def" n=<ID> ["(" args=args() ")"] [":" ty=return_type()] eos() {
     return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), n.image, args, ty, null);
   }
 }
@@ -618,8 +668,9 @@ AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
   AST.TypeNode type = null;
   AST.Expression init = null;
 }{
+  {enterSection();}
   start="forward" name=<FID> [":" type = type()]
-  ["=" init=term()] ";" {
+  ["=" eols() init=term()] eos() {
     return new AST.DelegatedFieldDeclaration(p(start), modifiers, name.image.substring(1), type, init);
   }
 }
@@ -629,8 +680,9 @@ AST.FieldDeclaration field_decl(int modifiers):{
   AST.TypeNode type = null;
   AST.Expression init = null;
 }{
+  {enterSection();}
   name=<FID> ":" [type=type()]
-  ["=" init=term()] ";" {
+  ["=" eols() init=term()] eos() {
     return new AST.FieldDeclaration(p(name), modifiers, name.image.substring(1), type, init);
   }
 }
@@ -654,20 +706,34 @@ AST.CompoundExpression statement():{AST.CompoundExpression s;}{
 | s=foreach_statement()      {return s;}
 }
 
+// End of section
+void eos() :{} {
+  (";" | (<EOL>)) { leaveSection(); }
+}
+
+void eols() :{} {
+  (<EOL>)*
+}
+
 AST.LocalVariableDeclaration local_var_statement() :{Token t; AST.TypeNode ty; AST.Expression e = null;}{
-  t=<ID> ":" ty=type() ["=" e=term()] ";" {return new AST.LocalVariableDeclaration(p(t), t.image, ty, e);}
+  {enterSection();}
+  t=<ID>
+  ":" ty=type() ["=" eols() e=term()] eos() {return new AST.LocalVariableDeclaration(p(t), t.image, ty, e);}
 }
 
 AST.BreakExpression break_statement() :{Token t;}{
-  t="break" ";" {return new AST.BreakExpression(p(t));}
+  {enterSection();}
+  t="break" eos() {return new AST.BreakExpression(p(t));}
 }
 
 AST.ContinueExpression continue_statement() :{Token t; AST.ContinueExpression st;}{
-  t="continue" ";" {return new AST.ContinueExpression(p(t));}
+  {enterSection();}
+  t="continue" eos() {return new AST.ContinueExpression(p(t));}
 }
 
 AST.ThrowExpression throw_statement() :{Token t; AST.Expression e;}{
-  t="throw" e=term() ";" {return new AST.ThrowExpression(p(t), e);}
+  {enterSection();}
+  t="throw" e=term() eos() {return new AST.ThrowExpression(p(t), e);}
 }
 
 AST.TryExpression try_statement() :{
@@ -679,7 +745,8 @@ AST.TryExpression try_statement() :{
 }
 
 AST.ExpressionBox exp_statement() :{AST.Expression e;}{
-  e=term() ";" {return new AST.ExpressionBox(e.location(), e);}
+  {enterSection();}
+  e=term() eos() {return new AST.ExpressionBox(e.location(), e);}
 }
 
 AST.EmptyExpression empty_statement() :{Token t;}{
@@ -708,7 +775,8 @@ AST.SelectExpression select_statement() :{
 }
 
 AST.ReturnExpression return_statement() :{Token t; AST.Expression e = null;}{
-  t="return" [e=term()] ";" {return new AST.ReturnExpression(p(t), e);}
+  {enterSection();}
+  t="return" [e=term()] eos() {return new AST.ReturnExpression(p(t), e);}
 }
 
 AST.SynchronizedExpression synchronized_statement() :{Token t; AST.Expression e = null; AST.BlockExpression b;}{
@@ -738,72 +806,72 @@ AST.Expression term() :{AST.Expression e;}{
 
 AST.Expression assignable() :{Token t; AST.Expression a, b; }{
   a=logical_or()
-  [ ( t="="  b=assignable() {a = new AST.Assignment(p(t), a, b);}
-    | t="+=" b=assignable() {a = new AST.AdditionAssignment(p(t), a, b);}
-    | t="-=" b=assignable() {a = new AST.SubtractionAssignment(p(t), a, b);}
-    | t="*=" b=assignable() {a = new AST.MultiplicationAssignment(p(t), a, b);}
-    | t="/=" b=assignable() {a = new AST.DivisionAssignment(p(t), a, b);}
-    | t="%=" b=assignable() {a = new AST.ModuloAssignment(p(t), a, b);}
+  [ ( t="="  eols() b=assignable() {a = new AST.Assignment(p(t), a, b);}
+    | t="+=" eols() b=assignable() {a = new AST.AdditionAssignment(p(t), a, b);}
+    | t="-=" eols() b=assignable() {a = new AST.SubtractionAssignment(p(t), a, b);}
+    | t="*=" eols() b=assignable() {a = new AST.MultiplicationAssignment(p(t), a, b);}
+    | t="/=" eols() b=assignable() {a = new AST.DivisionAssignment(p(t), a, b);}
+    | t="%=" eols() b=assignable() {a = new AST.ModuloAssignment(p(t), a, b);}
     )
   ]{return a;}
 }
 
 AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
   a=logical_and()
-  ( t="||" b=logical_and() {a = new AST.LogicalOr(p(t), a, b);}
-  | t="?:" b=logical_and() {a = new AST.Elvis(p(t), a, b);})*
+  ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(p(t), a, b);}
+  | t="?:" eols() b=logical_and() {a = new AST.Elvis(p(t), a, b);})*
   { return a; }
 }
 
 AST.Expression logical_and() :{Token t; AST.Expression a, b; }{
-  a=bit_or() (t="&&" b=bit_or() {a = new AST.LogicalAnd(p(t), a, b);})* {return a;}
+  a=bit_or() (t="&&" eols() b=bit_or() {a = new AST.LogicalAnd(p(t), a, b);})* {return a;}
 }
 
 AST.Expression bit_or() :{Token t; AST.Expression a, b; }{
-  a=xor() (t="|" b=xor() {a = new AST.BitOr(p(t), a, b);})* {return a;}
+  a=xor() (t="|" eols() b=xor() {a = new AST.BitOr(p(t), a, b);})* {return a;}
 }
 
 AST.Expression xor() :{Token t; AST.Expression a, b;}{
-  a = bit_and() (t="^" b=bit_and() {a = new AST.XOR(p(t), a, b);})* {return a;}
+  a = bit_and() (t="^" eols() b=bit_and() {a = new AST.XOR(p(t), a, b);})* {return a;}
 }
 
 AST.Expression bit_and() :{Token t; AST.Expression a, b; }{
-  a=equal() (t = "&" b=equal() {a = new AST.BitAnd(p(t), a, b);})* {return a;}
+  a=equal() (t = "&" eols() b=equal() {a = new AST.BitAnd(p(t), a, b);})* {return a;}
 }
 
 AST.Expression equal() :{ Token t; AST.Expression a, b; }{
   a=comparative()
-  ( ( t="===" b=comparative() {a= new AST.ReferenceEqual(p(t), a, b);}
-    | t="!==" b=comparative() {a= new AST.ReferenceNotEqual(p(t), a, b);}
-    | t="=="  b=comparative() {a= new AST.Equal(p(t), a, b);}
-    | t="!="  b=comparative() {a= new AST.NotEqual(p(t), a, b);}
+  ( ( t="===" eols() b=comparative() {a= new AST.ReferenceEqual(p(t), a, b);}
+    | t="!==" eols() b=comparative() {a= new AST.ReferenceNotEqual(p(t), a, b);}
+    | t="=="  eols() b=comparative() {a= new AST.Equal(p(t), a, b);}
+    | t="!="  eols() b=comparative() {a= new AST.NotEqual(p(t), a, b);}
     )
   )* {return a;}
 }
 
 AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
   a=bit_shift()
-  ( ( t="<=" b=bit_shift() {a = new AST.LessOrEqual(p(t), a, b);}
-    | t=">=" b=bit_shift() {a = new AST.GreaterOrEqual(p(t), a, b);}
-    | t="<"  b=bit_shift() {a = new AST.LessThan(p(t), a, b);}
-    | t=">"  b=bit_shift() {a = new AST.GreaterThan(p(t), a, b);}
-    | t="is" type = type() {a = new AST.IsInstance(p(t), a, type);}
+  ( ( t="<=" eols() b=bit_shift() {a = new AST.LessOrEqual(p(t), a, b);}
+    | t=">=" eols() b=bit_shift() {a = new AST.GreaterOrEqual(p(t), a, b);}
+    | t="<"  eols() b=bit_shift() {a = new AST.LessThan(p(t), a, b);}
+    | t=">"  eols() b=bit_shift() {a = new AST.GreaterThan(p(t), a, b);}
+    | t="is" eols() type = type() {a = new AST.IsInstance(p(t), a, type);}
     )
   )* {return a;}
 }
 
 AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
   e1=additive()
-( t="<<" e2=additive()    {e1 = new AST.MathLeftShift(p(t), e1, e2);}
-| t=">>" e2=additive()    {e1 = new AST.MathRightShift(p(t), e1, e2);}
-| t=">>>"e2=additive()    {e1 = new AST.LogicalRightShift(p(t), e1, e2);}
+( t="<<" eols() e2=additive()    {e1 = new AST.MathLeftShift(p(t), e1, e2);}
+| t=">>" eols() e2=additive()    {e1 = new AST.MathRightShift(p(t), e1, e2);}
+| t=">>>"eols() e2=additive()    {e1 = new AST.LogicalRightShift(p(t), e1, e2);}
 )* { return e1; }
 }
 
 AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
   e1=unary_prefix()
-( t="+" e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
-| t="-" e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
+( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
+| t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
 )* {return e1;}
 }
 
@@ -817,9 +885,9 @@ AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 
 AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
   e1=primary_suffix()
-( t="*" e2=primary_suffix()  {e1 = new AST.Multiplication(p(t), e1, e2);}
-| t="/" e2=primary_suffix()  {e1 = new AST.Division(p(t), e1, e2);}
-| t="%" e2=primary_suffix()  {e1 = new AST.Modulo(p(t), e1, e2);}
+( t="*" eols() e2=primary_suffix()  {e1 = new AST.Multiplication(p(t), e1, e2);}
+| t="/" eols() e2=primary_suffix()  {e1 = new AST.Division(p(t), e1, e2);}
+| t="%" eols() e2=primary_suffix()  {e1 = new AST.Modulo(p(t), e1, e2);}
 )* {return e1;}
 }
 
@@ -828,12 +896,11 @@ AST.Expression primary_suffix() : {
   AST.TypeNode type;
 }{
   e=primary()
-( t="[" a=term() "]"                                                      {e = new AST.Indexing(p(t), e, a);}
-| LOOKAHEAD(3) t="." n=<ID> "(" args=terms() ")" [a=anonymous_function()] {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);}
-| t="." n=<ID>                                                            {e = new AST.MemberSelection(p(t), e, c(n));}
-| t="$" type=type()                                                       {e = new AST.Cast(p(t), e, type);}
-| t="++"                                                                  {e = new AST.PostIncrement(p(t), e);}
-| t="--"                                                                  {e = new AST.PostDecrement(p(t), e);}
+( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
+| t="." eols() n=<ID> (LOOKAHEAD(1) "(" eols() args=terms() ")" [a=anonymous_function()] {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);} | {e = new AST.MemberSelection(p(t), e, c(n));})
+| t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
+| t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
+| t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
 )* {return e;}
 }
 
@@ -844,16 +911,16 @@ AST.Expression primary() : {
   AST.BlockExpression body;
 }{
   t=<FID>                                                           {return new AST.UnqualifiedFieldReference(p(t), c(t).substring(1));}
-| t="super" "." n=<ID> ["(" es=terms() ")"]                         {return new AST.SuperMethodCall(p(t), c(n), es);}
+| t="super" eols() "." eols() n=<ID> ["(" es=terms() ")"]           {return new AST.SuperMethodCall(p(t), c(n), es);}
 | LOOKAHEAD(4) ty=class_type() t="::" n=<ID> "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
 | LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
 | LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
 | t=<ID>                                                            {return new AST.Id(p(t), c(t));}
-| t="[" es=terms() "]"                                              {return new AST.ListLiteral(p(t), es);}
+| {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
 | e=anonymous_function()                                            {return e;}
 | t="new" ty=type() (
-    "[" (es=terms()) "]"                                            {return new AST.NewArray(p(t), ty, es);}
-  | ["(" (es=terms()) ")"]                                          {return new AST.NewObject(p(t), ty, es);}
+    "[" eols() (es=terms()) "]"                                           {return new AST.NewArray(p(t), ty, es);}
+  | ["(" eols() (es=terms()) ")"]                                         {return new AST.NewObject(p(t), ty, es);}
   )
 | t="self"                                                                {return new AST.CurrentInstance(p(t));}
 | e=integer_literal()                                                     {return e;}
@@ -862,7 +929,7 @@ AST.Expression primary() : {
 | e=string_literal()                                                      {return e;}
 | e=boolean_literal()                                                     {return e;}
 | e=null_literal()                                                        {return e;}
-| "(" e=term() ")"                                                  {return e;}
+| "(" eols() e=term() eols() ")"                                          {return e;}
 }
 
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
@@ -876,7 +943,8 @@ AST.ClosureExpression anonymous_function() :{
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.BlockExpression body;
 }{
- t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
+  {enterDefault();}
+  t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
     String mname;
     if(ty == null) {
       ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
@@ -884,6 +952,7 @@ AST.ClosureExpression anonymous_function() :{
     }else {
       mname = n.image;
     }
+    leaveDefault();
     return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
   }
 }

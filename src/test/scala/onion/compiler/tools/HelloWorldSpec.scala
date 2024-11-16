@@ -11,7 +11,7 @@ class HelloWorldSpec extends AbstractShellSpec {
           |class HelloWorld {
           |public:
           |  static def main(args: String[]): String {
-          |    return "Hello, World";
+          |    return "Hello, World"
           |  }
           |}
           |""".stripMargin,

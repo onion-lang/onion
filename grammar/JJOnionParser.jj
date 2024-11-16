@@ -22,6 +22,7 @@ import scala.collection.mutable.Buffer;
 import scala.Option;
 import scala.Option$;
 import static onion.compiler.AST.append;
+import java.util.Stack;
 
 @SuppressWarnings("unchecked")
 public class JJOnionParser implements Parser {
@@ -127,12 +128,32 @@ public class JJOnionParser implements Parser {
     return new String(b);
   }
 
+  private Stack<Integer> states = new Stack<Integer>();
+
+  private void enterState(int state) {
+    int oldState = token_source.curLexState;
+    states.push(oldState);
+    token_source.SwitchTo(state);
+  }
+
+  private void leaveState() {
+    token_source.SwitchTo(states.pop());
+  }
+
+  private void enterDefault() {
+    enterState(DEFAULT);
+  }
+
+  private void leaveDefault() {
+    leaveState();
+  }
+
   private void enterSection() {
-    token_source.SwitchTo(IN_STATEMENT);
+    enterState(IN_STATEMENT);
   }
 
   private void leaveSection() {
-    token_source.SwitchTo(DEFAULT);
+    leaveState();
   }
 }
 PARSER_END(JJOnionParser)
@@ -561,12 +582,11 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.BlockExpression b = null;
   AST.Expression e = null;
 }{
-  {enterSection();}
   "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()]
-  (  ({leaveSection();} b=block() | eos() ) {
+  (  (b=block() | {enterSection();} eos() ) {
        return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
      }
-  |  ("=" eols() e=term() eos()) {
+  |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.MethodDeclaration(
          p(t), mset, t.image, args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)))
@@ -785,12 +805,12 @@ AST.Expression term() :{AST.Expression e;}{
 
 AST.Expression assignable() :{Token t; AST.Expression a, b; }{
   a=logical_or()
-  [ ( t="="  b=assignable() {a = new AST.Assignment(p(t), a, b);}
-    | t="+=" b=assignable() {a = new AST.AdditionAssignment(p(t), a, b);}
-    | t="-=" b=assignable() {a = new AST.SubtractionAssignment(p(t), a, b);}
-    | t="*=" b=assignable() {a = new AST.MultiplicationAssignment(p(t), a, b);}
-    | t="/=" b=assignable() {a = new AST.DivisionAssignment(p(t), a, b);}
-    | t="%=" b=assignable() {a = new AST.ModuloAssignment(p(t), a, b);}
+  [ ( t="="  eols() b=assignable() {a = new AST.Assignment(p(t), a, b);}
+    | t="+=" eols() b=assignable() {a = new AST.AdditionAssignment(p(t), a, b);}
+    | t="-=" eols() b=assignable() {a = new AST.SubtractionAssignment(p(t), a, b);}
+    | t="*=" eols() b=assignable() {a = new AST.MultiplicationAssignment(p(t), a, b);}
+    | t="/=" eols() b=assignable() {a = new AST.DivisionAssignment(p(t), a, b);}
+    | t="%=" eols() b=assignable() {a = new AST.ModuloAssignment(p(t), a, b);}
     )
   ]{return a;}
 }
@@ -923,7 +943,8 @@ AST.ClosureExpression anonymous_function() :{
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.BlockExpression body;
 }{
- t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
+  {enterDefault();}
+  t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
     String mname;
     if(ty == null) {
       ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
@@ -931,6 +952,7 @@ AST.ClosureExpression anonymous_function() :{
     }else {
       mname = n.image;
     }
+    leaveDefault();
     return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
   }
 }

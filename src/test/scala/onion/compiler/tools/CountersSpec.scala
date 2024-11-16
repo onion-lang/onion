@@ -8,13 +8,15 @@ class CountersSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           | interface Counter {
-          |   def count :Int;
+          |   def count :Int
           | }
           |
           | class Counters {
           | public:
-          |   static def counter(begin :Int, up :Int) :Counter =
+          |   static def counter(begin :Int, up :Int) :Counter = 
           |     #Counter.count { return begin = begin + up; };
+          |
+          |   static def id(x: Int): Int = x
           |   static def main(args: String[]): Int {
           |     c = counter(1, 10);
           |     c.count;

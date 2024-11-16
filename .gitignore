@@ -1,7 +1,11 @@
 build/
 .bsp/
 build.lib/
+
 project/boot
+project/metals.sbt
+project/project
+
 src/main/parser/onion
 target/
 .idea/
@@ -10,3 +14,7 @@ target/
 .build.sbt.un~
 
 .settings
+
+.bloop/
+.metals/
+.vscode/

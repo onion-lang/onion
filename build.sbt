@@ -50,6 +50,7 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
       "javacc",
       "-UNICODE_INPUT=true",
       "-JAVA_UNICODE_ESCAPE=true",
+      "-BUILD_TOKEN_MANAGER=true",
       "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
       "grammar/JJOnionParser.jj"
     )

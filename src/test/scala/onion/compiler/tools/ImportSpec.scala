@@ -8,14 +8,14 @@ class ImportSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           | import {
-          |   java.util.*;
+          |   java.util.*
           | }
           | class Increment {
           | public:
           |   static def main(args: String[]): Int {
-          |     xs = new ArrayList();
-          |     xs.add(new Integer(2));
-          |     return xs.get(0)$Integer.intValue();
+          |     xs = new ArrayList()
+          |     xs.add(new Integer(2))
+          |     return xs.get(0)$Integer.intValue()
           |   }
           | }
         """.stripMargin,

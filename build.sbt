@@ -127,4 +127,4 @@ lazy val onionSettings = Seq(
   assembly / assemblyJarName := "onion.jar"
 )
 
-fork := true
+fork in run := true

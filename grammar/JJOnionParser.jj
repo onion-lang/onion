@@ -708,7 +708,7 @@ AST.CompoundExpression statement():{AST.CompoundExpression s;}{
 
 // End of section
 void eos() :{} {
-  (";" | (<EOL>)) { leaveSection(); }
+  (";" | <EOL> | <EOF>) { leaveSection(); }
 }
 
 void eols() :{} {

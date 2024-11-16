@@ -25,7 +25,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     loop(descriptor, 0)
   }
   private class NameMapper(imports: Seq[ImportItem]) {
-    def map(typeNode: AST.TypeNode): Type = map(typeNode.desc)
+    def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
     def map(descriptor : AST.TypeDescriptor): Type = descriptor match {
       case AST.PrimitiveType(AST.KChar)       => BasicType.CHAR
       case AST.PrimitiveType(AST.KByte)       => BasicType.BYTE
@@ -1602,7 +1602,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   private def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
-    val mappedType = mapper.map(typeNode)
+    val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
     mappedType
   }

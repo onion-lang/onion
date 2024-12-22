@@ -1,26 +1,21 @@
 name: onion
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-
+  push:
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up JDK 21
+    - name: Install sbt
+      uses: sbt/setup-sbt@v1
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup JDK
       uses: actions/setup-java@v4
       with:
-        java-version: '21'
         distribution: 'temurin'
+        java-version: '21'
         cache: 'sbt'
-    - name: Tests
-      run: sbt ++ test
+    - name: Build and Test
+      run: sbt -v +test

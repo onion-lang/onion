@@ -1,8 +1,9 @@
 package onion.compiler.tools
 
 import onion.tools.Shell
-import org.scalatest._
+import org.scalatest.diagrams.Diagrams
+import org.scalatest.funspec.AnyFunSpec
 
-class AbstractShellSpec extends FunSpec with DiagrammedAssertions {
+class AbstractShellSpec extends AnyFunSpec with Diagrams {
   val shell = Shell(Seq())
 }

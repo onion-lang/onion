@@ -88,7 +88,7 @@ lazy val onionSettings = Seq(
     "org.ow2.asm" % "asm" % "5.0.2",
     "net.java.dev.javacc" % "javacc" % "5.0",
     "junit" % "junit" % "4.7" % "test",
-    "org.scalatest" %% "scalatest" % "3.0.8" % "test"
+    "org.scalatest" %% "scalatest" % "3.2.19" % "test"
   ),
   Compile / sourceGenerators += Def.task {
     val cp = (Compile / externalDependencyClasspath).value

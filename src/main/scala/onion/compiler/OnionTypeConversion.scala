@@ -61,10 +61,11 @@ class OnionTypeConversion(table: ClassTable) {
     if (klass.isArray) {
       var dimension: Int = 0
       var component: Class[_] = null
-      do {
+      while({
         dimension += 1
         component = component.getComponentType
-      } while (component.getComponentType != null)
+        (component.getComponentType != null)
+      })()
       val componentType: IRT.Type = toOnionType(component)
       return table.loadArray(componentType, dimension)
     }

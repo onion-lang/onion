@@ -8,9 +8,9 @@
 package onion.compiler
 
 import java.util.{HashMap => JHashMap}
-import onion.compiler.environment.ClassFileClassTypeRef
+import onion.compiler.environment.BcelRefs.BcelClassType
 import onion.compiler.environment.ClassFileTable
-import onion.compiler.environment.ReflectionalClassTypeRef
+import onion.compiler.environment.ReflectionRefs.ReflectClassType
 
 /**
  * @author Kota Mizushima
@@ -36,11 +36,11 @@ class ClassTable(classPath: String) {
     if (clazz == null) {
       val javaClass = table.load(className)
       if (javaClass != null) {
-        clazz = new ClassFileClassTypeRef(javaClass, this)
+        clazz = new BcelClassType(javaClass, this)
         classFiles.put(clazz.name, clazz)
       } else {
         try {
-          clazz = new ReflectionalClassTypeRef(Class.forName(className, true, Thread.currentThread.getContextClassLoader), this)
+          clazz = new ReflectClassType(Class.forName(className, true, Thread.currentThread.getContextClassLoader), this)
           classFiles.put(clazz.name, clazz)
         }
         catch {

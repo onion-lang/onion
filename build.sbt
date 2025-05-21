@@ -85,7 +85,7 @@ lazy val onionSettings = Seq(
   },
   libraryDependencies ++= Seq(
     "org.apache.bcel" % "bcel" % "6.0",
-    "org.ow2.asm" % "asm" % "5.0.2",
+    "org.ow2.asm" % "asm" % "9.8",
     "net.java.dev.javacc" % "javacc" % "5.0",
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.0.8" % "test"

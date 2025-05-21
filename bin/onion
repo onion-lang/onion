@@ -18,4 +18,5 @@ then
   exit
 fi
 
-$JAVA_HOME/bin/java -classpath $CLASSPATH:$ONION_HOME/onion.jar:$ONION_HOME/onion-library.jar:$ONION_HOME/lib/bcel.jar onion.tools.ScriptRunner $@
+$JAVA_HOME/bin/java -classpath $CLASSPATH:$ONION_HOME/onion.jar:$ONION_HOME/onion-library.jar onion.tools.ScriptRunner "$@"
+

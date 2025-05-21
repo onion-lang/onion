@@ -307,10 +307,10 @@ object CodeGeneration {
   }
 }
 
-class CodeGeneration(config: CompilerConfig) {
+class CodeGeneration(config: CompilerConfig) extends BytecodeGenerator {
   import CodeGeneration._
 
-  def process(classes: Seq[IRT.ClassDefinition]): Seq[CompiledClass] = {
+  def process(classes: Seq[TypedAST.ClassDefinition]): Seq[CompiledClass] = {
     compiledClasses.clear
     val base =  (if (config.outputDirectory != null) config.outputDirectory else ".") + Systems.fileSeparator
     for (klass <- classes) codeClass(klass)

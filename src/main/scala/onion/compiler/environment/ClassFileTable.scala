@@ -36,6 +36,24 @@ class ClassFileTable(classPathString: String) {
     }
   }
 
+  def loadBytes(className: String): Array[Byte] = {
+    try {
+      val classFile: ClassPath.ClassFile = classPath.getClassFile(className)
+      val in = classFile.getInputStream
+      val out = new ByteArrayOutputStream()
+      val buf = new Array[Byte](8192)
+      var len = in.read(buf)
+      while (len != -1) {
+        out.write(buf, 0, len)
+        len = in.read(buf)
+      }
+      in.close()
+      out.toByteArray
+    } catch {
+      case _: IOException => null
+    }
+  }
+
   private def add(className: String): JavaClass = {
     try {
       val classFile: ClassPath.ClassFile = classPath.getClassFile(className)

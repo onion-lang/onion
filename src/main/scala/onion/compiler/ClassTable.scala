@@ -9,6 +9,7 @@ package onion.compiler
 
 import java.util.{HashMap => JHashMap}
 import onion.compiler.environment.BcelRefs.BcelClassType
+import onion.compiler.environment.AsmRefs.AsmClassType
 import onion.compiler.environment.ClassFileTable
 import onion.compiler.environment.ReflectionRefs.ReflectClassType
 
@@ -39,12 +40,18 @@ class ClassTable(classPath: String) {
         clazz = new BcelClassType(javaClass, this)
         classFiles.put(clazz.name, clazz)
       } else {
-        try {
-          clazz = new ReflectClassType(Class.forName(className, true, Thread.currentThread.getContextClassLoader), this)
+        val bytes = table.loadBytes(className)
+        if (bytes != null) {
+          clazz = new AsmClassType(bytes, this)
           classFiles.put(clazz.name, clazz)
-        }
-        catch {
-          case e: ClassNotFoundException => {}
+        } else {
+          try {
+            clazz = new ReflectClassType(Class.forName(className, true, Thread.currentThread.getContextClassLoader), this)
+            classFiles.put(clazz.name, clazz)
+          }
+          catch {
+            case e: ClassNotFoundException => {}
+          }
         }
       }
     }

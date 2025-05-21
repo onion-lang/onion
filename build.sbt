@@ -78,10 +78,12 @@ lazy val onionSettings = Seq(
     (Seq((Compile / javaSource).value) ++ Seq((Compile / scalaSource).value) ++ Seq((Compile / sourceManaged).value))
   },
   scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials"),
-  javacOptions ++= Seq("-sourcepath", "src.lib", "-Xlint:unchecked", "-source", "21"),
+  javacOptions ++= Seq("-sourcepath", "src.lib", "-Xlint:unchecked", "-source", "17"),
   libraryDependencies ++= Seq(
-    "org.apache.bcel" % "bcel" % "6.0",
-    "org.ow2.asm" % "asm" % "5.0.2",
+    "org.ow2.asm" % "asm" % "9.8",
+    "org.ow2.asm" % "asm-commons" % "9.8",
+    "org.ow2.asm" % "asm-tree" % "9.8",
+    "org.ow2.asm" % "asm-util" % "9.8",
     "net.java.dev.javacc" % "javacc" % "5.0",
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.2.19" % "test"
@@ -120,7 +122,13 @@ lazy val onionSettings = Seq(
     target.value / "dist"
   },
   mainClass := Some("onion.tools.CompilerFrontend"),
-  assembly / assemblyJarName := "onion.jar"
+  assembly / assemblyJarName := "onion.jar",
+  assembly / assemblyMergeStrategy := {
+    case "module-info.class" => MergeStrategy.discard
+    case x =>
+      val oldStrategy = (assembly / assemblyMergeStrategy).value
+      oldStrategy(x)
+  }
 )
 
 fork in run := true

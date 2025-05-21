@@ -8,50 +8,48 @@
 package onion.compiler.environment
 
 import java.io._
-import java.io.IOException
-import java.io.InputStream
-import org.apache.bcel.classfile._
-import org.apache.bcel.classfile.ClassParser
-import org.apache.bcel.classfile.JavaClass
-import org.apache.bcel.util.Repository
-import org.apache.bcel.util.ClassPath
+import java.net.{URL, URLClassLoader}
+import java.nio.file.{Files, Paths}
+import scala.jdk.CollectionConverters._
 
 /**
  * @author Kota Mizushima
  *
  */
 class ClassFileTable(classPathString: String) {
-  private val repository: Repository = org.apache.bcel.Repository.getRepository()
-  private val classPath: ClassPath = new ClassPath(classPathString)
+  private val classLoader: ClassLoader = createClassLoader(classPathString)
 
-  /**
-   * @param className fully qualified class name
-   * @return
-   */
-  def load(className: String): JavaClass = {
-    try {
-      repository.loadClass(className)
-    } catch {
-      case e: ClassNotFoundException => add(className)
+  private def createClassLoader(classPath: String): ClassLoader = {
+    val urls = classPath.split(File.pathSeparator).map { path =>
+      val file = new File(path)
+      file.toURI.toURL
     }
+    new URLClassLoader(urls, Thread.currentThread().getContextClassLoader)
   }
 
-  private def add(className: String): JavaClass = {
+  /**
+   * Load class bytes for the given class name
+   * @param className fully qualified class name
+   * @return byte array of the class file, or null if not found
+   */
+  def loadBytes(className: String): Array[Byte] = {
+    val resourcePath = className.replace('.', '/') + ".class"
+    val inputStream = classLoader.getResourceAsStream(resourcePath)
+    if (inputStream == null) return null
+    
     try {
-      val classFile: ClassPath.ClassFile = classPath.getClassFile(className)
-      val input: InputStream = classFile.getInputStream
-      val fileName: String = new File(classFile.getPath).getName
-      val parser: ClassParser = new ClassParser(input, fileName)
-      val javaClass: JavaClass = parser.parse
-      input.close()
-      repository.storeClass(javaClass)
-      javaClass
-    }
-    catch {
-      case e: IOException =>
-        null
-      case e: ClassFormatException =>
-        null
+      val out = new ByteArrayOutputStream()
+      val buf = new Array[Byte](8192)
+      var len = inputStream.read(buf)
+      while (len != -1) {
+        out.write(buf, 0, len)
+        len = inputStream.read(buf)
+      }
+      out.toByteArray
+    } catch {
+      case _: IOException => null
+    } finally {
+      inputStream.close()
     }
   }
 }

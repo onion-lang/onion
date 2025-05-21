@@ -1,26 +1,21 @@
 @echo off
 
-rem This variable represents the directory in which Onion is installed.
-rem set ONION_HOME=
+rem Remove trailing backslash from ONION_HOME if present
+if "%ONION_HOME:~-1%"=="\" set "ONION_HOME=%ONION_HOME:~0,-1%"
 
-rem This variable represents the directory in which J2SE is installed.
-rem set JAVA_HOME=$JAVA_HOME$ 
+rem Use java from PATH if JAVA_HOME is not set
+if defined JAVA_HOME (
+    set "JAVA_CMD=%JAVA_HOME%\bin\java"
+) else (
+    set "JAVA_CMD=java"
+)
 
-if /i %ONION_HOME%/ == / goto NO_ONION_HOME
+rem Check if java is available
+"%JAVA_CMD%" -version >nul 2>&1
+if errorlevel 1 (
+    echo Error: Java not found. Please install Java or set JAVA_HOME environment variable.
+    exit /b 1
+)
 
-if /i %JAVA_HOME%/ == / goto NO_JAVA_HOME
-
-goto START
-
-:NO_JAVA_HOME
-echo Please set the environment variable JAVA_HOME
-goto END
-
-:NO_ONION_HOME
-echo Please set the environment variable ONION_HOME
-goto END
-
-:START
-%JAVA_HOME%\bin\java -jar %ONION_HOME%\onion.jar %*
-
-:END
+rem Run the Onion compiler
+"%JAVA_CMD%" -jar "%ONION_HOME%\onion.jar" %*

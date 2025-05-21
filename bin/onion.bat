@@ -1,26 +1,35 @@
 @echo off
+setlocal enabledelayedexpansion
 
-rem This variable represents the directory in which Onion is installed.
-rem set ONION_HOME=
+rem Remove trailing backslash from ONION_HOME if present
+if "%ONION_HOME:~-1%"=="\" set "ONION_HOME=%ONION_HOME:~0,-1%"
 
-rem This variable represents the directory in which J2SE is installed.
-rem set JAVA_HOME=$JAVA_HOME$ 
+rem Use java from PATH if JAVA_HOME is not set
+if defined JAVA_HOME (
+    set "JAVA_CMD=%JAVA_HOME%\bin\java"
+) else (
+    set "JAVA_CMD=java"
+)
 
-if /i %ONION_HOME%/ == / goto NO_ONION_HOME
+rem Check if java is available
+"%JAVA_CMD%" -version >nul 2>&1
+if errorlevel 1 (
+    echo Error: Java not found. Please install Java or set JAVA_HOME environment variable.
+    exit /b 1
+)
 
-if /i %JAVA_HOME%/ == / goto NO_JAVA_HOME
+rem Build classpath with all jars in lib directory
+set "CP=%ONION_HOME%\onion.jar"
+if exist "%ONION_HOME%\lib" (
+    for %%F in ("%ONION_HOME%\lib\*.jar") do (
+        set "CP=!CP!;%%F"
+    )
+)
 
-goto START
+rem Add user classpath if set
+if defined CLASSPATH (
+    set "CP=%CP%;%CLASSPATH%"
+)
 
-:NO_JAVA_HOME
-echo Please set the environment variable JAVA_HOME
-goto END
-
-:NO_ONION_HOME
-echo Please set the environment variable ONION_HOME
-goto END
-
-:START
-%JAVA_HOME%\bin\java -classpath %CLASSPATH%;%ONION_HOME%\onion.jar;%ONION_HOME%\lib\bcel.jar;%ONION_HOME%\onion-library.jar onion.tools.ScriptRunner %*
-
-:END
+rem Run the Onion script runner
+"%JAVA_CMD%" -classpath "%CP%" onion.tools.ScriptRunner %*

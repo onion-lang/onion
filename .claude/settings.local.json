@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(java:*)",
+      "Bash(sbt clean:*)",
+      "Bash(rm:*)",
+      "Bash(sbt:*)",
+      "Bash(grep:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(timeout 30 sbt 'testOnly *CountersSpec')"
+    ],
+    "deny": []
+  }
+}

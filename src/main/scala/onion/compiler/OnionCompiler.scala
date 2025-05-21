@@ -28,7 +28,10 @@ class OnionCompiler(val config: CompilerConfig) {
 
   def compile(srcs: Seq[InputSource]): Seq[CompiledClass] = {
     try {
-      (new Parsing(config) andThen new Rewriting(config) andThen new Typing(config) andThen new Generating(config)).process(srcs)
+      (new Parsing(config)
+        andThen new Rewriting(config)
+        andThen new Typing(config)
+        andThen new TypedGenerating(config)).process(srcs)
     } catch {
       case e: CompilationException =>
         for (error <- e.problems) printError(error)

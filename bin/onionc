@@ -1,21 +1,17 @@
 #!/bin/sh
 
-# This variable represents the directory in which Onion is installed.
-# ONION_HOME=
-
-# This variable represents the directory in which J2SE is installed. 
-# JAVA_HOME= 
-
-if [ $JAVA_HOME/ = / ]
-then
-  echo Please set the environment variable JAVA_HOME.
-  exit
+# Use java from PATH if JAVA_HOME is not set
+if [ -z "$JAVA_HOME" ]; then
+    JAVA_CMD="java"
+else
+    JAVA_CMD="$JAVA_HOME/bin/java"
 fi
 
-if [ $ONION_HOME/ = / ]
-then
-  echo Please set the environment variable ONION_HOME.
-  exit
+# Check if java is available
+if ! command -v "$JAVA_CMD" > /dev/null 2>&1; then
+    echo "Error: Java not found. Please install Java or set JAVA_HOME environment variable."
+    exit 1
 fi
 
-$JAVA_HOME/bin/java -jar $ONION_HOME/onion.jar $@
+# Run the Onion compiler
+exec "$JAVA_CMD" -jar "$ONION_HOME/onion.jar" "$@"

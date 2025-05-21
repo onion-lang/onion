@@ -6,6 +6,12 @@ compiles into JVM class files as in-memory or real files.
 Originally, Onion was written in Java.  It has been rewritten in Scala completely except Parser,
 using JavaCC.
 
+## Architecture
+The compiler parses source code into an untyped AST and then performs type
+checking to produce a **typed AST**.  The old intermediate representation (IRT)
+has been folded into this typed tree.  Code generation now runs on the typed
+AST via a thin compatibility layer that still reuses the existing BCEL backend.
+
 ## Tools
 
 ### onionc

@@ -1,97 +1,53 @@
-/* ************************************************************** *
- *                                                                *
- * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
- *                                                                *
- *                                                                *
- * This software is distributed under the modified BSD License.   *
- * ************************************************************** */
 package onion.compiler
 
-import java.util.HashMap
-import java.util.Map
-import org.apache.bcel.generic.ArrayType
-import org.apache.bcel.generic.BasicType
-import org.apache.bcel.generic.ObjectType
-import org.apache.bcel.generic.Type
+import org.objectweb.asm.Type
+import scala.collection.mutable
 
-/**
- * @author Kota Mizushima
- *
- */
-object OnionTypeConversion {
-  private final val basicTypeTable: Map[BasicType, IRT.BasicType] = new HashMap[BasicType, IRT.BasicType]
-  private final val c2t: Map[Class[_], IRT.BasicType]             = new HashMap[Class[_], IRT.BasicType]
+object OnionTypeConversion:
+  private val basicTypeTable = Map[
+    Type, TypedAST.BasicType](
+      Type.BOOLEAN_TYPE -> TypedAST.BasicType.BOOLEAN,
+      Type.BYTE_TYPE    -> TypedAST.BasicType.BYTE,
+      Type.SHORT_TYPE   -> TypedAST.BasicType.SHORT,
+      Type.CHAR_TYPE    -> TypedAST.BasicType.CHAR,
+      Type.INT_TYPE     -> TypedAST.BasicType.INT,
+      Type.LONG_TYPE    -> TypedAST.BasicType.LONG,
+      Type.FLOAT_TYPE   -> TypedAST.BasicType.FLOAT,
+      Type.DOUBLE_TYPE  -> TypedAST.BasicType.DOUBLE,
+      Type.VOID_TYPE    -> TypedAST.BasicType.VOID)
 
-  basicTypeTable.put(Type.BYTE, IRT.BasicType.BYTE)
-  basicTypeTable.put(Type.SHORT, IRT.BasicType.SHORT)
-  basicTypeTable.put(Type.CHAR, IRT.BasicType.CHAR)
-  basicTypeTable.put(Type.INT, IRT.BasicType.INT)
-  basicTypeTable.put(Type.LONG, IRT.BasicType.LONG)
-  basicTypeTable.put(Type.FLOAT, IRT.BasicType.FLOAT)
-  basicTypeTable.put(Type.DOUBLE, IRT.BasicType.DOUBLE)
-  basicTypeTable.put(Type.BOOLEAN, IRT.BasicType.BOOLEAN)
-  basicTypeTable.put(Type.VOID, IRT.BasicType.VOID)
+  private val c2t = Map[Class[_], TypedAST.BasicType](
+      classOf[Boolean] -> TypedAST.BasicType.BOOLEAN,
+      classOf[Byte]    -> TypedAST.BasicType.BYTE,
+      classOf[Short]   -> TypedAST.BasicType.SHORT,
+      classOf[Char]    -> TypedAST.BasicType.CHAR,
+      classOf[Int]     -> TypedAST.BasicType.INT,
+      classOf[Long]    -> TypedAST.BasicType.LONG,
+      classOf[Float]   -> TypedAST.BasicType.FLOAT,
+      classOf[Double]  -> TypedAST.BasicType.DOUBLE,
+      classOf[Unit]    -> TypedAST.BasicType.VOID)
 
-  c2t.put(classOf[Byte], IRT.BasicType.BYTE)
-  c2t.put(classOf[Short], IRT.BasicType.SHORT)
-  c2t.put(classOf[Char], IRT.BasicType.CHAR)
-  c2t.put(classOf[Int], IRT.BasicType.INT)
-  c2t.put(classOf[Long], IRT.BasicType.LONG)
-  c2t.put(classOf[Float], IRT.BasicType.FLOAT)
-  c2t.put(classOf[Double], IRT.BasicType.DOUBLE)
-  c2t.put(classOf[Boolean], IRT.BasicType.BOOLEAN)
-  c2t.put(classOf[Unit], IRT.BasicType.VOID)
-}
+class OnionTypeConversion(table: ClassTable):
+  import OnionTypeConversion.*
 
-class OnionTypeConversion(table: ClassTable) {
-  import OnionTypeConversion._
+  def toOnionType(klass: Class[_]): TypedAST.Type =
+    c2t.get(klass) match
+      case Some(t) => t
+      case None =>
+        if klass.isArray then
+          val dim = klass.getName.takeWhile(_ == '[').length
+          val comp = toOnionType(klass.getComponentType)
+          if comp != null then table.loadArray(comp, dim) else null
+        else
+          table.load(klass.getName)
 
-  def toOnionType(klass: Class[_]): IRT.Type = {
-    val returnType: IRT.Type = c2t.get(klass).asInstanceOf[IRT.Type]
-    if (returnType != null) return returnType
-    if (!klass.isArray) {
-      val symbol: IRT.ClassType = table.load(klass.getName)
-      if (symbol != null) {
-        return symbol
-      }
-      else {
-        return null
-      }
-    }
-    if (klass.isArray) {
-      var dimension: Int = 0
-      var component: Class[_] = null
-      while({
-        dimension += 1
-        component = component.getComponentType
-        (component.getComponentType != null)
-      })()
-      val componentType: IRT.Type = toOnionType(component)
-      return table.loadArray(componentType, dimension)
-    }
-    null
-  }
+  def toOnionType(tpe: Type): TypedAST.Type =
+    basicTypeTable.get(tpe) match
+      case Some(t) => t
+      case None =>
+        if tpe.getSort == Type.ARRAY then
+          val comp = toOnionType(tpe.getElementType)
+          if comp != null then table.loadArray(comp, tpe.getDimensions) else null
+        else
+          table.load(tpe.getClassName)
 
-  def toOnionType(`type`: Type): IRT.Type = {
-    val returnType: IRT.Type = basicTypeTable.get(`type`).asInstanceOf[IRT.Type]
-    if (returnType != null) return returnType
-    if (`type`.isInstanceOf[ObjectType]) {
-      val objType: ObjectType = `type`.asInstanceOf[ObjectType]
-      val symbol: IRT.ClassType = table.load(objType.getClassName)
-      if (symbol != null) {
-        return symbol
-      }
-      else {
-        return null
-      }
-    }
-    if (`type`.isInstanceOf[ArrayType]) {
-      val arrType: ArrayType = `type`.asInstanceOf[ArrayType]
-      val component: IRT.Type = toOnionType(arrType.getBasicType)
-      if (component != null) {
-        return table.loadArray(component, arrType.getDimensions)
-      }
-    }
-    null
-  }
-}

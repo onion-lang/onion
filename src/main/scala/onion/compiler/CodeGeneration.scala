@@ -35,13 +35,13 @@ object CodeGeneration {
 
   private def toJavaModifier(src: Int): Int = {
     var modifier: Int = 0
-    modifier |= (if (Modifier.isPrivate(src)) Constants.ACC_PRIVATE else modifier)
-    modifier |= (if (Modifier.isProtected(src)) Constants.ACC_PROTECTED else modifier)
-    modifier |= (if (Modifier.isPublic(src)) Constants.ACC_PUBLIC else modifier)
-    modifier |= (if (Modifier.isStatic(src)) Constants.ACC_STATIC else modifier)
-    modifier |= (if (Modifier.isSynchronized(src)) Constants.ACC_SYNCHRONIZED else modifier)
-    modifier |= (if (Modifier.isAbstract(src)) Constants.ACC_ABSTRACT else modifier)
-    modifier |= (if (Modifier.isFinal(src)) Constants.ACC_FINAL else modifier)
+    modifier |= (if (Modifier.isPrivate(src)) (Constants.ACC_PRIVATE: Int) else modifier)
+    modifier |= (if (Modifier.isProtected(src)) (Constants.ACC_PROTECTED: Int) else modifier)
+    modifier |= (if (Modifier.isPublic(src)) (Constants.ACC_PUBLIC: Int) else modifier)
+    modifier |= (if (Modifier.isStatic(src)) (Constants.ACC_STATIC: Int) else modifier)
+    modifier |= (if (Modifier.isSynchronized(src)) (Constants.ACC_SYNCHRONIZED: Int) else modifier)
+    modifier |= (if (Modifier.isAbstract(src)) (Constants.ACC_ABSTRACT: Int) else modifier)
+    modifier |= (if (Modifier.isFinal(src)) (Constants.ACC_FINAL: Int) else modifier)
     modifier
   }
 
@@ -335,8 +335,8 @@ class CodeGeneration(config: CompilerConfig) {
 
   private def classModifier(node: IRT.ClassDefinition): Int = {
     var modifier: Int = toJavaModifier(node.modifier)
-    modifier |= (if (node.isInterface) Constants.ACC_INTERFACE else modifier)
-    modifier |= (if ((!Modifier.isInternal(modifier))) Constants.ACC_PUBLIC else modifier)
+    modifier |= (if (node.isInterface) (Constants.ACC_INTERFACE: Int) else modifier)
+    modifier |= (if ((!Modifier.isInternal(modifier))) (Constants.ACC_PUBLIC: Int) else modifier)
     modifier
   }
 

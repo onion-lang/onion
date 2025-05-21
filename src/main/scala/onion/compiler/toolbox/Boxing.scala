@@ -15,7 +15,16 @@ import onion.compiler.ClassTable
  *
  */
 object Boxing {
-  private final val TABLE: Array[Array[AnyRef]] = Array(Array(IRT.BasicType.BOOLEAN, "java.lang.Boolean"), Array(IRT.BasicType.BYTE, "java.lang.Byte"), Array(IRT.BasicType.SHORT, "java.lang.Short"), Array(IRT.BasicType.CHAR, "java.lang.Character"), Array(IRT.BasicType.INT, "java.lang.Integer"), Array(IRT.BasicType.LONG, "java.lang.Long"), Array(IRT.BasicType.FLOAT, "java.lang.Float"), Array(IRT.BasicType.DOUBLE, "java.lang.Double"))
+  private final val TABLE: Array[Array[AnyRef]] = Array(
+    Array[AnyRef](IRT.BasicType.BOOLEAN, "java.lang.Boolean"),
+    Array[AnyRef](IRT.BasicType.BYTE, "java.lang.Byte"),
+    Array[AnyRef](IRT.BasicType.SHORT, "java.lang.Short"),
+    Array[AnyRef](IRT.BasicType.CHAR, "java.lang.Character"),
+    Array[AnyRef](IRT.BasicType.INT, "java.lang.Integer"),
+    Array[AnyRef](IRT.BasicType.LONG, "java.lang.Long"),
+    Array[AnyRef](IRT.BasicType.FLOAT, "java.lang.Float"),
+    Array[AnyRef](IRT.BasicType.DOUBLE, "java.lang.Double")
+  )
 
   private def boxedType(table: ClassTable, `type`: IRT.BasicType): IRT.ClassType = {
     for (row <- TABLE) {

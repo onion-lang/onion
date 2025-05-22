@@ -45,7 +45,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val interfaces =
       if node.interfaces != null then node.interfaces.map(_.name.replace('.', '/')).toArray
       else Array.empty[String]
-    cw.visit(Opcodes.V21, toAsmModifier(node.modifier) | (if node.isInterface then Opcodes.ACC_INTERFACE else 0),
+    val classAccess =
+      if node.isInterface then
+        toAsmModifier(node.modifier) | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT
+      else
+        toAsmModifier(node.modifier)
+    cw.visit(Opcodes.V21, classAccess,
       node.name.replace('.', '/'), null, superName, interfaces)
 
     for m <- node.methods do m match
@@ -59,15 +64,25 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def codeMethod(cw: ClassWriter, node: TypedAST.MethodDefinition): Unit =
     val access = toAsmModifier(node.modifier)
     val desc = Method(node.name, asmType(node.returnType), node.arguments.map(asmType)).getDescriptor
-    val mv = cw.visitMethod(access, node.name, desc, null, null)
-    val gen = new GeneratorAdapter(mv, access, node.name, desc)
-    mv.visitCode()
-    node.block.statements match
-      case Array(ret: TypedAST.Return) =>
-        emitReturn(gen, ret.term, node.returnType)
-      case _ =>
-        gen.visitInsn(Opcodes.RETURN)
-    gen.endMethod()
+    val isAbstract = Modifier.isAbstract(node.modifier) || node.block == null
+    if isAbstract then
+      cw.visitMethod(access | Opcodes.ACC_ABSTRACT, node.name, desc, null, null).visitEnd()
+    else
+      val mv = cw.visitMethod(access, node.name, desc, null, null)
+      val gen = new GeneratorAdapter(mv, access, node.name, desc)
+      mv.visitCode()
+      findReturn(node.block) match
+        case Some(ret) =>
+          emitReturn(gen, ret.term, node.returnType)
+        case None =>
+          emitDefaultReturn(gen, node.returnType)
+      gen.endMethod()
+
+  private def findReturn(stmt: TypedAST.ActionStatement): Option[TypedAST.Return] = stmt match
+    case r: TypedAST.Return => Some(r)
+    case sb: TypedAST.StatementBlock =>
+      sb.statements.iterator.map(findReturn).collectFirst { case Some(r) => r }
+    case _ => None
 
   private def emitReturn(gen: GeneratorAdapter, term: TypedAST.Term, tp: TypedAST.Type): Unit = term match
     case v: TypedAST.IntValue =>
@@ -77,5 +92,27 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.push(v.value)
       gen.returnValue()
     case _ =>
-      gen.visitInsn(Opcodes.RETURN)
+      emitDefaultReturn(gen, tp)
+
+  private def emitDefaultReturn(gen: GeneratorAdapter, tp: TypedAST.Type): Unit =
+    tp match
+      case TypedAST.BasicType.VOID =>
+        gen.visitInsn(Opcodes.RETURN)
+      case TypedAST.BasicType.BOOLEAN | TypedAST.BasicType.BYTE |
+           TypedAST.BasicType.SHORT | TypedAST.BasicType.CHAR |
+           TypedAST.BasicType.INT =>
+        gen.push(0)
+        gen.returnValue()
+      case TypedAST.BasicType.LONG =>
+        gen.push(0L)
+        gen.returnValue()
+      case TypedAST.BasicType.FLOAT =>
+        gen.push(0f)
+        gen.returnValue()
+      case TypedAST.BasicType.DOUBLE =>
+        gen.push(0d)
+        gen.returnValue()
+      case _ =>
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.returnValue()
 

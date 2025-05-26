@@ -1,0 +1,512 @@
+/* ************************************************************** *
+*                                                                *
+* Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
+*                                                                *
+*                                                                *
+* This software is distributed under the modified BSD License.   *
+* ************************************************************** */
+options {
+  STATIC = false;
+}
+
+PARSER_BEGIN(JJOnionParserRefactored)
+package onion.compiler.parser;
+import onion.compiler.AST;
+import onion.compiler.Location;
+import onion.compiler.Parser;
+import onion.compiler.toolbox.*;
+import scala.Tuple2;
+import scala.collection.immutable.*;
+import scala.collection.mutable.ArrayBuffer;
+import scala.collection.mutable.Buffer;
+import scala.Option;
+import scala.Option$;
+import static onion.compiler.AST.append;
+import java.util.Stack;
+
+@SuppressWarnings("unchecked")
+public class JJOnionParserRefactored implements Parser {
+  private int mset; // used for semantic lookahead
+  private ASTBuilderAdapter builder;
+  
+  public JJOnionParserRefactored(java.io.Reader reader, ASTBuilderAdapter builder) {
+    this(reader);
+    this.builder = builder;
+  }
+  
+  public JJOnionParserRefactored(java.io.Reader reader) {
+    this(reader, new ASTBuilderAdapter());
+  }
+
+  private boolean no(int m, int mset) {
+    return (m & mset) == 0;
+  }
+
+  private boolean la(String s) {
+    Token t = getToken(1);
+    return t != null && t.image.equals(s);
+  }
+
+  private <T> Option<T> option(T value) {
+    return ASTBuilderAdapter.option(value);
+  }
+
+  /*
+   * workaround for Scala types being used from Java
+   */
+  private static <A> List<A> toList(Buffer<A> buffer) {
+    return ASTBuilderAdapter.toList((ArrayBuffer<A>)buffer);
+  }
+
+  /*
+   * workaround for Scala types being used from Java
+   */
+  private static <A> List<A> asList(A element) {
+    return ASTBuilderAdapter.asList(element);
+  }
+
+  /*
+   * convenience method to create a Location
+   */
+  private static Location p(Token t) {
+    return new Location(t.beginLine, t.beginColumn);
+  }
+
+  /*
+   * convenience method to create a Location
+   */
+  private static Location p(int line, int column) {
+    return new Location(line, column);
+  }
+
+  /*
+   * convenience method to get image of a Token
+   */
+  private static String c(Token t) {
+    return t.image;
+  }
+
+  /*
+   * converience method to create substring
+   */
+  private static String sub(String s, int sindex, int eindex) {
+    return s.substring(sindex, eindex);
+  }
+
+  /*
+   * Returns a String which last character of s is omitted.
+   */
+  private static String chop(String s) {
+    return s.substring(0, s.length() - 1);
+  }
+
+  /*
+   * Returns a String which first and last character of s is omitted.
+   */
+  private static String chopEdge(String s) {
+    return s.substring(1, s.length() - 1);
+  }
+
+  /*
+   * flag whether in global statement or normal statement
+   */
+  private boolean globalStatement = true;
+
+  private Stack<Boolean> sectionStack = new Stack<Boolean>();
+
+  private void enterSection() {
+    globalStatement = false;
+    sectionStack.push(false);
+    token_source.SwitchTo(IN_STATEMENT);
+  }
+
+  private void leaveSection() {
+    if(!sectionStack.empty()) {
+      sectionStack.pop();
+    }
+    if(sectionStack.empty()) {
+      globalStatement = true;
+    }
+    token_source.SwitchTo(DEFAULT);
+  }
+
+  private void eols() {
+    (<EOL>)+
+  }
+
+  private void eos() {
+    (";" | <EOL> {leaveSection();})+
+  }
+
+  // String interpolation helper
+  private AST.Expression parseStringInterpolation(Location loc, String s) {
+    ArrayBuffer<String> parts = new ArrayBuffer<String>();
+    ArrayBuffer<AST.Expression> expressions = new ArrayBuffer<AST.Expression>();
+    
+    int pos = 0;
+    int start = 0;
+    
+    while (pos < s.length()) {
+      if (pos < s.length() - 1 && s.charAt(pos) == '\\' && s.charAt(pos + 1) == '$') {
+        // Escaped dollar sign
+        pos += 2;
+      } else if (pos < s.length() - 1 && s.charAt(pos) == '$' && s.charAt(pos + 1) == '{') {
+        // Found interpolation start
+        append(parts, s.substring(start, pos));
+        
+        // Find the matching closing brace
+        pos += 2; // Skip ${
+        int braceCount = 1;
+        int exprStart = pos;
+        
+        while (pos < s.length() && braceCount > 0) {
+          if (s.charAt(pos) == '{') {
+            braceCount++;
+          } else if (s.charAt(pos) == '}') {
+            braceCount--;
+          }
+          pos++;
+        }
+        
+        if (braceCount != 0) {
+          throw new RuntimeException("Unmatched braces in string interpolation at " + loc);
+        }
+        
+        // Extract and parse the expression
+        int interpEnd = pos;
+        String exprStr = s.substring(exprStart, pos - 1); // -1 to exclude closing }
+        
+        // Parse the expression string
+        try {
+          JJOnionParserRefactored exprParser = new JJOnionParserRefactored(new java.io.StringReader(exprStr), builder);
+          AST.Expression expr = exprParser.term();
+          append(expressions, expr);
+        } catch (Exception e) {
+          throw new RuntimeException("Invalid expression in string interpolation: " + exprStr + " at " + loc, e);
+        }
+        
+        start = interpEnd;
+        pos = interpEnd;
+      } else {
+        pos++;
+      }
+    }
+    
+    // Add the remaining part
+    if (start < s.length()) {
+      append(parts, s.substring(start));
+    }
+    
+    // If we ended with an expression, add an empty string part
+    if (parts.size() == expressions.size()) {
+      append(parts, "");
+    }
+    
+    return builder.createStringInterpolation(loc, toList(parts), toList(expressions));
+  }
+}
+PARSER_END(JJOnionParserRefactored)
+
+<DEFAULT> SKIP:
+{
+  "\r\n"
+| "\t"
+| "\f"
+| "\r"
+| "\n"
+| " "
+}
+
+<IN_STATEMENT> SKIP:
+{
+  " "
+| "\t"
+| "\f"
+}
+
+<IN_STATEMENT> TOKEN:
+{
+  <EOL: ("\r\n" | "\r" | "\n")>
+}
+
+/*
+* COMMENTS
+*/
+<DEFAULT, IN_STATEMENT>
+SPECIAL_TOKEN:
+{
+  <MULTI_LINE_COMMENT: "/*" (~["*"])*  "*" ("*" | (~["*", "/"] (~["*"])* "*"))* "/">
+| <LINE_COMMENT:       "//" (~["\r", "\n"])*>
+| <SHELL_COMMENT:      "#!" (~["\r", "\n"])*>
+}
+
+/*
+* KEYWORDS
+*/
+<DEFAULT, IN_STATEMENT>
+TOKEN:
+{
+  <K_ABSTRACT:     "abstract"     >
+| <K_AND:          "and"          >
+| <K_BOOLEAN:      "Boolean" >
+| <K_BREAK:        "break"        >
+| <K_BYTE:         "Byte" >
+| <K_CASE:         "case"         >
+| <K_CHAR:         "Char"  >
+| <K_CLASS:        "class"        >
+| <K_RECORD:       "record"       >
+| <K_CONST:        "const"        >
+| <K_CONTINUE:     "continue"    >
+| <K_DEF:          "def"          >
+| <K_DOUBLE:       "Double"      >
+| <K_ELSE:         "else"         >
+| <K_FALSE:        "false"        >
+| <K_FINALLY:      "finally"      >
+| <K_FINAL:        "final"        >
+| <K_FLOAT:        "Float" >
+| <K_FOR:          "for"          >
+| <K_FOREACH:      "foreach"      >
+| <K_FORWARD:      "forward"      >
+| <K_GOTO:         "goto"         >
+| <K_IF:           "if"           >
+| <K_IMPORT:       "import"       >
+| <K_INT:          "Int"  >
+| <K_INTERFACE:    "interface"    >
+| <K_INTERNAL:     "internal"     >
+| <K_IS:           "is"           >
+| <K_LONG:         "Long"         >
+| <K_MODULE:       "module"       >
+| <K_NEW:          "new"          >
+| <K_THIS:         "this"         >
+| <K_NULL:         "null"         >
+| <K_OR:           "or"           >
+| <K_OVERRIDE:     "override"     >
+| <K_PRIVATE:      "private"      >
+| <K_PROTECTED:    "protected"    >
+| <K_PUBLIC:       "public"       >
+| <K_CATCH:        "catch"        >
+| <K_RETURN:       "return"       >
+| <K_SELECT:       "select"       >
+| <K_SELF:         "self"         >
+| <K_SHORT:        "Short"        >
+| <K_STATIC:       "static"       >
+| <K_SUPER:        "super"        >
+| <K_SYNCHRONIZED: "synchronized" >
+| <K_THROW:        "throw"        >
+| <K_THROWS:       "throws"       >
+| <K_TRUE:         "true"         >
+| <K_TRY:          "try"          >
+| <K_VAR:          "var"          >
+| <K_VOID:         "void" | "Unit" >
+| <K_VOLATILE:     "volatile"     >
+| <K_WHEN:         "when"         >
+| <K_WHILE:        "while"        >
+}
+
+
+/*
+* OPERATORS
+*/
+<DEFAULT, IN_STATEMENT>
+TOKEN : {
+  <PLUS:           "+"            >
+| <MINUS:          "-"            >
+| <STAR:           "*"            >
+| <SLASH:          "/"            >
+| <PERC:           "%"            >
+| <DOLLAR:         "$"            >
+| <LT:             "<"            >
+| <GT:             ">"            >
+| <ARROW:          "->"           >
+| <ARROW2:         "=>"           >
+| <SUBTYPE:        "<:"           >
+| <NOT:            "!"            >
+| <AMP:            "&"            >
+| <AND:            "&&"           >
+| <BAR:            "|"            >
+| <OR:             "||"           >
+| <EOR:            "^"            >
+| <BN:             "~"            >
+| <L2S:            "<<"           >
+| <R2S:            ">>"           >
+| <R3S:            ">>>"          >
+| <ASSIGN:         "="            >
+| <EQ:             "=="           >
+| <NOTEQ:          "!="           >
+| <REFEQ:          "==="          >
+| <REFNOTEQ:       "!=="          >
+| <ADDEQ:          "+="           >
+| <SUBEQ:          "-="           >
+| <MULEQ:          "*="           >
+| <DIVEQ:          "/="           >
+| <MODEQ:          "%="           >
+| <PLUSPLUS:       "++"           >
+| <MINUSMINUS:     "--"           >
+| <COLON:          ":"            >
+| <SEMI:           ";"            >
+| <COLON2:         "::"           >
+| <SHARP:          "#"            >
+| <DOT:            "."            >
+| <LBRACE:         "{"            >
+| <RBRACE:         "}"            >
+| <BACK_QUOTE:     "`"            >
+| <LPAREN:         "("            >
+| <RPAREN:         ")"            >
+| <COMMA:          ","            >
+| <LBRACKET:       "["            >
+| <RBRACKET:       "]"            >
+| <QUESTION:       "?"            >
+| <ELVIS:          "?:"           >
+}
+
+/*
+ * LITERALS
+ */
+<DEFAULT, IN_STATEMENT>
+TOKEN:
+{
+  <INTEGER:
+    <DECIMAL_LITERAL> (["L"])?
+  | <HEX_LITERAL> (["L"])?
+  | <OCTAL_LITERAL> (["L"])?
+  >
+| <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])* >
+| <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
+| <#OCTAL_LITERAL: "0" (["0"-"7"])* >
+| <FLOAT:
+    (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["F", "D"])?
+  | "." (["0"-"9"])+ (<EXPONENT>)? (["F","D"])?
+  | (["0"-"9"])+ <EXPONENT> (["F","D"])?
+  | (["0"-"9"])+ (<EXPONENT>)? ["F","D"]
+  >
+| <#EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
+| <CHARACTER:
+    "'"
+    ( (~["'","\\","\n","\r"])
+    | ("\\"
+        ( ["n","t","b","r","f","\\","'","\""]
+        | ["0"-"7"] ( ["0"-"7"] )?
+        | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+        )
+      )
+    )
+    "'"
+  >
+| <STRING:
+    "\""
+    ( (~["\"","\\","\n","\r"])
+    | ("\\"
+        ( ["n","t","b","r","f","\\","'","\""]
+        | ["0"-"7"] ( ["0"-"7"] )?
+        | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+        )
+      )
+    )*
+    "\""
+  >
+| <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
+| <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
+| <FID:      "@" <ID>                                                    >
+}
+
+/*
+ * ERROR TOKEN
+ */
+<DEFAULT, IN_STATEMENT>
+TOKEN:{
+  <ERROR: ~[]>
+}
+
+// PARSING RULES - Now using the builder pattern
+
+AST.CompilationUnit unit() :{
+  AST.ModuleDeclaration module = null; 
+  AST.ImportClause imports = null;
+  AST.Toplevel top = null;  
+  ArrayBuffer<AST.Toplevel> tops = new ArrayBuffer<AST.Toplevel>();
+}{
+  [module=module_decl()]
+  [imports=import_decl()]
+  (top=top_level() {append(tops, top);})+ <EOF> {
+    return builder.createCompilationUnit(p(1, 1), null, module, imports, toList(tops));
+  }
+}
+
+AST.ModuleDeclaration module_decl() :{
+  Token t1, t2; 
+  StringBuffer sb = new StringBuffer();
+}{
+  {enterSection();}
+  t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append("."); sb.append(t2.image);})* eos() {
+    return builder.createModuleDeclaration(p(t1), new String(sb));
+  }
+}
+
+AST.ImportClause import_decl() :{
+  Token t = null, n;
+  StringBuffer sb;
+  String s = null;
+  ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
+}{
+  t="import" "{"
+    ( {sb = new StringBuffer();enterSection();}
+      ( LOOKAHEAD(2)
+        (n=<ID> {s = n.image;} "=" n=<ID> {sb.append(n.image);} ("." n=<ID> {sb.append("."); sb.append(n.image);})+ eos())
+      | ((LOOKAHEAD(2) n=<ID> "." {sb.append(n.image); sb.append(".");})+ (n=<ID> | n="*") eos() {
+           s = n.image; sb.append(s);
+         }
+        )
+      ){ append(imports, new Tuple2<String, String>(s, new String(sb))); }
+    )*
+  "}"{ return builder.createImportClause(p(t), toList(imports)); }
+}
+
+AST.ClassDeclaration class_decl(int mset) : {
+  Token t1, t2; 
+  AST.TypeNode ty1 = null, ty2 = null;
+  AST.AccessSection sec1 = null;
+  AST.AccessSection sec2 = null;
+  Option<AST.AccessSection> sec3 = null;
+  ArrayBuffer<AST.TypeNode> ty2s = new ArrayBuffer<AST.TypeNode>();
+  ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
+}{
+  t1="class" t2=<ID> [":" ty1=class_type()]
+  ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{"
+    [sec1=default_section()] { sec3 = option(sec1); }
+    (sec2=access_section() {append(sec2s, sec2);})*
+  "}" {
+    return builder.createClassDeclaration(
+      p(t1), mset, t2.image, ty1, toList(ty2s), sec3, toList(sec2s)
+    );
+  }
+}
+
+AST.RecordDeclaration record_decl(int mset) : {
+  Token t1, t2; 
+  List<AST.Argument> args;
+}{
+  t1="record" t2=<ID> "(" args=args() ")" {
+    return builder.createRecordDeclaration(p(t1), mset, t2.image, args);
+  }
+}
+
+AST.MethodDeclaration method_decl(int mset) : {
+  Token t;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  AST.TypeNode ty = null;
+  AST.BlockExpression b = null;
+  AST.Expression e = null;
+}{
+  "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()]
+  (  (b=block() | {enterSection();} eos() ) {
+       return builder.createMethodDeclaration(p(t), mset, t.image, args, ty, b);
+     }
+  |  ({enterSection();} "=" eols() e=term() eos()) {
+       AST.BlockExpression body = builder.createBlockExpression(
+         p(t), 
+         asList(builder.createReturn(p(t), e))
+       );
+       return builder.createMethodDeclaration(p(t), mset, t.image, args, ty, body);
+     }
+  )
+}

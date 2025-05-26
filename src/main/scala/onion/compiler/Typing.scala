@@ -1171,10 +1171,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           new StatementBlock(elements.map{e => translate(e, context)}.toIndexedSeq:_*)
         }
       case node@AST.BreakExpression(loc) =>
-        report(UNIMPLEMENTED_FEATURE, node)
         new Break(loc)
       case node@AST.ContinueExpression(loc) =>
-        report(UNIMPLEMENTED_FEATURE, node)
         new Continue(loc)
       case node@AST.EmptyExpression(loc) =>
         new NOP(loc)

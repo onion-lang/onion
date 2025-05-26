@@ -13,7 +13,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   import TypedAST._
   
   // Track local variable mappings from TypedAST indices to GeneratorAdapter's local indices
-  private class LocalVarContext(gen: GeneratorAdapter):
+  class LocalVarContext(gen: GeneratorAdapter):
     val indexMap = mutable.Map[Int, Int]()
     val parameterCount = mutable.Map[Int, Int]() // Track which indices are parameters
     
@@ -44,7 +44,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       this
   
   // Special context for handling closures with captured variables
-  private class ClosureLocalVarContext(
+  class ClosureLocalVarContext(
     gen: GeneratorAdapter,
     val closureClassName: String,
     val capturedVars: Seq[LocalBinding]
@@ -76,7 +76,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     if Modifier.isSynchronized(mod) then access |= Opcodes.ACC_SYNCHRONIZED
     access
 
-  private def asmType(tp: TypedAST.Type): AsmType = tp match
+  def asmType(tp: TypedAST.Type): AsmType = tp match
     case BasicType.VOID    => AsmType.VOID_TYPE
     case BasicType.BOOLEAN => AsmType.BOOLEAN_TYPE
     case BasicType.BYTE    => AsmType.BYTE_TYPE
@@ -300,7 +300,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitStatement(gen: GeneratorAdapter, stmt: ActionStatement, className: String): Unit =
     emitStatementWithContext(gen, stmt, className, new LocalVarContext(gen))
     
-  private def emitStatementWithContext(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit = stmt match
+  private def emitStatementWithContext(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit =
+    val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
+    visitor.visitStatement(stmt)
+    
+  // Legacy implementation - to be removed after full migration  
+  private def emitStatementWithContextLegacy(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit = stmt match
     case expr: ExpressionActionStatement =>
       emitExpressionWithContext(gen, expr.term, className, localVars)
       // Pop the result if it's not void
@@ -394,12 +399,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       emitStatementsWithContext(gen, block.statements, className, localVars)
     
     case _: Break =>
-      // TODO: Need to handle break statements with label tracking
-      throw new UnsupportedOperationException("Break statements not yet implemented")
+      // Break statements are now handled by the visitor pattern
+      throw new UnsupportedOperationException("Break statements should be handled by AsmCodeGenerationVisitor")
       
     case _: Continue =>
-      // TODO: Need to handle continue statements with label tracking
-      throw new UnsupportedOperationException("Continue statements not yet implemented")
+      // Continue statements are now handled by the visitor pattern
+      throw new UnsupportedOperationException("Continue statements should be handled by AsmCodeGenerationVisitor")
     
     case _: NOP =>
       // No operation
@@ -411,7 +416,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitExpression(gen: GeneratorAdapter, expr: Term, className: String): Unit =
     emitExpressionWithContext(gen, expr, className, new LocalVarContext(gen))
     
-  private def emitExpressionWithContext(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit = expr match
+  private def emitExpressionWithContext(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit =
+    val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
+    visitor.visitTerm(expr)
+    
+  // Legacy implementation - to be removed after full migration
+  private def emitExpressionWithContextLegacy(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit = expr match
     // Literals
     case v: IntValue => gen.push(v.value)
     case v: LongValue => gen.push(v.value)
@@ -1047,6 +1057,57 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case _ =>
       throw new UnsupportedOperationException(s"Expression type not yet implemented: ${expr.getClass.getName}")
 
+  // Helper methods for visitor pattern
+  def emitRefLocal(gen: GeneratorAdapter, ref: RefLocal, localVars: LocalVarContext): Unit =
+    localVars match
+      case closureCtx: ClosureLocalVarContext if closureCtx.isCapturedVariable(ref.index) =>
+        gen.loadThis()
+        val capturedVar = closureCtx.capturedVars.find(_.index == ref.index).get
+        gen.getField(
+          AsmType.getObjectType(closureCtx.closureClassName),
+          s"captured_${capturedVar.index}",
+          asmType(capturedVar.tp)
+        )
+      case _ =>
+        if ref.frame == 0 then
+          if localVars.isParameter(ref.index) then
+            gen.loadArg(ref.index)
+          else
+            val slot = localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`))
+            if slot < 0 then
+              throw new RuntimeException(s"Invalid slot ${slot} for local variable index ${ref.index}")
+            gen.loadLocal(slot)
+        else
+          val slot = localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`))
+          if slot < 0 then
+            throw new RuntimeException(s"Invalid slot ${slot} for local variable index ${ref.index}")
+          gen.loadLocal(slot)
+          
+  def emitSetLocal(gen: GeneratorAdapter, set: SetLocal, className: String, localVars: LocalVarContext): Unit =
+    localVars match
+      case closureCtx: ClosureLocalVarContext if closureCtx.isCapturedVariable(set.index) =>
+        gen.loadThis()
+        emitExpressionWithContext(gen, set.value, className, localVars)
+        val valueType = asmType(set.`type`)
+        if valueType.getSize() == 2 then
+          gen.dup2X1()
+        else
+          gen.dupX1()
+        val capturedVar = closureCtx.capturedVars.find(_.index == set.index).get
+        gen.putField(
+          AsmType.getObjectType(closureCtx.closureClassName),
+          s"captured_${capturedVar.index}",
+          asmType(capturedVar.tp)
+        )
+      case _ =>
+        emitExpressionWithContext(gen, set.value, className, localVars)
+        gen.dup()
+        val slot = localVars.getOrAllocateSlot(set.index, asmType(set.`type`))
+        gen.storeLocal(slot)
+        
+  def emitNewClosure(gen: GeneratorAdapter, closure: NewClosure, className: String, localVars: LocalVarContext): Unit =
+    generateClosure(gen, closure, className, localVars)
+    
   private def generateClosure(gen: GeneratorAdapter, closure: NewClosure, currentClassName: String, localVars: LocalVarContext): Unit =
     closureCounter += 1
     val closureClassName = s"${currentClassName}$$Closure$closureCounter"

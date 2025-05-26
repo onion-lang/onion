@@ -155,6 +155,63 @@ public class JJOnionParser implements Parser {
   private void leaveSection() {
     leaveState();
   }
+
+  private AST.Expression parseInterpolatedString(Location loc, String str) {
+    // Remove quotes
+    str = str.substring(1, str.length() - 1);
+    
+    ArrayBuffer<String> parts = new ArrayBuffer<String>();
+    ArrayBuffer<AST.Expression> expressions = new ArrayBuffer<AST.Expression>();
+    
+    int start = 0;
+    int pos = 0;
+    
+    while (pos < str.length()) {
+      int interpStart = str.indexOf("#{", pos);
+      if (interpStart == -1) {
+        // No more interpolations
+        append(parts, unescape(str.substring(start)));
+        break;
+      }
+      
+      // Add the string part before interpolation
+      append(parts, unescape(str.substring(start, interpStart)));
+      
+      // Find the closing brace
+      int braceCount = 1;
+      int interpEnd = interpStart + 2;
+      while (interpEnd < str.length() && braceCount > 0) {
+        char c = str.charAt(interpEnd);
+        if (c == '{') braceCount++;
+        else if (c == '}') braceCount--;
+        interpEnd++;
+      }
+      
+      if (braceCount > 0) {
+        throw new RuntimeException("Unclosed interpolation in string at " + loc);
+      }
+      
+      // Parse the expression inside
+      String exprStr = str.substring(interpStart + 2, interpEnd - 1);
+      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(exprStr));
+      try {
+        AST.Expression expr = exprParser.term();
+        append(expressions, expr);
+      } catch (Exception e) {
+        throw new RuntimeException("Invalid expression in string interpolation: " + exprStr + " at " + loc, e);
+      }
+      
+      start = interpEnd;
+      pos = interpEnd;
+    }
+    
+    // If we ended with an expression, add an empty string part
+    if (parts.size() == expressions.size()) {
+      append(parts, "");
+    }
+    
+    return new AST.StringInterpolation(loc, toList(parts), toList(expressions));
+  }
 }
 PARSER_END(JJOnionParser)
 
@@ -1004,8 +1061,15 @@ AST.Expression boolean_literal() :{Token t;}{
 | t="false" {return new AST.BooleanLiteral(p(t), false);}
 }
 
-AST.StringLiteral string_literal() :{Token t;}{
-  t=<STRING> {return new AST.StringLiteral(p(t), unescape(chopEdge(t.image)));}
+AST.Expression string_literal() :{Token t; AST.Expression e;}{
+  t=<STRING> {
+    String str = t.image;
+    if (str.contains("#{")) {
+      return parseInterpolatedString(p(t), str);
+    } else {
+      return new AST.StringLiteral(p(t), unescape(chopEdge(str)));
+    }
+  }
 }
 
 AST.CharacterLiteral char_literal() :{Token t;}{

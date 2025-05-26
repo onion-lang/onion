@@ -1154,6 +1154,64 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
       case node@AST.StringLiteral(loc, value) =>
         Some(new StringValue(loc, value, load("java.lang.String")))
+      case node@AST.StringInterpolation(loc, parts, expressions) =>
+        // Type check all interpolated expressions
+        val typedExprs = expressions.map(e => typed(e, context).getOrElse(null))
+        if (typedExprs.contains(null)) return None
+        
+        // Build string concatenation using StringBuilder
+        val stringType = load("java.lang.String")
+        val sbType = load("java.lang.StringBuilder")
+        
+        // Find StringBuilder no-arg constructor
+        val constructors = sbType.findConstructor(Array[Term]())
+        if (constructors.isEmpty) {
+          report(SemanticError.CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type]())
+          return None
+        }
+        val noArgConstructor = constructors(0)
+        
+        // Create StringBuilder
+        val sb = new NewObject(noArgConstructor, Array[Term]())
+        var result: Term = sb
+        
+        // Append parts and expressions
+        for (i <- parts.indices) {
+          if (parts(i).nonEmpty) {
+            val part = new StringValue(loc, parts(i), stringType)
+            val appendMethods = sbType.findMethod("append", Array(part))
+            if (appendMethods.nonEmpty) {
+              result = new Call(result, appendMethods(0), Array(part))
+            }
+          }
+          
+          if (i < typedExprs.length) {
+            val expr = typedExprs(i)
+            // Try to find append method for the expression's type
+            val appendMethods = sbType.findMethod("append", Array(expr))
+            if (appendMethods.nonEmpty) {
+              result = new Call(result, appendMethods(0), Array(expr))
+            } else {
+              // If no direct match, convert to string first
+              val toStringMethods = expr.`type`.asInstanceOf[ObjectType].findMethod("toString", Array[Term]())
+              if (toStringMethods.nonEmpty) {
+                val stringExpr = new Call(expr, toStringMethods(0), Array[Term]())
+                val appendStringMethods = sbType.findMethod("append", Array(stringExpr))
+                if (appendStringMethods.nonEmpty) {
+                  result = new Call(result, appendStringMethods(0), Array(stringExpr))
+                }
+              }
+            }
+          }
+        }
+        
+        // Call toString()
+        val toStringMethods = sbType.findMethod("toString", Array[Term]())
+        if (toStringMethods.isEmpty) {
+          report(SemanticError.METHOD_NOT_FOUND, node, sbType, "toString", Array[Type]())
+          return None
+        }
+        Some(new Call(result, toStringMethods(0), Array[Term]()))
       case node@AST.SuperMethodCall(loc, _, _) =>
         val parameters = typedTerms(node.args.toArray, context)
         if (parameters == null) return None

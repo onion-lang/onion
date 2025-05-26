@@ -1,6 +1,7 @@
 build/
 .bsp/
 build.lib/
+.scala-build/
 
 project/boot
 project/metals.sbt

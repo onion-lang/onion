@@ -122,6 +122,7 @@ object AST {
   case class StaticMemberSelection(location: Location, typeRef: TypeNode, name: String) extends Expression
   case class StaticMethodCall(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) extends Expression
   case class StringLiteral(location: Location, value: String) extends Expression
+  case class StringInterpolation(location: Location, parts: List[String], expressions: List[Expression]) extends Expression
   case class Subtraction(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-")
   case class SubtractionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-=")
   case class SuperMethodCall(location: Location, name: String, args: List[Expression]) extends Expression

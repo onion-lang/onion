@@ -10,7 +10,8 @@
       "Bash(mv:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(timeout 30 sbt 'testOnly *CountersSpec')"
+      "Bash(timeout 30 sbt 'testOnly *CountersSpec')",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

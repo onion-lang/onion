@@ -10,6 +10,9 @@ package onion.tools
 import java.io.UnsupportedEncodingException
 import java.lang.System.err
 import onion.compiler._
+import onion.compiler.CompilationOutcome
+import onion.compiler.CompilationOutcome.{Failure, Success}
+import onion.compiler.CompilationReporter
 import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
@@ -42,7 +45,6 @@ object ScriptRunner {
   private final val MAX_ERROR: String = "-maxErrorReport"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
-  private final val DEFAULT_OUTPUT: String = "."
   private final val DEFAULT_MAX_ERROR: Int = 10
 }
 
@@ -51,7 +53,7 @@ class ScriptRunner {
   private[this] val parser = new CommandLineParser(conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(MAX_ERROR, true))
 
   def run(commandLine: Array[String]): Int = {
-    if (commandLine.length == 0) {
+    if (commandLine.isEmpty) {
       printUsage()
       return -1
     }
@@ -60,25 +62,24 @@ class ScriptRunner {
         printFailure(failure)
         return -1
       case success@ParseSuccess(_, _) =>
-        val config = createConfig(success)
-        if (config.isEmpty) return -1
+        val params = success.arguments
+        if (params.isEmpty) {
+          printUsage()
+          return -1
+        }
         createConfig(success) match {
-          case None => return -1
-          case Some (config) =>
-            val params = success.arguments
-            if(params.length == 0) {
-              printUsage()
-              return -1
-            }
-            val scriptParams: Array[String] = new Array[String](params.length - 1)
-            val classes = compile(config, Array(params(0)))
-            if(classes == null) return -1
-            for(i <- 1 until params.length) {
-              scriptParams(i - 1) = params(i)
-            }
-            new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptParams) match {
-              case Shell.Success(_) => 0
-              case Shell.Failure(code) => code
+          case None => -1
+          case Some(config) =>
+            val scriptArgs = params.drop(1).toArray
+            compile(config, Array(params.head)) match {
+              case Success(classes) =>
+                new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptArgs) match {
+                  case Shell.Success(_) => 0
+                  case Shell.Failure(code) => code
+                }
+              case Failure(errors) =>
+                CompilationReporter.printErrors(errors)
+                -1
             }
         }
     }
@@ -108,7 +109,7 @@ class ScriptRunner {
     ) yield (new CompilerConfig(classpath.toIndexedSeq, "", encoding, ".", maxErrorReport))
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): Seq[CompiledClass] = {
+  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationOutcome = {
     new OnionCompiler(config).compile(fileNames)
   }
 

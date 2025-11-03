@@ -12,9 +12,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.UnsupportedEncodingException
-import onion.compiler.CompiledClass
-import onion.compiler.OnionCompiler
-import onion.compiler.CompilerConfig
+import onion.compiler.{CompiledClass, CompilerConfig, OnionCompiler}
+import onion.compiler.CompilationOutcome
+import onion.compiler.CompilationOutcome.{Failure, Success}
+import onion.compiler.CompilationReporter
 import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
@@ -66,20 +67,22 @@ class CompilerFrontend {
     result match {
       case None => -1
       case Some(success) =>
-        val config: Option[CompilerConfig] = createConfig(success)
         val params: Array[String] = success.arguments.toArray
         if (params.length == 0) {
           printUsage()
           return -1
         }
-        config match {
+        createConfig(success) match {
           case None => -1
           case Some(config) =>
-            val classes = compile(config, params)
-            (for (cs <- classes) yield {
-              val succeed = generateFiles(cs)
-              if (succeed) 0 else -1
-            }).getOrElse(-1)
+            compile(config, params) match {
+              case Success(classes) =>
+                val generated = generateFiles(classes)
+                if (generated) 0 else -1
+              case Failure(errors) =>
+                CompilationReporter.printErrors(errors)
+                -1
+            }
         }
     }
   }
@@ -159,8 +162,8 @@ class CompilerFrontend {
     }
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): Option[Seq[CompiledClass]] = {
-    Option(new OnionCompiler(config).compile(fileNames))
+  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationOutcome = {
+    new OnionCompiler(config).compile(fileNames)
   }
 
   private def checkClasspath(classpath: Option[String]): Array[String] = {

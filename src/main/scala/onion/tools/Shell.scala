@@ -13,29 +13,39 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.net.MalformedURLException
 import onion.compiler._
+import onion.compiler.CompilationOutcome
+import onion.compiler.CompilationOutcome.{Failure, Success}
+import onion.compiler.CompilationReporter
 import onion.compiler.exceptions.ScriptException
 
 class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
   private val config = new CompilerConfig(classpath, null, "Shift_JIS", "", 10)
   def run(script: String, fileName: String, args: Array[String]): Shell.Result = {
     val compiler: OnionCompiler = new OnionCompiler(config)
-    Thread.currentThread.setContextClassLoader(classLoader)
-    val classes: Seq[CompiledClass] = compiler.compile(Seq(new StreamInputSource(new StringReader(script), fileName)))
-    run(classes, args)
+    val outcome: CompilationOutcome = withContextClassLoader(classLoader) {
+      compiler.compile(Seq(new StreamInputSource(new StringReader(script), fileName)))
+    }
+    outcome match {
+      case Success(classes) => run(classes, args)
+      case Failure(errors) =>
+        CompilationReporter.printErrors(errors)
+        Shell.Failure(-1)
+    }
   }
 
   def run(classes: Seq[CompiledClass], args: Array[String]): Shell.Result = {
-    try {
-      val loader = new OnionClassLoader(classLoader, classpath, classes)
-      Thread.currentThread.setContextClassLoader(loader)
-      val main = findFirstMainMethod(loader, classes)
-      main match {
-        case Some(method) => Shell.Success(method.invoke(null, args))
-        case None => Shell.Failure(-1)
+    val loader = new OnionClassLoader(classLoader, classpath, classes)
+    withContextClassLoader(loader) {
+      try {
+        val main = findFirstMainMethod(loader, classes)
+        main match {
+          case Some(method) => Shell.Success(method.invoke(null, args))
+          case None => Shell.Failure(-1)
+        }
+      } catch {
+        case _: ClassNotFoundException | _: IllegalAccessException | _: MalformedURLException => Shell.Failure(-1)
+        case e: InvocationTargetException => throw new ScriptException(e.getCause)
       }
-    } catch {
-      case _: ClassNotFoundException | _: IllegalAccessException | _: MalformedURLException => Shell.Failure(-1)
-      case e: InvocationTargetException => throw new ScriptException(e.getCause)
     }
   }
 
@@ -56,6 +66,14 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
     None
   }
 
+  private def withContextClassLoader[T](loader: ClassLoader)(body: => T): T = {
+    val thread = Thread.currentThread
+    val previous = thread.getContextClassLoader
+    thread.setContextClassLoader(loader)
+    try body
+    finally thread.setContextClassLoader(previous)
+  }
+
 }
 
 object Shell {
@@ -66,4 +84,3 @@ object Shell {
   case class Success(value: Any) extends Result
   case class Failure(code: Int) extends Result
 }
-

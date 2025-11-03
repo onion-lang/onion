@@ -17,6 +17,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val indexMap = mutable.Map[Int, Int]()
     val parameterCount = mutable.Map[Int, Int]() // Track which indices are parameters
     
+    def slotOf(typedIndex: Int): Option[Int] =
+      indexMap.get(typedIndex)
+    
     def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
       indexMap.getOrElse(typedIndex, {
         val slot = gen.newLocal(tp)
@@ -49,21 +52,26 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val closureClassName: String,
     val capturedVars: Seq[LocalBinding]
   ) extends LocalVarContext(gen):
-    
+
+    private val capturedByIndex: Map[Int, LocalBinding] =
+      capturedVars.map(binding => binding.index -> binding).toMap
+
+    def capturedFieldName(typedIndex: Int): String =
+      s"captured_$typedIndex"
+
+    def capturedBinding(typedIndex: Int): Option[LocalBinding] =
+      capturedByIndex.get(typedIndex)
+
     override def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
-      // First check if this is a captured variable
-      capturedVars.find(_.index == typedIndex) match
-        case Some(_) =>
-          // Return a special marker for captured variables
-          // We'll handle loading them differently in emitExpression
-          -typedIndex - 1000 // Use negative indices as markers
+      capturedBinding(typedIndex) match
+        case Some(binding) =>
+          throw new IllegalStateException(s"Attempted to allocate slot for captured variable ${binding.index}")
         case None =>
-          // Regular local variable or parameter
           super.getOrAllocateSlot(typedIndex, tp)
           
     // Override to check for captured variables regardless of how they're accessed
     def isCapturedVariable(typedIndex: Int): Boolean =
-      capturedVars.exists(_.index == typedIndex)
+      capturedByIndex.contains(typedIndex)
   
   private def toAsmModifier(mod: Int): Int =
     var access = 0
@@ -304,115 +312,6 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
     visitor.visitStatement(stmt)
     
-  // Legacy implementation - to be removed after full migration  
-  private def emitStatementWithContextLegacy(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit = stmt match
-    case expr: ExpressionActionStatement =>
-      emitExpressionWithContext(gen, expr.term, className, localVars)
-      // Pop the result if it's not void
-      expr.term.`type` match
-        case BasicType.VOID => // Nothing to pop
-        case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
-        case _ => gen.pop()
-    
-    case ret: Return =>
-      if ret.term != null then
-        emitExpressionWithContext(gen, ret.term, className, localVars)
-      gen.returnValue()
-    
-    case ifStmt: IfStatement =>
-      val elseLabel = gen.newLabel()
-      val endLabel = gen.newLabel()
-      
-      emitExpressionWithContext(gen, ifStmt.condition, className, localVars)
-      gen.visitJumpInsn(Opcodes.IFEQ, elseLabel)
-      
-      emitStatementWithContext(gen, ifStmt.thenStatement, className, localVars)
-      gen.visitJumpInsn(Opcodes.GOTO, endLabel)
-      
-      gen.visitLabel(elseLabel)
-      if ifStmt.elseStatement != null then
-        emitStatementWithContext(gen, ifStmt.elseStatement, className, localVars)
-      
-      gen.visitLabel(endLabel)
-    
-    case whileStmt: ConditionalLoop =>
-      val startLabel = gen.newLabel()
-      val endLabel = gen.newLabel()
-      
-      gen.visitLabel(startLabel)
-      emitExpressionWithContext(gen, whileStmt.condition, className, localVars)
-      gen.visitJumpInsn(Opcodes.IFEQ, endLabel)
-      
-      emitStatementWithContext(gen, whileStmt.stmt, className, localVars)
-      gen.visitJumpInsn(Opcodes.GOTO, startLabel)
-      
-      gen.visitLabel(endLabel)
-    
-    case tryStmt: Try =>
-      val tryStart = gen.mark()
-      emitStatementWithContext(gen, tryStmt.tryStatement, className, localVars)
-      val tryEnd = gen.mark()
-      
-      // Jump to end if no exception
-      val endLabel = gen.newLabel()
-      gen.goTo(endLabel)
-      
-      // Exception handlers
-      for i <- tryStmt.catchTypes.indices do
-        val catchType = tryStmt.catchTypes(i)
-        val catchStmt = tryStmt.catchStatements(i)
-        val handlerStart = gen.mark()
-        val slot = localVars.getOrAllocateSlot(catchType.index, asmType(catchType.tp))
-        gen.storeLocal(slot)
-        emitStatementWithContext(gen, catchStmt, className, localVars)
-        gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
-      
-      gen.visitLabel(endLabel)
-    
-    case sync: Synchronized =>
-      emitExpressionWithContext(gen, sync.term, className, localVars)
-      gen.monitorEnter()
-      
-      val tryStart = gen.mark()
-      emitStatementWithContext(gen, sync.statement, className, localVars)
-      val tryEnd = gen.mark()
-      
-      emitExpressionWithContext(gen, sync.term, className, localVars)
-      gen.monitorExit()
-      val endLabel = gen.newLabel()
-      gen.goTo(endLabel)
-      
-      // Exception handler to ensure monitor exit
-      val handlerStart = gen.mark()
-      emitExpressionWithContext(gen, sync.term, className, localVars)
-      gen.monitorExit()
-      gen.throwException()
-      
-      gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
-      gen.visitLabel(endLabel)
-    
-    case throwStmt: Throw =>
-      emitExpressionWithContext(gen, throwStmt.term, className, localVars)
-      gen.throwException()
-      
-    case block: StatementBlock =>
-      emitStatementsWithContext(gen, block.statements, className, localVars)
-    
-    case _: Break =>
-      // Break statements are now handled by the visitor pattern
-      throw new UnsupportedOperationException("Break statements should be handled by AsmCodeGenerationVisitor")
-      
-    case _: Continue =>
-      // Continue statements are now handled by the visitor pattern
-      throw new UnsupportedOperationException("Continue statements should be handled by AsmCodeGenerationVisitor")
-    
-    case _: NOP =>
-      // No operation
-      ()
-    
-    case _ =>
-      throw new UnsupportedOperationException(s"Statement type not yet implemented: ${stmt.getClass.getName}")
-
   private def emitExpression(gen: GeneratorAdapter, expr: Term, className: String): Unit =
     emitExpressionWithContext(gen, expr, className, new LocalVarContext(gen))
     
@@ -458,75 +357,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     // Local variables
     case ref: RefLocal =>
-      // Check if we're in a closure context and this might be a captured variable
-      localVars match
-        case closureCtx: ClosureLocalVarContext if closureCtx.isCapturedVariable(ref.index) =>
-          // Load captured variable from field
-          gen.loadThis()
-          val capturedVar = closureCtx.capturedVars.find(_.index == ref.index).get
-          gen.getField(
-            AsmType.getObjectType(closureCtx.closureClassName),
-            s"captured_${capturedVar.index}",
-            asmType(capturedVar.tp)
-          )
-        case _ =>
-          // Regular local variable
-          if ref.frame == 0 then
-            // Check if this is a parameter
-            if localVars.isParameter(ref.index) then
-              // For parameters, use loadArg which handles the internal tracking properly
-              gen.loadArg(ref.index)
-            else
-              // For regular locals, use loadLocal
-              val slot = localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`))
-              if slot < 0 then
-                throw new RuntimeException(s"Invalid slot ${slot} for local variable index ${ref.index}")
-              gen.loadLocal(slot)
-          else
-            // Frame != 0 means this variable will be captured by a closure
-            // But in the outer method, we still treat it as a regular local
-            val slot = localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`))
-            if slot < 0 then
-              throw new RuntimeException(s"Invalid slot ${slot} for local variable index ${ref.index}")
-            gen.loadLocal(slot)
+      emitRefLocal(gen, ref, localVars)
 
     case set: SetLocal =>
-      // Check if we're in a closure context and this might be a captured variable
-      localVars match
-        case closureCtx: ClosureLocalVarContext if closureCtx.isCapturedVariable(set.index) =>
-          // Set captured variable field
-          gen.loadThis()
-          emitExpressionWithContext(gen, set.value, className, localVars)
-          // Stack: [this, value]
-          // We want: [value] after putfield, so duplicate value under this
-          val valueType = asmType(set.`type`)
-          if valueType.getSize() == 2 then
-            // Long or double
-            gen.dup2X1() // [value, this, value]
-          else
-            // Single slot value
-            gen.dupX1()  // [value, this, value]
-          val capturedVar = closureCtx.capturedVars.find(_.index == set.index).get
-          gen.putField(
-            AsmType.getObjectType(closureCtx.closureClassName),
-            s"captured_${capturedVar.index}",
-            asmType(capturedVar.tp)
-          )
-          // Stack: [value]
-        case _ =>
-          // Regular local variable
-          if set.frame == 0 then
-            emitExpressionWithContext(gen, set.value, className, localVars)
-            gen.dup() // Duplicate for assignment result
-            val slot = localVars.getOrAllocateSlot(set.index, asmType(set.`type`))
-            gen.storeLocal(slot)
-          else
-            // Frame != 0 means this variable will be captured by a closure
-            // But in the outer method, we still treat it as a regular local
-            emitExpressionWithContext(gen, set.value, className, localVars)
-            gen.dup() // Duplicate for assignment result
-            val slot = localVars.getOrAllocateSlot(set.index, asmType(set.`type`))
-            gen.storeLocal(slot)
+      emitSetLocal(gen, set, className, localVars)
 
     // Field access
     case ref: RefField =>
@@ -1060,49 +894,54 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   // Helper methods for visitor pattern
   def emitRefLocal(gen: GeneratorAdapter, ref: RefLocal, localVars: LocalVarContext): Unit =
     localVars match
-      case closureCtx: ClosureLocalVarContext if closureCtx.isCapturedVariable(ref.index) =>
-        gen.loadThis()
-        val capturedVar = closureCtx.capturedVars.find(_.index == ref.index).get
-        gen.getField(
-          AsmType.getObjectType(closureCtx.closureClassName),
-          s"captured_${capturedVar.index}",
-          asmType(capturedVar.tp)
-        )
+      case closureCtx: ClosureLocalVarContext =>
+        closureCtx.capturedBinding(ref.index) match
+          case Some(binding) =>
+            gen.loadThis()
+            gen.getField(
+              AsmType.getObjectType(closureCtx.closureClassName),
+              closureCtx.capturedFieldName(binding.index),
+              asmType(binding.tp)
+            )
+          case None =>
+            if closureCtx.isParameter(ref.index) then
+              gen.loadArg(ref.index)
+            else
+              val slot = closureCtx.slotOf(ref.index).getOrElse(closureCtx.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
+              gen.loadLocal(slot)
       case _ =>
-        if ref.frame == 0 then
-          if localVars.isParameter(ref.index) then
-            gen.loadArg(ref.index)
-          else
-            val slot = localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`))
-            if slot < 0 then
-              throw new RuntimeException(s"Invalid slot ${slot} for local variable index ${ref.index}")
-            gen.loadLocal(slot)
+        if localVars.isParameter(ref.index) then
+          gen.loadArg(ref.index)
         else
-          val slot = localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`))
-          if slot < 0 then
-            throw new RuntimeException(s"Invalid slot ${slot} for local variable index ${ref.index}")
+          val slot = localVars.slotOf(ref.index).getOrElse(localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
           gen.loadLocal(slot)
           
   def emitSetLocal(gen: GeneratorAdapter, set: SetLocal, className: String, localVars: LocalVarContext): Unit =
     localVars match
-      case closureCtx: ClosureLocalVarContext if closureCtx.isCapturedVariable(set.index) =>
-        gen.loadThis()
-        emitExpressionWithContext(gen, set.value, className, localVars)
-        val valueType = asmType(set.`type`)
-        if valueType.getSize() == 2 then
-          gen.dup2X1()
-        else
-          gen.dupX1()
-        val capturedVar = closureCtx.capturedVars.find(_.index == set.index).get
-        gen.putField(
-          AsmType.getObjectType(closureCtx.closureClassName),
-          s"captured_${capturedVar.index}",
-          asmType(capturedVar.tp)
-        )
+      case closureCtx: ClosureLocalVarContext =>
+        closureCtx.capturedBinding(set.index) match
+          case Some(binding) =>
+            gen.loadThis()
+            emitExpressionWithContext(gen, set.value, className, localVars)
+            val valueType = asmType(set.`type`)
+            if valueType.getSize() == 2 then
+              gen.dup2X1()
+            else
+              gen.dupX1()
+            gen.putField(
+              AsmType.getObjectType(closureCtx.closureClassName),
+              closureCtx.capturedFieldName(binding.index),
+              asmType(binding.tp)
+            )
+          case None =>
+            emitExpressionWithContext(gen, set.value, className, localVars)
+            gen.dup()
+            val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, asmType(set.`type`)))
+            gen.storeLocal(slot)
       case _ =>
         emitExpressionWithContext(gen, set.value, className, localVars)
         gen.dup()
-        val slot = localVars.getOrAllocateSlot(set.index, asmType(set.`type`))
+        val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, asmType(set.`type`)))
         gen.storeLocal(slot)
         
   def emitNewClosure(gen: GeneratorAdapter, closure: NewClosure, className: String, localVars: LocalVarContext): Unit =
@@ -1133,14 +972,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     // Pass captured variables to constructor
     for capturedVar <- capturedVars do
-      // In the outer method, these are regular locals
-      // We need to load them to pass to the closure constructor
-      // Check if it's a parameter first
-      if localVars.isParameter(capturedVar.index) then
-        gen.loadArg(capturedVar.index)
-      else
-        val slot = localVars.getOrAllocateSlot(capturedVar.index, asmType(capturedVar.tp))
-        gen.loadLocal(slot)
+      val ref = new RefLocal(0, capturedVar.index, capturedVar.tp)
+      emitRefLocal(gen, ref, localVars)
     
     // Constructor descriptor
     val ctorDesc = AsmType.getMethodDescriptor(

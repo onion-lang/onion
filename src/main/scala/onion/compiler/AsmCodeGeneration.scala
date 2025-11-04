@@ -2,6 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{ClassWriter, Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
+import onion.compiler.bytecode.AsmUtil
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
@@ -94,7 +95,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case BasicType.LONG    => AsmType.LONG_TYPE
     case BasicType.FLOAT   => AsmType.FLOAT_TYPE
     case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
-    case ct: ClassType     => AsmType.getObjectType(ct.name.replace('.', '/'))
+    case ct: ClassType     => AsmUtil.objectType(ct.name)
     case at: ArrayType     => AsmType.getType("[" + asmType(at.component).getDescriptor)
     case _: NullType       => AsmType.getObjectType("java/lang/Object")
     case _                 => throw new RuntimeException(s"Unsupported type: $tp")
@@ -124,14 +125,14 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     else
       toAsmModifier(classModifier) | Opcodes.ACC_SUPER
       
-    val name = classDef.name.replace('.', '/')
+    val name = AsmUtil.internalName(classDef.name)
     val superName = if classDef.isInterface then
       "java/lang/Object"
     else if classDef.superClass != null then 
-      classDef.superClass.name.replace('.', '/') 
+      AsmUtil.internalName(classDef.superClass.name) 
     else 
       "java/lang/Object"
-    val interfaces = classDef.interfaces.map(_.name.replace('.', '/')).toArray
+    val interfaces: Array[String] = classDef.interfaces.map(i => AsmUtil.internalName(i.name)).toArray
     
     cw.visit(Opcodes.V17, access, name, null, superName, interfaces)
     
@@ -180,11 +181,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       for arg <- ctor.superInitializer.terms do
         emitExpressionWithContext(gen, arg, className, localVars)
       val superClass = if ctor.classType.superClass != null then 
-        ctor.classType.superClass.name.replace('.', '/') 
+        AsmUtil.internalName(ctor.classType.superClass.name) 
       else "java/lang/Object"
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)
       gen.invokeConstructor(
-        AsmType.getObjectType(superClass),
+        AsmUtil.objectType(superClass),
         AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, superArgTypes*))
       )
     else
@@ -230,26 +231,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     // Add default return if needed
     if node.block == null || !hasReturn(node.block.statements) then
-      node.returnType match
-        case BasicType.VOID => gen.returnValue()
-        case BasicType.BOOLEAN => 
-          gen.push(false)
-          gen.returnValue()
-        case BasicType.INT | BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
-          gen.push(0)
-          gen.returnValue()
-        case BasicType.LONG =>
-          gen.push(0L)
-          gen.returnValue()
-        case BasicType.FLOAT =>
-          gen.push(0.0f)
-          gen.returnValue()
-        case BasicType.DOUBLE =>
-          gen.push(0.0d)
-          gen.returnValue()
-        case _ =>
-          gen.visitInsn(Opcodes.ACONST_NULL)
-          gen.returnValue()
+      onion.compiler.bytecode.AsmUtil.emitDefaultReturn(gen, returnType)
     
     gen.endMethod()
     
@@ -391,14 +373,14 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       // Stack: value (the result of the assignment)
 
     case ref: RefStaticField =>
-      val ownerType = AsmType.getObjectType(ref.field.affiliation.name.replace('.', '/'))
+      val ownerType = AsmUtil.objectType(ref.field.affiliation.name)
       val fieldType = asmType(ref.field.`type`)
       gen.getStatic(ownerType, ref.field.name, fieldType)
 
     case set: SetStaticField =>
       emitExpressionWithContext(gen, set.value, className, localVars)
       gen.dup() // Duplicate value for assignment result
-      val ownerType = AsmType.getObjectType(set.field.affiliation.name.replace('.', '/'))
+      val ownerType = AsmUtil.objectType(set.field.affiliation.name)
       val fieldType = asmType(set.field.`type`)
       gen.putStatic(ownerType, set.field.name, fieldType)
 
@@ -416,7 +398,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           case BasicType.LONG => gen.newArray(AsmType.LONG_TYPE)
           case BasicType.FLOAT => gen.newArray(AsmType.FLOAT_TYPE)
           case BasicType.DOUBLE => gen.newArray(AsmType.DOUBLE_TYPE)
-          case ct: ClassType => gen.newArray(AsmType.getObjectType(ct.name.replace('.', '/')))
+          case ct: ClassType => gen.newArray(AsmUtil.objectType(ct.name))
           case at: ArrayType => gen.newArray(asmType(at.component))
           case _ => throw new RuntimeException(s"Cannot create array of type: ${newArr.arrayType.component}")
       else
@@ -458,7 +440,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       
       // Get method info
       val ownerType = call.target.`type` match
-        case ct: ClassType => AsmType.getObjectType(ct.name.replace('.', '/'))
+        case ct: ClassType => AsmUtil.objectType(ct.name)
         case _ => throw new RuntimeException(s"Invalid method owner type: ${call.target.`type`}")
       
       val methodDesc = AsmType.getMethodDescriptor(
@@ -482,7 +464,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       for arg <- callStatic.parameters do
         emitExpressionWithContext(gen, arg, className, localVars)
       
-      val ownerType = AsmType.getObjectType(callStatic.method.affiliation.name.replace('.', '/'))
+      val ownerType = AsmUtil.objectType(callStatic.method.affiliation.name)
       val methodDesc = AsmType.getMethodDescriptor(
         asmType(callStatic.method.returnType),
         callStatic.method.arguments.map(asmType)*
@@ -501,7 +483,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       // Get super class type
       val currentClass = callSuper.target.`type`.asInstanceOf[ClassType]
       val superType = if currentClass.superClass != null then
-        AsmType.getObjectType(currentClass.superClass.name.replace('.', '/'))
+        AsmUtil.objectType(currentClass.superClass.name)
       else
         AsmType.getObjectType("java/lang/Object")
       
@@ -520,7 +502,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     // Object creation
     case newObj: NewObject =>
-      val classType = AsmType.getObjectType(newObj.`type`.name.replace('.', '/'))
+      val classType = AsmUtil.objectType(newObj.`type`.name)
       gen.newInstance(classType)
       gen.dup()
       
@@ -538,14 +520,14 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // Type operations
     case instOf: InstanceOf =>
       emitExpressionWithContext(gen, instOf.target, className, localVars)
-      val checkType = AsmType.getObjectType(instOf.checked.name.replace('.', '/'))
+      val checkType = AsmUtil.objectType(instOf.checked.name)
       gen.instanceOf(checkType)
 
     case cast: AsInstanceOf =>
       emitExpressionWithContext(gen, cast.target, className, localVars)
       cast.destination match
         case ct: ClassType =>
-          gen.checkCast(AsmType.getObjectType(ct.name.replace('.', '/')))
+          gen.checkCast(AsmUtil.objectType(ct.name))
         case at: ArrayType =>
           gen.checkCast(asmType(at))
         case bt: BasicType =>
@@ -1082,29 +1064,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     emitStatementWithContext(gen, block, className, closureLocalVars)
     
     // Add default return if needed
-    method.returnType match
-      case BasicType.VOID => gen.returnValue()
-      case _ => 
-        if !hasReturn(Array(block)) then
-          // Method should return a value but doesn't
-          method.returnType match
-            case BasicType.BOOLEAN => 
-              gen.push(false)
-              gen.returnValue()
-            case BasicType.INT | BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
-              gen.push(0)
-              gen.returnValue()
-            case BasicType.LONG =>
-              gen.push(0L)
-              gen.returnValue()
-            case BasicType.FLOAT =>
-              gen.push(0.0f)
-              gen.returnValue()
-            case BasicType.DOUBLE =>
-              gen.push(0.0d)
-              gen.returnValue()
-            case _ =>
-              gen.visitInsn(Opcodes.ACONST_NULL)
-              gen.returnValue()
+    if method.returnType == BasicType.VOID then
+      gen.returnValue()
+    else if !hasReturn(Array(block)) then
+      AsmUtil.emitDefaultReturn(gen, asmType(method.returnType))
     
     gen.endMethod()

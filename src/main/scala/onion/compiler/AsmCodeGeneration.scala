@@ -2,7 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{ClassWriter, Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.{AsmUtil, LocalVarContext, ClosureLocalVarContext}
+import onion.compiler.bytecode.{AsmUtil, LocalVarContext, ClosureLocalVarContext, MethodEmitter}
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
@@ -153,26 +153,16 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val access = toAsmModifier(node.modifier)
     val argTypes = node.arguments.map(asmType)
     val returnType = asmType(node.returnType)
-    val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
-    val mv = cw.visitMethod(access, node.name, desc, null, null)
-    // Use ASM's Method object to properly initialize GeneratorAdapter
-    val asmMethod = AsmMethod(node.name, desc)
-    val gen = new GeneratorAdapter(access, asmMethod, mv)
-    
-    gen.visitCode()
-    
-    // Set up local variable context
+    val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes)
+
     val isStatic = (node.modifier & Modifier.STATIC) != 0
     val localVars = new LocalVarContext(gen).withParameters(isStatic, argTypes)
-    
-    // Generate method body if present
+
     if node.block != null then
       emitStatementsWithContext(gen, node.block.statements, className, localVars)
-    
-    // Add default return if needed
-    if node.block == null || !hasReturn(node.block.statements) then
-      onion.compiler.bytecode.AsmUtil.emitDefaultReturn(gen, returnType)
-    
+
+    val needsDefault = node.block == null || !hasReturn(node.block.statements)
+    MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     gen.endMethod()
     
   private def collectCapturedVariables(stmt: ActionStatement): Seq[LocalBinding] =

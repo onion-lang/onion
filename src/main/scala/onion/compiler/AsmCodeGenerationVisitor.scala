@@ -3,6 +3,7 @@ package onion.compiler
 import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
 import TypedAST._
+import onion.compiler.bytecode.LocalVarContext
 import scala.collection.mutable
 
 /**
@@ -13,7 +14,7 @@ import scala.collection.mutable
 class AsmCodeGenerationVisitor(
   gen: GeneratorAdapter,
   className: String,
-  localVars: Any, // Using Any to avoid path-dependent type issues
+  localVars: LocalVarContext,
   asmCodeGen: AsmCodeGeneration
 ) extends TypedASTVisitor[Unit]:
   
@@ -315,16 +316,13 @@ class AsmCodeGenerationVisitor(
       gen.pop() // Pop boolean result
   
   override def visitRefLocal(node: RefLocal): Unit =
-    // Delegate to the original implementation in AsmCodeGeneration
-    asmCodeGen.emitRefLocal(gen, node, localVars.asInstanceOf[asmCodeGen.LocalVarContext])
+    asmCodeGen.emitRefLocal(gen, node, localVars)
   
   override def visitSetLocal(node: SetLocal): Unit =
-    // Delegate to the original implementation in AsmCodeGeneration
-    asmCodeGen.emitSetLocal(gen, node, className, localVars.asInstanceOf[asmCodeGen.LocalVarContext])
+    asmCodeGen.emitSetLocal(gen, node, className, localVars)
   
   override def visitNewClosure(node: NewClosure): Unit =
-    // Delegate to the original implementation in AsmCodeGeneration
-    asmCodeGen.emitNewClosure(gen, node, className, localVars.asInstanceOf[asmCodeGen.LocalVarContext])
+    asmCodeGen.emitNewClosure(gen, node, className, localVars)
   
   override def visitRefField(node: RefField): Unit =
     visitTerm(node.target)

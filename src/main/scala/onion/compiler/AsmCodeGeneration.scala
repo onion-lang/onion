@@ -2,7 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{ClassWriter, Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.AsmUtil
+import onion.compiler.bytecode.{AsmUtil, LocalVarContext, ClosureLocalVarContext}
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
@@ -13,66 +13,6 @@ import scala.collection.mutable
 class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   import TypedAST._
   
-  // Track local variable mappings from TypedAST indices to GeneratorAdapter's local indices
-  class LocalVarContext(gen: GeneratorAdapter):
-    val indexMap = mutable.Map[Int, Int]()
-    val parameterCount = mutable.Map[Int, Int]() // Track which indices are parameters
-    
-    def slotOf(typedIndex: Int): Option[Int] =
-      indexMap.get(typedIndex)
-    
-    def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
-      indexMap.getOrElse(typedIndex, {
-        val slot = gen.newLocal(tp)
-        indexMap(typedIndex) = slot
-        slot
-      })
-      
-    def allocateSlot(typedIndex: Int, tp: AsmType): Int =
-      val slot = gen.newLocal(tp)
-      indexMap(typedIndex) = slot
-      slot
-      
-    def isParameter(typedIndex: Int): Boolean =
-      parameterCount.contains(typedIndex)
-      
-    def withParameters(isStatic: Boolean, argTypes: Array[TypedAST.Type]): LocalVarContext =
-      // Parameters are already allocated by GeneratorAdapter
-      // Slot 0 is 'this' for instance methods, first param for static
-      var slot = if isStatic then 0 else 1
-      for i <- argTypes.indices do
-        val tp = asmType(argTypes(i))
-        indexMap(i) = slot
-        parameterCount(i) = i // Mark as parameter
-        slot += tp.getSize()
-      this
-  
-  // Special context for handling closures with captured variables
-  class ClosureLocalVarContext(
-    gen: GeneratorAdapter,
-    val closureClassName: String,
-    val capturedVars: Seq[LocalBinding]
-  ) extends LocalVarContext(gen):
-
-    private val capturedByIndex: Map[Int, LocalBinding] =
-      capturedVars.map(binding => binding.index -> binding).toMap
-
-    def capturedFieldName(typedIndex: Int): String =
-      s"captured_$typedIndex"
-
-    def capturedBinding(typedIndex: Int): Option[LocalBinding] =
-      capturedByIndex.get(typedIndex)
-
-    override def getOrAllocateSlot(typedIndex: Int, tp: AsmType): Int =
-      capturedBinding(typedIndex) match
-        case Some(binding) =>
-          throw new IllegalStateException(s"Attempted to allocate slot for captured variable ${binding.index}")
-        case None =>
-          super.getOrAllocateSlot(typedIndex, tp)
-          
-    // Override to check for captured variables regardless of how they're accessed
-    def isCapturedVariable(typedIndex: Int): Boolean =
-      capturedByIndex.contains(typedIndex)
   
   private def toAsmModifier(mod: Int): Int =
     var access = 0
@@ -173,7 +113,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     gen.visitCode()
     
     // Set up local variable context
-    val localVars = new LocalVarContext(gen).withParameters(false, ctor.arguments)
+    val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
     
     // Handle super constructor call
     if ctor.superInitializer != null then
@@ -223,7 +163,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     // Set up local variable context
     val isStatic = (node.modifier & Modifier.STATIC) != 0
-    val localVars = new LocalVarContext(gen).withParameters(isStatic, node.arguments)
+    val localVars = new LocalVarContext(gen).withParameters(isStatic, argTypes)
     
     // Generate method body if present
     if node.block != null then
@@ -1057,7 +997,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     // Create a special local var context for closures
     val closureLocalVars = new ClosureLocalVarContext(gen, className, capturedVars)
-      .withParameters(false, method.arguments)
+      .withParameters(false, method.arguments.map(asmType))
     
     
     // Generate method body

@@ -1,0 +1,81 @@
+The followings are the grammar of Onion programming language like EBNF:
+
+block_comment     ::= '/*' ([^*])*  '*' ('*' | ([^*/] ([^*])* '*'))* '/'
+line_comment      ::= '//' ([^\r\n])*
+shell_comment     ::= '#!' ([^\r\n])*
+
+compile_unit      ::= module? import? (
+                       'class' | 'interface' | 'statement' | 'function' | 'global_var'
+                      )+
+module            ::= 'module' id (. id)* ;
+import            ::= 'import' { (id (. id)+ ; | id = id (. id)+ ;)* }
+                
+access            ::= 'public' | 'protected' | 'private'
+modifier          ::= 'final' | 'internal' | 'volatile' | 'synchronized' | 'static' | 'inherited'
+
+type              ::= primitive | id | '#<' id (. id)* '>' | type ('[]')+
+primitive         ::= 'Byte' | 'Short' | 'Char' | 'Int' | 'Long' | 'Float' | 'Double' | 'Boolean' | 'Unit'
+
+class             ::= modifier* 'class' id (':' type)? ('<:' type (, type)*)? {
+                       (field | method | constructor)*
+                       (access : (field | method | constructor)*)*
+                     }
+interface         ::= modifier* 'interface' id ('<:' type (, type)*)? {
+                        (id ('(' (var_decl (, var_decl)*)? ')')? (: type)? ;)*
+                      }
+                    
+field             ::= modifier* ('forward')? field_id : type [= expression] ;
+method            ::= ['def'] modifier* id ( '(' (arg_list)? ')' )? (: type)? (; | block)
+constructor       ::= modifier* new ( '(' (arg_list)? ')' )? (: '(' [expression_list] ')' )? block
+function          ::= modifier* def id ( '(' (arg_list)? ')' )? (: type)? block
+global_var        ::= modifier* var id : type (= expression)? ;
+
+statement         ::= 'if' expression block [else block]
+                    | 'select' expression { (case expr_list block)* [else block] } 
+                    | 'while' expression block 
+                    | 'for' (var_decl | expression_stmt) expression ; [expr] block
+                    | 'foreach' var_decl 'in' expression block
+                    | 'synchronized' expression block
+                    | 'try' block ('rec' id : type block)* 'fin' block
+                    | 'break' ;
+                    | 'continue' ;
+                    | 'return' [expression] ; 
+                    | 'throw' expression ;
+                    | { statement* } 
+                    | ';'
+                    | expression ;
+                    | var_decl
+                    | id : type (= expression)? ;
+
+arg_list          ::= id : type (, id : type)*
+                                    
+expression        ::= expression binary_op expression 
+                    | expression assign_op expression 
+                    | unary_op expression 
+                    | expression ( . id ( '(' (expr_list)? ')' )? )* 
+                    | 'new' type '[' expression_list ']'
+                    | 'new' type ( '(' (expression_list)? ')' )?
+                    | type '::' id ( '(' (expression_list)? ')' )? 
+                    | expression ('[' expression ']')* 
+                    | '(' expression ')' 
+                    | id  ( '(' (expression_list)? ')' )? 
+                    | expression 'is' type 
+                    | expression $ type
+                    | # type . id ( '(' [arg_list] ')' )? block
+                    | '[' (expression_list)? ']'
+                    | 'this' 
+                    | 'true'
+                    | 'false'
+                    | 'null'
+                    | <integer_literal>
+                    | <float_literal
+                    | <character_literal
+                    | <string_literal
+                    | <list_literal>
+                 
+expression_list   ::= expression (, expression)*
+unary_op          ::= ! | - | + | ~
+binary_op         ::= + | - | * | / | % | << || >> | >>> | ^ | & | '|' | < | > | <= | >= | == | != | === | !== | '||' | &&
+assign_op         ::= = | += | -= | *= | /= | %=
+id                ::= ([a-z] | [A-Z] | _) ([a-z] | [A-Z] | [0-9] | _)*
+field_id          ::= '@' id

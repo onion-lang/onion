@@ -1,0 +1,103 @@
+site_name: Onion Programming Language
+site_url: https://onion-lang.github.io/onion/
+site_description: A statically-typed, object-oriented programming language for the JVM
+site_author: Onion Language Team
+repo_url: https://github.com/onion-lang/onion
+repo_name: onion-lang/onion
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - tags
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Hello World: getting-started/hello-world.md
+      - Quick Start: getting-started/quick-start.md
+  - Language Guide:
+      - Overview: guide/overview.md
+      - Basic Syntax: guide/basic-syntax.md
+      - Variables and Types: guide/variables-and-types.md
+      - Control Flow: guide/control-flow.md
+      - Functions: guide/functions.md
+      - Classes and Objects: guide/classes-and-objects.md
+      - Inheritance: guide/inheritance.md
+      - Lambda Expressions: guide/lambda-expressions.md
+      - Java Interoperability: guide/java-interop.md
+  - Examples:
+      - Overview: examples/overview.md
+      - Basic Programs: examples/basic.md
+      - Object-Oriented Examples: examples/oop.md
+      - Functional Programming: examples/functional.md
+  - Tools:
+      - Compiler (onionc): tools/compiler.md
+      - Script Runner (onion): tools/script-runner.md
+      - REPL Shell: tools/repl.md
+  - Reference:
+      - Language Specification: reference/specification.md
+      - Standard Library: reference/stdlib.md
+      - Compiler Architecture: reference/compiler-architecture.md
+  - Contributing:
+      - Development Guide: contributing/development.md
+      - Building from Source: contributing/building.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/onion-lang/onion

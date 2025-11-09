@@ -10,23 +10,18 @@ All examples can be found in the `run/` directory of the Onion repository.
 
 - [Hello World](basic.md#hello-world) - Simple output
 - [Arrays](basic.md#arrays) - Array manipulation
-- [Strings](basic.md#strings) - String operations
 - [User Input](basic.md#user-input) - Reading input
-- [Loops](basic.md#loops) - Iteration patterns
 
 ### Object-Oriented Examples
 
 - [Classes and Objects](oop.md#classes-and-objects) - Basic OOP
 - [Inheritance](oop.md#inheritance) - Extending classes
 - [Interfaces](oop.md#interfaces) - Interface implementation
-- [JavaBeans](oop.md#javabeans) - Bean pattern
-- [GUI Applications](oop.md#gui-applications) - Swing applications
 
 ### Functional Programming
 
 - [Lambda Expressions](functional.md#lambda-expressions) - Anonymous functions
 - [Closures](functional.md#closures) - Capturing variables
-- [Filter and Map](functional.md#filter-and-map) - Higher-order functions
 - [Recursion](functional.md#recursion) - Recursive algorithms
 
 ## Running Examples

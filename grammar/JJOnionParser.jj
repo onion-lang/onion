@@ -414,7 +414,7 @@ TOKEN:
   >
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
-| <FID:      "@" <ID>                                                    >
+// | <FID:      "@" <ID>                                                    >  // Removed: @ syntax deprecated
 }
 
 /*
@@ -479,9 +479,9 @@ AST.GlobalVariableDeclaration var_decl(int modifiers) : {
   AST.Expression e = null;
 }{
   {enterSection();}
-  t1="var" t2=<FID> [":" ty=type()] ["=" e=term()] eos() {
+  t1="var" t2=<ID> [":" ty=type()] ["=" e=term()] eos() {
     return new AST.GlobalVariableDeclaration(
-      p(t1), modifiers, t2.image.substring(1), ty, e
+      p(t1), modifiers, t2.image, ty, e
     );
   }
 }
@@ -726,9 +726,9 @@ AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
   AST.Expression init = null;
 }{
   {enterSection();}
-  start="forward" name=<FID> [":" type = type()]
+  start="forward" name=<ID> [":" type = type()]
   ["=" eols() init=term()] eos() {
-    return new AST.DelegatedFieldDeclaration(p(start), modifiers, name.image.substring(1), type, init);
+    return new AST.DelegatedFieldDeclaration(p(start), modifiers, name.image, type, init);
   }
 }
 
@@ -738,9 +738,9 @@ AST.FieldDeclaration field_decl(int modifiers):{
   AST.Expression init = null;
 }{
   {enterSection();}
-  name=<FID> ":" [type=type()]
+  name=<ID> ":" [type=type()]
   ["=" eols() init=term()] eos() {
-    return new AST.FieldDeclaration(p(name), modifiers, name.image.substring(1), type, init);
+    return new AST.FieldDeclaration(p(name), modifiers, name.image, type, init);
   }
 }
 
@@ -967,8 +967,7 @@ AST.Expression primary() : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.BlockExpression body;
 }{
-  t=<FID>                                                           {return new AST.UnqualifiedFieldReference(p(t), c(t).substring(1));}
-| t="super" eols() "." eols() n=<ID> ["(" es=terms() ")"]           {return new AST.SuperMethodCall(p(t), c(n), es);}
+  t="super" eols() "." eols() n=<ID> ["(" es=terms() ")"]           {return new AST.SuperMethodCall(p(t), c(n), es);}
 | LOOKAHEAD(4) ty=class_type() t="::" n=<ID> "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
 | LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
 | LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
@@ -980,6 +979,7 @@ AST.Expression primary() : {
   | ["(" eols() (es=terms()) ")"]                                         {return new AST.NewObject(p(t), ty, es);}
   )
 | t="self"                                                                {return new AST.CurrentInstance(p(t));}
+| t="this"                                                                {return new AST.CurrentInstance(p(t));}
 | e=integer_literal()                                                     {return e;}
 | e=float_literal()                                                       {return e;}
 | e=char_literal()                                                        {return e;}

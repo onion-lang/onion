@@ -5,59 +5,59 @@ import {
 }
 
 class Calculator : JFrame <: ActionListener {
-	@text			:JTextField
-	@left			:Long
-	@right		    :Long
-	@operator	    :String
-	@isError	    :Boolean
+	text			:JTextField
+	left			:Long
+	right		    :Long
+	operator	    :String
+	isError	    	:Boolean
 public:
-	def setValue(value : Long) { @text.setText(JLong::toString(value)); }
-	def setValue(value : String) { @text.setText(value); }
+	def setValue(value : Long) { this.text.setText(JLong::toString(value)); }
+	def setValue(value : String) { this.text.setText(value); }
 	def actionPerformed(event : ActionEvent) {
 		label = event.source$JButton.label
 		try{
-			if @isError && !(label == "C") {
+			if this.isError && !(label == "C") {
 				return
 			}
 			input = JLong::parseLong(label)
-			if @operator != null {
-				@right = @right * 10 + input
-				setValue(@right)
+			if this.operator != null {
+				this.right = this.right * 10 + input
+				setValue(this.right)
 			}else{
-				@left = @left * 10 + input
-				setValue(@left)
+				this.left = this.left * 10 + input
+				setValue(this.left)
 			}
 		}catch e :NumberFormatException{
 			if label == "C" {
-				@left = 0
-				@right = 0
-				@operator	= null
-				@text.setText(JLong::toString(0))
-				@isError = false
+				this.left = 0
+				this.right = 0
+				this.operator	= null
+				this.text.setText(JLong::toString(0))
+				this.isError = false
 			}else{
-				if @operator != null {
-					if @operator == "/" {
-						if @right == 0L{
+				if this.operator != null {
+					if this.operator == "/" {
+						if this.right == 0L{
 							setValue("0で割ることはできません。")
-							@left = 0L
-							@right = 0L
-							@isError = true
+							this.left = 0L
+							this.right = 0L
+							this.isError = true
 						}else{
-							@left = @left / @right
+							this.left = this.left / this.right
 						}
-						setValue(@left)
+						setValue(this.left)
 					}else{
-						select @operator {
-						case "+": @left = @left + @right
-						case "-": @left = @left - @right
-						case "*": @left = @left * @right
-						case "/":  @left = @left / @right
+						select this.operator {
+						case "+": this.left = this.left + this.right
+						case "-": this.left = this.left - this.right
+						case "*": this.left = this.left * this.right
+						case "/":  this.left = this.left / this.right
 						}
-						setValue(@left)
+						setValue(this.left)
 					}
 				}
-				@operator = label
-				@right = 0
+				this.operator = label
+				this.right = 0
 			}
 		}
 	}
@@ -65,12 +65,12 @@ public:
 	def this:("簡易電卓") {
 		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE)
 		setSize(800, 600)
-		@text		= new JTextField
-		@text.setHorizontalAlignment(JTextField::RIGHT)
+		this.text		= new JTextField
+		this.text.setHorizontalAlignment(JTextField::RIGHT)
 		pane		= getContentPane()
 		north		= new JPanel
 		north.setLayout(new BorderLayout)
-		north.add(@text, BorderLayout::NORTH)
+		north.add(this.text, BorderLayout::NORTH)
 		center= new JPanel
 		center.setLayout(new GridLayout(4, 5, 4, 3))
 		center.setFont(new Font(null, Font::PLAIN, 8))
@@ -82,9 +82,9 @@ public:
 		]
 		foreach label:String in labels {
 			button = new JButton(label$String)
-			button.addActionListener(self)
+			button.addActionListener(this)
 			button.setPreferredSize(new Dimension(42, 28))
-			center.add(button)				
+			center.add(button)
 		}
 		pane.add(north, BorderLayout::NORTH)
 		pane.add(center, BorderLayout::CENTER)

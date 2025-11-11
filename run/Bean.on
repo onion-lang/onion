@@ -4,36 +4,36 @@ import {
 }
 
 class ExampleBean <: Serializable {
-  @name :String;
-  @value :Int;
-  
+  name :String;
+  value :Int;
+
 public:
   def this {
   }
-  
+
   def this(name :String, value :Int){
-    @name = name;
-    @value = value;
+    this.name = name;
+    this.value = value;
   }
-  
+
   def getName :String {
-    return @name; 
+    return this.name;
   }
-  
+
   def setName(name :String) {
-    @name = name; 
+    this.name = name;
   }
-  
+
   def setValue(value :Int) {
-    @value = value;
+    this.value = value;
   }
-  
+
   def getValue :Int {
-    return @value;
+    return this.value;
   }
-  
+
   def toString :String {
-    return "ExampleBean(name = " + @name + ", value = " + @value + ")";
+    return "ExampleBean(name = " + this.name + ", value = " + this.value + ")";
   }
 }
 

@@ -8,22 +8,22 @@ class BeanSpec extends AbstractShellSpec {
       val resultBean = shell.run(
         """
           | class Bean <: Serializable {
-          |   @value :Int
+          |   value :Int
           | public:
           |   def this {
           |   }
           |
           |   def this(value :Int){
-          |     @value = value
+          |     this.value = value
           |   }
           |
-          |   def getValue :Int = @value
+          |   def getValue :Int = this.value
           |
           |   def setValue(value :Int) {
-          |     @value = value
+          |     this.value = value
           |   }
           |
-          |   def toString :String = "Bean(value = " + @value + ")"
+          |   def toString :String = "Bean(value = " + this.value + ")"
           |
           |   static def main(args: String[]): String {
           |     bean = new Bean

@@ -482,33 +482,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       value = processAssignable(node.rhs, leftType, value)
       if (value != null) new SetLocal(frame, index, leftType, value) else null
     }
-    def processThisFieldAssign(node: AST.Assignment, context: LocalContext): Term = {
-      var value = typed(node.rhs, context).getOrElse(null)
-      if (value == null) return null
-      val ref = node.lhs.asInstanceOf[AST.UnqualifiedFieldReference]
-      var selfClass: ClassType = null
-      if (context.isGlobal) {
-        selfClass = loadTopClass
-      } else {
-        if (context.method != null) {
-          selfClass = context.method.affiliation
-        }
-        else {
-          selfClass = context.constructor.affiliation
-        }
-      }
-      val field: FieldRef = findField(selfClass, ref.name)
-      if (field == null) {
-        report(FIELD_NOT_FOUND, ref, selfClass, ref.name)
-        return null
-      }
-      if (!isAccessible(field, selfClass)) {
-        report(FIELD_NOT_ACCESSIBLE, node, field.affiliation, field.name, selfClass)
-        return null
-      }
-      value = processAssignable(node.rhs, field.`type`, value)
-      if (value != null) new SetField(new This(selfClass), field, value) else null
-    }
+    // Removed: processThisFieldAssign - use this.field or self.field instead
     def processArrayAssign(node: AST.Assignment, context: LocalContext): Term = {
       var value = typed(node.rhs, context).getOrElse(null)
       val indexing = node.lhs.asInstanceOf[AST.Indexing]
@@ -762,8 +736,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         node.lhs match {
           case _ : AST.Id =>
             Option(processLocalAssign(node, context))
-          case _ : AST.UnqualifiedFieldReference =>
-            Option(processThisFieldAssign(node, context))
+          // Removed: UnqualifiedFieldReference case - use this.field or self.field instead
           case _ : AST.Indexing =>
             Option(processArrayAssign(node, context))
           case _ : AST.MemberSelection =>
@@ -1089,19 +1062,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             report(LVALUE_REQUIRED, target);
             null
         })
-      case node@AST.UnqualifiedFieldReference(loc, name) =>
-        if (context.isStatic) return None
-        val selfClass = definition_
-        val field = findField(selfClass, node.name)
-        if (field == null) {
-          report(FIELD_NOT_FOUND, node, selfClass, node.name)
-          None
-        }else if (!isAccessible(field, selfClass)) {
-          report(FIELD_NOT_ACCESSIBLE, node, field.affiliation, node.name, selfClass)
-          None
-        }else {
-          Some(new RefField(new This(selfClass), field))
-        }
+      // Removed: UnqualifiedFieldReference - use this.field or self.field instead
       case node@AST.UnqualifiedMethodCall(loc, name, args) =>
         var params = typedTerms(node.args.toArray, context)
         if (params == null) return None

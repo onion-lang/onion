@@ -4,10 +4,10 @@ import {
 }
 
 class Delegation <: List {
-	forward @n :List;
+	forward n :List;
 public:
-	def new {
-		@n = new ArrayList;
+	def this {
+		this.n = new ArrayList;
 	}
 	static def main(args: String[]){
 		list = new Delegation;

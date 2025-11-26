@@ -104,38 +104,25 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
   private def codeConstructor(cw: ClassWriter, ctor: ConstructorDefinition, className: String): Unit =
     val argTypes = ctor.arguments.map(asmType)
-    val desc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)
-    val mv = cw.visitMethod(toAsmModifier(ctor.modifier), "<init>", desc, null, null)
-    // Use ASM's Method object to properly initialize GeneratorAdapter
-    val asmMethod = AsmMethod("<init>", desc)
-    val gen = new GeneratorAdapter(toAsmModifier(ctor.modifier), asmMethod, mv)
-    
-    gen.visitCode()
-    
-    // Set up local variable context
+    val gen = MethodEmitter.newGenerator(cw, toAsmModifier(ctor.modifier), "<init>", AsmType.VOID_TYPE, argTypes)
+
     val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
-    
-    // Handle super constructor call
+
     if ctor.superInitializer != null then
       gen.loadThis()
       for arg <- ctor.superInitializer.terms do
         emitExpressionWithContext(gen, arg, className, localVars)
-      val superClass = if ctor.classType.superClass != null then 
-        AsmUtil.internalName(ctor.classType.superClass.name) 
-      else "java/lang/Object"
+      val superClass = if ctor.classType.superClass != null then AsmUtil.internalName(ctor.classType.superClass.name) else "java/lang/Object"
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)
       gen.invokeConstructor(
         AsmUtil.objectType(superClass),
         AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, superArgTypes*))
       )
     else
-      // Default super constructor
       gen.loadThis()
-      gen.invokeConstructor(AsmType.getObjectType("java/lang/Object"), AsmMethod.getMethod("void <init>()"))
-    
-    // Process constructor body
+      gen.invokeConstructor(AsmUtil.objectType("java/lang/Object"), AsmMethod.getMethod("void <init>()"))
+
     emitStatementsWithContext(gen, ctor.block.statements, className, localVars)
-    
     gen.returnValue()
     gen.endMethod()
     

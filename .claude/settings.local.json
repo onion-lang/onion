@@ -1,19 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Bash(java:*)",
-      "Bash(sbt clean:*)",
-      "Bash(rm:*)",
-      "Bash(sbt:*)",
-      "Bash(grep:*)",
-      "Bash(mv:*)",
-      "Bash(ls:*)",
-      "Bash(cat:*)",
-      "Bash(timeout 30 sbt 'testOnly *CountersSpec')",
-      "Bash(rg:*)",
-      "Bash(scala -cp \"target/scala-3.6.2/classes:target/scala-3.6.2/test-classes\" manual_test.scala)"
+      "Bash(git checkout:*)"
     ],
-    "deny": []
+    "deny": [],
+    "ask": []
   }
 }

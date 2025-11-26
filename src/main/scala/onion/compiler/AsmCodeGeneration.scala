@@ -37,7 +37,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
     case ct: ClassType     => AsmUtil.objectType(ct.name)
     case at: ArrayType     => AsmType.getType("[" + asmType(at.component).getDescriptor)
-    case _: NullType       => AsmType.getObjectType("java/lang/Object")
+    case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
     case _                 => throw new RuntimeException(s"Unsupported type: $tp")
 
   // Counter for generating unique closure class names
@@ -232,11 +232,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // List literal
     case list: ListLiteral =>
       // Create ArrayList
-      gen.newInstance(AsmType.getObjectType("java/util/ArrayList"))
+      gen.newInstance(AsmUtil.objectType(AsmUtil.JavaUtilArrayList))
       gen.dup()
       gen.push(list.elements.length)
       gen.invokeConstructor(
-        AsmType.getObjectType("java/util/ArrayList"),
+        AsmUtil.objectType(AsmUtil.JavaUtilArrayList),
         AsmMethod.getMethod("void <init>(int)")
       )
       
@@ -249,7 +249,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           case bt: BasicType => gen.box(asmType(bt))
           case _ => // Already an object
         gen.invokeVirtual(
-          AsmType.getObjectType("java/util/ArrayList"),
+          AsmUtil.objectType(AsmUtil.JavaUtilArrayList),
           AsmMethod.getMethod("boolean add(Object)")
         )
         gen.pop() // Pop boolean result
@@ -265,7 +265,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case ref: RefField =>
       emitExpressionWithContext(gen, ref.target, className, localVars)
       val ownerType = ref.target.`type` match
-        case ct: ClassType => AsmType.getObjectType(ct.name.replace('.', '/'))
+        case ct: ClassType => AsmUtil.objectType(ct.name)
         case _ => throw new RuntimeException(s"Invalid field owner type: ${ref.target.`type`}")
       val fieldType = asmType(ref.field.`type`)
       gen.getField(ownerType, ref.field.name, fieldType)
@@ -283,7 +283,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         // Single slot value  
         gen.dupX1() // Stack: value, target, value
       val ownerType = set.target.`type` match
-        case ct: ClassType => AsmType.getObjectType(ct.name.replace('.', '/'))
+        case ct: ClassType => AsmUtil.objectType(ct.name)
         case _ => throw new RuntimeException(s"Invalid field owner type: ${set.target.`type`}")
       val fieldType = asmType(set.field.`type`)
       gen.putField(ownerType, set.field.name, fieldType)
@@ -402,7 +402,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       val superType = if currentClass.superClass != null then
         AsmUtil.objectType(currentClass.superClass.name)
       else
-        AsmType.getObjectType("java/lang/Object")
+        AsmUtil.objectType(AsmUtil.JavaLangObject)
       
       val methodDesc = AsmType.getMethodDescriptor(
         asmType(callSuper.method.returnType),
@@ -798,7 +798,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           case Some(binding) =>
             gen.loadThis()
             gen.getField(
-              AsmType.getObjectType(closureCtx.closureClassName),
+              AsmUtil.objectType(closureCtx.closureClassName),
               closureCtx.capturedFieldName(binding.index),
               asmType(binding.tp)
             )
@@ -828,7 +828,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             else
               gen.dupX1()
             gen.putField(
-              AsmType.getObjectType(closureCtx.closureClassName),
+              AsmUtil.objectType(closureCtx.closureClassName),
               closureCtx.capturedFieldName(binding.index),
               asmType(binding.tp)
             )
@@ -865,7 +865,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     generatedClosures += CompiledClass(closureClassName.replace('/', '.'), config.outputDirectory, closureBytes)
     
     // Create instance of the closure class
-    val closureType = AsmType.getObjectType(closureClassName)
+    val closureType = AsmUtil.objectType(closureClassName)
     gen.newInstance(closureType)
     gen.dup()
     
@@ -903,8 +903,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       Opcodes.ACC_PUBLIC,
       className,
       null,
-      "java/lang/Object",
-      Array(interfaceType.name.replace('.', '/'))
+      AsmUtil.internalName(AsmUtil.JavaLangObject),
+      Array(AsmUtil.internalName(interfaceType.name))
     )
     
     // Generate fields for captured variables
@@ -940,14 +940,14 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     // Call super constructor
     gen.loadThis()
-    gen.invokeConstructor(AsmType.getObjectType("java/lang/Object"), AsmMethod.getMethod("void <init>()"))
+    gen.invokeConstructor(AsmUtil.objectType(AsmUtil.JavaLangObject), AsmMethod.getMethod("void <init>()"))
     
     // Initialize captured variable fields
     for (capturedVar, paramIndex) <- capturedVars.zipWithIndex do
       gen.loadThis()
       gen.loadArg(paramIndex)
       gen.putField(
-        AsmType.getObjectType(className),
+        AsmUtil.objectType(className),
         s"captured_${capturedVar.index}",
         asmType(capturedVar.tp)
       )

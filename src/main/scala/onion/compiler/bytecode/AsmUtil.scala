@@ -4,6 +4,9 @@ import org.objectweb.asm.{Opcodes, Type as AsmType}
 import org.objectweb.asm.commons.GeneratorAdapter
 
 object AsmUtil {
+  val JavaLangObject: String = "java.lang.Object"
+  val JavaUtilArrayList: String = "java.util.ArrayList"
+
   def internalName(fqcn: String): String = fqcn.replace('.', '/')
 
   def objectType(fqcn: String): AsmType = AsmType.getObjectType(internalName(fqcn))

@@ -17,6 +17,12 @@ object AsmUtil {
   def putField(gen: GeneratorAdapter, ownerFqcn: String, name: String, fieldType: AsmType): Unit =
     gen.putField(objectType(ownerFqcn), name, fieldType)
 
+  def newArray(gen: GeneratorAdapter, component: AsmType): Unit =
+    gen.newArray(component)
+
+  def checkCast(gen: GeneratorAdapter, tp: AsmType): Unit =
+    gen.checkCast(tp)
+
   /** Emit a default return for the given ASM type. */
   def emitDefaultReturn(gen: GeneratorAdapter, returnType: AsmType): Unit = {
     returnType.getSort match {

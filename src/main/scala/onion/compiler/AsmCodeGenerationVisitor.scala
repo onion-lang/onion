@@ -2,10 +2,8 @@ package onion.compiler
 
 import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.AsmUtil
+import onion.compiler.bytecode.{AsmUtil, LocalVarContext, LoopContext}
 import TypedAST._
-import onion.compiler.bytecode.LocalVarContext
-import scala.collection.mutable
 
 /**
  * Visitor implementation for ASM bytecode generation from TypedAST nodes.
@@ -19,9 +17,7 @@ class AsmCodeGenerationVisitor(
   asmCodeGen: AsmCodeGeneration
 ) extends TypedASTVisitor[Unit]:
   
-  // Stack to track loop labels for break/continue support
-  private val loopStartLabels = mutable.Stack[Label]()
-  private val loopEndLabels = mutable.Stack[Label]()
+  private val loops = new LoopContext
 
   import BinaryTerm.Constants._
   import UnaryTerm.Constants._
@@ -418,16 +414,14 @@ class AsmCodeGenerationVisitor(
       visitStatement(stmt)
   
   override def visitBreak(node: Break): Unit =
-    if loopEndLabels.isEmpty then
-      throw new RuntimeException("Break statement outside of loop")
-    // Jump to the end of the current loop
-    gen.goTo(loopEndLabels.top)
+    loops.currentEnd match
+      case Some(label) => gen.goTo(label)
+      case None => throw new RuntimeException("Break statement outside of loop")
   
   override def visitContinue(node: Continue): Unit =
-    if loopStartLabels.isEmpty then
-      throw new RuntimeException("Continue statement outside of loop")
-    // Jump to the start of the current loop (condition check)
-    gen.goTo(loopStartLabels.top)
+    loops.currentStart match
+      case Some(label) => gen.goTo(label)
+      case None => throw new RuntimeException("Continue statement outside of loop")
   
   override def visitExpressionActionStatement(node: ExpressionActionStatement): Unit =
     visitTerm(node.term)
@@ -456,24 +450,16 @@ class AsmCodeGenerationVisitor(
   override def visitConditionalLoop(node: ConditionalLoop): Unit =
     val startLabel = gen.newLabel()
     val endLabel = gen.newLabel()
-    
-    // Push labels for break/continue support
-    loopStartLabels.push(startLabel)
-    loopEndLabels.push(endLabel)
-    
+    loops.push(startLabel, endLabel)
     try
       gen.visitLabel(startLabel)
       visitTerm(node.condition)
       gen.visitJumpInsn(Opcodes.IFEQ, endLabel)
-      
       visitStatement(node.stmt)
       gen.visitJumpInsn(Opcodes.GOTO, startLabel)
-      
       gen.visitLabel(endLabel)
     finally
-      // Pop labels after loop processing
-      loopStartLabels.pop()
-      loopEndLabels.pop()
+      loops.pop()
   
   override def visitNOP(node: NOP): Unit = ()
   

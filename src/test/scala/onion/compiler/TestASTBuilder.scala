@@ -20,7 +20,8 @@ class TestASTBuilder extends DefaultASTBuilder {
     name: String,
     args: List[AST.Argument],
     returnType: AST.TypeNode,
-    body: AST.BlockExpression
+    body: AST.BlockExpression,
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.MethodDeclaration = {
     // Custom behavior: track method statistics
     methodCount += 1
@@ -31,7 +32,7 @@ class TestASTBuilder extends DefaultASTBuilder {
     // - Inject security checks
     // - Optimize certain patterns
     
-    super.createMethodDeclaration(location, modifiers, name, args, returnType, body)
+    super.createMethodDeclaration(location, modifiers, name, args, returnType, body, typeParameters)
   }
   
   // Example: Automatically add toString methods to records
@@ -58,10 +59,11 @@ class LoggingASTBuilder extends DefaultASTBuilder {
     superClass: AST.TypeNode,
     interfaces: List[AST.TypeNode],
     defaultSection: Option[AST.AccessSection],
-    sections: List[AST.AccessSection]
+    sections: List[AST.AccessSection],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.ClassDeclaration = {
     println(s"Creating class: $name at $location")
-    super.createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections)
+    super.createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections, typeParameters)
   }
   
   override def createMethodDeclaration(
@@ -70,10 +72,11 @@ class LoggingASTBuilder extends DefaultASTBuilder {
     name: String,
     args: List[AST.Argument],
     returnType: AST.TypeNode,
-    body: AST.BlockExpression
+    body: AST.BlockExpression,
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.MethodDeclaration = {
     println(s"Creating method: $name with ${args.length} arguments at $location")
-    super.createMethodDeclaration(location, modifiers, name, args, returnType, body)
+    super.createMethodDeclaration(location, modifiers, name, args, returnType, body, typeParameters)
   }
 }
 
@@ -88,7 +91,8 @@ class ValidatingASTBuilder extends DefaultASTBuilder {
     name: String,
     args: List[AST.Argument],
     returnType: AST.TypeNode,
-    body: AST.BlockExpression
+    body: AST.BlockExpression,
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.MethodDeclaration = {
     // Enforce naming conventions
     if (!name.matches("[a-z][a-zA-Z0-9]*")) {
@@ -100,7 +104,7 @@ class ValidatingASTBuilder extends DefaultASTBuilder {
       throw new IllegalArgumentException(s"Method '$name' has too many parameters (${args.length}) at $location")
     }
     
-    super.createMethodDeclaration(location, modifiers, name, args, returnType, body)
+    super.createMethodDeclaration(location, modifiers, name, args, returnType, body, typeParameters)
   }
   
   override def createClassDeclaration(
@@ -110,14 +114,15 @@ class ValidatingASTBuilder extends DefaultASTBuilder {
     superClass: AST.TypeNode,
     interfaces: List[AST.TypeNode],
     defaultSection: Option[AST.AccessSection],
-    sections: List[AST.AccessSection]
+    sections: List[AST.AccessSection],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.ClassDeclaration = {
     // Enforce naming conventions
     if (!name.matches("[A-Z][a-zA-Z0-9]*")) {
       throw new IllegalArgumentException(s"Class name '$name' does not follow PascalCase convention at $location")
     }
     
-    super.createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections)
+    super.createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections, typeParameters)
   }
 }
 

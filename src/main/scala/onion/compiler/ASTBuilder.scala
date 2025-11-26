@@ -22,7 +22,8 @@ trait ASTBuilder {
     superClass: AST.TypeNode,
     interfaces: List[AST.TypeNode],
     defaultSection: Option[AST.AccessSection],
-    sections: List[AST.AccessSection]
+    sections: List[AST.AccessSection],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.ClassDeclaration
 
   def createInterfaceDeclaration(
@@ -30,7 +31,8 @@ trait ASTBuilder {
     modifiers: Int,
     name: String,
     superTypes: List[AST.TypeNode],
-    methods: List[AST.MethodDeclaration]
+    methods: List[AST.MethodDeclaration],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.InterfaceDeclaration
 
   def createRecordDeclaration(
@@ -46,8 +48,15 @@ trait ASTBuilder {
     name: String,
     args: List[AST.Argument],
     returnType: AST.TypeNode,
-    body: AST.BlockExpression
+    body: AST.BlockExpression,
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.MethodDeclaration
+
+  def createTypeParameter(
+    location: Location,
+    name: String,
+    upperBound: Option[AST.TypeNode]
+  ): AST.TypeParameter
 
   def createConstructorDeclaration(
     location: Location,
@@ -132,9 +141,10 @@ class DefaultASTBuilder extends ASTBuilder {
     superClass: AST.TypeNode,
     interfaces: List[AST.TypeNode],
     defaultSection: Option[AST.AccessSection],
-    sections: List[AST.AccessSection]
+    sections: List[AST.AccessSection],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.ClassDeclaration = {
-    AST.ClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections)
+    AST.ClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections, typeParameters)
   }
 
   def createInterfaceDeclaration(
@@ -142,9 +152,10 @@ class DefaultASTBuilder extends ASTBuilder {
     modifiers: Int,
     name: String,
     superTypes: List[AST.TypeNode],
-    methods: List[AST.MethodDeclaration]
+    methods: List[AST.MethodDeclaration],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.InterfaceDeclaration = {
-    AST.InterfaceDeclaration(location, modifiers, name, superTypes, methods)
+    AST.InterfaceDeclaration(location, modifiers, name, superTypes, methods, typeParameters)
   }
 
   def createRecordDeclaration(
@@ -162,10 +173,17 @@ class DefaultASTBuilder extends ASTBuilder {
     name: String,
     args: List[AST.Argument],
     returnType: AST.TypeNode,
-    body: AST.BlockExpression
+    body: AST.BlockExpression,
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.MethodDeclaration = {
-    AST.MethodDeclaration(location, modifiers, name, args, returnType, body)
+    AST.MethodDeclaration(location, modifiers, name, args, returnType, body, typeParameters)
   }
+
+  def createTypeParameter(
+    location: Location,
+    name: String,
+    upperBound: Option[AST.TypeNode]
+  ): AST.TypeParameter = AST.TypeParameter(location, name, upperBound)
 
   def createConstructorDeclaration(
     location: Location,

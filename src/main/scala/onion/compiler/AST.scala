@@ -149,7 +149,12 @@ object AST {
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 
   abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
-  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) extends MemberDeclaration
+  case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None) extends Node
+
+  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil) extends MemberDeclaration {
+    def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) =
+      this(location, modifiers, name, args, returnType, block, Nil)
+  }
   case class FieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends MemberDeclaration
   case class DelegatedFieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression) extends MemberDeclaration
   case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockExpression) extends MemberDeclaration {val name = "new" }
@@ -157,6 +162,12 @@ object AST {
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
   case class RecordDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument]) extends TypeDeclaration
-  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) extends TypeDeclaration
-  case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) extends TypeDeclaration
+  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
+    def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
+      this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)
+  }
+  case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
+    def this(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) =
+      this(location, modifiers, name, superInterfaces, methods, Nil)
+  }
 }

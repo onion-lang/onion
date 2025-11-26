@@ -68,9 +68,23 @@ public class ASTBuilderAdapter {
         AST.TypeNode superClass,
         List<AST.TypeNode> interfaces,
         Option<AST.AccessSection> defaultSection,
+        List<AST.AccessSection> sections,
+        List<AST.TypeParameter> typeParameters
+    ) {
+        return builder.createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections, typeParameters);
+    }
+
+    // Backward-compatible overload without type parameters
+    public AST.ClassDeclaration createClassDeclaration(
+        Location location,
+        int modifiers,
+        String name,
+        AST.TypeNode superClass,
+        List<AST.TypeNode> interfaces,
+        Option<AST.AccessSection> defaultSection,
         List<AST.AccessSection> sections
     ) {
-        return builder.createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections);
+        return createClassDeclaration(location, modifiers, name, superClass, interfaces, defaultSection, sections, scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty());
     }
     
     public AST.InterfaceDeclaration createInterfaceDeclaration(
@@ -78,9 +92,21 @@ public class ASTBuilderAdapter {
         int modifiers,
         String name,
         List<AST.TypeNode> superTypes,
+        List<AST.MethodDeclaration> methods,
+        List<AST.TypeParameter> typeParameters
+    ) {
+        return builder.createInterfaceDeclaration(location, modifiers, name, superTypes, methods, typeParameters);
+    }
+
+    // Backward-compatible overload without type parameters
+    public AST.InterfaceDeclaration createInterfaceDeclaration(
+        Location location,
+        int modifiers,
+        String name,
+        List<AST.TypeNode> superTypes,
         List<AST.MethodDeclaration> methods
     ) {
-        return builder.createInterfaceDeclaration(location, modifiers, name, superTypes, methods);
+        return createInterfaceDeclaration(location, modifiers, name, superTypes, methods, scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty());
     }
     
     public AST.RecordDeclaration createRecordDeclaration(
@@ -98,9 +124,26 @@ public class ASTBuilderAdapter {
         String name,
         List<AST.Argument> args,
         AST.TypeNode returnType,
+        AST.BlockExpression body,
+        List<AST.TypeParameter> typeParameters
+    ) {
+        return builder.createMethodDeclaration(location, modifiers, name, args, returnType, body, typeParameters);
+    }
+
+    // Backward-compatible overload without type parameters
+    public AST.MethodDeclaration createMethodDeclaration(
+        Location location,
+        int modifiers,
+        String name,
+        List<AST.Argument> args,
+        AST.TypeNode returnType,
         AST.BlockExpression body
     ) {
-        return builder.createMethodDeclaration(location, modifiers, name, args, returnType, body);
+        return createMethodDeclaration(location, modifiers, name, args, returnType, body, scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty());
+    }
+
+    public AST.TypeParameter createTypeParameter(Location location, String name, Option<AST.TypeNode> upperBound) {
+        return builder.createTypeParameter(location, name, upperBound);
     }
     
     public AST.ConstructorDeclaration createConstructorDeclaration(

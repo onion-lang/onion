@@ -2,6 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
+import onion.compiler.bytecode.AsmUtil
 import TypedAST._
 import onion.compiler.bytecode.LocalVarContext
 import scala.collection.mutable
@@ -240,7 +241,7 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.target)
     for param <- node.parameters do
       visitTerm(param)
-    val ownerType = AsmType.getObjectType(node.method.affiliation.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
       node.method.arguments.map(asmType)*
@@ -259,7 +260,7 @@ class AsmCodeGenerationVisitor(
   override def visitCallStatic(node: CallStatic): Unit =
     for param <- node.parameters do
       visitTerm(param)
-    val ownerType = AsmType.getObjectType(node.target.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.target.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
       node.method.arguments.map(asmType)*
@@ -270,7 +271,7 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.target)
     for param <- node.params do
       visitTerm(param)
-    val ownerType = AsmType.getObjectType(node.method.affiliation.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
       node.method.arguments.map(asmType)*
@@ -293,11 +294,11 @@ class AsmCodeGenerationVisitor(
   
   override def visitListLiteral(node: ListLiteral): Unit =
     // Create ArrayList
-    gen.newInstance(AsmType.getObjectType("java/util/ArrayList"))
+    gen.newInstance(AsmUtil.objectType("java.util.ArrayList"))
     gen.dup()
     gen.push(node.elements.length)
     gen.invokeConstructor(
-      AsmType.getObjectType("java/util/ArrayList"),
+      AsmUtil.objectType("java.util.ArrayList"),
       AsmMethod.getMethod("void <init>(int)")
     )
     
@@ -310,7 +311,7 @@ class AsmCodeGenerationVisitor(
         case bt: BasicType => gen.box(asmType(bt))
         case _ => // Already an object
       gen.invokeVirtual(
-        AsmType.getObjectType("java/util/ArrayList"),
+        AsmUtil.objectType("java.util.ArrayList"),
         AsmMethod.getMethod("boolean add(Object)")
       )
       gen.pop() // Pop boolean result
@@ -326,7 +327,7 @@ class AsmCodeGenerationVisitor(
   
   override def visitRefField(node: RefField): Unit =
     visitTerm(node.target)
-    val ownerType = AsmType.getObjectType(node.field.affiliation.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.field.affiliation.name)
     gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
   
   override def visitSetField(node: SetField): Unit =
@@ -338,11 +339,11 @@ class AsmCodeGenerationVisitor(
       gen.dup2X1()
     else
       gen.dupX1()
-    val ownerType = AsmType.getObjectType(node.field.affiliation.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.field.affiliation.name)
     gen.putField(ownerType, node.field.name, valueType)
   
   override def visitNewObject(node: NewObject): Unit =
-    val classType = AsmType.getObjectType(node.constructor.affiliation.name.replace('.', '/'))
+    val classType = AsmUtil.objectType(node.constructor.affiliation.name)
     gen.newInstance(classType)
     gen.dup()
     for param <- node.parameters do
@@ -361,19 +362,19 @@ class AsmCodeGenerationVisitor(
       gen.visitMultiANewArrayInsn(asmType(node.arrayType).getDescriptor, node.parameters.length)
   
   override def visitRefStaticField(node: RefStaticField): Unit =
-    val ownerType = AsmType.getObjectType(node.target.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.target.name)
     gen.getStatic(ownerType, node.field.name, asmType(node.field.`type`))
   
   override def visitSetStaticField(node: SetStaticField): Unit =
     visitTerm(node.value)
     gen.dup()
-    val ownerType = AsmType.getObjectType(node.target.name.replace('.', '/'))
+    val ownerType = AsmUtil.objectType(node.target.name)
     gen.putStatic(ownerType, node.field.name, asmType(node.field.`type`))
   
   override def visitOuterThis(node: OuterThis): Unit =
     gen.loadThis()
     gen.getField(
-      AsmType.getObjectType(className),
+      AsmUtil.objectType(className),
       "this$0",
       asmType(node.`type`)
     )

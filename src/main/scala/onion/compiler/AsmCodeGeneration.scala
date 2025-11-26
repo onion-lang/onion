@@ -962,28 +962,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     block: ActionStatement,
     capturedVars: Seq[LocalBinding]
   ): Unit =
-    val methodDesc = AsmType.getMethodDescriptor(
-      asmType(method.returnType),
-      method.arguments.map(asmType)*
+    val argTypes = method.arguments.map(asmType)
+    val returnType = asmType(method.returnType)
+
+    val gen = MethodEmitter.newGenerator(
+      cw,
+      Opcodes.ACC_PUBLIC,
+      method.name,
+      returnType,
+      argTypes
     )
-    
-    val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, method.name, methodDesc, null, null)
-    val gen = new GeneratorAdapter(mv, Opcodes.ACC_PUBLIC, method.name, methodDesc)
-    
-    gen.visitCode()
-    
-    // Create a special local var context for closures
+
     val closureLocalVars = new ClosureLocalVarContext(gen, className, capturedVars)
-      .withParameters(false, method.arguments.map(asmType))
-    
-    
-    // Generate method body
+      .withParameters(false, argTypes)
+
     emitStatementWithContext(gen, block, className, closureLocalVars)
-    
-    // Add default return if needed
-    if method.returnType == BasicType.VOID then
-      gen.returnValue()
-    else if !hasReturn(Array(block)) then
-      AsmUtil.emitDefaultReturn(gen, asmType(method.returnType))
-    
+
+    val needsDefault = method.returnType != BasicType.VOID && !hasReturn(Array(block))
+    MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     gen.endMethod()

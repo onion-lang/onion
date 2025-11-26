@@ -8,6 +8,12 @@ object AsmUtil {
 
   def objectType(fqcn: String): AsmType = AsmType.getObjectType(internalName(fqcn))
 
+  def getField(gen: GeneratorAdapter, ownerFqcn: String, name: String, fieldType: AsmType): Unit =
+    gen.getField(objectType(ownerFqcn), name, fieldType)
+
+  def putField(gen: GeneratorAdapter, ownerFqcn: String, name: String, fieldType: AsmType): Unit =
+    gen.putField(objectType(ownerFqcn), name, fieldType)
+
   /** Emit a default return for the given ASM type. */
   def emitDefaultReturn(gen: GeneratorAdapter, returnType: AsmType): Unit = {
     returnType.getSort match {
@@ -34,4 +40,3 @@ object AsmUtil {
     }
   }
 }
-

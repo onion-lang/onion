@@ -199,17 +199,17 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
   private def emitStatements(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String): Unit =
     emitStatementsWithContext(gen, stmts, className, new LocalVarContext(gen))
-    
-  private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit =
-    for stmt <- stmts do
-      emitStatementWithContext(gen, stmt, className, localVars)
+
+  private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit = {
+    val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
+    stmts.foreach(visitor.visitStatement)
+  }
 
   private def emitStatement(gen: GeneratorAdapter, stmt: ActionStatement, className: String): Unit =
-    emitStatementWithContext(gen, stmt, className, new LocalVarContext(gen))
+    emitStatementsWithContext(gen, Array(stmt), className, new LocalVarContext(gen))
     
   private def emitStatementWithContext(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit =
-    val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
-    visitor.visitStatement(stmt)
+    emitStatementsWithContext(gen, Array(stmt), className, localVars)
     
   private def emitExpression(gen: GeneratorAdapter, expr: Term, className: String): Unit =
     emitExpressionWithContext(gen, expr, className, new LocalVarContext(gen))

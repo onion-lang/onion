@@ -257,6 +257,7 @@ TOKEN:
   <K_ABSTRACT:     "abstract"     >
 | <K_AND:          "and"          >
 | <K_BOOLEAN:      "Boolean" >
+| <K_EXTENDS:     "extends"     >
 | <K_BREAK:        "break"        >
 | <K_BYTE:         "Byte" >
 | <K_CASE:         "case"         >
@@ -687,6 +688,16 @@ AST.TypeNode raw_type() :{AST.TypeNode c;}{
   (c = basic_type() | c = class_type()) {return c;}
 }
 
+// Parses a type parameter list: [T], [T extends Bound]
+List<GenericModel.TypeParameter> type_params() : {
+  ArrayBuffer<GenericModel.TypeParameter> params = new ArrayBuffer<GenericModel.TypeParameter>();
+  Token name; AST.TypeNode bound = null;
+}{
+  "[" name=<ID> [<K_EXTENDS> bound=type()] { params.append(new GenericModel.TypeParameter(name.image, option(bound))); }
+  ("," name=<ID> [<K_EXTENDS> bound=type()] { params.append(new GenericModel.TypeParameter(name.image, option(bound))); })*
+  "]" { return toList(params); }
+}
+
 AST.TypeNode void_type() :{Token t;}{
   t=<K_VOID> {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()), false);}
 }
@@ -698,7 +709,7 @@ AST.TypeNode type() : {
 }{
   ("+" {isRelaxed = true;})?
   c=raw_type()
-  [LOOKAHEAD(2) "<" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* ">" ]
+  [LOOKAHEAD(2) "[" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* "]" ]
   (LOOKAHEAD(2) "[" "]" {d++;})* {
     AST.TypeDescriptor desc = args.size() > 0 ? new AST.ParameterizedType(c.desc(), toList(args)) : c.desc();
     for(int i = 0; i < d; i++) {

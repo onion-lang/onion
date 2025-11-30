@@ -3,7 +3,7 @@
 Goal: Add basic generics with Scala-style erasure (upper bounds, generic classes/methods, bridge emission for overriding). Deliver in small PR-sized steps.
 
 ## Scope
-- **Type params on classes/methods** with optional upper bounds (`T <: Foo`). No variance for now. Syntax uses brackets `[]` for both definitions and applications (Scala-style): `class Box[T <: Foo]`, `def id[T](x: T): T`.
+- **Type params on classes/methods** with optional upper bounds using `extends` (e.g., `T extends Foo`). No variance for now. Syntax uses brackets `[]` for both definitions and applications: `class Box[T extends Foo]`, `def id[T extends Foo](x: T): T`.
 - **Type applications** on types/expressions: `Box[Int]`, `foo[String](x)` (brackets only).
 - **Erasure**: map type params to `Object` or bound’s erasure in JVM signatures. Emit bridges when overriding causes erased signature collisions.
 

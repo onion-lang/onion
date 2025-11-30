@@ -3,8 +3,8 @@
 Goal: Add basic generics with Scala-style erasure (upper bounds, generic classes/methods, bridge emission for overriding). Deliver in small PR-sized steps.
 
 ## Scope
-- **Type params on classes/methods** with optional upper bounds (`T <: Foo`). No variance for now.
-- **Type applications** on types/expressions: `Box[Int]`, `foo[String](x)`. Keep syntax close to Scala.
+- **Type params on classes/methods** with optional upper bounds (`T <: Foo`). No variance for now. Syntax uses brackets `[]` for both definitions and applications (Scala-style): `class Box[T <: Foo]`, `def id[T](x: T): T`.
+- **Type applications** on types/expressions: `Box[Int]`, `foo[String](x)` (brackets only).
 - **Erasure**: map type params to `Object` or bound’s erasure in JVM signatures. Emit bridges when overriding causes erased signature collisions.
 
 Out of scope (for later): variance, wildcards, lower bounds, reified generics, generic fields with runtime type info, constraints beyond single upper bound.
@@ -12,8 +12,8 @@ Out of scope (for later): variance, wildcards, lower bounds, reified generics, g
 ## Incremental Plan
 ### 1) Grammar & AST
 - Extend grammar (JavaCC) to parse:
-  - Type parameter lists on classes/methods: `<T>` / `<T <: Bound>`.
-  - Type applications on types and expressions.
+  - Type parameter lists on classes/methods: `[T]` / `[T <: Bound]` (brackets unified with applications).
+  - Type applications on types and expressions: `Foo[Bar]`.
 - AST changes (parser-level `AST`):
   - Add `TypeParameter(name, upperBound: Option[TypeNode])`.
   - Add `TypeApplication(target: TypeNode, args: List[TypeNode])`.

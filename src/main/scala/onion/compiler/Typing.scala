@@ -46,6 +46,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case AST.ReferenceType(name, qualified) => forName(name, qualified)
       case AST.ParameterizedType(base, _)     => map(base)
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
+      case unknown => throw new RuntimeException("Unknown type descriptor: " + unknown)
     }
     private def forName(name: String, qualified: Boolean): ClassType = {
       if(qualified) {
@@ -71,6 +72,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private var staticImportedList_ : StaticImportList = _
   private var definition_ : ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
+  private var typeParams_ : TypeParamScope = emptyTypeParams
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {

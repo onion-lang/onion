@@ -581,14 +581,15 @@ AST.ClassDeclaration class_decl(int mset) : {
   Option<AST.AccessSection> sec3 = null;
   ArrayBuffer<AST.TypeNode> ty2s = new ArrayBuffer<AST.TypeNode>();
   ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  t1="class" t2=<ID> [":" ty1=class_type()]
-  ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{"
+  t1="class" t2=<ID> [tparams=type_params()] [":" ty1=class_type()]
+  ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{" 
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
   "}" {
     return new AST.ClassDeclaration(
-      p(t1), mset, t2.image, ty1, toList(ty2s), sec3, toList(sec2s)
+      p(t1), mset, t2.image, ty1, toList(ty2s), sec3, toList(sec2s), tparams
     );
   }
 }
@@ -609,16 +610,17 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
   AST.MethodDeclaration signature;
   ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
   ArrayBuffer<AST.MethodDeclaration> signatures = new ArrayBuffer<AST.MethodDeclaration>();
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  start = "interface" name = <ID>
+  start = "interface" name = <ID> [tparams=type_params()]
   [ "<:"
-    superType = class_type() {append(superTypes, superType);}
+    superType = class_type() {append(superTypes, superType);} 
     ("," superType = class_type() {append(superTypes, superType);})*
-  ] "{"
+  ] "{" 
     (signature = interface_method_decl() {append(signatures, signature); })*
   "}" {
     return new AST.InterfaceDeclaration(
-      p(start), mset, name.image, toList(superTypes), toList(signatures)
+      p(start), mset, name.image, toList(superTypes), toList(signatures), tparams
     );
   }
 }
@@ -640,15 +642,17 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.TypeNode ty = null;
   AST.BlockExpression b = null;
   AST.Expression e = null;
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  "def" t=<ID> ["(" args=args() ")"] [":" ty=return_type()]
+  "def" t=<ID> [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()]
   (  (b=block() | {enterSection();} eos() ) {
-       return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b);
+       return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b, tparams);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.MethodDeclaration(
          p(t), mset, t.image, args, ty,
-         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)))
+         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
+         tparams
        );
      }
   )
@@ -658,10 +662,11 @@ AST.MethodDeclaration interface_method_decl() : {
   Token n;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty  = null;
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
   {enterSection();}
-  "def" n=<ID> ["(" args=args() ")"] [":" ty=return_type()] eos() {
-    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), n.image, args, ty, null);
+  "def" n=<ID> [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] eos() {
+    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), n.image, args, ty, null, tparams);
   }
 }
 
@@ -689,12 +694,12 @@ AST.TypeNode raw_type() :{AST.TypeNode c;}{
 }
 
 // Parses a type parameter list: [T], [T extends Bound]
-List<GenericModel.TypeParameter> type_params() : {
-  ArrayBuffer<GenericModel.TypeParameter> params = new ArrayBuffer<GenericModel.TypeParameter>();
+List<AST.TypeParameter> type_params() : {
+  ArrayBuffer<AST.TypeParameter> params = new ArrayBuffer<AST.TypeParameter>();
   Token name; AST.TypeNode bound = null;
 }{
-  "[" name=<ID> [<K_EXTENDS> bound=type()] { params.append(new GenericModel.TypeParameter(name.image, option(bound))); }
-  ("," name=<ID> [<K_EXTENDS> bound=type()] { params.append(new GenericModel.TypeParameter(name.image, option(bound))); })*
+  "[" name=<ID> [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), name.image, option(bound))); }
+  ("," name=<ID> [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), name.image, option(bound))); })*
   "]" { return toList(params); }
 }
 

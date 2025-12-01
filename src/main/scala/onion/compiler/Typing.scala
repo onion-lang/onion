@@ -11,9 +11,16 @@ import _root_.onion.compiler.IRT.UnaryTerm.Constants._
 import _root_.onion.compiler.SemanticError._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
+import onion.compiler.generics.Erasure
 
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
+  private case class TypeParam(name: String, upper: Option[Type])
+  private case class TypeParamScope(params: Map[String, TypeParam]) {
+    def get(name: String): Option[TypeParam] = params.get(name)
+    def ++(ps: Seq[TypeParam]): TypeParamScope = copy(params ++ ps.map(p => p.name -> p))
+  }
+  private val emptyTypeParams = TypeParamScope(Map.empty)
   type Continuable = Boolean
   type Environment = TypingEnvironment
   type Dimension = Int

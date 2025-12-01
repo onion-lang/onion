@@ -318,7 +318,7 @@ object TypedAST {
     }
   }
 
-  class ConstructorDefinition(val location: Location, val modifier: Int, val classType: TypedAST.ClassType, val arguments: Array[TypedAST.Type], var block: TypedAST.StatementBlock, var superInitializer: TypedAST.Super) extends
+  class ConstructorDefinition(val location: Location, val modifier: Int, val classType: TypedAST.ClassType, val arguments: Array[TypedAST.Type], var block: TypedAST.StatementBlock, var superInitializer: TypedAST.Super, override val typeParameters: Array[TypedAST.TypeParameter] = Array()) extends
   Node with TypedAST.ConstructorRef {
     def this(modifier: Int, classType: TypedAST.ClassType, arguments: Array[TypedAST.Type], block: TypedAST.StatementBlock, superInitializer: TypedAST.Super) = {
       this(null, modifier, classType, arguments, block, superInitializer)
@@ -865,6 +865,8 @@ object TypedAST {
     def affiliation: TypedAST.ClassType
 
     def getArgs: Array[TypedAST.Type]
+
+    def typeParameters: Array[TypedAST.TypeParameter] = Array()
   }
 
   /**

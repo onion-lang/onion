@@ -251,7 +251,7 @@ object TypedAST {
     def newClass(modifier: Int, name: String): TypedAST.ClassDefinition =  new TypedAST.ClassDefinition(null, false, modifier, name, null, null)
   }
 
-  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: TypedAST.ClassType, var interfaces: Seq[TypedAST.ClassType])
+  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: TypedAST.ClassType, var interfaces: Seq[TypedAST.ClassType], val typeParameters: Array[TypedAST.TypeParameter] = Array())
     extends TypedAST.AbstractClassType() with Node with Named {
 
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray(new Array[TypedAST.ConstructorRef](0))
@@ -536,8 +536,16 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class MethodDefinition(val location: Location, val modifier: Int, val classType: TypedAST.ClassType, val name: String, val arguments: Array[TypedAST.Type], val returnType: TypedAST.Type, var block: TypedAST.StatementBlock)
-    extends Node with Method {
+  class MethodDefinition(
+    val location: Location,
+    val modifier: Int,
+    val classType: TypedAST.ClassType,
+    val name: String,
+    val arguments: Array[TypedAST.Type],
+    val returnType: TypedAST.Type,
+    var block: TypedAST.StatementBlock,
+    override val typeParameters: Array[TypedAST.TypeParameter] = Array()
+  ) extends Node with Method {
     private var closure: Boolean = false
     private var frame: LocalFrame = _
 
@@ -692,6 +700,8 @@ object TypedAST {
       this(null, kind, `type`, operand)
     }
   }
+
+  case class TypeParameter(name: String, upperBound: Option[TypedAST.Type])
 
   abstract class AbstractClassType extends AbstractObjectType with ClassType {
     private val constructorRefFinder: TypedAST.ConstructorFinder = new TypedAST.ConstructorFinder()
@@ -980,6 +990,8 @@ object TypedAST {
     def arguments: Array[TypedAST.Type]
 
     def returnType: TypedAST.Type
+
+    def typeParameters: Array[TypedAST.TypeParameter] = Array()
   }
 
   class MethodComparator extends Comparator[TypedAST.Method] {
@@ -1157,4 +1169,3 @@ object TypedAST {
 @deprecated("Use TypedAST", "0.1")
 object IRT:
   export TypedAST.*
-

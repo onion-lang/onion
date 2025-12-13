@@ -583,8 +583,8 @@ AST.ClassDeclaration class_decl(int mset) : {
   ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  t1="class" t2=<ID> [tparams=type_params()] [":" ty1=class_type()]
-  ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{" 
+  t1="class" t2=<ID> [tparams=type_params()] [":" ty1=type()]
+  ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*] "{" 
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
   "}" {
@@ -614,8 +614,8 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
 }{
   start = "interface" name = <ID> [tparams=type_params()]
   [ "<:"
-    superType = class_type() {append(superTypes, superType);} 
-    ("," superType = class_type() {append(superTypes, superType);})*
+    superType = type() {append(superTypes, superType);} 
+    ("," superType = type() {append(superTypes, superType);})*
   ] "{" 
     (signature = interface_method_decl() {append(signatures, signature); })*
   "}" {

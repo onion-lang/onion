@@ -97,12 +97,79 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         codeInterfaceMethod(cw, methodDef, name)
       else
         codeMethod(cw, methodDef, name)
+
+    if !classDef.isInterface then
+      emitBridges(cw, classDef)
     
     cw.visitEnd()
     
     // Return compiled class with output directory path from config
     val outputPath = config.outputDirectory
     CompiledClass(classDef.name, outputPath, cw.toByteArray)
+
+  private def emitBridges(cw: ClassWriter, classDef: ClassDefinition): Unit =
+    val appliedSuper = classDef.superClass match
+      case ap: AppliedClassType => ap
+      case _ => null
+    if appliedSuper == null then return
+
+    val rawParams = appliedSuper.raw.typeParameters
+    if rawParams.isEmpty then return
+
+    val subst: Map[String, TypedAST.Type] =
+      rawParams.map(_.name).zip(appliedSuper.typeArguments).toMap
+
+    def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = tp match
+      case tv: TypeVariableType if subst.contains(tv.name) => subst(tv.name)
+      case at: ArrayType =>
+        val newComponent = substituteClassParams(at.component)
+        if newComponent eq at.component then at else at.table.loadArray(newComponent, at.dimension)
+      case other => other
+
+    def methodDesc(ret: TypedAST.Type, args: Array[TypedAST.Type]): String =
+      AsmType.getMethodDescriptor(asmType(ret), args.map(asmType)*)
+
+    val existing = classDef.methods.map { m =>
+      (m.name, methodDesc(m.returnType, m.arguments))
+    }.toSet
+
+    for rawMethod <- appliedSuper.raw.methods do
+      if Modifier.isStatic(rawMethod.modifier) || Modifier.isPrivate(rawMethod.modifier) then
+        ()
+      else
+        val specializedArgs = rawMethod.arguments.map(substituteClassParams)
+        val implOpt = classDef.methods.find { m =>
+          m.name == rawMethod.name &&
+          m.arguments.length == specializedArgs.length &&
+          m.arguments.indices.forall(i => m.arguments(i).name == specializedArgs(i).name)
+        }
+
+        implOpt.foreach { impl =>
+          if Modifier.isAbstract(impl.modifier) || Modifier.isStatic(impl.modifier) then
+            ()
+          else
+            val bridgeDesc = methodDesc(rawMethod.returnType, rawMethod.arguments)
+            val implDesc = methodDesc(impl.returnType, impl.arguments)
+            if bridgeDesc != implDesc && !existing.contains((rawMethod.name, bridgeDesc)) then
+              val access = toAsmModifier(impl.modifier) | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
+              val bridgeArgTypes = rawMethod.arguments.map(asmType)
+              val bridgeReturnType = asmType(rawMethod.returnType)
+              val gen = MethodEmitter.newGenerator(cw, access, rawMethod.name, bridgeReturnType, bridgeArgTypes)
+
+              val ownerType = AsmUtil.objectType(classDef.name)
+              gen.loadThis()
+              var i = 0
+              while i < bridgeArgTypes.length do
+                gen.loadArg(i)
+                val desired = asmType(impl.arguments(i))
+                if desired != bridgeArgTypes(i) then
+                  gen.checkCast(desired)
+                i += 1
+
+              gen.invokeVirtual(ownerType, AsmMethod(impl.name, implDesc))
+              gen.returnValue()
+              gen.endMethod()
+        }
 
   private def codeConstructor(cw: ClassWriter, ctor: ConstructorDefinition, className: String): Unit =
     val argTypes = ctor.arguments.map(asmType)

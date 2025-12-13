@@ -192,6 +192,25 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, message("error.semantic.unimplementedFeature"))
   }
 
+  private def reportDuplicateTypeParameter(position: Location, items: Array[AnyRef]): Unit = {
+    problem(position, format(message("error.semantic.duplicatedTypeParameter"), items(0).asInstanceOf[String]))
+  }
+
+  private def reportTypeNotGeneric(position: Location, items: Array[AnyRef]): Unit = {
+    problem(position, format(message("error.semantic.typeNotGeneric"), items(0).asInstanceOf[String]))
+  }
+
+  private def reportTypeArgumentArityMismatch(position: Location, items: Array[AnyRef]): Unit = {
+    val typeName = items(0).asInstanceOf[String]
+    val expected = items(1).toString
+    val actual = items(2).toString
+    problem(position, format(message("error.semantic.typeArgumentArityMismatch"), Array[String](typeName, expected, actual)))
+  }
+
+  private def reportTypeArgumentMustBeReference(position: Location, items: Array[AnyRef]): Unit = {
+    problem(position, format(message("error.semantic.typeArgumentMustBeReference"), items(0).asInstanceOf[String]))
+  }
+
   private def reportDuplicateGeneratedMethod(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.duplicateGeneratedMethod"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.Type]])))
   }
@@ -257,6 +276,14 @@ class SemanticErrorReporter(threshold: Int) {
         reportInterfaceRequied(position, items)
       case SemanticError.UNIMPLEMENTED_FEATURE =>
         reportUnimplementedFeature(position, items)
+      case SemanticError.DUPLICATE_TYPE_PARAMETER =>
+        reportDuplicateTypeParameter(position, items)
+      case SemanticError.TYPE_NOT_GENERIC =>
+        reportTypeNotGeneric(position, items)
+      case SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH =>
+        reportTypeArgumentArityMismatch(position, items)
+      case SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE =>
+        reportTypeArgumentMustBeReference(position, items)
       case SemanticError.DUPLICATE_CONSTRUCTOR =>
         reportDuplicateConstructor(position, items)
       case SemanticError.DUPLICATE_GENERATED_METHOD =>

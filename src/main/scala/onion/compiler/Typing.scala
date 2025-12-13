@@ -1741,11 +1741,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           case applied: TypedAST.AppliedClassType =>
             val rawParams = applied.raw.typeParameters
             if (rawParams.isEmpty) {
-              report(UNIMPLEMENTED_FEATURE, typeNode)
+              report(TYPE_NOT_GENERIC, typeNode, applied.raw.name)
               return
             }
             if (rawParams.length != applied.typeArguments.length) {
-              report(UNIMPLEMENTED_FEATURE, typeNode)
+              report(TYPE_ARGUMENT_ARITY_MISMATCH, typeNode, applied.raw.name, Integer.valueOf(rawParams.length), Integer.valueOf(applied.typeArguments.length))
               return
             }
             var i = 0
@@ -1753,7 +1753,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
               val upper = rawParams(i).upperBound.getOrElse(rootClass)
               val arg = applied.typeArguments(i)
               if (arg.isBasicType) {
-                report(UNIMPLEMENTED_FEATURE, typeNode)
+                report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
                 return
               }
               if (!TypeRules.isAssignable(upper, arg)) {
@@ -1780,7 +1780,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     val result = Buffer[TypeParam]()
     for (tp <- nodes) {
       if (seen.contains(tp.name)) {
-        report(UNIMPLEMENTED_FEATURE, tp)
+        report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
       } else {
         seen += tp.name
         val upper = tp.upperBound match {

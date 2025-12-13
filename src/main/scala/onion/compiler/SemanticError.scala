@@ -30,5 +30,9 @@ object SemanticError {
   case object DUPLICATE_GENERATED_METHOD extends SemanticError(26)
   case object IS_NOT_BOXABLE_TYPE extends SemanticError(27)
   case object LVALUE_REQUIRED extends SemanticError(28)
+  case object DUPLICATE_TYPE_PARAMETER extends SemanticError(29)
+  case object TYPE_NOT_GENERIC extends SemanticError(30)
+  case object TYPE_ARGUMENT_ARITY_MISMATCH extends SemanticError(31)
+  case object TYPE_ARGUMENT_MUST_BE_REFERENCE extends SemanticError(32)
 }
 sealed abstract class SemanticError(code: Int)

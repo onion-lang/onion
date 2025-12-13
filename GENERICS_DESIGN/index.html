@@ -12,31 +12,27 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.github.io/onion/getting-started/installation/">
+        <link rel="canonical" href="https://onion-lang.github.io/onion/GENERICS_DESIGN/">
       
       
-        <link rel="prev" href="../..">
-      
-      
-        <link rel="next" href="../hello-world/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
     
     
       
-        <title>Installation - Onion Programming Language</title>
+        <title>Generics (Erasure-Based) – Design & TODO - Onion Programming Language</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,7 +51,7 @@
       
     
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#generics-erasure-based-design-todo" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +90,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href=".." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -114,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Generics (Erasure-Based) – Design &amp; TODO
             
           </span>
         </div>
@@ -227,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -244,13 +240,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -270,7 +264,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../guide/overview/" class="md-tabs__link">
+        <a href="../guide/overview/" class="md-tabs__link">
           
   
   
@@ -290,7 +284,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../examples/overview/" class="md-tabs__link">
+        <a href="../examples/overview/" class="md-tabs__link">
           
   
   
@@ -310,7 +304,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tools/compiler/" class="md-tabs__link">
+        <a href="../tools/compiler/" class="md-tabs__link">
           
   
   
@@ -330,7 +324,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/specification/" class="md-tabs__link">
+        <a href="../reference/specification/" class="md-tabs__link">
           
   
   
@@ -350,7 +344,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../contributing/development/" class="md-tabs__link">
+        <a href="../contributing/development/" class="md-tabs__link">
           
   
   
@@ -384,7 +378,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href=".." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -414,7 +408,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -438,31 +432,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -480,7 +471,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -495,37 +486,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -541,137 +505,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-methods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation Methods
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Installation Methods">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#method-1-download-pre-built-binary-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Method 1: Download Pre-built Binary (Recommended)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#method-2-build-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Method 2: Build from Source
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verify-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify Installation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#ide-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IDE Setup
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IDE Setup">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#visual-studio-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Visual Studio Code
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#intellij-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IntelliJ IDEA
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -684,7 +517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../hello-world/" class="md-nav__link">
+      <a href="../getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -712,7 +545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../quick-start/" class="md-nav__link">
+      <a href="../getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -801,7 +634,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/overview/" class="md-nav__link">
+      <a href="../guide/overview/" class="md-nav__link">
         
   
   
@@ -829,7 +662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/basic-syntax/" class="md-nav__link">
+      <a href="../guide/basic-syntax/" class="md-nav__link">
         
   
   
@@ -857,7 +690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/variables-and-types/" class="md-nav__link">
+      <a href="../guide/variables-and-types/" class="md-nav__link">
         
   
   
@@ -885,7 +718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/control-flow/" class="md-nav__link">
+      <a href="../guide/control-flow/" class="md-nav__link">
         
   
   
@@ -913,7 +746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/functions/" class="md-nav__link">
+      <a href="../guide/functions/" class="md-nav__link">
         
   
   
@@ -941,7 +774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/classes-and-objects/" class="md-nav__link">
+      <a href="../guide/classes-and-objects/" class="md-nav__link">
         
   
   
@@ -969,7 +802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/inheritance/" class="md-nav__link">
+      <a href="../guide/inheritance/" class="md-nav__link">
         
   
   
@@ -997,7 +830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/lambda-expressions/" class="md-nav__link">
+      <a href="../guide/lambda-expressions/" class="md-nav__link">
         
   
   
@@ -1025,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/java-interop/" class="md-nav__link">
+      <a href="../guide/java-interop/" class="md-nav__link">
         
   
   
@@ -1114,7 +947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/overview/" class="md-nav__link">
+      <a href="../examples/overview/" class="md-nav__link">
         
   
   
@@ -1142,7 +975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/basic/" class="md-nav__link">
+      <a href="../examples/basic/" class="md-nav__link">
         
   
   
@@ -1170,7 +1003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/oop/" class="md-nav__link">
+      <a href="../examples/oop/" class="md-nav__link">
         
   
   
@@ -1198,7 +1031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/functional/" class="md-nav__link">
+      <a href="../examples/functional/" class="md-nav__link">
         
   
   
@@ -1287,7 +1120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/compiler/" class="md-nav__link">
+      <a href="../tools/compiler/" class="md-nav__link">
         
   
   
@@ -1315,7 +1148,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/script-runner/" class="md-nav__link">
+      <a href="../tools/script-runner/" class="md-nav__link">
         
   
   
@@ -1343,7 +1176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/repl/" class="md-nav__link">
+      <a href="../tools/repl/" class="md-nav__link">
         
   
   
@@ -1432,7 +1265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/specification/" class="md-nav__link">
+      <a href="../reference/specification/" class="md-nav__link">
         
   
   
@@ -1460,7 +1293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/stdlib/" class="md-nav__link">
+      <a href="../reference/stdlib/" class="md-nav__link">
         
   
   
@@ -1488,7 +1321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/compiler-architecture/" class="md-nav__link">
+      <a href="../reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -1577,7 +1410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/development/" class="md-nav__link">
+      <a href="../contributing/development/" class="md-nav__link">
         
   
   
@@ -1605,7 +1438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/building/" class="md-nav__link">
+      <a href="../contributing/building/" class="md-nav__link">
         
   
   
@@ -1660,10 +1493,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prerequisites
+        Scope
       
     </span>
   </a>
@@ -1671,22 +1504,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation-methods" class="md-nav__link">
+  <a href="#incremental-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installation Methods
+        Incremental Plan
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Installation Methods">
+    <nav class="md-nav" aria-label="Incremental Plan">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#method-1-download-pre-built-binary-recommended" class="md-nav__link">
+  <a href="#1-grammar-ast" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Method 1: Download Pre-built Binary (Recommended)
+        1) Grammar &amp; AST
       
     </span>
   </a>
@@ -1694,10 +1527,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#method-2-build-from-source" class="md-nav__link">
+  <a href="#2-typed-ast-typing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Method 2: Build from Source
+        2) Typed AST &amp; Typing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-code-generation-asm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Code Generation (ASM)
       
     </span>
   </a>
@@ -1710,10 +1554,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#verify-installation" class="md-nav__link">
+  <a href="#testing-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verify Installation
+        Testing Plan
       
     </span>
   </a>
@@ -1721,49 +1565,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ide-setup" class="md-nav__link">
+  <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IDE Setup
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IDE Setup">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#visual-studio-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Visual Studio Code
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#intellij-idea" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        IntelliJ IDEA
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
+        Notes
       
     </span>
   </a>
@@ -1790,78 +1595,65 @@
   
 
 
-<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<p>This guide will help you install and set up the Onion programming language on your system.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>Onion runs on the JVM and requires:</p>
+<h1 id="generics-erasure-based-design-todo">Generics (Erasure-Based) – Design &amp; TODO<a class="headerlink" href="#generics-erasure-based-design-todo" title="Permanent link">&para;</a></h1>
+<p>Goal: Add basic generics with Scala-style erasure (upper bounds, generic classes/methods, bridge emission for overriding). Deliver in small PR-sized steps.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Java Development Kit (JDK) 17 or later</strong></li>
-<li><strong>SBT (Scala Build Tool)</strong> - for building from source</li>
+<li><strong>Type params on classes/methods</strong> with optional upper bounds using <code>extends</code> (e.g., <code>T extends Foo</code>). No variance for now. Syntax uses brackets <code>[]</code> for both definitions and applications: <code>class Box[T extends Foo]</code>, <code>def id[T extends Foo](x: T): T</code>.</li>
+<li><strong>Type applications</strong> on types/expressions: <code>Box[Int]</code>, <code>foo[String](x)</code> (brackets only).</li>
+<li><strong>Erasure</strong>: map type params to <code>Object</code> or bound’s erasure in JVM signatures. Emit bridges when overriding causes erased signature collisions.</li>
 </ul>
-<h2 id="installation-methods">Installation Methods<a class="headerlink" href="#installation-methods" title="Permanent link">&para;</a></h2>
-<h3 id="method-1-download-pre-built-binary-recommended">Method 1: Download Pre-built Binary (Recommended)<a class="headerlink" href="#method-1-download-pre-built-binary-recommended" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Download the latest release from the <a href="https://github.com/onion-lang/onion/releases">GitHub Releases page</a></li>
-<li>Extract the archive:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>unzip<span class="w"> </span>onion-dist.zip
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>onion-dist
-</span></code></pre></div></li>
-<li>Add the <code>bin</code> directory to your PATH:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="nv">$PATH</span>:/path/to/onion-dist/bin
-</span></code></pre></div></li>
-</ol>
-<h3 id="method-2-build-from-source">Method 2: Build from Source<a class="headerlink" href="#method-2-build-from-source" title="Permanent link">&para;</a></h3>
-<ol>
-<li>
-<p>Clone the repository:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/onion-lang/onion.git
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>onion
-</span></code></pre></div></p>
-</li>
-<li>
-<p>Build the project with SBT:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span>compile
-</span></code></pre></div></p>
-</li>
-<li>
-<p>Create the distribution package:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sbt<span class="w"> </span>dist
-</span></code></pre></div></p>
-</li>
-</ol>
-<p>This creates a distribution ZIP in <code>target/onion-dist.zip</code></p>
-<ol>
-<li>Or build a standalone JAR:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sbt<span class="w"> </span>assembly
-</span></code></pre></div></li>
-</ol>
-<p>This creates <code>onion.jar</code> in the <code>target/scala-3.6.2/</code> directory</p>
-<h2 id="verify-installation">Verify Installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h2>
-<p>Check that Onion is installed correctly:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># If using the distribution</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>onionc<span class="w"> </span>--help
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># If using the JAR directly</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>java<span class="w"> </span>-jar<span class="w"> </span>onion.jar<span class="w"> </span>--help
-</span></code></pre></div>
-<h2 id="ide-setup">IDE Setup<a class="headerlink" href="#ide-setup" title="Permanent link">&para;</a></h2>
-<h3 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h3>
-<p>While there's no official Onion extension yet, you can use:</p>
+<p>Out of scope (for later): variance, wildcards, lower bounds, reified generics, generic fields with runtime type info, constraints beyond single upper bound.</p>
+<h2 id="incremental-plan">Incremental Plan<a class="headerlink" href="#incremental-plan" title="Permanent link">&para;</a></h2>
+<h3 id="1-grammar-ast">1) Grammar &amp; AST<a class="headerlink" href="#1-grammar-ast" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Generic syntax highlighting for similar languages</li>
-<li>Java/Scala extensions for dependency management</li>
+<li>Extend grammar (JavaCC) to parse:</li>
+<li>Type parameter lists on classes/methods: <code>[T]</code> / <code>[T &lt;: Bound]</code> (brackets unified with applications).</li>
+<li>Type applications on types and expressions: <code>Foo[Bar]</code>.</li>
+<li>AST changes (parser-level <code>AST</code>):</li>
+<li>Add <code>TypeParameter(name, upperBound: Option[TypeNode])</code>.</li>
+<li>Add <code>TypeApplication(target: TypeNode, args: List[TypeNode])</code>.</li>
+<li>Thread type params into <code>ClassDeclaration</code>, <code>MethodDeclaration</code>, <code>FunctionDeclaration</code>, <code>ClosureExpression</code> if applicable.</li>
+<li>Thread type args into <code>NewObject</code>, <code>StaticMethodCall</code>, <code>MethodCall</code>, <code>StaticMemberSelection</code> when present.</li>
+<li>Regenerate parser sources (JavaCC) after grammar updates.</li>
 </ul>
-<h3 id="intellij-idea">IntelliJ IDEA<a class="headerlink" href="#intellij-idea" title="Permanent link">&para;</a></h3>
-<p>For developing the Onion compiler itself:</p>
-<ol>
-<li>Install the Scala plugin</li>
-<li>Import the project as an SBT project</li>
-<li>The IDE will automatically download dependencies</li>
-</ol>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>Checkpoint: Parser builds; AST nodes produced for simple examples like <code>class Box[T] { def get(x: T): T = x }</code> and <code>new Box[Int]()</code>.</p>
+<h3 id="2-typed-ast-typing">2) Typed AST &amp; Typing<a class="headerlink" href="#2-typed-ast-typing" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="../hello-world/">Hello World Tutorial</a> - Write your first Onion program</li>
-<li><a href="../quick-start/">Quick Start Guide</a> - Learn the essential features</li>
+<li>Typed model additions:</li>
+<li><code>TypedAST.TypeParameter(name, upperBound: IRT.Type)</code> and <code>TypeApplication</code> nodes.</li>
+<li>Include type params on <code>ClassDefinition</code>, <code>MethodDefinition</code>.</li>
+<li>Environment/bindings:</li>
+<li>Track type param scopes (class-level + method-level) with bounds.</li>
+<li>Validate type argument arity at use sites.</li>
+<li>Bound checking: substitute type args into bounds, ensure conformity (erased to bound when unknown).</li>
+<li>Erasure semantics in typing:</li>
+<li>Compute erased type for type params: <code>erasure(T) = erasure(bound)</code> else <code>Object</code>.</li>
+<li>Erase generic method/class types for codegen signatures.</li>
+<li>Type inference: initially <strong>not</strong> implemented; require explicit type arguments at calls.</li>
+</ul>
+<p>Checkpoint: Typing accepts generic class/method definitions and applications, rejects arity/bound errors, produces TypedAST with erased info attached.</p>
+<h3 id="3-code-generation-asm">3) Code Generation (ASM)<a class="headerlink" href="#3-code-generation-asm" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Signature computation: use erased types for descriptors.</li>
+<li>Bridge methods:</li>
+<li>When a subclass overrides a generic parent method where the erased signature would differ, emit a bridge that delegates to the typed implementation.</li>
+<li>Detect collisions during method table assembly (compare erased names+descs).</li>
+<li>Class/method naming: no mangling beyond erasure; rely on bridges for dispatch correctness.</li>
+</ul>
+<p>Checkpoint: Bytecode for generic hierarchies loads and runs; overridden generic methods dispatch correctly via bridges.</p>
+<h2 id="testing-plan">Testing Plan<a class="headerlink" href="#testing-plan" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Parser round-trips: generic class/method definitions and instantiations.</li>
+<li>Typing: arity/bound errors; correct acceptance of <code>Box[Int]</code>, rejection of <code>Box[Int, String]</code>.</li>
+<li>Runtime: execute small programs with generic collections/identity methods; override scenarios that require bridges.</li>
+<li>Non-generic regressions: full existing test suite.</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Keep resource strings (errors) consistent; add new keys for arity/bound errors.</li>
+<li>Maintain backward compatibility: existing non-generic code should compile unchanged.</li>
+<li>Consider feature flags if rollout needs to be staged; otherwise, ship as a single feature branch with checkpoints.</li>
 </ul>
 
 
@@ -1893,44 +1685,6 @@
       
         <footer class="md-footer">
   
-    
-      
-      <nav class="md-footer__inner md-grid" aria-label="Footer" >
-        
-          
-          <a href="../.." class="md-footer__link md-footer__link--prev" aria-label="Previous: Home">
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
-            </div>
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Previous
-              </span>
-              <div class="md-ellipsis">
-                Home
-              </div>
-            </div>
-          </a>
-        
-        
-          
-          <a href="../hello-world/" class="md-footer__link md-footer__link--next" aria-label="Next: Hello World">
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              <div class="md-ellipsis">
-                Hello World
-              </div>
-            </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
-            </div>
-          </a>
-        
-      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1974,10 +1728,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
       
     
   </body>

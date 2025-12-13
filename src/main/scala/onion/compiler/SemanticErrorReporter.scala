@@ -211,6 +211,20 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(message("error.semantic.typeArgumentMustBeReference"), items(0).asInstanceOf[String]))
   }
 
+  private def reportMethodNotGeneric(position: Location, items: Array[AnyRef]): Unit = {
+    val owner = items(0).asInstanceOf[String]
+    val name = items(1).asInstanceOf[String]
+    problem(position, format(message("error.semantic.methodNotGeneric"), owner, name))
+  }
+
+  private def reportMethodTypeArgumentArityMismatch(position: Location, items: Array[AnyRef]): Unit = {
+    val owner = items(0).asInstanceOf[String]
+    val name = items(1).asInstanceOf[String]
+    val expected = items(2).toString
+    val actual = items(3).toString
+    problem(position, format(message("error.semantic.methodTypeArgumentArityMismatch"), owner, name, expected, actual))
+  }
+
   private def reportDuplicateGeneratedMethod(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.duplicateGeneratedMethod"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.Type]])))
   }
@@ -284,6 +298,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportTypeArgumentArityMismatch(position, items)
       case SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE =>
         reportTypeArgumentMustBeReference(position, items)
+      case SemanticError.METHOD_NOT_GENERIC =>
+        reportMethodNotGeneric(position, items)
+      case SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH =>
+        reportMethodTypeArgumentArityMismatch(position, items)
       case SemanticError.DUPLICATE_CONSTRUCTOR =>
         reportDuplicateConstructor(position, items)
       case SemanticError.DUPLICATE_GENERATED_METHOD =>

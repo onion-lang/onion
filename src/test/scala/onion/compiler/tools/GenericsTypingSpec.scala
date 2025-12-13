@@ -59,6 +59,48 @@ class GenericsTypingSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == result)
     }
 
+    it("accepts explicit generic method type arguments") {
+      val result = shell.run(
+        """
+          |class UtilExplicit {
+          |public:
+          |  static def id[A extends Object](x: A): A {
+          |    return x
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    return UtilExplicit::id[String]("ok")
+          |  }
+          |}
+          |""".stripMargin,
+        "UtilExplicit.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("rejects invalid explicit generic method type arguments") {
+      val result = silenceErr {
+        shell.run(
+          """
+            |class UtilExplicitFail {
+            |public:
+            |  static def id[A extends Object](x: A): A {
+            |    return x
+            |  }
+            |
+            |  static def main(args: String[]): String {
+            |    return UtilExplicitFail::id[String](new Object)
+            |  }
+            |}
+            |""".stripMargin,
+          "UtilExplicitFail.on",
+          Array()
+        )
+      }
+      assert(Shell.Failure(-1) == result)
+    }
+
     it("rejects conflicting generic method inference") {
       val result = silenceErr {
         shell.run(
@@ -121,4 +163,3 @@ class GenericsTypingSpec extends AbstractShellSpec {
     }
   }
 }
-

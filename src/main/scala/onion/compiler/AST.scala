@@ -101,7 +101,10 @@ object AST {
   case class MathLeftShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<")
   case class MathRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>")
   case class MemberSelection(location: Location, target: Expression/*nullable*/, name: String) extends Expression
-  case class MethodCall(location: Location, target: Expression/*nullable*/, name: String, args: List[Expression]) extends Expression
+  case class MethodCall(location: Location, target: Expression/*nullable*/, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
+    def this(location: Location, target: Expression, name: String, args: List[Expression]) =
+      this(location, target, name, args, Nil)
+  }
   case class Modulo(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("%")
   case class ModuloAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("%=")
   case class Multiplication(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("*")
@@ -118,14 +121,23 @@ object AST {
   case class ReferenceEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("===")
   case class ReferenceNotEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("!==")
   case class UnqualifiedFieldReference(location: Location, name: String) extends Expression
-  case class UnqualifiedMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
+  case class UnqualifiedMethodCall(location: Location, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
+    def this(location: Location, name: String, args: List[Expression]) =
+      this(location, name, args, Nil)
+  }
   case class StaticMemberSelection(location: Location, typeRef: TypeNode, name: String) extends Expression
-  case class StaticMethodCall(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) extends Expression
+  case class StaticMethodCall(location: Location, typeRef: TypeNode, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
+    def this(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) =
+      this(location, typeRef, name, args, Nil)
+  }
   case class StringLiteral(location: Location, value: String) extends Expression
   case class StringInterpolation(location: Location, parts: List[String], expressions: List[Expression]) extends Expression
   case class Subtraction(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-")
   case class SubtractionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-=")
-  case class SuperMethodCall(location: Location, name: String, args: List[Expression]) extends Expression
+  case class SuperMethodCall(location: Location, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
+    def this(location: Location, name: String, args: List[Expression]) =
+      this(location, name, args, Nil)
+  }
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
 
   abstract sealed class CompoundExpression extends Toplevel

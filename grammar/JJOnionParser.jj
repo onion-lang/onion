@@ -703,6 +703,17 @@ List<AST.TypeParameter> type_params() : {
   "]" { return toList(params); }
 }
 
+// Parses a type argument list: [String], [Foo[Bar]], etc.
+List<AST.TypeNode> type_arguments() : {
+  AST.TypeNode ty;
+  ArrayBuffer<AST.TypeNode> args = new ArrayBuffer<AST.TypeNode>();
+}{
+  "[" eols()
+    ty=type() { append(args, ty); }
+    ("," eols() ty=type() { append(args, ty); })*
+  eols() "]" { return toList(args); }
+}
+
 AST.TypeNode void_type() :{Token t;}{
   t=<K_VOID> {return new AST.TypeNode(p(t), new AST.PrimitiveType(AST.K_VOID()), false);}
 }
@@ -966,11 +977,19 @@ AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
 
 AST.Expression primary_suffix() : {
   Token t, n; AST.Expression e, a = null; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
+  List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
   AST.TypeNode type;
 }{
   e=primary()
 ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
-| t="." eols() n=<ID> (LOOKAHEAD(1) "(" eols() args=terms() ")" [a=anonymous_function()] {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);} | {e = new AST.MemberSelection(p(t), e, c(n));})
+| t="." eols() n=<ID> (
+    LOOKAHEAD( type_arguments() eols() "(" )
+      tas=type_arguments() eols() "(" eols() args=terms() ")" [a=anonymous_function()]
+        {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args, tas);}
+  | LOOKAHEAD(1) "(" eols() args=terms() ")" [a=anonymous_function()]
+        {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);}
+  | {e = new AST.MemberSelection(p(t), e, c(n));}
+  )
 | t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
 | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
 | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
@@ -981,11 +1000,16 @@ AST.Expression primary() : {
   Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
   List<AST.Expression> es = (List<AST.Expression>)AST.NIL();
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
   AST.BlockExpression body;
 }{
-  t="super" eols() "." eols() n=<ID> ["(" es=terms() ")"]           {return new AST.SuperMethodCall(p(t), c(n), es);}
+  LOOKAHEAD( "super" eols() "." eols() <ID> type_arguments() "(" )
+    t="super" eols() "." eols() n=<ID> tas=type_arguments() "(" es=terms() ")"           {return new AST.SuperMethodCall(p(t), c(n), es, tas);}
+| t="super" eols() "." eols() n=<ID> ["(" es=terms() ")"]                                {return new AST.SuperMethodCall(p(t), c(n), es);}
+| LOOKAHEAD( class_type() "::" <ID> type_arguments() "(" ) ty=class_type() t="::" n=<ID> tas=type_arguments() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es, tas);}
 | LOOKAHEAD(4) ty=class_type() t="::" n=<ID> "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
 | LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
+| LOOKAHEAD( <ID> type_arguments() "(" ) t=<ID> tas=type_arguments() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas);}
 | LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
 | t=<ID>                                                            {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}

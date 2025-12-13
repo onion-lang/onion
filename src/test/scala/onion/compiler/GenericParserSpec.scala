@@ -39,6 +39,29 @@ class GenericParserSpec extends AnyFunSpec with Diagrams {
       val useMethods = use.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
       assert(useMethods.exists(_.returnType.desc.isInstanceOf[AST.ParameterizedType]))
     }
+
+    it("parses method call type arguments") {
+      val source =
+        """
+          |class Util {
+          |public:
+          |  static def id[A extends Object](x: A): A = x
+          |
+          |  static def main(args: String[]): String {
+          |    return Util::id[String]("ok")
+          |  }
+          |}
+          |""".stripMargin
+
+      val unit = new JJOnionParser(new StringReader(source)).unit()
+      val util = unit.toplevels.collectFirst { case c: AST.ClassDeclaration if c.name == "Util" => c }.get
+      val methods = util.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
+      val main = methods.find(_.name == "main").get
+      val returns = main.block.elements.collect { case r: AST.ReturnExpression => r }
+      val returned = returns.head.result
+      val call = returned.asInstanceOf[AST.StaticMethodCall]
+      assert(call.typeArgs.nonEmpty)
+      assert(call.typeArgs.head.desc.toString == "String")
+    }
   }
 }
-

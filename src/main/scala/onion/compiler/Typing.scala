@@ -1038,7 +1038,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             None
         }
 
-      case node@AST.MethodCall(loc, target, name, args) =>
+      case node@AST.MethodCall(loc, target, name, args, typeArgs) =>
         val target = typed(node.target, context).getOrElse(null)
         if (target == null) return None
         val params = typedTerms(node.args.toArray, context)
@@ -1155,7 +1155,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             null
         })
       // Removed: UnqualifiedFieldReference - use this.field or self.field instead
-      case node@AST.UnqualifiedMethodCall(loc, name, args) =>
+      case node@AST.UnqualifiedMethodCall(loc, name, args, typeArgs) =>
         var params = typedTerms(node.args.toArray, context)
         if (params == null) return None
         val targetType = definition_
@@ -1200,7 +1200,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }else {
           Some(new RefStaticField(typeRef,field))
         }
-      case node@AST.StaticMethodCall(loc, _, _, _) =>
+      case node@AST.StaticMethodCall(loc, _, _, _, typeArgs) =>
         val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         val parameters = typedTerms(node.args.toArray, context)
         if (typeRef == null || parameters == null) {
@@ -1282,7 +1282,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           return None
         }
         Some(new Call(result, toStringMethods(0), Array[Term]()))
-      case node@AST.SuperMethodCall(loc, _, _) =>
+      case node@AST.SuperMethodCall(loc, _, _, typeArgs) =>
         val parameters = typedTerms(node.args.toArray, context)
         if (parameters == null) return None
         val contextClass = definition_

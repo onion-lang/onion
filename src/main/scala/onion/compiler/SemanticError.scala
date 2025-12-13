@@ -36,5 +36,6 @@ object SemanticError {
   case object TYPE_ARGUMENT_MUST_BE_REFERENCE extends SemanticError(32)
   case object METHOD_NOT_GENERIC extends SemanticError(33)
   case object METHOD_TYPE_ARGUMENT_ARITY_MISMATCH extends SemanticError(34)
+  case object ERASURE_SIGNATURE_COLLISION extends SemanticError(35)
 }
 sealed abstract class SemanticError(code: Int)

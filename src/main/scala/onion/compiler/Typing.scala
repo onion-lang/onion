@@ -12,6 +12,7 @@ import _root_.onion.compiler.SemanticError._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 import onion.compiler.generics.Erasure
+import org.objectweb.asm.{Type => AsmType}
 
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
@@ -1721,6 +1722,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
       for (section <- node.sections) processAccessSection(section)
       generateMethods()
+      checkErasureSignatureCollisions(clazz, node.location)
     }
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
       val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
@@ -1731,7 +1733,42 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       definition_ = clazz
       mapper_ = find(clazz.name)
       for (node <- node.methods) processInterfaceMethodDeclaration(node)
+      checkErasureSignatureCollisions(clazz, node.location)
     }
+
+    def erasedAsmType(tp: Type): AsmType = tp match
+      case BasicType.VOID    => AsmType.VOID_TYPE
+      case BasicType.BOOLEAN => AsmType.BOOLEAN_TYPE
+      case BasicType.BYTE    => AsmType.BYTE_TYPE
+      case BasicType.SHORT   => AsmType.SHORT_TYPE
+      case BasicType.CHAR    => AsmType.CHAR_TYPE
+      case BasicType.INT     => AsmType.INT_TYPE
+      case BasicType.LONG    => AsmType.LONG_TYPE
+      case BasicType.FLOAT   => AsmType.FLOAT_TYPE
+      case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
+      case tv: TypedAST.TypeVariableType => erasedAsmType(tv.upperBound)
+      case ap: TypedAST.AppliedClassType => erasedAsmType(ap.raw)
+      case ct: ClassType => AsmType.getObjectType(ct.name.replace('.', '/'))
+      case at: ArrayType =>
+        val componentDesc = erasedAsmType(at.component).getDescriptor
+        AsmType.getType("[" * at.dimension + componentDesc)
+      case _: NullType => AsmType.getObjectType("java/lang/Object")
+      case other => throw new RuntimeException(s"Unsupported type for erasure collision check: $other")
+
+    def erasedMethodDesc(method: Method): String =
+      AsmType.getMethodDescriptor(erasedAsmType(method.returnType), method.arguments.map(erasedAsmType)*)
+
+    def checkErasureSignatureCollisions(clazz: ClassDefinition, fallback: Location): Unit =
+      val seen = HashMap[(String, String), Method]()
+      for m <- clazz.methods do
+        val key = (m.name, erasedMethodDesc(m))
+        if seen.contains(key) then
+          val ast = lookupAST(m.asInstanceOf[Node])
+          val location = if ast != null then ast.location else fallback
+          report(ERASURE_SIGNATURE_COLLISION, location, clazz, m.name, key._2)
+        else
+          seen(key) = m
+
     unit_ = node
     variables.clear()
     functions.clear()

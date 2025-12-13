@@ -182,6 +182,32 @@ class GenericsTypingSpec extends AbstractShellSpec {
       }
       assert(Shell.Failure(-1) == result)
     }
+
+    it("rejects erased signature collisions") {
+      val result = silenceErr {
+        shell.run(
+          """
+            |class Collision[T] {
+            |public:
+            |  def f(x: T): Object {
+            |    return x
+            |  }
+            |
+            |  def f(x: Object): Object {
+            |    return x
+            |  }
+            |
+            |  static def main(args: String[]): Int {
+            |    return 0
+            |  }
+            |}
+            |""".stripMargin,
+          "Collision.on",
+          Array()
+        )
+      }
+      assert(Shell.Failure(-1) == result)
+    }
   }
 
   private def silenceErr[A](block: => A): A = {

@@ -225,6 +225,13 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(message("error.semantic.methodTypeArgumentArityMismatch"), owner, name, expected, actual))
   }
 
+  private def reportErasureSignatureCollision(position: Location, items: Array[AnyRef]): Unit = {
+    val owner = (items(0).asInstanceOf[IRT.Type]).name
+    val name = items(1).asInstanceOf[String]
+    val desc = items(2).asInstanceOf[String]
+    problem(position, format(message("error.semantic.erasureSignatureCollision"), owner, name, desc))
+  }
+
   private def reportDuplicateGeneratedMethod(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.duplicateGeneratedMethod"), (items(0).asInstanceOf[IRT.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[IRT.Type]])))
   }
@@ -302,6 +309,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportMethodNotGeneric(position, items)
       case SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH =>
         reportMethodTypeArgumentArityMismatch(position, items)
+      case SemanticError.ERASURE_SIGNATURE_COLLISION =>
+        reportErasureSignatureCollision(position, items)
       case SemanticError.DUPLICATE_CONSTRUCTOR =>
         reportDuplicateConstructor(position, items)
       case SemanticError.DUPLICATE_GENERATED_METHOD =>

@@ -282,7 +282,15 @@ class AsmCodeGenerationVisitor(
   
   override def visitAsInstanceOf(node: AsInstanceOf): Unit =
     visitTerm(node.target)
-    gen.checkCast(asmType(node.destination))
+    (node.target.`type`, node.destination) match
+      case (from: BasicType, to: BasicType) =>
+        gen.cast(asmType(from), asmType(to))
+      case (_: BasicType, _: ObjectType | _: ArrayType | _: NullType) =>
+        throw new RuntimeException(s"Unsupported cast from basic to reference: ${node.target.`type`} => ${node.destination}")
+      case (_: ObjectType | _: ArrayType | _: NullType, to: BasicType) =>
+        throw new RuntimeException(s"Unsupported cast from reference to basic: ${node.target.`type`} => ${node.destination}")
+      case _ =>
+        gen.checkCast(asmType(node.destination))
   
   override def visitInstanceOf(node: InstanceOf): Unit =
     visitTerm(node.target)

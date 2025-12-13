@@ -251,8 +251,23 @@ object TypedAST {
     def newClass(modifier: Int, name: String): TypedAST.ClassDefinition =  new TypedAST.ClassDefinition(null, false, modifier, name, null, null)
   }
 
-  class ClassDefinition(val location: Location, val isInterface: Boolean, val modifier: Int, val name: String, var superClass: TypedAST.ClassType, var interfaces: Seq[TypedAST.ClassType], val typeParameters: Array[TypedAST.TypeParameter] = Array())
+  class ClassDefinition(
+    val location: Location,
+    val isInterface: Boolean,
+    val modifier: Int,
+    val name: String,
+    var superClass: TypedAST.ClassType,
+    var interfaces: Seq[TypedAST.ClassType],
+    typeParameters0: Array[TypedAST.TypeParameter] = Array()
+  )
     extends TypedAST.AbstractClassType() with Node with Named {
+
+    private var typeParameters_ = typeParameters0
+
+    override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
+
+    def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
+      typeParameters_ = typeParameters
 
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray(new Array[TypedAST.ConstructorRef](0))
     def methods: Seq[TypedAST.Method] = methods_.values.toSeq
@@ -703,6 +718,41 @@ object TypedAST {
 
   case class TypeParameter(name: String, upperBound: Option[TypedAST.Type])
 
+  object AppliedClassType {
+    private val cache = scala.collection.mutable.HashMap[(TypedAST.ClassType, scala.collection.immutable.List[TypedAST.Type]), AppliedClassType]()
+
+    def apply(raw: TypedAST.ClassType, typeArguments: scala.collection.immutable.List[TypedAST.Type]): AppliedClassType =
+      cache.getOrElseUpdate((raw, typeArguments), new AppliedClassType(raw, typeArguments.toArray[TypedAST.Type]))
+  }
+
+  final class AppliedClassType private(val raw: TypedAST.ClassType, val typeArguments: Array[TypedAST.Type])
+    extends AbstractClassType {
+    def name: String = raw.name
+    def isInterface: Boolean = raw.isInterface
+    def modifier: Int = raw.modifier
+    def superClass: TypedAST.ClassType = raw.superClass
+    def interfaces: Seq[TypedAST.ClassType] = raw.interfaces
+    def methods: Seq[TypedAST.Method] = raw.methods
+    def methods(name: String): Array[TypedAST.Method] = raw.methods(name)
+    def fields: Array[TypedAST.FieldRef] = raw.fields
+    def field(name: String): TypedAST.FieldRef = raw.field(name)
+    def constructors: Array[TypedAST.ConstructorRef] = raw.constructors
+    override def typeParameters: Array[TypedAST.TypeParameter] = Array()
+  }
+
+  final class TypeVariableType(val name: String, val upperBound: TypedAST.ClassType) extends AbstractClassType {
+    def isInterface: Boolean = upperBound.isInterface
+    def modifier: Int = upperBound.modifier
+    def superClass: TypedAST.ClassType = upperBound.superClass
+    def interfaces: Seq[TypedAST.ClassType] = upperBound.interfaces
+    def methods: Seq[TypedAST.Method] = upperBound.methods
+    def methods(name: String): Array[TypedAST.Method] = upperBound.methods(name)
+    def fields: Array[TypedAST.FieldRef] = upperBound.fields
+    def field(name: String): TypedAST.FieldRef = upperBound.field(name)
+    def constructors: Array[TypedAST.ConstructorRef] = upperBound.constructors
+    override def typeParameters: Array[TypedAST.TypeParameter] = Array()
+  }
+
   abstract class AbstractClassType extends AbstractObjectType with ClassType {
     private val constructorRefFinder: TypedAST.ConstructorFinder = new TypedAST.ConstructorFinder()
 
@@ -736,7 +786,7 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class ArrayType(val component: TypedAST.Type, val dimension: Int, table: ClassTable) extends AbstractObjectType {
+  class ArrayType(val component: TypedAST.Type, val dimension: Int, val table: ClassTable) extends AbstractObjectType {
     val superClass: TypedAST.ClassType        = table.load("java.lang.Object")
     val interfaces: Seq[TypedAST.ClassType] = Seq(table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
     var name: String                     = "[" * dimension + component.name
@@ -809,6 +859,8 @@ object TypedAST {
     def constructors: Array[TypedAST.ConstructorRef]
 
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef]
+
+    def typeParameters: Array[TypedAST.TypeParameter] = Array()
   }
 
   class ConstructorFinder {
@@ -1096,29 +1148,37 @@ object TypedAST {
 
   object TypeRules {
     def isSuperType(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
-      if (left.isBasicType) {
-        if (right.isBasicType) {
-          return isSuperTypeForBasic(left.asInstanceOf[TypedAST.BasicType], right.asInstanceOf[TypedAST.BasicType])
+      val l = left match {
+        case tv: TypedAST.TypeVariableType => tv.upperBound
+        case _ => left
+      }
+      val r = right match {
+        case tv: TypedAST.TypeVariableType => tv.upperBound
+        case _ => right
+      }
+      if (l.isBasicType) {
+        if (r.isBasicType) {
+          return isSuperTypeForBasic(l.asInstanceOf[TypedAST.BasicType], r.asInstanceOf[TypedAST.BasicType])
         }
         return false
       }
-      if (left.isClassType) {
-        if (right.isClassType) {
-          return isSuperTypeForClass(left.asInstanceOf[TypedAST.ClassType], right.asInstanceOf[TypedAST.ClassType])
+      if (l.isClassType) {
+        if (r.isClassType) {
+          return isSuperTypeForClass(l.asInstanceOf[TypedAST.ClassType], r.asInstanceOf[TypedAST.ClassType])
         }
-        if (right.isArrayType) {
-          return left eq right.asInstanceOf[TypedAST.ArrayType].superClass
+        if (r.isArrayType) {
+          return l eq r.asInstanceOf[TypedAST.ArrayType].superClass
         }
-        if (right.isNullType) {
+        if (r.isNullType) {
           return true
         }
         return false
       }
-      if (left.isArrayType) {
-        if (right.isArrayType) {
-          return isSuperTypeForArray(left.asInstanceOf[TypedAST.ArrayType], right.asInstanceOf[TypedAST.ArrayType])
+      if (l.isArrayType) {
+        if (r.isArrayType) {
+          return isSuperTypeForArray(l.asInstanceOf[TypedAST.ArrayType], r.asInstanceOf[TypedAST.ArrayType])
         }
-        if (right.isNullType) {
+        if (r.isNullType) {
           return true
         }
         return false

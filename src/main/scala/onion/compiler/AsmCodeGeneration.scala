@@ -35,6 +35,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case BasicType.LONG    => AsmType.LONG_TYPE
     case BasicType.FLOAT   => AsmType.FLOAT_TYPE
     case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
+    case tv: TypeVariableType => asmType(tv.upperBound)
+    case ap: AppliedClassType => asmType(ap.raw)
     case ct: ClassType     => AsmUtil.objectType(ct.name)
     case at: ArrayType     => AsmType.getType("[" + asmType(at.component).getDescriptor)
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)

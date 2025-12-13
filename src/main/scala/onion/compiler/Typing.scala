@@ -15,7 +15,7 @@ import onion.compiler.generics.Erasure
 
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
-  private case class TypeParam(name: String, upper: Option[Type])
+  private case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
   private case class TypeParamScope(params: Map[String, TypeParam]) {
     def get(name: String): Option[TypeParam] = params.get(name)
     def ++(ps: Seq[TypeParam]): TypeParamScope = copy(params ++ ps.map(p => p.name -> p))
@@ -44,7 +44,17 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case AST.PrimitiveType(AST.KBoolean)    => BasicType.BOOLEAN
       case AST.PrimitiveType(AST.KVoid)       => BasicType.VOID
       case AST.ReferenceType(name, qualified) => forName(name, qualified)
-      case AST.ParameterizedType(base, _)     => map(base)
+      case AST.ParameterizedType(base, params) =>
+        val raw = map(base)
+        if (raw == null) return null
+        raw match {
+          case clazz: ClassType =>
+            val mappedArgs = params.map(map)
+            if (mappedArgs.exists(_ == null)) return null
+            TypedAST.AppliedClassType(clazz, mappedArgs)
+          case _ =>
+            raw
+        }
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
       case unknown => throw new RuntimeException("Unknown type descriptor: " + unknown)
     }
@@ -52,14 +62,20 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       if(qualified) {
         table_.load(name)
       }else {
-        for(item <- imports) {
-          val qname = item matches name
-          if(qname.isDefined) {
-            val mappedType = forName(qname.get, true)
-            if(mappedType != null) return mappedType
+        typeParams_.get(name).map(_.variableType).getOrElse {
+          val module = unit_.module
+          val moduleName = if (module != null) module.name else null
+          val local = table_.lookup(createFQCN(moduleName, name))
+          if (local != null) return local
+          for(item <- imports) {
+            val qname = item matches name
+            if(qname.isDefined) {
+              val mappedType = forName(qname.get, true)
+              if(mappedType != null) return mappedType
+            }
           }
+          null
         }
-        null
       }
     }
   }
@@ -73,6 +89,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private var definition_ : ClassDefinition = _
   private var unit_ : AST.CompilationUnit = _
   private var typeParams_ : TypeParamScope = emptyTypeParams
+  private val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
@@ -158,24 +175,29 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       nconstructors = 0
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
+      val classTypeParams = createTypeParams(node.typeParameters)
+      declaredTypeParams_(node) = classTypeParams
+      definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
       constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
-      for(defaultSection <- node.defaultSection) {
-        access_ = defaultSection.modifiers
-        for(member <- defaultSection.members) member match {
-          case node: AST.FieldDeclaration => processFieldDeclaration(node)
-          case node: AST.MethodDeclaration => processMethodDeclaration(node)
-          case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-          case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+      openTypeParams(emptyTypeParams ++ classTypeParams) {
+        for(defaultSection <- node.defaultSection) {
+          access_ = defaultSection.modifiers
+          for(member <- defaultSection.members) member match {
+            case node: AST.FieldDeclaration => processFieldDeclaration(node)
+            case node: AST.MethodDeclaration => processMethodDeclaration(node)
+            case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
+            case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+          }
         }
-      }
-      for(section <- node.sections; member <- section.members) {
-        access_ = section.modifiers
-        member match {
-          case node: AST.FieldDeclaration => processFieldDeclaration(node)
-          case node: AST.MethodDeclaration => processMethodDeclaration(node)
-          case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-          case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+        for(section <- node.sections; member <- section.members) {
+          access_ = section.modifiers
+          member match {
+            case node: AST.FieldDeclaration => processFieldDeclaration(node)
+            case node: AST.MethodDeclaration => processMethodDeclaration(node)
+            case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
+            case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+          }
         }
       }
       if (nconstructors == 0) definition_.addDefaultConstructor
@@ -183,9 +205,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
+      val interfaceTypeParams = createTypeParams(node.typeParameters)
+      declaredTypeParams_(node) = interfaceTypeParams
+      definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
       constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
-      for(method <- node.methods) processInterfaceMethodDeclaration(method)
+      openTypeParams(emptyTypeParams ++ interfaceTypeParams) {
+        for(method <- node.methods) processInterfaceMethodDeclaration(method)
+      }
     }
     def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
@@ -218,26 +245,52 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       definition_.add(field)
     }
     def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-      val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-      for(args <- argsOption; returnType <- returnTypeOption) {
-        var modifier = node.modifiers | access_
-        if (node.block == null) modifier |= AST.M_ABSTRACT
-        val name = node.name
-        val method = new MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
-        put(node, method)
-        definition_.add(method)
+      val methodTypeParams = createTypeParams(node.typeParameters)
+      declaredTypeParams_(node) = methodTypeParams
+      openTypeParams(typeParams_ ++ methodTypeParams) {
+        val argsOption = typesOf(node.args)
+        val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+        for(args <- argsOption; returnType <- returnTypeOption) {
+          var modifier = node.modifiers | access_
+          if (node.block == null) modifier |= AST.M_ABSTRACT
+          val name = node.name
+          val method = new MethodDefinition(
+            node.location,
+            modifier,
+            definition_,
+            name,
+            args.toArray,
+            returnType,
+            null,
+            methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
+          )
+          put(node, method)
+          definition_.add(method)
+        }
       }
     }
     def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-      val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-      for(args <- argsOption; returnType <- returnTypeOption) {
-        val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
-        val name = node.name
-        var method = new MethodDefinition(node.location, modifier, definition_, name, args.toArray, returnType, null)
-        put(node, method)
-        definition_.add(method)
+      val methodTypeParams = createTypeParams(node.typeParameters)
+      declaredTypeParams_(node) = methodTypeParams
+      openTypeParams(typeParams_ ++ methodTypeParams) {
+        val argsOption = typesOf(node.args)
+        val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+        for(args <- argsOption; returnType <- returnTypeOption) {
+          val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
+          val name = node.name
+          val method = new MethodDefinition(
+            node.location,
+            modifier,
+            definition_,
+            name,
+            args.toArray,
+            returnType,
+            null,
+            methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
+          )
+          put(node, method)
+          definition_.add(method)
+        }
       }
     }
     def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
@@ -386,18 +439,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
       if (method == null) return
       if (node.block == null) return
-      val context = new LocalContext
-      if((method.modifier & AST.M_STATIC) != 0) {
-        context.setStatic(true)
+      val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
+      openTypeParams(typeParams_ ++ methodTypeParams) {
+        val context = new LocalContext
+        if((method.modifier & AST.M_STATIC) != 0) {
+          context.setStatic(true)
+        }
+        context.setMethod(method)
+        val arguments = method.arguments
+        for(i <- 0 until arguments.length) {
+          context.add(node.args(i).name, arguments(i))
+        }
+        val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], method.returnType)
+        method.setBlock(block)
+        method.setFrame(context.getContextFrame)
       }
-      context.setMethod(method)
-      val arguments = method.arguments
-      for(i <- 0 until arguments.length) {
-        context.add(node.args(i).name, arguments(i))
-      }
-      val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], method.returnType)
-      method.setBlock(block)
-      method.setFrame(context.getContextFrame)
     }
     def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
       val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
@@ -427,24 +483,27 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
-      for(section <- node.defaultSection; member <- section.members) {
-        member match {
-          case member: AST.FieldDeclaration =>
-          case member: AST.MethodDeclaration =>
-            processMethodDeclaration(member)
-          case member: AST.ConstructorDeclaration =>
-            processConstructorDeclaration(member)
-          case member: AST.DelegatedFieldDeclaration =>
+      val classTypeParams = declaredTypeParams_.getOrElse(node, Seq())
+      openTypeParams(emptyTypeParams ++ classTypeParams) {
+        for(section <- node.defaultSection; member <- section.members) {
+          member match {
+            case member: AST.FieldDeclaration =>
+            case member: AST.MethodDeclaration =>
+              processMethodDeclaration(member)
+            case member: AST.ConstructorDeclaration =>
+              processConstructorDeclaration(member)
+            case member: AST.DelegatedFieldDeclaration =>
+          }
         }
-      }
-      for(section <- node.sections; member <- section.members) {
-        member match {
-          case member: AST.FieldDeclaration =>
-          case member: AST.MethodDeclaration =>
-            processMethodDeclaration(member)
-          case member: AST.ConstructorDeclaration =>
-            processConstructorDeclaration(member)
-          case member: AST.DelegatedFieldDeclaration =>
+        for(section <- node.sections; member <- section.members) {
+          member match {
+            case member: AST.FieldDeclaration =>
+            case member: AST.MethodDeclaration =>
+              processMethodDeclaration(member)
+            case member: AST.ConstructorDeclaration =>
+              processConstructorDeclaration(member)
+            case member: AST.DelegatedFieldDeclaration =>
+          }
         }
       }
     }
@@ -944,24 +1003,32 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
         val field = findField(targetType, name)
         if (field != null && isAccessible(field, definition_)) {
-          return Some(new RefField(target, field))
+          val ref = new RefField(target, field)
+          val castType = substituteType(ref.`type`, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+          return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
         }
 
         tryFindMethod(node, targetType, name, new Array[Term](0)) match {
           case Right(method) =>
-            return Some(new Call(target, method, new Array[Term](0)))
+            val call = new Call(target, method, new Array[Term](0))
+            val castType = substituteType(method.returnType, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+            return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(continuable) =>
             if(!continuable) return None
         }
         tryFindMethod(node, targetType, getter(name), new Array[Term](0)) match {
           case Right(method) =>
-            return Some(new Call(target, method, new Array[Term](0)))
+            val call = new Call(target, method, new Array[Term](0))
+            val castType = substituteType(method.returnType, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+            return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(continuable) =>
             if(!continuable) return None
         }
         tryFindMethod(node, targetType, getterBoolean(name), new Array[Term](0)) match {
           case Right(method) =>
-            Some(new Call(target, method, new Array[Term](0)))
+            val call = new Call(target, method, new Array[Term](0))
+            val castType = substituteType(method.returnType, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(_) =>
             if (field == null) {
               report(FIELD_NOT_FOUND, node, targetType, node.name)
@@ -989,7 +1056,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           report(ILLEGAL_METHOD_CALL, node, methods(0).affiliation, name, methods(0).arguments)
           None
         } else {
-          Some(new Call(target, methods(0), doCastInsertion(methods(0).arguments, params)))
+          val method = methods(0)
+          val classSubst = classSubstitution(target.`type`)
+          val methodSubst = inferMethodTypeArgs(node, method, params, classSubst)
+          val call = new Call(target, method, doCastInsertion(method.arguments, params))
+          val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
         }
       case node@AST.Negate(loc, target) =>
         val term = typed(node.term, context).getOrElse(null)
@@ -1017,7 +1089,18 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](constructors(0).affiliation, constructors(0).getArgs), Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs))
           None
         }else {
-          Some(new NewObject(constructors(0), parameters))
+          typeRef match {
+            case applied: TypedAST.AppliedClassType =>
+              val appliedCtor = new TypedAST.ConstructorRef {
+                def modifier: Int = constructors(0).modifier
+                def affiliation: TypedAST.ClassType = applied
+                def name: String = constructors(0).name
+                def getArgs: Array[TypedAST.Type] = constructors(0).getArgs
+              }
+              Some(new NewObject(appliedCtor, parameters))
+            case _ =>
+              Some(new NewObject(constructors(0), parameters))
+          }
         }
       case node@AST.Not(loc, target) =>
         val term = typed(node.term, context).getOrElse(null)
@@ -1086,12 +1169,24 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         } else {
           params = doCastInsertion(methods(0).arguments, params)
           if ((methods(0).modifier & AST.M_STATIC) != 0) {
-            Some(new CallStatic(targetType, methods(0), params))
+            val method = methods(0)
+            val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+            val methodSubst = inferMethodTypeArgs(node, method, params, classSubst)
+            val call = new CallStatic(targetType, method, params)
+            val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           } else {
+            val method = methods(0)
+            val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+            val methodSubst = inferMethodTypeArgs(node, method, params, classSubst)
             if(context.isClosure) {
-              Some(new Call(new OuterThis(targetType), methods(0), params))
+              val call = new Call(new OuterThis(targetType), method, params)
+              val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
             }else {
-              Some(new Call(new This(targetType), methods(0), params))
+              val call = new Call(new This(targetType), method, params)
+              val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
             }
           }
         }
@@ -1119,7 +1214,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             report(AMBIGUOUS_METHOD, node, node.name, typeNames(methods(0).arguments), typeNames(methods(1).arguments))
             None
           } else {
-            Some(new CallStatic(typeRef, methods(0), doCastInsertion(methods(0).arguments, parameters)))
+            val method = methods(0)
+            val classSubst = classSubstitution(typeRef)
+            val methodSubst = inferMethodTypeArgs(node, method, parameters, classSubst)
+            val call = new CallStatic(typeRef, method, doCastInsertion(method.arguments, parameters))
+            val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           }
         }
       case node@AST.StringLiteral(loc, value) =>
@@ -1630,7 +1730,170 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
+    else validateTypeApplication(typeNode, mappedType)
     mappedType
+  }
+
+  private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {
+    typeNode.desc match {
+      case AST.ParameterizedType(_, _) =>
+        mappedType match {
+          case applied: TypedAST.AppliedClassType =>
+            val rawParams = applied.raw.typeParameters
+            if (rawParams.isEmpty) {
+              report(UNIMPLEMENTED_FEATURE, typeNode)
+              return
+            }
+            if (rawParams.length != applied.typeArguments.length) {
+              report(UNIMPLEMENTED_FEATURE, typeNode)
+              return
+            }
+            var i = 0
+            while (i < rawParams.length) {
+              val upper = rawParams(i).upperBound.getOrElse(rootClass)
+              val arg = applied.typeArguments(i)
+              if (arg.isBasicType) {
+                report(UNIMPLEMENTED_FEATURE, typeNode)
+                return
+              }
+              if (!TypeRules.isAssignable(upper, arg)) {
+                report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
+                return
+              }
+              i += 1
+            }
+          case _ =>
+        }
+      case _ =>
+    }
+  }
+
+  private def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
+    val prev = typeParams_
+    typeParams_ = scope
+    try block
+    finally typeParams_ = prev
+  }
+
+  private def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {
+    val seen = MutableSet[String]()
+    val result = Buffer[TypeParam]()
+    for (tp <- nodes) {
+      if (seen.contains(tp.name)) {
+        report(UNIMPLEMENTED_FEATURE, tp)
+      } else {
+        seen += tp.name
+        val upper = tp.upperBound match {
+          case Some(boundNode) =>
+            val mapped = mapFrom(boundNode)
+            mapped match {
+              case ct: ClassType => ct
+              case _ =>
+                report(INCOMPATIBLE_TYPE, boundNode, rootClass, mapped)
+                rootClass
+            }
+          case None =>
+            rootClass
+        }
+        val variableType = new TypedAST.TypeVariableType(tp.name, upper)
+        result += TypeParam(tp.name, variableType, upper)
+      }
+    }
+    result.toSeq
+  }
+
+  private def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
+    case applied: TypedAST.AppliedClassType =>
+      val rawParams = applied.raw.typeParameters
+      val mapping = HashMap[String, Type]()
+      var i = 0
+      while (i < rawParams.length && i < applied.typeArguments.length) {
+        mapping += rawParams(i).name -> applied.typeArguments(i)
+        i += 1
+      }
+      mapping.toMap
+    case _ =>
+      scala.collection.immutable.Map.empty
+  }
+
+  private def substituteType(tp: Type, classSubst: scala.collection.immutable.Map[String, Type], methodSubst: scala.collection.immutable.Map[String, Type], defaultToBound: Boolean): Type = {
+    def lookup(name: String): Option[Type] = methodSubst.get(name).orElse(classSubst.get(name))
+    tp match {
+      case tv: TypedAST.TypeVariableType =>
+        lookup(tv.name).getOrElse(if (defaultToBound) tv.upperBound else tv)
+      case applied: TypedAST.AppliedClassType =>
+        val newArgs = applied.typeArguments.map(arg => substituteType(arg, classSubst, methodSubst, defaultToBound))
+        if (newArgs.sameElements(applied.typeArguments)) applied
+        else TypedAST.AppliedClassType(applied.raw, newArgs.toList)
+      case at: ArrayType =>
+        val newComponent = substituteType(at.component, classSubst, methodSubst, defaultToBound)
+        if (newComponent eq at.component) at
+        else loadArray(newComponent, at.dimension)
+      case other =>
+        other
+    }
+  }
+
+  private def inferMethodTypeArgs(callNode: AST.Node, method: Method, args: Array[Term], classSubst: scala.collection.immutable.Map[String, Type]): scala.collection.immutable.Map[String, Type] = {
+    val typeParams = method.typeParameters
+    if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
+
+    val bounds = HashMap[String, Type]()
+    for (tp <- typeParams) {
+      val upper = tp.upperBound.getOrElse(rootClass)
+      bounds += tp.name -> substituteType(upper, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+    }
+
+    val inferred = HashMap[String, Type]()
+    val paramNames = typeParams.map(_.name).toSet
+
+    def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
+      if (actual.isNullType) return
+      formal match {
+        case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+          inferred.get(tv.name) match {
+            case Some(prev) =>
+              if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
+            case None =>
+              inferred += tv.name -> actual
+          }
+        case apf: TypedAST.AppliedClassType =>
+          actual match {
+            case apa: TypedAST.AppliedClassType if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length =>
+              var i = 0
+              while (i < apf.typeArguments.length) {
+                unify(apf.typeArguments(i), apa.typeArguments(i), position)
+                i += 1
+              }
+            case _ =>
+          }
+        case aft: ArrayType =>
+          actual match {
+            case aat: ArrayType if aft.dimension == aat.dimension =>
+              unify(aft.component, aat.component, position)
+            case _ =>
+          }
+        case _ =>
+      }
+    }
+
+    val formalArgs = method.arguments.map(t => substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+    var i = 0
+    while (i < formalArgs.length && i < args.length) {
+      unify(formalArgs(i), args(i).`type`, callNode)
+      i += 1
+    }
+
+    for (tp <- typeParams) {
+      val inferredType = inferred.getOrElse(tp.name, bounds(tp.name))
+      val bound = bounds(tp.name)
+      if (!TypeRules.isAssignable(bound, inferredType)) {
+        report(INCOMPATIBLE_TYPE, callNode, bound, inferredType)
+      }
+      inferred += tp.name -> inferredType
+    }
+
+    inferred.toMap
   }
   private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
     val params = Array[Term](new AsInstanceOf(rhs, rootClass))

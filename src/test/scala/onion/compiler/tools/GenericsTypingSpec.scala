@@ -6,6 +6,39 @@ import java.io.PrintStream
 
 class GenericsTypingSpec extends AbstractShellSpec {
   describe("Generics typing (erasure-based)") {
+    it("defaults missing upper bounds to Object") {
+      val result = shell.run(
+        """
+          |class Box[T] {
+          |  value: T
+          |public:
+          |  def this {
+          |  }
+          |
+          |  def set(v: T) {
+          |    this.value = v
+          |  }
+          |
+          |  def get(): T {
+          |    return this.value
+          |  }
+          |}
+          |
+          |class UseBox {
+          |public:
+          |  static def main(args: String[]): String {
+          |    box = new Box[String]
+          |    box.set("hello")
+          |    return box.get()
+          |  }
+          |}
+          |""".stripMargin,
+        "UseBoxDefaultBound.on",
+        Array()
+      )
+      assert(Shell.Success("hello") == result)
+    }
+
     it("type-checks generic class applications") {
       val result = shell.run(
         """

@@ -1839,19 +1839,22 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     private val seenGlobalVariables = new JTreeSet[FieldRef](new FieldComparator)
     private val seenFunctions = new JTreeSet[Method](new MethodComparator)
 
+    private def withKernel[T <: Node](ast: AST.Node)(f: T => Unit): Unit = {
+      val kernel = lookupKernelNode(ast)
+      if (kernel != null) f(kernel.asInstanceOf[T])
+    }
+
     def run(): Unit = {
       unit_ = unit
+      mapper_ = find(topClass)
       seenGlobalVariables.clear()
       seenFunctions.clear()
-      for (toplevel <- unit.toplevels) {
-        mapper_ = find(topClass)
-        toplevel match {
-          case node: AST.ClassDeclaration => processClassDeclaration(node)
-          case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
-          case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
-          case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
-          case _ =>
-        }
+      unit.toplevels.foreach {
+        case node: AST.ClassDeclaration => processClassDeclaration(node)
+        case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
+        case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
+        case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
+        case _ =>
       }
     }
 
@@ -1875,59 +1878,36 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       if (seenConstructors.contains(constructor)) report(DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
       else seenConstructors.add(constructor)
 
-    private def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
-      val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
-      if (field == null) return
-      registerField(node, field)
-    }
+    private def processFieldLikeDeclaration(ast: AST.Node): Unit =
+      withKernel[FieldDefinition](ast)(field => registerField(ast, field))
 
-    private def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
-      val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
-      if (field == null) return
-      registerField(node, field)
-    }
+    private def processMethodDeclaration(node: AST.MethodDeclaration): Unit =
+      withKernel[MethodDefinition](node)(method => registerMethod(node, method))
 
-    private def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
-      if (method == null) return
-      registerMethod(node, method)
-    }
-
-    private def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
-      if (method == null) return
-      registerMethod(node, method)
-    }
-
-    private def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
-      val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
-      if (constructor == null) return
-      registerConstructor(node, constructor)
-    }
+    private def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
+      withKernel[ConstructorDefinition](node)(ctor => registerConstructor(node, ctor))
 
     private def processAccessSection(node: AST.AccessSection): Unit = {
       for (member <- node.members)
         member match {
-          case node: AST.FieldDeclaration => processFieldDeclaration(node)
+          case node: AST.FieldDeclaration => processFieldLikeDeclaration(node)
+          case node: AST.DelegatedFieldDeclaration => processFieldLikeDeclaration(node)
           case node: AST.MethodDeclaration => processMethodDeclaration(node)
           case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-          case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
         }
     }
 
-    private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
-      val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
-      if (field == null) return
-      if (seenGlobalVariables.contains(field)) report(DUPLICATE_GLOBAL_VARIABLE, node, field.name)
-      else seenGlobalVariables.add(field)
-    }
+    private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit =
+      withKernel[FieldDefinition](node) { field =>
+        if (seenGlobalVariables.contains(field)) report(DUPLICATE_GLOBAL_VARIABLE, node, field.name)
+        else seenGlobalVariables.add(field)
+      }
 
-    private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
-      val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
-      if (method == null) return
-      if (seenFunctions.contains(method)) report(DUPLICATE_FUNCTION, node, method.name, method.arguments)
-      else seenFunctions.add(method)
-    }
+    private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit =
+      withKernel[MethodDefinition](node) { method =>
+        if (seenFunctions.contains(method)) report(DUPLICATE_FUNCTION, node, method.name, method.arguments)
+        else seenFunctions.add(method)
+      }
 
     private def makeDelegationMethod(delegated: FieldRef, delegator: Method): MethodDefinition = {
       val args = delegator.arguments
@@ -1948,17 +1928,16 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
     private def generateForwardedMethods(): Unit = {
       val generated = new JTreeSet[Method](new MethodComparator)
-      val methodSet = new JTreeSet[Method](new MethodComparator)
 
-      def generateDelegationMethods(node: FieldDefinition): Unit = {
-        val typeRef = node.`type`.asInstanceOf[ClassType]
+      def generateDelegationMethods(field: FieldDefinition): Unit = {
+        val typeRef = field.`type`.asInstanceOf[ClassType]
         val src = Classes.getInterfaceMethods(typeRef)
         for (method <- src.asScala) {
-          if (!methodSet.contains(method)) {
+          if (!seenMethods.contains(method)) {
             if (generated.contains(method)) {
-              report(DUPLICATE_GENERATED_METHOD, node.location, method.affiliation, method.name, method.arguments)
+              report(DUPLICATE_GENERATED_METHOD, field.location, method.affiliation, method.name, method.arguments)
             } else {
-              val generatedMethod = makeDelegationMethod(node, method)
+              val generatedMethod = makeDelegationMethod(field, method)
               generated.add(generatedMethod)
               definition_.add(generatedMethod)
             }
@@ -1966,8 +1945,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
       }
 
-      for (node <- seenFields.asScala) {
-        if ((AST.M_FORWARDED & node.modifier) != 0) generateDelegationMethods(node.asInstanceOf[FieldDefinition])
+      for (field <- seenFields.asScala) {
+        if ((AST.M_FORWARDED & field.modifier) != 0) generateDelegationMethods(field.asInstanceOf[FieldDefinition])
       }
     }
 
@@ -1986,7 +1965,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       if (clazz == null) return
       resetForTypeDeclaration(clazz)
-      for (node <- node.methods) processInterfaceMethodDeclaration(node)
+      for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
       DuplicationChecks.checkErasureSignatureCollisions(clazz, node.location)
     }
   }

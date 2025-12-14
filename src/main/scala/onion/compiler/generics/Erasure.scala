@@ -30,6 +30,7 @@ object Erasure {
     case TypedAST.BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
     case tv: TypedAST.TypeVariableType => asmType(tv.upperBound)
     case ap: TypedAST.AppliedClassType => asmType(ap.raw)
+    case w: TypedAST.WildcardType => asmType(w.upperBound)
     case ct: TypedAST.ClassType => AsmUtil.objectType(ct.name)
     case at: TypedAST.ArrayType => AsmType.getType("[" * at.dimension + asmType(at.component).getDescriptor)
     case _: TypedAST.NullType   => AsmUtil.objectType(AsmUtil.JavaLangObject)

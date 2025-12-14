@@ -98,16 +98,21 @@ object AsmRefs {
       }
 
       override def visitTypeArgument(): Unit = {
-        typeArgs += root
+        typeArgs += new IRT.WildcardType(root, None)
       }
 
       override def visitTypeArgument(wildcard: Char): SignatureVisitor = {
         new TypeRefVisitor(
           t =>
             wildcard match {
-              case '-' | '*' => typeArgs += root
-              case _ => typeArgs += (if (t == null) root else t)
-            },
+              case '+' =>
+                typeArgs += new IRT.WildcardType(if (t == null) root else t, None)
+              case '-' =>
+                typeArgs += new IRT.WildcardType(root, Some(if (t == null) root else t))
+              case _ =>
+                typeArgs += (if (t == null) root else t)
+            }
+          ,
           env
         )
       }

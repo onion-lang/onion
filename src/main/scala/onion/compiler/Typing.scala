@@ -2040,6 +2040,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           val newComponent = substituteType(at.component, classSubst, methodSubst, defaultToBound)
           if (newComponent eq at.component) at
           else loadArray(newComponent, at.dimension)
+        case w: TypedAST.WildcardType =>
+          val newUpper = substituteType(w.upperBound, classSubst, methodSubst, defaultToBound)
+          val newLower = w.lowerBound.map(lb => substituteType(lb, classSubst, methodSubst, defaultToBound))
+          if ((newUpper eq w.upperBound) && newLower == w.lowerBound) w
+          else new TypedAST.WildcardType(newUpper, newLower)
         case other =>
           other
       }
@@ -2134,15 +2139,28 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
                 inferred += tv.name -> actual
             }
           case apf: TypedAST.AppliedClassType =>
-            actual match {
-              case apa: TypedAST.AppliedClassType if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length =>
+            def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
+              if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
                 var i = 0
                 while (i < apf.typeArguments.length) {
                   unify(apf.typeArguments(i), apa.typeArguments(i), position)
                   i += 1
                 }
+
+            actual match
+              case apa: TypedAST.AppliedClassType =>
+                if (apf.raw eq apa.raw) then unifyWithApplied(apa)
+                else
+                  val views = AppliedTypeViews.collectAppliedViewsFrom(apa)
+                  views.get(apf.raw) match
+                    case Some(view) => unifyWithApplied(view)
+                    case None =>
+              case ct: ClassType =>
+                val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
+                views.get(apf.raw) match
+                  case Some(view) => unifyWithApplied(view)
+                  case None =>
               case _ =>
-            }
           case aft: ArrayType =>
             actual match {
               case aat: ArrayType if aft.dimension == aat.dimension =>

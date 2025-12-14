@@ -75,5 +75,47 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("ok") == result)
     }
+
+    it("supports Collections.copy with wildcards") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsCopy {
+          |public:
+          |  static def main(args: String[]): String {
+          |    src: ArrayList[String] = new ArrayList[String]
+          |    src.add("x")
+          |    dest: ArrayList[Object] = new ArrayList[Object]
+          |    dest.add("y")
+          |
+          |    Collections::copy[String](dest, src)
+          |    return "" + dest.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsCopy.on",
+        Array()
+      )
+      assert(Shell.Success("x") == result)
+    }
+
+    it("supports Collections.sort with inferred type arguments") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsSort {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("b")
+          |    list.add("a")
+          |    Collections::sort(list)
+          |    return list.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsSort.on",
+        Array()
+      )
+      assert(Shell.Success("a") == result)
+    }
   }
 }

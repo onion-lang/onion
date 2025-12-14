@@ -97,7 +97,22 @@ object ReflectionRefs {
         if (componentType == null) null else table.loadArray(componentType, dim)
       case w: WildcardType =>
         val uppers = w.getUpperBounds
-        if (uppers != null && uppers.nonEmpty) toOnionType(uppers(0), env) else root
+        val lowers = w.getLowerBounds
+        val upper =
+          if (uppers != null && uppers.nonEmpty) {
+            val t = toOnionType(uppers(0), env)
+            if (t == null) root else t
+          } else {
+            root
+          }
+        val lower =
+          if (lowers != null && lowers.nonEmpty) {
+            val t = toOnionType(lowers(0), env)
+            if (t == null) None else Some(t)
+          } else {
+            None
+          }
+        new IRT.WildcardType(upper, lower)
       case _ =>
         root
     }

@@ -745,6 +745,11 @@ object TypedAST {
         val newComponent = substitute(at.component)
         if newComponent eq at.component then at
         else at.table.loadArray(newComponent, at.dimension)
+      case w: TypedAST.WildcardType =>
+        val newUpper = substitute(w.upperBound)
+        val newLower = w.lowerBound.map(substitute)
+        if ((newUpper eq w.upperBound) && newLower == w.lowerBound) then w
+        else new TypedAST.WildcardType(newUpper, newLower)
       case other =>
         other
 
@@ -778,6 +783,22 @@ object TypedAST {
     def field(name: String): TypedAST.FieldRef = upperBound.field(name)
     def constructors: Array[TypedAST.ConstructorRef] = upperBound.constructors
     override def typeParameters: Array[TypedAST.TypeParameter] = Array()
+  }
+
+  final class WildcardType(val upperBound: TypedAST.Type, val lowerBound: Option[TypedAST.Type]) extends Type {
+    def name: String =
+      lowerBound match
+        case Some(lb) => s"? super ${lb.name}"
+        case None =>
+          upperBound match
+            case ct: TypedAST.ClassType if ct.name == "java.lang.Object" => "?"
+            case _ => s"? extends ${upperBound.name}"
+
+    def isArrayType: Boolean = false
+    def isBasicType: Boolean = false
+    def isClassType: Boolean = false
+    def isNullType: Boolean = false
+    def isObjectType: Boolean = false
   }
 
   abstract class AbstractClassType extends AbstractObjectType with ClassType {
@@ -1220,6 +1241,30 @@ object TypedAST {
     private def isSuperTypeForClass(left: TypedAST.ClassType, right: TypedAST.ClassType): Boolean = {
       if (right == null) return false
       if (left eq right) return true
+
+      (left, right) match
+        case (lraw, rapp: TypedAST.AppliedClassType) if lraw eq rapp.raw =>
+          return true
+        case (lapp: TypedAST.AppliedClassType, rapp: TypedAST.AppliedClassType)
+          if (lapp.raw eq rapp.raw) && lapp.typeArguments.length == rapp.typeArguments.length =>
+          var i = 0
+          while i < lapp.typeArguments.length do
+            val expectedArg = lapp.typeArguments(i)
+            val actualArg = rapp.typeArguments(i)
+            expectedArg match
+              case w: TypedAST.WildcardType =>
+                w.lowerBound match
+                  case Some(lb) =>
+                    if !isSuperType(actualArg, lb) then return false
+                  case None =>
+                    if !isSuperType(w.upperBound, actualArg) then return false
+              case tv: TypedAST.TypeVariableType =>
+                if !isSuperType(tv.upperBound, actualArg) then return false
+              case _ =>
+                if !(expectedArg eq actualArg) then return false
+            i += 1
+          return true
+        case _ =>
       if (isSuperTypeForClass(left, right.superClass)) return true
       var i: Int = 0
       while (i < right.interfaces.length) {

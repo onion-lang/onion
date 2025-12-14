@@ -339,5 +339,104 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("1") == result)
     }
+
+    it("supports Collections.lastIndexOfSubList") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsLastIndexOfSubList {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    list.add("c")
+          |    list.add("b")
+          |    list.add("c")
+          |    sub: ArrayList[String] = new ArrayList[String]
+          |    sub.add("b")
+          |    sub.add("c")
+          |    return "" + Collections::lastIndexOfSubList(list, sub)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsLastIndexOfSubList.on",
+        Array()
+      )
+      assert(Shell.Success("3") == result)
+    }
+
+    it("supports Collections.rotate") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsRotate {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    list.add("c")
+          |    Collections::rotate(list, 1)
+          |    return list.get(0) + list.get(1) + list.get(2)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsRotate.on",
+        Array()
+      )
+      assert(Shell.Success("cab") == result)
+    }
+
+    it("supports Collections.synchronizedList") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsSynchronizedList {
+          |public:
+          |  static def main(args: String[]): String {
+          |    src: ArrayList[String] = new ArrayList[String]
+          |    src.add("ok")
+          |    v: List[String] = Collections::synchronizedList(src)
+          |    return v.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsSynchronizedList.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("supports Collections.emptyList") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsEmptyList {
+          |public:
+          |  static def main(args: String[]): String {
+          |    v: List[String] = Collections::emptyList[String]()
+          |    return "" + v.isEmpty
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsEmptyList.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
+
+    it("supports Collections.nCopies") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsNCopies {
+          |public:
+          |  static def main(args: String[]): String {
+          |    v: List[String] = Collections::nCopies(3, "x")
+          |    return v.get(2)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsNCopies.on",
+        Array()
+      )
+      assert(Shell.Success("x") == result)
+    }
   }
 }

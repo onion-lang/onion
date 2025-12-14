@@ -208,6 +208,54 @@ class GenericsTypingSpec extends AbstractShellSpec {
       }
       assert(Shell.Failure(-1) == result)
     }
+
+    it("checks field assignment types on applied class types") {
+      val ok = shell.run(
+        """
+          |class Box[T] {
+          |public:
+          |  value: T
+          |  def this { }
+          |}
+          |
+          |class UseBoxFieldOk {
+          |public:
+          |  static def main(args: String[]): String {
+          |    b: Box[String] = new Box[String]
+          |    b.value = "ok"
+          |    return b.value
+          |  }
+          |}
+          |""".stripMargin,
+        "UseBoxFieldOk.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == ok)
+
+      val bad = silenceErr {
+        shell.run(
+          """
+            |class Box[T] {
+            |public:
+            |  value: T
+            |  def this { }
+            |}
+            |
+            |class UseBoxFieldBad {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    b: Box[String] = new Box[String]
+            |    b.value = new Object
+            |    return 0
+            |  }
+            |}
+            |""".stripMargin,
+          "UseBoxFieldBad.on",
+          Array()
+        )
+      }
+      assert(Shell.Failure(-1) == bad)
+    }
   }
 
   private def silenceErr[A](block: => A): A = {

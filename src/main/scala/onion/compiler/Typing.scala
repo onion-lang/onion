@@ -607,7 +607,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           val field: FieldRef = findField(targetType, name)
           val value: Term = typed(expression, context).getOrElse(null)
           if (field != null && isAccessible(field, definition_)) {
-            val term = processAssignable(expression, field.`type`, value)
+            val classSubst = classSubstitution(target.`type`)
+            val expected = substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+            val term = processAssignable(expression, expected, value)
+            if (term == null) return null
             return new SetField(target, field, term)
           }
           tryFindMethod(node, targetType, setter(name), Array[Term](value)) match {

@@ -422,6 +422,23 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       assert(Shell.Success("true") == result)
     }
 
+    it("infers type arguments for Collections.emptyList from the expected type") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsEmptyListInferred {
+          |public:
+          |  static def main(args: String[]): String {
+          |    v: List[String] = Collections::emptyList()
+          |    return "" + v.isEmpty
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsEmptyListInferred.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
+
     it("supports Collections.nCopies") {
       val result = shell.run(
         """
@@ -470,6 +487,25 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |}
           |""".stripMargin,
         "JavaCollectionsEmptyMap.on",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
+    }
+
+    it("infers type arguments for Collections.emptyMap from the expected type") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsEmptyMapInferred {
+          |public:
+          |  static def main(args: String[]): String {
+          |    m: Map[String, String] = Collections::emptyMap()
+          |    v = m.get("missing")
+          |    if v == null { return "null"; }
+          |    return v
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsEmptyMapInferred.on",
         Array()
       )
       assert(Shell.Success("null") == result)

@@ -826,7 +826,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
     }
 
-    def typeMethodCall(node: AST.MethodCall, context: LocalContext): Option[Term] = {
+    def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
       val target = typed(node.target, context).getOrElse(null)
       if (target == null) return None
       val params = typedTerms(node.args.toArray, context)
@@ -855,7 +855,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           if (node.typeArgs.nonEmpty) {
             GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
           } else {
-            GenericMethodTypeArguments.infer(node, method, params, classSubst)
+            GenericMethodTypeArguments.infer(node, method, params, classSubst, expected)
           }
 
         val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -872,7 +872,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
     }
 
-    def typeUnqualifiedMethodCall(node: AST.UnqualifiedMethodCall, context: LocalContext): Option[Term] = {
+    def typeUnqualifiedMethodCall(node: AST.UnqualifiedMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
       var params = typedTerms(node.args.toArray, context)
       if (params == null) return None
       val targetType = definition_
@@ -895,7 +895,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           if (node.typeArgs.nonEmpty) {
             GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
           } else {
-            GenericMethodTypeArguments.infer(node, method, params, classSubst)
+            GenericMethodTypeArguments.infer(node, method, params, classSubst, expected)
           }
 
         val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -936,7 +936,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
     }
 
-    def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext): Option[Term] = {
+    def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
       val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
       val parameters = typedTerms(node.args.toArray, context)
       if (typeRef == null || parameters == null) {
@@ -990,7 +990,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
           val applicable = candidates.asScala.flatMap { method =>
             val classSubst = TypeSubstitution.classSubstitution(typeRef)
-            val methodSubst = GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
+            val methodSubst = GenericMethodTypeArguments.infer(node, method, parameters, classSubst, expected)
             val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
             if (expectedArgs.length != parameters.length) None
             else {
@@ -1073,7 +1073,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
     }
 
-    def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext): Option[Term] = {
+    def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
       val parameters = typedTerms(node.args.toArray, context)
       if (parameters == null) return None
       val contextClass = definition_
@@ -1084,7 +1084,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             if (node.typeArgs.nonEmpty) {
               GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
             } else {
-              GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
+              GenericMethodTypeArguments.infer(node, method, parameters, classSubst, expected)
             }
 
           val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -1348,7 +1348,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       else Some(new InstanceOf(target, destinationType))
     }
 
-    def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
+    def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
         var left = typed(node.lhs, context).getOrElse(null)
         var right = typed(node.rhs, context).getOrElse(null)
@@ -1497,7 +1497,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case node: AST.MemberSelection =>
         typeMemberSelection(node, context)
       case node: AST.MethodCall =>
-        typeMethodCall(node, context)
+        typeMethodCall(node, context, expected)
       case node@AST.Negate(loc, target) =>
         typeUnaryNumeric(node, "-", MINUS, context)
       case node: AST.NewArray =>
@@ -1514,17 +1514,17 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         typePostUpdate(node, node.term, "++", ADD, context)
       // Removed: UnqualifiedFieldReference - use this.field or self.field instead
       case node: AST.UnqualifiedMethodCall =>
-        typeUnqualifiedMethodCall(node, context)
+        typeUnqualifiedMethodCall(node, context, expected)
       case node: AST.StaticMemberSelection =>
         typeStaticMemberSelection(node)
       case node: AST.StaticMethodCall =>
-        typeStaticMethodCall(node, context)
+        typeStaticMethodCall(node, context, expected)
       case node@AST.StringLiteral(loc, value) =>
         Some(new StringValue(loc, value, load("java.lang.String")))
       case node: AST.StringInterpolation =>
         typeStringInterpolation(node, context)
       case node: AST.SuperMethodCall =>
-        typeSuperMethodCall(node, context)
+        typeSuperMethodCall(node, context, expected)
     }
     def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
       case AST.BlockExpression(loc, elements) =>
@@ -1611,7 +1611,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         val index = context.add(name, lhsType)
         var local: SetLocal = null
         if (init != null) {
-          val valueNode = typed(init, context)
+          val valueNode = typed(init, context, lhsType)
           valueNode match {
             case None => return new NOP(loc)
             case Some(v) =>
@@ -1631,7 +1631,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
           new Return(loc, null)
         } else {
-          val returnedOpt= typed(node.result, context)
+          val returnedOpt= typed(node.result, context, returnType)
           if (returnedOpt == null) return new Return(loc, null)
           (for(returned <- returnedOpt) yield {
             if (returned.`type` == BasicType.VOID) {
@@ -2151,6 +2151,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   private object GenericMethodTypeArguments {
+    def infer(
+      callNode: AST.Node,
+      method: Method,
+      args: Array[Term],
+      classSubst: scala.collection.immutable.Map[String, Type]
+    ): scala.collection.immutable.Map[String, Type] =
+      infer(callNode, method, args, classSubst, null)
+
     def explicit(
       callNode: AST.Node,
       method: Method,
@@ -2213,7 +2221,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       callNode: AST.Node,
       method: Method,
       args: Array[Term],
-      classSubst: scala.collection.immutable.Map[String, Type]
+      classSubst: scala.collection.immutable.Map[String, Type],
+      expectedReturn: Type
     ): scala.collection.immutable.Map[String, Type] = {
       val typeParams = method.typeParameters
       if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
@@ -2313,6 +2322,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       while (i < formalArgs.length && i < args.length) {
         unify(formalArgs(i), args(i).`type`, callNode)
         i += 1
+      }
+
+      if (expectedReturn != null) {
+        val formalReturn =
+          TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+        unify(formalReturn, expectedReturn, callNode)
       }
 
       for (tp <- typeParams) {

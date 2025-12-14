@@ -942,34 +942,133 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       if (typeRef == null || parameters == null) {
         None
       } else {
-        val methods = typeRef.findMethod(node.name, parameters)
-        if (methods.length == 0) {
-          report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
-          None
-        } else if (methods.length > 1) {
-          report(AMBIGUOUS_METHOD, node, node.name, typeNames(methods(0).arguments), typeNames(methods(1).arguments))
-          None
-        } else {
-          val method = methods(0)
-          val classSubst = TypeSubstitution.classSubstitution(typeRef)
-          val methodSubst =
-            if (node.typeArgs.nonEmpty) {
+        if (node.typeArgs.nonEmpty) {
+          val methods = typeRef.findMethod(node.name, parameters)
+          if (methods.length == 0) {
+            report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
+            None
+          } else if (methods.length > 1) {
+            report(AMBIGUOUS_METHOD, node, node.name, typeNames(methods(0).arguments), typeNames(methods(1).arguments))
+            None
+          } else {
+            val method = methods(0)
+            val classSubst = TypeSubstitution.classSubstitution(typeRef)
+            val methodSubst =
               GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
-            } else {
-              GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
+
+            val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+            var i = 0
+            while (i < parameters.length) {
+              parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
+              if (parameters(i) == null) return None
+              i += 1
             }
 
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          while (i < parameters.length) {
-            parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
-            if (parameters(i) == null) return None
-            i += 1
+            val call = new CallStatic(typeRef, method, parameters)
+            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          }
+        } else {
+          val candidates = new JTreeSet[Method](new MethodComparator)
+
+          def collectStatics(tp: ObjectType): Unit = {
+            if (tp == null) return
+            tp.methods(node.name).foreach { m =>
+              if ((m.modifier & AST.M_STATIC) != 0) candidates.add(m)
+            }
+            collectStatics(tp.superClass)
+            tp.interfaces.foreach(collectStatics)
           }
 
-          val call = new CallStatic(typeRef, method, parameters)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          collectStatics(typeRef)
+          if (candidates.isEmpty) {
+            report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
+            return None
+          }
+
+          final case class Applicable(method: Method, expectedArgs: Array[Type], methodSubst: scala.collection.immutable.Map[String, Type])
+
+          val applicable = candidates.asScala.flatMap { method =>
+            val classSubst = TypeSubstitution.classSubstitution(typeRef)
+            val methodSubst = GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
+            val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+            if (expectedArgs.length != parameters.length) None
+            else {
+              var ok = true
+              var i = 0
+              while (i < expectedArgs.length && ok) {
+                ok = TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`)
+                i += 1
+              }
+              if (ok) Some(Applicable(method, expectedArgs, methodSubst)) else None
+            }
+          }.toList
+
+          if (applicable.isEmpty) {
+            report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
+            None
+          } else if (applicable.length == 1) {
+            val selected = applicable.head
+            val classSubst = TypeSubstitution.classSubstitution(typeRef)
+            var i = 0
+            while (i < parameters.length) {
+              parameters(i) = processAssignable(node.args(i), selected.expectedArgs(i), parameters(i))
+              if (parameters(i) == null) return None
+              i += 1
+            }
+            val call = new CallStatic(typeRef, selected.method, parameters)
+            val castType = TypeSubstitution.substituteType(selected.method.returnType, classSubst, selected.methodSubst, defaultToBound = true)
+            Some(if (castType eq selected.method.returnType) call else new AsInstanceOf(call, castType))
+          } else {
+            def isAllSuperType(a: Array[Type], b: Array[Type]): Boolean =
+              var i = 0
+              while i < a.length do
+                if !TypeRules.isSuperType(a(i), b(i)) then return false
+                i += 1
+              true
+
+            val sorter: java.util.Comparator[Applicable] = new java.util.Comparator[Applicable] {
+              def compare(a1: Applicable, a2: Applicable): Int =
+                if isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
+                else if isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
+                else 0
+            }
+
+            val selected = new java.util.ArrayList[Applicable]()
+            selected.addAll(applicable.asJava)
+            java.util.Collections.sort(selected, sorter)
+            if (selected.size < 2) {
+              val only = selected.get(0)
+              val classSubst = TypeSubstitution.classSubstitution(typeRef)
+              var i = 0
+              while (i < parameters.length) {
+                parameters(i) = processAssignable(node.args(i), only.expectedArgs(i), parameters(i))
+                if (parameters(i) == null) return None
+                i += 1
+              }
+              val call = new CallStatic(typeRef, only.method, parameters)
+              val castType = TypeSubstitution.substituteType(only.method.returnType, classSubst, only.methodSubst, defaultToBound = true)
+              Some(if (castType eq only.method.returnType) call else new AsInstanceOf(call, castType))
+            } else {
+              val a1 = selected.get(0)
+              val a2 = selected.get(1)
+              if (sorter.compare(a1, a2) >= 0) {
+                report(AMBIGUOUS_METHOD, node, node.name, typeNames(a1.method.arguments), typeNames(a2.method.arguments))
+                None
+              } else {
+                val classSubst = TypeSubstitution.classSubstitution(typeRef)
+                var i = 0
+                while (i < parameters.length) {
+                  parameters(i) = processAssignable(node.args(i), a1.expectedArgs(i), parameters(i))
+                  if (parameters(i) == null) return None
+                  i += 1
+                }
+                val call = new CallStatic(typeRef, a1.method, parameters)
+                val castType = TypeSubstitution.substituteType(a1.method.returnType, classSubst, a1.methodSubst, defaultToBound = true)
+                Some(if (castType eq a1.method.returnType) call else new AsInstanceOf(call, castType))
+              }
+            }
+          }
         }
       }
     }
@@ -2131,6 +2230,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
         if (actual.isNullType) return
         formal match {
+          case w: TypedAST.WildcardType =>
+            w.lowerBound match
+              case Some(lb) => unify(lb, actual, position)
+              case None => unify(w.upperBound, actual, position)
           case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
             inferred.get(tv.name) match {
               case Some(prev) =>

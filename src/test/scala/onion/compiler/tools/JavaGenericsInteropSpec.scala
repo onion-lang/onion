@@ -117,5 +117,45 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("a") == result)
     }
+
+    it("supports Collections.max") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsMax {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("b")
+          |    list.add("a")
+          |    return Collections::max(list)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsMax.on",
+        Array()
+      )
+      assert(Shell.Success("b") == result)
+    }
+
+    it("supports Collections.binarySearch") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsBinarySearch {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("b")
+          |    list.add("a")
+          |    Collections::sort(list)
+          |    idx = Collections::binarySearch(list, "b")
+          |    return "" + idx
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsBinarySearch.on",
+        Array()
+      )
+      assert(Shell.Success("1") == result)
+    }
   }
 }

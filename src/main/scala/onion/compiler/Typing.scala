@@ -765,6 +765,245 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       val result = nodes.map{node => typed(node, context).getOrElse{failed = true; null}}
       if(failed) null else result
     }
+
+    def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
+      val contextClass = definition_
+      val target = typed(node.target, context).getOrElse(null)
+      if (target == null) return None
+      if (target.`type`.isBasicType || target.`type`.isNullType) {
+        report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
+        return None
+      }
+      val targetType = target.`type`.asInstanceOf[ObjectType]
+      if (!MemberAccess.ensureTypeAccessible(node, targetType, contextClass)) return None
+      val name = node.name
+      if (target.`type`.isArrayType) {
+        if (name.equals("length") || name.equals("size")) {
+          return Some(new ArrayLength(target))
+        } else {
+          return None
+        }
+      }
+      val field = MemberAccess.findField(targetType, name)
+      if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
+        val ref = new RefField(target, field)
+        val castType =
+          TypeSubstitution.substituteType(ref.`type`, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+        return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
+      }
+
+      tryFindMethod(node, targetType, name, new Array[Term](0)) match {
+        case Right(method) =>
+          val call = new Call(target, method, new Array[Term](0))
+          val castType =
+            TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+          return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        case Left(continuable) =>
+          if (!continuable) return None
+      }
+      tryFindMethod(node, targetType, getter(name), new Array[Term](0)) match {
+        case Right(method) =>
+          val call = new Call(target, method, new Array[Term](0))
+          val castType =
+            TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+          return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        case Left(continuable) =>
+          if (!continuable) return None
+      }
+      tryFindMethod(node, targetType, getterBoolean(name), new Array[Term](0)) match {
+        case Right(method) =>
+          val call = new Call(target, method, new Array[Term](0))
+          val castType =
+            TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        case Left(_) =>
+          if (field == null) {
+            report(FIELD_NOT_FOUND, node, targetType, node.name)
+          } else {
+            report(FIELD_NOT_ACCESSIBLE, node, targetType, node.name, definition_)
+          }
+          None
+      }
+    }
+
+    def typeMethodCall(node: AST.MethodCall, context: LocalContext): Option[Term] = {
+      val target = typed(node.target, context).getOrElse(null)
+      if (target == null) return None
+      val params = typedTerms(node.args.toArray, context)
+      if (params == null) return None
+      val targetType = target.`type`.asInstanceOf[ObjectType]
+      val name = node.name
+      val methods = MethodResolution.findMethods(targetType, name, params)
+      if (methods.length == 0) {
+        report(METHOD_NOT_FOUND, node, targetType, name, types(params))
+        None
+      } else if (methods.length > 1) {
+        report(
+          AMBIGUOUS_METHOD,
+          node,
+          Array[AnyRef](methods(0).affiliation, name, methods(0).arguments),
+          Array[AnyRef](methods(1).affiliation, name, methods(1).arguments)
+        )
+        None
+      } else if ((methods(0).modifier & AST.M_STATIC) != 0) {
+        report(ILLEGAL_METHOD_CALL, node, methods(0).affiliation, name, methods(0).arguments)
+        None
+      } else {
+        val method = methods(0)
+        val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+        val methodSubst =
+          if (node.typeArgs.nonEmpty) {
+            GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
+          } else {
+            GenericMethodTypeArguments.infer(node, method, params, classSubst)
+          }
+
+        val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+        var i = 0
+        while (i < params.length) {
+          params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
+          if (params(i) == null) return None
+          i += 1
+        }
+
+        val call = new Call(target, method, params)
+        val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+        Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+      }
+    }
+
+    def typeUnqualifiedMethodCall(node: AST.UnqualifiedMethodCall, context: LocalContext): Option[Term] = {
+      var params = typedTerms(node.args.toArray, context)
+      if (params == null) return None
+      val targetType = definition_
+      val methods = targetType.findMethod(node.name, params)
+      if (methods.length == 0) {
+        report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
+        None
+      } else if (methods.length > 1) {
+        report(
+          AMBIGUOUS_METHOD,
+          node,
+          Array[AnyRef](methods(0).affiliation, node.name, methods(0).arguments),
+          Array[AnyRef](methods(1).affiliation, node.name, methods(1).arguments)
+        )
+        None
+      } else {
+        val method = methods(0)
+        val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+        val methodSubst =
+          if (node.typeArgs.nonEmpty) {
+            GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
+          } else {
+            GenericMethodTypeArguments.infer(node, method, params, classSubst)
+          }
+
+        val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+        var i = 0
+        while (i < params.length) {
+          params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
+          if (params(i) == null) return None
+          i += 1
+        }
+
+        if ((methods(0).modifier & AST.M_STATIC) != 0) {
+          val call = new CallStatic(targetType, method, params)
+          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        } else {
+          if (context.isClosure) {
+            val call = new Call(new OuterThis(targetType), method, params)
+            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          } else {
+            val call = new Call(new This(targetType), method, params)
+            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          }
+        }
+      }
+    }
+
+    def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] = {
+      val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
+      if (typeRef == null) return None
+      val field = MemberAccess.findField(typeRef, node.name)
+      if (field == null) {
+        report(FIELD_NOT_FOUND, node, typeRef, node.name)
+        None
+      } else {
+        Some(new RefStaticField(typeRef, field))
+      }
+    }
+
+    def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext): Option[Term] = {
+      val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
+      val parameters = typedTerms(node.args.toArray, context)
+      if (typeRef == null || parameters == null) {
+        None
+      } else {
+        val methods = typeRef.findMethod(node.name, parameters)
+        if (methods.length == 0) {
+          report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
+          None
+        } else if (methods.length > 1) {
+          report(AMBIGUOUS_METHOD, node, node.name, typeNames(methods(0).arguments), typeNames(methods(1).arguments))
+          None
+        } else {
+          val method = methods(0)
+          val classSubst = TypeSubstitution.classSubstitution(typeRef)
+          val methodSubst =
+            if (node.typeArgs.nonEmpty) {
+              GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
+            } else {
+              GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
+            }
+
+          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+          var i = 0
+          while (i < parameters.length) {
+            parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
+            if (parameters(i) == null) return None
+            i += 1
+          }
+
+          val call = new CallStatic(typeRef, method, parameters)
+          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        }
+      }
+    }
+
+    def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext): Option[Term] = {
+      val parameters = typedTerms(node.args.toArray, context)
+      if (parameters == null) return None
+      val contextClass = definition_
+      tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
+        case Right(method) =>
+          val classSubst = TypeSubstitution.classSubstitution(contextClass.superClass)
+          val methodSubst =
+            if (node.typeArgs.nonEmpty) {
+              GenericMethodTypeArguments.explicit(node, method, node.typeArgs, classSubst).getOrElse(return None)
+            } else {
+              GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
+            }
+
+          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+          var i = 0
+          while (i < parameters.length) {
+            parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
+            if (parameters(i) == null) return None
+            i += 1
+          }
+          val call = new CallSuper(new This(contextClass), method, parameters)
+          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        case Left(_) =>
+          report(METHOD_NOT_FOUND, node, contextClass, node.name, types(parameters))
+          None
+      }
+    }
+
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
         var left = typed(node.lhs, context).getOrElse(null)
@@ -995,100 +1234,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         val destinationType = mapFrom(node.typeRef, mapper_)
         if (target == null || destinationType == null) None
         else  Some(new InstanceOf(target, destinationType))
-      case node@AST.MemberSelection(loc, _, _) =>
-        val contextClass = definition_
-        val target = typed(node.target, context).getOrElse(null)
-        if (target == null) return None
-        if (target.`type`.isBasicType || target.`type`.isNullType) {
-          report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
-          return None
-        }
-        val targetType = target.`type`.asInstanceOf[ObjectType]
-        if (!MemberAccess.ensureTypeAccessible(node, targetType, contextClass)) return None
-        val name = node.name
-        if (target.`type`.isArrayType) {
-          if (name.equals("length") || name.equals("size")) {
-            return Some(new ArrayLength(target))
-          } else {
-            return None
-          }
-        }
-        val field = MemberAccess.findField(targetType, name)
-        if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
-          val ref = new RefField(target, field)
-          val castType = TypeSubstitution.substituteType(ref.`type`, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-          return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
-        }
-
-        tryFindMethod(node, targetType, name, new Array[Term](0)) match {
-          case Right(method) =>
-            val call = new Call(target, method, new Array[Term](0))
-            val castType = TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-            return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          case Left(continuable) =>
-            if(!continuable) return None
-        }
-        tryFindMethod(node, targetType, getter(name), new Array[Term](0)) match {
-          case Right(method) =>
-            val call = new Call(target, method, new Array[Term](0))
-            val castType = TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-            return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          case Left(continuable) =>
-            if(!continuable) return None
-        }
-        tryFindMethod(node, targetType, getterBoolean(name), new Array[Term](0)) match {
-          case Right(method) =>
-            val call = new Call(target, method, new Array[Term](0))
-            val castType = TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          case Left(_) =>
-            if (field == null) {
-              report(FIELD_NOT_FOUND, node, targetType, node.name)
-            } else {
-              report(FIELD_NOT_ACCESSIBLE, node, targetType, node.name, definition_)
-            }
-            None
-        }
-
-      case node@AST.MethodCall(loc, target, name, args, typeArgs) =>
-        val target = typed(node.target, context).getOrElse(null)
-        if (target == null) return None
-        val params = typedTerms(node.args.toArray, context)
-        if (params == null) return None
-        val targetType = target.`type`.asInstanceOf[ObjectType]
-        val name = node.name
-        val methods = MethodResolution.findMethods(targetType, name, params)
-        if (methods.length == 0) {
-          report(METHOD_NOT_FOUND, node, targetType, name, types(params))
-          None
-        } else if (methods.length > 1) {
-          report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))
-          None
-        } else if ((methods(0).modifier & AST.M_STATIC) != 0) {
-          report(ILLEGAL_METHOD_CALL, node, methods(0).affiliation, name, methods(0).arguments)
-          None
-        } else {
-          val method = methods(0)
-          val classSubst = TypeSubstitution.classSubstitution(target.`type`)
-          val methodSubst =
-            if (typeArgs.nonEmpty) {
-              GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
-            } else {
-              GenericMethodTypeArguments.infer(node, method, params, classSubst)
-            }
-
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          while (i < params.length) {
-            params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
-            if (params(i) == null) return None
-            i += 1
-          }
-
-          val call = new Call(target, method, params)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-        }
+      case node: AST.MemberSelection =>
+        typeMemberSelection(node, context)
+      case node: AST.MethodCall =>
+        typeMethodCall(node, context)
       case node@AST.Negate(loc, target) =>
         val term = typed(node.term, context).getOrElse(null)
         if (term == null) return None
@@ -1181,97 +1330,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             null
         })
       // Removed: UnqualifiedFieldReference - use this.field or self.field instead
-      case node@AST.UnqualifiedMethodCall(loc, name, args, typeArgs) =>
-        var params = typedTerms(node.args.toArray, context)
-        if (params == null) return None
-        val targetType = definition_
-        val methods = targetType.findMethod(node.name, params)
-        if (methods.length == 0) {
-          report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
-          None
-        } else if (methods.length > 1) {
-          report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, node.name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, node.name, methods(1).arguments))
-          None
-        } else {
-          val method = methods(0)
-          val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-          val methodSubst =
-            if (typeArgs.nonEmpty) {
-              GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
-            } else {
-              GenericMethodTypeArguments.infer(node, method, params, classSubst)
-            }
-
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          while (i < params.length) {
-            params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
-            if (params(i) == null) return None
-            i += 1
-          }
-
-          if ((methods(0).modifier & AST.M_STATIC) != 0) {
-            val call = new CallStatic(targetType, method, params)
-            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          } else {
-            if(context.isClosure) {
-              val call = new Call(new OuterThis(targetType), method, params)
-              val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-            }else {
-              val call = new Call(new This(targetType), method, params)
-              val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-            }
-          }
-        }
-      case node@AST.StaticMemberSelection(loc, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
-        if (typeRef == null) return None
-        val field = MemberAccess.findField(typeRef, node.name)
-        if (field == null) {
-          report(FIELD_NOT_FOUND, node, typeRef, node.name)
-          None
-        }else {
-          Some(new RefStaticField(typeRef,field))
-        }
-      case node@AST.StaticMethodCall(loc, _, _, _, typeArgs) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
-        val parameters = typedTerms(node.args.toArray, context)
-        if (typeRef == null || parameters == null) {
-          None
-        } else {
-          val methods = typeRef.findMethod(node.name, parameters)
-          if (methods.length == 0) {
-            report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
-            None
-          } else if (methods.length > 1) {
-            report(AMBIGUOUS_METHOD, node, node.name, typeNames(methods(0).arguments), typeNames(methods(1).arguments))
-            None
-          } else {
-            val method = methods(0)
-            val classSubst = TypeSubstitution.classSubstitution(typeRef)
-            val methodSubst =
-              if (typeArgs.nonEmpty) {
-                GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
-              } else {
-                GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
-              }
-
-            val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-            var i = 0
-            while (i < parameters.length) {
-              parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
-              if (parameters(i) == null) return None
-              i += 1
-            }
-
-            val call = new CallStatic(typeRef, method, parameters)
-            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          }
-        }
+      case node: AST.UnqualifiedMethodCall =>
+        typeUnqualifiedMethodCall(node, context)
+      case node: AST.StaticMemberSelection =>
+        typeStaticMemberSelection(node)
+      case node: AST.StaticMethodCall =>
+        typeStaticMethodCall(node, context)
       case node@AST.StringLiteral(loc, value) =>
         Some(new StringValue(loc, value, load("java.lang.String")))
       case node@AST.StringInterpolation(loc, parts, expressions) =>
@@ -1332,34 +1396,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           return None
         }
         Some(new Call(result, toStringMethods(0), Array[Term]()))
-      case node@AST.SuperMethodCall(loc, _, _, typeArgs) =>
-        val parameters = typedTerms(node.args.toArray, context)
-        if (parameters == null) return None
-        val contextClass = definition_
-        tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
-          case Right(method) =>
-            val classSubst = TypeSubstitution.classSubstitution(contextClass.superClass)
-            val methodSubst =
-              if (typeArgs.nonEmpty) {
-                GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
-              } else {
-                GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
-              }
-
-            val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-            var i = 0
-            while (i < parameters.length) {
-              parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
-              if (parameters(i) == null) return None
-              i += 1
-            }
-            val call = new CallSuper(new This(contextClass), method, parameters)
-            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          case Left(_) =>
-            report(METHOD_NOT_FOUND, node, contextClass, node.name, types(parameters))
-            None
-        }
+      case node: AST.SuperMethodCall =>
+        typeSuperMethodCall(node, context)
     }
     def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
       case AST.BlockExpression(loc, elements) =>

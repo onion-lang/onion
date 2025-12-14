@@ -438,5 +438,80 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("x") == result)
     }
+
+    it("supports Collections.singletonMap") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsSingletonMap {
+          |public:
+          |  static def main(args: String[]): String {
+          |    m = Collections::singletonMap("k", "v")
+          |    return m.get("k")
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsSingletonMap.on",
+        Array()
+      )
+      assert(Shell.Success("v") == result)
+    }
+
+    it("supports Collections.emptyMap with explicit type args") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsEmptyMap {
+          |public:
+          |  static def main(args: String[]): String {
+          |    m: Map[String, String] = Collections::emptyMap[String, String]()
+          |    v = m.get("missing")
+          |    if v == null { return "null"; }
+          |    return v
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsEmptyMap.on",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
+    }
+
+    it("supports Collections.enumeration and list") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsEnumeration {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    e: Enumeration[String] = Collections::enumeration(list)
+          |    list2: ArrayList[String] = Collections::list(e)
+          |    return list2.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsEnumeration.on",
+        Array()
+      )
+      assert(Shell.Success("a") == result)
+    }
+
+    it("supports Collections.newSetFromMap") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsNewSetFromMap {
+          |public:
+          |  static def main(args: String[]): String {
+          |    m: HashMap[String, JBoolean] = new HashMap[String, JBoolean]
+          |    s: Set[String] = Collections::newSetFromMap(m)
+          |    s.add("x")
+          |    return "" + s.contains("x")
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsNewSetFromMap.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
   }
 }

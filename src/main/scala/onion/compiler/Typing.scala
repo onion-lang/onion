@@ -1004,6 +1004,72 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
     }
 
+    def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] = {
+      val target = typed(node.lhs, context).getOrElse(null)
+      val index = typed(node.rhs, context).getOrElse(null)
+      if (target == null || index == null) return None
+
+      if (target.isArrayType) {
+        if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
+          report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
+          return None
+        }
+        Some(new RefArray(target, index))
+      } else if (target.isBasicType) {
+        report(INCOMPATIBLE_TYPE, node.lhs, rootClass, target.`type`)
+        None
+      } else {
+        val params = Array(index)
+        tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", Array[Term](index)) match {
+          case Left(_) =>
+            report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+            None
+          case Right(method) =>
+            Some(new Call(target, method, params))
+        }
+      }
+    }
+
+    def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
+      val typeRef = mapFrom(node.typeRef, mapper_)
+      val parameters = typedTerms(node.args.toArray, context)
+      if (typeRef == null || parameters == null) return None
+      val resultType = loadArray(typeRef, parameters.length)
+      Some(new NewArray(resultType, parameters))
+    }
+
+    def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] = {
+      val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
+      val parameters = typedTerms(node.args.toArray, context)
+      if (parameters == null || typeRef == null) return None
+      val constructors = typeRef.findConstructor(parameters)
+      if (constructors.length == 0) {
+        report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters))
+        None
+      } else if (constructors.length > 1) {
+        report(
+          AMBIGUOUS_CONSTRUCTOR,
+          node,
+          Array[AnyRef](constructors(0).affiliation, constructors(0).getArgs),
+          Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs)
+        )
+        None
+      } else {
+        typeRef match {
+          case applied: TypedAST.AppliedClassType =>
+            val appliedCtor = new TypedAST.ConstructorRef {
+              def modifier: Int = constructors(0).modifier
+              def affiliation: TypedAST.ClassType = applied
+              def name: String = constructors(0).name
+              def getArgs: Array[TypedAST.Type] = constructors(0).getArgs
+            }
+            Some(new NewObject(appliedCtor, parameters))
+          case _ =>
+            Some(new NewObject(constructors(0), parameters))
+        }
+      }
+    }
+
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
         var left = typed(node.lhs, context).getOrElse(null)
@@ -1111,36 +1177,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }else {
           Some(new BinaryTerm(ELVIS, left.`type`, left, right))
         }
-      case node@AST.Indexing(loc, left, right) =>
-        val target = typed(node.lhs, context).getOrElse(null)
-        val index = typed(node.rhs, context).getOrElse(null)
-        if (target == null || index == null) return None
-        if (target.isArrayType) {
-          if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
-            report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
-            return None
-          }
-          return Some(new RefArray(target, index))
-        }
-        if (target.isBasicType) {
-          report(INCOMPATIBLE_TYPE, node.lhs, rootClass, target.`type`)
-          return None
-        }
-        if (target.isArrayType) {
-          if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
-            report(INCOMPATIBLE_TYPE, node.rhs, BasicType.INT, index.`type`)
-            return None
-          }
-          return new Some(new RefArray(target, index))
-        }
-        val params = Array(index)
-        tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", Array[Term](index)) match {
-          case Left(_) =>
-            report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
-            None
-          case Right(method) =>
-            Some(new Call(target, method, params))
-        }
+      case node: AST.Indexing =>
+        typeIndexing(node, context)
       case node@AST.AdditionAssignment(loc, left, right) =>
         typed(left, context)
         typed(right, context)
@@ -1246,37 +1284,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           return None
         }
         Some(new UnaryTerm(MINUS, term.`type`, term))
-      case node@AST.NewArray(loc, _, _) =>
-        val typeRef = mapFrom(node.typeRef, mapper_)
-        val parameters = typedTerms(node.args.toArray, context)
-        if(typeRef == null || parameters == null) return None
-        val resultType = loadArray(typeRef, parameters.length)
-        Some(new NewArray(resultType, parameters))
-      case node@AST.NewObject(loc, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
-        val parameters = typedTerms(node.args.toArray, context)
-        if (parameters == null || typeRef == null) return None
-        val constructors = typeRef.findConstructor(parameters)
-        if (constructors.length == 0) {
-          report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters))
-          None
-        }else if (constructors.length > 1) {
-          report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](constructors(0).affiliation, constructors(0).getArgs), Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs))
-          None
-        }else {
-          typeRef match {
-            case applied: TypedAST.AppliedClassType =>
-              val appliedCtor = new TypedAST.ConstructorRef {
-                def modifier: Int = constructors(0).modifier
-                def affiliation: TypedAST.ClassType = applied
-                def name: String = constructors(0).name
-                def getArgs: Array[TypedAST.Type] = constructors(0).getArgs
-              }
-              Some(new NewObject(appliedCtor, parameters))
-            case _ =>
-              Some(new NewObject(constructors(0), parameters))
-          }
-        }
+      case node: AST.NewArray =>
+        typeNewArray(node, context)
+      case node: AST.NewObject =>
+        typeNewObject(node, context)
       case node@AST.Not(loc, target) =>
         val term = typed(node.term, context).getOrElse(null)
         if (term == null) return None

@@ -1072,9 +1072,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           val classSubst = classSubstitution(target.`type`)
           val methodSubst =
             if (typeArgs.nonEmpty) {
-              explicitMethodTypeArgs(node, method, typeArgs, classSubst).getOrElse(return None)
+              GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
             } else {
-              inferMethodTypeArgs(node, method, params, classSubst)
+              GenericMethodTypeArguments.infer(node, method, params, classSubst)
             }
 
           val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -1197,9 +1197,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
           val methodSubst =
             if (typeArgs.nonEmpty) {
-              explicitMethodTypeArgs(node, method, typeArgs, classSubst).getOrElse(return None)
+              GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
             } else {
-              inferMethodTypeArgs(node, method, params, classSubst)
+              GenericMethodTypeArguments.infer(node, method, params, classSubst)
             }
 
           val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -1254,9 +1254,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             val classSubst = classSubstitution(typeRef)
             val methodSubst =
               if (typeArgs.nonEmpty) {
-                explicitMethodTypeArgs(node, method, typeArgs, classSubst).getOrElse(return None)
+                GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
               } else {
-                inferMethodTypeArgs(node, method, parameters, classSubst)
+                GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
               }
 
             val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -1341,9 +1341,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             val classSubst = classSubstitution(contextClass.superClass)
             val methodSubst =
               if (typeArgs.nonEmpty) {
-                explicitMethodTypeArgs(node, method, typeArgs, classSubst).getOrElse(return None)
+                GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
               } else {
-                inferMethodTypeArgs(node, method, parameters, classSubst)
+                GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
               }
 
             val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
@@ -1968,124 +1968,131 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
   }
 
-  private def explicitMethodTypeArgs(
-    callNode: AST.Node,
-    method: Method,
-    typeArgs: List[AST.TypeNode],
-    classSubst: scala.collection.immutable.Map[String, Type]
-  ): Option[scala.collection.immutable.Map[String, Type]] = {
-    val typeParams = method.typeParameters
-    if (typeParams.isEmpty) {
-      report(METHOD_NOT_GENERIC, callNode, method.affiliation.name, method.name)
-      return None
-    }
-    if (typeParams.length != typeArgs.length) {
-      report(
-        METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
-        callNode,
-        method.affiliation.name,
-        method.name,
-        Integer.valueOf(typeParams.length),
-        Integer.valueOf(typeArgs.length)
-      )
-      return None
-    }
-
-    val mappedArgs = new Array[Type](typeArgs.length)
-    var i = 0
-    while (i < typeArgs.length) {
-      val mapped = mapFrom(typeArgs(i))
-      if (mapped == null) return None
-      if (mapped.isBasicType) {
-        report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mapped.name)
+  private object GenericMethodTypeArguments {
+    def explicit(
+      callNode: AST.Node,
+      method: Method,
+      typeArgs: List[AST.TypeNode],
+      classSubst: scala.collection.immutable.Map[String, Type]
+    ): Option[scala.collection.immutable.Map[String, Type]] = {
+      val typeParams = method.typeParameters
+      if (typeParams.isEmpty) {
+        report(METHOD_NOT_GENERIC, callNode, method.affiliation.name, method.name)
         return None
       }
-      mappedArgs(i) = mapped
-      i += 1
-    }
-
-    var subst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-    i = 0
-    while (i < typeParams.length) {
-      subst = subst.updated(typeParams(i).name, mappedArgs(i))
-      i += 1
-    }
-
-    i = 0
-    while (i < typeParams.length) {
-      val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
-      val upper = substituteType(upper0, classSubst, subst, defaultToBound = true)
-      val arg = mappedArgs(i)
-      if (!TypeRules.isAssignable(upper, arg)) {
-        report(INCOMPATIBLE_TYPE, typeArgs(i), upper, arg)
+      if (typeParams.length != typeArgs.length) {
+        report(
+          METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
+          callNode,
+          method.affiliation.name,
+          method.name,
+          Integer.valueOf(typeParams.length),
+          Integer.valueOf(typeArgs.length)
+        )
         return None
       }
-      i += 1
-    }
 
-    Some(subst)
-  }
-
-  private def inferMethodTypeArgs(callNode: AST.Node, method: Method, args: Array[Term], classSubst: scala.collection.immutable.Map[String, Type]): scala.collection.immutable.Map[String, Type] = {
-    val typeParams = method.typeParameters
-    if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
-
-    val bounds = HashMap[String, Type]()
-    for (tp <- typeParams) {
-      val upper = tp.upperBound.getOrElse(rootClass)
-      bounds += tp.name -> substituteType(upper, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
-    }
-
-    val inferred = HashMap[String, Type]()
-    val paramNames = typeParams.map(_.name).toSet
-
-    def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
-      if (actual.isNullType) return
-      formal match {
-        case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
-          inferred.get(tv.name) match {
-            case Some(prev) =>
-              if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
-            case None =>
-              inferred += tv.name -> actual
-          }
-        case apf: TypedAST.AppliedClassType =>
-          actual match {
-            case apa: TypedAST.AppliedClassType if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length =>
-              var i = 0
-              while (i < apf.typeArguments.length) {
-                unify(apf.typeArguments(i), apa.typeArguments(i), position)
-                i += 1
-              }
-            case _ =>
-          }
-        case aft: ArrayType =>
-          actual match {
-            case aat: ArrayType if aft.dimension == aat.dimension =>
-              unify(aft.component, aat.component, position)
-            case _ =>
-          }
-        case _ =>
+      val mappedArgs = new Array[Type](typeArgs.length)
+      var i = 0
+      while (i < typeArgs.length) {
+        val mapped = mapFrom(typeArgs(i))
+        if (mapped == null) return None
+        if (mapped.isBasicType) {
+          report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mapped.name)
+          return None
+        }
+        mappedArgs(i) = mapped
+        i += 1
       }
-    }
 
-    val formalArgs = method.arguments.map(t => substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-    var i = 0
-    while (i < formalArgs.length && i < args.length) {
-      unify(formalArgs(i), args(i).`type`, callNode)
-      i += 1
-    }
-
-    for (tp <- typeParams) {
-      val inferredType = inferred.getOrElse(tp.name, bounds(tp.name))
-      val bound = bounds(tp.name)
-      if (!TypeRules.isAssignable(bound, inferredType)) {
-        report(INCOMPATIBLE_TYPE, callNode, bound, inferredType)
+      var subst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+      i = 0
+      while (i < typeParams.length) {
+        subst = subst.updated(typeParams(i).name, mappedArgs(i))
+        i += 1
       }
-      inferred += tp.name -> inferredType
+
+      i = 0
+      while (i < typeParams.length) {
+        val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
+        val upper = substituteType(upper0, classSubst, subst, defaultToBound = true)
+        val arg = mappedArgs(i)
+        if (!TypeRules.isAssignable(upper, arg)) {
+          report(INCOMPATIBLE_TYPE, typeArgs(i), upper, arg)
+          return None
+        }
+        i += 1
+      }
+
+      Some(subst)
     }
 
-    inferred.toMap
+    def infer(
+      callNode: AST.Node,
+      method: Method,
+      args: Array[Term],
+      classSubst: scala.collection.immutable.Map[String, Type]
+    ): scala.collection.immutable.Map[String, Type] = {
+      val typeParams = method.typeParameters
+      if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
+
+      val bounds = HashMap[String, Type]()
+      for (tp <- typeParams) {
+        val upper = tp.upperBound.getOrElse(rootClass)
+        bounds += tp.name -> substituteType(upper, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+      }
+
+      val inferred = HashMap[String, Type]()
+      val paramNames = typeParams.map(_.name).toSet
+
+      def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
+        if (actual.isNullType) return
+        formal match {
+          case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+            inferred.get(tv.name) match {
+              case Some(prev) =>
+                if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
+              case None =>
+                inferred += tv.name -> actual
+            }
+          case apf: TypedAST.AppliedClassType =>
+            actual match {
+              case apa: TypedAST.AppliedClassType if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length =>
+                var i = 0
+                while (i < apf.typeArguments.length) {
+                  unify(apf.typeArguments(i), apa.typeArguments(i), position)
+                  i += 1
+                }
+              case _ =>
+            }
+          case aft: ArrayType =>
+            actual match {
+              case aat: ArrayType if aft.dimension == aat.dimension =>
+                unify(aft.component, aat.component, position)
+              case _ =>
+            }
+          case _ =>
+        }
+      }
+
+      val formalArgs = method.arguments.map(t => substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      var i = 0
+      while (i < formalArgs.length && i < args.length) {
+        unify(formalArgs(i), args(i).`type`, callNode)
+        i += 1
+      }
+
+      for (tp <- typeParams) {
+        val inferredType = inferred.getOrElse(tp.name, bounds(tp.name))
+        val bound = bounds(tp.name)
+        if (!TypeRules.isAssignable(bound, inferredType)) {
+          report(INCOMPATIBLE_TYPE, callNode, bound, inferredType)
+        }
+        inferred += tp.name -> inferredType
+      }
+
+      inferred.toMap
+    }
   }
   private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
     val params = Array[Term](new AsInstanceOf(rhs, rootClass))

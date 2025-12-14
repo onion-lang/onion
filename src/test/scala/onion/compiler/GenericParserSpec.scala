@@ -63,5 +63,22 @@ class GenericParserSpec extends AnyFunSpec with Diagrams {
       assert(call.typeArgs.nonEmpty)
       assert(call.typeArgs.head.desc.toString == "String")
     }
+
+    it("parses function type syntax") {
+      val source =
+        """
+          |class FuncTypes {
+          |public:
+          |  def applyTwice(f: (String) => String, x: String): String = f.call(f.call(x))
+          |}
+          |""".stripMargin
+
+      val unit = new JJOnionParser(new StringReader(source)).unit()
+      val clazz = unit.toplevels.collectFirst { case c: AST.ClassDeclaration if c.name == "FuncTypes" => c }.get
+      val methods = clazz.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
+      val applyTwice = methods.find(_.name == "applyTwice").get
+      val fArg = applyTwice.args.head
+      assert(fArg.typeRef.desc.isInstanceOf[AST.FunctionType])
+    }
   }
 }

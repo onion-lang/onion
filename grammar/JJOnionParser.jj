@@ -719,18 +719,33 @@ AST.TypeNode void_type() :{Token t;}{
 
 AST.TypeNode type() : {
   int d = 0; ArrayBuffer<AST.TypeDescriptor> args = new ArrayBuffer<AST.TypeDescriptor>();
-  AST.TypeNode arg, c;
+  ArrayBuffer<AST.TypeDescriptor> fargs = new ArrayBuffer<AST.TypeDescriptor>();
+  AST.TypeNode arg, c, r;
   boolean isRelaxed = false;
+  AST.TypeDescriptor core = null;
+  Location loc = null;
 }{
   ("+" {isRelaxed = true;})?
-  c=raw_type()
-  [LOOKAHEAD(2) "[" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* "]" ]
+  (
+    LOOKAHEAD( "(" )
+      "(" eols()
+        [ arg=type() { append(fargs, arg.desc()); } ("," eols() arg=type() { append(fargs, arg.desc()); })* ]
+      eols() ")" eols() ( <ARROW> | <ARROW2> ) eols() r=type() {
+        core = new AST.FunctionType(toList(fargs), r.desc());
+        loc = p(getToken(0));
+      }
+  | c=raw_type()
+    [LOOKAHEAD(2) "[" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* "]" ] {
+      core = args.size() > 0 ? new AST.ParameterizedType(c.desc(), toList(args)) : c.desc();
+      loc = c.location();
+    }
+  )
   (LOOKAHEAD(2) "[" "]" {d++;})* {
-    AST.TypeDescriptor desc = args.size() > 0 ? new AST.ParameterizedType(c.desc(), toList(args)) : c.desc();
+    AST.TypeDescriptor desc = core;
     for(int i = 0; i < d; i++) {
       desc = new AST.ArrayType(desc);
     }
-    return new AST.TypeNode(c.location(), desc, isRelaxed);
+    return new AST.TypeNode(loc, desc, isRelaxed);
   }
 }
 

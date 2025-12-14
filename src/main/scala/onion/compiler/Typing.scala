@@ -178,97 +178,113 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       add(node.name, new NameMapper(imports.toSeq))
     }
   }
-  def processOutline(unit: AST.CompilationUnit): Unit = {
-    var nconstructors = 0
-    unit_ = unit
-    def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
-      nconstructors = 0
+  def processOutline(unit: AST.CompilationUnit): Unit =
+    new OutlinePass(unit).run()
+
+  private final class OutlinePass(unit: AST.CompilationUnit) {
+    private var constructorCount = 0
+
+    def run(): Unit = {
+      unit_ = unit
+      mapper_ = find(topClass)
+      unit.toplevels.foreach {
+        case node: AST.ClassDeclaration => processClassDeclaration(node)
+        case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
+        case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
+        case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
+        case _ =>
+      }
+    }
+
+    private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
+      constructorCount = 0
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
+
       val classTypeParams = createTypeParams(node.typeParameters)
       declaredTypeParams_(node) = classTypeParams
       definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
       constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
+
       openTypeParams(emptyTypeParams ++ classTypeParams) {
-        for(defaultSection <- node.defaultSection) {
-          access_ = defaultSection.modifiers
-          for(member <- defaultSection.members) member match {
-            case node: AST.FieldDeclaration => processFieldDeclaration(node)
-            case node: AST.MethodDeclaration => processMethodDeclaration(node)
-            case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-            case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
-          }
-        }
-        for(section <- node.sections; member <- section.members) {
-          access_ = section.modifiers
-          member match {
-            case node: AST.FieldDeclaration => processFieldDeclaration(node)
-            case node: AST.MethodDeclaration => processMethodDeclaration(node)
-            case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-            case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
-          }
-        }
+        node.defaultSection.foreach(processAccessSection)
+        node.sections.foreach(processAccessSection)
       }
-      if (nconstructors == 0) definition_.addDefaultConstructor
+
+      if (constructorCount == 0) definition_.addDefaultConstructor
     }
-    def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
+
+    private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
       definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
       mapper_ = find(definition_.name)
+
       val interfaceTypeParams = createTypeParams(node.typeParameters)
       declaredTypeParams_(node) = interfaceTypeParams
       definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
       constructTypeHierarchy(definition_, MutableSet[ClassType]())
       if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
+
       openTypeParams(emptyTypeParams ++ interfaceTypeParams) {
-        for(method <- node.methods) processInterfaceMethodDeclaration(method)
+        node.methods.foreach(processInterfaceMethodDeclaration)
       }
     }
-    def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
+
+    private def processAccessSection(section: AST.AccessSection): Unit = {
+      access_ = section.modifiers
+      section.members.foreach {
+        case node: AST.FieldDeclaration => processFieldDeclaration(node)
+        case node: AST.MethodDeclaration => processMethodDeclaration(node)
+        case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
+        case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
+      }
+    }
+
+    private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return
       val modifier = node.modifiers | AST.M_PUBLIC
       val classType = loadTopClass.asInstanceOf[ClassDefinition]
-      val name = node.name
-      val field = new FieldDefinition(node.location, modifier, classType, name, typeRef)
+      val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)
       put(node, field)
       classType.add(field)
     }
-    def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
+
+    private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
       val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-      for(args <- argsOption; returnType <- returnTypeOption) {
-        val classType= loadTopClass.asInstanceOf[ClassDefinition]
+      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+      for (args <- argsOption; returnType <- returnTypeOption) {
+        val classType = loadTopClass.asInstanceOf[ClassDefinition]
         val modifier = node.modifiers | AST.M_PUBLIC
-        val name = node.name
-        val method = new MethodDefinition(node.location, modifier, classType, name, args.toArray, returnType, null)
+        val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null)
         put(node, method)
         classType.add(method)
       }
     }
-    def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
+
+    private def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
-      if (typeRef == null) return; val modifier = node.modifiers | access_
-      val name = node.name
-      val field = new FieldDefinition(node.location, modifier, definition_, name, typeRef)
+      if (typeRef == null) return
+      val modifier = node.modifiers | access_
+      val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
       put(node, field)
       definition_.add(field)
     }
-    def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
+
+    private def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val methodTypeParams = createTypeParams(node.typeParameters)
       declaredTypeParams_(node) = methodTypeParams
       openTypeParams(typeParams_ ++ methodTypeParams) {
         val argsOption = typesOf(node.args)
         val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-        for(args <- argsOption; returnType <- returnTypeOption) {
+        for (args <- argsOption; returnType <- returnTypeOption) {
           var modifier = node.modifiers | access_
           if (node.block == null) modifier |= AST.M_ABSTRACT
-          val name = node.name
           val method = new MethodDefinition(
             node.location,
             modifier,
             definition_,
-            name,
+            node.name,
             args.toArray,
             returnType,
             null,
@@ -279,20 +295,20 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
       }
     }
-    def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
+
+    private def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
       val methodTypeParams = createTypeParams(node.typeParameters)
       declaredTypeParams_(node) = methodTypeParams
       openTypeParams(typeParams_ ++ methodTypeParams) {
         val argsOption = typesOf(node.args)
-        val returnTypeOption = Option(if(node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-        for(args <- argsOption; returnType <- returnTypeOption) {
+        val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+        for (args <- argsOption; returnType <- returnTypeOption) {
           val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
-          val name = node.name
           val method = new MethodDefinition(
             node.location,
             modifier,
             definition_,
-            name,
+            node.name,
             args.toArray,
             returnType,
             null,
@@ -303,17 +319,19 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
       }
     }
-    def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
-      nconstructors += 1
+
+    private def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
+      constructorCount += 1
       val argsOption = typesOf(node.args)
-      for(args <- argsOption) {
+      for (args <- argsOption) {
         val modifier = node.modifiers | access_
         val constructor = new ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
         put(node, constructor)
         definition_.add(constructor)
       }
     }
-    def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
+
+    private def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
       val typeRef = mapFrom(node.typeRef)
       if (typeRef == null) return
       if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectType]).isInterface)) {
@@ -321,23 +339,24 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         return
       }
       val modifier = node.modifiers | access_ | AST.M_FORWARDED
-      var name = node.name
-      var field = new FieldDefinition(node.location, modifier, definition_, name, typeRef)
+      val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
       put(node, field)
       definition_.add(field)
     }
-    def cyclic(start: ClassDefinition): Boolean = {
+
+    private def cyclic(start: ClassDefinition): Boolean = {
       def loop(node: ClassType, visit: Set[ClassType]): Boolean = {
-        if(node == null) return false
-        if(visit.contains(node)) return true
+        if (node == null) return false
+        if (visit.contains(node)) return true
         val newVisit = visit + node
-        if(loop(node.superClass, newVisit)) return true
-        for(interface <- node.interfaces) if(loop(interface, newVisit)) return true
+        if (loop(node.superClass, newVisit)) return true
+        for (iface <- node.interfaces) if (loop(iface, newVisit)) return true
         false
       }
       loop(start, Set[ClassType]())
     }
-    def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassType = {
+
+    private def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassType = {
       if (node == null) {
         return if (mustBeInterface) null else table_.rootClass
       }
@@ -351,56 +370,49 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
       val isInterface = typeRef.isInterface
       if (((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))) {
-        var location: Location = null
-        if (typeRef.isInstanceOf[ClassDefinition]) {
-          location = typeRef.asInstanceOf[ClassDefinition].location
-        }
+        val location =
+          typeRef match
+            case cd: ClassDefinition => cd.location
+            case _ => null
         report(ILLEGAL_INHERITANCE, location, typeRef.name)
       }
       typeRef
     }
-    def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]): Unit = {
-      if(node == null || visit.contains(node)) return
+
+    private def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]): Unit = {
+      if (node == null || visit.contains(node)) return
       visit += node
       node match {
         case node: ClassDefinition =>
           if (node.isResolutionComplete) return
           val interfaces = Buffer[ClassType]()
           val resolver = find(node.name)
-          var superClass: ClassType = null
-          if (node.isInterface) {
-            val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
-            superClass = rootClass
-            for (typeSpec <- ast.superInterfaces) {
-              val superType = validateSuperType(typeSpec, true, resolver)
-              if (superType != null) interfaces += superType
+          val superClass =
+            if (node.isInterface) {
+              val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
+              for (typeSpec <- ast.superInterfaces) {
+                val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
+                if (superType != null) interfaces += superType
+              }
+              rootClass
+            } else {
+              val ast = lookupAST(node).asInstanceOf[AST.ClassDeclaration]
+              val superClass0 = validateSuperType(ast.superClass, mustBeInterface = false, resolver)
+              for (typeSpec <- ast.superInterfaces) {
+                val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
+                if (superType != null) interfaces += superType
+              }
+              superClass0
             }
-          }else {
-            val ast = lookupAST(node).asInstanceOf[AST.ClassDeclaration]
-            superClass = validateSuperType(ast.superClass, false, resolver)
-            for (typeSpec <- ast.superInterfaces) {
-              var superType = validateSuperType(typeSpec, true, resolver)
-              if (superType != null) interfaces += superType
-            }
-          }
+
           constructTypeHierarchy(superClass, visit)
-          for (superType <- interfaces)  constructTypeHierarchy(superType, visit)
+          interfaces.foreach(constructTypeHierarchy(_, visit))
           node.setSuperClass(superClass)
           node.setInterfaces(interfaces.toArray)
           node.setResolutionComplete(true)
         case _ =>
           constructTypeHierarchy(node.superClass, visit)
-          for (interface<- node.interfaces)  constructTypeHierarchy(interface, visit)
-      }
-    }
-    for(top <- unit.toplevels) {
-      mapper_ = find(topClass)
-      top match {
-        case node : AST.ClassDeclaration => processClassDeclaration(node)
-        case node : AST.InterfaceDeclaration => processInterfaceDeclaration(node)
-        case node : AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
-        case node : AST.FunctionDeclaration => processFunctionDeclaration(node)
-        case _ =>
+          node.interfaces.foreach(constructTypeHierarchy(_, visit))
       }
     }
   }

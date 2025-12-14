@@ -281,6 +281,69 @@ class GenericsTypingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("ok") == result)
     }
+
+    it("rejects incompatible overrides for generic supertypes") {
+      val badBase = silenceErr {
+        shell.run(
+          """
+            |class Base[T] {
+            |public:
+            |  def get(): T { return null }
+            |}
+            |
+            |class Sub : Base[String] {
+            |public:
+            |  def get(): Object { return new Object }
+            |  static def main(args: String[]): Int { return 0 }
+            |}
+            |""".stripMargin,
+          "BadOverrideBase.on",
+          Array()
+        )
+      }
+      assert(Shell.Failure(-1) == badBase)
+
+      val badInterface = silenceErr {
+        shell.run(
+          """
+            |interface Id[T] {
+            |  def id(x: T): T
+            |}
+            |
+            |class BadImpl <: Id[String] {
+            |public:
+            |  def id(x: String): Object { return x }
+            |  static def main(args: String[]): Int { return 0 }
+            |}
+            |""".stripMargin,
+          "BadOverrideInterface.on",
+          Array()
+        )
+      }
+      assert(Shell.Failure(-1) == badInterface)
+
+      val okInterface = shell.run(
+        """
+          |interface Id2[T] {
+          |  def id(x: T): T
+          |}
+          |
+          |class OkImpl <: Id2[String] {
+          |public:
+          |  def id(x: String): String {
+          |    return x
+          |  }
+          |  static def main(args: String[]): String {
+          |    i: Id2[String] = new OkImpl
+          |    return i.id("ok")
+          |  }
+          |}
+          |""".stripMargin,
+        "OkOverrideInterface.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == okInterface)
+    }
   }
 
   private def silenceErr[A](block: => A): A = {

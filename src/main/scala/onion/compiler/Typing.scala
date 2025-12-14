@@ -1733,6 +1733,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
       for (section <- node.sections) processAccessSection(section)
       generateMethods()
+      checkOverrideContracts(clazz, node.location)
       checkErasureSignatureCollisions(clazz, node.location)
     }
     def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
@@ -1749,6 +1750,51 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
     def erasedMethodDesc(method: Method): String =
       Erasure.methodDescriptor(method.returnType, method.arguments)
+
+    def checkOverrideContracts(clazz: ClassDefinition, fallback: Location): Unit =
+      if clazz.isInterface then return
+      val views = collectAppliedViewsFrom(clazz)
+      if views.isEmpty then return
+
+      val emptyMethodSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+
+      def erasedParamDescriptor(args: Array[Type]): String =
+        args.map(Erasure.asmType).map(_.getDescriptor).mkString("(", "", ")")
+
+      val implByErasedParams: scala.collection.immutable.Map[(String, String), Method] =
+        clazz.methods
+          .filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
+          .map(m => ((m.name, erasedParamDescriptor(m.arguments)), m))
+          .toMap
+
+      for (view <- views.values) {
+        val viewSubst: scala.collection.immutable.Map[String, Type] =
+          view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
+
+        for (contract <- view.raw.methods) {
+          if !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
+            val key = (contract.name, erasedParamDescriptor(contract.arguments))
+            implByErasedParams.get(key).foreach { impl =>
+              val specializedArgs = contract.arguments.map(tp => substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+              val specializedRet = substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
+
+              val implAst = lookupAST(impl.asInstanceOf[Node])
+              val location = if implAst != null then implAst.location else fallback
+
+              var i = 0
+              while (i < specializedArgs.length && i < impl.arguments.length) {
+                if (!TypeRules.isSuperType(impl.arguments(i), specializedArgs(i))) {
+                  report(INCOMPATIBLE_TYPE, location, specializedArgs(i), impl.arguments(i))
+                }
+                i += 1
+              }
+
+              if (!TypeRules.isAssignable(specializedRet, impl.returnType)) {
+                report(INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
+              }
+            }
+        }
+      }
 
     def checkErasureSignatureCollisions(clazz: ClassDefinition, fallback: Location): Unit =
       val seen = HashMap[(String, String), Method]()

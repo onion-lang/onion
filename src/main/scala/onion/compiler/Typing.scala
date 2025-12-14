@@ -12,7 +12,6 @@ import _root_.onion.compiler.SemanticError._
 import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 import onion.compiler.generics.Erasure
-import org.objectweb.asm.{Type => AsmType}
 
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
@@ -1748,27 +1747,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       checkErasureSignatureCollisions(clazz, node.location)
     }
 
-    def erasedAsmType(tp: Type): AsmType = tp match
-      case BasicType.VOID    => AsmType.VOID_TYPE
-      case BasicType.BOOLEAN => AsmType.BOOLEAN_TYPE
-      case BasicType.BYTE    => AsmType.BYTE_TYPE
-      case BasicType.SHORT   => AsmType.SHORT_TYPE
-      case BasicType.CHAR    => AsmType.CHAR_TYPE
-      case BasicType.INT     => AsmType.INT_TYPE
-      case BasicType.LONG    => AsmType.LONG_TYPE
-      case BasicType.FLOAT   => AsmType.FLOAT_TYPE
-      case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
-      case tv: TypedAST.TypeVariableType => erasedAsmType(tv.upperBound)
-      case ap: TypedAST.AppliedClassType => erasedAsmType(ap.raw)
-      case ct: ClassType => AsmType.getObjectType(ct.name.replace('.', '/'))
-      case at: ArrayType =>
-        val componentDesc = erasedAsmType(at.component).getDescriptor
-        AsmType.getType("[" * at.dimension + componentDesc)
-      case _: NullType => AsmType.getObjectType("java/lang/Object")
-      case other => throw new RuntimeException(s"Unsupported type for erasure collision check: $other")
-
     def erasedMethodDesc(method: Method): String =
-      AsmType.getMethodDescriptor(erasedAsmType(method.returnType), method.arguments.map(erasedAsmType)*)
+      Erasure.methodDescriptor(method.returnType, method.arguments)
 
     def checkErasureSignatureCollisions(clazz: ClassDefinition, fallback: Location): Unit =
       val seen = HashMap[(String, String), Method]()

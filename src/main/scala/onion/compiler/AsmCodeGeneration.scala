@@ -250,7 +250,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     val needsDefault = node.block == null || !hasReturn(node.block.statements)
     MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
-    gen.endMethod()
+    try gen.endMethod()
+    catch
+      case e: Throwable =>
+        val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
+        throw new RuntimeException(s"Bytecode generation failed at $className.${node.name}$desc", e)
     
   private def collectCapturedVariables(stmt: ActionStatement): Seq[LocalBinding] =
     val captured = mutable.LinkedHashMap[Int, LocalBinding]()

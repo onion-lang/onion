@@ -13,17 +13,17 @@ class CountersSpec extends AbstractShellSpec {
           |
           | class Counters {
           | public:
-          |   static def counter(begin :Int, up :Int) :Counter = 
-          |     #Counter.count {
-          |       return begin =
-          |         begin + up
+          |   static def counter(begin :Int, up :Int) :() -> JInteger =
+          |     () -> {
+          |       begin = begin + up
+          |       return new JInteger(begin);
           |     }
           |
           |   static def main(args: String[]): Int {
           |     c = counter(1, 10)
-          |     c.count
-          |     c.count
-          |     return c.count
+          |     c.call().intValue()
+          |     c.call().intValue()
+          |     return c.call().intValue()
           |   }
           |}
           |""".stripMargin,

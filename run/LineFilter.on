@@ -9,7 +9,7 @@ def filterLines(filter :Function1) :String {
 
 i = 1;
 
-lines = filterLines(#(line :Object){
+lines = filterLines((line :Object) -> {
   newLine = i + ":" + line;
   i++;
   return newLine + System::getProperty("line.separator");

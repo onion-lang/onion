@@ -998,10 +998,10 @@ AST.Expression primary_suffix() : {
 ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
 | t="." eols() n=<ID> (
     LOOKAHEAD( type_arguments() eols() "(" )
-      tas=type_arguments() eols() "(" eols() args=terms() ")" [a=anonymous_function()]
-        {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args, tas);}
-  | LOOKAHEAD(1) "(" eols() args=terms() ")" [a=anonymous_function()]
-        {e = new AST.MethodCall(p(t), e, c(n), a != null ? args.reverse().$colon$colon(a).reverse() : args);}
+      tas=type_arguments() eols() "(" eols() args=terms() ")"
+        {e = new AST.MethodCall(p(t), e, c(n), args, tas);}
+  | LOOKAHEAD(1) "(" eols() args=terms() ")"
+        {e = new AST.MethodCall(p(t), e, c(n), args);}
   | {e = new AST.MemberSelection(p(t), e, c(n));}
   )
 | t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
@@ -1029,7 +1029,6 @@ AST.Expression primary() : {
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
 | LOOKAHEAD( "(" eols() ")" eols() <ARROW> ) e=arrow_anonymous_function()  {return e;}
 | LOOKAHEAD( "(" eols() <ID> ":" ) e=arrow_anonymous_function()           {return e;}
-| e=anonymous_function()                                            {return e;}
 | t="new" ty=type() (
     "[" eols() (es=terms()) "]"                                           {return new AST.NewArray(p(t), ty, es);}
   | ["(" eols() (es=terms()) ")"]                                         {return new AST.NewObject(p(t), ty, es);}
@@ -1048,25 +1047,6 @@ AST.Expression primary() : {
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
   [arg=term() {append(args, arg);} ("," arg=term() {append(args, arg);})*] {
     return toList(args);
-  }
-}
-
-AST.ClosureExpression anonymous_function() :{
-  Token n = null, t; AST.TypeNode ty = null; AST.Expression e;
-  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
-  AST.BlockExpression body;
-}{
-  {enterDefault();}
-  t="#" [ ty=class_type() "." n=<ID>] ["(" args=args() ")"] body=block() {
-    String mname;
-    if(ty == null) {
-      ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
-      mname = "call";
-    }else {
-      mname = n.image;
-    }
-    leaveDefault();
-    return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
   }
 }
 

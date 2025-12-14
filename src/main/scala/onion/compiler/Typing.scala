@@ -2225,15 +2225,49 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
 
       val inferred = HashMap[String, Type]()
+      val upperConstraints = HashMap[String, Type]()
+      val lowerConstraints = HashMap[String, Type]()
       val paramNames = typeParams.map(_.name).toSet
+
+      def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
+        if (bound == null || bound.isNullType) return
+        upperConstraints.get(name) match
+          case None =>
+            upperConstraints += name -> bound
+          case Some(prev) =>
+            if (TypeRules.isSuperType(prev, bound)) upperConstraints += name -> bound
+            else if (TypeRules.isSuperType(bound, prev)) ()
+            else report(INCOMPATIBLE_TYPE, position, prev, bound)
+      }
+
+      def addLower(name: String, bound: Type): Unit = {
+        if (bound == null || bound.isNullType) return
+        lowerConstraints.get(name) match
+          case None =>
+            lowerConstraints += name -> bound
+          case Some(prev) =>
+            if (TypeRules.isSuperType(prev, bound)) ()
+            else if (TypeRules.isSuperType(bound, prev)) lowerConstraints += name -> bound
+            else lowerConstraints += name -> rootClass
+      }
 
       def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
         if (actual.isNullType) return
         formal match {
           case w: TypedAST.WildcardType =>
             w.lowerBound match
-              case Some(lb) => unify(lb, actual, position)
-              case None => unify(w.upperBound, actual, position)
+              case Some(lb) =>
+                lb match
+                  case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+                    addUpper(tv.name, actual, position)
+                  case _ =>
+                    unify(lb, actual, position)
+              case None =>
+                w.upperBound match
+                  case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+                    addLower(tv.name, actual)
+                  case _ =>
+                    unify(w.upperBound, actual, position)
           case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
             inferred.get(tv.name) match {
               case Some(prev) =>
@@ -2282,12 +2316,33 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
 
       for (tp <- typeParams) {
-        val inferredType = inferred.getOrElse(tp.name, bounds(tp.name))
-        val bound = bounds(tp.name)
-        if (!TypeRules.isAssignable(bound, inferredType)) {
-          report(INCOMPATIBLE_TYPE, callNode, bound, inferredType)
-        }
-        inferred += tp.name -> inferredType
+        val name = tp.name
+        val bound0 = bounds(name)
+        val bound =
+          upperConstraints.get(name) match
+            case None => bound0
+            case Some(upper) =>
+              if (TypeRules.isSuperType(bound0, upper)) upper
+              else if (TypeRules.isSuperType(upper, bound0)) bound0
+              else {
+                report(INCOMPATIBLE_TYPE, callNode, bound0, upper)
+                bound0
+              }
+
+        val inferredType0 =
+          inferred.get(name)
+            .orElse(lowerConstraints.get(name))
+            .getOrElse(bound)
+
+        val inferredType =
+          if (!TypeRules.isAssignable(bound, inferredType0)) {
+            report(INCOMPATIBLE_TYPE, callNode, bound, inferredType0)
+            bound
+          } else {
+            inferredType0
+          }
+
+        inferred += name -> inferredType
       }
 
       inferred.toMap

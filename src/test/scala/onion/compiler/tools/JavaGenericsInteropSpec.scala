@@ -215,5 +215,129 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("a") == result)
     }
+
+    it("supports Collections.swap") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsSwap {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    Collections::swap(list, 0, 1)
+          |    return list.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsSwap.on",
+        Array()
+      )
+      assert(Shell.Success("b") == result)
+    }
+
+    it("supports Collections.fill with lower-bounded wildcard") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsFill {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[Object] = new ArrayList[Object]
+          |    list.add(new Object)
+          |    list.add(new Object)
+          |    Collections::fill(list, "x")
+          |    return "" + list.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsFill.on",
+        Array()
+      )
+      assert(Shell.Success("x") == result)
+    }
+
+    it("supports Collections.replaceAll") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsReplaceAll {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    Collections::replaceAll(list, "a", "x")
+          |    return list.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsReplaceAll.on",
+        Array()
+      )
+      assert(Shell.Success("x") == result)
+    }
+
+    it("supports Collections.frequency") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsFrequency {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    list.add("a")
+          |    return "" + Collections::frequency(list, "a")
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsFrequency.on",
+        Array()
+      )
+      assert(Shell.Success("2") == result)
+    }
+
+    it("supports Collections.disjoint") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsDisjoint {
+          |public:
+          |  static def main(args: String[]): String {
+          |    a: ArrayList[String] = new ArrayList[String]
+          |    a.add("a")
+          |    b: ArrayList[String] = new ArrayList[String]
+          |    b.add("b")
+          |    b.add("a")
+          |    return "" + Collections::disjoint(a, b)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsDisjoint.on",
+        Array()
+      )
+      assert(Shell.Success("false") == result)
+    }
+
+    it("supports Collections.indexOfSubList") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsIndexOfSubList {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    list.add("c")
+          |    sub: ArrayList[String] = new ArrayList[String]
+          |    sub.add("b")
+          |    sub.add("c")
+          |    return "" + Collections::indexOfSubList(list, sub)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsIndexOfSubList.on",
+        Array()
+      )
+      assert(Shell.Success("1") == result)
+    }
   }
 }

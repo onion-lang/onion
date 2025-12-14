@@ -1207,6 +1207,48 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       })
     }
 
+    def typeAssignment(node: AST.Assignment, context: LocalContext): Option[Term] =
+      node.lhs match {
+        case _ : AST.Id =>
+          Option(processLocalAssign(node, context))
+        // Removed: UnqualifiedFieldReference case - use this.field or self.field instead
+        case _ : AST.Indexing =>
+          Option(processArrayAssign(node, context))
+        case _ : AST.MemberSelection =>
+          Option(processMemberAssign(node, context))
+        case _ =>
+          None
+      }
+
+    def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] = {
+      val left = typed(node.lhs, context).getOrElse(null)
+      val right = typed(node.rhs, context).getOrElse(null)
+      if (left == null || right == null) return None
+      if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+        None
+      } else {
+        Some(new BinaryTerm(ELVIS, left.`type`, left, right))
+      }
+    }
+
+    def typeCast(node: AST.Cast, context: LocalContext): Option[Term] = {
+      val term = typed(node.src, context).getOrElse(null)
+      if (term == null) None
+      else {
+        val destination = mapFrom(node.to, mapper_)
+        if (destination == null) None
+        else Some(new AsInstanceOf(term, destination))
+      }
+    }
+
+    def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] = {
+      val target = typed(node.target, context).getOrElse(null)
+      val destinationType = mapFrom(node.typeRef, mapper_)
+      if (target == null || destinationType == null) None
+      else Some(new InstanceOf(target, destinationType))
+    }
+
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
         var left = typed(node.lhs, context).getOrElse(null)
@@ -1246,18 +1288,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         typeNumericBinary(node, DIVIDE, context)
       case node@AST.Modulo(loc, left, right) =>
         typeNumericBinary(node, MOD, context)
-      case node@AST.Assignment(loc, l, r) =>
-        node.lhs match {
-          case _ : AST.Id =>
-            Option(processLocalAssign(node, context))
-          // Removed: UnqualifiedFieldReference case - use this.field or self.field instead
-          case _ : AST.Indexing =>
-            Option(processArrayAssign(node, context))
-          case _ : AST.MemberSelection =>
-            Option(processMemberAssign(node, context))
-          case _ =>
-            None
-        }
+      case node: AST.Assignment =>
+        typeAssignment(node, context)
       case node@AST.LogicalAnd(loc, left, right) =>
         typeLogicalBinary(node, LOGICAL_AND, context)
       case node@AST.LogicalOr(loc, left, right) =>
@@ -1290,16 +1322,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         Option(processRefEquals(EQUAL, node, context))
       case node@AST.ReferenceNotEqual(loc, left, right) =>
         Option(processRefEquals(NOT_EQUAL, node, context))
-      case node@AST.Elvis(loc, _, _) =>
-        val left = typed(node.lhs, context).getOrElse(null)
-        val right = typed(node.rhs, context).getOrElse(null)
-        if(left == null || right == null) return None
-        if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
-          report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
-          None
-        }else {
-          Some(new BinaryTerm(ELVIS, left.`type`, left, right))
-        }
+      case node: AST.Elvis =>
+        typeElvis(node, context)
       case node: AST.Indexing =>
         typeIndexing(node, context)
       case node@AST.AdditionAssignment(_, left, right) =>
@@ -1328,14 +1352,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         Some(new ListLiteral(elements.map{e => typed(e, context).getOrElse(null)}.toArray, load("java.util.List")))
       case node@AST.NullLiteral(loc) =>
         Some(new NullValue(loc))
-      case node@AST.Cast(loc, src, to) =>
-        val term = typed(node.src, context).getOrElse(null)
-        if(term == null) None
-        else {
-          val destination = mapFrom(node.to, mapper_)
-          if(destination == null) None
-          else Some(new AsInstanceOf(term, destination))
-        }
+      case node: AST.Cast =>
+        typeCast(node, context)
       case node@AST.ClosureExpression(loc, _, _, _, _, _) =>
         val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         val args = node.args
@@ -1375,11 +1393,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }else {
           Some(new RefLocal(bind))
         }
-      case node@AST.IsInstance(loc, _, _) =>
-        val target = typed(node.target, context).getOrElse(null)
-        val destinationType = mapFrom(node.typeRef, mapper_)
-        if (target == null || destinationType == null) None
-        else  Some(new InstanceOf(target, destinationType))
+      case node: AST.IsInstance =>
+        typeIsInstance(node, context)
       case node: AST.MemberSelection =>
         typeMemberSelection(node, context)
       case node: AST.MethodCall =>

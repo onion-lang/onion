@@ -55,6 +55,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           case _ =>
             raw
         }
+      case AST.FunctionType(params, result) =>
+        val mappedParams = params.map(map)
+        val mappedResult = map(result)
+        if (mappedParams.exists(_ == null) || mappedResult == null) return null
+        val arity = mappedParams.length
+        val functionType = table_.load(s"onion.Function$arity")
+        if (functionType == null) return null
+        TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
       case unknown => throw new RuntimeException("Unknown type descriptor: " + unknown)
     }
@@ -1454,7 +1462,6 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case node: AST.Cast =>
         typeCast(node, context)
       case node@AST.ClosureExpression(loc, _, _, _, _, _) =>
-        val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         val args = node.args
         val name = node.mname
         openFrame(context){
@@ -1462,21 +1469,72 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             val argTypes = args.map{arg => addArgument(arg, context)}.toArray
             val error = argTypes.exists(_ == null)
             if (error) return None
+
+            val inferredTarget: ClassType =
+              expected match {
+                case ct: ClassType if node.typeRef.isRelaxed && ct.isInterface => ct
+                case _ => null
+              }
+
+            val typeRef = Option(inferredTarget).getOrElse(mapFrom(node.typeRef).asInstanceOf[ClassType])
             if (typeRef == null) return None
             if (!typeRef.isInterface) {
               report(INTERFACE_REQUIRED, node.typeRef, typeRef)
               return None
             }
-            val methods = typeRef.methods
-            val method = matches(argTypes, name, methods)
+
+            val classSubst = TypeSubstitution.classSubstitution(typeRef)
+
+            def substitutedArgs(method: Method): Array[Type] =
+              method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true))
+
+            def substitutedReturn(method: Method): Type =
+              TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+
+            val candidates = typeRef.methods.filter(m => m.name == name && m.arguments.length == argTypes.length)
+            val method = candidates.find(m => equals(substitutedArgs(m), argTypes)).getOrElse(null)
             if (method == null) {
               report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
               return None
             }
-            context.setMethod(method)
+
+            val expectedArgs = substitutedArgs(method)
+            val expectedRet = substitutedReturn(method)
+
+            val typedMethod = new Method {
+              def modifier: Int = method.modifier
+              def affiliation: ClassType = method.affiliation
+              def name: String = method.name
+              override def arguments: Array[Type] = expectedArgs.clone()
+              override def returnType: Type = expectedRet
+              override def typeParameters: Array[TypedAST.TypeParameter] = Array()
+            }
+
+            context.setMethod(typedMethod)
             context.getContextFrame.parent.setAllClosed(true)
-            var block = translate(node.body, context)
-            block = addReturnNode(block, method.returnType)
+
+            val prologue = Buffer[ActionStatement]()
+            var i = 0
+            while (i < args.length) {
+              val bind = context.lookup(args(i).name)
+              if (bind != null) {
+                val erased = TypeSubstitution.substituteType(method.arguments(i), scala.collection.immutable.Map.empty, scala.collection.immutable.Map.empty, defaultToBound = true)
+                val desired = expectedArgs(i)
+                if (desired ne erased) {
+                  val rawBind = new ClosureLocalBinding(bind.frameIndex, bind.index, erased)
+                  val casted = new AsInstanceOf(new RefLocal(rawBind), desired)
+                  prologue += new ExpressionActionStatement(new SetLocal(bind, casted))
+                }
+              }
+              i += 1
+            }
+
+            var block: ActionStatement = translate(node.body, context)
+            if (prologue.nonEmpty) {
+              block = new StatementBlock((prologue.toIndexedSeq :+ block).asJava)
+            }
+
+            block = addReturnNode(block, expectedRet)
             val result = new NewClosure(typeRef, method, block)
             result.frame_=(context.getContextFrame)
             Some(result)
@@ -2040,7 +2098,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {
     typeNode.desc match {
-      case AST.ParameterizedType(_, _) =>
+      case AST.ParameterizedType(_, _) | AST.FunctionType(_, _) =>
         mappedType match {
           case applied: TypedAST.AppliedClassType =>
             val rawParams = applied.raw.typeParameters

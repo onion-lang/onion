@@ -940,13 +940,19 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           case None =>
             emitExpressionWithContext(gen, set.value, className, localVars)
             gen.dup()
-            val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, asmType(set.`type`)))
-            gen.storeLocal(slot)
+            if closureCtx.isParameter(set.index) then
+              gen.storeArg(set.index)
+            else
+              val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, asmType(set.`type`)))
+              gen.storeLocal(slot)
       case _ =>
         emitExpressionWithContext(gen, set.value, className, localVars)
         gen.dup()
-        val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, asmType(set.`type`)))
-        gen.storeLocal(slot)
+        if localVars.isParameter(set.index) then
+          gen.storeArg(set.index)
+        else
+          val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, asmType(set.`type`)))
+          gen.storeLocal(slot)
         
   def emitNewClosure(gen: GeneratorAdapter, closure: NewClosure, className: String, localVars: LocalVarContext): Unit =
     generateClosure(gen, closure, className, localVars)
@@ -956,12 +962,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val closureClassName = s"${currentClassName}$$Closure$closureCounter"
     val interfaceType = closure.`type`
     
-    // Get captured variables from the closure frame
-    val capturedVars = if closure.frame != null && closure.frame.entries.nonEmpty then 
-      closure.frame.entries 
-    else 
-      // Fallback: collect variables with frame != 0 from the closure body
-      collectCapturedVariables(closure.block)
+    // Capture outer-scope locals actually referenced by the closure body.
+    // (Do not capture the closure's own parameters/locals.)
+    val capturedVars = collectCapturedVariables(closure.block)
     
     // Generate the closure class bytecode
     val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, capturedVars)

@@ -1138,6 +1138,75 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       None
     }
 
+    def typeNumericBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
+      val left = typed(node.lhs, context).getOrElse(null)
+      val right = typed(node.rhs, context).getOrElse(null)
+      if (left == null || right == null) None else Option(processNumericExpression(kind, node, left, right))
+    }
+
+    def typeLogicalBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
+      val ops = processLogicalExpression(node, context)
+      if (ops == null) None else Some(new BinaryTerm(kind, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+    }
+
+    def typeComparableBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
+      val ops = processComparableExpression(node, context)
+      if (ops == null) None else Some(new BinaryTerm(kind, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+    }
+
+    def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] = {
+      val term = typed(node.term, context).getOrElse(null)
+      if (term == null) return None
+      if (!hasNumericType(term)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        None
+      } else {
+        Some(new UnaryTerm(kind, term.`type`, term))
+      }
+    }
+
+    def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] = {
+      val term = typed(node.term, context).getOrElse(null)
+      if (term == null) return None
+      if (term.`type` != IRT.BasicType.BOOLEAN) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        None
+      } else {
+        Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
+      }
+    }
+
+    def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: Int, context: LocalContext): Option[Term] = {
+      val operand = typed(termNode, context).getOrElse(null)
+      if (operand == null) return None
+      if ((!operand.isBasicType) || !hasNumericType(operand)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
+        return None
+      }
+      Option(operand match {
+        case ref: RefLocal =>
+          val varIndex = context.add(context.newName, operand.`type`)
+          new Begin(
+            new SetLocal(0, varIndex, operand.`type`, operand),
+            new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))),
+            new RefLocal(0, varIndex, operand.`type`)
+          )
+        case ref: RefField =>
+          val varIndex = context.add(context.newName, ref.target.`type`)
+          new Begin(
+            new SetLocal(0, varIndex, ref.target.`type`, ref.target),
+            new SetField(
+              new RefLocal(0, varIndex, ref.target.`type`),
+              ref.field,
+              new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))
+            )
+          )
+        case _ =>
+          report(LVALUE_REQUIRED, termNode)
+          null
+      })
+    }
+
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
         var left = typed(node.lhs, context).getOrElse(null)
@@ -1170,21 +1239,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         val concat: Method = findMethod(node, left.`type`.asInstanceOf[ObjectType], "concat", Array[Term](right))
         Some(new Call(left, concat, Array[Term](right)))
       case node@AST.Subtraction(loc, left, right) =>
-        val left = typed(node.lhs, context).getOrElse(null)
-        val right = typed(node.rhs, context).getOrElse(null)
-        if (left == null || right == null) None else Option(processNumericExpression(SUBTRACT, node, left, right))
+        typeNumericBinary(node, SUBTRACT, context)
       case node@AST.Multiplication(loc, left, right) =>
-        val left = typed(node.lhs, context).getOrElse(null)
-        val right = typed(node.rhs, context).getOrElse(null)
-        if (left == null || right == null) None else Option(processNumericExpression(MULTIPLY, node, left, right))
+        typeNumericBinary(node, MULTIPLY, context)
       case node@AST.Division(loc, left, right) =>
-        val left = typed(node.lhs, context).getOrElse(null)
-        val right = typed(node.rhs, context).getOrElse(null)
-        if (left == null || right == null) None else Option(processNumericExpression(DIVIDE, node, left, right))
+        typeNumericBinary(node, DIVIDE, context)
       case node@AST.Modulo(loc, left, right) =>
-        val left = typed(node.lhs, context).getOrElse(null)
-        val right = typed(node.rhs, context).getOrElse(null)
-        if (left == null || right == null) None else Option(processNumericExpression(MOD, node, left, right))
+        typeNumericBinary(node, MOD, context)
       case node@AST.Assignment(loc, l, r) =>
         node.lhs match {
           case _ : AST.Id =>
@@ -1198,11 +1259,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             None
         }
       case node@AST.LogicalAnd(loc, left, right) =>
-        val ops = processLogicalExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LOGICAL_AND, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+        typeLogicalBinary(node, LOGICAL_AND, context)
       case node@AST.LogicalOr(loc, left, right) =>
-        val ops = processLogicalExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LOGICAL_OR, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+        typeLogicalBinary(node, LOGICAL_OR, context)
       case node@AST.BitAnd(loc, l, r) =>
         Option(processBitExpression(BIT_AND, node, context))
       case node@AST.BitOr(loc, l, r) =>
@@ -1216,17 +1275,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case node@AST.MathRightShift(loc, left, right) =>
         Option(processShiftExpression(BIT_SHIFT_R2, node, context))
       case node@AST.GreaterOrEqual(loc, left, right) =>
-        val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(GREATER_OR_EQUAL, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+        typeComparableBinary(node, GREATER_OR_EQUAL, context)
       case node@AST.GreaterThan(loc, left, right) =>
-        val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(GREATER_THAN, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+        typeComparableBinary(node, GREATER_THAN, context)
       case node@AST.LessOrEqual(loc, left, right) =>
-        val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LESS_OR_EQUAL, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+        typeComparableBinary(node, LESS_OR_EQUAL, context)
       case node@AST.LessThan(loc, left, right) =>
-        val ops = processComparableExpression(node, context)
-        if (ops == null) None else Some(new BinaryTerm(LESS_THAN, IRT.BasicType.BOOLEAN, ops(0), ops(1)))
+        typeComparableBinary(node, LESS_THAN, context)
       case node@AST.Equal(loc, left, right) =>
         Option(processEquals(EQUAL, node, context))
       case node@AST.NotEqual(loc, left, right) =>
@@ -1330,69 +1385,19 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case node: AST.MethodCall =>
         typeMethodCall(node, context)
       case node@AST.Negate(loc, target) =>
-        val term = typed(node.term, context).getOrElse(null)
-        if (term == null) return None
-        if (!hasNumericType(term)) {
-          report(INCOMPATIBLE_OPERAND_TYPE, node, "-", Array[Type](term.`type`))
-          return None
-        }
-        Some(new UnaryTerm(MINUS, term.`type`, term))
+        typeUnaryNumeric(node, "-", MINUS, context)
       case node: AST.NewArray =>
         typeNewArray(node, context)
       case node: AST.NewObject =>
         typeNewObject(node, context)
       case node@AST.Not(loc, target) =>
-        val term = typed(node.term, context).getOrElse(null)
-        if (term == null) return None
-        if (term.`type` != IRT.BasicType.BOOLEAN) {
-          report(INCOMPATIBLE_OPERAND_TYPE, node, "!", Array[Type](term.`type`))
-          return None
-        }
-        Some(new UnaryTerm(NOT, BasicType.BOOLEAN, term))
+        typeUnaryBoolean(node, "!", NOT, context)
       case node@AST.Posit(loc, target) =>
-        val term = typed(node.term, context).getOrElse(null)
-        if (term == null) return None
-        if (!hasNumericType(term)) {
-          report(INCOMPATIBLE_OPERAND_TYPE, node, "+", Array[Type](term.`type`))
-          return None
-        }
-        Some(new UnaryTerm(PLUS, term.`type`, term))
+        typeUnaryNumeric(node, "+", PLUS, context)
       case node@AST.PostDecrement(loc, target) =>
-        val operand = typed(node.term, context).getOrElse(null)
-        if (operand == null) return None
-        if ((!operand.isBasicType) || !hasNumericType(operand)) {
-          report(INCOMPATIBLE_OPERAND_TYPE, node, "--", Array[Type](operand.`type`))
-          return None
-        }
-        Option(operand match {
-          case ref: RefLocal =>
-            val varIndex = context.add(context.newName, operand.`type`)
-            new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(SUBTRACT, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
-          case ref: RefField =>
-            val varIndex = context.add(context.newName, ref.target.`type`)
-            new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(SUBTRACT, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
-          case _ =>
-            report(LVALUE_REQUIRED, target)
-            null
-        })
+        typePostUpdate(node, node.term, "--", SUBTRACT, context)
       case node@AST.PostIncrement(loc, target) =>
-        val operand = typed(node.term, context).getOrElse(null)
-        if (operand == null) return None
-        if ((!operand.isBasicType) || !hasNumericType(operand)) {
-          report(INCOMPATIBLE_OPERAND_TYPE, node, "++", Array[Type](operand.`type`))
-          return None
-        }
-        Option(operand match {
-          case ref: RefLocal =>
-            val varIndex = context.add(context.newName, operand.`type`)
-            new Begin(new SetLocal(0, varIndex, operand.`type`, operand), new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(ADD, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))), new RefLocal(0, varIndex, operand.`type`))
-          case ref: RefField =>
-            val varIndex = context.add(context.newName, ref.target.`type`)
-            new Begin(new SetLocal(0, varIndex, ref.target.`type`, ref.target), new SetField(new RefLocal(0, varIndex, ref.target.`type`), ref.field, new BinaryTerm(ADD, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))))
-          case _ =>
-            report(LVALUE_REQUIRED, target);
-            null
-        })
+        typePostUpdate(node, node.term, "++", ADD, context)
       // Removed: UnqualifiedFieldReference - use this.field or self.field instead
       case node: AST.UnqualifiedMethodCall =>
         typeUnqualifiedMethodCall(node, context)

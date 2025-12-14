@@ -601,11 +601,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             return null
           }
           val targetType = target.`type`.asInstanceOf[ObjectType]
-          if (!isAccessible(node, targetType, contextClass)) return null
+          if (!MemberAccess.ensureTypeAccessible(node, targetType, contextClass)) return null
           val name = node.name
-          val field: FieldRef = findField(targetType, name)
+          val field: FieldRef = MemberAccess.findField(targetType, name)
           val value: Term = typed(expression, context).getOrElse(null)
-          if (field != null && isAccessible(field, definition_)) {
+          if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
             val classSubst = TypeSubstitution.classSubstitution(target.`type`)
             val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
             val term = processAssignable(expression, expected, value)
@@ -1004,7 +1004,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           return None
         }
         val targetType = target.`type`.asInstanceOf[ObjectType]
-        if (!isAccessible(node, targetType, contextClass)) return None
+        if (!MemberAccess.ensureTypeAccessible(node, targetType, contextClass)) return None
         val name = node.name
         if (target.`type`.isArrayType) {
           if (name.equals("length") || name.equals("size")) {
@@ -1013,8 +1013,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             return None
           }
         }
-        val field = findField(targetType, name)
-        if (field != null && isAccessible(field, definition_)) {
+        val field = MemberAccess.findField(targetType, name)
+        if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
           val ref = new RefField(target, field)
           val castType = TypeSubstitution.substituteType(ref.`type`, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
           return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
@@ -1229,7 +1229,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case node@AST.StaticMemberSelection(loc, _, _) =>
         val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
         if (typeRef == null) return None
-        val field = findField(typeRef, node.name)
+        val field = MemberAccess.findField(typeRef, node.name)
         if (field == null) {
           report(FIELD_NOT_FOUND, node, typeRef, node.name)
           None
@@ -2123,54 +2123,60 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
     methods(0)
   }
-  private def hasSamePackage(a: ClassType, b: ClassType): Boolean = {
-    var name1 = a.name
-    var name2 = b.name
-    var index: Int = 0
-    index = name1.lastIndexOf(".")
-    if (index >= 0)  name1 = name1.substring(0, index)
-    else name1 = ""
-    index = name2.lastIndexOf(".")
-    name2 = if(index >= 0) name2.substring(0, index) else ""
-    name1 == name2
-  }
-  private def isAccessible(target: ClassType, context: ClassType): Boolean = {
-    if (hasSamePackage(target, context))  true else (target.modifier & AST.M_INTERNAL) == 0
-  }
-  private def isAccessible(member: MemberRef, context: ClassType): Boolean = {
-    val targetType = member.affiliation
-    if (targetType == context) return true
-    val modifier = member.modifier
-    if (TypeRules.isSuperType(targetType, context)) (modifier & AST.M_PROTECTED) != 0 || (modifier & AST.M_PUBLIC) != 0 else (AST.M_PUBLIC & modifier) != 0
-  }
-  private def findField(target: ObjectType, name: String): FieldRef = {
-    if(target == null) return null
-    var field = target.field(name)
-    if(field != null) return field
-    field = findField(target.superClass, name)
-    if (field != null) return field
-    for (interface <- target.interfaces) {
-      field = findField(interface, name)
-      if (field != null) return field
+  private object MemberAccess {
+    private def hasSamePackage(a: ClassType, b: ClassType): Boolean = {
+      var name1 = a.name
+      var name2 = b.name
+      var index: Int = 0
+      index = name1.lastIndexOf(".")
+      if (index >= 0) name1 = name1.substring(0, index)
+      else name1 = ""
+      index = name2.lastIndexOf(".")
+      name2 = if (index >= 0) name2.substring(0, index) else ""
+      name1 == name2
     }
-    null
-  }
-  private def isAccessible(node: AST.Node, target: ObjectType, context: ClassType): Boolean = {
-    if (target.isArrayType) {
-      val component = target.asInstanceOf[ArrayType].component
-      if (!component.isBasicType) {
-        if (!isAccessible(component.asInstanceOf[ClassType], definition_)) {
+
+    def isTypeAccessible(target: ClassType, context: ClassType): Boolean = {
+      if (hasSamePackage(target, context)) true else (target.modifier & AST.M_INTERNAL) == 0
+    }
+
+    def isMemberAccessible(member: MemberRef, context: ClassType): Boolean = {
+      val targetType = member.affiliation
+      if (targetType == context) return true
+      val modifier = member.modifier
+      if (TypeRules.isSuperType(targetType, context)) (modifier & AST.M_PROTECTED) != 0 || (modifier & AST.M_PUBLIC) != 0 else (AST.M_PUBLIC & modifier) != 0
+    }
+
+    def findField(target: ObjectType, name: String): FieldRef = {
+      if (target == null) return null
+      var field = target.field(name)
+      if (field != null) return field
+      field = findField(target.superClass, name)
+      if (field != null) return field
+      for (interface <- target.interfaces) {
+        field = findField(interface, name)
+        if (field != null) return field
+      }
+      null
+    }
+
+    def ensureTypeAccessible(node: AST.Node, target: ObjectType, context: ClassType): Boolean = {
+      if (target.isArrayType) {
+        val component = target.asInstanceOf[ArrayType].component
+        if (!component.isBasicType) {
+          if (!isTypeAccessible(component.asInstanceOf[ClassType], definition_)) {
+            report(CLASS_NOT_ACCESSIBLE, node, target, context)
+            return false
+          }
+        }
+      } else {
+        if (!isTypeAccessible(target.asInstanceOf[ClassType], context)) {
           report(CLASS_NOT_ACCESSIBLE, node, target, context)
           return false
         }
       }
-    } else {
-      if (!isAccessible(target.asInstanceOf[ClassType], context)) {
-        report(CLASS_NOT_ACCESSIBLE, node, target, context)
-        return false
-      }
+      true
     }
-    true
   }
   private def hasNumericType(term: Term): Boolean =  numeric(term.`type`)
   private def numeric(symbol: Type): Boolean = {
@@ -2190,7 +2196,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       if (methods.length > 1) {
         report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))
         Left(false)
-      } else if (!isAccessible(methods(0), definition_)) {
+      } else if (!MemberAccess.isMemberAccessible(methods(0), definition_)) {
         report(METHOD_NOT_ACCESSIBLE, node, methods(0).affiliation, name, methods(0).arguments, definition_)
         Left(false)
       } else {

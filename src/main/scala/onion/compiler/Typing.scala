@@ -329,8 +329,17 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       loop(start, Set[ClassType]())
     }
     def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassType = {
-      val typeRef = if(node == null) table_.rootClass else mapFrom(node, mapper).asInstanceOf[ClassType]
-      if (typeRef == null) return null
+      if (node == null) {
+        return if (mustBeInterface) null else table_.rootClass
+      }
+      val mapped = mapFrom(node, mapper)
+      if (mapped == null) return if (mustBeInterface) null else table_.rootClass
+      val typeRef = mapped match {
+        case ct: ClassType => ct
+        case _ =>
+          report(INCOMPATIBLE_TYPE, node, table_.rootClass, mapped)
+          return if (mustBeInterface) null else table_.rootClass
+      }
       val isInterface = typeRef.isInterface
       if (((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))) {
         var location: Location = null

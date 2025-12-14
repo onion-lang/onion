@@ -157,5 +157,63 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("1") == result)
     }
+
+    it("supports Collections.reverse with wildcard parameter") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsReverse {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("a")
+          |    list.add("b")
+          |    Collections::reverse(list)
+          |    return list.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsReverse.on",
+        Array()
+      )
+      assert(Shell.Success("b") == result)
+    }
+
+    it("supports Collections.unmodifiableList") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsUnmodifiableList {
+          |public:
+          |  static def main(args: String[]): String {
+          |    src: ArrayList[String] = new ArrayList[String]
+          |    src.add("ok")
+          |    v: List[String] = Collections::unmodifiableList(src)
+          |    return v.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsUnmodifiableList.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("supports Collections.min") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsMin {
+          |public:
+          |  static def main(args: String[]): String {
+          |    list: ArrayList[String] = new ArrayList[String]
+          |    list.add("b")
+          |    list.add("a")
+          |    return Collections::min(list)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsMin.on",
+        Array()
+      )
+      assert(Shell.Success("a") == result)
+    }
   }
 }

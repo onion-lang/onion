@@ -13,6 +13,8 @@ import collection.mutable.{Stack, Buffer, Map, HashMap, Set => MutableSet}
 import java.util.{Arrays, TreeSet => JTreeSet}
 import onion.compiler.generics.Erasure
 
+import scala.compiletime.uninitialized
+
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
   private case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
@@ -91,11 +93,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private val ast2ixt_ = Map[AST.Node, IRT.Node]()
   private val ixt2ast_ = Map[IRT.Node, AST.Node]()
   private val mappers_  = Map[String, NameMapper]()
-  private var access_ : Int = _
-  private var mapper_ : NameMapper = _
-  private var staticImportedList_ : StaticImportList = _
-  private var definition_ : ClassDefinition = _
-  private var unit_ : AST.CompilationUnit = _
+  private var access_ : Int = uninitialized
+  private var mapper_ : NameMapper = uninitialized
+  private var staticImportedList_ : StaticImportList = uninitialized
+  private var definition_ : ClassDefinition = uninitialized
+  private var unit_ : AST.CompilationUnit = uninitialized
   private var typeParams_ : TypeParamScope = emptyTypeParams
   private val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
   private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
@@ -1587,7 +1589,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
       case AST.BlockExpression(loc, elements) =>
         context.openScope {
-          new StatementBlock(elements.map{e => translate(e, context)}.toIndexedSeq:_*)
+          new StatementBlock(elements.map(e => translate(e, context)).toIndexedSeq*)
         }
       case node@AST.BreakExpression(loc) =>
         new Break(loc)
@@ -2032,7 +2034,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit = {
-    report(error, node.location, items:_*)
+    report(error, node.location, items*)
   }
   def report(error: SemanticError, location: Location, items: AnyRef*): Unit = {
     def report_(items: Array[AnyRef]): Unit = {

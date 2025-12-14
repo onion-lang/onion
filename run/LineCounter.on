@@ -6,6 +6,7 @@ def countLines(file: File): Int {
   }
   return count;
 }
+
 def process(file: File, callback: Function1) {
   if(file == null) { return; }
   foreach myFile: File in file.listFiles {
@@ -16,6 +17,7 @@ def process(file: File, callback: Function1) {
     }
   }
 }
+
 lines = 0;
 foreach file: File in [new File("src"), new File("run")] {
   process(file, #(file: Object){

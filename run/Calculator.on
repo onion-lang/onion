@@ -15,54 +15,18 @@ public:
 	def setValue(value : String) { this.text.setText(value); }
 	def actionPerformed(event : ActionEvent) {
 		label = event.source$JButton.label
-		try{
-			if this.isError && !(label == "C") {
-				return
-			}
-			input = JLong::parseLong(label)
-			if this.operator != null {
-				this.right = this.right * 10 + input
-				setValue(this.right)
-			}else{
-				this.left = this.left * 10 + input
-				setValue(this.left)
-			}
-		}catch e :NumberFormatException{
-			if label == "C" {
-				this.left = 0
-				this.right = 0
-				this.operator	= null
-				this.text.setText(JLong::toString(0))
-				this.isError = false
-			}else{
-				if this.operator != null {
-					if this.operator == "/" {
-						if this.right == 0L{
-							setValue("0で割ることはできません。")
-							this.left = 0L
-							this.right = 0L
-							this.isError = true
-						}else{
-							this.left = this.left / this.right
-						}
-						setValue(this.left)
-					}else{
-						select this.operator {
-						case "+": this.left = this.left + this.right
-						case "-": this.left = this.left - this.right
-						case "*": this.left = this.left * this.right
-						case "/":  this.left = this.left / this.right
-						}
-						setValue(this.left)
-					}
-				}
-				this.operator = label
-				this.right = 0
-			}
+		if label == "C" {
+			this.left = 0
+			this.right = 0
+			this.operator = null
+			this.text.setText(JLong::toString(0))
+			this.isError = false
+		}else{
+			this.text.setText(label)
 		}
 	}
 
-	def this:("簡易電卓") {
+	def this {
 		setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE)
 		setSize(800, 600)
 		this.text		= new JTextField

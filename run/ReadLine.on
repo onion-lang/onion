@@ -1,2 +1,2 @@
-line = IO::input("Please input a line: ")
+line = IO::readln("Please input a line: ")
 IO::println("You input: " + line)

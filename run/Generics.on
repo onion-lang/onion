@@ -1,0 +1,13 @@
+class Box[T] {
+  value :T;
+public:
+  def this(value :T) {
+    this.value = value;
+  }
+  def get :T {
+    return this.value;
+  }
+}
+
+box = new Box("Hello");
+System::out.println(box.get);

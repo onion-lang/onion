@@ -1,31 +1,32 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Core compiler code lives in `src/main/scala/onion/compiler`; pipeline stages (`Parsing`, `Rewriting`, `Typing`, `TypedGenerating`) now report through `CompilationOutcome` and share diagnostics via `CompilationReporter`.
-- Tooling entry points are under `src/main/scala/onion/tools` (`CompilerFrontend`, `ScriptRunner`, `Shell`); JVM interop helpers remain in `src/main/java/onion`.
-- The bytecode backend (`AsmCodeGeneration.scala`, `AsmCodeGenerationVisitor.scala`) centralises local-slot management, including captured-variable helpers for closures, so new emitters should reuse those utilities.
-- Resources such as localized error messages sit in `src/main/resources`; integration fixtures are in `src/test/run`.
-- Tests use ScalaTest (`AnyFunSpec`, `Diagrams`) and live under `src/test/scala/onion/compiler` and `src/test/scala/onion/compiler/tools`.
+- Compiler pipeline and IR live in `src/main/scala/onion/compiler` (`Parsing` → `Rewriting` → `Typing` → `TypedGenerating`), returning `CompilationOutcome` and reporting via `CompilationReporter`.
+- CLI/tools are in `src/main/scala/onion/tools` (`CompilerFrontend`, `ScriptRunner`, `Shell`); Java helpers for JVM interop are in `src/main/java/onion`.
+- Parser grammar is JavaCC: edit `grammar/JJOnionParser.jj` (not generated sources). Generated parser code lands under `target/scala-*/src_managed/main/java/onion/compiler/parser`.
+- Samples are in `run/` (`*.on`), and user-facing docs are in `docs/` (MkDocs config: `mkdocs.yml`).
+- Tests are ScalaTest and live in `src/test/scala`; script-style fixtures live in `src/test/run`.
 
 ## Build, Test, and Development Commands
-- `sbt compile` – compile both Scala and Java sources with the Scala 3 toolchain.
-- `sbt test` – execute the ScalaTest suite, including the new failure-handling spec for `Shell`.
-- `sbt run` – launch `onion.tools.CompilerFrontend` with interactive flags.
-- `sbt runScript -- <file.on> [args…]` – run scripts through `ScriptRunner`.
-- `sbt "runMain onion.tools.CompilerFrontend -d target/run-samples run/*.on"` – compile all `run/` samples into `target/run-samples`.
+- `sbt compile` – build the compiler; also regenerates the JavaCC parser if `grammar/JJOnionParser.jj` is newer.
+- `sbt test` – run the full ScalaTest suite.
+- `sbt "testOnly onion.compiler.tools.FunctionTypeSpec"` – run a focused spec while iterating.
+- `sbt run` – run `onion.tools.CompilerFrontend` (main entrypoint).
+- `sbt runScript -- run/Hello.on [args…]` – compile+run a script via `ScriptRunner`.
+- `sbt dist` – build a distributable zip under `target/dist` (includes `bin/`, `run/`, and `onion.jar`).
 
 ## Coding Style & Naming Conventions
-- Scala sources use two-space indentation, braced blocks, and `camelCase` for methods/values, `PascalCase` for classes/objects.
-- Prefer `given`/`using` idioms and sum types (`CompilationOutcome`) over `null`; rely on `scala.util.Using` for resource safety.
-- Java helpers mirror functional interfaces (`Function0`…`Function10`); keep them minimal and annotate with `@FunctionalInterface` when extending.
-- Localized strings come from `Message`/`Systems`; avoid hard-coded literals outside resource bundles.
+- Use 2-space indentation and the existing braced style; keep names `camelCase` (methods/vals) and `PascalCase` (types).
+- Prefer Scala 3 idioms (`given`/`using`, enums/ADTs) and avoid `null`; use `scala.util.Using` for resource safety.
+- Keep codegen changes localized to the ASM backend (`AsmCodeGeneration*.scala`) and reuse the local-slot/capture utilities there.
+- Lint/refactor tooling is available via sbt-scalafix: use `sbt scalafix` when rules are configured for the change.
 
 ## Testing Guidelines
-- Place new behavioural tests alongside existing specs under `src/test/scala/onion/compiler/tools`; follow the `<Feature>Spec` naming pattern.
-- Capture failure scenarios with the structured reporter (`CompilationReporter`) and silence `System.err` within specs when asserting failures.
-- Aim to cover both happy path (`Shell.Success`) and failure path (`Shell.Failure`) for new pipeline features.
+- Add/extend specs under `src/test/scala` using the existing `*Spec` naming pattern.
+- For end-to-end behavior, prefer running `Shell`/`ScriptRunner` against small programs in `src/test/run` or `run/`.
+- When changing parsing/typing/codegen, include at least one positive case and one failure case (assert via `CompilationOutcome.Failure` diagnostics).
 
 ## Commit & Pull Request Guidelines
-- Match the existing `git log` style: `<Area>: <action>` (e.g., `Typing: extract …`), one topic per commit.
-- In the body, explain the intent and note how you verified it (e.g., `sbt test`), linking issues when relevant.
-- Prepare PRs with a short checklist: scope summary, tests executed (`sbt test`), any follow-up tasks, and screenshots/logs only when UX changes are involved.
+- Follow existing commit subjects: `<Area>: <action>` (examples: `Parser: …`, `Typing: …`, `Docs: …`), one topic per commit.
+- Include a short “how verified” note in the commit body (e.g., `sbt test`, or the specific `testOnly` you ran).
+- PRs should summarize behavior changes, link issues/design notes when relevant, and mention updated docs/samples if syntax changes are involved.

@@ -4,17 +4,17 @@ Lambda expressions provide a concise way to create anonymous functions in Onion.
 
 ## Lambda Syntax
 
-Lambdas use the `#(parameters) { body }` syntax:
+Lambdas use the `(parameters) -> { body }` syntax:
 
 ```onion
 // Lambda with one parameter
-def double = #(x :Int) { x * 2 }
+def double = (x :Int) -> { return x * 2; }
 
 // Lambda with multiple parameters
-def add = #(x :Int, y :Int) { x + y }
+def add = (x :Int, y :Int) -> { return x + y; }
 
 // Lambda with no parameters
-def greet = #() { IO::println("Hello!") }
+def greet = () -> { IO::println("Hello!") }
 ```
 
 ## Calling Lambdas
@@ -22,7 +22,7 @@ def greet = #() { IO::println("Hello!") }
 Use the `.call()` method to invoke a lambda:
 
 ```onion
-def square = #(x :Int) { x * x }
+def square = (x :Int) -> { return x * x; }
 
 def result :Int = square.call(5)$Int  // 25
 IO::println(result)
@@ -34,15 +34,15 @@ Lambdas are typed using `Function0` through `Function10` interfaces:
 
 ```onion
 // Function with 0 parameters
-def func0 :Function0 = #() { 42 }
+def func0 :Function0 = () -> { return 42; }
 def value :Int = func0.call()$Int
 
 // Function with 1 parameter
-def func1 :Function1 = #(x :Int) { x * 2 }
+def func1 :Function1 = (x :Int) -> { return x * 2; }
 def doubled :Int = func1.call(10)$Int
 
 // Function with 2 parameters
-def func2 :Function2 = #(x :Int, y :Int) { x + y }
+def func2 :Function2 = (x :Int, y :Int) -> { return x + y; }
 def sum :Int = func2.call(3, 7)$Int
 ```
 
@@ -54,7 +54,7 @@ Lambdas can capture variables from their enclosing scope:
 
 ```onion
 def multiplier :Int = 10
-def multiply = #(x :Int) { x * multiplier }
+def multiply = (x :Int) -> { return x * multiplier; }
 
 IO::println(multiply.call(5))  // 50
 ```
@@ -65,9 +65,9 @@ Closures can modify captured variables:
 
 ```onion
 def count :Int = 0
-def increment = #() {
+def increment = () -> {
   count = count + 1
-  count
+  return count;
 }
 
 IO::println(increment.call())  // 1
@@ -80,9 +80,9 @@ IO::println(increment.call())  // 3
 ```onion
 def makeCounter {
   def count :Int = 0
-  #() {
+  () -> {
     count = count + 1
-    count
+    return count;
   }
 }
 
@@ -123,9 +123,7 @@ def lines :String[] = [
   "ERROR: Timeout"
 ]
 
-def isError = #(line :String) {
-  line.startsWith("ERROR")
-}
+def isError = (line :String) -> { return line.startsWith("ERROR"); }
 
 def errors :String[] = filter(lines, isError)
 foreach error :String in errors {
@@ -151,7 +149,7 @@ def map(items :String[], transform :Function1) :String[] {
 }
 
 def words :String[] = ["hello", "world", "onion"]
-def toUpper = #(s :String) { s.toUpperCase() }
+def toUpper = (s :String) -> { return s.toUpperCase(); }
 
 def upper :String[] = map(words, toUpper)
 foreach word :String in upper {
@@ -177,7 +175,7 @@ def reduce(items :Int[], operation :Function2, initial :Int) :Int {
 }
 
 def numbers :Int[] = [1, 2, 3, 4, 5]
-def sum = #(acc :Int, n :Int) { acc + n }
+def sum = (acc :Int, n :Int) -> { return acc + n; }
 
 def total :Int = reduce(numbers, sum, 0)
 IO::println(total)  // 15
@@ -210,9 +208,7 @@ def filterFile(filename :String, predicate :Function1) {
 }
 
 // Filter lines starting with ERROR
-def errorFilter = #(line :String) {
-  line.startsWith("ERROR")
-}
+def errorFilter = (line :String) -> { return line.startsWith("ERROR"); }
 
 filterFile("logfile.txt", errorFilter)
 ```
@@ -244,10 +240,10 @@ list << "banana"
 list << "apple"
 list << "cherry"
 
-def alphabetical = #(a :Object, b :Object) {
+def alphabetical = (a :Object, b :Object) -> {
   def s1 :String = a$String
   def s2 :String = b$String
-  s1.compareTo(s2)
+  return s1.compareTo(s2);
 }
 
 def comparator :LambdaComparator = new LambdaComparator(alphabetical)
@@ -286,7 +282,7 @@ class LambdaActionListener <: ActionListener {
 
 def button :JButton = new JButton("Click me")
 
-def onClick = #(event :ActionEvent) {
+def onClick = (event :ActionEvent) -> {
   IO::println("Button was clicked!")
 }
 
@@ -300,16 +296,16 @@ button.addActionListener(listener)
 
 ```onion
 // Good: Simple, focused lambda
-def isEven = #(n :Int) { n % 2 == 0 }
+def isEven = (n :Int) -> { return n % 2 == 0; }
 
 // Bad: Complex lambda (use named function instead)
-def complex = #(n :Int) {
+def complex = (n :Int) -> {
   def temp :Int = n * 2
   def result :Int = temp + 10
   if result > 100 {
-    result / 2
+    return result / 2;
   } else {
-    result * 3
+    return result * 3;
   }
 }
 ```
@@ -318,23 +314,21 @@ def complex = #(n :Int) {
 
 ```onion
 // Good
-def filterErrors = #(logLine :String) {
-  logLine.startsWith("ERROR")
-}
+def filterErrors = (logLine :String) -> { return logLine.startsWith("ERROR"); }
 
 // Bad
-def f = #(x :String) { x.startsWith("ERROR") }
+def f = (x :String) -> { return x.startsWith("ERROR"); }
 ```
 
 ### Avoid Side Effects When Possible
 
 ```onion
 // Good: Pure function
-def double = #(x :Int) { x * 2 }
+def double = (x :Int) -> { return x * 2; }
 
 // Less ideal: Side effect
 def count :Int = 0
-def incrementCounter = #() {
+def incrementCounter = () -> {
   count = count + 1  // Modifies external state
 }
 ```

@@ -79,10 +79,10 @@ def square(x :Int) :Int {
 
 ### Lambda Syntax
 
-Anonymous functions use the `#(params) { body }` syntax:
+Anonymous functions use the `(params) -> { body }` syntax:
 
 ```onion
-def double = #(x :Int) { x * 2 }
+def double = (x :Int) -> { return x * 2; }
 
 def result :Int = double.call(5)$Int  // 10
 ```
@@ -90,7 +90,7 @@ def result :Int = double.call(5)$Int  // 10
 ### Lambda with Multiple Parameters
 
 ```onion
-def add = #(x :Int, y :Int) { x + y }
+def add = (x :Int, y :Int) -> { return x + y; }
 
 def sum :Int = add.call(3, 7)$Int  // 10
 ```
@@ -98,7 +98,7 @@ def sum :Int = add.call(3, 7)$Int  // 10
 ### Lambda with No Parameters
 
 ```onion
-def sayHello = #() { IO::println("Hello!") }
+def sayHello = () -> { IO::println("Hello!") }
 
 sayHello.call()
 ```
@@ -110,9 +110,9 @@ Lambdas can capture variables from their enclosing scope:
 ```onion
 def makeCounter {
   def count :Int = 0
-  #() {
+  () -> {
     count = count + 1
-    count
+    return count;
   }
 }
 
@@ -126,9 +126,9 @@ IO::println(counter.call())  // 3
 
 ```onion
 def i :Int = 0
-def filter = #(line :String) {
+def filter = (line :String) -> {
   i = i + 1
-  line + " (line " + i + ")"
+  return line + " (line " + i + ")";
 }
 
 IO::println(filter.call("First"))   // "First (line 1)"
@@ -141,13 +141,13 @@ Functions are typed using `Function0` through `Function10` interfaces:
 
 ```onion
 // Function with 1 parameter
-def func1 :Function1 = #(x :Int) { x * 2 }
+def func1 :Function1 = (x :Int) -> { return x * 2; }
 
 // Function with 2 parameters
-def func2 :Function2 = #(x :Int, y :Int) { x + y }
+def func2 :Function2 = (x :Int, y :Int) -> { return x + y; }
 
 // Function with no parameters
-def func0 :Function0 = #() { 42 }
+def func0 :Function0 = () -> { return 42; }
 ```
 
 The number indicates the parameter count:
@@ -166,7 +166,7 @@ def applyTwice(f :Function1, value :Int) :Int {
   f.call(temp)$Int
 }
 
-def increment = #(x :Int) { x + 1 }
+def increment = (x :Int) -> { return x + 1; }
 def result :Int = applyTwice(increment, 5)  // 7
 ```
 
@@ -270,9 +270,7 @@ def filterLines(lines :String[], predicate :Function1) :String[] {
   result.toArray(new String[result.size()])
 }
 
-def startsWithError = #(line :String) {
-  line.startsWith("ERROR")
-}
+def startsWithError = (line :String) -> { return line.startsWith("ERROR"); }
 
 def lines :String[] = ["INFO: OK", "ERROR: Failed", "ERROR: Timeout"]
 def errors :String[] = filterLines(lines, startsWithError)
@@ -292,7 +290,7 @@ def mapLines(lines :String[], transform :Function1) :String[] {
   result.toArray(new String[result.size()])
 }
 
-def toUpper = #(s :String) { s.toUpperCase() }
+def toUpper = (s :String) -> { return s.toUpperCase(); }
 
 def lines :String[] = ["hello", "world"]
 def upper :String[] = mapLines(lines, toUpper)

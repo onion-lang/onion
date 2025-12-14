@@ -90,8 +90,8 @@ IO::println(message)
 ### Lambda Expressions
 
 ```onion
-// Lambda syntax: #(params) { body }
-def add = #(x :Int, y :Int) { x + y }
+// Lambda syntax: (params) -> { body }
+def add = (x :Int, y :Int) -> { return x + y; }
 
 def result :Int = add.call(5, 3)  // 8
 IO::println(result)

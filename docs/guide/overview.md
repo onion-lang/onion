@@ -74,12 +74,15 @@ While primarily object-oriented, Onion includes functional programming features:
 
 ```onion
 // Lambda expressions
-def filter = #(x :Int) { x > 10 }
+def filter = (x :Int) -> { return x > 10; }
 
 // Closures
 def makeCounter {
   def count :Int = 0
-  #() { count = count + 1; count }
+  () -> {
+    count = count + 1;
+    return count;
+  }
 }
 
 def counter = makeCounter()
@@ -88,7 +91,7 @@ IO::println(counter.call())  // 2
 ```
 
 Features:
-- **Lambda expressions** - Anonymous functions with `#(params) { body }` syntax
+- **Lambda expressions** - Anonymous functions with `(params) -> { body }` syntax
 - **Closures** - Functions that capture variables from their enclosing scope
 - **First-class functions** - Functions as values via `Function0` through `Function10` interfaces
 
@@ -218,7 +221,7 @@ select value {
 | Type annotations | `Type variable` | `variable :Type` |
 | Static access | `Class.method()` | `Class::method()` |
 | Type casting | `(Type) value` | `value$Type` |
-| Lambda syntax | `(x) -> x + 1` | `#(x) { x + 1 }` |
+| Lambda syntax | `(x) -> x + 1` | `(x :Int) -> { return x + 1; }` |
 | Pattern matching | `switch` (Java 14+) | `select` |
 | List append | `list.add(x)` | `list << x` |
 

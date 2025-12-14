@@ -8,15 +8,15 @@ Basic lambda syntax:
 
 ```onion
 // Simple lambda
-def double = #(x :Int) { x * 2 }
+def double = (x :Int) -> { return x * 2; }
 IO::println(double.call(5))  // 10
 
 // Lambda with multiple parameters
-def add = #(x :Int, y :Int) { x + y }
+def add = (x :Int, y :Int) -> { return x + y; }
 IO::println(add.call(3, 7))  // 10
 
 // Lambda with no parameters
-def greet = #() { IO::println("Hello!") }
+def greet = () -> { IO::println("Hello!") }
 greet.call()
 ```
 
@@ -33,9 +33,9 @@ import {
 }
 
 def i :Int = 0
-def filter = #(line :String) {
+def filter = (line :String) -> {
   i = i + 1
-  line + " (" + i + ")"
+  return line + " (" + i + ")";
 }
 
 def reader :BufferedReader = new BufferedReader(
@@ -67,9 +67,9 @@ Creating multiple independent counters:
 ```onion
 def makeCounter {
   def count :Int = 0
-  #() {
+  () -> {
     count = count + 1
-    count
+    return count;
   }
 }
 
@@ -214,9 +214,7 @@ def logs :String[] = [
   "INFO: Complete"
 ]
 
-def isError = #(line :String) {
-  line.startsWith("ERROR")
-}
+def isError = (line :String) -> { return line.startsWith("ERROR"); }
 
 def errors :ArrayList = filter(logs, isError)
 
@@ -251,7 +249,7 @@ def map(items :String[], transform :Function1) :ArrayList {
 
 // Usage
 def words :String[] = ["hello", "world", "onion"]
-def toUpper = #(s :String) { s.toUpperCase() }
+def toUpper = (s :String) -> { return s.toUpperCase(); }
 
 def upper :ArrayList = map(words, toUpper)
 
@@ -284,12 +282,12 @@ def reduce(items :Int[], operation :Function2, initial :Int) :Int {
 
 // Sum
 def numbers :Int[] = [1, 2, 3, 4, 5]
-def sum = #(acc :Int, n :Int) { acc + n }
+def sum = (acc :Int, n :Int) -> { return acc + n; }
 def total :Int = reduce(numbers, sum, 0)
 IO::println("Sum: " + total)  // 15
 
 // Product
-def product = #(acc :Int, n :Int) { acc * n }
+def product = (acc :Int, n :Int) -> { return acc * n; }
 def result :Int = reduce(numbers, product, 1)
 IO::println("Product: " + result)  // 120
 ```
@@ -300,14 +298,12 @@ Combine multiple operations:
 
 ```onion
 def compose(f :Function1, g :Function1) :Function1 {
-  #(x :Object) {
-    f.call(g.call(x))
-  }
+  (x :Object) -> { return f.call(g.call(x)); }
 }
 
 // Define functions
-def addTen = #(x :Int) { x + 10 }
-def double = #(x :Int) { x * 2 }
+def addTen = (x :Int) -> { return x + 10; }
+def double = (x :Int) -> { return x * 2; }
 
 // Compose: double then add 10
 def composed = compose(addTen, double)
@@ -321,7 +317,7 @@ Transform multi-parameter functions:
 
 ```onion
 def add(x :Int) :Function1 {
-  #(y :Int) { x + y }
+  (y :Int) -> { return x + y; }
 }
 
 def add5 = add(5)
@@ -351,9 +347,9 @@ def analyzeLog(filename :String) {
   def warningCount :Int = 0
   def infoCount :Int = 0
 
-  def isError = #(line :String) { line.startsWith("ERROR") }
-  def isWarning = #(line :String) { line.startsWith("WARNING") }
-  def isInfo = #(line :String) { line.startsWith("INFO") }
+  def isError = (line :String) -> { return line.startsWith("ERROR"); }
+  def isWarning = (line :String) -> { return line.startsWith("WARNING"); }
+  def isInfo = (line :String) -> { return line.startsWith("INFO"); }
 
   def line :String = null
   while (line = reader.readLine()) != null {

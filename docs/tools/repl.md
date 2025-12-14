@@ -118,13 +118,13 @@ onion> p.distance()
 ## Lambda Expressions
 
 ```
-onion> def double = #(x :Int) { x * 2 }
+onion> def double = (x :Int) -> { return x * 2; }
 double: Function1
 
 onion> double.call(5)
 10
 
-onion> def add = #(a :Int, b :Int) { a + b }
+onion> def add = (a :Int, b :Int) -> { return a + b; }
 add: Function2
 
 onion> add.call(3, 7)
@@ -311,7 +311,7 @@ onion> IO::println(y)
 
 onion> // Test closures
 onion> def makeAdder(n :Int) {
-         #(x :Int) { x + n }
+         (x :Int) -> { return x + n; }
        }
 onion> def add5 = makeAdder(5)
 onion> add5.call(10)

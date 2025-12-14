@@ -240,7 +240,7 @@ def list :ArrayList = new ArrayList  // Can hold any Object
 Functions are represented by `Function0` through `Function10` interfaces:
 
 ```onion
-def func :Function1 = #(x :Int) { x * 2 }
+def func :Function1 = (x :Int) -> { return x * 2; }
 def result :Int = func.call(5)$Int  // 10
 ```
 

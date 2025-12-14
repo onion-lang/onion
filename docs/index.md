@@ -34,8 +34,8 @@ class Calculator : JFrame <: ActionListener {
 }
 
 // Lambda expressions
-def filter = #(line :String) {
-  line.startsWith("ERROR")
+def filter = (line :String) -> {
+  return line.startsWith("ERROR");
 }
 
 // Pattern matching with select

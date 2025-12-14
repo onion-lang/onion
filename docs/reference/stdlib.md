@@ -172,7 +172,7 @@ Built-in function types for lambdas and closures.
 Function with no parameters:
 
 ```onion
-def func :Function0 = #() { 42 }
+def func :Function0 = () -> { return 42; }
 def result :Int = func.call()$Int
 ```
 
@@ -181,7 +181,7 @@ def result :Int = func.call()$Int
 Function with one parameter:
 
 ```onion
-def double :Function1 = #(x :Int) { x * 2 }
+def double :Function1 = (x :Int) -> { return x * 2; }
 def result :Int = double.call(5)$Int
 ```
 
@@ -190,7 +190,7 @@ def result :Int = double.call(5)$Int
 Function with two parameters:
 
 ```onion
-def add :Function2 = #(x :Int, y :Int) { x + y }
+def add :Function2 = (x :Int, y :Int) -> { return x + y; }
 def result :Int = add.call(3, 7)$Int
 ```
 

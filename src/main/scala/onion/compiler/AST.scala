@@ -28,7 +28,7 @@ object AST {
     override def toString: String = component.toString + params.map(_.toString).mkString("[", ",", "]")
   }
   case class FunctionType(params: List[TypeDescriptor], result: TypeDescriptor) extends TypeDescriptor {
-    override def toString: String = params.map(_.toString).mkString("(", ", ", ")") + " => " + result.toString
+    override def toString: String = params.map(_.toString).mkString("(", ", ", ")") + " -> " + result.toString
   }
   case class ArrayType(component: TypeDescriptor) extends TypeDescriptor {
     override def toString: String = s"${component.toString}[]"

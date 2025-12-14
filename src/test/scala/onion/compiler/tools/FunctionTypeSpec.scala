@@ -10,7 +10,7 @@ class FunctionTypeSpec extends AbstractShellSpec {
           |class FunctionTypeArrowLocal {
           |public:
           |  static def main(args: String[]): String {
-          |    f: (String) => String = #(x: String) { return x.toUpperCase(); }
+          |    f: (String) -> String = #(x: String) { return x.toUpperCase(); }
           |    return f.call("a")
           |  }
           |}
@@ -26,12 +26,12 @@ class FunctionTypeSpec extends AbstractShellSpec {
         """
           |class FunctionTypeArrowParam {
           |public:
-          |  static def applyTwice(f: (String) => String, x: String): String {
+          |  static def applyTwice(f: (String) -> String, x: String): String {
           |    return f.call(f.call(x))
           |  }
           |
           |  static def main(args: String[]): String {
-          |    f: (String) => String = #(x: String) { return x + "!"; }
+          |    f: (String) -> String = #(x: String) { return x + "!"; }
           |    return FunctionTypeArrowParam::applyTwice(f, "a")
           |  }
           |}
@@ -40,6 +40,23 @@ class FunctionTypeSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success("a!!") == result)
+    }
+
+    it("accepts (args) -> { ... } lambda syntax") {
+      val result = shell.run(
+        """
+          |class ArrowLambdaSyntax {
+          |public:
+          |  static def main(args: String[]): String {
+          |    f: (String) -> String = (x: String) -> { return x + "!"; }
+          |    return f.call("a")
+          |  }
+          |}
+          |""".stripMargin,
+        "ArrowLambdaSyntax.on",
+        Array()
+      )
+      assert(Shell.Success("a!") == result)
     }
   }
 }

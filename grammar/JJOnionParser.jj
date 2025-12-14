@@ -730,7 +730,7 @@ AST.TypeNode type() : {
     LOOKAHEAD( "(" )
       "(" eols()
         [ arg=type() { append(fargs, arg.desc()); } ("," eols() arg=type() { append(fargs, arg.desc()); })* ]
-      eols() ")" eols() ( <ARROW> | <ARROW2> ) eols() r=type() {
+      eols() ")" eols() <ARROW> eols() r=type() {
         core = new AST.FunctionType(toList(fargs), r.desc());
         loc = p(getToken(0));
       }
@@ -1027,6 +1027,8 @@ AST.Expression primary() : {
 | LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
 | t=<ID>                                                            {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
+| LOOKAHEAD( "(" eols() ")" eols() <ARROW> ) e=arrow_anonymous_function()  {return e;}
+| LOOKAHEAD( "(" eols() <ID> ":" ) e=arrow_anonymous_function()           {return e;}
 | e=anonymous_function()                                            {return e;}
 | t="new" ty=type() (
     "[" eols() (es=terms()) "]"                                           {return new AST.NewArray(p(t), ty, es);}
@@ -1065,6 +1067,20 @@ AST.ClosureExpression anonymous_function() :{
     }
     leaveDefault();
     return new AST.ClosureExpression(p(t), ty, mname, args, null, body);
+  }
+}
+
+AST.ClosureExpression arrow_anonymous_function() :{
+  Token t;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  AST.BlockExpression body;
+  AST.TypeNode ty = null;
+}{
+  {enterDefault();}
+  t="(" args=args() ")" eols() <ARROW> eols() body=block() {
+    ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
+    leaveDefault();
+    return new AST.ClosureExpression(p(t), ty, "call", args, null, body);
   }
 }
 

@@ -69,7 +69,7 @@ class GenericParserSpec extends AnyFunSpec with Diagrams {
         """
           |class FuncTypes {
           |public:
-          |  def applyTwice(f: (String) => String, x: String): String = f.call(f.call(x))
+          |  def applyTwice(f: (String) -> String, x: String): String = f.call(f.call(x))
           |}
           |""".stripMargin
 

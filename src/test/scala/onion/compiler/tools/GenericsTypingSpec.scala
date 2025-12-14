@@ -256,6 +256,31 @@ class GenericsTypingSpec extends AbstractShellSpec {
       }
       assert(Shell.Failure(-1) == bad)
     }
+
+    it("resolves generic interface methods on concrete class receivers") {
+      val result = shell.run(
+        """
+          |interface Picker[T] {
+          |  def pick(x: T): String
+          |}
+          |
+          |class PickerImpl <: Picker[String] {
+          |public:
+          |  def pick(x: Object): String {
+          |    return "ok"
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    p = new PickerImpl
+          |    return p.pick("x")
+          |  }
+          |}
+          |""".stripMargin,
+        "PickerImpl.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
   }
 
   private def silenceErr[A](block: => A): A = {

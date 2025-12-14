@@ -242,12 +242,7 @@ class AsmCodeGenerationVisitor(
       asmType(node.method.returnType),
       node.method.arguments.map(asmType)*
     )
-    // Check if the target type is an interface
-    val targetType = node.target.`type`
-    val isInterface = targetType match {
-      case objType: ObjectType => objType.isInterface
-      case _ => false
-    }
+    val isInterface = node.method.affiliation.isInterface
     if isInterface then
       gen.invokeInterface(ownerType, AsmMethod(node.method.name, methodDesc))
     else

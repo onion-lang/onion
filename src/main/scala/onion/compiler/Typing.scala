@@ -1131,6 +1131,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       Some(new Call(result, toStringMethods(0), Array[Term]()))
     }
 
+    def unimplementedBinaryAssignment(node: AST.Expression, lhs: AST.Expression, rhs: AST.Expression, context: LocalContext): Option[Term] = {
+      typed(lhs, context)
+      typed(rhs, context)
+      report(UNIMPLEMENTED_FEATURE, node)
+      None
+    }
+
     def typed(node: AST.Expression, context: LocalContext): Option[Term] = node match {
       case node@AST.Addition(loc, _, _) =>
         var left = typed(node.lhs, context).getOrElse(null)
@@ -1240,31 +1247,16 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
       case node: AST.Indexing =>
         typeIndexing(node, context)
-      case node@AST.AdditionAssignment(loc, left, right) =>
-        typed(left, context)
-        typed(right, context)
-        report(UNIMPLEMENTED_FEATURE, node)
-        None
-      case node@AST.SubtractionAssignment(loc, left, right) =>
-        typed(left, context)
-        typed(right, context)
-        report(UNIMPLEMENTED_FEATURE, node)
-        None
-      case node@AST.MultiplicationAssignment(loc, left, right) =>
-        typed(left, context)
-        typed(right, context)
-        report(UNIMPLEMENTED_FEATURE, node)
-        None
-      case node@AST.DivisionAssignment(loc, left, right) =>
-        typed(left, context)
-        typed(right, context)
-        report(UNIMPLEMENTED_FEATURE, node)
-        null
-      case node@AST.ModuloAssignment(loc, left, right) =>
-        typed(left, context)
-        typed(right, context)
-        report(UNIMPLEMENTED_FEATURE, node)
-        None
+      case node@AST.AdditionAssignment(_, left, right) =>
+        unimplementedBinaryAssignment(node, left, right, context)
+      case node@AST.SubtractionAssignment(_, left, right) =>
+        unimplementedBinaryAssignment(node, left, right, context)
+      case node@AST.MultiplicationAssignment(_, left, right) =>
+        unimplementedBinaryAssignment(node, left, right, context)
+      case node@AST.DivisionAssignment(_, left, right) =>
+        unimplementedBinaryAssignment(node, left, right, context)
+      case node@AST.ModuloAssignment(_, left, right) =>
+        unimplementedBinaryAssignment(node, left, right, context)
       case node@AST.CharacterLiteral(loc, v) =>
         Some(new CharacterValue(loc, v))
       case node@AST.IntegerLiteral(loc, v) =>

@@ -56,6 +56,24 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("v") == result)
     }
+
+    it("preserves generic supertypes for applied Java classes") {
+      val result = shell.run(
+        """
+          |class JavaListAsSuper {
+          |public:
+          |  static def main(args: String[]): String {
+          |    impl: ArrayList[String] = new ArrayList[String]
+          |    impl.add("ok")
+          |    asList: List[String] = impl
+          |    return asList.get(0)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaListAsSuper.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
   }
 }
-

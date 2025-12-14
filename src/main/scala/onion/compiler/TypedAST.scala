@@ -730,8 +730,35 @@ object TypedAST {
     def name: String = raw.name
     def isInterface: Boolean = raw.isInterface
     def modifier: Int = raw.modifier
-    def superClass: TypedAST.ClassType = raw.superClass
-    def interfaces: Seq[TypedAST.ClassType] = raw.interfaces
+
+    private lazy val subst: scala.collection.immutable.Map[String, TypedAST.Type] =
+      raw.typeParameters.map(_.name).zip(typeArguments).toMap
+
+    private def substitute(tp: TypedAST.Type): TypedAST.Type = tp match
+      case tv: TypedAST.TypeVariableType =>
+        subst.getOrElse(tv.name, tv)
+      case ap: TypedAST.AppliedClassType =>
+        val newArgs = ap.typeArguments.map(substitute)
+        if newArgs.sameElements(ap.typeArguments) then ap
+        else TypedAST.AppliedClassType(ap.raw, newArgs.toList)
+      case at: TypedAST.ArrayType =>
+        val newComponent = substitute(at.component)
+        if newComponent eq at.component then at
+        else at.table.loadArray(newComponent, at.dimension)
+      case other =>
+        other
+
+    private def specializeClass(tp: TypedAST.ClassType): TypedAST.ClassType =
+      substitute(tp).asInstanceOf[TypedAST.ClassType]
+
+    private lazy val superClass0: TypedAST.ClassType =
+      if raw.superClass == null then null else specializeClass(raw.superClass)
+
+    private lazy val interfaces0: Seq[TypedAST.ClassType] =
+      raw.interfaces.map(specializeClass)
+
+    def superClass: TypedAST.ClassType = superClass0
+    def interfaces: Seq[TypedAST.ClassType] = interfaces0
     def methods: Seq[TypedAST.Method] = raw.methods
     def methods(name: String): Array[TypedAST.Method] = raw.methods(name)
     def fields: Array[TypedAST.FieldRef] = raw.fields

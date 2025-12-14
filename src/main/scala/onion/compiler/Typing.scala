@@ -606,8 +606,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           val field: FieldRef = findField(targetType, name)
           val value: Term = typed(expression, context).getOrElse(null)
           if (field != null && isAccessible(field, definition_)) {
-            val classSubst = classSubstitution(target.`type`)
-            val expected = substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+            val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+            val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
             val term = processAssignable(expression, expected, value)
             if (term == null) return null
             return new SetField(target, field, term)
@@ -1016,14 +1016,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         val field = findField(targetType, name)
         if (field != null && isAccessible(field, definition_)) {
           val ref = new RefField(target, field)
-          val castType = substituteType(ref.`type`, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+          val castType = TypeSubstitution.substituteType(ref.`type`, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
           return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
         }
 
         tryFindMethod(node, targetType, name, new Array[Term](0)) match {
           case Right(method) =>
             val call = new Call(target, method, new Array[Term](0))
-            val castType = substituteType(method.returnType, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+            val castType = TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
             return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(continuable) =>
             if(!continuable) return None
@@ -1031,7 +1031,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         tryFindMethod(node, targetType, getter(name), new Array[Term](0)) match {
           case Right(method) =>
             val call = new Call(target, method, new Array[Term](0))
-            val castType = substituteType(method.returnType, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+            val castType = TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
             return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(continuable) =>
             if(!continuable) return None
@@ -1039,7 +1039,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         tryFindMethod(node, targetType, getterBoolean(name), new Array[Term](0)) match {
           case Right(method) =>
             val call = new Call(target, method, new Array[Term](0))
-            val castType = substituteType(method.returnType, classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+            val castType = TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
             Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(_) =>
             if (field == null) {
@@ -1069,7 +1069,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           None
         } else {
           val method = methods(0)
-          val classSubst = classSubstitution(target.`type`)
+          val classSubst = TypeSubstitution.classSubstitution(target.`type`)
           val methodSubst =
             if (typeArgs.nonEmpty) {
               GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
@@ -1077,7 +1077,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
               GenericMethodTypeArguments.infer(node, method, params, classSubst)
             }
 
-          val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
           var i = 0
           while (i < params.length) {
             params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
@@ -1086,7 +1086,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           }
 
           val call = new Call(target, method, params)
-          val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
           Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
         }
       case node@AST.Negate(loc, target) =>
@@ -1202,7 +1202,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
               GenericMethodTypeArguments.infer(node, method, params, classSubst)
             }
 
-          val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
           var i = 0
           while (i < params.length) {
             params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
@@ -1212,16 +1212,16 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
           if ((methods(0).modifier & AST.M_STATIC) != 0) {
             val call = new CallStatic(targetType, method, params)
-            val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
             Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           } else {
             if(context.isClosure) {
               val call = new Call(new OuterThis(targetType), method, params)
-              val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+              val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
               Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
             }else {
               val call = new Call(new This(targetType), method, params)
-              val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+              val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
               Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
             }
           }
@@ -1251,7 +1251,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             None
           } else {
             val method = methods(0)
-            val classSubst = classSubstitution(typeRef)
+            val classSubst = TypeSubstitution.classSubstitution(typeRef)
             val methodSubst =
               if (typeArgs.nonEmpty) {
                 GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
@@ -1259,7 +1259,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
                 GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
               }
 
-            val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+            val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
             var i = 0
             while (i < parameters.length) {
               parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
@@ -1268,7 +1268,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             }
 
             val call = new CallStatic(typeRef, method, parameters)
-            val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
             Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           }
         }
@@ -1338,7 +1338,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         val contextClass = definition_
         tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
           case Right(method) =>
-            val classSubst = classSubstitution(contextClass.superClass)
+            val classSubst = TypeSubstitution.classSubstitution(contextClass.superClass)
             val methodSubst =
               if (typeArgs.nonEmpty) {
                 GenericMethodTypeArguments.explicit(node, method, typeArgs, classSubst).getOrElse(return None)
@@ -1346,7 +1346,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
                 GenericMethodTypeArguments.infer(node, method, parameters, classSubst)
               }
 
-            val expectedArgs = method.arguments.map(tp => substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+            val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
             var i = 0
             while (i < parameters.length) {
               parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
@@ -1354,7 +1354,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
               i += 1
             }
             val call = new CallSuper(new This(contextClass), method, parameters)
-            val castType = substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
             Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
           case Left(_) =>
             report(METHOD_NOT_FOUND, node, contextClass, node.name, types(parameters))
@@ -1791,8 +1791,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           if !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
             val key = (contract.name, erasedParamDescriptor(contract.arguments))
             implByErasedParams.get(key).foreach { impl =>
-              val specializedArgs = contract.arguments.map(tp => substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
-              val specializedRet = substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
+              val specializedArgs = contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+              val specializedRet = TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 
               val implAst = lookupAST(impl.asInstanceOf[Node])
               val location = if implAst != null then implAst.location else fallback
@@ -1936,35 +1936,42 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     result.toSeq
   }
 
-  private def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
-    case applied: TypedAST.AppliedClassType =>
-      val rawParams = applied.raw.typeParameters
-      val mapping = HashMap[String, Type]()
-      var i = 0
-      while (i < rawParams.length && i < applied.typeArguments.length) {
-        mapping += rawParams(i).name -> applied.typeArguments(i)
-        i += 1
-      }
-      mapping.toMap
-    case _ =>
-      scala.collection.immutable.Map.empty
-  }
-
-  private def substituteType(tp: Type, classSubst: scala.collection.immutable.Map[String, Type], methodSubst: scala.collection.immutable.Map[String, Type], defaultToBound: Boolean): Type = {
-    def lookup(name: String): Option[Type] = methodSubst.get(name).orElse(classSubst.get(name))
-    tp match {
-      case tv: TypedAST.TypeVariableType =>
-        lookup(tv.name).getOrElse(if (defaultToBound) tv.upperBound else tv)
+  private object TypeSubstitution {
+    def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
       case applied: TypedAST.AppliedClassType =>
-        val newArgs = applied.typeArguments.map(arg => substituteType(arg, classSubst, methodSubst, defaultToBound))
-        if (newArgs.sameElements(applied.typeArguments)) applied
-        else TypedAST.AppliedClassType(applied.raw, newArgs.toList)
-      case at: ArrayType =>
-        val newComponent = substituteType(at.component, classSubst, methodSubst, defaultToBound)
-        if (newComponent eq at.component) at
-        else loadArray(newComponent, at.dimension)
-      case other =>
-        other
+        val rawParams = applied.raw.typeParameters
+        val mapping = HashMap[String, Type]()
+        var i = 0
+        while (i < rawParams.length && i < applied.typeArguments.length) {
+          mapping += rawParams(i).name -> applied.typeArguments(i)
+          i += 1
+        }
+        mapping.toMap
+      case _ =>
+        scala.collection.immutable.Map.empty
+    }
+
+    def substituteType(
+      tp: Type,
+      classSubst: scala.collection.immutable.Map[String, Type],
+      methodSubst: scala.collection.immutable.Map[String, Type],
+      defaultToBound: Boolean
+    ): Type = {
+      def lookup(name: String): Option[Type] = methodSubst.get(name).orElse(classSubst.get(name))
+      tp match {
+        case tv: TypedAST.TypeVariableType =>
+          lookup(tv.name).getOrElse(if (defaultToBound) tv.upperBound else tv)
+        case applied: TypedAST.AppliedClassType =>
+          val newArgs = applied.typeArguments.map(arg => substituteType(arg, classSubst, methodSubst, defaultToBound))
+          if (newArgs.sameElements(applied.typeArguments)) applied
+          else TypedAST.AppliedClassType(applied.raw, newArgs.toList)
+        case at: ArrayType =>
+          val newComponent = substituteType(at.component, classSubst, methodSubst, defaultToBound)
+          if (newComponent eq at.component) at
+          else loadArray(newComponent, at.dimension)
+        case other =>
+          other
+      }
     }
   }
 
@@ -2015,7 +2022,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       i = 0
       while (i < typeParams.length) {
         val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
-        val upper = substituteType(upper0, classSubst, subst, defaultToBound = true)
+        val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
         val arg = mappedArgs(i)
         if (!TypeRules.isAssignable(upper, arg)) {
           report(INCOMPATIBLE_TYPE, typeArgs(i), upper, arg)
@@ -2039,7 +2046,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       val bounds = HashMap[String, Type]()
       for (tp <- typeParams) {
         val upper = tp.upperBound.getOrElse(rootClass)
-        bounds += tp.name -> substituteType(upper, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+        bounds += tp.name -> TypeSubstitution.substituteType(upper, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
       }
 
       val inferred = HashMap[String, Type]()
@@ -2075,7 +2082,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         }
       }
 
-      val formalArgs = method.arguments.map(t => substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      val formalArgs = method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
       var i = 0
       while (i < formalArgs.length && i < args.length) {
         unify(formalArgs(i), args(i).`type`, callNode)
@@ -2234,7 +2241,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       def specializedArgs(method: Method): Array[Type] =
         specializedArgsCache.getOrElseUpdate(
           method,
-          method.arguments.map(tp => substituteType(tp, ownerViewSubst(method), scala.collection.immutable.Map.empty, defaultToBound = true))
+          method.arguments.map(tp => TypeSubstitution.substituteType(tp, ownerViewSubst(method), scala.collection.immutable.Map.empty, defaultToBound = true))
         )
 
       def applicable(method: Method): Boolean =
@@ -2292,7 +2299,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         if tp == null then return
         tp match
           case ap: TypedAST.AppliedClassType =>
-            val specializedArgs = ap.typeArguments.map(arg => substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = false))
+            val specializedArgs = ap.typeArguments.map(arg => TypeSubstitution.substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = false))
             val specialized = TypedAST.AppliedClassType(ap.raw, specializedArgs.toList)
             val k = keyOf(specialized)
             if visited.contains(k) then return

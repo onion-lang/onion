@@ -494,12 +494,11 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   AST.BlockExpression b = null;
   AST.Expression e = null;
 }{
-  {enterSection();}
   t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()]
-  (  (b=block() {leaveSection();} | eos()) {
+  (  (b=block() | {enterSection();} eos()) {
        return new AST.FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
      }
-  |  ("=" eols() e=term() eos()) {
+  |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, t1.image, args, ty,
          new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)))

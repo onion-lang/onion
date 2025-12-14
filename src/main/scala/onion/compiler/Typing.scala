@@ -17,12 +17,12 @@ import scala.compiletime.uninitialized
 
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
-  private case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
-  private case class TypeParamScope(params: Map[String, TypeParam]) {
+  private[compiler] case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
+  private[compiler] case class TypeParamScope(params: Map[String, TypeParam]) {
     def get(name: String): Option[TypeParam] = params.get(name)
     def ++(ps: Seq[TypeParam]): TypeParamScope = copy(params ++ ps.map(p => p.name -> p))
   }
-  private val emptyTypeParams = TypeParamScope(Map.empty)
+  private[compiler] val emptyTypeParams = TypeParamScope(Map.empty)
   type Continuable = Boolean
   type Environment = TypingEnvironment
   type Dimension = Int
@@ -33,7 +33,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
     loop(descriptor, 0)
   }
-  private class NameMapper(imports: Seq[ImportItem]) {
+  private[compiler] class NameMapper(imports: Seq[ImportItem]) {
     def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
     def map(descriptor : AST.TypeDescriptor): Type = descriptor match {
       case AST.PrimitiveType(AST.KChar)       => BasicType.CHAR
@@ -95,18 +95,18 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       }
     }
   }
-  private val table_  = new ClassTable(classpath(config.classPath))
-  private val ast2ixt_ = Map[AST.Node, TypedAST.Node]()
-  private val ixt2ast_ = Map[TypedAST.Node, AST.Node]()
-  private val mappers_  = Map[String, NameMapper]()
-  private var access_ : Int = uninitialized
-  private var mapper_ : NameMapper = uninitialized
-  private var staticImportedList_ : StaticImportList = uninitialized
-  private var definition_ : ClassDefinition = uninitialized
-  private var unit_ : AST.CompilationUnit = uninitialized
-  private var typeParams_ : TypeParamScope = emptyTypeParams
-  private val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
-  private val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
+  private[compiler] val table_  = new ClassTable(classpath(config.classPath))
+  private[compiler] val ast2ixt_ = Map[AST.Node, TypedAST.Node]()
+  private[compiler] val ixt2ast_ = Map[TypedAST.Node, AST.Node]()
+  private[compiler] val mappers_  = Map[String, NameMapper]()
+  private[compiler] var access_ : Int = uninitialized
+  private[compiler] var mapper_ : NameMapper = uninitialized
+  private[compiler] var staticImportedList_ : StaticImportList = uninitialized
+  private[compiler] var definition_ : ClassDefinition = uninitialized
+  private[compiler] var unit_ : AST.CompilationUnit = uninitialized
+  private[compiler] var typeParams_ : TypeParamScope = emptyTypeParams
+  private[compiler] val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
+  private[compiler] val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
@@ -185,244 +185,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
-    new OutlinePass(unit).run()
-
-  private final class OutlinePass(unit: AST.CompilationUnit) {
-    private var constructorCount = 0
-
-    def run(): Unit = {
-      unit_ = unit
-      mapper_ = find(topClass)
-      unit.toplevels.foreach {
-        case node: AST.ClassDeclaration => processClassDeclaration(node)
-        case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
-        case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
-        case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
-        case _ =>
-      }
-    }
-
-    private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
-      constructorCount = 0
-      definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-      mapper_ = find(definition_.name)
-
-      val classTypeParams = createTypeParams(node.typeParameters)
-      declaredTypeParams_(node) = classTypeParams
-      definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
-      constructTypeHierarchy(definition_, MutableSet[ClassType]())
-      if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
-
-      openTypeParams(emptyTypeParams ++ classTypeParams) {
-        node.defaultSection.foreach(processAccessSection)
-        node.sections.foreach(processAccessSection)
-      }
-
-      if (constructorCount == 0) definition_.addDefaultConstructor
-    }
-
-    private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
-      definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-      mapper_ = find(definition_.name)
-
-      val interfaceTypeParams = createTypeParams(node.typeParameters)
-      declaredTypeParams_(node) = interfaceTypeParams
-      definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
-      constructTypeHierarchy(definition_, MutableSet[ClassType]())
-      if (cyclic(definition_)) report(CYCLIC_INHERITANCE, node, definition_.name)
-
-      openTypeParams(emptyTypeParams ++ interfaceTypeParams) {
-        node.methods.foreach(processInterfaceMethodDeclaration)
-      }
-    }
-
-    private def processAccessSection(section: AST.AccessSection): Unit = {
-      access_ = section.modifiers
-      section.members.foreach {
-        case node: AST.FieldDeclaration => processFieldDeclaration(node)
-        case node: AST.MethodDeclaration => processMethodDeclaration(node)
-        case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-        case node: AST.DelegatedFieldDeclaration => processDelegatedFieldDeclaration(node)
-      }
-    }
-
-    private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
-      val typeRef = mapFrom(node.typeRef)
-      if (typeRef == null) return
-      val modifier = node.modifiers | AST.M_PUBLIC
-      val classType = loadTopClass.asInstanceOf[ClassDefinition]
-      val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)
-      put(node, field)
-      classType.add(field)
-    }
-
-    private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
-      val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-      for (args <- argsOption; returnType <- returnTypeOption) {
-        val classType = loadTopClass.asInstanceOf[ClassDefinition]
-        val modifier = node.modifiers | AST.M_PUBLIC
-        val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null)
-        put(node, method)
-        classType.add(method)
-      }
-    }
-
-    private def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
-      val typeRef = mapFrom(node.typeRef)
-      if (typeRef == null) return
-      val modifier = node.modifiers | access_
-      val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
-      put(node, field)
-      definition_.add(field)
-    }
-
-    private def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-      val methodTypeParams = createTypeParams(node.typeParameters)
-      declaredTypeParams_(node) = methodTypeParams
-      openTypeParams(typeParams_ ++ methodTypeParams) {
-        val argsOption = typesOf(node.args)
-        val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-        for (args <- argsOption; returnType <- returnTypeOption) {
-          var modifier = node.modifiers | access_
-          if (node.block == null) modifier |= AST.M_ABSTRACT
-          val method = new MethodDefinition(
-            node.location,
-            modifier,
-            definition_,
-            node.name,
-            args.toArray,
-            returnType,
-            null,
-            methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
-          )
-          put(node, method)
-          definition_.add(method)
-        }
-      }
-    }
-
-    private def processInterfaceMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-      val methodTypeParams = createTypeParams(node.typeParameters)
-      declaredTypeParams_(node) = methodTypeParams
-      openTypeParams(typeParams_ ++ methodTypeParams) {
-        val argsOption = typesOf(node.args)
-        val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
-        for (args <- argsOption; returnType <- returnTypeOption) {
-          val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
-          val method = new MethodDefinition(
-            node.location,
-            modifier,
-            definition_,
-            node.name,
-            args.toArray,
-            returnType,
-            null,
-            methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
-          )
-          put(node, method)
-          definition_.add(method)
-        }
-      }
-    }
-
-    private def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
-      constructorCount += 1
-      val argsOption = typesOf(node.args)
-      for (args <- argsOption) {
-        val modifier = node.modifiers | access_
-        val constructor = new ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
-        put(node, constructor)
-        definition_.add(constructor)
-      }
-    }
-
-    private def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
-      val typeRef = mapFrom(node.typeRef)
-      if (typeRef == null) return
-      if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectType]).isInterface)) {
-        report(INTERFACE_REQUIRED, node, typeRef)
-        return
-      }
-      val modifier = node.modifiers | access_ | AST.M_FORWARDED
-      val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
-      put(node, field)
-      definition_.add(field)
-    }
-
-    private def cyclic(start: ClassDefinition): Boolean = {
-      def loop(node: ClassType, visited: Set[ClassType]): Boolean =
-        node != null && {
-          if (visited.contains(node)) true
-          else {
-            val next = visited + node
-            loop(node.superClass, next) || node.interfaces.exists(loop(_, next))
-          }
-        }
-
-      loop(start, Set.empty)
-    }
-
-    private def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassType = {
-      if (node == null) {
-        return if (mustBeInterface) null else table_.rootClass
-      }
-      val mapped = mapFrom(node, mapper)
-      if (mapped == null) return if (mustBeInterface) null else table_.rootClass
-      val typeRef = mapped match {
-        case ct: ClassType => ct
-        case _ =>
-          report(INCOMPATIBLE_TYPE, node, table_.rootClass, mapped)
-          return if (mustBeInterface) null else table_.rootClass
-      }
-      val isInterface = typeRef.isInterface
-      if (((!isInterface) && mustBeInterface) || (isInterface && (!mustBeInterface))) {
-        val location =
-          typeRef match
-            case cd: ClassDefinition => cd.location
-            case _ => null
-        report(ILLEGAL_INHERITANCE, location, typeRef.name)
-      }
-      typeRef
-    }
-
-    private def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]): Unit = {
-      if (node == null || visit.contains(node)) return
-      visit += node
-      node match {
-        case node: ClassDefinition =>
-          if (node.isResolutionComplete) return
-          val interfaces = Buffer[ClassType]()
-          val resolver = find(node.name)
-          val superClass =
-            if (node.isInterface) {
-              val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
-              for (typeSpec <- ast.superInterfaces) {
-                val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
-                if (superType != null) interfaces += superType
-              }
-              rootClass
-            } else {
-              val ast = lookupAST(node).asInstanceOf[AST.ClassDeclaration]
-              val superClass0 = validateSuperType(ast.superClass, mustBeInterface = false, resolver)
-              for (typeSpec <- ast.superInterfaces) {
-                val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
-                if (superType != null) interfaces += superType
-              }
-              superClass0
-            }
-
-          constructTypeHierarchy(superClass, visit)
-          interfaces.foreach(constructTypeHierarchy(_, visit))
-          node.setSuperClass(superClass)
-          node.setInterfaces(interfaces.toArray)
-          node.setResolutionComplete(true)
-        case _ =>
-          constructTypeHierarchy(node.superClass, visit)
-          node.interfaces.foreach(constructTypeHierarchy(_, visit))
-      }
-    }
-  }
+    new onion.compiler.typing.TypingOutlinePass(this, unit).run()
   def processTyping(unit: AST.CompilationUnit): Unit =
     new TypingPass(unit).run()
 
@@ -1899,147 +1662,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
   }
   def processDuplication(node: AST.CompilationUnit): Unit =
-    new DuplicationPass(node).run()
+    new onion.compiler.typing.TypingDuplicationPass(this, node).run()
 
-  private final class DuplicationPass(unit: AST.CompilationUnit) {
-    private val seenMethods = new JTreeSet[Method](new MethodComparator)
-    private val seenFields = new JTreeSet[FieldRef](new FieldComparator)
-    private val seenConstructors = new JTreeSet[ConstructorRef](new ConstructorComparator)
-    private val seenGlobalVariables = new JTreeSet[FieldRef](new FieldComparator)
-    private val seenFunctions = new JTreeSet[Method](new MethodComparator)
-
-    private def withKernel[T <: Node](ast: AST.Node)(f: T => Unit): Unit = {
-      val kernel = lookupKernelNode(ast)
-      if (kernel != null) f(kernel.asInstanceOf[T])
-    }
-
-    def run(): Unit = {
-      unit_ = unit
-      mapper_ = find(topClass)
-      seenGlobalVariables.clear()
-      seenFunctions.clear()
-      unit.toplevels.foreach {
-        case node: AST.ClassDeclaration => processClassDeclaration(node)
-        case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
-        case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
-        case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
-        case _ =>
-      }
-    }
-
-    private def resetForTypeDeclaration(clazz: ClassDefinition): Unit = {
-      seenMethods.clear()
-      seenFields.clear()
-      seenConstructors.clear()
-      definition_ = clazz
-      mapper_ = find(clazz.name)
-    }
-
-    private def registerField(ast: AST.Node, field: FieldDefinition): Unit =
-      if (seenFields.contains(field)) report(DUPLICATE_FIELD, ast, field.affiliation, field.name)
-      else seenFields.add(field)
-
-    private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit =
-      if (seenMethods.contains(method)) report(DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
-      else seenMethods.add(method)
-
-    private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
-      if (seenConstructors.contains(constructor)) report(DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
-      else seenConstructors.add(constructor)
-
-    private def processFieldLikeDeclaration(ast: AST.Node): Unit =
-      withKernel[FieldDefinition](ast)(field => registerField(ast, field))
-
-    private def processMethodDeclaration(node: AST.MethodDeclaration): Unit =
-      withKernel[MethodDefinition](node)(method => registerMethod(node, method))
-
-    private def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
-      withKernel[ConstructorDefinition](node)(ctor => registerConstructor(node, ctor))
-
-    private def processAccessSection(node: AST.AccessSection): Unit = {
-      for (member <- node.members)
-        member match {
-          case node: AST.FieldDeclaration => processFieldLikeDeclaration(node)
-          case node: AST.DelegatedFieldDeclaration => processFieldLikeDeclaration(node)
-          case node: AST.MethodDeclaration => processMethodDeclaration(node)
-          case node: AST.ConstructorDeclaration => processConstructorDeclaration(node)
-        }
-    }
-
-    private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit =
-      withKernel[FieldDefinition](node) { field =>
-        if (seenGlobalVariables.contains(field)) report(DUPLICATE_GLOBAL_VARIABLE, node, field.name)
-        else seenGlobalVariables.add(field)
-      }
-
-    private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit =
-      withKernel[MethodDefinition](node) { method =>
-        if (seenFunctions.contains(method)) report(DUPLICATE_FUNCTION, node, method.name, method.arguments)
-        else seenFunctions.add(method)
-      }
-
-    private def makeDelegationMethod(delegated: FieldRef, delegator: Method): MethodDefinition = {
-      val args = delegator.arguments
-      val params = new Array[Term](args.length)
-      val frame = new LocalFrame(null)
-      for (i <- 0 until params.length) {
-        val index = frame.add("arg" + i, args(i))
-        params(i) = new RefLocal(new ClosureLocalBinding(0, index, args(i)))
-      }
-      val target = new Call(new RefField(new This(definition_), delegated), delegator, params)
-      val statement =
-        if (delegator.returnType != BasicType.VOID) new StatementBlock(new Return(target))
-        else new StatementBlock(new ExpressionActionStatement(target), new Return(null))
-      val node = new MethodDefinition(null, AST.M_PUBLIC, definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
-      node.setFrame(frame)
-      node
-    }
-
-    private def generateForwardedMethods(): Unit = {
-      val generated = new JTreeSet[Method](new MethodComparator)
-
-      def generateDelegationMethods(field: FieldDefinition): Unit = {
-        val typeRef = field.`type`.asInstanceOf[ClassType]
-        val src = Classes.getInterfaceMethods(typeRef)
-        for (method <- src.asScala) {
-          if (!seenMethods.contains(method)) {
-            if (generated.contains(method)) {
-              report(DUPLICATE_GENERATED_METHOD, field.location, method.affiliation, method.name, method.arguments)
-            } else {
-              val generatedMethod = makeDelegationMethod(field, method)
-              generated.add(generatedMethod)
-              definition_.add(generatedMethod)
-            }
-          }
-        }
-      }
-
-      for (field <- seenFields.asScala) {
-        if ((AST.M_FORWARDED & field.modifier) != 0) generateDelegationMethods(field.asInstanceOf[FieldDefinition])
-      }
-    }
-
-    private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
-      val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-      if (clazz == null) return
-      resetForTypeDeclaration(clazz)
-      for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
-      for (section <- node.sections) processAccessSection(section)
-      generateForwardedMethods()
-      DuplicationChecks.checkOverrideContracts(clazz, node.location)
-      DuplicationChecks.checkErasureSignatureCollisions(clazz, node.location)
-    }
-
-    private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
-      val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-      if (clazz == null) return
-      resetForTypeDeclaration(clazz)
-      for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
-      DuplicationChecks.checkErasureSignatureCollisions(clazz, node.location)
-    }
-  }
-
-  private object DuplicationChecks {
+  private[compiler] object DuplicationChecks {
     private val emptyMethodSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
 
     private def erasedMethodDesc(method: Method): String =
@@ -2122,22 +1747,22 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     val moduleName = if (module != null) module.name else null
     createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
   }
-  private def put(astNode: AST.Node, kernelNode: Node): Unit = {
+  private[compiler] def put(astNode: AST.Node, kernelNode: Node): Unit = {
     ast2ixt_(astNode) = kernelNode
     ixt2ast_(kernelNode) = astNode
   }
-  private def lookupAST(kernelNode: Node): AST.Node =  ixt2ast_.get(kernelNode).getOrElse(null)
-  private def lookupKernelNode(astNode: AST.Node): Node = ast2ixt_.get(astNode).getOrElse(null)
-  private def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
-  private def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
+  private[compiler] def lookupAST(kernelNode: Node): AST.Node =  ixt2ast_.get(kernelNode).getOrElse(null)
+  private[compiler] def lookupKernelNode(astNode: AST.Node): Node = ast2ixt_.get(astNode).getOrElse(null)
+  private[compiler] def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
+  private[compiler] def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
-  private def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
+  private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
     val result = arguments.map{arg => mapFrom(arg.typeRef)}
     if(result.forall(_ != null)) Some(result) else None
   }
-  private def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)
-  private def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
+  private[compiler] def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)
+  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
     else validateTypeApplication(typeNode, mappedType)
@@ -2178,14 +1803,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
   }
 
-  private def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
+  private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
     val prev = typeParams_
     typeParams_ = scope
     try block
     finally typeParams_ = prev
   }
 
-  private def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {
+  private[compiler] def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {
     val seen = MutableSet[String]()
     val result = Buffer[TypeParam]()
     for (tp <- nodes) {

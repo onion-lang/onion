@@ -2059,20 +2059,23 @@
 <h3 id="functional-elements">Functional Elements<a class="headerlink" href="#functional-elements" title="Permanent link">&para;</a></h3>
 <p>While primarily object-oriented, Onion includes functional programming features:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>// Lambda expressions
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>def filter = #(x :Int) { x &gt; 10 }
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>def filter = (x :Int) -&gt; { return x &gt; 10; }
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>// Closures
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>def makeCounter {
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  def count :Int = 0
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  #() { count = count + 1; count }
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>}
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>def counter = makeCounter()
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>IO::println(counter.call())  // 1
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>IO::println(counter.call())  // 2
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  () -&gt; {
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    count = count + 1;
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    return count;
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  }
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>}
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>def counter = makeCounter()
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>IO::println(counter.call())  // 1
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>IO::println(counter.call())  // 2
 </span></code></pre></div>
 <p>Features:
-- <strong>Lambda expressions</strong> - Anonymous functions with <code>#(params) { body }</code> syntax
+- <strong>Lambda expressions</strong> - Anonymous functions with <code>(params) -&gt; { body }</code> syntax
 - <strong>Closures</strong> - Functions that capture variables from their enclosing scope
 - <strong>First-class functions</strong> - Functions as values via <code>Function0</code> through <code>Function10</code> interfaces</p>
 <h3 id="jvm-target">JVM Target<a class="headerlink" href="#jvm-target" title="Permanent link">&para;</a></h3>
@@ -2195,7 +2198,7 @@
 <tr>
 <td>Lambda syntax</td>
 <td><code>(x) -&gt; x + 1</code></td>
-<td><code>#(x) { x + 1 }</code></td>
+<td><code>(x :Int) -&gt; { return x + 1; }</code></td>
 </tr>
 <tr>
 <td>Pattern matching</td>

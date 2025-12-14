@@ -2596,17 +2596,17 @@
 <p>Built-in function types for lambdas and closures.</p>
 <h3 id="function0">Function0<a class="headerlink" href="#function0" title="Permanent link">&para;</a></h3>
 <p>Function with no parameters:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>def func :Function0 = #() { 42 }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>def func :Function0 = () -&gt; { return 42; }
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>def result :Int = func.call()$Int
 </span></code></pre></div>
 <h3 id="function1">Function1<a class="headerlink" href="#function1" title="Permanent link">&para;</a></h3>
 <p>Function with one parameter:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>def double :Function1 = #(x :Int) { x * 2 }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>def double :Function1 = (x :Int) -&gt; { return x * 2; }
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>def result :Int = double.call(5)$Int
 </span></code></pre></div>
 <h3 id="function2">Function2<a class="headerlink" href="#function2" title="Permanent link">&para;</a></h3>
 <p>Function with two parameters:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>def add :Function2 = #(x :Int, y :Int) { x + y }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>def add :Function2 = (x :Int, y :Int) -&gt; { return x + y; }
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>def result :Int = add.call(3, 7)$Int
 </span></code></pre></div>
 <h3 id="function3-through-function10">Function3 through Function10<a class="headerlink" href="#function3-through-function10" title="Permanent link">&para;</a></h3>

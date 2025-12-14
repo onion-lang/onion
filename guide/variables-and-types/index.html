@@ -2305,7 +2305,7 @@
 </span></code></pre></div>
 <h2 id="function-types">Function Types<a class="headerlink" href="#function-types" title="Permanent link">&para;</a></h2>
 <p>Functions are represented by <code>Function0</code> through <code>Function10</code> interfaces:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>def func :Function1 = #(x :Int) { x * 2 }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>def func :Function1 = (x :Int) -&gt; { return x * 2; }
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>def result :Int = func.call(5)$Int  // 10
 </span></code></pre></div>
 <ul>

@@ -1869,11 +1869,11 @@
 </ul>
 <h2 id="more-examples">More Examples<a class="headerlink" href="#more-examples" title="Permanent link">&para;</a></h2>
 <h3 id="using-variables">Using Variables<a class="headerlink" href="#using-variables" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def message :String = &quot;Hello, Onion!&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val message: String = &quot;Hello, Onion!&quot;
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>IO::println(message)
 </span></code></pre></div>
 <h3 id="getting-user-input">Getting User Input<a class="headerlink" href="#getting-user-input" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>def name :String = IO::input(&quot;What&#39;s your name? &quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val name: String = IO::readln(&quot;What&#39;s your name? &quot;)
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>IO::println(&quot;Hello, &quot; + name + &quot;!&quot;)
 </span></code></pre></div>
 <p>Run it:
@@ -1899,7 +1899,7 @@
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  public:
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    static def main(args: String[]) {
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>      IO::println(&quot;Number of arguments: &quot; + args.length)
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>      for i = 0; i &lt; args.length; i = i + 1 {
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>      for var i: Int = 0; i &lt; args.length; i = i + 1 {
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        IO::println(&quot;Arg &quot; + i + &quot;: &quot; + args[i])
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>      }
 </span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    }

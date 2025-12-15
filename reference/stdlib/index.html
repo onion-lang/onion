@@ -1396,10 +1396,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ioinput" class="md-nav__link">
+  <a href="#ioreadln" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IO::input
+        IO::readln
       
     </span>
   </a>
@@ -2048,10 +2048,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ioinput" class="md-nav__link">
+  <a href="#ioreadln" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IO::input
+        IO::readln
       
     </span>
   </a>
@@ -2510,11 +2510,11 @@
 <h3 id="ioprint">IO::print<a class="headerlink" href="#ioprint" title="Permanent link">&para;</a></h3>
 <p>Print without newline:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>IO::print(&quot;Enter name: &quot;)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>def name :String = IO::input(&quot;&quot;)
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val name: String = IO::readln()
 </span></code></pre></div>
-<h3 id="ioinput">IO::input<a class="headerlink" href="#ioinput" title="Permanent link">&para;</a></h3>
+<h3 id="ioreadln">IO::readln<a class="headerlink" href="#ioreadln" title="Permanent link">&para;</a></h3>
 <p>Read a line of input from the user:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>def name :String = IO::input(&quot;What&#39;s your name? &quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val name: String = IO::readln(&quot;What&#39;s your name? &quot;)
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>IO::println(&quot;Hello, &quot; + name)
 </span></code></pre></div>
 <h2 id="system-module">System Module<a class="headerlink" href="#system-module" title="Permanent link">&para;</a></h2>
@@ -2531,20 +2531,20 @@
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  java.io.InputStreamReader;
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>}
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>def reader :BufferedReader = new BufferedReader(
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>val reader: BufferedReader = new BufferedReader(
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  new InputStreamReader(System::in)
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>)
 </span></code></pre></div>
 <h3 id="systemcurrenttimemillis">System::currentTimeMillis<a class="headerlink" href="#systemcurrenttimemillis" title="Permanent link">&para;</a></h3>
 <p>Get current time in milliseconds:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def time :Long = System::currentTimeMillis()
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val time: Long = System::currentTimeMillis()
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>IO::println(&quot;Current time: &quot; + time)
 </span></code></pre></div>
 <h3 id="systemgetproperty">System::getProperty<a class="headerlink" href="#systemgetproperty" title="Permanent link">&para;</a></h3>
 <p>Get system properties:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>def os :String = System::getProperty(&quot;os.name&quot;)
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>def user :String = System::getProperty(&quot;user.name&quot;)
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>def home :String = System::getProperty(&quot;user.home&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val os: String = System::getProperty(&quot;os.name&quot;)
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>val user: String = System::getProperty(&quot;user.name&quot;)
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>val home: String = System::getProperty(&quot;user.home&quot;)
 </span></code></pre></div>
 <h3 id="systemexit">System::exit<a class="headerlink" href="#systemexit" title="Permanent link">&para;</a></h3>
 <p>Exit the program:</p>
@@ -2555,59 +2555,59 @@
 <p>Mathematical operations via Java's <code>Math</code> class.</p>
 <h3 id="mathrandom">Math::random<a class="headerlink" href="#mathrandom" title="Permanent link">&para;</a></h3>
 <p>Generate random number between 0.0 and 1.0:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>def r :Double = Math::random()
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>def randomInt :Int = (Math::random() * 100)$Int
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>val r: Double = Math::random()
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>val randomInt: Int = (Math::random() * 100)$Int
 </span></code></pre></div>
 <h3 id="mathsqrt">Math::sqrt<a class="headerlink" href="#mathsqrt" title="Permanent link">&para;</a></h3>
 <p>Square root:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>def result :Double = Math::sqrt(16.0)  // 4.0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>val result: Double = Math::sqrt(16.0)  // 4.0
 </span></code></pre></div>
 <h3 id="mathpow">Math::pow<a class="headerlink" href="#mathpow" title="Permanent link">&para;</a></h3>
 <p>Exponentiation:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>def result :Double = Math::pow(2.0, 3.0)  // 8.0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>val result: Double = Math::pow(2.0, 3.0)  // 8.0
 </span></code></pre></div>
 <h3 id="mathabs">Math::abs<a class="headerlink" href="#mathabs" title="Permanent link">&para;</a></h3>
 <p>Absolute value:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>def abs1 :Int = Math::abs(-10)     // 10
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>def abs2 :Double = Math::abs(-3.14)  // 3.14
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>val abs1: Int = Math::abs(-10)     // 10
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>val abs2: Double = Math::abs(-3.14)  // 3.14
 </span></code></pre></div>
 <h3 id="mathmax-mathmin">Math::max / Math::min<a class="headerlink" href="#mathmax-mathmin" title="Permanent link">&para;</a></h3>
 <p>Maximum and minimum:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>def max :Int = Math::max(10, 20)    // 20
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>def min :Int = Math::min(10, 20)    // 10
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>val max: Int = Math::max(10, 20)    // 20
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>val min: Int = Math::min(10, 20)    // 10
 </span></code></pre></div>
 <h3 id="mathfloor-mathceil-mathround">Math::floor / Math::ceil / Math::round<a class="headerlink" href="#mathfloor-mathceil-mathround" title="Permanent link">&para;</a></h3>
 <p>Rounding functions:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>def floor :Double = Math::floor(3.7)  // 3.0
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>def ceil :Double = Math::ceil(3.2)    // 4.0
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>def round :Long = Math::round(3.5)    // 4
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>val floor: Double = Math::floor(3.7)  // 3.0
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>val ceil: Double = Math::ceil(3.2)    // 4.0
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>val round: Long = Math::round(3.5)    // 4
 </span></code></pre></div>
 <h3 id="mathsin-mathcos-mathtan">Math::sin / Math::cos / Math::tan<a class="headerlink" href="#mathsin-mathcos-mathtan" title="Permanent link">&para;</a></h3>
 <p>Trigonometric functions (radians):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>def sine :Double = Math::sin(Math::PI / 2)    // 1.0
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>def cosine :Double = Math::cos(0.0)           // 1.0
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>def tangent :Double = Math::tan(Math::PI / 4) // 1.0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>val sine: Double = Math::sin(Math::PI / 2)    // 1.0
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>val cosine: Double = Math::cos(0.0)           // 1.0
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>val tangent: Double = Math::tan(Math::PI / 4) // 1.0
 </span></code></pre></div>
 <h3 id="math-constants">Math Constants<a class="headerlink" href="#math-constants" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>def pi :Double = Math::PI       // 3.14159...
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>def e :Double = Math::E         // 2.71828...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>val pi: Double = Math::PI       // 3.14159...
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>val e: Double = Math::E         // 2.71828...
 </span></code></pre></div>
 <h2 id="function-interfaces">Function Interfaces<a class="headerlink" href="#function-interfaces" title="Permanent link">&para;</a></h2>
 <p>Built-in function types for lambdas and closures.</p>
 <h3 id="function0">Function0<a class="headerlink" href="#function0" title="Permanent link">&para;</a></h3>
 <p>Function with no parameters:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>def func :Function0 = () -&gt; { return 42; }
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>def result :Int = func.call()$Int
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>val func: Function0[Int] = () -&gt; { return 42; }
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>val result: Int = func.call()
 </span></code></pre></div>
 <h3 id="function1">Function1<a class="headerlink" href="#function1" title="Permanent link">&para;</a></h3>
 <p>Function with one parameter:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>def double :Function1 = (x :Int) -&gt; { return x * 2; }
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>def result :Int = double.call(5)$Int
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>val double: Function1[Int, Int] = (x: Int) -&gt; { return x * 2; }
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>val result: Int = double.call(5)
 </span></code></pre></div>
 <h3 id="function2">Function2<a class="headerlink" href="#function2" title="Permanent link">&para;</a></h3>
 <p>Function with two parameters:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>def add :Function2 = (x :Int, y :Int) -&gt; { return x + y; }
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>def result :Int = add.call(3, 7)$Int
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>val add: Function2[Int, Int, Int] = (x: Int, y: Int) -&gt; { return x + y; }
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>val result: Int = add.call(3, 7)
 </span></code></pre></div>
 <h3 id="function3-through-function10">Function3 through Function10<a class="headerlink" href="#function3-through-function10" title="Permanent link">&para;</a></h3>
 <p>Functions with 3 to 10 parameters follow the same pattern.</p>
@@ -2615,83 +2615,83 @@
 <p>Java wrapper classes for primitives (accessed with <code>J</code> prefix in some contexts).</p>
 <h3 id="jinteger">JInteger<a class="headerlink" href="#jinteger" title="Permanent link">&para;</a></h3>
 <p>Integer operations:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>def i :Int = JInteger::parseInt(&quot;42&quot;)
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>def s :String = JInteger::toString(42)
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>def max :Int = JInteger::MAX_VALUE
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>def min :Int = JInteger::MIN_VALUE
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>val i: Int = JInteger::parseInt(&quot;42&quot;)
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>val s: String = JInteger::toString(42)
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>val max: Int = JInteger::MAX_VALUE
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>val min: Int = JInteger::MIN_VALUE
 </span></code></pre></div>
 <h3 id="jlong">JLong<a class="headerlink" href="#jlong" title="Permanent link">&para;</a></h3>
 <p>Long operations:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>def l :Long = JLong::parseLong(&quot;1234567890&quot;)
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>def s :String = JLong::toString(1234567890L)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>val l: Long = JLong::parseLong(&quot;1234567890&quot;)
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>val s: String = JLong::toString(1234567890L)
 </span></code></pre></div>
 <h3 id="jdouble">JDouble<a class="headerlink" href="#jdouble" title="Permanent link">&para;</a></h3>
 <p>Double operations:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>def d :Double = JDouble::parseDouble(&quot;3.14&quot;)
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>def s :String = JDouble::toString(3.14)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>val d: Double = JDouble::parseDouble(&quot;3.14&quot;)
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>val s: String = JDouble::toString(3.14)
 </span></code></pre></div>
 <h3 id="jboolean">JBoolean<a class="headerlink" href="#jboolean" title="Permanent link">&para;</a></h3>
 <p>Boolean operations:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>def b :Boolean = JBoolean::parseBoolean(&quot;true&quot;)
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>def s :String = JBoolean::toString(true)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>val b: Boolean = JBoolean::parseBoolean(&quot;true&quot;)
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>val s: String = JBoolean::toString(true)
 </span></code></pre></div>
 <h2 id="common-java-classes">Common Java Classes<a class="headerlink" href="#common-java-classes" title="Permanent link">&para;</a></h2>
 <p>Frequently used Java standard library classes.</p>
 <h3 id="string">String<a class="headerlink" href="#string" title="Permanent link">&para;</a></h3>
 <p>String operations (automatically available):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>def text :String = &quot;Hello, World!&quot;
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>def upper :String = text.toUpperCase()
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>def lower :String = text.toLowerCase()
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>def length :Int = text.length()
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>def sub :String = text.substring(0, 5)
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>def contains :Boolean = text.contains(&quot;World&quot;)
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>def starts :Boolean = text.startsWith(&quot;Hello&quot;)
-</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>def ends :Boolean = text.endsWith(&quot;!&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>val text: String = &quot;Hello, World!&quot;
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>val upper: String = text.toUpperCase()
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>val lower: String = text.toLowerCase()
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>val length: Int = text.length()
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>val sub: String = text.substring(0, 5)
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>val contains: Boolean = text.contains(&quot;World&quot;)
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>val starts: Boolean = text.startsWith(&quot;Hello&quot;)
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>val ends: Boolean = text.endsWith(&quot;!&quot;)
 </span></code></pre></div>
 <h3 id="stringbuilder">StringBuilder<a class="headerlink" href="#stringbuilder" title="Permanent link">&para;</a></h3>
 <p>Efficient string building:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>import { java.lang.StringBuilder; }
 </span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>def builder :StringBuilder = new StringBuilder()
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>val builder: StringBuilder = new StringBuilder()
 </span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>builder.append(&quot;Hello&quot;)
 </span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>builder.append(&quot; &quot;)
 </span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>builder.append(&quot;World&quot;)
-</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>def result :String = builder.toString()
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>val result: String = builder.toString()
 </span></code></pre></div>
 <h3 id="arraylist">ArrayList<a class="headerlink" href="#arraylist" title="Permanent link">&para;</a></h3>
 <p>Dynamic arrays:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>import { java.util.ArrayList; }
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>def list :ArrayList = new ArrayList
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>val list: ArrayList = new ArrayList
 </span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>list.add(&quot;First&quot;)
 </span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>list &lt;&lt; &quot;Second&quot;  // Using &lt;&lt; operator
-</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>def size :Int = list.size()
-</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>def item :Object = list.get(0)
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>val size: Int = list.size()
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>val item: Object = list.get(0)
 </span><span id="__span-25-8"><a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>list.remove(0)
-</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>def empty :Boolean = list.isEmpty()
+</span><span id="__span-25-9"><a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>val empty: Boolean = list.isEmpty()
 </span></code></pre></div>
 <h3 id="hashmap">HashMap<a class="headerlink" href="#hashmap" title="Permanent link">&para;</a></h3>
 <p>Key-value maps:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>import { java.util.HashMap; }
 </span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>def map :HashMap = new HashMap
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>val map: HashMap = new HashMap
 </span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>map.put(&quot;key1&quot;, &quot;value1&quot;)
 </span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>map.put(&quot;key2&quot;, &quot;value2&quot;)
-</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>def value :Object = map.get(&quot;key1&quot;)
-</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>def has :Boolean = map.containsKey(&quot;key1&quot;)
-</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>def size :Int = map.size()
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>val value: Object = map.get(&quot;key1&quot;)
+</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>val has: Boolean = map.containsKey(&quot;key1&quot;)
+</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>val size: Int = map.size()
 </span></code></pre></div>
 <h3 id="file">File<a class="headerlink" href="#file" title="Permanent link">&para;</a></h3>
 <p>File operations:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>import { java.io.File; }
 </span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>def file :File = new File(&quot;data.txt&quot;)
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>def exists :Boolean = file.exists()
-</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>def isFile :Boolean = file.isFile()
-</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>def isDir :Boolean = file.isDirectory()
-</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>def name :String = file.getName()
-</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>def path :String = file.getPath()
-</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>def length :Long = file.length()
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>val file: File = new File(&quot;data.txt&quot;)
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>val exists: Boolean = file.exists()
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>val isFile: Boolean = file.isFile()
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>val isDir: Boolean = file.isDirectory()
+</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>val name: String = file.getName()
+</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>val path: String = file.getPath()
+</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>val length: Long = file.length()
 </span></code></pre></div>
 <h3 id="bufferedreader">BufferedReader<a class="headerlink" href="#bufferedreader" title="Permanent link">&para;</a></h3>
 <p>Reading text:</p>
@@ -2700,11 +2700,11 @@
 </span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>  java.io.FileReader;
 </span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>}
 </span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>
-</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>def reader :BufferedReader = new BufferedReader(
+</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>val reader: BufferedReader = new BufferedReader(
 </span><span id="__span-28-7"><a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>  new FileReader(&quot;file.txt&quot;)
 </span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>)
 </span><span id="__span-28-9"><a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>
-</span><span id="__span-28-10"><a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>def line :String = null
+</span><span id="__span-28-10"><a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>var line: String = null
 </span><span id="__span-28-11"><a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>while (line = reader.readLine()) != null {
 </span><span id="__span-28-12"><a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>  IO::println(line)
 </span><span id="__span-28-13"><a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>}
@@ -2718,7 +2718,7 @@
 </span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>  java.io.FileWriter;
 </span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>}
 </span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>
-</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>def writer :BufferedWriter = new BufferedWriter(
+</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>val writer: BufferedWriter = new BufferedWriter(
 </span><span id="__span-29-7"><a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>  new FileWriter(&quot;output.txt&quot;)
 </span><span id="__span-29-8"><a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a>)
 </span><span id="__span-29-9"><a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a>

@@ -826,10 +826,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#member-variables-with" class="md-nav__link">
+  <a href="#fields-with-val-var" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Member Variables with @
+        Fields with val / var
       
     </span>
   </a>
@@ -1888,10 +1888,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#member-variables-with" class="md-nav__link">
+  <a href="#fields-with-val-var" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Member Variables with @
+        Fields with val / var
       
     </span>
   </a>
@@ -2014,9 +2014,9 @@
 <h2 id="language-characteristics">Language Characteristics<a class="headerlink" href="#language-characteristics" title="Permanent link">&para;</a></h2>
 <h3 id="statically-typed">Statically Typed<a class="headerlink" href="#statically-typed" title="Permanent link">&para;</a></h3>
 <p>Every variable and expression has a type known at compile time:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>def name :String = &quot;Alice&quot;  // Type annotation
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>def age :Int = 30
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>def scores :Int[] = new Int[10]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val name: String = &quot;Alice&quot;  // Type annotation
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val age: Int = 30
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>val scores: Int[] = new Int[10]
 </span></code></pre></div>
 <p>The type system includes:
 - Primitive types: <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Byte</code>, <code>Short</code>, <code>Char</code>
@@ -2026,29 +2026,27 @@
 <h3 id="object-oriented">Object-Oriented<a class="headerlink" href="#object-oriented" title="Permanent link">&para;</a></h3>
 <p>Onion fully supports object-oriented programming:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>class Animal {
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  @name :String
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  val name: String
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  public:
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    def new(n :String) {
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>      @name = n
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    def this(n: String) {
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>      this.name = n
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    }
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    def speak :String {
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>      &quot;Some sound&quot;
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    def speak: String {
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>      return &quot;Some sound&quot;
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    }
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>}
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>class Dog : Animal {
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  public:
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    def new(n :String) {
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>      // Call parent constructor
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>      super.new(n)
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    }
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    def speak :String {
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>      &quot;Woof!&quot;
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    }
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>}
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    def this(n: String): (n) {
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    }
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    def speak: String {
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>      return &quot;Woof!&quot;
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    }
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>}
 </span></code></pre></div>
 <p>Features:
 - <strong>Classes</strong> - Encapsulation of data and behavior
@@ -2059,18 +2057,18 @@
 <h3 id="functional-elements">Functional Elements<a class="headerlink" href="#functional-elements" title="Permanent link">&para;</a></h3>
 <p>While primarily object-oriented, Onion includes functional programming features:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>// Lambda expressions
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>def filter = (x :Int) -&gt; { return x &gt; 10; }
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>val filter: (Int) -&gt; Boolean = (x: Int) -&gt; { return x &gt; 10; }
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>// Closures
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>def makeCounter {
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  def count :Int = 0
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  () -&gt; {
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>def makeCounter(): () -&gt; Int {
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  var count: Int = 0
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  return () -&gt; {
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    count = count + 1;
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    return count;
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  }
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  };
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>}
 </span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>def counter = makeCounter()
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>val counter: () -&gt; Int = makeCounter()
 </span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>IO::println(counter.call())  // 1
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>IO::println(counter.call())  // 2
 </span></code></pre></div>
@@ -2094,9 +2092,9 @@
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  javax.swing.JFrame;
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>}
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>def list :ArrayList = new ArrayList
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>def map :HashMap = new HashMap
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>def window :JFrame = new JFrame(&quot;Title&quot;)
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>val list: ArrayList = new ArrayList
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>val map: HashMap = new HashMap
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>val window: JFrame = new JFrame(&quot;Title&quot;)
 </span></code></pre></div>
 <p>Key points:
 - Import Java classes with <code>import { }</code>
@@ -2124,21 +2122,21 @@
 <li><strong>Interactive REPL</strong> (<code>Shell</code>) - Evaluate expressions interactively</li>
 </ol>
 <h2 id="syntax-highlights">Syntax Highlights<a class="headerlink" href="#syntax-highlights" title="Permanent link">&para;</a></h2>
-<h3 id="member-variables-with">Member Variables with <code>@</code><a class="headerlink" href="#member-variables-with" title="Permanent link">&para;</a></h3>
-<p>Instance variables are prefixed with <code>@</code>:</p>
+<h3 id="fields-with-val-var">Fields with <code>val</code> / <code>var</code><a class="headerlink" href="#fields-with-val-var" title="Permanent link">&para;</a></h3>
+<p>Declare fields with <code>val</code> (immutable) or <code>var</code> (mutable) and access them via <code>this.field</code>:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>class Counter {
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  @count :Int
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  var count: Int
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>  public:
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    def increment {
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>      @count = @count + 1
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>      this.count = this.count + 1
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    }
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>}
 </span></code></pre></div>
 <h3 id="type-annotations-with">Type Annotations with <code>:</code><a class="headerlink" href="#type-annotations-with" title="Permanent link">&para;</a></h3>
 <p>Types are specified after a colon:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>def variable :Type = value
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>def method(param :Type) :ReturnType { }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val variable: Type = value
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>def method(param: Type): ReturnType { }
 </span></code></pre></div>
 <h3 id="static-access-with">Static Access with <code>::</code><a class="headerlink" href="#static-access-with" title="Permanent link">&para;</a></h3>
 <p>Static methods and fields use <code>::</code>:</p>
@@ -2148,11 +2146,11 @@
 </span></code></pre></div>
 <h3 id="type-casting-with">Type Casting with <code>$</code><a class="headerlink" href="#type-casting-with" title="Permanent link">&para;</a></h3>
 <p>Cast expressions use the <code>$</code> operator:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>def x :Double = 3.14
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>def y :Int = x$Int  // Cast to Int
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>val x: Double = 3.14
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>val y: Int = x$Int  // Cast to Int
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>def obj :Object = &quot;string&quot;
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>def str :String = obj$String  // Cast to String
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>val obj: Object = &quot;string&quot;
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>val str: String = obj$String  // Cast to String
 </span></code></pre></div>
 <h3 id="pattern-matching-with-select">Pattern Matching with <code>select</code><a class="headerlink" href="#pattern-matching-with-select" title="Permanent link">&para;</a></h3>
 <p>Switch-style pattern matching:</p>
@@ -2176,14 +2174,14 @@
 </thead>
 <tbody>
 <tr>
-<td>Instance variables</td>
-<td><code>this.field</code></td>
-<td><code>@field</code></td>
+<td>Field declarations</td>
+<td><code>Type field</code></td>
+<td><code>val/var field: Type</code></td>
 </tr>
 <tr>
-<td>Type annotations</td>
+<td>Variable declarations</td>
 <td><code>Type variable</code></td>
-<td><code>variable :Type</code></td>
+<td><code>val variable: Type</code></td>
 </tr>
 <tr>
 <td>Static access</td>

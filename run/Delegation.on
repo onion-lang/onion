@@ -4,7 +4,7 @@ import {
 }
 
 class Delegation <: List {
-	forward n :List;
+	forward val n: List;
 public:
 	def this {
 		this.n = new ArrayList;

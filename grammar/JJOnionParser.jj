@@ -765,14 +765,16 @@ List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.A
 }
 
 AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
-  Token start, name;
+  Token start, keyword, name;
   AST.TypeNode type = null;
   AST.Expression init = null;
 }{
   {enterSection();}
-  start="forward" name=<ID> ":" type = type()
+  start="forward" (keyword="val" | keyword="var") name=<ID> ":" type = type()
   ["=" eols() init=term()] eos() {
-    return new AST.DelegatedFieldDeclaration(p(start), modifiers, name.image, type, init);
+    int declMods = modifiers;
+    if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
+    return new AST.DelegatedFieldDeclaration(p(start), declMods, name.image, type, init);
   }
 }
 

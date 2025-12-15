@@ -195,27 +195,25 @@ import {
 }
 
 class MyList <: List {
-  forward @internal :List  // Delegate List methods to @internal
-
-  @internal :ArrayList
+  forward val internal: List;
 
   public:
-    def new {
-      @internal = new ArrayList
+    def this {
+      this.internal = new ArrayList;
     }
 
     // Custom methods
-    def addAll(items :String[]) {
-      foreach item :String in items {
-        @internal.add(item)
+    def addAll(items: String[]) {
+      foreach item: String in items {
+        this.internal << item;
       }
     }
 }
 
-def list :MyList = new MyList
-list << "First"   // Uses delegated add() method
-list << "Second"
-IO::println(list.size())  // Uses delegated size() method
+val list: MyList = new MyList;
+list << "First";
+list << "Second";
+IO::println(list.size);
 ```
 
 The `forward` directive automatically implements interface methods by forwarding calls to the specified member.
@@ -321,12 +319,11 @@ class MyList : ArrayList {
 
 // Consider delegation
 class MyList <: List {
-  forward @internal :List
-  @internal :ArrayList
+  forward val internal: List;
 
   public:
-    def new {
-      @internal = new ArrayList
+    def this {
+      this.internal = new ArrayList;
     }
 }
 ```

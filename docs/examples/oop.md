@@ -145,23 +145,21 @@ import {
 }
 
 class Delegation <: List {
-  forward @n :List
-
-  @n :ArrayList
+  forward val n: List;
 
   public:
-    def new {
-      @n = new ArrayList
+    def this {
+      this.n = new ArrayList;
     }
 
-    static def main(args :String[]) {
-      def delegation :Delegation = new Delegation
-      delegation << "a"
-      delegation << "b"
-      delegation << "c"
+    static def main(args: String[]) {
+      val list: List = new Delegation;
+      list << "a";
+      list << "b";
+      list << "c";
 
-      for i = 0; i < delegation.size(); i = i + 1 {
-        IO::println(delegation.get(i))
+      for var i: Int = 0; i < list.size; i = i + 1 {
+        IO::println(list[i]);
       }
     }
 }

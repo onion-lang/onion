@@ -347,9 +347,12 @@ class Example {
 
 ```onion
 class MyClass <: Interface {
-  forward @member :Interface
+  forward val member: Interface;
 
-  @member :Implementation
+  public:
+    def this {
+      this.member = new Implementation;
+    }
 }
 ```
 

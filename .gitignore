@@ -20,6 +20,7 @@ target/
 .metals/
 .vscode/
 .sbt/
+.ivy2/
 
 # MkDocs
 site/

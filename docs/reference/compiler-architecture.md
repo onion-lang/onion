@@ -244,7 +244,7 @@ Error: Type mismatch
   Expected: Int
   Found: String
   at MyProgram.on:15
-    def x :Int = "hello"
+    val x: Int = "hello"
                  ^^^^^^^
 ```
 

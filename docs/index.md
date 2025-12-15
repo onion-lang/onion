@@ -21,24 +21,26 @@ IO::println("Hello, World!")
 
 // Class definition with inheritance
 class Calculator : JFrame <: ActionListener {
-  @result :Long
+  var result: Long
 
   public:
-    def new {
+    def this {
       // Constructor logic
+      this.result = 0L;
     }
 
-    def calculate(x :Long, y :Long) :Long {
-      x + y
+    def calculate(x: Long, y: Long): Long {
+      return x + y;
     }
 }
 
 // Lambda expressions
-def filter = (line :String) -> {
+val filter: (String) -> Boolean = (line: String) -> {
   return line.startsWith("ERROR");
 }
 
 // Pattern matching with select
+val value: Int = 3;
 select value {
   case 0, 1, 2:
     IO::println("Low")

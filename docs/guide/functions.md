@@ -9,31 +9,25 @@ Functions in Onion allow you to encapsulate reusable code. Onion supports both n
 Define functions with the `def` keyword:
 
 ```onion
-def greet(name :String) :String {
-  "Hello, " + name + "!"
-}
+def greet(name: String): String = "Hello, " + name + "!"
 
-def message :String = greet("Alice")
+val message: String = greet("Alice")
 IO::println(message)  // "Hello, Alice!"
 ```
 
 ### Function with Multiple Parameters
 
 ```onion
-def add(a :Int, b :Int) :Int {
-  a + b
-}
+def add(a: Int, b: Int): Int = a + b
 
-def sum :Int = add(5, 3)
+val sum: Int = add(5, 3)
 IO::println(sum)  // 8
 ```
 
 ### Function with No Parameters
 
 ```onion
-def getCurrentTime :String {
-  System::currentTimeMillis()$String
-}
+def getCurrentTime: String = System::currentTimeMillis()$String
 
 IO::println(getCurrentTime())
 ```
@@ -65,14 +59,12 @@ def max(a :Int, b :Int) :Int {
 }
 ```
 
-### Implicit Return
+### Expression Body
 
-The last expression in a function is implicitly returned:
+For concise functions, prefer an expression body using `=`:
 
 ```onion
-def square(x :Int) :Int {
-  x * x  // Implicitly returned
-}
+def square(x: Int): Int = x * x
 ```
 
 ## Lambda Expressions
@@ -82,23 +74,23 @@ def square(x :Int) :Int {
 Anonymous functions use the `(params) -> { body }` syntax:
 
 ```onion
-def double = (x :Int) -> { return x * 2; }
+val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 
-def result :Int = double.call(5)$Int  // 10
+val result: Int = double.call(5)  // 10
 ```
 
 ### Lambda with Multiple Parameters
 
 ```onion
-def add = (x :Int, y :Int) -> { return x + y; }
+val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
-def sum :Int = add.call(3, 7)$Int  // 10
+val sum: Int = add.call(3, 7)  // 10
 ```
 
 ### Lambda with No Parameters
 
 ```onion
-def sayHello = () -> { IO::println("Hello!") }
+val sayHello: () -> String = () -> { IO::println("Hello!"); return "done"; }
 
 sayHello.call()
 ```
@@ -108,15 +100,15 @@ sayHello.call()
 Lambdas can capture variables from their enclosing scope:
 
 ```onion
-def makeCounter {
-  def count :Int = 0
-  () -> {
+def makeCounter(): () -> Int {
+  var count: Int = 0
+  return () -> {
     count = count + 1
     return count;
-  }
+  };
 }
 
-def counter = makeCounter()
+val counter: () -> Int = makeCounter()
 IO::println(counter.call())  // 1
 IO::println(counter.call())  // 2
 IO::println(counter.call())  // 3
@@ -125,8 +117,8 @@ IO::println(counter.call())  // 3
 ### Capturing Loop Variables
 
 ```onion
-def i :Int = 0
-def filter = (line :String) -> {
+var i: Int = 0
+val filter: (String) -> String = (line: String) -> {
   i = i + 1
   return line + " (line " + i + ")";
 }
@@ -137,17 +129,17 @@ IO::println(filter.call("Second"))  // "Second (line 2)"
 
 ## Function Types
 
-Functions are typed using `Function0` through `Function10` interfaces:
+You can either use the `Function0` through `Function10` interfaces, or the arrow type syntax `(A, B) -> R`:
 
 ```onion
 // Function with 1 parameter
-def func1 :Function1 = (x :Int) -> { return x * 2; }
+val func1: (Int) -> Int = (x: Int) -> { return x * 2; }
 
 // Function with 2 parameters
-def func2 :Function2 = (x :Int, y :Int) -> { return x + y; }
+val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
 // Function with no parameters
-def func0 :Function0 = () -> { return 42; }
+val func0: () -> Int = () -> { return 42; }
 ```
 
 The number indicates the parameter count:
@@ -161,13 +153,13 @@ The number indicates the parameter count:
 Functions that accept or return other functions:
 
 ```onion
-def applyTwice(f :Function1, value :Int) :Int {
-  def temp :Int = f.call(value)$Int
-  f.call(temp)$Int
+def applyTwice(f: (Int) -> Int, value: Int): Int {
+  val temp: Int = f.call(value)
+  return f.call(temp)
 }
 
-def increment = (x :Int) -> { return x + 1; }
-def result :Int = applyTwice(increment, 5)  // 7
+val increment: (Int) -> Int = (x: Int) -> { return x + 1; }
+val result: Int = applyTwice(increment, 5)  // 7
 ```
 
 ## Recursive Functions
@@ -179,7 +171,7 @@ def factorial(n :Int) :Int {
   if n <= 1 {
     return 1
   }
-  n * factorial(n - 1)
+  return n * factorial(n - 1)
 }
 
 IO::println(factorial(5))  // 120
@@ -194,11 +186,11 @@ def factorialTail(n :Int, acc :Int) :Int {
   if n <= 1 {
     return acc
   }
-  factorialTail(n - 1, n * acc)
+  return factorialTail(n - 1, n * acc)
 }
 
 def factorial(n :Int) :Int {
-  factorialTail(n, 1)
+  return factorialTail(n, 1)
 }
 
 IO::println(factorial(5))  // 120
@@ -211,20 +203,14 @@ Classes can have multiple methods with the same name but different parameter typ
 ```onion
 class Calculator {
   public:
-    def add(a :Int, b :Int) :Int {
-      a + b
-    }
+    def add(a: Int, b: Int): Int = a + b
 
-    def add(a :Double, b :Double) :Double {
-      a + b
-    }
+    def add(a: Double, b: Double): Double = a + b
 
-    def add(a :String, b :String) :String {
-      a + b
-    }
+    def add(a: String, b: String): String = a + b
 }
 
-def calc :Calculator = new Calculator
+val calc: Calculator = new Calculator
 IO::println(calc.add(5, 3))           // 8
 IO::println(calc.add(2.5, 3.7))       // 6.2
 IO::println(calc.add("Hello", "!"))   // "Hello!"
@@ -237,13 +223,9 @@ Methods can be static (class-level) rather than instance-level:
 ```onion
 class MathUtils {
   public:
-    static def square(x :Int) :Int {
-      x * x
-    }
+    static def square(x: Int): Int = x * x
 
-    static def cube(x :Int) :Int {
-      x * x * x
-    }
+    static def cube(x: Int): Int = x * x * x
 }
 
 // Call static methods with ::
@@ -256,45 +238,51 @@ IO::println(MathUtils::cube(3))    // 27
 ### Filter Function
 
 ```onion
-def filterLines(lines :String[], predicate :Function1) :String[] {
-  def result :ArrayList = new ArrayList
+import {
+  java.util.ArrayList;
+  java.util.List;
+}
 
-  foreach line :String in lines {
-    def keep :Boolean = predicate.call(line)$Boolean
-    if keep {
+def filterLines(lines: List, predicate: (String) -> Boolean): List {
+  val result: ArrayList = new ArrayList
+
+  foreach line: String in lines {
+    if predicate.call(line) {
       result << line
     }
   }
 
-  // Convert to array (simplified)
-  result.toArray(new String[result.size()])
+  return result
 }
 
-def startsWithError = (line :String) -> { return line.startsWith("ERROR"); }
+val startsWithError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
-def lines :String[] = ["INFO: OK", "ERROR: Failed", "ERROR: Timeout"]
-def errors :String[] = filterLines(lines, startsWithError)
+val lines: List = ["INFO: OK", "ERROR: Failed", "ERROR: Timeout"]
+val errors: List = filterLines(lines, startsWithError)
 ```
 
 ### Map Function
 
 ```onion
-def mapLines(lines :String[], transform :Function1) :String[] {
-  def result :ArrayList = new ArrayList
-
-  foreach line :String in lines {
-    def transformed :String = transform.call(line)$String
-    result << transformed
-  }
-
-  result.toArray(new String[result.size()])
+import {
+  java.util.ArrayList;
+  java.util.List;
 }
 
-def toUpper = (s :String) -> { return s.toUpperCase(); }
+def mapLines(lines: List, transform: (String) -> String): List {
+  val result: ArrayList = new ArrayList
 
-def lines :String[] = ["hello", "world"]
-def upper :String[] = mapLines(lines, toUpper)
-// ["HELLO", "WORLD"]
+  foreach line: String in lines {
+    result << transform.call(line)
+  }
+
+  return result
+}
+
+val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
+
+val lines: List = ["hello", "world"]
+val upper: List = mapLines(lines, toUpper)
 ```
 
 ## Best Practices

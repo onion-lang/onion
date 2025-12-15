@@ -10,18 +10,16 @@ Define a class with the `class` keyword:
 
 ```onion
 class Person {
-  @name :String
-  @age :Int
+  val name: String
+  var age: Int
 
   public:
-    def new(n :String, a :Int) {
-      @name = n
-      @age = a
+    def this(n: String, a: Int) {
+      this.name = n
+      this.age = a
     }
 
-    def greet :String {
-      "Hello, I'm " + @name
-    }
+    def greet: String = "Hello, I'm " + this.name
 }
 ```
 
@@ -30,32 +28,30 @@ class Person {
 Instantiate objects with the `new` keyword:
 
 ```onion
-def person :Person = new Person("Alice", 30)
+val person: Person = new Person("Alice", 30)
 IO::println(person.greet())  // "Hello, I'm Alice"
 ```
 
-## Member Variables
+## Fields
 
-### Instance Variables
+### Instance Fields
 
-Instance variables are prefixed with `@`:
+Declare instance fields with `val` (immutable) or `var` (mutable), and access them via `this.field`:
 
 ```onion
 class Counter {
-  @count :Int
+  var count: Int
 
   public:
-    def new {
-      @count = 0
+    def this {
+      this.count = 0
     }
 
     def increment {
-      @count = @count + 1
+      this.count = this.count + 1
     }
 
-    def getCount :Int {
-      @count
-    }
+    def getCount: Int = this.count
 }
 ```
 
@@ -65,24 +61,23 @@ Members are **private by default**. Use `public:` to mark public members:
 
 ```onion
 class BankAccount {
-  @balance :Double  // Private (default)
-  @accountNumber :String  // Private
+  var balance: Double  // Private (default)
+  val accountNumber: String  // Private
 
   public:
-    @owner :String  // Public
+    val owner: String  // Public
 
-    def new(owner :String, initial :Double) {
-      @owner = owner
-      @balance = initial
+    def this(owner: String, initial: Double) {
+      this.owner = owner
+      this.balance = initial
+      this.accountNumber = "UNKNOWN"
     }
 
     def deposit(amount :Double) {  // Public method
-      @balance = @balance + amount
+      this.balance = this.balance + amount
     }
 
-    def getBalance :Double {  // Public method
-      @balance
-    }
+    def getBalance: Double = this.balance  // Public method
 }
 ```
 
@@ -92,42 +87,38 @@ Static members belong to the class, not instances:
 
 ```onion
 class MathUtils {
-  static @PI :Double = 3.14159
+  static val PI: Double = 3.14159
 
   public:
-    static def square(x :Double) :Double {
-      x * x
-    }
+    static def square(x: Double): Double = x * x
 
-    static def circleArea(radius :Double) :Double {
-      MathUtils::PI * radius * radius
-    }
+    static def circleArea(radius: Double): Double = MathUtils::PI * radius * radius
 }
 
 // Access static members with ::
-def pi :Double = MathUtils::PI
-def area :Double = MathUtils::circleArea(5.0)
+val pi: Double = MathUtils::PI
+val area: Double = MathUtils::circleArea(5.0)
 ```
 
 ## Constructors
 
 ### Default Constructor
 
-Define constructors with `def new`:
+Define constructors with `def this`:
 
 ```onion
 class Point {
-  @x :Int
-  @y :Int
+  val x: Int
+  val y: Int
 
   public:
-    def new(x :Int, y :Int) {
-      @x = x
-      @y = y
+    def this(x: Int, y: Int) {
+      this.x = x
+      this.y = y
     }
 }
 
-def point :Point = new Point(10, 20)
+val point: Point = new Point(10, 20)
 ```
 
 ### Multiple Constructors
@@ -136,47 +127,34 @@ Overload constructors for different initialization patterns:
 
 ```onion
 class Rectangle {
-  @width :Int
-  @height :Int
+  val width: Int
+  val height: Int
 
   public:
-    def new {
-      @width = 0
-      @height = 0
+    def this {
+      this.width = 0
+      this.height = 0
     }
 
-    def new(size :Int) {
-      @width = size
-      @height = size
+    def this(size: Int) {
+      this.width = size
+      this.height = size
     }
 
-    def new(w :Int, h :Int) {
-      @width = w
-      @height = h
+    def this(w: Int, h: Int) {
+      this.width = w
+      this.height = h
     }
 }
 
-def rect1 :Rectangle = new Rectangle()
-def rect2 :Rectangle = new Rectangle(10)
-def rect3 :Rectangle = new Rectangle(10, 20)
+val rect1: Rectangle = new Rectangle()
+val rect2: Rectangle = new Rectangle(10)
+val rect3: Rectangle = new Rectangle(10, 20)
 ```
 
-### Named Constructors
+### Calling Super Constructors
 
-Use special syntax for named constructors:
-
-```onion
-class Window {
-  @title :String
-
-  public:
-    def this:(title :String) {
-      @title = title
-    }
-}
-
-def window :Window = new Window("My Window")
-```
+To call a superclass constructor, add a super-initializer list: `def this(args): (superArgs) { ... }`.
 
 ## Methods
 
@@ -186,23 +164,19 @@ Methods that operate on instance data:
 
 ```onion
 class Circle {
-  @radius :Double
+  val radius: Double
 
   public:
-    def new(r :Double) {
-      @radius = r
+    def this(r: Double) {
+      this.radius = r
     }
 
-    def area :Double {
-      3.14159 * @radius * @radius
-    }
+    def area: Double = 3.14159 * this.radius * this.radius
 
-    def circumference :Double {
-      2.0 * 3.14159 * @radius
-    }
+    def circumference: Double = 2.0 * 3.14159 * this.radius
 }
 
-def circle :Circle = new Circle(5.0)
+val circle: Circle = new Circle(5.0)
 IO::println("Area: " + circle.area())
 ```
 
@@ -226,7 +200,7 @@ class Printer {
     }
 }
 
-def printer :Printer = new Printer
+val printer: Printer = new Printer
 printer.print(42)
 printer.print("Hello")
 printer.print(3.14)
@@ -236,25 +210,21 @@ printer.print(3.14)
 
 ```onion
 class Person {
-  @name :String
-  @age :Int
+  var name: String
+  var age: Int
 
   public:
-    def getName :String {
-      @name
-    }
+    def getName: String = this.name
 
     def setName(name :String) {
-      @name = name
+      this.name = name
     }
 
-    def getAge :Int {
-      @age
-    }
+    def getAge: Int = this.age
 
     def setAge(age :Int) {
       if age >= 0 {
-        @age = age
+        this.age = age
       }
     }
 }
@@ -267,13 +237,14 @@ Access the current instance with `self`:
 ```onion
 import {
   javax.swing.JButton;
+  java.awt.event.ActionEvent;
   java.awt.event.ActionListener;
 }
 
 class ButtonHandler <: ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
-      def button :JButton = event.getSource()$JButton
+      val button: JButton = event.getSource()$JButton
       button.addActionListener(self)  // Reference to this instance
     }
 }

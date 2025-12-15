@@ -9,7 +9,7 @@ Onion provides several control flow constructs for conditionals, loops, and patt
 Basic conditional execution:
 
 ```onion
-def age :Int = 18
+val age: Int = 18
 
 if age >= 18 {
   IO::println("Adult")
@@ -23,7 +23,7 @@ if age >= 18 {
 Multiple conditions:
 
 ```onion
-def score :Int = 85
+val score: Int = 85
 
 if score >= 90 {
   IO::println("Grade: A")
@@ -48,11 +48,11 @@ import {
   java.io.InputStreamReader;
 }
 
-def reader :BufferedReader = new BufferedReader(
+val reader: BufferedReader = new BufferedReader(
   new InputStreamReader(System::in)
 )
 
-def line :String = null
+var line: String = null
 while (line = reader.readLine()) != null {
   IO::println("Read: " + line)
 }
@@ -65,7 +65,7 @@ while (line = reader.readLine()) != null {
 Execute while a condition is true:
 
 ```onion
-def count :Int = 0
+var count: Int = 0
 while count < 5 {
   IO::println("Count: " + count)
   count = count + 1
@@ -86,7 +86,7 @@ Count: 4
 Traditional C-style for loop:
 
 ```onion
-for i = 0; i < 10; i = i + 1 {
+for var i: Int = 0; i < 10; i = i + 1 {
   IO::println(i)
 }
 ```
@@ -98,7 +98,10 @@ Syntax: `for init; condition; update { body }`
 Iterate over arrays and collections:
 
 ```onion
-def fruits :String[] = ["apple", "banana", "cherry"]
+val fruits: String[] = new String[3]
+fruits[0] = "apple"
+fruits[1] = "banana"
+fruits[2] = "cherry"
 
 foreach fruit :String in fruits {
   IO::println("Fruit: " + fruit)
@@ -110,7 +113,7 @@ With collections:
 ```onion
 import { java.util.ArrayList; }
 
-def list :ArrayList = new ArrayList
+val list: ArrayList = new ArrayList
 list << "First"
 list << "Second"
 list << "Third"
@@ -127,7 +130,7 @@ foreach item :Object in list {
 Switch-style pattern matching with multiple values per case:
 
 ```onion
-def day :Int = 3
+val day: Int = 3
 
 select day {
   case 1:
@@ -152,7 +155,7 @@ select day {
 Group multiple values in a single case:
 
 ```onion
-def num :Int = (Math::random() * 10)$Int
+val num: Int = (Math::random() * 10)$Int
 
 select num {
   case 0, 1, 2, 3:
@@ -169,8 +172,8 @@ select num {
 ### Select with Expressions
 
 ```onion
-def score :Int = 85
-def grade :String = null
+val score: Int = 85
+var grade: String = null
 
 select score {
   case 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100:
@@ -193,7 +196,7 @@ IO::println("Grade: " + grade)
 Exit a loop early:
 
 ```onion
-def i :Int = 0
+var i: Int = 0
 while true {
   if i >= 5 {
     break
@@ -208,7 +211,7 @@ while true {
 Skip to the next iteration:
 
 ```onion
-for i = 0; i < 10; i = i + 1 {
+for var i: Int = 0; i < 10; i = i + 1 {
   if i % 2 == 0 {
     continue  // Skip even numbers
   }
@@ -227,10 +230,10 @@ Handle exceptions with try-catch blocks:
 ```onion
 import { java.lang.NumberFormatException; }
 
-def input :String = "not a number"
+val input: String = "not a number"
 
 try {
-  def number :Int = JInteger::parseInt(input)
+  val number: Int = JInteger::parseInt(input)
   IO::println("Parsed: " + number)
 } catch e :NumberFormatException {
   IO::println("Invalid number: " + e.getMessage())
@@ -247,7 +250,7 @@ import {
 }
 
 try {
-  def reader :FileReader = new FileReader("file.txt")
+  val reader: FileReader = new FileReader("file.txt")
   // Use reader...
 } catch e :FileNotFoundException {
   IO::println("File not found: " + e.getMessage())
@@ -260,7 +263,7 @@ try {
 
 ```onion
 try {
-  def result :Int = 10 / 0
+  val result: Int = 10 / 0
 } catch e :ArithmeticException {
   IO::println("Error: " + e.getMessage())
   IO::println("Type: " + e.getClass().getName())
@@ -284,7 +287,7 @@ def processData(data :String) :Int {
   }
 
   // Process data...
-  data.length()
+  return data.length()
 }
 ```
 
@@ -299,7 +302,7 @@ def divide(a :Int, b :Int) :Int {
     return 0
   }
 
-  a / b
+  return a / b
 }
 ```
 

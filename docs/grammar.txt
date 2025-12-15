@@ -1,82 +1,116 @@
-The followings are the grammar of Onion programming language like EBNF:
+The following is an informal EBNF-style sketch of Onion’s current grammar.
+For the authoritative grammar, see `grammar/JJOnionParser.jj`.
 
-block_comment     ::= '/*' ([^*])*  '*' ('*' | ([^*/] ([^*])* '*'))* '/'
-line_comment      ::= '//' ([^\r\n])*
-shell_comment     ::= '#!' ([^\r\n])*
+block_comment        ::= '/*' ... '*/'
+line_comment         ::= '//' ... EOL
+shell_comment        ::= '#!' ... EOL
 
-compile_unit      ::= module? import? (
-                       'class' | 'interface' | 'statement' | 'function' | 'global_var'
-                      )+
-module            ::= 'module' id (. id)* ;
-import            ::= 'import' { (id (. id)+ ; | id = id (. id)+ ;)* }
-                
-access            ::= 'public' | 'protected' | 'private'
-modifier          ::= 'final' | 'internal' | 'volatile' | 'synchronized' | 'static' | 'inherited'
+compile_unit         ::= module_decl? import_decl? top_level+ EOF
+top_level            ::= statement
+                       | modifiers? (class_decl | interface_decl | record_decl | function_decl | global_var_decl)
 
-type              ::= primitive | id | '#<' id (. id)* '>' | type ('[]')+
-primitive         ::= 'Byte' | 'Short' | 'Char' | 'Int' | 'Long' | 'Float' | 'Double' | 'Boolean' | 'Unit'
+module_decl          ::= 'module' id ('.' id)* eos
 
-class             ::= modifier* 'class' id (':' type)? ('<:' type (, type)*)? {
-                       (field | delegated_field | method | constructor)*
-                       (access : (field | delegated_field | method | constructor)*)*
-                     }
-interface         ::= modifier* 'interface' id ('<:' type (, type)*)? {
-                        (id ('(' (var_decl (, var_decl)*)? ')')? (: type)? ;)*
-                      }
-                    
-field             ::= modifier* ('val' | 'var') id : type [= expression] ;
-delegated_field   ::= modifier* 'forward' ('val' | 'var') id : type [= expression] ;
-method            ::= ['def'] modifier* id ( '(' (arg_list)? ')' )? (: type)? (; | block)
-constructor       ::= modifier* new ( '(' (arg_list)? ')' )? (: '(' [expression_list] ')' )? block
-function          ::= modifier* def id ( '(' (arg_list)? ')' )? (: type)? block
-global_var        ::= modifier* ('val' | 'var') id : type (= expression)? ;
-local_var         ::= ('val' | 'var') id : type (= expression)? ;
+import_decl           ::= 'import' '{' import_item* '}'
+import_item           ::= (alias_import | wildcard_import) eos
+alias_import          ::= id '=' fqcn
+wildcard_import       ::= fqcn ('.' '*')?
 
-statement         ::= 'if' expression block [else block]
-                    | 'select' expression { (case expr_list block)* [else block] } 
-                    | 'while' expression block 
-                    | 'for' (local_var | expression_stmt) expression ; [expr] block
-                    | 'foreach' var_decl 'in' expression block
-                    | 'synchronized' expression block
-                    | 'try' block ('rec' id : type block)* 'fin' block
-                    | 'break' ;
-                    | 'continue' ;
-                    | 'return' [expression] ; 
-                    | 'throw' expression ;
-                    | { statement* } 
-                    | ';'
-                    | expression ;
-                    | var_decl
-                    | local_var ;
+access               ::= 'public' | 'protected' | 'private'
+modifier              ::= 'final' | 'internal' | 'volatile' | 'synchronized' | 'static' | 'inherited'
+modifiers             ::= modifier*
 
-arg_list          ::= id : type (, id : type)*
-                                    
-expression        ::= expression binary_op expression 
-                    | expression assign_op expression 
-                    | unary_op expression 
-                    | expression ( . id ( '(' (expr_list)? ')' )? )* 
-                    | 'new' type '[' expression_list ']'
-                    | 'new' type ( '(' (expression_list)? ')' )?
-                    | type '::' id ( '(' (expression_list)? ')' )? 
-                    | expression ('[' expression ']')* 
-                    | '(' expression ')' 
-                    | id  ( '(' (expression_list)? ')' )? 
-                    | expression 'is' type 
-                    | expression $ type
-                    | # type . id ( '(' [arg_list] ')' )? block
-                    | '[' (expression_list)? ']'
-                    | 'this' 
-                    | 'true'
-                    | 'false'
-                    | 'null'
-                    | <integer_literal>
-                    | <float_literal
-                    | <character_literal
-                    | <string_literal
-                    | <list_literal>
-                 
-expression_list   ::= expression (, expression)*
-unary_op          ::= ! | - | + | ~
-binary_op         ::= + | - | * | / | % | << || >> | >>> | ^ | & | '|' | < | > | <= | >= | == | != | === | !== | '||' | &&
-assign_op         ::= = | += | -= | *= | /= | %=
-id                ::= ([a-z] | [A-Z] | _) ([a-z] | [A-Z] | [0-9] | _)*
+primitive             ::= 'Byte' | 'Short' | 'Char' | 'Int' | 'Long' | 'Float' | 'Double' | 'Boolean' | 'Void'
+
+type                  ::= ['+'] (function_type | raw_or_param_type) array_suffix*
+function_type         ::= '(' [type (',' type)*] ')' '->' type
+raw_or_param_type     ::= raw_type [type_arguments]
+raw_type              ::= primitive | id | fqcn
+type_arguments         ::= '[' type (',' type)* ']'
+array_suffix          ::= '[]'
+
+type_params           ::= '[' type_param (',' type_param)* ']'
+type_param            ::= id ['extends' type]
+
+class_decl            ::= modifiers 'class' id type_params? [':' type]
+                         ['<:' type (',' type)*]
+                         '{' default_section? access_section* '}'
+interface_decl        ::= modifiers 'interface' id type_params?
+                         ['<:' type (',' type)*]
+                         '{' interface_method_sig* '}'
+record_decl           ::= modifiers 'record' id '(' args? ')'
+
+default_section       ::= member_decl*
+access_section        ::= access ':' (modifiers? member_decl)*
+
+member_decl           ::= field_decl
+                       | delegated_field_decl
+                       | method_decl
+                       | constructor_decl
+
+field_decl            ::= modifiers ('val' | 'var') id ':' type ['=' term] eos
+delegated_field_decl  ::= modifiers 'forward' ('val' | 'var') id ':' type ['=' term] eos
+
+method_decl           ::= 'def' modifiers id type_params?
+                         ['(' args? ')'] [':' return_type]
+                         (block | '=' term eos | eos)
+constructor_decl      ::= 'def' modifiers 'this'
+                         ['(' args? ')'] [':' '(' terms? ')'] block
+
+function_decl         ::= modifiers 'def' id type_params?
+                         ['(' args? ')'] [':' return_type]
+                         (block | '=' term eos | eos)
+global_var_decl       ::= modifiers ('val' | 'var') id ':' type ['=' term] eos
+local_var_stmt        ::= ('val' | 'var') id ':' type ['=' term] eos
+
+args                  ::= argument (',' argument)*
+argument              ::= id ':' type
+return_type           ::= 'Void' | type
+
+statement             ::= block
+                       | if_stmt | select_stmt | while_stmt | for_stmt | foreach_stmt
+                       | try_stmt | synchronized_stmt
+                       | break_stmt | continue_stmt | return_stmt | throw_stmt
+                       | local_var_stmt
+                       | expr_stmt
+                       | ';'
+
+if_stmt               ::= 'if' term block ['else' block]
+select_stmt           ::= 'select' term '{' ('case' term (',' term)* ':' statements)* ['else' ':' statements] '}'
+while_stmt            ::= 'while' term block
+for_stmt              ::= 'for' (local_var_stmt | expr_stmt | ';') [term] ';' [term] block
+foreach_stmt          ::= 'foreach' argument 'in' term block
+try_stmt              ::= 'try' block ('catch' argument block)* ['finally' block]
+synchronized_stmt     ::= 'synchronized' [term] block
+return_stmt           ::= 'return' [term] eos
+throw_stmt            ::= 'throw' term eos
+break_stmt            ::= 'break' eos
+continue_stmt         ::= 'continue' eos
+expr_stmt             ::= term eos
+statements            ::= compound_statement*
+compound_statement    ::= statement | empty_statement
+empty_statement       ::= ';'
+
+term                  ::= assignable
+assignable            ::= logical_or [assign_op assignable]
+assign_op             ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
+
+expression            ::= ... (see parser for full precedence table)
+primary               ::= id
+                       | id type_arguments '(' terms? ')'
+                       | id '(' terms? ')'
+                       | type '::' id
+                       | type '::' id '(' terms? ')'
+                       | type '::' id type_arguments '(' terms? ')'
+                       | 'new' type ('[' terms? ']' | ['(' terms? ')'])
+                       | list_literal
+                       | '(' args? ')' '->' block
+                       | 'this' | 'self' | 'super'
+                       | literals
+
+list_literal          ::= '[' terms? ']'
+terms                 ::= term (',' term)*
+eos                   ::= ';' | NEWLINE+
+id                    ::= ([a-z] | [A-Z] | '_') ([a-z] | [A-Z] | [0-9] | '_')*
+fqcn                  ::= id ('.' id)+
+literals              ::= <INTEGER> | <FLOAT> | <CHAR> | <STRING> | 'true' | 'false' | 'null'

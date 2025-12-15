@@ -8,15 +8,15 @@ Basic lambda syntax:
 
 ```onion
 // Simple lambda
-def double = (x :Int) -> { return x * 2; }
+val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 IO::println(double.call(5))  // 10
 
 // Lambda with multiple parameters
-def add = (x :Int, y :Int) -> { return x + y; }
+val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 IO::println(add.call(3, 7))  // 10
 
 // Lambda with no parameters
-def greet = () -> { IO::println("Hello!") }
+val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
 greet.call()
 ```
 
@@ -32,19 +32,19 @@ import {
   java.io.StringReader;
 }
 
-def i :Int = 0
-def filter = (line :String) -> {
+var i: Int = 0
+val filter: (String) -> String = (line: String) -> {
   i = i + 1
   return line + " (" + i + ")";
 }
 
-def reader :BufferedReader = new BufferedReader(
+val reader: BufferedReader = new BufferedReader(
   new StringReader("First\nSecond\nThird")
 )
 
-def line :String = null
+var line: String = null
 while (line = reader.readLine()) != null {
-  IO::println(filter.call(line)$String)
+  IO::println(filter.call(line))
 }
 ```
 
@@ -65,16 +65,16 @@ Third (3)
 Creating multiple independent counters:
 
 ```onion
-def makeCounter {
-  def count :Int = 0
-  () -> {
+def makeCounter(): () -> Int {
+  var count: Int = 0
+  return () -> {
     count = count + 1
     return count;
-  }
+  };
 }
 
-def counter1 = makeCounter()
-def counter2 = makeCounter()
+val counter1: () -> Int = makeCounter()
+val counter2: () -> Int = makeCounter()
 
 IO::println(counter1.call())  // 1
 IO::println(counter1.call())  // 2
@@ -89,11 +89,7 @@ Each counter maintains its own `count` variable.
 
 **File: `Factorial.on`**
 ```onion
-import {
-  java.io.BufferedReader;
-  java.io.InputStreamReader;
-  java.lang.NumberFormatException;
-}
+import { java.lang.NumberFormatException; }
 
 def fact(n :Int) :Int {
   if n < 0 {
@@ -103,18 +99,14 @@ def fact(n :Int) :Int {
   if n == 0 {
     return 1
   }
-  n * fact(n - 1)
+  return n * fact(n - 1)
 }
 
-def reader :BufferedReader = new BufferedReader(
-  new InputStreamReader(System::in)
-)
-
-def line :String = null
-while (line = IO::input("Enter number: ")) != null {
+var line: String = null
+while (line = IO::readln("Enter number: ")) != null {
   try {
-    def value :Int = JInteger::parseInt(line)
-    def result :Int = fact(value)
+    val value: Int = JInteger::parseInt(line)
+    val result: Int = fact(value)
     IO::println("Factorial: " + result)
   } catch e :NumberFormatException {
     IO::println("Invalid number")
@@ -143,12 +135,12 @@ def countLines(file :File) :Int {
   }
 
   if file.isDirectory() {
-    def total :Int = 0
-    def files :File[] = file.listFiles()
+    var total: Int = 0
+    val files: File[] = file.listFiles()
 
     if files != null {
       foreach f :File in files {
-        total = total + countLines(f$File)
+        total = total + countLines(f)
       }
     }
 
@@ -159,24 +151,24 @@ def countLines(file :File) :Int {
     return 0
   }
 
-  def reader :BufferedReader = new BufferedReader(
+  val reader: BufferedReader = new BufferedReader(
     new FileReader(file)
   )
 
-  def count :Int = 0
-  def line :String = null
+  var count: Int = 0
+  var line: String = null
   while (line = reader.readLine()) != null {
     count = count + 1
   }
 
   reader.close()
   IO::println(file.name + ": " + count)
-  count
+  return count
 }
 
 // Usage
-def dir :File = new File("src")
-def total :Int = countLines(dir)
+val dir: File = new File("src")
+val total: Int = countLines(dir)
 IO::println("Total lines: " + total)
 ```
 
@@ -190,23 +182,25 @@ IO::println("Total lines: " + total)
 Higher-order function that filters a list:
 
 ```onion
-import { java.util.ArrayList; }
+import {
+  java.util.ArrayList;
+  java.util.List;
+}
 
-def filter(items :String[], predicate :Function1) :ArrayList {
-  def result :ArrayList = new ArrayList
+def filter(items: List, predicate: (String) -> Boolean): ArrayList {
+  val result: ArrayList = new ArrayList
 
-  foreach item :String in items {
-    def keep :Boolean = predicate.call(item)$Boolean
-    if keep {
+  foreach item: String in items {
+    if predicate.call(item) {
       result << item
     }
   }
 
-  result
+  return result
 }
 
 // Usage
-def logs :String[] = [
+val logs: List = [
   "INFO: Started",
   "ERROR: Failed",
   "INFO: Processing",
@@ -214,12 +208,12 @@ def logs :String[] = [
   "INFO: Complete"
 ]
 
-def isError = (line :String) -> { return line.startsWith("ERROR"); }
+val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
-def errors :ArrayList = filter(logs, isError)
+val errors: ArrayList = filter(logs, isError)
 
-foreach error :Object in errors {
-  IO::println(error$String)
+foreach error: String in errors {
+  IO::println(error)
 }
 ```
 
@@ -236,25 +230,24 @@ Transform each element in a collection:
 ```onion
 import { java.util.ArrayList; }
 
-def map(items :String[], transform :Function1) :ArrayList {
-  def result :ArrayList = new ArrayList
+def map(items: java.util.List, transform: (String) -> String): ArrayList {
+  val result: ArrayList = new ArrayList
 
-  foreach item :String in items {
-    def transformed :String = transform.call(item)$String
-    result << transformed
+  foreach item: String in items {
+    result << transform.call(item)
   }
 
-  result
+  return result
 }
 
 // Usage
-def words :String[] = ["hello", "world", "onion"]
-def toUpper = (s :String) -> { return s.toUpperCase(); }
+val words: java.util.List = ["hello", "world", "onion"]
+val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
 
-def upper :ArrayList = map(words, toUpper)
+val upper: ArrayList = map(words, toUpper)
 
-foreach word :Object in upper {
-  IO::println(word$String)
+foreach word: String in upper {
+  IO::println(word)
 }
 ```
 
@@ -270,25 +263,27 @@ ONION
 Accumulate values:
 
 ```onion
-def reduce(items :Int[], operation :Function2, initial :Int) :Int {
-  def accumulator :Int = initial
+import { java.util.List; }
 
-  foreach item :Int in items {
-    accumulator = operation.call(accumulator, item)$Int
+def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
+  var accumulator: Int = initial
+
+  foreach item: Int in items {
+    accumulator = operation.call(accumulator, item)
   }
 
-  accumulator
+  return accumulator
 }
 
 // Sum
-def numbers :Int[] = [1, 2, 3, 4, 5]
-def sum = (acc :Int, n :Int) -> { return acc + n; }
-def total :Int = reduce(numbers, sum, 0)
+val numbers: List = [1, 2, 3, 4, 5]
+val sum: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc + n; }
+val total: Int = reduce(numbers, sum, 0)
 IO::println("Sum: " + total)  // 15
 
 // Product
-def product = (acc :Int, n :Int) -> { return acc * n; }
-def result :Int = reduce(numbers, product, 1)
+val product: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc * n; }
+val result: Int = reduce(numbers, product, 1)
 IO::println("Product: " + result)  // 120
 ```
 
@@ -297,18 +292,18 @@ IO::println("Product: " + result)  // 120
 Combine multiple operations:
 
 ```onion
-def compose(f :Function1, g :Function1) :Function1 {
-  (x :Object) -> { return f.call(g.call(x)); }
+def compose(f: (Int) -> Int, g: (Int) -> Int): (Int) -> Int {
+  return (x: Int) -> { return f.call(g.call(x)); }
 }
 
 // Define functions
-def addTen = (x :Int) -> { return x + 10; }
-def double = (x :Int) -> { return x * 2; }
+val addTen: (Int) -> Int = (x: Int) -> { return x + 10; }
+val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 
 // Compose: double then add 10
-def composed = compose(addTen, double)
+val composed: (Int) -> Int = compose(addTen, double)
 
-IO::println(composed.call(5)$Int)  // (5 * 2) + 10 = 20
+IO::println(composed.call(5))  // (5 * 2) + 10 = 20
 ```
 
 ## Currying
@@ -316,15 +311,13 @@ IO::println(composed.call(5)$Int)  // (5 * 2) + 10 = 20
 Transform multi-parameter functions:
 
 ```onion
-def add(x :Int) :Function1 {
-  (y :Int) -> { return x + y; }
-}
+def add(x: Int): (Int) -> Int = (y: Int) -> { return x + y; }
 
-def add5 = add(5)
-def add10 = add(10)
+val add5: (Int) -> Int = add(5)
+val add10: (Int) -> Int = add(10)
 
-IO::println(add5.call(3)$Int)   // 8
-IO::println(add10.call(3)$Int)  // 13
+IO::println(add5.call(3))   // 8
+IO::println(add10.call(3))  // 13
 ```
 
 ## Practical: Log Analyzer
@@ -339,25 +332,25 @@ import {
 }
 
 def analyzeLog(filename :String) {
-  def reader :BufferedReader = new BufferedReader(
+  val reader: BufferedReader = new BufferedReader(
     new FileReader(filename)
   )
 
-  def errorCount :Int = 0
-  def warningCount :Int = 0
-  def infoCount :Int = 0
+  var errorCount: Int = 0
+  var warningCount: Int = 0
+  var infoCount: Int = 0
 
-  def isError = (line :String) -> { return line.startsWith("ERROR"); }
-  def isWarning = (line :String) -> { return line.startsWith("WARNING"); }
-  def isInfo = (line :String) -> { return line.startsWith("INFO"); }
+  val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
+  val isWarning: (String) -> Boolean = (line: String) -> { return line.startsWith("WARNING"); }
+  val isInfo: (String) -> Boolean = (line: String) -> { return line.startsWith("INFO"); }
 
-  def line :String = null
+  var line: String = null
   while (line = reader.readLine()) != null {
-    if isError.call(line)$Boolean {
+    if isError.call(line) {
       errorCount = errorCount + 1
-    } else if isWarning.call(line)$Boolean {
+    } else if isWarning.call(line) {
       warningCount = warningCount + 1
-    } else if isInfo.call(line)$Boolean {
+    } else if isInfo.call(line) {
       infoCount = infoCount + 1
     }
   }

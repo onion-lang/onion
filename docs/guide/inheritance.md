@@ -10,54 +10,48 @@ Use `:` to extend a parent class:
 
 ```onion
 class Animal {
-  @name :String
+protected:
+  val name: String
 
   public:
-    def new(n :String) {
-      @name = n
+    def this(n: String) {
+      this.name = n
     }
 
-    def speak :String {
-      "Some sound"
-    }
+    def speak: String = "Some sound"
 }
 
 class Dog : Animal {
   public:
-    def new(n :String) {
-      super.new(n)
-    }
+    def this(n: String): (n) { }
 
-    def speak :String {
-      "Woof!"
-    }
+    def speak: String = "Woof!"
 }
 
-def dog :Dog = new Dog("Buddy")
+val dog: Dog = new Dog("Buddy")
 IO::println(dog.speak())  // "Woof!"
 ```
 
 ### Calling Parent Constructor
 
-Use `super.new()` to call the parent constructor:
+Call the parent constructor via the super-initializer list on `def this`:
 
 ```onion
 class Vehicle {
-  @brand :String
+  val brand: String
 
   public:
-    def new(b :String) {
-      @brand = b
+    def this(b: String) {
+      this.brand = b
     }
 }
 
 class Car : Vehicle {
-  @model :String
+  val model: String
 
   public:
-    def new(b :String, m :String) {
-      super.new(b)  // Call parent constructor
-      @model = m
+    def this(b: String, m: String): (b) {
+      this.model = m
     }
 }
 ```
@@ -69,30 +63,22 @@ Child classes can override parent methods:
 ```onion
 class Shape {
   public:
-    def area :Double {
-      0.0
-    }
+    def area: Double = 0.0
 
-    def describe :String {
-      "A shape"
-    }
+    def describe: String = "A shape"
 }
 
 class Circle : Shape {
-  @radius :Double
+  val radius: Double
 
   public:
-    def new(r :Double) {
-      @radius = r
+    def this(r: Double) {
+      this.radius = r
     }
 
-    def area :Double {  // Override
-      3.14159 * @radius * @radius
-    }
+    def area: Double = 3.14159 * this.radius * this.radius  // Override
 
-    def describe :String {  // Override
-      "A circle with radius " + @radius
-    }
+    def describe: String = "A circle with radius " + this.radius  // Override
 }
 ```
 
@@ -106,25 +92,25 @@ Use `<:` to implement an interface:
 import { java.lang.Comparable; }
 
 class Person <: Comparable {
-  @name :String
-  @age :Int
+  val name: String
+  val age: Int
 
   public:
-    def new(n :String, a :Int) {
-      @name = n
-      @age = a
+    def this(n: String, a: Int) {
+      this.name = n
+      this.age = a
     }
 
-    def compareTo(other :Object) :Int {
-      def otherPerson :Person = other$Person
-      @age - otherPerson.@age
+    def compareTo(other: Object): Int {
+      val otherPerson: Person = other$Person
+      return this.age - otherPerson.age
     }
 }
 ```
 
 ### Multiple Interfaces
 
-Implement multiple interfaces with additional `<:` declarations:
+Implement multiple interfaces with a comma-separated list:
 
 ```onion
 import {
@@ -132,19 +118,19 @@ import {
   java.lang.Comparable;
 }
 
-class Student <: Serializable <: Comparable {
-  @id :Int
-  @name :String
+class Student <: Serializable, Comparable {
+  val id: Int
+  val name: String
 
   public:
-    def new(i :Int, n :String) {
-      @id = i
-      @name = n
+    def this(i: Int, n: String) {
+      this.id = i
+      this.name = n
     }
 
-    def compareTo(other :Object) :Int {
-      def otherStudent :Student = other$Student
-      @id - otherStudent.@id
+    def compareTo(other: Object): Int {
+      val otherStudent: Student = other$Student
+      return this.id - otherStudent.id
     }
 }
 ```
@@ -161,11 +147,12 @@ import {
 }
 
 class Calculator : JFrame <: ActionListener {
-  @result :Long
+  var result: Long
 
   public:
-    def new {
+    def this {
       // JFrame constructor
+      this.result = 0L
     }
 
     def actionPerformed(event :ActionEvent) {
@@ -177,7 +164,7 @@ class Calculator : JFrame <: ActionListener {
 
 Syntax:
 ```onion
-class Child : ParentClass <: Interface1 <: Interface2 {
+class Child : ParentClass <: Interface1, Interface2 {
   // ...
 }
 ```
@@ -227,26 +214,20 @@ Child objects can be assigned to parent variables:
 ```onion
 class Animal {
   public:
-    def speak :String {
-      "Generic sound"
-    }
+    def speak: String = "Generic sound"
 }
 
 class Dog : Animal {
   public:
-    def speak :String {
-      "Woof!"
-    }
+    def speak: String = "Woof!"
 }
 
 class Cat : Animal {
   public:
-    def speak :String {
-      "Meow!"
-    }
+    def speak: String = "Meow!"
 }
 
-def animals :Animal[] = new Animal[3]
+val animals: Animal[] = new Animal[3]
 animals[0] = new Dog
 animals[1] = new Cat
 animals[2] = new Animal
@@ -269,11 +250,11 @@ import {
   java.util.LinkedList;
 }
 
-def list1 :List = new ArrayList  // ArrayList implements List
-def list2 :List = new LinkedList  // LinkedList implements List
+val list1: List = new ArrayList  // ArrayList implements List
+val list2: List = new LinkedList  // LinkedList implements List
 
-def lists :List[] = [list1, list2]
-foreach list :List in lists {
+val lists: java.util.List = [list1, list2]
+foreach list: List in lists {
   list.add("Item")
   IO::println("Size: " + list.size())
 }
@@ -289,19 +270,18 @@ Onion currently has limited support for abstract method validation. Abstract met
 // Abstract pattern (not fully enforced)
 class AbstractShape {
   public:
-    def area :Double {
-      // Should be overridden by subclasses
-      0.0
-    }
+    def area: Double = 0.0  // Should be overridden by subclasses
 }
 
 class Circle : AbstractShape {
-  @radius :Double
+  val radius: Double
 
   public:
-    def area :Double {
-      3.14159 * @radius * @radius
+    def this(r: Double) {
+      this.radius = r
     }
+
+    def area: Double = 3.14159 * this.radius * this.radius
 }
 ```
 
@@ -357,7 +337,7 @@ class Parent {
       if value < 0 {
         return 0
       }
-      value * 2
+      return value * 2
     }
 }
 
@@ -368,7 +348,7 @@ class Child : Parent {
       if value < 0 {
         return 0
       }
-      value * 3  // Different implementation, same contract
+      return value * 3  // Different implementation, same contract
     }
 }
 ```

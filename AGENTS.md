@@ -13,7 +13,7 @@
 - `sbt "testOnly onion.compiler.tools.FunctionTypeSpec"` – run a focused spec while iterating.
 - `sbt run` – run `onion.tools.CompilerFrontend` (main entrypoint).
 - `sbt runScript -- run/Hello.on [args…]` – compile+run a script via `ScriptRunner`.
-- `sbt dist` – build a distributable zip under `target/dist` (includes `bin/`, `run/`, and `onion.jar`).
+- `sbt onion-dist` – build a distributable zip under `target/dist` (includes `bin/`, `run/`, and `onion.jar`).
 
 ## Coding Style & Naming Conventions
 - Use 2-space indentation and the existing braced style; keep names `camelCase` (methods/vals) and `PascalCase` (types).

@@ -4,16 +4,16 @@ This guide covers the essential features of Onion to get you productive quickly.
 
 ## Variables and Types
 
-Onion is statically typed with type inference:
+Onion is statically typed and requires explicit type annotations for `val` / `var` declarations:
 
 ```onion
 // Type annotation
-def name :String = "Alice"
-def age :Int = 30
-def price :Double = 19.99
+val name: String = "Alice"
+val age: Int = 30
+val price: Double = 19.99
 
 // Type inference (coming in future versions)
-def count = 42  // Inferred as Int
+val count = 42  // Inferred as Int
 ```
 
 ## Control Flow
@@ -21,7 +21,7 @@ def count = 42  // Inferred as Int
 ### If-Else
 
 ```onion
-def x :Int = 10
+val x: Int = 10
 
 if x > 5 {
   IO::println("x is greater than 5")
@@ -33,7 +33,7 @@ if x > 5 {
 ### While Loop
 
 ```onion
-def i :Int = 0
+var i: Int = 0
 while i < 5 {
   IO::println(i)
   i = i + 1
@@ -43,7 +43,7 @@ while i < 5 {
 ### For Loop
 
 ```onion
-for i = 0; i < 10; i = i + 1 {
+for var i: Int = 0; i < 10; i = i + 1 {
   IO::println("Count: " + i)
 }
 ```
@@ -51,8 +51,8 @@ for i = 0; i < 10; i = i + 1 {
 ### Foreach Loop
 
 ```onion
-def names :String[] = ["Alice", "Bob", "Charlie"]
-foreach name :String in names {
+val names: java.util.List = ["Alice", "Bob", "Charlie"]
+foreach name: String in names {
   IO::println("Hello, " + name)
 }
 ```
@@ -60,7 +60,7 @@ foreach name :String in names {
 ### Select Statement (Pattern Matching)
 
 ```onion
-def score :Int = 85
+val score: Int = 85
 
 select score {
   case 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100:
@@ -79,11 +79,9 @@ select score {
 ### Basic Function
 
 ```onion
-def greet(name :String) :String {
-  "Hello, " + name + "!"
-}
+def greet(name: String): String = "Hello, " + name + "!"
 
-def message :String = greet("World")
+val message: String = greet("World")
 IO::println(message)
 ```
 
@@ -91,18 +89,16 @@ IO::println(message)
 
 ```onion
 // Lambda syntax: (params) -> { body }
-def add = (x :Int, y :Int) -> { return x + y; }
+val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
-def result :Int = add.call(5, 3)  // 8
+val result: Int = add.call(5, 3)  // 8
 IO::println(result)
 ```
 
 ### Function with Multiple Parameters
 
 ```onion
-def multiply(a :Int, b :Int) :Int {
-  a * b
-}
+def multiply(a: Int, b: Int): Int = a * b
 
 IO::println(multiply(6, 7))  // 42
 ```
@@ -113,12 +109,14 @@ IO::println(multiply(6, 7))  // 42
 
 ```onion
 // Fixed-size array
-def numbers :Int[] = new Int[5]
+val numbers: Int[] = new Int[5]
 numbers[0] = 10
 numbers[1] = 20
 
-// Array literal
-def colors :String[] = ["red", "green", "blue"]
+val colors: String[] = new String[3]
+colors[0] = "red"
+colors[1] = "green"
+colors[2] = "blue"
 
 // Iterate over array
 foreach color :String in colors {
@@ -133,7 +131,7 @@ import {
   java.util.ArrayList;
 }
 
-def list :ArrayList = new ArrayList
+val list: ArrayList = new ArrayList
 list << "First"   // << is the append operator
 list << "Second"
 list << "Third"
@@ -148,29 +146,27 @@ IO::println(list[0])     // "First"
 
 ```onion
 class Person {
-  @name :String
-  @age :Int
+  val name: String
+  var age: Int
 
   public:
-    def new(n :String, a :Int) {
-      @name = n
-      @age = a
+    def this(n: String, a: Int) {
+      this.name = n
+      this.age = a
     }
 
-    def greet :String {
-      "Hello, I'm " + @name
-    }
+    def greet: String = "Hello, I'm " + this.name
 }
 
-def person :Person = new Person("Alice", 30)
+val person: Person = new Person("Alice", 30)
 IO::println(person.greet)
 ```
 
 Key points:
-- `@name` denotes instance variables (members)
+- Fields are accessed via `this.field`
 - Members are private by default
 - Use `public:` to mark public members
-- `def new` is the constructor
+- `def this` declares a constructor
 
 ### Inheritance
 
@@ -181,19 +177,11 @@ import {
 }
 
 class MyList <: List {
-  @internal :ArrayList
+  forward val internal: List;
 
   public:
-    def new {
-      @internal = new ArrayList
-    }
-
-    def add(item :Object) :Boolean {
-      @internal.add(item)
-    }
-
-    def size :Int {
-      @internal.size
+    def this {
+      this.internal = new ArrayList;
     }
 }
 ```
@@ -214,11 +202,11 @@ import {
   javax.swing.JButton;
 }
 
-def frame :JFrame = new JFrame("My Window")
+val frame: JFrame = new JFrame("My Window")
 frame.setSize(400, 300)
 frame.setVisible(true)
 
-def file :File = new File("data.txt")
+val file: File = new File("data.txt")
 if file.exists {
   IO::println("File exists!")
 }
@@ -228,22 +216,22 @@ if file.exists {
 
 ```onion
 // Math operations
-def random :Double = Math::random()
-def sqrt :Double = Math::sqrt(16.0)
+val random: Double = Math::random()
+val sqrt: Double = Math::sqrt(16.0)
 
 // String operations
-def upper :String = "hello".toUpperCase()
-def length :Int = "hello".length
+val upper: String = "hello".toUpperCase()
+val length: Int = "hello".length
 
 // Parsing
-def num :Int = JInteger::parseInt("42")
+val num: Int = JInteger::parseInt("42")
 ```
 
 ## Exception Handling
 
 ```onion
 try {
-  def value :Int = JInteger::parseInt("not a number")
+  val value: Int = JInteger::parseInt("not a number")
   IO::println(value)
 } catch e :NumberFormatException {
   IO::println("Invalid number format: " + e.getMessage)
@@ -255,11 +243,11 @@ try {
 Use the `$` operator for type casting:
 
 ```onion
-def random :Double = Math::random()
-def randomInt :Int = (random * 100)$Int
+val random: Double = Math::random()
+val randomInt: Int = (random * 100)$Int
 
-def obj :Object = "Hello"
-def str :String = obj$String
+val obj: Object = "Hello"
+val str: String = obj$String
 ```
 
 ## Module System
@@ -273,7 +261,7 @@ import {
 }
 
 // Use fully qualified names without import
-def list :java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList = new java.util.ArrayList
 ```
 
 ## Next Steps

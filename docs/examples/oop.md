@@ -8,26 +8,24 @@ Basic class definition:
 
 ```onion
 class Person {
-  @name :String
-  @age :Int
+  val name: String
+  var age: Int
 
   public:
-    def new(n :String, a :Int) {
-      @name = n
-      @age = a
+    def this(n: String, a: Int) {
+      this.name = n
+      this.age = a
     }
 
-    def greet :String {
-      "Hello, I'm " + @name + " and I'm " + @age + " years old"
-    }
+    def greet: String = "Hello, I'm " + this.name + " and I'm " + this.age + " years old"
 
     def haveBirthday {
-      @age = @age + 1
-      IO::println("Happy birthday! Now " + @age)
+      this.age = this.age + 1
+      IO::println("Happy birthday! Now " + this.age)
     }
 }
 
-def person :Person = new Person("Alice", 30)
+val person: Person = new Person("Alice", 30)
 IO::println(person.greet())
 person.haveBirthday()
 ```
@@ -44,37 +42,31 @@ Extending classes:
 
 ```onion
 class Animal {
-  @name :String
+protected:
+  val name: String
 
   public:
-    def new(n :String) {
-      @name = n
+    def this(n: String) {
+      this.name = n
     }
 
-    def speak :String {
-      @name + " makes a sound"
-    }
+    def speak: String = this.name + " makes a sound"
 }
 
 class Dog : Animal {
-  @breed :String
+  val breed: String
 
   public:
-    def new(n :String, b :String) {
-      super.new(n)
-      @breed = b
+    def this(n: String, b: String): (n) {
+      this.breed = b
     }
 
-    def speak :String {
-      @name + " barks: Woof!"
-    }
+    def speak: String = this.name + " barks: Woof!"
 
-    def getBreed :String {
-      @breed
-    }
+    def getBreed: String = this.breed
 }
 
-def dog :Dog = new Dog("Buddy", "Golden Retriever")
+val dog: Dog = new Dog("Buddy", "Golden Retriever")
 IO::println(dog.speak())
 IO::println("Breed: " + dog.getBreed())
 ```
@@ -93,26 +85,24 @@ Implementing Java interfaces:
 import { java.lang.Comparable; }
 
 class Student <: Comparable {
-  @name :String
-  @grade :Int
+  val name: String
+  val grade: Int
 
   public:
-    def new(n :String, g :Int) {
-      @name = n
-      @grade = g
+    def this(n: String, g: Int) {
+      this.name = n
+      this.grade = g
     }
 
-    def compareTo(other :Object) :Int {
-      def otherStudent :Student = other$Student
-      @grade - otherStudent.@grade
+    def compareTo(other: Object): Int {
+      val otherStudent: Student = other$Student
+      return this.grade - otherStudent.grade
     }
 
-    def toString :String {
-      @name + ": " + @grade
-    }
+    def toString: String = this.name + ": " + this.grade
 }
 
-def students :Student[] = new Student[3]
+val students: Student[] = new Student[3]
 students[0] = new Student("Alice", 85)
 students[1] = new Student("Bob", 92)
 students[2] = new Student("Charlie", 78)
@@ -183,55 +173,50 @@ import {
 }
 
 class ExampleBean <: Serializable {
-  @name :String
-  @value :Int
+  var name: String
+  var value: Int
 
   public:
-    def new {
+    def this {
       // Default constructor required for beans
     }
 
-    def this(name :String, value :Int) {
-      @name = name
-      @value = value
+    def this(name: String, value: Int) {
+      this.name = name
+      this.value = value
     }
 
     // Getters
-    def getName :String {
-      @name
-    }
-
-    def getValue :Int {
-      @value
-    }
+    def getName: String = this.name
+    def getValue: Int = this.value
 
     // Setters
-    def setName(name :String) {
-      @name = name
+    def setName(name: String) {
+      this.name = name
     }
 
-    def setValue(value :Int) {
-      @value = value
+    def setValue(value: Int) {
+      this.value = value
     }
 
-    static def main(args :String[]) {
+    static def main(args: String[]) {
       // Create bean
-      def bean :ExampleBean = new ExampleBean("Test", 42)
+      val bean: ExampleBean = new ExampleBean("Test", 42)
 
       // Serialize to XML
-      def out :ByteArrayOutputStream = new ByteArrayOutputStream
-      def encoder :XMLEncoder = new XMLEncoder(out)
+      val out: ByteArrayOutputStream = new ByteArrayOutputStream
+      val encoder: XMLEncoder = new XMLEncoder(out)
       encoder.writeObject(bean)
       encoder.close()
 
       IO::println("Serialized bean")
 
       // Deserialize from XML
-      def in :ByteArrayInputStream = new ByteArrayInputStream(
+      val inStream: ByteArrayInputStream = new ByteArrayInputStream(
         out.toByteArray()
       )
-      def decoder :XMLDecoder = new XMLDecoder(in)
-      def restored :ExampleBean = decoder.readObject()$ExampleBean
+      val decoder: XMLDecoder = new XMLDecoder(inStream)
+      val restored: ExampleBean = decoder.readObject()$ExampleBean
       decoder.close()
 
       IO::println("Name: " + restored.getName())
@@ -262,94 +247,94 @@ import {
 }
 
 class Calculator : JFrame <: ActionListener {
-  @text :JTextField
-  @currentValue :Long
-  @operator :String
+  val text: JTextField
+  var currentValue: Long
+  var operator: String
 
   public:
-    def new {
+    def this {
       setTitle("Simple Calculator")
       setSize(300, 400)
       setLayout(new BorderLayout())
 
-      @text = new JTextField("0")
-      add(@text, BorderLayout::NORTH)
+      this.text = new JTextField("0")
+      add(this.text, BorderLayout::NORTH)
 
-      def panel :JPanel = new JPanel()
+      val panel: JPanel = new JPanel()
       panel.setLayout(new GridLayout(4, 4))
 
-      def buttons :String[] = [
+      val buttons: java.util.List = [
         "7", "8", "9", "/",
         "4", "5", "6", "*",
         "1", "2", "3", "-",
         "0", "C", "=", "+"
       ]
 
-      foreach label :String in buttons {
-        def button :JButton = new JButton(label)
-        button.addActionListener(self)
+      foreach label: String in buttons {
+        val button: JButton = new JButton(label)
+        button.addActionListener(this)
         panel.add(button)
       }
 
       add(panel, BorderLayout::CENTER)
 
-      @currentValue = 0L
-      @operator = null
+      this.currentValue = 0L
+      this.operator = null
 
       setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE)
       setVisible(true)
     }
 
     def actionPerformed(event :ActionEvent) {
-      def button :JButton = event.getSource()$JButton
-      def label :String = button.getText()
+      val button: JButton = event.getSource()$JButton
+      val label: String = button.getText()
 
       // Handle button click
       if label == "C" {
-        @text.setText("0")
-        @currentValue = 0L
-        @operator = null
+        this.text.setText("0")
+        this.currentValue = 0L
+        this.operator = null
       } else if label == "=" {
         calculate()
       } else if label == "+" || label == "-" ||
                 label == "*" || label == "/" {
-        @operator = label
-        @currentValue = JLong::parseLong(@text.getText())
-        @text.setText("0")
+        this.operator = label
+        this.currentValue = JLong::parseLong(this.text.getText())
+        this.text.setText("0")
       } else {
         // Number button
-        def current :String = @text.getText()
+        val current: String = this.text.getText()
         if current == "0" {
-          @text.setText(label)
+          this.text.setText(label)
         } else {
-          @text.setText(current + label)
+          this.text.setText(current + label)
         }
       }
     }
 
     def calculate {
-      if @operator != null {
-        def value :Long = JLong::parseLong(@text.getText())
-        def result :Long = 0L
+      if this.operator != null {
+        val value: Long = JLong::parseLong(this.text.getText())
+        var result: Long = 0L
 
-        select @operator {
+        select this.operator {
           case "+":
-            result = @currentValue + value
+            result = this.currentValue + value
           case "-":
-            result = @currentValue - value
+            result = this.currentValue - value
           case "*":
-            result = @currentValue * value
+            result = this.currentValue * value
           case "/":
-            result = @currentValue / value
+            result = this.currentValue / value
         }
 
-        @text.setText(JLong::toString(result))
-        @operator = null
+        this.text.setText(JLong::toString(result))
+        this.operator = null
       }
     }
 
     static def main(args :String[]) {
-      def calc :Calculator = new Calculator
+      val calc: Calculator = new Calculator
     }
 }
 ```

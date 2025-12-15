@@ -57,14 +57,14 @@ IO::println("Hello, World!")
 ### Using Variables
 
 ```onion
-def message :String = "Hello, Onion!"
+val message: String = "Hello, Onion!"
 IO::println(message)
 ```
 
 ### Getting User Input
 
 ```onion
-def name :String = IO::input("What's your name? ")
+val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name + "!")
 ```
 
@@ -103,7 +103,7 @@ class ArgsDemo {
   public:
     static def main(args: String[]) {
       IO::println("Number of arguments: " + args.length)
-      for i = 0; i < args.length; i = i + 1 {
+      for var i: Int = 0; i < args.length; i = i + 1 {
         IO::println("Arg " + i + ": " + args[i])
       }
     }

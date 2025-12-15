@@ -99,7 +99,7 @@ If there's no explicit `main` method, the first top-level statement is the entry
 ```onion
 IO::println("Hello, World!")
 
-def x :Int = 10
+val x: Int = 10
 IO::println("x = " + x)
 
 // These statements execute immediately
@@ -149,8 +149,8 @@ Hello, stranger!
 
 **calc.on:**
 ```onion
-def a :Int = 10
-def b :Int = 20
+val a: Int = 10
+val b: Int = 20
 IO::println("Sum: " + (a + b))
 IO::println("Product: " + (a * b))
 ```
@@ -179,13 +179,13 @@ class LineCounter {
         return
       }
 
-      def filename :String = args[0]
-      def reader :BufferedReader = new BufferedReader(
+      val filename: String = args[0]
+      val reader: BufferedReader = new BufferedReader(
         new FileReader(filename)
       )
 
-      def count :Int = 0
-      def line :String = null
+      var count: Int = 0
+      var line: String = null
       while (line = reader.readLine()) != null {
         count = count + 1
       }

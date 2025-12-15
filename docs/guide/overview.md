@@ -19,9 +19,9 @@ Onion was created with several goals in mind:
 Every variable and expression has a type known at compile time:
 
 ```onion
-def name :String = "Alice"  // Type annotation
-def age :Int = 30
-def scores :Int[] = new Int[10]
+val name: String = "Alice"  // Type annotation
+val age: Int = 30
+val scores: Int[] = new Int[10]
 ```
 
 The type system includes:
@@ -36,27 +36,25 @@ Onion fully supports object-oriented programming:
 
 ```onion
 class Animal {
-  @name :String
+  val name: String
 
   public:
-    def new(n :String) {
-      @name = n
+    def this(n: String) {
+      this.name = n
     }
 
-    def speak :String {
-      "Some sound"
+    def speak: String {
+      return "Some sound"
     }
 }
 
 class Dog : Animal {
   public:
-    def new(n :String) {
-      // Call parent constructor
-      super.new(n)
+    def this(n: String): (n) {
     }
 
-    def speak :String {
-      "Woof!"
+    def speak: String {
+      return "Woof!"
     }
 }
 ```
@@ -74,18 +72,18 @@ While primarily object-oriented, Onion includes functional programming features:
 
 ```onion
 // Lambda expressions
-def filter = (x :Int) -> { return x > 10; }
+val filter: (Int) -> Boolean = (x: Int) -> { return x > 10; }
 
 // Closures
-def makeCounter {
-  def count :Int = 0
-  () -> {
+def makeCounter(): () -> Int {
+  var count: Int = 0
+  return () -> {
     count = count + 1;
     return count;
-  }
+  };
 }
 
-def counter = makeCounter()
+val counter: () -> Int = makeCounter()
 IO::println(counter.call())  // 1
 IO::println(counter.call())  // 2
 ```
@@ -115,9 +113,9 @@ import {
   javax.swing.JFrame;
 }
 
-def list :ArrayList = new ArrayList
-def map :HashMap = new HashMap
-def window :JFrame = new JFrame("Title")
+val list: ArrayList = new ArrayList
+val map: HashMap = new HashMap
+val window: JFrame = new JFrame("Title")
 ```
 
 Key points:
@@ -152,17 +150,17 @@ Source Code (.on)
 
 ## Syntax Highlights
 
-### Member Variables with `@`
+### Fields with `val` / `var`
 
-Instance variables are prefixed with `@`:
+Declare fields with `val` (immutable) or `var` (mutable) and access them via `this.field`:
 
 ```onion
 class Counter {
-  @count :Int
+  var count: Int
 
   public:
     def increment {
-      @count = @count + 1
+      this.count = this.count + 1
     }
 }
 ```
@@ -172,8 +170,8 @@ class Counter {
 Types are specified after a colon:
 
 ```onion
-def variable :Type = value
-def method(param :Type) :ReturnType { }
+val variable: Type = value
+def method(param: Type): ReturnType { }
 ```
 
 ### Static Access with `::`
@@ -191,11 +189,11 @@ System::out.println("Java style")
 Cast expressions use the `$` operator:
 
 ```onion
-def x :Double = 3.14
-def y :Int = x$Int  // Cast to Int
+val x: Double = 3.14
+val y: Int = x$Int  // Cast to Int
 
-def obj :Object = "string"
-def str :String = obj$String  // Cast to String
+val obj: Object = "string"
+val str: String = obj$String  // Cast to String
 ```
 
 ### Pattern Matching with `select`
@@ -217,8 +215,8 @@ select value {
 
 | Feature | Java | Onion |
 |---------|------|-------|
-| Instance variables | `this.field` | `@field` |
-| Type annotations | `Type variable` | `variable :Type` |
+| Field declarations | `Type field` | `val/var field: Type` |
+| Variable declarations | `Type variable` | `val variable: Type` |
 | Static access | `Class.method()` | `Class::method()` |
 | Type casting | `(Type) value` | `value$Type` |
 | Lambda syntax | `(x) -> x + 1` | `(x :Int) -> { return x + 1; }` |

@@ -7,9 +7,9 @@ Onion is a statically-typed language, meaning every variable has a type determin
 Variables require explicit type annotations:
 
 ```onion
-def name :String = "Alice"
-def age :Int = 30
-def height :Double = 5.8
+val name: String = "Alice"
+val age: Int = 30
+val height: Double = 5.8
 ```
 
 ## Type System
@@ -19,14 +19,14 @@ def height :Double = 5.8
 Onion supports all JVM primitive types:
 
 ```onion
-def byteVal :Byte = 127
-def shortVal :Short = 32767
-def intVal :Int = 2147483647
-def longVal :Long = 9223372036854775807L
-def floatVal :Float = 3.14f
-def doubleVal :Double = 3.14159
-def charVal :Char = 'A'
-def boolVal :Boolean = true
+val byteVal: Byte = 127
+val shortVal: Short = 32767
+val intVal: Int = 2147483647
+val longVal: Long = 9223372036854775807L
+val floatVal: Float = 3.14f
+val doubleVal: Double = 3.14159
+val charVal: Char = 'A'
+val boolVal: Boolean = true
 ```
 
 ### Reference Types
@@ -34,9 +34,9 @@ def boolVal :Boolean = true
 #### String Type
 
 ```onion
-def message :String = "Hello, World!"
-def empty :String = ""
-def multiline :String = "Line 1\nLine 2"
+val message: String = "Hello, World!"
+val empty: String = ""
+val multiline: String = "Line 1\nLine 2"
 ```
 
 #### Class Types
@@ -49,8 +49,8 @@ import {
   java.io.File;
 }
 
-def list :ArrayList = new ArrayList
-def file :File = new File("data.txt")
+val list: ArrayList = new ArrayList
+val file: File = new File("data.txt")
 ```
 
 #### Interface Types
@@ -61,7 +61,7 @@ import {
   java.util.ArrayList;
 }
 
-def list :List = new ArrayList  // Interface type
+val list: List = new ArrayList  // Interface type
 ```
 
 ### Array Types
@@ -69,9 +69,12 @@ def list :List = new ArrayList  // Interface type
 Arrays are declared with `Type[]` syntax:
 
 ```onion
-def integers :Int[] = new Int[10]
-def strings :String[] = ["a", "b", "c"]
-def objects :Object[] = new Object[5]
+val integers: Int[] = new Int[10]
+val strings: String[] = new String[3]
+strings[0] = "a"
+strings[1] = "b"
+strings[2] = "c"
+val objects: Object[] = new Object[5]
 ```
 
 ### Null Type
@@ -79,8 +82,8 @@ def objects :Object[] = new Object[5]
 The `null` literal has a special null type:
 
 ```onion
-def maybeString :String = null
-def maybeObject :Object = null
+val maybeString: String = null
+val maybeObject: Object = null
 ```
 
 ## Type Casting
@@ -91,15 +94,15 @@ Convert between types using the `$` casting operator:
 
 ```onion
 // Numeric casting
-def x :Double = 3.14
-def y :Int = x$Int  // 3
+val x: Double = 3.14
+val y: Int = x$Int  // 3
 
 // Object casting
-def obj :Object = "Hello"
-def str :String = obj$String
+val obj: Object = "Hello"
+val str: String = obj$String
 
 // Random number to Int
-def random :Int = (Math::random() * 100)$Int
+val random: Int = (Math::random() * 100)$Int
 ```
 
 ### Automatic Widening
@@ -107,9 +110,9 @@ def random :Int = (Math::random() * 100)$Int
 Smaller numeric types automatically widen to larger ones:
 
 ```onion
-def i :Int = 42
-def l :Long = i  // Int → Long (automatic)
-def d :Double = l  // Long → Double (automatic)
+val i: Int = 42
+val l: Long = i  // Int → Long (automatic)
+val d: Double = l  // Long → Double (automatic)
 ```
 
 ### Explicit Narrowing
@@ -117,8 +120,8 @@ def d :Double = l  // Long → Double (automatic)
 Narrowing conversions require explicit casting:
 
 ```onion
-def d :Double = 3.14
-def i :Int = d$Int  // Must use $ operator
+val d: Double = 3.14
+val i: Int = d$Int  // Must use $ operator
 ```
 
 ## Type Compatibility
@@ -133,17 +136,17 @@ A value can be assigned to a variable if:
 
 ```onion
 // Same type
-def s1 :String = "Hello"
-def s2 :String = s1  // OK
+val s1: String = "Hello"
+val s2: String = s1  // OK
 
 // Subtype
 import { java.util.ArrayList; java.util.List; }
-def arrayList :ArrayList = new ArrayList
-def list :List = arrayList  // OK (ArrayList implements List)
+val arrayList: ArrayList = new ArrayList
+val list: List = arrayList  // OK (ArrayList implements List)
 
 // Widening
-def i :Int = 42
-def l :Long = i  // OK (Int → Long)
+val i: Int = 42
+val l: Long = i  // OK (Int → Long)
 ```
 
 ## Variable Scope
@@ -154,9 +157,9 @@ Variables declared in methods or blocks:
 
 ```onion
 def method {
-  def local :Int = 10
+  val local: Int = 10
   if true {
-    def nested :Int = 20
+    val nested: Int = 20
     IO::println(local)   // OK
     IO::println(nested)  // OK
   }
@@ -164,26 +167,24 @@ def method {
 }
 ```
 
-### Member Variables
+### Fields
 
-Instance variables prefixed with `@`:
+Declare fields with `val` / `var` and access them via `this.field`:
 
 ```onion
 class Counter {
-  @count :Int
+  var count: Int
 
   public:
-    def new {
-      @count = 0  // Initialize member
+    def this {
+      this.count = 0  // Initialize member
     }
 
     def increment {
-      @count = @count + 1  // Access member
+      this.count = this.count + 1  // Access member
     }
 
-    def getCount :Int {
-      @count  // Return member value
-    }
+    def getCount: Int = this.count  // Return member value
 }
 ```
 
@@ -193,17 +194,15 @@ Static members belong to the class, not instances:
 
 ```onion
 class MathUtils {
-  static @PI :Double = 3.14159
+  static val PI: Double = 3.14159
 
   public:
-    static def square(x :Double) :Double {
-      x * x
-    }
+    static def square(x: Double): Double = x * x
 }
 
 // Access static members
-def pi :Double = MathUtils::PI
-def result :Double = MathUtils::square(5.0)
+val pi: Double = MathUtils::PI
+val result: Double = MathUtils::square(5.0)
 ```
 
 ## Type Inference (Future Feature)
@@ -212,15 +211,15 @@ Currently, Onion requires explicit type annotations. Future versions may support
 
 ```onion
 // Current (required)
-def name :String = "Alice"
+val name: String = "Alice"
 
 // Future (planned)
-def name = "Alice"  // Inferred as String
+val name = "Alice"  // Inferred as String
 ```
 
 ## Generic Types (Java Generics)
 
-When using Java generic types, specify type parameters:
+When using Java generic types, specify type parameters with `[]`:
 
 ```onion
 import {
@@ -228,11 +227,8 @@ import {
   java.util.HashMap;
 }
 
-// Note: Current Onion may not enforce type parameters
-def list :ArrayList = new ArrayList  // Can hold any Object
-
-// In Java: ArrayList<String> list = new ArrayList<>();
-// Onion: def list :ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]
+val map: HashMap[String, Int] = new HashMap[String, Int]
 ```
 
 ## Function Types
@@ -240,8 +236,8 @@ def list :ArrayList = new ArrayList  // Can hold any Object
 Functions are represented by `Function0` through `Function10` interfaces:
 
 ```onion
-def func :Function1 = (x :Int) -> { return x * 2; }
-def result :Int = func.call(5)$Int  // 10
+val func: (Int) -> Int = (x: Int) -> { return x * 2; }
+val result: Int = func.call(5)$Int  // 10
 ```
 
 - `Function0` - No parameters

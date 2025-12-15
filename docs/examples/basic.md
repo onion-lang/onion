@@ -27,12 +27,12 @@ Working with arrays:
 
 **File: `Array.on`**
 ```onion
-def array :String[] = new String[3]
+val array: String[] = new String[3]
 array[0] = "A"
 array[1] = "B"
 array[2] = "C"
 
-for i = 0; i < array.length; i = i + 1 {
+for var i: Int = 0; i < array.length; i = i + 1 {
   IO::println(array[i])
 }
 ```
@@ -44,18 +44,14 @@ for i = 0; i < array.length; i = i + 1 {
 
 ## String Concatenation
 
-String operations and array literals:
+String operations and list iteration:
 
 **File: `StringCat.on`**
 ```onion
-def array :String[] = ["a", "b", "c", "d", "e", "f", "g"]
-
-def result :String = ""
-for i = 0; i < array.size; i = i + 1 {
-  result = result + array[i]
+val list: List = ["a", "b", "c", "d", "e", "f", "g"];
+for var i: Int = 0; i < list.size; i = i + 1 {
+  System::out.println("list[" + i + "] = " + list[i]);
 }
-
-System::out.println(result)
 ```
 
 **Topics:**
@@ -70,7 +66,7 @@ Reading user input:
 
 **File: `ReadLine.on`**
 ```onion
-def name :String = IO::input("What's your name? ")
+val name: String = IO::readln("What's your name? ")
 IO::println("Hello, " + name + "!")
 ```
 
@@ -86,7 +82,7 @@ Hello, Alice!
 ```
 
 **Topics:**
-- `IO::input()` for reading input
+- `IO::readln()` for reading input
 - String concatenation
 - Interactive programs
 
@@ -96,15 +92,15 @@ Using ArrayList with the `<<` append operator:
 
 **File: `List.on`**
 ```onion
-import { java.util.ArrayList; }
+val list: List = [];
 
-def list :ArrayList = new ArrayList
-list << "First"
-list << "Second"
-list << "Third"
+list << "a";
+list << "b";
+list << "c";
+list << "d";
 
-for i = 0; i < list.size; i = i + 1 {
-  IO::println(list[i])
+for var i: Int = 0; i < list.size; i = i + 1 {
+  System::out.println(list[i]);
 }
 ```
 
@@ -122,10 +118,10 @@ Enhanced for loop with collections:
 ```onion
 import { java.util.ArrayList; }
 
-def list :ArrayList = new ArrayList
-list << "HELLO"
-list << "WORLD"
-list << "ONION"
+val list: ArrayList[String] = new ArrayList[String]
+list << "HELLO";
+list << "WORLD";
+list << "ONION";
 
 foreach object :String in list {
   IO::println(object.toLowerCase())
@@ -150,7 +146,7 @@ Using the `select` statement:
 
 **File: `Select.on`**
 ```onion
-def value :Int = (Math::random() * 10)$Int
+val value: Int = (Math::random() * 10)$Int
 
 select value {
   case 0, 1, 2, 3:
@@ -178,11 +174,11 @@ Combining multiple concepts:
 ```onion
 import { java.util.ArrayList; }
 
-// Create array
-def numbers :Int[] = [10, 20, 30, 40, 50]
+// Create numbers list
+val numbers: java.util.List = [10, 20, 30, 40, 50]
 
 // Filter even numbers
-def evens :ArrayList = new ArrayList
+val evens: ArrayList = new ArrayList
 foreach num :Int in numbers {
   if num % 2 == 0 {
     evens << num
@@ -209,8 +205,8 @@ Even numbers:
 ## Complete Example: Simple Calculator
 
 ```onion
-def x :Int = 10
-def y :Int = 3
+val x: Int = 10
+val y: Int = 3
 
 IO::println("Addition: " + (x + y))
 IO::println("Subtraction: " + (x - y))

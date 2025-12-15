@@ -19,20 +19,20 @@ Currently, Onion supports C-style comments:
 
 ### Variable Declaration
 
-Variables are declared with the `def` keyword and type annotations:
+Variables are declared with `val` (immutable) or `var` (mutable). Type annotations are required:
 
 ```onion
-def name :String = "Alice"
-def age :Int = 30
-def price :Double = 19.99
-def isActive :Boolean = true
+val name: String = "Alice"
+val age: Int = 30
+val price: Double = 19.99
+val isActive: Boolean = true
 ```
 
 ### Naming Conventions
 
 - Variable names use camelCase: `firstName`, `totalCount`
 - Class names use PascalCase: `Person`, `Calculator`
-- Member variables are prefixed with `@`: `@name`, `@balance`
+- Fields are accessed via `this.field`
 
 ## Primitive Types
 
@@ -54,41 +54,41 @@ Onion supports the standard JVM primitive types:
 ### String Literals
 
 ```onion
-def greeting :String = "Hello, World!"
-def multiline :String = "Line 1\nLine 2\nLine 3"
-def withQuotes :String = "She said \"Hello\""
+val greeting: String = "Hello, World!"
+val multiline: String = "Line 1\nLine 2\nLine 3"
+val withQuotes: String = "She said \"Hello\""
 ```
 
 ### Numeric Literals
 
 ```onion
-def decimal :Int = 42
-def hex :Int = 0xFF
-def octal :Int = 077
-def longValue :Long = 100L
-def doubleValue :Double = 3.14
-def scientific :Double = 1.23e10
+val decimal: Int = 42
+val hex: Int = 0xFF
+val octal: Int = 077
+val longValue: Long = 100L
+val doubleValue: Double = 3.14
+val scientific: Double = 1.23e10
 ```
 
 ### Character Literals
 
 ```onion
-def letter :Char = 'A'
-def newline :Char = '\n'
-def tab :Char = '\t'
+val letter: Char = 'A'
+val newline: Char = '\n'
+val tab: Char = '\t'
 ```
 
 ### Boolean Literals
 
 ```onion
-def isTrue :Boolean = true
-def isFalse :Boolean = false
+val isTrue: Boolean = true
+val isFalse: Boolean = false
 ```
 
 ### Null Literal
 
 ```onion
-def nullable :String = null
+val nullable: String = null
 ```
 
 ## Operators
@@ -96,21 +96,21 @@ def nullable :String = null
 ### Arithmetic Operators
 
 ```onion
-def a :Int = 10
-def b :Int = 3
+val a: Int = 10
+val b: Int = 3
 
-def sum :Int = a + b        // 13
-def diff :Int = a - b       // 7
-def product :Int = a * b    // 30
-def quotient :Int = a / b   // 3
-def remainder :Int = a % b  // 1
+val sum: Int = a + b        // 13
+val diff: Int = a - b       // 7
+val product: Int = a * b    // 30
+val quotient: Int = a / b   // 3
+val remainder: Int = a % b  // 1
 ```
 
 ### Comparison Operators
 
 ```onion
-def x :Int = 5
-def y :Int = 10
+val x: Int = 5
+val y: Int = 10
 
 x == y  // false (equal)
 x != y  // true  (not equal)
@@ -123,8 +123,8 @@ x >= y  // false (greater than or equal)
 ### Logical Operators
 
 ```onion
-def a :Boolean = true
-def b :Boolean = false
+val a: Boolean = true
+val b: Boolean = false
 
 a && b  // false (logical AND)
 a || b  // true  (logical OR)
@@ -134,7 +134,7 @@ a || b  // true  (logical OR)
 ### Assignment Operators
 
 ```onion
-def x :Int = 10
+var x: Int = 10
 
 x = 20       // Simple assignment
 x = x + 5    // Add and assign (no += syntax yet)
@@ -145,7 +145,7 @@ x = x * 2    // Multiply and assign
 ### Increment/Decrement
 
 ```onion
-def count :Int = 0
+var count: Int = 0
 count = count + 1  // Increment
 // Or use post-increment (in some contexts)
 count++
@@ -157,11 +157,11 @@ count--
 The `$` operator performs type casting:
 
 ```onion
-def x :Double = 3.14
-def y :Int = x$Int  // Cast to Int (3)
+val x: Double = 3.14
+val y: Int = x$Int  // Cast to Int (3)
 
-def random :Double = Math::random()
-def randomInt :Int = (random * 100)$Int
+val random: Double = Math::random()
+val randomInt: Int = (random * 100)$Int
 ```
 
 ### List Append Operator
@@ -171,7 +171,7 @@ The `<<` operator appends to lists:
 ```onion
 import { java.util.ArrayList; }
 
-def list :ArrayList = new ArrayList
+val list: ArrayList = new ArrayList
 list << "First"
 list << "Second"
 list << "Third"
@@ -183,13 +183,15 @@ list << "Third"
 
 ```onion
 // Create array with size
-def numbers :Int[] = new Int[10]
+val numbers: Int[] = new Int[10]
 
-// Array literal
-def colors :String[] = ["red", "green", "blue"]
+// Initialize elements
+val colors: String[] = new String[3]
+colors[0] = "red"
+colors[1] = "green"
+colors[2] = "blue"
 
-// Mixed approach
-def scores :Double[] = new Double[5]
+val scores: Double[] = new Double[5]
 scores[0] = 95.5
 scores[1] = 87.3
 ```
@@ -197,14 +199,17 @@ scores[1] = 87.3
 ### Array Access
 
 ```onion
-def fruits :String[] = ["apple", "banana", "orange"]
+val fruits: String[] = new String[3]
+fruits[0] = "apple"
+fruits[1] = "banana"
+fruits[2] = "orange"
 
-def first :String = fruits[0]     // "apple"
-def second :String = fruits[1]    // "banana"
+val first: String = fruits[0]     // "apple"
+val second: String = fruits[1]    // "banana"
 
 fruits[2] = "grape"  // Modify element
 
-def length :Int = fruits.length  // Array length
+val length: Int = fruits.length  // Array length
 ```
 
 ## Expressions
@@ -212,19 +217,19 @@ def length :Int = fruits.length  // Array length
 ### Arithmetic Expressions
 
 ```onion
-def result :Int = (10 + 5) * 2 - 3  // 27
-def average :Double = (a + b + c) / 3.0
+val result: Int = (10 + 5) * 2 - 3  // 27
+val average: Double = (10 + 20 + 30) / 3.0
 ```
 
 ### String Concatenation
 
 ```onion
-def firstName :String = "Alice"
-def lastName :String = "Smith"
-def fullName :String = firstName + " " + lastName
+val firstName: String = "Alice"
+val lastName: String = "Smith"
+val fullName: String = firstName + " " + lastName
 
-def age :Int = 30
-def message :String = "I am " + age + " years old"
+val age: Int = 30
+val message: String = "I am " + age + " years old"
 ```
 
 ### Method Calls
@@ -234,9 +239,9 @@ def message :String = "I am " + age + " years old"
 IO::println("Hello")
 
 // Instance method call
-def text :String = "hello"
-def upper :String = text.toUpperCase()
-def len :Int = text.length
+val text: String = "hello"
+val upper: String = text.toUpperCase()
+val len: Int = text.length
 ```
 
 ### Object Creation
@@ -244,8 +249,8 @@ def len :Int = text.length
 ```onion
 import { java.util.ArrayList; }
 
-def list :ArrayList = new ArrayList
-def array :String[] = new String[10]
+val list: ArrayList = new ArrayList
+val array: String[] = new String[10]
 ```
 
 ## Statements
@@ -256,7 +261,7 @@ Any expression can be a statement:
 
 ```onion
 IO::println("Hello")
-def x :Int = 10
+var x: Int = 10
 x = x + 1
 ```
 
@@ -266,7 +271,7 @@ Blocks are enclosed in curly braces:
 
 ```onion
 {
-  def temp :Int = 5
+  val temp: Int = 5
   IO::println(temp)
   // temp is only visible in this block
 }
@@ -280,23 +285,23 @@ Variables declared in a method or block are local to that scope:
 
 ```onion
 def method {
-  def local :Int = 10
+  val local: Int = 10
   // local is only visible here
 }
 ```
 
-### Member Variables
+### Fields
 
-Member variables are prefixed with `@` and belong to the class instance:
+Fields are declared with `val` / `var` and accessed via `this.field`:
 
 ```onion
 class Example {
-  @count :Int
-  @name :String
+  var count: Int
+  val name: String = "default"
 
   public:
     def increment {
-      @count = @count + 1
+      this.count = this.count + 1
     }
 }
 ```
@@ -307,14 +312,12 @@ By default, members are private. Use `public:` to mark public members:
 
 ```onion
 class Person {
-  @ssn :String  // Private by default
+  val ssn: String = "000-00-0000"  // Private by default
 
   public:
-    @name :String  // Public
+    val name: String = "Alice"  // Public
 
-    def getName :String {  // Public method
-      @name
-    }
+    def getName: String = this.name  // Public method
 }
 ```
 
@@ -331,9 +334,9 @@ import {
   java.io.File;
 }
 
-def list :ArrayList = new ArrayList
-def map :HashMap = new HashMap
-def file :File = new File("data.txt")
+val list: ArrayList = new ArrayList
+val map: HashMap = new HashMap
+val file: File = new File("data.txt")
 ```
 
 ### Fully Qualified Names
@@ -341,7 +344,7 @@ def file :File = new File("data.txt")
 You can also use fully qualified names without importing:
 
 ```onion
-def list :java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList = new java.util.ArrayList
 ```
 
 ## Next Steps

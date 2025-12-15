@@ -33,10 +33,10 @@ onion> 10 * 5
 ### Variable Definitions
 
 ```
-onion> def x :Int = 42
+onion> val x: Int = 42
 x: Int = 42
 
-onion> def name :String = "Alice"
+onion> val name: String = "Alice"
 name: String = Alice
 
 onion> IO::println(name)
@@ -59,14 +59,14 @@ onion> Math::max(10, 20)
 ## Defining Functions
 
 ```
-onion> def square(x :Int) :Int { x * x }
-square: (Int) => Int
+onion> def square(x: Int): Int = x * x
+square: (Int) -> Int
 
 onion> square(5)
 25
 
-onion> def greet(name :String) :String { "Hello, " + name }
-greet: (String) => String
+onion> def greet(name: String): String = "Hello, " + name
+greet: (String) -> String
 
 onion> greet("World")
 Hello, World
@@ -79,7 +79,7 @@ Hello, World
 ```
 onion> import { java.util.ArrayList; }
 
-onion> def list :ArrayList = new ArrayList
+onion> val list: ArrayList = new ArrayList
 list: ArrayList = []
 
 onion> list.add("First")
@@ -96,19 +96,17 @@ onion> list.size()
 
 ```
 onion> class Point {
-         @x :Int
-         @y :Int
+         val x: Int
+         val y: Int
          public:
-           def new(x :Int, y :Int) {
-             @x = x
-             @y = y
+           def this(x: Int, y: Int) {
+             this.x = x
+             this.y = y
            }
-           def distance :Double {
-             Math::sqrt(@x * @x + @y * @y)
-           }
+           def distance: Double = Math::sqrt(this.x * this.x + this.y * this.y)
        }
 
-onion> def p :Point = new Point(3, 4)
+onion> val p: Point = new Point(3, 4)
 p: Point = Point@1a2b3c4d
 
 onion> p.distance()
@@ -118,14 +116,14 @@ onion> p.distance()
 ## Lambda Expressions
 
 ```
-onion> def double = (x :Int) -> { return x * 2; }
-double: Function1
+onion> val double: (Int) -> Int = (x: Int) -> { return x * 2; }
+double: (Int) -> Int
 
 onion> double.call(5)
 10
 
-onion> def add = (a :Int, b :Int) -> { return a + b; }
-add: Function2
+onion> val add: (Int, Int) -> Int = (a: Int, b: Int) -> { return a + b; }
+add: (Int, Int) -> Int
 
 onion> add.call(3, 7)
 10
@@ -138,9 +136,9 @@ For complex expressions, use multiple lines:
 ```
 onion> def factorial(n :Int) :Int {
          if n <= 1 {
-           1
+           return 1;
          } else {
-           n * factorial(n - 1)
+           return n * factorial(n - 1);
          }
        }
 
@@ -199,9 +197,7 @@ Or use `Ctrl+D` (Unix) / `Ctrl+Z` (Windows).
 ### Quick Math
 
 ```
-onion> def hypotenuse(a :Double, b :Double) :Double {
-         Math::sqrt(a * a + b * b)
-       }
+onion> def hypotenuse(a: Double, b: Double): Double = Math::sqrt(a * a + b * b)
 
 onion> hypotenuse(3.0, 4.0)
 5.0
@@ -213,7 +209,7 @@ onion> hypotenuse(5.0, 12.0)
 ### String Manipulation
 
 ```
-onion> def text :String = "Hello, World!"
+onion> val text: String = "Hello, World!"
 onion> text.length()
 13
 
@@ -229,7 +225,7 @@ Hello
 ```
 onion> import { java.util.ArrayList; }
 
-onion> def numbers :ArrayList = new ArrayList
+onion> val numbers: ArrayList = new ArrayList
 onion> numbers << 10
 onion> numbers << 20
 onion> numbers << 30
@@ -248,12 +244,12 @@ onion> def isPrime(n :Int) :Boolean {
          if n <= 1 {
            return false
          }
-         for i = 2; i * i <= n; i = i + 1 {
+         for var i: Int = 2; i * i <= n; i = i + 1 {
            if n % i == 0 {
              return false
            }
          }
-         true
+         return true
        }
 
 onion> isPrime(7)
@@ -274,9 +270,7 @@ Use the REPL to test ideas before writing full programs:
 
 ```
 onion> // Test string formatting
-onion> def format(name :String, age :Int) :String {
-         name + " is " + age + " years old"
-       }
+onion> def format(name: String, age: Int): String = name + " is " + age + " years old"
 
 onion> format("Alice", 30)
 Alice is 30 years old
@@ -288,9 +282,9 @@ Test individual functions:
 
 ```
 onion> def calculate(x :Int) :Int {
-         def temp :Int = x * 2
+         val temp: Int = x * 2
          IO::println("temp = " + temp)
-         temp + 10
+         return temp + 10
        }
 
 onion> calculate(5)
@@ -304,16 +298,14 @@ Experiment with language features:
 
 ```
 onion> // Test type casting
-onion> def x :Double = 3.14
-onion> def y :Int = x$Int
+onion> val x: Double = 3.14
+onion> val y: Int = x$Int
 onion> IO::println(y)
 3
 
 onion> // Test closures
-onion> def makeAdder(n :Int) {
-         (x :Int) -> { return x + n; }
-       }
-onion> def add5 = makeAdder(5)
+onion> def makeAdder(n: Int): (Int) -> Int = (x: Int) -> { return x + n; }
+onion> val add5: (Int) -> Int = makeAdder(5)
 onion> add5.call(10)
 15
 ```

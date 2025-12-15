@@ -10,11 +10,12 @@ Reserved words in Onion:
 
 ```
 break       case        catch       class       continue
-def         else        false       for         foreach
-forward     if          import      in          module
-new         null        public      return      select
-self        static      super       true        try
-while
+def         else        false       finally     for
+foreach     forward     if          import      interface
+module      new         null        private     protected
+public      record      return      select      self
+static      super       this        throw       true
+try         val         var         while
 ```
 
 ### Identifiers
@@ -30,11 +31,6 @@ Invalid identifiers:
 - `123abc` (starts with digit)
 - `my-variable` (contains hyphen)
 - `class` (reserved keyword)
-
-### Member Variables
-
-Instance variables are prefixed with `@`:
-- `@name`, `@count`, `@value`
 
 ### Literals
 
@@ -89,12 +85,12 @@ Instance variables are prefixed with `@`:
 
 ### Type Annotations
 
-Syntax: `variable :Type`
+Types are written after a colon in declarations (e.g., `val name: String`).
 
 ```onion
-def name :String
-def age :Int
-def scores :Int[]
+val name: String
+val age: Int
+val scores: Int[]
 ```
 
 ## Declarations
@@ -102,7 +98,8 @@ def scores :Int[]
 ### Variable Declaration
 
 ```onion
-def identifier :Type = expression
+val identifier: Type = expression
+var identifier: Type = expression
 ```
 
 ### Function Declaration
@@ -128,7 +125,7 @@ class ClassName <: Interface {
   members
 }
 
-class ClassName : ParentClass <: Interface1 <: Interface2 {
+class ClassName : ParentClass <: Interface1, Interface2 {
   members
 }
 ```
@@ -137,21 +134,21 @@ class ClassName : ParentClass <: Interface1 <: Interface2 {
 
 ```onion
 class Example {
-  @memberName :Type
+  val memberName: Type
 
   public:
-    @publicMember :Type
+    var publicMember: Type
 }
 ```
 
 ### Constructors
 
 ```onion
-def new(params) {
+def this(params) {
   body
 }
 
-def this:(param) {
+def this(params): (superArgs) {
   body
 }
 ```
@@ -332,10 +329,10 @@ module package.name
 
 ```onion
 class Example {
-  @privateMember :Int
+  var privateMember: Int
 
   public:
-    @publicMember :Int
+    var publicMember: Int
 
     def publicMethod {
       // ...
@@ -370,8 +367,8 @@ The `forward` directive automatically delegates interface methods to the specifi
 Require explicit cast using `$` operator:
 
 ```onion
-def d :Double = 3.14
-def i :Int = d$Int
+val d: Double = 3.14
+val i: Int = d$Int
 ```
 
 ## Current Limitations

@@ -8,13 +8,13 @@ Lambdas use the `(parameters) -> { body }` syntax:
 
 ```onion
 // Lambda with one parameter
-def double = (x :Int) -> { return x * 2; }
+val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 
 // Lambda with multiple parameters
-def add = (x :Int, y :Int) -> { return x + y; }
+val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
 // Lambda with no parameters
-def greet = () -> { IO::println("Hello!") }
+val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
 ```
 
 ## Calling Lambdas
@@ -22,28 +22,28 @@ def greet = () -> { IO::println("Hello!") }
 Use the `.call()` method to invoke a lambda:
 
 ```onion
-def square = (x :Int) -> { return x * x; }
+val square: (Int) -> Int = (x: Int) -> { return x * x; }
 
-def result :Int = square.call(5)$Int  // 25
+val result: Int = square.call(5)  // 25
 IO::println(result)
 ```
 
 ## Function Types
 
-Lambdas are typed using `Function0` through `Function10` interfaces:
+Lambdas can be typed using the arrow type syntax `(A, B) -> R`:
 
 ```onion
 // Function with 0 parameters
-def func0 :Function0 = () -> { return 42; }
-def value :Int = func0.call()$Int
+val func0: () -> Int = () -> { return 42; }
+val value: Int = func0.call()
 
 // Function with 1 parameter
-def func1 :Function1 = (x :Int) -> { return x * 2; }
-def doubled :Int = func1.call(10)$Int
+val func1: (Int) -> Int = (x: Int) -> { return x * 2; }
+val doubled: Int = func1.call(10)
 
 // Function with 2 parameters
-def func2 :Function2 = (x :Int, y :Int) -> { return x + y; }
-def sum :Int = func2.call(3, 7)$Int
+val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
+val sum: Int = func2.call(3, 7)
 ```
 
 ## Closures
@@ -53,8 +53,8 @@ Lambdas can capture variables from their enclosing scope:
 ### Simple Closure
 
 ```onion
-def multiplier :Int = 10
-def multiply = (x :Int) -> { return x * multiplier; }
+val multiplier: Int = 10
+val multiply: (Int) -> Int = (x: Int) -> { return x * multiplier; }
 
 IO::println(multiply.call(5))  // 50
 ```
@@ -64,8 +64,8 @@ IO::println(multiply.call(5))  // 50
 Closures can modify captured variables:
 
 ```onion
-def count :Int = 0
-def increment = () -> {
+var count: Int = 0
+val increment: () -> Int = () -> {
   count = count + 1
   return count;
 }
@@ -78,16 +78,16 @@ IO::println(increment.call())  // 3
 ### Counter Factory
 
 ```onion
-def makeCounter {
-  def count :Int = 0
-  () -> {
+def makeCounter(): () -> Int {
+  var count: Int = 0
+  return () -> {
     count = count + 1
     return count;
-  }
+  };
 }
 
-def counter1 = makeCounter()
-def counter2 = makeCounter()
+val counter1: () -> Int = makeCounter()
+val counter2: () -> Int = makeCounter()
 
 IO::println(counter1.call())  // 1
 IO::println(counter1.call())  // 2
@@ -102,31 +102,34 @@ Functions that accept lambdas as parameters:
 ### Filter Function
 
 ```onion
-def filter(items :String[], predicate :Function1) :String[] {
-  def result :ArrayList = new ArrayList
+import {
+  java.util.ArrayList;
+  java.util.List;
+}
 
-  foreach item :String in items {
-    def keep :Boolean = predicate.call(item)$Boolean
-    if keep {
+def filter(items: List, predicate: (String) -> Boolean): List {
+  val result: ArrayList = new ArrayList
+
+  foreach item: String in items {
+    if predicate.call(item) {
       result << item
     }
   }
 
-  // Convert to array
-  result.toArray(new String[result.size()])
+  return result
 }
 
-def lines :String[] = [
+val lines: List = [
   "INFO: System started",
   "ERROR: Connection failed",
   "INFO: Processing data",
   "ERROR: Timeout"
 ]
 
-def isError = (line :String) -> { return line.startsWith("ERROR"); }
+val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
-def errors :String[] = filter(lines, isError)
-foreach error :String in errors {
+val errors: List = filter(lines, isError)
+foreach error: String in errors {
   IO::println(error)
 }
 // Output:
@@ -137,22 +140,26 @@ foreach error :String in errors {
 ### Map Function
 
 ```onion
-def map(items :String[], transform :Function1) :String[] {
-  def result :ArrayList = new ArrayList
-
-  foreach item :String in items {
-    def transformed :String = transform.call(item)$String
-    result << transformed
-  }
-
-  result.toArray(new String[result.size()])
+import {
+  java.util.ArrayList;
+  java.util.List;
 }
 
-def words :String[] = ["hello", "world", "onion"]
-def toUpper = (s :String) -> { return s.toUpperCase(); }
+def map(items: List, transform: (String) -> String): List {
+  val result: ArrayList = new ArrayList
 
-def upper :String[] = map(words, toUpper)
-foreach word :String in upper {
+  foreach item: String in items {
+    result << transform.call(item)
+  }
+
+  return result
+}
+
+val words: List = ["hello", "world", "onion"]
+val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
+
+val upper: List = map(words, toUpper)
+foreach word: String in upper {
   IO::println(word)
 }
 // Output:
@@ -164,20 +171,22 @@ foreach word :String in upper {
 ### Reduce Function
 
 ```onion
-def reduce(items :Int[], operation :Function2, initial :Int) :Int {
-  def accumulator :Int = initial
+import { java.util.List; }
 
-  foreach item :Int in items {
-    accumulator = operation.call(accumulator, item)$Int
+def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
+  var accumulator: Int = initial
+
+  foreach item: Int in items {
+    accumulator = operation.call(accumulator, item)
   }
 
-  accumulator
+  return accumulator
 }
 
-def numbers :Int[] = [1, 2, 3, 4, 5]
-def sum = (acc :Int, n :Int) -> { return acc + n; }
+val numbers: List = [1, 2, 3, 4, 5]
+val sum: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc + n; }
 
-def total :Int = reduce(numbers, sum, 0)
+val total: Int = reduce(numbers, sum, 0)
 IO::println(total)  // 15
 ```
 
@@ -191,15 +200,14 @@ import {
   java.io.FileReader;
 }
 
-def filterFile(filename :String, predicate :Function1) {
-  def reader :BufferedReader = new BufferedReader(
+def filterFile(filename: String, predicate: (String) -> Boolean) {
+  val reader: BufferedReader = new BufferedReader(
     new FileReader(filename)
   )
 
-  def line :String = null
+  var line: String = null
   while (line = reader.readLine()) != null {
-    def keep :Boolean = predicate.call(line)$Boolean
-    if keep {
+    if predicate.call(line) {
       IO::println(line)
     }
   }
@@ -208,7 +216,7 @@ def filterFile(filename :String, predicate :Function1) {
 }
 
 // Filter lines starting with ERROR
-def errorFilter = (line :String) -> { return line.startsWith("ERROR"); }
+val errorFilter: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
 filterFile("logfile.txt", errorFilter)
 ```
@@ -223,30 +231,28 @@ import {
 }
 
 class LambdaComparator <: Comparator {
-  @compareFunc :Function2
+  val compareFunc: (Object, Object) -> Int
 
   public:
-    def new(func :Function2) {
-      @compareFunc = func
+    def this(func: (Object, Object) -> Int) {
+      this.compareFunc = func
     }
 
-    def compare(a :Object, b :Object) :Int {
-      @compareFunc.call(a, b)$Int
-    }
+    def compare(a: Object, b: Object): Int = this.compareFunc.call(a, b)
 }
 
-def list :ArrayList = new ArrayList
+val list: ArrayList = new ArrayList
 list << "banana"
 list << "apple"
 list << "cherry"
 
-def alphabetical = (a :Object, b :Object) -> {
-  def s1 :String = a$String
-  def s2 :String = b$String
+val alphabetical: (Object, Object) -> Int = (a: Object, b: Object) -> {
+  val s1: String = a$String
+  val s2: String = b$String
   return s1.compareTo(s2);
 }
 
-def comparator :LambdaComparator = new LambdaComparator(alphabetical)
+val comparator: LambdaComparator = new LambdaComparator(alphabetical)
 Collections::sort(list, comparator)
 
 foreach item :Object in list {
@@ -268,25 +274,26 @@ import {
 }
 
 class LambdaActionListener <: ActionListener {
-  @handler :Function1
+  val handler: (ActionEvent) -> Int
 
   public:
-    def new(h :Function1) {
-      @handler = h
+    def this(h: (ActionEvent) -> Int) {
+      this.handler = h
     }
 
     def actionPerformed(event :ActionEvent) {
-      @handler.call(event)
+      this.handler.call(event)
     }
 }
 
-def button :JButton = new JButton("Click me")
+val button: JButton = new JButton("Click me")
 
-def onClick = (event :ActionEvent) -> {
+val onClick: (ActionEvent) -> Int = (event: ActionEvent) -> {
   IO::println("Button was clicked!")
+  return 0
 }
 
-def listener :LambdaActionListener = new LambdaActionListener(onClick)
+val listener: LambdaActionListener = new LambdaActionListener(onClick)
 button.addActionListener(listener)
 ```
 
@@ -296,12 +303,12 @@ button.addActionListener(listener)
 
 ```onion
 // Good: Simple, focused lambda
-def isEven = (n :Int) -> { return n % 2 == 0; }
+val isEven: (Int) -> Boolean = (n: Int) -> { return n % 2 == 0; }
 
 // Bad: Complex lambda (use named function instead)
-def complex = (n :Int) -> {
-  def temp :Int = n * 2
-  def result :Int = temp + 10
+val complex: (Int) -> Int = (n: Int) -> {
+  val temp: Int = n * 2
+  val result: Int = temp + 10
   if result > 100 {
     return result / 2;
   } else {
@@ -314,22 +321,23 @@ def complex = (n :Int) -> {
 
 ```onion
 // Good
-def filterErrors = (logLine :String) -> { return logLine.startsWith("ERROR"); }
+val filterErrors: (String) -> Boolean = (logLine: String) -> { return logLine.startsWith("ERROR"); }
 
 // Bad
-def f = (x :String) -> { return x.startsWith("ERROR"); }
+val f: (String) -> Boolean = (x: String) -> { return x.startsWith("ERROR"); }
 ```
 
 ### Avoid Side Effects When Possible
 
 ```onion
 // Good: Pure function
-def double = (x :Int) -> { return x * 2; }
+val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 
 // Less ideal: Side effect
-def count :Int = 0
-def incrementCounter = () -> {
+var count: Int = 0
+val incrementCounter: () -> Int = () -> {
   count = count + 1  // Modifies external state
+  return count
 }
 ```
 

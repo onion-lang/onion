@@ -1450,38 +1450,425 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     method
   }
 
-  private def runUnit(): Unit = {
-  unit_ = unit
-  val toplevels = unit.toplevels
-  val context = new LocalContext
-  val statements = Buffer[ActionStatement]()
-  mapper_ = find(topClass)
-  val klass = loadTopClass.asInstanceOf[ClassDefinition]
-  val argsType = loadArray(load("java.lang.String"), 1)
-  val method = new MethodDefinition(unit.location, AST.M_PUBLIC, klass, "start", Array[Type](argsType), BasicType.VOID, null)
-  context.add("args", argsType)
-  for (element <- toplevels) {
-    if(!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass
-    element match {
-      case node: AST.CompoundExpression =>
-        context.setMethod(method)
-        statements += translate(node, context)
-      case _ =>
-        element match {
-          case node: AST.ClassDeclaration => processClassDeclaration(node, context)
-          case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
-          case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
-          case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
+  private object GenericMethodTypeArguments {
+    def infer(
+      callNode: AST.Node,
+      method: Method,
+      args: Array[Term],
+      classSubst: scala.collection.immutable.Map[String, Type]
+    ): scala.collection.immutable.Map[String, Type] =
+      infer(callNode, method, args, classSubst, null)
+
+    def explicit(
+      callNode: AST.Node,
+      method: Method,
+      typeArgs: List[AST.TypeNode],
+      classSubst: scala.collection.immutable.Map[String, Type]
+    ): Option[scala.collection.immutable.Map[String, Type]] = {
+      val typeParams = method.typeParameters
+      if (typeParams.isEmpty) {
+        report(METHOD_NOT_GENERIC, callNode, method.affiliation.name, method.name)
+        return None
+      }
+      if (typeParams.length != typeArgs.length) {
+        report(
+          METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
+          callNode,
+          method.affiliation.name,
+          method.name,
+          Integer.valueOf(typeParams.length),
+          Integer.valueOf(typeArgs.length)
+        )
+        return None
+      }
+
+      val mappedArgs = new Array[Type](typeArgs.length)
+      var i = 0
+      while (i < typeArgs.length) {
+        val mapped = mapFrom(typeArgs(i))
+        if (mapped == null) return None
+        if (mapped.isBasicType) {
+          report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mapped.name)
+          return None
+        }
+        mappedArgs(i) = mapped
+        i += 1
+      }
+
+      var subst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+      i = 0
+      while (i < typeParams.length) {
+        subst = subst.updated(typeParams(i).name, mappedArgs(i))
+        i += 1
+      }
+
+      i = 0
+      while (i < typeParams.length) {
+        val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
+        val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
+        val arg = mappedArgs(i)
+        if (!TypeRules.isAssignable(upper, arg)) {
+          report(INCOMPATIBLE_TYPE, typeArgs(i), upper, arg)
+          return None
+        }
+        i += 1
+      }
+
+      Some(subst)
+    }
+
+    def infer(
+      callNode: AST.Node,
+      method: Method,
+      args: Array[Term],
+      classSubst: scala.collection.immutable.Map[String, Type],
+      expectedReturn: Type
+    ): scala.collection.immutable.Map[String, Type] = {
+      val typeParams = method.typeParameters
+      if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
+
+      val bounds = HashMap[String, Type]()
+      for (tp <- typeParams) {
+        val upper = tp.upperBound.getOrElse(rootClass)
+        bounds += tp.name -> TypeSubstitution.substituteType(upper, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+      }
+
+      val inferred = HashMap[String, Type]()
+      val upperConstraints = HashMap[String, Type]()
+      val lowerConstraints = HashMap[String, Type]()
+      val paramNames = typeParams.map(_.name).toSet
+
+      def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
+        if (bound == null || bound.isNullType) return
+        upperConstraints.get(name) match
+          case None =>
+            upperConstraints += name -> bound
+          case Some(prev) =>
+            if (TypeRules.isSuperType(prev, bound)) upperConstraints += name -> bound
+            else if (TypeRules.isSuperType(bound, prev)) ()
+            else report(INCOMPATIBLE_TYPE, position, prev, bound)
+      }
+
+      def addLower(name: String, bound: Type): Unit = {
+        if (bound == null || bound.isNullType) return
+        lowerConstraints.get(name) match
+          case None =>
+            lowerConstraints += name -> bound
+          case Some(prev) =>
+            if (TypeRules.isSuperType(prev, bound)) ()
+            else if (TypeRules.isSuperType(bound, prev)) lowerConstraints += name -> bound
+            else lowerConstraints += name -> rootClass
+      }
+
+      def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
+        if (actual.isNullType) return
+        formal match {
+          case w: TypedAST.WildcardType =>
+            w.lowerBound match
+              case Some(lb) =>
+                lb match
+                  case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+                    addUpper(tv.name, actual, position)
+                  case _ =>
+                    unify(lb, actual, position)
+              case None =>
+                w.upperBound match
+                  case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+                    addLower(tv.name, actual)
+                  case _ =>
+                    unify(w.upperBound, actual, position)
+          case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+            inferred.get(tv.name) match {
+              case Some(prev) =>
+                if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
+              case None =>
+                inferred += tv.name -> actual
+            }
+          case apf: TypedAST.AppliedClassType =>
+            def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
+              if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
+                var i = 0
+                while (i < apf.typeArguments.length) {
+                  unify(apf.typeArguments(i), apa.typeArguments(i), position)
+                  i += 1
+                }
+
+            actual match
+              case apa: TypedAST.AppliedClassType =>
+                if (apf.raw eq apa.raw) then unifyWithApplied(apa)
+                else
+                  val views = AppliedTypeViews.collectAppliedViewsFrom(apa)
+                  views.get(apf.raw) match
+                    case Some(view) => unifyWithApplied(view)
+                    case None =>
+              case ct: ClassType =>
+                val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
+                views.get(apf.raw) match
+                  case Some(view) => unifyWithApplied(view)
+                  case None =>
+              case _ =>
+          case aft: ArrayType =>
+            actual match {
+              case aat: ArrayType if aft.dimension == aat.dimension =>
+                unify(aft.component, aat.component, position)
+              case _ =>
+            }
           case _ =>
         }
+      }
+
+      val formalArgs = method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      var i = 0
+      while (i < formalArgs.length && i < args.length) {
+        unify(formalArgs(i), args(i).`type`, callNode)
+        i += 1
+      }
+
+      if (expectedReturn != null) {
+        val formalReturn =
+          TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+        unify(formalReturn, expectedReturn, callNode)
+      }
+
+      for (tp <- typeParams) {
+        val name = tp.name
+        val bound0 = bounds(name)
+        val bound =
+          upperConstraints.get(name) match
+            case None => bound0
+            case Some(upper) =>
+              if (TypeRules.isSuperType(bound0, upper)) upper
+              else if (TypeRules.isSuperType(upper, bound0)) bound0
+              else {
+                report(INCOMPATIBLE_TYPE, callNode, bound0, upper)
+                bound0
+              }
+
+        val inferredType0 =
+          inferred.get(name)
+            .orElse(lowerConstraints.get(name))
+            .getOrElse(bound)
+
+        val inferredType =
+          if (!TypeRules.isAssignable(bound, inferredType0)) {
+            report(INCOMPATIBLE_TYPE, callNode, bound, inferredType0)
+            bound
+          } else {
+            inferredType0
+          }
+
+        inferred += name -> inferredType
+      }
+
+      inferred.toMap
     }
   }
-  if (klass != null) {
-    statements += new Return(null)
-    method.setBlock(new StatementBlock(statements.asJava))
-    method.setFrame(context.getContextFrame)
-    klass.add(method)
-    klass.add(createMain(klass, method, "main", Array[Type](argsType), BasicType.VOID))
+  private def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
+    val params = Array[Term](new AsInstanceOf(rhs, rootClass))
+    val target = lhs.`type`.asInstanceOf[ObjectType]
+    val methods = target.findMethod("equals", params)
+    var node: Term = new Call(lhs, methods(0), params)
+    if (kind == BinaryTerm.Constants.NOT_EQUAL) {
+      node = new UnaryTerm(NOT, BasicType.BOOLEAN, node)
+    }
+    node
   }
+  private def indexref(bind: ClosureLocalBinding, value: Term): Term =
+    new RefArray(new RefLocal(bind), value)
+  private def assign(bind: ClosureLocalBinding, value: Term): ActionStatement =
+    new ExpressionActionStatement(new SetLocal(bind, value))
+  private def ref(bind: ClosureLocalBinding): Term =
+    new RefLocal(bind)
+  private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
+    findMethod(node, target, name, new Array[Term](0))
+  private def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method = {
+    val methods = MethodResolution.findMethods(target, name, params)
+    if (methods.length == 0) {
+      report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
+      return null
+    }
+    methods(0)
+  }
+  private object MemberAccess {
+    private def hasSamePackage(a: ClassType, b: ClassType): Boolean = {
+      var name1 = a.name
+      var name2 = b.name
+      var index: Int = 0
+      index = name1.lastIndexOf(".")
+      if (index >= 0) name1 = name1.substring(0, index)
+      else name1 = ""
+      index = name2.lastIndexOf(".")
+      name2 = if (index >= 0) name2.substring(0, index) else ""
+      name1 == name2
+    }
+
+    def isTypeAccessible(target: ClassType, context: ClassType): Boolean = {
+      if (hasSamePackage(target, context)) true else (target.modifier & AST.M_INTERNAL) == 0
+    }
+
+    def isMemberAccessible(member: MemberRef, context: ClassType): Boolean = {
+      val targetType = member.affiliation
+      val modifier = member.modifier
+      if (targetType == context) {
+        true
+      } else if (TypeRules.isSuperType(targetType, context)) {
+        (modifier & AST.M_PROTECTED) != 0 || (modifier & AST.M_PUBLIC) != 0
+      } else {
+        (AST.M_PUBLIC & modifier) != 0
+      }
+    }
+
+    def findField(target: ObjectType, name: String): FieldRef = {
+      if (target == null) {
+        null
+      } else {
+        val direct = target.field(name)
+        if (direct != null) {
+          direct
+        } else {
+          val fromSuper = findField(target.superClass, name)
+          if (fromSuper != null) {
+            fromSuper
+          } else {
+            target.interfaces.iterator
+              .map(findField(_, name))
+              .find(_ != null)
+              .getOrElse(null)
+          }
+        }
+      }
+    }
+
+    def ensureTypeAccessible(node: AST.Node, target: ObjectType, context: ClassType): Boolean = {
+      if (target.isArrayType) {
+        val component = target.asInstanceOf[ArrayType].component
+        if (!component.isBasicType) {
+          if (!isTypeAccessible(component.asInstanceOf[ClassType], definition_)) {
+            report(CLASS_NOT_ACCESSIBLE, node, target, context)
+            return false
+          }
+        }
+      } else {
+        if (!isTypeAccessible(target.asInstanceOf[ClassType], context)) {
+          report(CLASS_NOT_ACCESSIBLE, node, target, context)
+          return false
+        }
+      }
+      true
+    }
+  }
+  private def hasNumericType(term: Term): Boolean = numeric(term.`type`)
+  private def numeric(symbol: Type): Boolean = {
+    symbol.isBasicType && (symbol == BasicType.BYTE || symbol == BasicType.SHORT || symbol == BasicType.CHAR || symbol == BasicType.INT || symbol == BasicType.LONG || symbol == BasicType.FLOAT || symbol == BasicType.DOUBLE)
+  }
+  private def types(terms: Array[Term]): Array[Type] = terms.map(term => term.`type`)
+  private def typeNames(types: Array[Type]): Array[String] = types.map(_.name)
+  private def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Continuable, Method] = {
+    val methods = MethodResolution.findMethods(target, name, params)
+    if (methods.length > 0) {
+      if (methods.length > 1) {
+        report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))
+        Left(false)
+      } else if (!MemberAccess.isMemberAccessible(methods(0), definition_)) {
+        report(METHOD_NOT_ACCESSIBLE, node, methods(0).affiliation, name, methods(0).arguments, definition_)
+        Left(false)
+      } else {
+        Right(methods(0))
+      }
+    }else {
+      Left(true)
+    }
+  }
+
+  private def sameTypes(left: Array[Type], right: Array[Type]): Boolean = {
+    if (left.length != right.length) return false
+    (for (i <- 0 until left.length) yield (left(i), right(i))).forall { case (l, r) => l eq r }
+  }
+  private def getter(name: String): String =
+    "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
+  private def getterBoolean(name: String): String =
+    "is" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
+  private def setter(name: String): String =
+    "set" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
+  private def promote(left: Type, right: Type): Type = {
+    if (!numeric(left) || !numeric(right)) return null
+    if ((left eq BasicType.DOUBLE) || (right eq BasicType.DOUBLE)) {
+      return BasicType.DOUBLE
+    }
+    if ((left eq BasicType.FLOAT) || (right eq BasicType.FLOAT)) {
+      return BasicType.FLOAT
+    }
+    if ((left eq BasicType.LONG) || (right eq BasicType.LONG)) {
+      return BasicType.LONG
+    }
+    BasicType.INT
+  }
+  private def processNumericExpression(kind: Int, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
+    var left = lt
+    var right = rt
+    if ((!hasNumericType(left)) || (!hasNumericType(right))) {
+      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      return null
+    }
+    val resultType = promote(left.`type`, right.`type`)
+    if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
+    if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
+    new BinaryTerm(kind, resultType, left, right)
+  }
+  private def promoteInteger(typeRef: Type): Type = {
+    if (typeRef == BasicType.BYTE || typeRef == BasicType.SHORT || typeRef == BasicType.CHAR || typeRef == BasicType.INT) {
+      return BasicType.INT
+    }
+    if (typeRef == BasicType.LONG) {
+      return BasicType.LONG
+    }
+    null
+  }
+  private def addArgument(arg: AST.Argument, context: LocalContext): Type = {
+    val name = arg.name
+    val binding = context.lookupOnlyCurrentScope(name)
+    if (binding != null) {
+      report(DUPLICATE_LOCAL_VARIABLE, arg, name)
+      return null
+    }
+    val argType = mapFrom(arg.typeRef, mapper_)
+    if(argType == null) return null
+    context.add(name, argType)
+    argType
+  }
+
+  private def runUnit(): Unit = {
+    unit_ = unit
+    val toplevels = unit.toplevels
+    val context = new LocalContext
+    val statements = Buffer[ActionStatement]()
+    mapper_ = find(topClass)
+    val klass = loadTopClass.asInstanceOf[ClassDefinition]
+    val argsType = loadArray(load("java.lang.String"), 1)
+    val method = new MethodDefinition(unit.location, AST.M_PUBLIC, klass, "start", Array[Type](argsType), BasicType.VOID, null)
+    context.add("args", argsType)
+    for (element <- toplevels) {
+      if (!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass
+      element match {
+        case node: AST.CompoundExpression =>
+          context.setMethod(method)
+          statements += translate(node, context)
+        case _ =>
+          element match {
+            case node: AST.ClassDeclaration => processClassDeclaration(node, context)
+            case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
+            case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
+            case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
+            case _ =>
+          }
+      }
+    }
+    if (klass != null) {
+      statements += new Return(null)
+      method.setBlock(new StatementBlock(statements.asJava))
+      method.setFrame(context.getContextFrame)
+      klass.add(method)
+      klass.add(createMain(klass, method, "main", Array[Type](argsType), BasicType.VOID))
+    }
   }
 }

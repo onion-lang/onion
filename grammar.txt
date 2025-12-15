@@ -17,23 +17,25 @@ type              ::= primitive | id | '#<' id (. id)* '>' | type ('[]')+
 primitive         ::= 'Byte' | 'Short' | 'Char' | 'Int' | 'Long' | 'Float' | 'Double' | 'Boolean' | 'Unit'
 
 class             ::= modifier* 'class' id (':' type)? ('<:' type (, type)*)? {
-                       (field | method | constructor)*
-                       (access : (field | method | constructor)*)*
+                       (field | delegated_field | method | constructor)*
+                       (access : (field | delegated_field | method | constructor)*)*
                      }
 interface         ::= modifier* 'interface' id ('<:' type (, type)*)? {
                         (id ('(' (var_decl (, var_decl)*)? ')')? (: type)? ;)*
                       }
                     
-field             ::= modifier* ('forward')? field_id : type [= expression] ;
+field             ::= modifier* ('val' | 'var') id : type [= expression] ;
+delegated_field   ::= modifier* 'forward' ('val' | 'var') id : type [= expression] ;
 method            ::= ['def'] modifier* id ( '(' (arg_list)? ')' )? (: type)? (; | block)
 constructor       ::= modifier* new ( '(' (arg_list)? ')' )? (: '(' [expression_list] ')' )? block
 function          ::= modifier* def id ( '(' (arg_list)? ')' )? (: type)? block
-global_var        ::= modifier* var id : type (= expression)? ;
+global_var        ::= modifier* ('val' | 'var') id : type (= expression)? ;
+local_var         ::= ('val' | 'var') id : type (= expression)? ;
 
 statement         ::= 'if' expression block [else block]
                     | 'select' expression { (case expr_list block)* [else block] } 
                     | 'while' expression block 
-                    | 'for' (var_decl | expression_stmt) expression ; [expr] block
+                    | 'for' (local_var | expression_stmt) expression ; [expr] block
                     | 'foreach' var_decl 'in' expression block
                     | 'synchronized' expression block
                     | 'try' block ('rec' id : type block)* 'fin' block
@@ -45,7 +47,7 @@ statement         ::= 'if' expression block [else block]
                     | ';'
                     | expression ;
                     | var_decl
-                    | id : type (= expression)? ;
+                    | local_var ;
 
 arg_list          ::= id : type (, id : type)*
                                     
@@ -78,4 +80,3 @@ unary_op          ::= ! | - | + | ~
 binary_op         ::= + | - | * | / | % | << || >> | >>> | ^ | & | '|' | < | > | <= | >= | == | != | === | !== | '||' | &&
 assign_op         ::= = | += | -= | *= | /= | %=
 id                ::= ([a-z] | [A-Z] | _) ([a-z] | [A-Z] | [0-9] | _)*
-field_id          ::= '@' id

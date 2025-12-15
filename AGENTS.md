@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Compiler pipeline and IR live in `src/main/scala/onion/compiler` (`Parsing` → `Rewriting` → `Typing` → `TypedGenerating`), returning `CompilationOutcome` and reporting via `CompilationReporter`.
+- Compiler pipeline and IR live in `src/main/scala/onion/compiler` (`Parsing` → `Rewriting` → `Typing` → `TypedGenerating`), returning `CompilationOutcome` and reporting via `CompilationReporter`. Typing is split into pass modules under `src/main/scala/onion/compiler/typing` (e.g., `TypingOutlinePass`, `TypingBodyPass`, `TypingDuplicationPass`).
 - CLI/tools are in `src/main/scala/onion/tools` (`CompilerFrontend`, `ScriptRunner`, `Shell`); Java helpers for JVM interop are in `src/main/java/onion`.
 - Parser grammar is JavaCC: edit `grammar/JJOnionParser.jj` (not generated sources). Generated parser code lands under `target/scala-*/src_managed/main/java/onion/compiler/parser`.
 - Samples are in `run/` (`*.on`), and user-facing docs are in `docs/` (MkDocs config: `mkdocs.yml`).
@@ -17,9 +17,9 @@
 
 ## Coding Style & Naming Conventions
 - Use 2-space indentation and the existing braced style; keep names `camelCase` (methods/vals) and `PascalCase` (types).
-- Prefer Scala 3 idioms (`given`/`using`, enums/ADTs) and avoid `null`; use `scala.util.Using` for resource safety.
+- Prefer Scala 3 idioms (`given`/`using`, enums/ADTs). Avoid introducing new `null` where feasible; prefer `Option`/sealed ADTs for new code, but keep consistency in legacy areas.
 - Keep codegen changes localized to the ASM backend (`AsmCodeGeneration*.scala`) and reuse the local-slot/capture utilities there.
-- Lint/refactor tooling is available via sbt-scalafix: use `sbt scalafix` when rules are configured for the change.
+- Lint/refactor tooling is available via sbt-scalafix: use `sbt scalafix` if/when a `.scalafix.conf` is present for the change.
 
 ## Testing Guidelines
 - Add/extend specs under `src/test/scala` using the existing `*Spec` naming pattern.

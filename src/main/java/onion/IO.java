@@ -1,10 +1,12 @@
 package onion;
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Scanner;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 
 public class IO {
+    private static final BufferedReader STDIN = new BufferedReader(new InputStreamReader(System.in));
+
     public static void print(Object o) {
         System.out.print(o);
     }
@@ -14,15 +16,27 @@ public class IO {
     }
 
     public static String readLine() {
-        try(var scanner = new Scanner(System.in)) {
-            return scanner.nextLine();
+        try {
+            return STDIN.readLine();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
+    public static String readln() {
+        return readLine();
+    }
+
+    public static String readln(String prompt) {
+        return input(prompt);
+    }
+
     public static String input(String prompt) {
-        try(var scanner = new Scanner(System.in)) {
-            System.out.print(prompt);
-            return scanner.nextLine();
+        System.out.print(prompt);
+        try {
+            return STDIN.readLine();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

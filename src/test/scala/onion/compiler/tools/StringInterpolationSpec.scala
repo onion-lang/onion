@@ -25,8 +25,8 @@ class StringInterpolationSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    x: Int = 5
-          |    y: Int = 10
+          |    val x: Int = 5
+          |    val y: Int = 10
           |    return "The sum of #{x} and #{y} is #{x + y}"
           |  }
           |}
@@ -43,8 +43,8 @@ class StringInterpolationSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    a: Int = 1
-          |    b: Int = 2
+          |    val a: Int = 1
+          |    val b: Int = 2
           |    return "#{a}#{b}"
           |  }
           |}
@@ -75,9 +75,9 @@ class StringInterpolationSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    a: Int = 1
-          |    b: Int = 2
-          |    c: Int = 3
+          |    val a: Int = 1
+          |    val b: Int = 2
+          |    val c: Int = 3
           |    return "a=#{a}, b=#{b}, c=#{c}, sum=#{a+b+c}"
           |  }
           |}

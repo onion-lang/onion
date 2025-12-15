@@ -18,7 +18,7 @@ class GenericsInterfaceBridgeSpec extends AbstractShellSpec {
           |  }
           |
           |  static def main(args: String[]): String {
-          |    i: I[String] = new Impl
+          |    val i: I[String] = new Impl
           |    return i.get("a")
           |  }
           |}
@@ -30,4 +30,3 @@ class GenericsInterfaceBridgeSpec extends AbstractShellSpec {
     }
   }
 }
-

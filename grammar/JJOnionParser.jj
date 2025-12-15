@@ -305,6 +305,7 @@ TOKEN:
 | <K_THROWS:       "throws"       >
 | <K_TRUE:         "true"         >
 | <K_TRY:          "try"          >
+| <K_VAL:          "val"          >
 | <K_VAR:          "var"          >
 | <K_VOID:         "void" | "Unit" >
 | <K_VOLATILE:     "volatile"     >
@@ -475,14 +476,16 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
 }
 
 AST.GlobalVariableDeclaration var_decl(int modifiers) : {
-  Token t1, t2;
+  Token keyword, name;
   AST.TypeNode ty = null;
   AST.Expression e = null;
 }{
   {enterSection();}
-  t1="var" t2=<ID> [":" ty=type()] ["=" e=term()] eos() {
+  (keyword="val" | keyword="var") name=<ID> ":" ty=type() ["=" e=term()] eos() {
+    int declMods = modifiers;
+    if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
     return new AST.GlobalVariableDeclaration(
-      p(t1), modifiers, t2.image, ty, e
+      p(keyword), declMods, name.image, ty, e
     );
   }
 }
@@ -767,26 +770,27 @@ AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
   AST.Expression init = null;
 }{
   {enterSection();}
-  start="forward" name=<ID> [":" type = type()]
+  start="forward" name=<ID> ":" type = type()
   ["=" eols() init=term()] eos() {
     return new AST.DelegatedFieldDeclaration(p(start), modifiers, name.image, type, init);
   }
 }
 
 AST.FieldDeclaration field_decl(int modifiers):{
-  Token name;
+  Token keyword, name;
   AST.TypeNode type = null;
   AST.Expression init = null;
 }{
   {enterSection();}
-  name=<ID> ":" [type=type()]
+  (keyword="val" | keyword="var") name=<ID> ":" type=type()
   ["=" eols() init=term()] eos() {
-    return new AST.FieldDeclaration(p(name), modifiers, name.image, type, init);
+    int declMods = modifiers;
+    if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
+    return new AST.FieldDeclaration(p(keyword), declMods, name.image, type, init);
   }
 }
 
 AST.CompoundExpression statement():{AST.CompoundExpression s;}{
-  LOOKAHEAD(2)
   s=local_var_statement()    {return s;}
 | s=if_statement()           {return s;}
 | s=while_statement()        {return s;}
@@ -813,10 +817,10 @@ void eols() :{} {
   (<EOL>)*
 }
 
-AST.LocalVariableDeclaration local_var_statement() :{Token t; AST.TypeNode ty; AST.Expression e = null;}{
+AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declMods = 0; AST.TypeNode ty; AST.Expression e = null;}{
   {enterSection();}
-  t=<ID>
-  ":" ty=type() ["=" eols() e=term()] eos() {return new AST.LocalVariableDeclaration(p(t), t.image, ty, e);}
+  (keyword="val" {declMods = AST.M_FINAL();} | keyword="var" {declMods = 0;})
+  t=<ID> ":" ty=type() ["=" eols() e=term()] eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, t.image, ty, e);}
 }
 
 AST.BreakExpression break_statement() :{Token t;}{
@@ -892,7 +896,7 @@ AST.ForeachExpression foreach_statement() :{Token t; AST.Argument a; AST.Express
 }
 
 AST.ForExpression for_statement() :{Token t; AST.CompoundExpression s; AST.Expression e1 = null, e2 = null; AST.BlockExpression b;}{
-  t="for" (LOOKAHEAD(2) s=local_var_statement() | s=exp_statement() | s=empty_statement())
+  t="for" (s=local_var_statement() | s=exp_statement() | s=empty_statement())
   [e1=term()] ";" [e2=term()] b=block() {
   	return new AST.ForExpression(p(t), s, e1, e2, b);
   }

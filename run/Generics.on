@@ -1,5 +1,5 @@
 class Box[T] {
-  value :T;
+  val value: T;
 public:
   def this(value :T) {
     this.value = value;
@@ -9,5 +9,5 @@ public:
   }
 }
 
-box = new Box("Hello");
+val box: Box[String] = new Box[String]("Hello");
 System::out.println(box.get);

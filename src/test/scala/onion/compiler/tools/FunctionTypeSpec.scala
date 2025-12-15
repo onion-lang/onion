@@ -10,7 +10,7 @@ class FunctionTypeSpec extends AbstractShellSpec {
           |class FunctionTypeArrowLocal {
           |public:
           |  static def main(args: String[]): String {
-          |    f: (String) -> String = (x: String) -> { return x.toUpperCase(); }
+          |    val f: (String) -> String = (x: String) -> { return x.toUpperCase(); }
           |    return f.call("a")
           |  }
           |}
@@ -31,7 +31,7 @@ class FunctionTypeSpec extends AbstractShellSpec {
           |  }
           |
           |  static def main(args: String[]): String {
-          |    f: (String) -> String = (x: String) -> { return x + "!"; }
+          |    val f: (String) -> String = (x: String) -> { return x + "!"; }
           |    return FunctionTypeArrowParam::applyTwice(f, "a")
           |  }
           |}
@@ -48,7 +48,7 @@ class FunctionTypeSpec extends AbstractShellSpec {
           |class ArrowLambdaSyntax {
           |public:
           |  static def main(args: String[]): String {
-          |    f: (String) -> String = (x: String) -> { return x + "!"; }
+          |    val f: (String) -> String = (x: String) -> { return x + "!"; }
           |    return f.call("a")
           |  }
           |}

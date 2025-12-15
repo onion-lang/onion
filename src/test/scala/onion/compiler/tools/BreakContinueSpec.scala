@@ -10,8 +10,8 @@ class BreakContinueSpec extends AbstractShellSpec {
           |class BreakTest {
           |public:
           |  static def main(args: String[]): Int {
-          |    count = 0
-          |    i = 0
+          |    var count: Int = 0
+          |    var i: Int = 0
           |    while i < 10 {
           |      if i == 5 {
           |        break
@@ -35,8 +35,8 @@ class BreakContinueSpec extends AbstractShellSpec {
           |class ContinueTest {
           |public:
           |  static def main(args: String[]): Int {
-          |    count = 0
-          |    i = 0
+          |    var count: Int = 0
+          |    var i: Int = 0
           |    while i < 10 {
           |      i = i + 1
           |      if i % 2 == 0 {

@@ -92,7 +92,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
     val frame = new LocalFrame(null)
     for (i <- 0 until params.length) {
       val index = frame.add("arg" + i, args(i))
-      params(i) = new RefLocal(new ClosureLocalBinding(0, index, args(i)))
+      params(i) = new RefLocal(new ClosureLocalBinding(0, index, args(i), isMutable = true))
     }
     val target = new Call(new RefField(new This(definition_), delegated), delegator, params)
     val statement =
@@ -146,4 +146,3 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
     DuplicationChecks.checkErasureSignatureCollisions(clazz, node.location)
   }
 }
-

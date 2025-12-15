@@ -20,7 +20,7 @@ class CountersSpec extends AbstractShellSpec {
           |     }
           |
           |   static def main(args: String[]): Int {
-          |     c = counter(1, 10)
+          |     val c: () -> JInteger = counter(1, 10)
           |     c.call().intValue()
           |     c.call().intValue()
           |     return c.call().intValue()

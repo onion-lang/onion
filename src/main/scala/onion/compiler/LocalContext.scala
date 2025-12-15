@@ -91,12 +91,16 @@ class LocalContext {
   }
 
   def add(name: String, `type` : IRT.Type): Int = {
-    contextFrame.add(name, `type`)
+    add(name, `type`, isMutable = true)
+  }
+
+  def add(name: String, `type`: IRT.Type, isMutable: Boolean): Int = {
+    contextFrame.add(name, `type`, isMutable)
   }
 
   def add(`type` : IRT.Type): String = {
     val name = newName
-    contextFrame.add(name, `type`)
+    contextFrame.add(name, `type`, isMutable = true)
     name
   }
 

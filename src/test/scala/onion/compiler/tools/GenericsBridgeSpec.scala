@@ -21,7 +21,7 @@ class GenericsBridgeSpec extends AbstractShellSpec {
           |  }
           |
           |  static def main(args: String[]): String {
-          |    b: Base[String] = new Sub
+          |    val b: Base[String] = new Sub
           |    return b.get("a")
           |  }
           |}

@@ -1,9 +1,8 @@
 class JavaGenericsDemo {
 public:
   static def main(args: String[]): String {
-    list: ArrayList[String] = new ArrayList[String]
+    val list: ArrayList[String] = new ArrayList[String]
     list.add("ok")
     return list.get(0)
   }
 }
-

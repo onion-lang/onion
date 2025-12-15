@@ -88,6 +88,10 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(message("error.semantic.variableNotFound"), items(0).asInstanceOf[String]))
   }
 
+  private def reportCannotAssignToVal(position: Location, items: Array[AnyRef]): Unit = {
+    problem(position, format(message("error.semantic.cannotAssignToVal"), items(0).asInstanceOf[String]))
+  }
+
   private def reportClassNotFound(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.classNotFound"), items(0).asInstanceOf[String]))
   }
@@ -255,6 +259,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportIncompatibleOperandType(position, items)
       case SemanticError.VARIABLE_NOT_FOUND =>
         reportVariableNotFound(position, items)
+      case SemanticError.CANNOT_ASSIGN_TO_VAL =>
+        reportCannotAssignToVal(position, items)
       case SemanticError.CLASS_NOT_FOUND =>
         reportClassNotFound(position, items)
       case SemanticError.FIELD_NOT_FOUND =>

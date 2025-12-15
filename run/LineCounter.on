@@ -1,7 +1,7 @@
 def countLines(file: File): Int {
-  reader = new BufferedReader(new FileReader(file));
-  count = 0;
-  for line: String = null; (line = reader.readLine) != null; {
+  val reader: BufferedReader = new BufferedReader(new FileReader(file));
+  var count: Int = 0;
+  for var line: String = null; (line = reader.readLine) != null; {
     count++;
   }
   return count;
@@ -18,10 +18,10 @@ def process(file: File, callback: Function1) {
   }
 }
 
-lines = 0;
+var lines: Int = 0;
 foreach file: File in [new File("src"), new File("run")] {
   process(file, (file: Object) -> {
-    f = file$File;
+    val f: File = file$File;
     if f.name.endsWith(".scala") || f.name.endsWith(".java") || f.name.endsWith(".jj") {
       lines = lines + countLines(f);
     }

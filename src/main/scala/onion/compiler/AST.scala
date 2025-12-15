@@ -152,7 +152,7 @@ object AST {
   case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends CompoundExpression
   case class ForExpression(location: Location, init: CompoundExpression, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends CompoundExpression
   case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
-  case class LocalVariableDeclaration(location: Location, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends CompoundExpression
+  case class LocalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends CompoundExpression
   case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends CompoundExpression
   case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Expression], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
   case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression

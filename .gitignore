@@ -19,6 +19,7 @@ target/
 .bloop/
 .metals/
 .vscode/
+.sbt/
 
 # MkDocs
 site/

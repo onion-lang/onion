@@ -10,7 +10,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaList {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("ok")
           |    return list.get(0)
           |  }
@@ -28,7 +28,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaGenericMethod {
           |public:
           |  static def main(args: String[]): String {
-          |    list = Collections::singletonList[String]("x")
+          |    val list: List[String] = Collections::singletonList[String]("x")
           |    return list.get(0)
           |  }
           |}
@@ -45,7 +45,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaMap {
           |public:
           |  static def main(args: String[]): String {
-          |    map: HashMap[String, String] = new HashMap[String, String]
+          |    val map: HashMap[String, String] = new HashMap[String, String]
           |    map.put("k", "v")
           |    return map.get("k")
           |  }
@@ -63,9 +63,9 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaListAsSuper {
           |public:
           |  static def main(args: String[]): String {
-          |    impl: ArrayList[String] = new ArrayList[String]
+          |    val impl: ArrayList[String] = new ArrayList[String]
           |    impl.add("ok")
-          |    asList: List[String] = impl
+          |    val asList: List[String] = impl
           |    return asList.get(0)
           |  }
           |}
@@ -82,9 +82,9 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsCopy {
           |public:
           |  static def main(args: String[]): String {
-          |    src: ArrayList[String] = new ArrayList[String]
+          |    val src: ArrayList[String] = new ArrayList[String]
           |    src.add("x")
-          |    dest: ArrayList[Object] = new ArrayList[Object]
+          |    val dest: ArrayList[Object] = new ArrayList[Object]
           |    dest.add("y")
           |
           |    Collections::copy[String](dest, src)
@@ -104,7 +104,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsSort {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("b")
           |    list.add("a")
           |    Collections::sort(list)
@@ -124,7 +124,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsMax {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("b")
           |    list.add("a")
           |    return Collections::max(list)
@@ -143,11 +143,11 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsBinarySearch {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("b")
           |    list.add("a")
           |    Collections::sort(list)
-          |    idx = Collections::binarySearch(list, "b")
+          |    val idx: Int = Collections::binarySearch(list, "b")
           |    return "" + idx
           |  }
           |}
@@ -164,7 +164,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsReverse {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    Collections::reverse(list)
@@ -184,9 +184,9 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsUnmodifiableList {
           |public:
           |  static def main(args: String[]): String {
-          |    src: ArrayList[String] = new ArrayList[String]
+          |    val src: ArrayList[String] = new ArrayList[String]
           |    src.add("ok")
-          |    v: List[String] = Collections::unmodifiableList(src)
+          |    val v: List[String] = Collections::unmodifiableList(src)
           |    return v.get(0)
           |  }
           |}
@@ -203,7 +203,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsMin {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("b")
           |    list.add("a")
           |    return Collections::min(list)
@@ -222,7 +222,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsSwap {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    Collections::swap(list, 0, 1)
@@ -242,7 +242,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsFill {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[Object] = new ArrayList[Object]
+          |    val list: ArrayList[Object] = new ArrayList[Object]
           |    list.add(new Object)
           |    list.add(new Object)
           |    Collections::fill(list, "x")
@@ -262,7 +262,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsReplaceAll {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    Collections::replaceAll(list, "a", "x")
@@ -282,7 +282,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsFrequency {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    list.add("a")
@@ -302,9 +302,9 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsDisjoint {
           |public:
           |  static def main(args: String[]): String {
-          |    a: ArrayList[String] = new ArrayList[String]
+          |    val a: ArrayList[String] = new ArrayList[String]
           |    a.add("a")
-          |    b: ArrayList[String] = new ArrayList[String]
+          |    val b: ArrayList[String] = new ArrayList[String]
           |    b.add("b")
           |    b.add("a")
           |    return "" + Collections::disjoint(a, b)
@@ -323,11 +323,11 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsIndexOfSubList {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    list.add("c")
-          |    sub: ArrayList[String] = new ArrayList[String]
+          |    val sub: ArrayList[String] = new ArrayList[String]
           |    sub.add("b")
           |    sub.add("c")
           |    return "" + Collections::indexOfSubList(list, sub)
@@ -346,13 +346,13 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsLastIndexOfSubList {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    list.add("c")
           |    list.add("b")
           |    list.add("c")
-          |    sub: ArrayList[String] = new ArrayList[String]
+          |    val sub: ArrayList[String] = new ArrayList[String]
           |    sub.add("b")
           |    sub.add("c")
           |    return "" + Collections::lastIndexOfSubList(list, sub)
@@ -371,7 +371,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsRotate {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
           |    list.add("b")
           |    list.add("c")
@@ -392,9 +392,9 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsSynchronizedList {
           |public:
           |  static def main(args: String[]): String {
-          |    src: ArrayList[String] = new ArrayList[String]
+          |    val src: ArrayList[String] = new ArrayList[String]
           |    src.add("ok")
-          |    v: List[String] = Collections::synchronizedList(src)
+          |    val v: List[String] = Collections::synchronizedList(src)
           |    return v.get(0)
           |  }
           |}
@@ -411,7 +411,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsEmptyList {
           |public:
           |  static def main(args: String[]): String {
-          |    v: List[String] = Collections::emptyList[String]()
+          |    val v: List[String] = Collections::emptyList[String]()
           |    return "" + v.isEmpty
           |  }
           |}
@@ -428,7 +428,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsEmptyListInferred {
           |public:
           |  static def main(args: String[]): String {
-          |    v: List[String] = Collections::emptyList()
+          |    val v: List[String] = Collections::emptyList()
           |    return "" + v.isEmpty
           |  }
           |}
@@ -445,7 +445,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsNCopies {
           |public:
           |  static def main(args: String[]): String {
-          |    v: List[String] = Collections::nCopies(3, "x")
+          |    val v: List[String] = Collections::nCopies(3, "x")
           |    return v.get(2)
           |  }
           |}
@@ -462,7 +462,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsSingletonMap {
           |public:
           |  static def main(args: String[]): String {
-          |    m = Collections::singletonMap("k", "v")
+          |    val m: Map[String, String] = Collections::singletonMap("k", "v")
           |    return m.get("k")
           |  }
           |}
@@ -479,8 +479,8 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsEmptyMap {
           |public:
           |  static def main(args: String[]): String {
-          |    m: Map[String, String] = Collections::emptyMap[String, String]()
-          |    v = m.get("missing")
+          |    val m: Map[String, String] = Collections::emptyMap[String, String]()
+          |    val v: String = m.get("missing")
           |    if v == null { return "null"; }
           |    return v
           |  }
@@ -498,8 +498,8 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsEmptyMapInferred {
           |public:
           |  static def main(args: String[]): String {
-          |    m: Map[String, String] = Collections::emptyMap()
-          |    v = m.get("missing")
+          |    val m: Map[String, String] = Collections::emptyMap()
+          |    val v: String = m.get("missing")
           |    if v == null { return "null"; }
           |    return v
           |  }
@@ -517,10 +517,10 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsEnumeration {
           |public:
           |  static def main(args: String[]): String {
-          |    list: ArrayList[String] = new ArrayList[String]
+          |    val list: ArrayList[String] = new ArrayList[String]
           |    list.add("a")
-          |    e: Enumeration[String] = Collections::enumeration(list)
-          |    list2: ArrayList[String] = Collections::list(e)
+          |    val e: Enumeration[String] = Collections::enumeration(list)
+          |    val list2: ArrayList[String] = Collections::list(e)
           |    return list2.get(0)
           |  }
           |}
@@ -537,8 +537,8 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
           |class JavaCollectionsNewSetFromMap {
           |public:
           |  static def main(args: String[]): String {
-          |    m: HashMap[String, JBoolean] = new HashMap[String, JBoolean]
-          |    s: Set[String] = Collections::newSetFromMap(m)
+          |    val m: HashMap[String, JBoolean] = new HashMap[String, JBoolean]
+          |    val s: Set[String] = Collections::newSetFromMap(m)
           |    s.add("x")
           |    return "" + s.contains("x")
           |  }

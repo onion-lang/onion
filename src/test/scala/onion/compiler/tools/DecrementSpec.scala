@@ -10,7 +10,7 @@ class DecrementSpec extends AbstractShellSpec {
           | class Decrement {
           | public:
           |   static def main(args: String[]): Int {
-          |     i = 10;
+          |     var i: Int = 10;
           |     for ; i >= 0; i-- { }
           |     return i;
           |   }

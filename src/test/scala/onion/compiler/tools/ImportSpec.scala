@@ -13,7 +13,7 @@ class ImportSpec extends AbstractShellSpec {
           | class Increment {
           | public:
           |   static def main(args: String[]): Int {
-          |     xs = new ArrayList()
+          |     val xs: ArrayList = new ArrayList()
           |     xs.add(new Integer(2))
           |     return xs.get(0)$Integer.intValue()
           |   }

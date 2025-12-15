@@ -1,16 +1,17 @@
 def filterLines(filter :Function1) :String {
-  reader = new BufferedReader(new InputStreamReader(System::in));
-  buffer = new StringBuffer;
+  val reader: BufferedReader = new BufferedReader(new InputStreamReader(System::in));
+  val buffer: StringBuffer = new StringBuffer;
+  var line: String = null;
   while (line = reader.readLine) != null {
     buffer.append(filter.call(line)$String);
   }
   return new String(buffer);
 }
 
-i = 1;
+var i: Int = 1;
 
-lines = filterLines((line :Object) -> {
-  newLine = i + ":" + line;
+val lines: String = filterLines((line :Object) -> {
+  val newLine: String = i + ":" + line;
   i++;
   return newLine + System::getProperty("line.separator");
 });

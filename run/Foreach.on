@@ -1,5 +1,4 @@
-
-strings = new ArrayList;
+val strings: ArrayList[String] = new ArrayList[String];
 
 strings << "Foo";
 strings << "Bar";

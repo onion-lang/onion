@@ -160,23 +160,18 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     if (value == null) return null
     val id = node.lhs.asInstanceOf[AST.Id]
     val bind = context.lookup(id.name)
-    var frame = 0
-    var index = 0
-    var leftType: Type = null
-    val rightType: Type = value.`type`
-    if (bind != null) {
-      frame = bind.frameIndex
-      index = bind.index
-      leftType = bind.tp
-    } else {
-      frame = 0
-      if (rightType.isNullType) {
-        leftType = rootClass
-      } else {
-        leftType = rightType
-      }
-      index = context.add(id.name, leftType)
+    if (bind == null) {
+      report(VARIABLE_NOT_FOUND, id, id.name)
+      return null
     }
+    if (!bind.isMutable) {
+      report(CANNOT_ASSIGN_TO_VAL, id, id.name)
+      return null
+    }
+
+    val frame = bind.frameIndex
+    val index = bind.index
+    val leftType = bind.tp
     value = processAssignable(node.rhs, leftType, value)
     if (value != null) new SetLocal(frame, index, leftType, value) else null
   }
@@ -227,6 +222,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         val field: FieldRef = MemberAccess.findField(targetType, name)
         val value: Term = typed(expression, context).getOrElse(null)
         if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
+          if (Modifier.isFinal(field.modifier) && (context.constructor == null || !target.isInstanceOf[This])) {
+            report(CANNOT_ASSIGN_TO_VAL, node, field.name)
+            return null
+          }
           val classSubst = TypeSubstitution.classSubstitution(target.`type`)
           val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
           val term = processAssignable(expression, expected, value)
@@ -917,6 +916,15 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
     Option(operand match {
       case ref: RefLocal =>
+        termNode match {
+          case id: AST.Id =>
+            val bind = context.lookup(id.name)
+            if (bind != null && !bind.isMutable) {
+              report(CANNOT_ASSIGN_TO_VAL, id, id.name)
+              return None
+            }
+          case _ =>
+        }
         val varIndex = context.add(context.newName, operand.`type`)
         new Begin(
           new SetLocal(0, varIndex, operand.`type`, operand),
@@ -924,6 +932,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
           new RefLocal(0, varIndex, operand.`type`)
         )
       case ref: RefField =>
+        if (Modifier.isFinal(ref.field.modifier)) {
+          report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
+          return None
+        }
         val varIndex = context.add(context.newName, ref.target.`type`)
         new Begin(
           new SetLocal(0, varIndex, ref.target.`type`, ref.target),
@@ -1151,7 +1163,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
                       )
                     val desired = expectedArgs(i)
                     if (desired ne erased) {
-                      val rawBind = new ClosureLocalBinding(bind.frameIndex, bind.index, erased)
+                      val rawBind = new ClosureLocalBinding(bind.frameIndex, bind.index, erased, bind.isMutable)
                       val casted = new AsInstanceOf(new RefLocal(rawBind), desired)
                       prologue += new ExpressionActionStatement(new SetLocal(bind, casted))
                     }
@@ -1246,10 +1258,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
           new NOP(node.location)
         } else {
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
-          val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`)
+          val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
 
           if (collection.isArrayType) {
-            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT)
+            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT, isMutable = true)
             val init =
               new StatementBlock(
                 new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
@@ -1268,7 +1280,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
             new StatementBlock(init, block)
           } else {
             val iteratorType = load("java.util.Iterator")
-            val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType)
+            val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
             val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
             val mNext = findMethod(node.collection, iteratorType, "next")
             val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
@@ -1313,7 +1325,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         val elseBlock = if (node.elseBlock == null) null else translate(node.elseBlock, context)
         conditionOpt.map{c => new IfStatement(c, thenBlock, elseBlock)}.getOrElse(new NOP(loc))
       }
-    case node@AST.LocalVariableDeclaration(loc, name, typeRef, init) =>
+    case node@AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
       val binding = context.lookupOnlyCurrentScope(name)
       if (binding != null) {
         report(DUPLICATE_LOCAL_VARIABLE, node, name)
@@ -1321,7 +1333,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       }
       val lhsType = mapFrom(node.typeRef)
       if (lhsType == null) return new NOP(loc)
-      val index = context.add(name, lhsType)
+      val index = context.add(name, lhsType, isMutable = !Modifier.isFinal(modifiers))
       var local: SetLocal = null
       if (init != null) {
         val valueNode = typed(init, context, lhsType)

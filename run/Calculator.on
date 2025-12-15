@@ -5,16 +5,16 @@ import {
 }
 
 class Calculator : JFrame <: ActionListener {
-	text			:JTextField
-	left			:Long
-	right		    :Long
-	operator	    :String
-	isError	    	:Boolean
+	val text: JTextField
+	var left: Long
+	var right: Long
+	var operator: String
+	var isError: Boolean
 public:
 	def setValue(value : Long) { this.text.setText(JLong::toString(value)); }
 	def setValue(value : String) { this.text.setText(value); }
 	def actionPerformed(event : ActionEvent) {
-		label = event.source$JButton.label
+		val label: String = event.source$JButton.label
 		if label == "C" {
 			this.left = 0
 			this.right = 0
@@ -31,21 +31,21 @@ public:
 		setSize(800, 600)
 		this.text		= new JTextField
 		this.text.setHorizontalAlignment(JTextField::RIGHT)
-		pane		= getContentPane()
-		north		= new JPanel
+		val pane: Container = getContentPane()
+		val north: JPanel = new JPanel
 		north.setLayout(new BorderLayout)
 		north.add(this.text, BorderLayout::NORTH)
-		center= new JPanel
+		val center: JPanel = new JPanel
 		center.setLayout(new GridLayout(4, 5, 4, 3))
 		center.setFont(new Font(null, Font::PLAIN, 8))
-		labels = [
+		val labels: java.util.List = [
 			"7", "8", "9", "C",
 			"4", "5", "6", "*",
 			"1", "2", "3", "-",
 			"0", "=", "/", "+"
 		]
 		foreach label:String in labels {
-			button = new JButton(label$String)
+			val button: JButton = new JButton(label$String)
 			button.addActionListener(this)
 			button.setPreferredSize(new Dimension(42, 28))
 			center.add(button)
@@ -55,7 +55,7 @@ public:
 	}
 
 	static def main(args :String[]){
-		frame = new Calculator
+		val frame: Calculator = new Calculator
 		frame.pack
 		frame.setVisible(true)
 	}

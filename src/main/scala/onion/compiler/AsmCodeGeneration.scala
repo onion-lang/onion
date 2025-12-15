@@ -262,9 +262,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     def collectFromExpression(expr: Term): Unit = expr match
       case ref: RefLocal if ref.frame != 0 =>
-        captured.getOrElseUpdate(ref.index, LocalBinding(ref.index, ref.`type`))
+        captured.getOrElseUpdate(ref.index, LocalBinding(ref.index, ref.`type`, isMutable = true))
       case set: SetLocal if set.frame != 0 =>
-        captured.getOrElseUpdate(set.index, LocalBinding(set.index, set.`type`))
+        captured.getOrElseUpdate(set.index, LocalBinding(set.index, set.`type`, isMutable = true))
         collectFromExpression(set.value)
       case bin: BinaryTerm =>
         collectFromExpression(bin.lhs)

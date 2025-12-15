@@ -10,7 +10,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |class Box[T] {
-          |  value: T
+          |  var value: T
           |public:
           |  def this {
           |  }
@@ -27,7 +27,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |class UseBox {
           |public:
           |  static def main(args: String[]): String {
-          |    box = new Box[String]
+          |    val box: Box[String] = new Box[String]
           |    box.set("hello")
           |    return box.get()
           |  }
@@ -43,7 +43,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |class Box[T extends Object] {
-          |  value: T
+          |  var value: T
           |public:
           |  def this {
           |  }
@@ -60,7 +60,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |class UseBox {
           |public:
           |  static def main(args: String[]): String {
-          |    box = new Box[String]
+          |    val box: Box[String] = new Box[String]
           |    box.set("hello")
           |    return box.get()
           |  }
@@ -167,14 +167,14 @@ class GenericsTypingSpec extends AbstractShellSpec {
             |  def this { }
             |}
             |
-            |class UseBoundBox {
-            |public:
-            |  static def main(args: String[]): String {
-            |    good = new BoundBox[String]
-            |    bad = new BoundBox[Object]
-            |    return "done"
-            |  }
-            |}
+          |class UseBoundBox {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val good: BoundBox[String] = new BoundBox[String]
+          |    val bad: BoundBox[Object] = new BoundBox[Object]
+          |    return "done"
+          |  }
+          |}
             |""".stripMargin,
           "UseBoundBox.on",
           Array()
@@ -214,14 +214,14 @@ class GenericsTypingSpec extends AbstractShellSpec {
         """
           |class Box[T] {
           |public:
-          |  value: T
+          |  var value: T
           |  def this { }
           |}
           |
           |class UseBoxFieldOk {
           |public:
           |  static def main(args: String[]): String {
-          |    b: Box[String] = new Box[String]
+          |    val b: Box[String] = new Box[String]
           |    b.value = "ok"
           |    return b.value
           |  }
@@ -237,14 +237,14 @@ class GenericsTypingSpec extends AbstractShellSpec {
           """
             |class Box[T] {
             |public:
-            |  value: T
+            |  var value: T
             |  def this { }
             |}
             |
             |class UseBoxFieldBad {
             |public:
             |  static def main(args: String[]): Int {
-            |    b: Box[String] = new Box[String]
+            |    val b: Box[String] = new Box[String]
             |    b.value = new Object
             |    return 0
             |  }
@@ -271,7 +271,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |  }
           |
           |  static def main(args: String[]): String {
-          |    p = new PickerImpl
+          |    val p: PickerImpl = new PickerImpl
           |    return p.pick("x")
           |  }
           |}
@@ -334,7 +334,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |    return x
           |  }
           |  static def main(args: String[]): String {
-          |    i: Id2[String] = new OkImpl
+          |    val i: Id2[String] = new OkImpl
           |    return i.id("ok")
           |  }
           |}

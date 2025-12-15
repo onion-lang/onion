@@ -44,13 +44,17 @@ class LocalFrame(val parent: LocalFrame) {
   }
 
   def add(name: String, `type` : IRT.Type): Int = {
+    add(name, `type`, isMutable = true)
+  }
+
+  def add(name: String, `type`: IRT.Type, isMutable: Boolean): Int = {
     val bind = scope.get(name)
     bind match {
       case Some(_) => -1
       case None =>
         val index = maxIndex
         maxIndex += 1
-        scope.put(name, LocalBinding(index, `type`))
+        scope.put(name, LocalBinding(index, `type`, isMutable))
         index
     }
   }
@@ -61,7 +65,7 @@ class LocalFrame(val parent: LocalFrame) {
     while (frame != null) {
       val binding = frame.scope.lookup(name)
       if (binding != null) {
-        return new ClosureLocalBinding(frameIndex, binding.index, binding.tp)
+        return new ClosureLocalBinding(frameIndex, binding.index, binding.tp, binding.isMutable)
       }
       frameIndex += 1
       frame = frame.parent
@@ -71,7 +75,7 @@ class LocalFrame(val parent: LocalFrame) {
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     for(binding <- scope.get(name)) {
-      return new ClosureLocalBinding(0, binding.index, binding.tp)
+      return new ClosureLocalBinding(0, binding.index, binding.tp, binding.isMutable)
     }
     null
   }

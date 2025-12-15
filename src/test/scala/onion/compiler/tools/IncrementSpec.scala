@@ -10,8 +10,8 @@ class IncrementSpec extends AbstractShellSpec {
           | class Increment {
           | public:
           |   static def main(args: String[]): Int {
-          |     i = 0;
-          |     for i = 0; i < 10; i++ { }
+          |     var i: Int = 0;
+          |     for ; i < 10; i++ { }
           |     return i;
           |   }
           | }

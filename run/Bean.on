@@ -4,8 +4,8 @@ import {
 }
 
 class ExampleBean <: Serializable {
-  name :String;
-  value :Int;
+  var name: String;
+  var value: Int;
 
 public:
   def this {
@@ -37,12 +37,12 @@ public:
   }
 }
 
-out = new ByteArrayOutputStream;
+val out: ByteArrayOutputStream = new ByteArrayOutputStream;
 
-encoder = new XMLEncoder(out);
+val encoder: XMLEncoder = new XMLEncoder(out);
 encoder.writeObject(new ExampleBean("HogeBean", 100));
 encoder.close;
 
-decoder = new XMLDecoder(new ByteArrayInputStream(out.toByteArray()));
-bean = decoder.readObject$ExampleBean;
+val decoder: XMLDecoder = new XMLDecoder(new ByteArrayInputStream(out.toByteArray()));
+val bean: ExampleBean = decoder.readObject$ExampleBean;
 System::out.println(bean);

@@ -10,8 +10,8 @@ class TerminatorSpec extends AbstractShellSpec {
           | class LocalVar {
           | public:
           |   static def main(args: String[]): Int {
-          |     val i: Int = 10
-          |     val j: Int = 
+          |     val i = 10
+          |     val j =
           |       20
           |     return 0;
           |   }

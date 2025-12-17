@@ -1,8 +1,7 @@
-val arr: String[] = new String[3];
+val arr = new String[3];
 arr[0] = "foo";
 arr[1] = "bar";
 arr[2] = "baz";
 for var i: Int = 0; i < arr.length; i = i + 1 {
   System::out.println(arr[i]);
 }
-

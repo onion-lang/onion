@@ -1331,24 +1331,36 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         report(DUPLICATE_LOCAL_VARIABLE, node, name)
         return new NOP(loc)
       }
-      val lhsType = mapFrom(node.typeRef)
-      if (lhsType == null) return new NOP(loc)
-      val index = context.add(name, lhsType, isMutable = !Modifier.isFinal(modifiers))
-      var local: SetLocal = null
-      if (init != null) {
-        val valueNode = typed(init, context, lhsType)
-        valueNode match {
-          case None => return new NOP(loc)
-          case Some(v) =>
-            val value = processAssignable(init, lhsType, v)
-            if(value == null) return new NOP(loc)
-            local = new SetLocal(loc, 0, index, lhsType, value)
+      if (typeRef == null) {
+        val inferred = typed(init, context).getOrElse(null)
+        if (inferred == null) return new NOP(loc)
+        val inferredType = inferred.`type`
+        if (inferredType == BasicType.VOID) {
+          report(INCOMPATIBLE_TYPE, init, rootClass, inferredType)
+          return new NOP(loc)
         }
+        val index = context.add(name, inferredType, isMutable = !Modifier.isFinal(modifiers))
+        new ExpressionActionStatement(new SetLocal(loc, 0, index, inferredType, inferred))
+      } else {
+        val lhsType = mapFrom(node.typeRef)
+        if (lhsType == null) return new NOP(loc)
+        val index = context.add(name, lhsType, isMutable = !Modifier.isFinal(modifiers))
+        var local: SetLocal = null
+        if (init != null) {
+          val valueNode = typed(init, context, lhsType)
+          valueNode match {
+            case None => return new NOP(loc)
+            case Some(v) =>
+              val value = processAssignable(init, lhsType, v)
+              if (value == null) return new NOP(loc)
+              local = new SetLocal(loc, 0, index, lhsType, value)
+          }
+        }
+        else {
+          local = new SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
+        }
+        new ExpressionActionStatement(local)
       }
-      else {
-        local = new SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
-      }
-      new ExpressionActionStatement(local)
     case node@AST.ReturnExpression(loc, _) =>
       val returnType = context.returnType
       if(node.result == null) {

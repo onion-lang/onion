@@ -819,10 +819,15 @@ void eols() :{} {
   (<EOL>)*
 }
 
-AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declMods = 0; AST.TypeNode ty; AST.Expression e = null;}{
+AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;}{
   {enterSection();}
   (keyword="val" {declMods = AST.M_FINAL();} | keyword="var" {declMods = 0;})
-  t=<ID> ":" ty=type() ["=" eols() e=term()] eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, t.image, ty, e);}
+  t=<ID>
+  (
+    ":" ty=type() ["=" eols() e=term()]
+  | "=" eols() e=term()
+  )
+  eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, t.image, ty, e);}
 }
 
 AST.BreakExpression break_statement() :{Token t;}{

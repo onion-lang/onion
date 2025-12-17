@@ -1,2 +1,2 @@
-val line: String = IO::readln("Please input a line: ")
+val line = IO::readln("Please input a line: ")
 IO::println("You input: " + line)

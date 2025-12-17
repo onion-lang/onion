@@ -1602,13 +1602,14 @@
 <li><strong>Type params on classes/methods</strong> with optional upper bounds using <code>extends</code> (e.g., <code>T extends Foo</code>). No variance for now. Syntax uses brackets <code>[]</code> for both definitions and applications: <code>class Box[T extends Foo]</code>, <code>def id[T extends Foo](x: T): T</code>.</li>
 <li><strong>Type applications</strong> on types/expressions: <code>Box[Int]</code>, <code>foo[String](x)</code> (brackets only).</li>
 <li><strong>Erasure</strong>: map type params to <code>Object</code> or bound’s erasure in JVM signatures. Emit bridges when overriding causes erased signature collisions.</li>
+<li><strong>Primitive type arguments</strong>: allowed (e.g., <code>ArrayList[Int]</code>); boxed/unboxed at erased JVM boundaries.</li>
 </ul>
 <p>Out of scope (for later): variance, wildcards, lower bounds, reified generics, generic fields with runtime type info, constraints beyond single upper bound.</p>
 <h2 id="incremental-plan">Incremental Plan<a class="headerlink" href="#incremental-plan" title="Permanent link">&para;</a></h2>
 <h3 id="1-grammar-ast">1) Grammar &amp; AST<a class="headerlink" href="#1-grammar-ast" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Extend grammar (JavaCC) to parse:</li>
-<li>Type parameter lists on classes/methods: <code>[T]</code> / <code>[T &lt;: Bound]</code> (brackets unified with applications).</li>
+<li>Type parameter lists on classes/methods: <code>[T]</code> / <code>[T extends Bound]</code> (brackets unified with applications).</li>
 <li>Type applications on types and expressions: <code>Foo[Bar]</code>.</li>
 <li>AST changes (parser-level <code>AST</code>):</li>
 <li>Add <code>TypeParameter(name, upperBound: Option[TypeNode])</code>.</li>
@@ -1630,7 +1631,7 @@
 <li>Erasure semantics in typing:</li>
 <li>Compute erased type for type params: <code>erasure(T) = erasure(bound)</code> else <code>Object</code>.</li>
 <li>Erase generic method/class types for codegen signatures.</li>
-<li>Type inference: initially <strong>not</strong> implemented; require explicit type arguments at calls.</li>
+<li>Type inference: supported for common generic method calls; explicit type arguments are still supported.</li>
 </ul>
 <p>Checkpoint: Typing accepts generic class/method definitions and applications, rejects arity/bound errors, produces TypedAST with erased info attached.</p>
 <h3 id="3-code-generation-asm">3) Code Generation (ASM)<a class="headerlink" href="#3-code-generation-asm" title="Permanent link">&para;</a></h3>

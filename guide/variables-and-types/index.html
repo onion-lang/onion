@@ -998,10 +998,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#type-inference-future-feature" class="md-nav__link">
+  <a href="#type-inference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Type Inference (Future Feature)
+        Type Inference
       
     </span>
   </a>
@@ -1016,6 +1016,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Generic Types (Java Generics)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primitive-type-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primitive Type Arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2071,10 +2088,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#type-inference-future-feature" class="md-nav__link">
+  <a href="#type-inference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Type Inference (Future Feature)
+        Type Inference
       
     </span>
   </a>
@@ -2089,6 +2106,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Generic Types (Java Generics)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primitive-type-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primitive Type Arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2281,13 +2315,14 @@
 </span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>val pi: Double = MathUtils::PI
 </span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>val result: Double = MathUtils::square(5.0)
 </span></code></pre></div>
-<h2 id="type-inference-future-feature">Type Inference (Future Feature)<a class="headerlink" href="#type-inference-future-feature" title="Permanent link">&para;</a></h2>
-<p>Currently, Onion requires explicit type annotations. Future versions may support type inference:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>// Current (required)
+<h2 id="type-inference">Type Inference<a class="headerlink" href="#type-inference" title="Permanent link">&para;</a></h2>
+<p>Onion can infer the type of <strong>local</strong> <code>val</code> / <code>var</code> declarations when an initializer is present:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>// With explicit type
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>val name: String = &quot;Alice&quot;
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>// Future (planned)
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>val name = &quot;Alice&quot;  // Inferred as String
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>// Inferred from the initializer
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>val age = 30         // Int
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>var greeting = &quot;Hi&quot;  // String
 </span></code></pre></div>
 <h2 id="generic-types-java-generics">Generic Types (Java Generics)<a class="headerlink" href="#generic-types-java-generics" title="Permanent link">&para;</a></h2>
 <p>When using Java generic types, specify type parameters with <code>[]</code>:</p>
@@ -2299,10 +2334,16 @@
 </span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>val list: ArrayList[String] = new ArrayList[String]
 </span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>val map: HashMap[String, Int] = new HashMap[String, Int]
 </span></code></pre></div>
+<h3 id="primitive-type-arguments">Primitive Type Arguments<a class="headerlink" href="#primitive-type-arguments" title="Permanent link">&para;</a></h3>
+<p>Type arguments may be primitive types (e.g., <code>Int</code>). Onion uses JVM erasure, so primitive type arguments are boxed/unboxed at call boundaries:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>val list: ArrayList[Int] = new ArrayList[Int]
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>list.add(1)
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>val x: Int = list.get(0)
+</span></code></pre></div>
 <h2 id="function-types">Function Types<a class="headerlink" href="#function-types" title="Permanent link">&para;</a></h2>
 <p>Functions are represented by <code>Function0</code> through <code>Function10</code> interfaces:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>val func: (Int) -&gt; Int = (x: Int) -&gt; { return x * 2; }
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>val result: Int = func.call(5)$Int  // 10
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>val func: (Int) -&gt; Int = (x: Int) -&gt; { return x * 2; }
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>val result: Int = func.call(5)$Int  // 10
 </span></code></pre></div>
 <ul>
 <li><code>Function0</code> - No parameters</li>

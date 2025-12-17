@@ -2,110 +2,110 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://onion-lang.github.io/onion/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/GENERICS_DESIGN/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/parser-refactoring/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/contributing/building/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/contributing/development/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/basic/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/functional/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/oop/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/overview/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/getting-started/hello-world/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/getting-started/installation/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/getting-started/quick-start/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/basic-syntax/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/classes-and-objects/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/control-flow/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/functions/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/inheritance/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/java-interop/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/lambda-expressions/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/overview/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/variables-and-types/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/compiler-architecture/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/specification/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/stdlib/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/compiler/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/repl/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/script-runner/</loc>
-         <lastmod>2025-12-15</lastmod>
+         <lastmod>2025-12-17</lastmod>
     </url>
 </urlset>

@@ -1,0 +1,16 @@
+import {
+  java.util.ArrayList;
+  java.util.Collections;
+}
+
+class JavaCollectionsSample {
+public:
+  static def main(args: String[]): String {
+    val list = new ArrayList[String];
+    list.add("b");
+    list.add("a");
+    list.add("c");
+    Collections::sort(list);
+    return list.get(0);
+  }
+}

@@ -1,0 +1,11 @@
+class ValVarInference {
+public:
+  static def main(args: String[]): Int {
+    val base = 10;
+    var sum = 0;
+    for var i = 0; i < 5; i = i + 1 {
+      sum = sum + base + i;
+    }
+    return sum;
+  }
+}

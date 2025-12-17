@@ -1,0 +1,11 @@
+class FunctionTypesSample {
+public:
+  static def applyTwice(f: (JInteger) -> JInteger, x: JInteger): JInteger {
+    return f.call(f.call(x));
+  }
+
+  static def main(args: String[]): JInteger {
+    val inc: (JInteger) -> JInteger = (x: JInteger) -> { return new JInteger(x.intValue() + 1); };
+    return applyTwice(inc, new JInteger(10));
+  }
+}

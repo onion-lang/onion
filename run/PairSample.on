@@ -1,0 +1,20 @@
+class Pair[A, B] {
+public:
+  val a: A;
+  val b: B;
+
+  def this(a: A, b: B) {
+    this.a = a;
+    this.b = b;
+  }
+
+  def swap: Pair[B, A] = new Pair[B, A](this.b, this.a);
+}
+
+class PairSample {
+public:
+  static def main(args: String[]): String {
+    val p = new Pair[JInteger, String](new JInteger(1), "x");
+    return p.swap.a;
+  }
+}

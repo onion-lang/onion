@@ -4,7 +4,7 @@ This guide covers the essential features of Onion to get you productive quickly.
 
 ## Variables and Types
 
-Onion is statically typed and requires explicit type annotations for `val` / `var` declarations:
+Onion is statically typed. Local `val` / `var` declarations can include a type annotation, or omit it when an initializer is present:
 
 ```onion
 // Type annotation
@@ -12,8 +12,9 @@ val name: String = "Alice"
 val age: Int = 30
 val price: Double = 19.99
 
-// Type inference (coming in future versions)
-val count = 42  // Inferred as Int
+// Type inference (local only)
+val count = 42         // Inferred as Int
+var greeting = "Hello" // Inferred as String
 ```
 
 ## Control Flow

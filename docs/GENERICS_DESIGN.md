@@ -6,13 +6,14 @@ Goal: Add basic generics with Scala-style erasure (upper bounds, generic classes
 - **Type params on classes/methods** with optional upper bounds using `extends` (e.g., `T extends Foo`). No variance for now. Syntax uses brackets `[]` for both definitions and applications: `class Box[T extends Foo]`, `def id[T extends Foo](x: T): T`.
 - **Type applications** on types/expressions: `Box[Int]`, `foo[String](x)` (brackets only).
 - **Erasure**: map type params to `Object` or bound’s erasure in JVM signatures. Emit bridges when overriding causes erased signature collisions.
+- **Primitive type arguments**: allowed (e.g., `ArrayList[Int]`); boxed/unboxed at erased JVM boundaries.
 
 Out of scope (for later): variance, wildcards, lower bounds, reified generics, generic fields with runtime type info, constraints beyond single upper bound.
 
 ## Incremental Plan
 ### 1) Grammar & AST
 - Extend grammar (JavaCC) to parse:
-  - Type parameter lists on classes/methods: `[T]` / `[T <: Bound]` (brackets unified with applications).
+  - Type parameter lists on classes/methods: `[T]` / `[T extends Bound]` (brackets unified with applications).
   - Type applications on types and expressions: `Foo[Bar]`.
 - AST changes (parser-level `AST`):
   - Add `TypeParameter(name, upperBound: Option[TypeNode])`.
@@ -34,7 +35,7 @@ Checkpoint: Parser builds; AST nodes produced for simple examples like `class Bo
 - Erasure semantics in typing:
   - Compute erased type for type params: `erasure(T) = erasure(bound)` else `Object`.
   - Erase generic method/class types for codegen signatures.
-- Type inference: initially **not** implemented; require explicit type arguments at calls.
+- Type inference: supported for common generic method calls; explicit type arguments are still supported.
 
 Checkpoint: Typing accepts generic class/method definitions and applications, rejects arity/bound errors, produces TypedAST with erased info attached.
 

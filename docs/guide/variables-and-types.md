@@ -205,16 +205,17 @@ val pi: Double = MathUtils::PI
 val result: Double = MathUtils::square(5.0)
 ```
 
-## Type Inference (Future Feature)
+## Type Inference
 
-Currently, Onion requires explicit type annotations. Future versions may support type inference:
+Onion can infer the type of **local** `val` / `var` declarations when an initializer is present:
 
 ```onion
-// Current (required)
+// With explicit type
 val name: String = "Alice"
 
-// Future (planned)
-val name = "Alice"  // Inferred as String
+// Inferred from the initializer
+val age = 30         // Int
+var greeting = "Hi"  // String
 ```
 
 ## Generic Types (Java Generics)
@@ -229,6 +230,16 @@ import {
 
 val list: ArrayList[String] = new ArrayList[String]
 val map: HashMap[String, Int] = new HashMap[String, Int]
+```
+
+### Primitive Type Arguments
+
+Type arguments may be primitive types (e.g., `Int`). Onion uses JVM erasure, so primitive type arguments are boxed/unboxed at call boundaries:
+
+```onion
+val list: ArrayList[Int] = new ArrayList[Int]
+list.add(1)
+val x: Int = list.get(0)
 ```
 
 ## Function Types

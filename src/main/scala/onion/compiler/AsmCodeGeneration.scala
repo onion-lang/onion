@@ -43,6 +43,18 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
     case _                 => throw new RuntimeException(s"Unsupported type: $tp")
 
+  private[compiler] def isReferenceAsmType(tp: AsmType): Boolean =
+    tp.getSort == AsmType.OBJECT || tp.getSort == AsmType.ARRAY
+
+  private[compiler] def adaptValueOnStack(gen: GeneratorAdapter, actual: TypedAST.Type, expected: AsmType): Unit =
+    actual match
+      case bt: BasicType if isReferenceAsmType(expected) =>
+        gen.valueOf(asmType(bt))
+      case _ if !actual.isBasicType && !isReferenceAsmType(expected) =>
+        gen.unbox(expected)
+      case _ =>
+        ()
+
   // Counter for generating unique closure class names
   private var closureCounter = 0
   
@@ -194,11 +206,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
                 while i < bridgeArgTypes.length do
                   gen.loadArg(i)
                   val desired = asmType(impl.arguments(i))
-                  if desired != bridgeArgTypes(i) then
-                    gen.checkCast(desired)
+                  val provided = bridgeArgTypes(i)
+                  if desired != provided then
+                    if isReferenceAsmType(provided) && !isReferenceAsmType(desired) then
+                      gen.unbox(desired)
+                    else if !isReferenceAsmType(provided) && isReferenceAsmType(desired) then
+                      gen.valueOf(provided)
+                    else if isReferenceAsmType(desired) then
+                      gen.checkCast(desired)
+                    else
+                      gen.cast(provided, desired)
                   i += 1
 
                 gen.invokeVirtual(ownerType, AsmMethod(impl.name, implDesc))
+                val implRet = asmType(impl.returnType)
+                if implRet != AsmType.VOID_TYPE && !isReferenceAsmType(implRet) && isReferenceAsmType(bridgeReturnType) then
+                  gen.valueOf(implRet)
                 gen.returnValue()
                 gen.endMethod()
           }
@@ -211,8 +234,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     if ctor.superInitializer != null then
       gen.loadThis()
-      for arg <- ctor.superInitializer.terms do
+      var i = 0
+      while i < ctor.superInitializer.terms.length do
+        val arg = ctor.superInitializer.terms(i)
         emitExpressionWithContext(gen, arg, className, localVars)
+        adaptValueOnStack(gen, arg.`type`, asmType(ctor.superInitializer.arguments(i)))
+        i += 1
       val superClass = if ctor.classType.superClass != null then AsmUtil.internalName(ctor.classType.superClass.name) else "java/lang/Object"
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)
       gen.invokeConstructor(
@@ -380,17 +407,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       emitExpressionWithContext(gen, set.value, className, localVars)
       // Stack: target, value
       // We want to leave value on stack after putfield
-      val valueType = asmType(set.value.`type`)
-      if valueType.getSize() == 2 then
-        // Long or double - duplicate value under target
-        gen.dup2X1() // Stack: value, target, value
-      else
-        // Single slot value  
-        gen.dupX1() // Stack: value, target, value
       val ownerType = set.target.`type` match
         case ct: ClassType => AsmUtil.objectType(ct.name)
         case _ => throw new RuntimeException(s"Invalid field owner type: ${set.target.`type`}")
       val fieldType = asmType(set.field.`type`)
+      adaptValueOnStack(gen, set.value.`type`, fieldType)
+      if fieldType.getSize() == 2 then
+        gen.dup2X1()
+      else
+        gen.dupX1()
       gen.putField(ownerType, set.field.name, fieldType)
       // Stack: value (the result of the assignment)
 
@@ -401,9 +426,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     case set: SetStaticField =>
       emitExpressionWithContext(gen, set.value, className, localVars)
-      gen.dup() // Duplicate value for assignment result
       val ownerType = AsmUtil.objectType(set.field.affiliation.name)
       val fieldType = asmType(set.field.`type`)
+      adaptValueOnStack(gen, set.value.`type`, fieldType)
+      if fieldType.getSize() == 2 then gen.dup2() else gen.dup()
       gen.putStatic(ownerType, set.field.name, fieldType)
 
     // Arrays
@@ -457,8 +483,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       emitExpressionWithContext(gen, call.target, className, localVars)
       
       // Push arguments
-      for arg <- call.parameters do
+      val expectedArgs = call.method.arguments.map(asmType)
+      var i = 0
+      while i < call.parameters.length do
+        val arg = call.parameters(i)
         emitExpressionWithContext(gen, arg, className, localVars)
+        adaptValueOnStack(gen, arg.`type`, expectedArgs(i))
+        i += 1
       
       // Get method info
       val ownerType = call.target.`type` match
@@ -483,8 +514,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // Method calls - static
     case callStatic: CallStatic =>
       // Push arguments
-      for arg <- callStatic.parameters do
+      val expectedArgs = callStatic.method.arguments.map(asmType)
+      var i = 0
+      while i < callStatic.parameters.length do
+        val arg = callStatic.parameters(i)
         emitExpressionWithContext(gen, arg, className, localVars)
+        adaptValueOnStack(gen, arg.`type`, expectedArgs(i))
+        i += 1
       
       val ownerType = AsmUtil.objectType(callStatic.method.affiliation.name)
       val methodDesc = AsmType.getMethodDescriptor(
@@ -499,8 +535,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.loadThis()
       
       // Push arguments
-      for arg <- callSuper.params do
+      val expectedArgs = callSuper.method.arguments.map(asmType)
+      var i = 0
+      while i < callSuper.params.length do
+        val arg = callSuper.params(i)
         emitExpressionWithContext(gen, arg, className, localVars)
+        adaptValueOnStack(gen, arg.`type`, expectedArgs(i))
+        i += 1
       
       // Get super class type
       val currentClass = callSuper.target.`type`.asInstanceOf[ClassType]
@@ -529,12 +570,17 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.dup()
       
       // Push constructor arguments
-      for arg <- newObj.parameters do
+      val expectedArgs = newObj.constructor.getArgs.map(asmType)
+      var i = 0
+      while i < newObj.parameters.length do
+        val arg = newObj.parameters(i)
         emitExpressionWithContext(gen, arg, className, localVars)
+        adaptValueOnStack(gen, arg.`type`, expectedArgs(i))
+        i += 1
       
       val ctorDesc = AsmType.getMethodDescriptor(
         AsmType.VOID_TYPE,
-        newObj.constructor.getArgs.map(asmType)*
+        expectedArgs*
       )
       
       gen.invokeConstructor(classType, AsmMethod("<init>", ctorDesc))
@@ -553,36 +599,41 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         case at: ArrayType =>
           gen.checkCast(asmType(at))
         case bt: BasicType =>
-          // Handle primitive casts
           cast.target.`type` match
-            case BasicType.INT =>
-              bt match
-                case BasicType.BYTE => gen.visitInsn(Opcodes.I2B)
-                case BasicType.SHORT => gen.visitInsn(Opcodes.I2S)
-                case BasicType.CHAR => gen.visitInsn(Opcodes.I2C)
-                case BasicType.LONG => gen.visitInsn(Opcodes.I2L)
-                case BasicType.FLOAT => gen.visitInsn(Opcodes.I2F)
-                case BasicType.DOUBLE => gen.visitInsn(Opcodes.I2D)
-                case _ => // No-op for same type
-            case BasicType.LONG =>
-              bt match
-                case BasicType.INT => gen.visitInsn(Opcodes.L2I)
-                case BasicType.FLOAT => gen.visitInsn(Opcodes.L2F)
-                case BasicType.DOUBLE => gen.visitInsn(Opcodes.L2D)
-                case _ => // No-op
-            case BasicType.FLOAT =>
-              bt match
-                case BasicType.INT => gen.visitInsn(Opcodes.F2I)
-                case BasicType.LONG => gen.visitInsn(Opcodes.F2L)
-                case BasicType.DOUBLE => gen.visitInsn(Opcodes.F2D)
-                case _ => // No-op
-            case BasicType.DOUBLE =>
-              bt match
-                case BasicType.INT => gen.visitInsn(Opcodes.D2I)
-                case BasicType.LONG => gen.visitInsn(Opcodes.D2L)
-                case BasicType.FLOAT => gen.visitInsn(Opcodes.D2F)
-                case _ => // No-op
-            case _ => // Other types, no conversion needed
+            case src: BasicType =>
+              // Handle primitive casts
+              src match
+                case BasicType.INT =>
+                  bt match
+                    case BasicType.BYTE => gen.visitInsn(Opcodes.I2B)
+                    case BasicType.SHORT => gen.visitInsn(Opcodes.I2S)
+                    case BasicType.CHAR => gen.visitInsn(Opcodes.I2C)
+                    case BasicType.LONG => gen.visitInsn(Opcodes.I2L)
+                    case BasicType.FLOAT => gen.visitInsn(Opcodes.I2F)
+                    case BasicType.DOUBLE => gen.visitInsn(Opcodes.I2D)
+                    case _ => ()
+                case BasicType.LONG =>
+                  bt match
+                    case BasicType.INT => gen.visitInsn(Opcodes.L2I)
+                    case BasicType.FLOAT => gen.visitInsn(Opcodes.L2F)
+                    case BasicType.DOUBLE => gen.visitInsn(Opcodes.L2D)
+                    case _ => ()
+                case BasicType.FLOAT =>
+                  bt match
+                    case BasicType.INT => gen.visitInsn(Opcodes.F2I)
+                    case BasicType.LONG => gen.visitInsn(Opcodes.F2L)
+                    case BasicType.DOUBLE => gen.visitInsn(Opcodes.F2D)
+                    case _ => ()
+                case BasicType.DOUBLE =>
+                  bt match
+                    case BasicType.INT => gen.visitInsn(Opcodes.D2I)
+                    case BasicType.LONG => gen.visitInsn(Opcodes.D2L)
+                    case BasicType.FLOAT => gen.visitInsn(Opcodes.D2F)
+                    case _ => ()
+                case _ =>
+                  ()
+            case _ =>
+              gen.unbox(asmType(bt))
         case _ => // No-op for other types
 
     // Binary operations

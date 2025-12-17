@@ -1511,7 +1511,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       while (i < typeArgs.length) {
         val mapped = mapFrom(typeArgs(i))
         if (mapped == null) return None
-        if (mapped.isBasicType) {
+        if (mapped eq BasicType.VOID) {
           report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mapped.name)
           return None
         }
@@ -1531,7 +1531,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
         val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
         val arg = mappedArgs(i)
-        if (!TypeRules.isAssignable(upper, arg)) {
+        if (!TypeRules.isAssignable(upper, boxedTypeArgument(arg))) {
           report(INCOMPATIBLE_TYPE, typeArgs(i), upper, arg)
           return None
         }
@@ -1551,6 +1551,14 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       val typeParams = method.typeParameters
       if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
 
+      def isSuperTypeForBounds(left: Type, right: Type): Boolean =
+        if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArgument(right))
+        else TypeRules.isSuperType(left, right)
+
+      def isAssignableForBounds(left: Type, right: Type): Boolean =
+        if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArgument(right))
+        else TypeRules.isAssignable(left, right)
+
       val bounds = HashMap[String, Type]()
       for (tp <- typeParams) {
         val upper = tp.upperBound.getOrElse(rootClass)
@@ -1568,8 +1576,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
           case None =>
             upperConstraints += name -> bound
           case Some(prev) =>
-            if (TypeRules.isSuperType(prev, bound)) upperConstraints += name -> bound
-            else if (TypeRules.isSuperType(bound, prev)) ()
+            if (isSuperTypeForBounds(prev, bound)) upperConstraints += name -> bound
+            else if (isSuperTypeForBounds(bound, prev)) ()
             else report(INCOMPATIBLE_TYPE, position, prev, bound)
       }
 
@@ -1579,8 +1587,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
           case None =>
             lowerConstraints += name -> bound
           case Some(prev) =>
-            if (TypeRules.isSuperType(prev, bound)) ()
-            else if (TypeRules.isSuperType(bound, prev)) lowerConstraints += name -> bound
+            if (isSuperTypeForBounds(prev, bound)) ()
+            else if (isSuperTypeForBounds(bound, prev)) lowerConstraints += name -> bound
             else lowerConstraints += name -> rootClass
       }
 
@@ -1661,8 +1669,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
           upperConstraints.get(name) match
             case None => bound0
             case Some(upper) =>
-              if (TypeRules.isSuperType(bound0, upper)) upper
-              else if (TypeRules.isSuperType(upper, bound0)) bound0
+              if (isSuperTypeForBounds(bound0, upper)) upper
+              else if (isSuperTypeForBounds(upper, bound0)) bound0
               else {
                 report(INCOMPATIBLE_TYPE, callNode, bound0, upper)
                 bound0
@@ -1674,7 +1682,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
             .getOrElse(bound)
 
         val inferredType =
-          if (!TypeRules.isAssignable(bound, inferredType0)) {
+          if (!isAssignableForBounds(bound, inferredType0)) {
             report(INCOMPATIBLE_TYPE, callNode, bound, inferredType0)
             bound
           } else {

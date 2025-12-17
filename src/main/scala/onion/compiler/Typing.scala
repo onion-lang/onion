@@ -19,6 +19,24 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     def ++(ps: Seq[TypeParam]): TypeParamScope = copy(params ++ ps.map(p => p.name -> p))
   }
   private[compiler] val emptyTypeParams = TypeParamScope(Map.empty)
+
+  private[compiler] def boxedClass(`type`: BasicType): ClassType =
+    `type` match
+      case BasicType.BOOLEAN => load("java.lang.Boolean")
+      case BasicType.BYTE => load("java.lang.Byte")
+      case BasicType.SHORT => load("java.lang.Short")
+      case BasicType.CHAR => load("java.lang.Character")
+      case BasicType.INT => load("java.lang.Integer")
+      case BasicType.LONG => load("java.lang.Long")
+      case BasicType.FLOAT => load("java.lang.Float")
+      case BasicType.DOUBLE => load("java.lang.Double")
+      case _ => throw new IllegalArgumentException(s"Not a boxable primitive type: ${`type`.name}")
+
+  private[compiler] def boxedTypeArgument(arg: Type): Type =
+    arg match
+      case bt: BasicType if bt != BasicType.VOID => boxedClass(bt)
+      case _ => arg
+
   type Continuable = Boolean
   type Environment = TypingEnvironment
   type Dimension = Int
@@ -227,7 +245,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
               var i = 0
               while (i < specializedArgs.length && i < impl.arguments.length) {
-                if (!TypeRules.isSuperType(impl.arguments(i), specializedArgs(i))) {
+                val arg = specializedArgs(i)
+                val checkedArg = if (!impl.arguments(i).isBasicType && arg.isBasicType) boxedTypeArgument(arg) else arg
+                if (!TypeRules.isSuperType(impl.arguments(i), checkedArg)) {
                   report(INCOMPATIBLE_TYPE, location, specializedArgs(i), impl.arguments(i))
                 }
                 i += 1
@@ -314,11 +334,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
             while (i < rawParams.length) {
               val upper = rawParams(i).upperBound.getOrElse(rootClass)
               val arg = applied.typeArguments(i)
-              if (arg.isBasicType) {
+              if (arg eq BasicType.VOID) {
                 report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
                 return
               }
-              if (!TypeRules.isAssignable(upper, arg)) {
+              val checkedArg = boxedTypeArgument(arg)
+              if (!TypeRules.isAssignable(upper, checkedArg)) {
                 report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
                 return
               }

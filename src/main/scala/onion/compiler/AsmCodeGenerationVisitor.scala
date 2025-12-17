@@ -235,8 +235,13 @@ class AsmCodeGenerationVisitor(
   
   override def visitCall(node: Call): Unit =
     visitTerm(node.target)
-    for param <- node.parameters do
+    val expectedArgs = node.method.arguments.map(asmType)
+    var i = 0
+    while i < node.parameters.length do
+      val param = node.parameters(i)
       visitTerm(param)
+      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedArgs(i))
+      i += 1
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -249,8 +254,13 @@ class AsmCodeGenerationVisitor(
       gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
   
   override def visitCallStatic(node: CallStatic): Unit =
-    for param <- node.parameters do
+    val expectedArgs = node.method.arguments.map(asmType)
+    var i = 0
+    while i < node.parameters.length do
+      val param = node.parameters(i)
       visitTerm(param)
+      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedArgs(i))
+      i += 1
     val ownerType = AsmUtil.objectType(node.target.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -260,8 +270,13 @@ class AsmCodeGenerationVisitor(
   
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)
-    for param <- node.params do
+    val expectedArgs = node.method.arguments.map(asmType)
+    var i = 0
+    while i < node.params.length do
+      val param = node.params(i)
       visitTerm(param)
+      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedArgs(i))
+      i += 1
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -283,7 +298,7 @@ class AsmCodeGenerationVisitor(
       case (_: BasicType, _: ObjectType | _: ArrayType | _: NullType) =>
         throw new RuntimeException(s"Unsupported cast from basic to reference: ${node.target.`type`} => ${node.destination}")
       case (_: ObjectType | _: ArrayType | _: NullType, to: BasicType) =>
-        throw new RuntimeException(s"Unsupported cast from reference to basic: ${node.target.`type`} => ${node.destination}")
+        gen.unbox(asmType(to))
       case _ =>
         gen.checkCast(asmType(node.destination))
   
@@ -334,6 +349,7 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.value)
     // Duplicate value for return
     val valueType = asmType(node.`type`)
+    asmCodeGen.adaptValueOnStack(gen, node.value.`type`, valueType)
     if valueType.getSize() == 2 then
       gen.dup2X1()
     else
@@ -345,9 +361,13 @@ class AsmCodeGenerationVisitor(
     val classType = AsmUtil.objectType(node.constructor.affiliation.name)
     gen.newInstance(classType)
     gen.dup()
-    for param <- node.parameters do
-      visitTerm(param)
     val argTypes = node.constructor.getArgs.map(asmType)
+    var i = 0
+    while i < node.parameters.length do
+      val param = node.parameters(i)
+      visitTerm(param)
+      asmCodeGen.adaptValueOnStack(gen, param.`type`, argTypes(i))
+      i += 1
     gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
   
   override def visitNewArray(node: NewArray): Unit =
@@ -365,10 +385,12 @@ class AsmCodeGenerationVisitor(
     gen.getStatic(ownerType, node.field.name, asmType(node.field.`type`))
   
   override def visitSetStaticField(node: SetStaticField): Unit =
+    val fieldType = asmType(node.field.`type`)
     visitTerm(node.value)
-    gen.dup()
+    asmCodeGen.adaptValueOnStack(gen, node.value.`type`, fieldType)
+    if fieldType.getSize() == 2 then gen.dup2() else gen.dup()
     val ownerType = AsmUtil.objectType(node.target.name)
-    gen.putStatic(ownerType, node.field.name, asmType(node.field.`type`))
+    gen.putStatic(ownerType, node.field.name, fieldType)
   
   override def visitOuterThis(node: OuterThis): Unit =
     gen.loadThis()

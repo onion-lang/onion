@@ -22,6 +22,25 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == result)
     }
 
+    it("accepts primitive type arguments using boxing") {
+      val result = shell.run(
+        """
+          |class JavaListInt {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val list: ArrayList[Int] = new ArrayList[Int]
+          |    list.add(1)
+          |    list.add(2)
+          |    return list.get(0) + list.get(1)
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaListInt.on",
+        Array()
+      )
+      assert(Shell.Success(3) == result)
+    }
+
     it("handles Java generic methods") {
       val result = shell.run(
         """

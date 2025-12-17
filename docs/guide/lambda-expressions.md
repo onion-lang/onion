@@ -30,7 +30,7 @@ IO::println(result)
 
 ## Function Types
 
-Lambdas can be typed using the arrow type syntax `(A, B) -> R`:
+Lambdas can be typed using the arrow type syntax `(A, B) -> R`. For a single parameter, parentheses are optional (`A -> R`):
 
 ```onion
 // Function with 0 parameters
@@ -38,7 +38,7 @@ val func0: () -> Int = () -> { return 42; }
 val value: Int = func0.call()
 
 // Function with 1 parameter
-val func1: (Int) -> Int = (x: Int) -> { return x * 2; }
+val func1: Int -> Int = (x: Int) -> { return x * 2; }
 val doubled: Int = func1.call(10)
 
 // Function with 2 parameters

@@ -129,11 +129,11 @@ IO::println(filter.call("Second"))  // "Second (line 2)"
 
 ## Function Types
 
-You can either use the `Function0` through `Function10` interfaces, or the arrow type syntax `(A, B) -> R`:
+You can either use the `Function0` through `Function10` interfaces, or the arrow type syntax `(A, B) -> R` (for a single parameter, parentheses are optional: `A -> R`):
 
 ```onion
 // Function with 1 parameter
-val func1: (Int) -> Int = (x: Int) -> { return x * 2; }
+val func1: Int -> Int = (x: Int) -> { return x * 2; }
 
 // Function with 2 parameters
 val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }

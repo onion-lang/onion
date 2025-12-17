@@ -726,16 +726,18 @@ AST.TypeNode type() : {
   AST.TypeNode arg, c, r;
   boolean isRelaxed = false;
   AST.TypeDescriptor core = null;
+  AST.TypeDescriptor left = null;
   Location loc = null;
+  Token start = null;
 }{
   ("+" {isRelaxed = true;})?
   (
     LOOKAHEAD( "(" )
-      "(" eols()
+      start="(" eols()
         [ arg=type() { append(fargs, arg.desc()); } ("," eols() arg=type() { append(fargs, arg.desc()); })* ]
       eols() ")" eols() <ARROW> eols() r=type() {
         core = new AST.FunctionType(toList(fargs), r.desc());
-        loc = p(getToken(0));
+        loc = p(start);
       }
   | c=raw_type()
     [LOOKAHEAD(2) "[" arg=type() {append(args, arg.desc());} ("," arg=type() {append(args, arg.desc());})* "]" ] {
@@ -744,11 +746,18 @@ AST.TypeNode type() : {
     }
   )
   (LOOKAHEAD(2) "[" "]" {d++;})* {
-    AST.TypeDescriptor desc = core;
+    left = core;
     for(int i = 0; i < d; i++) {
-      desc = new AST.ArrayType(desc);
+      left = new AST.ArrayType(left);
     }
-    return new AST.TypeNode(loc, desc, isRelaxed);
+  }
+  [ <ARROW> eols() r=type() {
+      ArrayBuffer<AST.TypeDescriptor> p = new ArrayBuffer<AST.TypeDescriptor>();
+      append(p, left);
+      left = new AST.FunctionType(toList(p), r.desc());
+    }
+  ] {
+    return new AST.TypeNode(loc, left, isRelaxed);
   }
 }
 

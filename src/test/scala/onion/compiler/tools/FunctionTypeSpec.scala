@@ -4,6 +4,23 @@ import onion.tools.Shell
 
 class FunctionTypeSpec extends AbstractShellSpec {
   describe("Function type syntax") {
+    it("accepts shorthand single-argument function types") {
+      val result = shell.run(
+        """
+          |class FunctionTypeArrowShorthand {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val f: String -> String = (x: String) -> { return x.toUpperCase(); }
+          |    return f.call("a")
+          |  }
+          |}
+          |""".stripMargin,
+        "FunctionTypeArrowShorthand.on",
+        Array()
+      )
+      assert(Shell.Success("A") == result)
+    }
+
     it("accepts arrow function types in variable declarations") {
       val result = shell.run(
         """

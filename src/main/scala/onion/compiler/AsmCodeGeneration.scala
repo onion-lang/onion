@@ -349,8 +349,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitExpressionWithContext(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit =
     val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
     visitor.visitTerm(expr)
-    
-  // Legacy implementation - to be removed after full migration
+
+  /* Legacy codegen implementation (disabled; use AsmCodeGenerationVisitor).
   private def emitExpressionWithContextLegacy(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit = expr match
     // Literals
     case v: IntValue => gen.push(v.value)
@@ -945,6 +945,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     case _ =>
       throw new UnsupportedOperationException(s"Expression type not yet implemented: ${expr.getClass.getName}")
+  */
 
   // Helper methods for visitor pattern
   def emitRefLocal(gen: GeneratorAdapter, ref: RefLocal, localVars: LocalVarContext): Unit =
@@ -1004,7 +1005,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         else
           val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, asmType(set.`type`)))
           gen.storeLocal(slot)
-        
+
   def emitNewClosure(gen: GeneratorAdapter, closure: NewClosure, className: String, localVars: LocalVarContext): Unit =
     generateClosure(gen, closure, className, localVars)
     

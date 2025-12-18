@@ -5,6 +5,10 @@
 *                                                                *
 * This software is distributed under the modified BSD License.   *
 * ************************************************************** */
+/**
+ * NOTE: This JavaCC grammar is currently not used by the sbt build.
+ * The active grammar is `grammar/JJOnionParser.jj`.
+ */
 options {
   STATIC = false;
 }

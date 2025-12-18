@@ -2,7 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{ClassWriter, Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.{AsmUtil, LocalVarContext, ClosureLocalVarContext, MethodEmitter}
+import onion.compiler.bytecode.{AsmUtil, CapturedVariableCollector, LocalVarContext, ClosureLocalVarContext, MethodEmitter}
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
@@ -285,33 +285,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         throw new RuntimeException(s"Bytecode generation failed at $className.${node.name}$desc", e)
     
   private def collectCapturedVariables(stmt: ActionStatement): Seq[LocalBinding] =
-    val captured = mutable.LinkedHashMap[Int, LocalBinding]()
-    
-    def collectFromExpression(expr: Term): Unit = expr match
-      case ref: RefLocal if ref.frame != 0 =>
-        captured.getOrElseUpdate(ref.index, LocalBinding(ref.index, ref.`type`, isMutable = true))
-      case set: SetLocal if set.frame != 0 =>
-        captured.getOrElseUpdate(set.index, LocalBinding(set.index, set.`type`, isMutable = true))
-        collectFromExpression(set.value)
-      case bin: BinaryTerm =>
-        collectFromExpression(bin.lhs)
-        collectFromExpression(bin.rhs)
-      case call: Call =>
-        collectFromExpression(call.target)
-        call.parameters.foreach(collectFromExpression)
-      case _ => // Other expressions - add more cases as needed
-        
-    def collectFromStatement(s: ActionStatement): Unit = s match
-      case expr: ExpressionActionStatement =>
-        collectFromExpression(expr.term)
-      case ret: Return if ret.term != null =>
-        collectFromExpression(ret.term)
-      case block: StatementBlock =>
-        block.statements.foreach(collectFromStatement)
-      case _ => // Other statements
-        
-    collectFromStatement(stmt)
-    captured.values.toSeq
+    CapturedVariableCollector.collect(stmt)
     
   private def hasReturn(stmts: Array[ActionStatement]): Boolean =
     stmts.exists {

@@ -751,7 +751,7 @@ AST.TypeNode type() : {
       left = new AST.ArrayType(left);
     }
   }
-  [ <ARROW> eols() r=type() {
+  [ LOOKAHEAD(2) <ARROW> eols() r=type() {
       ArrayBuffer<AST.TypeDescriptor> p = new ArrayBuffer<AST.TypeDescriptor>();
       append(p, left);
       left = new AST.FunctionType(toList(p), r.desc());
@@ -825,7 +825,7 @@ void eos() :{} {
 }
 
 void eols() :{} {
-  (<EOL>)*
+  ( LOOKAHEAD(2) <EOL> )*
 }
 
 AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;}{

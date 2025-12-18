@@ -134,8 +134,8 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
     for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
     for (section <- node.sections) processAccessSection(section)
     generateForwardedMethods()
-    DuplicationChecks.checkOverrideContracts(clazz, node.location)
-    DuplicationChecks.checkErasureSignatureCollisions(clazz, node.location)
+    DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
+    DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
   }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
@@ -143,6 +143,6 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
     if (clazz == null) return
     resetForTypeDeclaration(clazz)
     for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
-    DuplicationChecks.checkErasureSignatureCollisions(clazz, node.location)
+    DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
   }
 }

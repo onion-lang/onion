@@ -2354,9 +2354,9 @@
 </span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>IO::println(filter.call(&quot;Second&quot;))  // &quot;Second (line 2)&quot;
 </span></code></pre></div>
 <h2 id="function-types">Function Types<a class="headerlink" href="#function-types" title="Permanent link">&para;</a></h2>
-<p>You can either use the <code>Function0</code> through <code>Function10</code> interfaces, or the arrow type syntax <code>(A, B) -&gt; R</code>:</p>
+<p>You can either use the <code>Function0</code> through <code>Function10</code> interfaces, or the arrow type syntax <code>(A, B) -&gt; R</code> (for a single parameter, parentheses are optional: <code>A -&gt; R</code>):</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>// Function with 1 parameter
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>val func1: (Int) -&gt; Int = (x: Int) -&gt; { return x * 2; }
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>val func1: Int -&gt; Int = (x: Int) -&gt; { return x * 2; }
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>// Function with 2 parameters
 </span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>val func2: (Int, Int) -&gt; Int = (x: Int, y: Int) -&gt; { return x + y; }

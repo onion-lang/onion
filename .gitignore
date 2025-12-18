@@ -22,6 +22,8 @@ target/
 .vscode/
 .sbt/
 .ivy2/
+.home/
+.xdg/
 
 # MkDocs
 site/

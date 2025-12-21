@@ -131,70 +131,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   def processHeader(unit: AST.CompilationUnit): Unit = {
-    unit_ = unit
-    val module = unit.module
-    val moduleName = if (module != null) module.name else null
-    val imports = Buffer[ImportItem](
-      ImportItem("*", Seq("java", "lang", "*")),
-      ImportItem("*", Seq("java", "io", "*")),
-      ImportItem("*", Seq("java", "util", "*")),
-      ImportItem("*", Seq("javax", "swing", "*")),
-      ImportItem("*", Seq("java", "awt", "event", "*")),
-      ImportItem("JByte", Seq("java", "lang", "Byte")),
-      ImportItem("JShort", Seq("java", "lang", "Short")),
-      ImportItem("JCharacter", Seq("java", "lang", "Character")),
-      ImportItem("JInteger", Seq("java", "lang", "Integer")),
-      ImportItem("JLong", Seq("java", "lang", "Long")),
-      ImportItem("JFloat", Seq("java", "lang", "Float")),
-      ImportItem("JDouble", Seq("java", "lang", "Double")),
-      ImportItem("JBoolean", Seq("java", "lang", "Boolean")),
-      ImportItem("*", Seq("onion", "*")),
-      ImportItem("*", if (moduleName != null) moduleName.split("\\.").toIndexedSeq.appended("*")else Seq("*"))
-    )
-    if(unit.imports != null) {
-      for((key, value) <- unit.imports.mapping) {
-        imports.append(ImportItem(key, value.split("\\.").toIndexedSeq))
-      }
-    }
-    val staticList = new StaticImportList
-    staticList.add(new StaticImportItem("java.lang.System", true))
-    staticList.add(new StaticImportItem("java.lang.Runtime", true))
-    staticList.add(new StaticImportItem("java.lang.Math", true))
-    staticImportedList_ = staticList
-    var count = 0
-    for(top <- unit.toplevels) top match {
-      case declaration: AST.ClassDeclaration =>
-        val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null, null)
-        node.setSourceFile(Paths.nameOf(unit.sourceFile))
-        if (table_.lookup(node.name) != null) {
-          report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
-        }else {
-          table_.classes.add(node)
-          put(declaration, node)
-          add(node.name, new NameMapper(imports.toSeq))
-        }
-      case declaration: AST.InterfaceDeclaration =>
-        val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
-        node.setSourceFile(Paths.nameOf(unit.sourceFile))
-        if (table_.lookup(node.name) != null) {
-          report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
-        }else{
-          table_.classes.add(node)
-          put(declaration, node)
-          add(node.name, new NameMapper(imports.toSeq))
-        }
-      case otherwise =>
-        count += 1
-    }
-    if (count > 0) {
-      val node = ClassDefinition.newClass(unit.location, 0, topClass, table_.rootClass, new Array[ClassType](0))
-      node.setSourceFile(Paths.nameOf(unit_.sourceFile))
-      node.setResolutionComplete(true)
-      table_.classes.add(node)
-      node.addDefaultConstructor
-      put(unit, node)
-      add(node.name, new NameMapper(imports.toSeq))
-    }
+    new onion.compiler.typing.TypingHeaderPass(this, unit).run()
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, unit).run()

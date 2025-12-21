@@ -2,7 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{ClassWriter, Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.{AsmUtil, CapturedVariableCollector, LocalVarContext, ClosureLocalVarContext, MethodEmitter}
+import onion.compiler.bytecode.{AsmUtil, ClosureCodegen, LocalVarContext, ClosureLocalVarContext, MethodEmitter}
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
@@ -60,6 +60,14 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   
   // Collect generated closure classes
   private val generatedClosures = mutable.ArrayBuffer[CompiledClass]()
+
+  private def nextClosureId(): Int = {
+    closureCounter += 1
+    closureCounter
+  }
+
+  private val closureCodegen =
+    new ClosureCodegen(this, config.outputDirectory, () => nextClosureId(), compiled => generatedClosures += compiled)
   
   override def process(classes: Seq[TypedAST.ClassDefinition]): Seq[CompiledClass] =
     generatedClosures.clear()
@@ -284,10 +292,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
         throw new RuntimeException(s"Bytecode generation failed at $className.${node.name}$desc", e)
     
-  private def collectCapturedVariables(stmt: ActionStatement): Seq[LocalBinding] =
-    CapturedVariableCollector.collect(stmt)
-    
-  private def hasReturn(stmts: Array[ActionStatement]): Boolean =
+  private[compiler] def hasReturn(stmts: Array[ActionStatement]): Boolean =
     stmts.exists {
       case _: Return => true
       case ifStmt: IfStatement => 
@@ -314,7 +319,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitStatement(gen: GeneratorAdapter, stmt: ActionStatement, className: String): Unit =
     emitStatementsWithContext(gen, Array(stmt), className, new LocalVarContext(gen))
     
-  private def emitStatementWithContext(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit =
+  private[compiler] def emitStatementWithContext(gen: GeneratorAdapter, stmt: ActionStatement, className: String, localVars: LocalVarContext): Unit =
     emitStatementsWithContext(gen, Array(stmt), className, localVars)
     
   private def emitExpression(gen: GeneratorAdapter, expr: Term, className: String): Unit =
@@ -981,137 +986,4 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           gen.storeLocal(slot)
 
   def emitNewClosure(gen: GeneratorAdapter, closure: NewClosure, className: String, localVars: LocalVarContext): Unit =
-    generateClosure(gen, closure, className, localVars)
-    
-  private def generateClosure(gen: GeneratorAdapter, closure: NewClosure, currentClassName: String, localVars: LocalVarContext): Unit =
-    closureCounter += 1
-    val closureClassName = s"${currentClassName}$$Closure$closureCounter"
-    val interfaceType = closure.`type`
-    
-    // Capture outer-scope locals actually referenced by the closure body.
-    // (Do not capture the closure's own parameters/locals.)
-    val capturedVars = collectCapturedVariables(closure.block)
-    
-    // Generate the closure class bytecode
-    val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, capturedVars)
-    
-    // Store the generated closure class
-    generatedClosures += CompiledClass(closureClassName.replace('/', '.'), config.outputDirectory, closureBytes)
-    
-    // Create instance of the closure class
-    val closureType = AsmUtil.objectType(closureClassName)
-    gen.newInstance(closureType)
-    gen.dup()
-    
-    // Pass captured variables to constructor
-    for capturedVar <- capturedVars do
-      val ref = new RefLocal(0, capturedVar.index, capturedVar.tp)
-      emitRefLocal(gen, ref, localVars)
-    
-    // Constructor descriptor
-    val ctorDesc = AsmType.getMethodDescriptor(
-      AsmType.VOID_TYPE,
-      capturedVars.map(v => asmType(v.tp)).toArray*
-    )
-    
-    gen.visitMethodInsn(
-      Opcodes.INVOKESPECIAL,
-      closureClassName,
-      "<init>",
-      ctorDesc,
-      false
-    )
-
-  private def generateClosureClass(
-    className: String,
-    interfaceType: ClassType, 
-    method: TypedAST.Method,
-    block: ActionStatement,
-    capturedVars: Seq[LocalBinding]
-  ): Array[Byte] =
-    val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
-    
-    // Generate class header - implement the interface
-    cw.visit(
-      Opcodes.V17,
-      Opcodes.ACC_PUBLIC,
-      className,
-      null,
-      AsmUtil.internalName(AsmUtil.JavaLangObject),
-      Array(AsmUtil.internalName(interfaceType.name))
-    )
-    
-    // Generate fields for captured variables
-    for capturedVar <- capturedVars do
-      val fieldType = asmType(capturedVar.tp)
-      cw.visitField(
-        Opcodes.ACC_PRIVATE,
-        s"captured_${capturedVar.index}",
-        fieldType.getDescriptor,
-        null,
-        null
-      )
-    
-    // Generate constructor
-    generateClosureConstructor(cw, className, capturedVars)
-    
-    // Generate the interface method implementation
-    generateClosureMethod(cw, className, method, block, capturedVars)
-    
-    cw.visitEnd()
-    cw.toByteArray
-
-  private def generateClosureConstructor(cw: ClassWriter, className: String, capturedVars: Seq[LocalBinding]): Unit =
-    val ctorDesc = AsmType.getMethodDescriptor(
-      AsmType.VOID_TYPE,
-      capturedVars.map(v => asmType(v.tp)).toArray*
-    )
-    
-    val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", ctorDesc, null, null)
-    val gen = new GeneratorAdapter(mv, Opcodes.ACC_PUBLIC, "<init>", ctorDesc)
-    
-    gen.visitCode()
-    
-    // Call super constructor
-    gen.loadThis()
-    gen.invokeConstructor(AsmUtil.objectType(AsmUtil.JavaLangObject), AsmMethod.getMethod("void <init>()"))
-    
-    // Initialize captured variable fields
-    for (capturedVar, paramIndex) <- capturedVars.zipWithIndex do
-      gen.loadThis()
-      gen.loadArg(paramIndex)
-      gen.putField(
-        AsmUtil.objectType(className),
-        s"captured_${capturedVar.index}",
-        asmType(capturedVar.tp)
-      )
-    
-    gen.returnValue()
-    gen.endMethod()
-
-  private def generateClosureMethod(
-    cw: ClassWriter,
-    className: String,
-    method: TypedAST.Method,
-    block: ActionStatement,
-    capturedVars: Seq[LocalBinding]
-  ): Unit =
-    val argTypes = method.arguments.map(asmType)
-    val returnType = asmType(method.returnType)
-
-    val gen = MethodEmitter.newGenerator(
-      cw,
-      Opcodes.ACC_PUBLIC,
-      method.name,
-      returnType,
-      argTypes
-    )
-
-    val closureLocalVars = new ClosureLocalVarContext(gen, className, capturedVars)
-      .withParameters(false, argTypes)
-
-    emitStatementWithContext(gen, block, className, closureLocalVars)
-
-    val needsDefault = method.returnType != BasicType.VOID && !hasReturn(Array(block))
-    MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
-    gen.endMethod()
+    closureCodegen.emitNewClosure(gen, closure, className, localVars)

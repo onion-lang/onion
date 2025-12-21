@@ -751,6 +751,7 @@ AST.TypeNode type() : {
       left = new AST.ArrayType(left);
     }
   }
+  // Lookahead avoids conflicts with nested expansions that also start with "->".
   [ LOOKAHEAD(2) <ARROW> eols() r=type() {
       ArrayBuffer<AST.TypeDescriptor> p = new ArrayBuffer<AST.TypeDescriptor>();
       append(p, left);
@@ -825,6 +826,7 @@ void eos() :{} {
 }
 
 void eols() :{} {
+  // Lookahead reduces choice conflicts with EOL-consuming constructs.
   ( LOOKAHEAD(2) <EOL> )*
 }
 

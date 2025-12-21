@@ -116,6 +116,37 @@ trait ASTBuilder {
 }
 
 class DefaultASTBuilder extends ASTBuilder {
+  private val binaryOperators: Map[String, (Location, AST.Expression, AST.Expression) => AST.Expression] = Map(
+    "+" -> ((location, lhs, rhs) => AST.Addition(location, lhs, rhs)),
+    "-" -> ((location, lhs, rhs) => AST.Subtraction(location, lhs, rhs)),
+    "*" -> ((location, lhs, rhs) => AST.Multiplication(location, lhs, rhs)),
+    "/" -> ((location, lhs, rhs) => AST.Division(location, lhs, rhs)),
+    "%" -> ((location, lhs, rhs) => AST.Modulo(location, lhs, rhs)),
+    "==" -> ((location, lhs, rhs) => AST.Equal(location, lhs, rhs)),
+    "!=" -> ((location, lhs, rhs) => AST.NotEqual(location, lhs, rhs)),
+    "<" -> ((location, lhs, rhs) => AST.LessThan(location, lhs, rhs)),
+    "<=" -> ((location, lhs, rhs) => AST.LessOrEqual(location, lhs, rhs)),
+    ">" -> ((location, lhs, rhs) => AST.GreaterThan(location, lhs, rhs)),
+    ">=" -> ((location, lhs, rhs) => AST.GreaterOrEqual(location, lhs, rhs)),
+    "&&" -> ((location, lhs, rhs) => AST.LogicalAnd(location, lhs, rhs)),
+    "||" -> ((location, lhs, rhs) => AST.LogicalOr(location, lhs, rhs)),
+    "=" -> ((location, lhs, rhs) => AST.Assignment(location, lhs, rhs)),
+    "+=" -> ((location, lhs, rhs) => AST.AdditionAssignment(location, lhs, rhs)),
+    "-=" -> ((location, lhs, rhs) => AST.SubtractionAssignment(location, lhs, rhs)),
+    "*=" -> ((location, lhs, rhs) => AST.MultiplicationAssignment(location, lhs, rhs)),
+    "/=" -> ((location, lhs, rhs) => AST.DivisionAssignment(location, lhs, rhs)),
+    "%=" -> ((location, lhs, rhs) => AST.ModuloAssignment(location, lhs, rhs)),
+    ":?" -> ((location, lhs, rhs) => AST.Elvis(location, lhs, rhs))
+  )
+
+  private val unaryOperators: Map[String, (Location, AST.Expression) => AST.Expression] = Map(
+    "+" -> ((location, operand) => AST.Posit(location, operand)),
+    "-" -> ((location, operand) => AST.Negate(location, operand)),
+    "!" -> ((location, operand) => AST.Not(location, operand)),
+    "++" -> ((location, operand) => AST.PostIncrement(location, operand)), // Parser handles pre/post.
+    "--" -> ((location, operand) => AST.PostDecrement(location, operand))  // Parser handles pre/post.
+  )
+
   def createCompilationUnit(
     location: Location,
     sourceFile: String,
@@ -218,28 +249,9 @@ class DefaultASTBuilder extends ASTBuilder {
     lhs: AST.Expression,
     rhs: AST.Expression
   ): AST.Expression = {
-    operator match {
-      case "+" => AST.Addition(location, lhs, rhs)
-      case "-" => AST.Subtraction(location, lhs, rhs)
-      case "*" => AST.Multiplication(location, lhs, rhs)
-      case "/" => AST.Division(location, lhs, rhs)
-      case "%" => AST.Modulo(location, lhs, rhs)
-      case "==" => AST.Equal(location, lhs, rhs)
-      case "!=" => AST.NotEqual(location, lhs, rhs)
-      case "<" => AST.LessThan(location, lhs, rhs)
-      case "<=" => AST.LessOrEqual(location, lhs, rhs)
-      case ">" => AST.GreaterThan(location, lhs, rhs)
-      case ">=" => AST.GreaterOrEqual(location, lhs, rhs)
-      case "&&" => AST.LogicalAnd(location, lhs, rhs)
-      case "||" => AST.LogicalOr(location, lhs, rhs)
-      case "=" => AST.Assignment(location, lhs, rhs)
-      case "+=" => AST.AdditionAssignment(location, lhs, rhs)
-      case "-=" => AST.SubtractionAssignment(location, lhs, rhs)
-      case "*=" => AST.MultiplicationAssignment(location, lhs, rhs)
-      case "/=" => AST.DivisionAssignment(location, lhs, rhs)
-      case "%=" => AST.ModuloAssignment(location, lhs, rhs)
-      case ":?" => AST.Elvis(location, lhs, rhs)
-      case _ => throw new IllegalArgumentException(s"Unknown binary operator: $operator")
+    binaryOperators.get(operator) match {
+      case Some(factory) => factory(location, lhs, rhs)
+      case None => throw new IllegalArgumentException(s"Unknown binary operator: $operator")
     }
   }
 
@@ -248,13 +260,9 @@ class DefaultASTBuilder extends ASTBuilder {
     operator: String,
     operand: AST.Expression
   ): AST.Expression = {
-    operator match {
-      case "+" => AST.Posit(location, operand)
-      case "-" => AST.Negate(location, operand)
-      case "!" => AST.Not(location, operand)
-      case "++" => AST.PostIncrement(location, operand)  // Note: Parser needs to handle pre/post
-      case "--" => AST.PostDecrement(location, operand)  // Note: Parser needs to handle pre/post
-      case _ => throw new IllegalArgumentException(s"Unknown unary operator: $operator")
+    unaryOperators.get(operator) match {
+      case Some(factory) => factory(location, operand)
+      case None => throw new IllegalArgumentException(s"Unknown unary operator: $operator")
     }
   }
 

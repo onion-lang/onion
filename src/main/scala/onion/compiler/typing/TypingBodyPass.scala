@@ -5,7 +5,7 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Constants.*
 import onion.compiler.TypedAST.UnaryTerm.Constants.*
-import onion.compiler.toolbox.{Boxing, Classes}
+import onion.compiler.toolbox.Boxing
 
 import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, HashMap, Map, Set => MutableSet, Stack}
@@ -13,6 +13,7 @@ import scala.collection.mutable.{Buffer, HashMap, Map, Set => MutableSet, Stack}
 final class TypingBodyPass(private val typing: Typing, private val unit: AST.CompilationUnit) {
   import typing.*
   private val methodCallTyping = new MethodCallTyping(typing, this)
+  private val assignmentTyping = new AssignmentTyping(typing, this)
   def run(): Unit = runUnit()
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
@@ -154,94 +155,13 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     function.setFrame(context.getContextFrame)
   }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
-  def processLocalAssign(node: AST.Assignment, context: LocalContext): Term = {
-    var value: Term = typed(node.rhs, context).getOrElse(null)
-    if (value == null) return null
-    val id = node.lhs.asInstanceOf[AST.Id]
-    val bind = context.lookup(id.name)
-    if (bind == null) {
-      report(VARIABLE_NOT_FOUND, id, id.name)
-      return null
-    }
-    if (!bind.isMutable) {
-      report(CANNOT_ASSIGN_TO_VAL, id, id.name)
-      return null
-    }
-
-    val frame = bind.frameIndex
-    val index = bind.index
-    val leftType = bind.tp
-    value = processAssignable(node.rhs, leftType, value)
-    if (value != null) new SetLocal(frame, index, leftType, value) else null
-  }
+  def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =
+    assignmentTyping.processLocalAssign(node, context)
   // Removed: processThisFieldAssign - use this.field or self.field instead
-  def processArrayAssign(node: AST.Assignment, context: LocalContext): Term = {
-    var value = typed(node.rhs, context).getOrElse(null)
-    val indexing = node.lhs.asInstanceOf[AST.Indexing]
-    val target = typed(indexing.lhs, context).getOrElse(null)
-    val index = typed(indexing.rhs, context).getOrElse(null)
-    if (value == null || target == null || index == null) return null
-    if (target.isBasicType) {
-      report(INCOMPATIBLE_TYPE, indexing.lhs, rootClass, target.`type`)
-      return null
-    }
-    if (target.isArrayType) {
-      val targetType = target.`type`.asInstanceOf[ArrayType]
-      if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
-        report(INCOMPATIBLE_TYPE, indexing.rhs, BasicType.INT, index.`type`)
-        return null
-      }
-      value = processAssignable(node.rhs, targetType.base, value)
-      if (value == null) return null
-      new SetArray(target, index, value)
-    }else {
-      val params = Array[Term](index, value)
-      tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "set", Array[Term](index, value)) match {
-        case Left(_) =>
-          report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
-          null
-        case Right(method) =>
-          new Call(target, method, params)
-      }
-    }
-  }
-  def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {
-    node match {
-      case target@AST.Assignment(loc, node@AST.MemberSelection(_, _, _), expression) =>
-        val contextClass = definition_
-        val target = typed(node.target, context).getOrElse(null)
-        if (target == null) return null
-        if (target.`type`.isBasicType || target.`type`.isNullType) {
-          report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
-          return null
-        }
-        val targetType = target.`type`.asInstanceOf[ObjectType]
-        if (!MemberAccess.ensureTypeAccessible(typing, node, targetType, contextClass)) return null
-        val name = node.name
-        val field: FieldRef = MemberAccess.findField(targetType, name)
-        val value: Term = typed(expression, context).getOrElse(null)
-        if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
-          if (Modifier.isFinal(field.modifier) && (context.constructor == null || !target.isInstanceOf[This])) {
-            report(CANNOT_ASSIGN_TO_VAL, node, field.name)
-            return null
-          }
-          val classSubst = TypeSubstitution.classSubstitution(target.`type`)
-          val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
-          val term = processAssignable(expression, expected, value)
-          if (term == null) return null
-          return new SetField(target, field, term)
-        }
-        tryFindMethod(node, targetType, setter(name), Array[Term](value)) match {
-          case Right(method) =>
-            new Call(target, method, Array[Term](value))
-          case Left(_) =>
-            null
-        }
-      case _ =>
-        report(UNIMPLEMENTED_FEATURE, node)
-        null
-    }
-  }
+  def processArrayAssign(node: AST.Assignment, context: LocalContext): Term =
+    assignmentTyping.processArrayAssign(node, context)
+  def processMemberAssign(node: AST.Assignment, context: LocalContext): Term =
+    assignmentTyping.processMemberAssign(node, context)
   def processEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
     var left: Term = typed(node.lhs, context).getOrElse(null)
     var right: Term = typed(node.rhs, context).getOrElse(null)
@@ -620,17 +540,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   }
 
   def typeAssignment(node: AST.Assignment, context: LocalContext): Option[Term] =
-    node.lhs match {
-      case _ : AST.Id =>
-        Option(processLocalAssign(node, context))
-      // Removed: UnqualifiedFieldReference case - use this.field or self.field instead
-      case _ : AST.Indexing =>
-        Option(processArrayAssign(node, context))
-      case _ : AST.MemberSelection =>
-        Option(processMemberAssign(node, context))
-      case _ =>
-        None
-    }
+    assignmentTyping.typeAssignment(node, context)
 
   def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] = {
     val left = typed(node.lhs, context).getOrElse(null)
@@ -1195,8 +1105,6 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     if (left.length != right.length) return false
     (for (i <- 0 until left.length) yield (left(i), right(i))).forall { case (l, r) => l eq r }
   }
-  private def setter(name: String): String =
-    "set" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
   private def promote(left: Type, right: Type): Type = {
     if (!numeric(left) || !numeric(right)) return null
     if ((left eq BasicType.DOUBLE) || (right eq BasicType.DOUBLE)) {

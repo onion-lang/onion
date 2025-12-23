@@ -10,4 +10,4 @@ public:
 }
 
 val box: Box[String] = new Box[String]("Hello")
-IO::println(box.get)
+println(box.get)

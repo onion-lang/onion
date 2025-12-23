@@ -1,0 +1,5 @@
+# Default static import classes (one per line).
+java.lang.System
+java.lang.Runtime
+java.lang.Math
+onion.IO

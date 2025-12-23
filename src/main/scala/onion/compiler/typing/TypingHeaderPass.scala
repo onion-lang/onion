@@ -58,9 +58,9 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
 
   private def defaultStaticImports(): StaticImportList = {
     val staticList = new StaticImportList
-    staticList.add(new StaticImportItem("java.lang.System", true))
-    staticList.add(new StaticImportItem("java.lang.Runtime", true))
-    staticList.add(new StaticImportItem("java.lang.Math", true))
+    DefaultStaticImports.classes.foreach { name =>
+      staticList.add(new StaticImportItem(name, true))
+    }
     staticList
   }
 

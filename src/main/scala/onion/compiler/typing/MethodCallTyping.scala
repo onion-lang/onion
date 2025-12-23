@@ -11,6 +11,17 @@ import scala.jdk.CollectionConverters.*
 final class MethodCallTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
+  private sealed trait StaticImportLookup
+  private case class StaticImportFound(term: Term) extends StaticImportLookup
+  private case object StaticImportNotFound extends StaticImportLookup
+  private case object StaticImportError extends StaticImportLookup
+
+  private sealed trait StaticImportResolution
+  private case class StaticImportResolved(method: Method, term: Term) extends StaticImportResolution
+  private case class StaticImportAmbiguous(first: Method, second: Method) extends StaticImportResolution
+  private case object StaticImportNoMatch extends StaticImportResolution
+  private case class StaticApplicable(method: Method, expectedArgs: Array[Type], methodSubst: scala.collection.immutable.Map[String, Type])
+
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
     val contextClass = definition_
     val target = typed(node.target, context).getOrElse(null)
@@ -126,8 +137,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     val targetType = definition_
     val methods = targetType.findMethod(node.name, params)
     if (methods.length == 0) {
-      report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
-      None
+      resolveStaticImportMethodCall(node, params, expected) match {
+        case StaticImportFound(term) =>
+          Some(term)
+        case StaticImportError =>
+          None
+        case StaticImportNotFound =>
+          report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
+          None
+      }
     } else if (methods.length > 1) {
       report(
         AMBIGUOUS_METHOD,
@@ -173,6 +191,191 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         }
       }
     }
+  }
+
+  private def resolveStaticImportMethodCall(
+    node: AST.UnqualifiedMethodCall,
+    params: Array[Term],
+    expected: Type
+  ): StaticImportLookup = {
+    val mappedTypeArgs =
+      if (node.typeArgs.nonEmpty) {
+        mapTypeArgs(node.typeArgs) match {
+          case Some(mapped) => Some(mapped)
+          case None => return StaticImportError
+        }
+      } else {
+        None
+      }
+
+    val resolved = scala.collection.mutable.Buffer[StaticImportResolved]()
+    var ambiguous: Option[StaticImportAmbiguous] = None
+    staticImportedList_.getItems.foreach { item =>
+      val typeRef = load(item.getName)
+      if (typeRef != null) {
+        resolveStaticImportOnType(node, typeRef, params, expected, mappedTypeArgs) match {
+          case found: StaticImportResolved =>
+            resolved += found
+          case amb: StaticImportAmbiguous =>
+            if (ambiguous.isEmpty) ambiguous = Some(amb)
+          case StaticImportNoMatch =>
+        }
+      }
+    }
+
+    if (resolved.length == 1) {
+      StaticImportFound(resolved.head.term)
+    } else if (resolved.length > 1) {
+      reportAmbiguousMethod(node, resolved(0).method, resolved(1).method)
+      StaticImportError
+    } else {
+      ambiguous match {
+        case Some(amb) =>
+          reportAmbiguousMethod(node, amb.first, amb.second)
+          StaticImportError
+        case None =>
+          StaticImportNotFound
+      }
+    }
+  }
+
+  private def resolveStaticImportOnType(
+    node: AST.UnqualifiedMethodCall,
+    typeRef: ClassType,
+    params: Array[Term],
+    expected: Type,
+    mappedTypeArgs: Option[Array[Type]]
+  ): StaticImportResolution = {
+    val name = node.name
+    val candidates = new JTreeSet[Method](new MethodComparator)
+
+    def collectStatics(tp: ObjectType): Unit = {
+      if (tp == null) return
+      tp.methods(name).foreach { m =>
+        if ((m.modifier & AST.M_STATIC) != 0) candidates.add(m)
+      }
+      collectStatics(tp.superClass)
+      tp.interfaces.foreach(collectStatics)
+    }
+
+    collectStatics(typeRef)
+    if (candidates.isEmpty) return StaticImportNoMatch
+
+    val applicable = candidates.asScala.flatMap { method =>
+      val classSubst = TypeSubstitution.classSubstitution(typeRef)
+      val methodSubstOpt = mappedTypeArgs match {
+        case Some(mapped) =>
+          GenericMethodTypeArguments.explicitFromMappedArgs(
+            typing,
+            node,
+            method,
+            mapped,
+            classSubst,
+            reportErrors = false
+          )
+        case None =>
+          Some(GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected))
+      }
+      methodSubstOpt.flatMap { methodSubst =>
+        val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+        if (expectedArgs.length != params.length) None
+        else {
+          var ok = true
+          var i = 0
+          while (i < expectedArgs.length && ok) {
+            ok = TypeRules.isAssignable(expectedArgs(i), params(i).`type`)
+            i += 1
+          }
+          if (ok) Some(StaticApplicable(method, expectedArgs, methodSubst)) else None
+        }
+      }
+    }.toList
+
+    if (applicable.isEmpty) return StaticImportNoMatch
+
+    selectStaticApplicable(applicable) match {
+      case Left(amb) =>
+        StaticImportAmbiguous(amb.first, amb.second)
+      case Right(chosen) =>
+        val classSubst = TypeSubstitution.classSubstitution(typeRef)
+        val adjusted = params.clone()
+        var i = 0
+        while (i < adjusted.length) {
+          adjusted(i) = processAssignable(node.args(i), chosen.expectedArgs(i), adjusted(i))
+          if (adjusted(i) == null) return StaticImportNoMatch
+          i += 1
+        }
+        StaticImportResolved(chosen.method, buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst))
+    }
+  }
+
+  private def selectStaticApplicable(
+    applicable: List[StaticApplicable]
+  ): Either[StaticImportAmbiguous, StaticApplicable] = {
+    if (applicable.length == 1) return Right(applicable.head)
+
+    def isAllSuperType(a: Array[Type], b: Array[Type]): Boolean =
+      var i = 0
+      while i < a.length do
+        if !TypeRules.isSuperType(a(i), b(i)) then return false
+        i += 1
+      true
+
+    val sorter: java.util.Comparator[StaticApplicable] = new java.util.Comparator[StaticApplicable] {
+      def compare(a1: StaticApplicable, a2: StaticApplicable): Int =
+        if isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
+        else if isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
+        else 0
+    }
+
+    val selected = new java.util.ArrayList[StaticApplicable]()
+    selected.addAll(applicable.asJava)
+    java.util.Collections.sort(selected, sorter)
+    if (selected.size < 2) {
+      Right(selected.get(0))
+    } else {
+      val a1 = selected.get(0)
+      val a2 = selected.get(1)
+      if (sorter.compare(a1, a2) >= 0) Left(StaticImportAmbiguous(a1.method, a2.method))
+      else Right(a1)
+    }
+  }
+
+  private def mapTypeArgs(typeArgs: List[AST.TypeNode]): Option[Array[Type]] = {
+    val mapped = new Array[Type](typeArgs.length)
+    var i = 0
+    while (i < typeArgs.length) {
+      val mappedType = mapFrom(typeArgs(i))
+      if (mappedType == null) return None
+      if (mappedType eq BasicType.VOID) {
+        report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mappedType.name)
+        return None
+      }
+      mapped(i) = mappedType
+      i += 1
+    }
+    Some(mapped)
+  }
+
+  private def buildStaticCall(
+    typeRef: ClassType,
+    method: Method,
+    params: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    methodSubst: scala.collection.immutable.Map[String, Type]
+  ): Term = {
+    val call = new CallStatic(typeRef, method, params)
+    val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+    if (castType eq method.returnType) call else new AsInstanceOf(call, castType)
+  }
+
+  private def reportAmbiguousMethod(node: AST.Node, first: Method, second: Method): Unit = {
+    report(
+      AMBIGUOUS_METHOD,
+      node,
+      Array[AnyRef](first.affiliation, first.name, first.arguments),
+      Array[AnyRef](second.affiliation, second.name, second.arguments)
+    )
   }
 
   def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] = {

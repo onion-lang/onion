@@ -7,6 +7,62 @@ import onion.compiler.TypedAST.*
 import scala.collection.mutable.HashMap
 
 private[typing] object GenericMethodTypeArguments {
+  def explicitFromMappedArgs(
+    typing: Typing,
+    callNode: AST.Node,
+    method: Method,
+    mappedArgs: Array[Type],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    reportErrors: Boolean = true,
+    typeArgNodes: Array[AST.TypeNode] = null
+  ): Option[scala.collection.immutable.Map[String, Type]] = {
+    import typing.*
+    val typeParams = method.typeParameters
+    if (typeParams.isEmpty) {
+      if (reportErrors) {
+        report(METHOD_NOT_GENERIC, callNode, method.affiliation.name, method.name)
+      }
+      return None
+    }
+    if (typeParams.length != mappedArgs.length) {
+      if (reportErrors) {
+        report(
+          METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
+          callNode,
+          method.affiliation.name,
+          method.name,
+          Integer.valueOf(typeParams.length),
+          Integer.valueOf(mappedArgs.length)
+        )
+      }
+      return None
+    }
+
+    var subst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+    var i = 0
+    while (i < typeParams.length) {
+      subst = subst.updated(typeParams(i).name, mappedArgs(i))
+      i += 1
+    }
+
+    i = 0
+    while (i < typeParams.length) {
+      val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
+      val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
+      val arg = mappedArgs(i)
+      if (!TypeRules.isAssignable(upper, boxedTypeArgument(arg))) {
+        if (reportErrors) {
+          val position = if (typeArgNodes == null || i >= typeArgNodes.length) callNode else typeArgNodes(i)
+          report(INCOMPATIBLE_TYPE, position, upper, arg)
+        }
+        return None
+      }
+      i += 1
+    }
+
+    Some(subst)
+  }
+
   def infer(
     typing: Typing,
     callNode: AST.Node,
@@ -24,23 +80,6 @@ private[typing] object GenericMethodTypeArguments {
     classSubst: scala.collection.immutable.Map[String, Type]
   ): Option[scala.collection.immutable.Map[String, Type]] = {
     import typing.*
-    val typeParams = method.typeParameters
-    if (typeParams.isEmpty) {
-      report(METHOD_NOT_GENERIC, callNode, method.affiliation.name, method.name)
-      return None
-    }
-    if (typeParams.length != typeArgs.length) {
-      report(
-        METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
-        callNode,
-        method.affiliation.name,
-        method.name,
-        Integer.valueOf(typeParams.length),
-        Integer.valueOf(typeArgs.length)
-      )
-      return None
-    }
-
     val mappedArgs = new Array[Type](typeArgs.length)
     var i = 0
     while (i < typeArgs.length) {
@@ -53,27 +92,7 @@ private[typing] object GenericMethodTypeArguments {
       mappedArgs(i) = mapped
       i += 1
     }
-
-    var subst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-    i = 0
-    while (i < typeParams.length) {
-      subst = subst.updated(typeParams(i).name, mappedArgs(i))
-      i += 1
-    }
-
-    i = 0
-    while (i < typeParams.length) {
-      val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
-      val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
-      val arg = mappedArgs(i)
-      if (!TypeRules.isAssignable(upper, boxedTypeArgument(arg))) {
-        report(INCOMPATIBLE_TYPE, typeArgs(i), upper, arg)
-        return None
-      }
-      i += 1
-    }
-
-    Some(subst)
+    explicitFromMappedArgs(typing, callNode, method, mappedArgs, classSubst, typeArgNodes = typeArgs.toArray)
   }
 
   def infer(
@@ -232,4 +251,3 @@ private[typing] object GenericMethodTypeArguments {
     inferred.toMap
   }
 }
-

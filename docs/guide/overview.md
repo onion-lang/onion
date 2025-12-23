@@ -186,6 +186,8 @@ Math::random()
 System::out.println("Java style")
 ```
 
+Default static imports make some class members available without `::` (for example, `println("Hello")` from `onion.IO`). The list lives in `src/main/resources/onion/default-static-imports.txt`.
+
 ### Type Casting with `$`
 
 Cast expressions use the `$` operator:

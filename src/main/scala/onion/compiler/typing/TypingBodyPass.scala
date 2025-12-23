@@ -17,6 +17,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private val operatorTyping = new OperatorTyping(typing, this)
   private val expressionFormTyping = new ExpressionFormTyping(typing, this)
   private val closureTyping = new ClosureTyping(typing, this)
+  private val statementTyping = new StatementTyping(typing, this)
   def run(): Unit = runUnit()
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
@@ -409,227 +410,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node: AST.SuperMethodCall =>
       typeSuperMethodCall(node, context, expected)
   }
-  def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
-    case AST.BlockExpression(loc, elements) =>
-      context.openScope {
-        new StatementBlock(elements.map(e => translate(e, context)).toIndexedSeq*)
-      }
-    case node@AST.BreakExpression(loc) =>
-      new Break(loc)
-    case node@AST.ContinueExpression(loc) =>
-      new Continue(loc)
-    case node@AST.EmptyExpression(loc) =>
-      new NOP(loc)
-    case node@AST.ExpressionBox(loc, body) =>
-      typed(body, context).map{e =>  new ExpressionActionStatement(loc, e)}.getOrElse(new NOP(loc))
-    case node@AST.ForeachExpression(loc, _, _, _) =>
-      context.openScope {
-        val collection = typed(node.collection, context).getOrElse(null)
-        val arg = node.arg
-        addArgument(arg, context)
-        var block = translate(node.statement, context)
-        if (collection == null) {
-          new NOP(node.location)
-        } else if (collection.isBasicType) {
-          report(INCOMPATIBLE_TYPE, node.collection, load("java.util.Collection"), collection.`type`)
-          new NOP(node.location)
-        } else {
-          val elementVar = context.lookupOnlyCurrentScope(arg.name)
-          val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
+  def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
+    statementTyping.translate(node, context)
 
-          if (collection.isArrayType) {
-            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT, isMutable = true)
-            val init =
-              new StatementBlock(
-                new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
-                new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
-              )
-
-            block =
-              new ConditionalLoop(
-                new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
-                new StatementBlock(
-                  assign(elementVar, indexref(collectionVar, ref(counterVariable))),
-                  block,
-                  assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
-                )
-              )
-            new StatementBlock(init, block)
-          } else {
-            val iteratorType = load("java.util.Iterator")
-            val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
-            val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
-            val mNext = findMethod(node.collection, iteratorType, "next")
-            val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
-            val init =
-              new StatementBlock(
-                new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
-                assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0)))
-              )
-            var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-            if (elementVar.tp != rootClass) {
-              next = new AsInstanceOf(next, elementVar.tp)
-            }
-            block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
-            new StatementBlock(init, block)
-          }
-        }
-      }
-    case node@AST.ForExpression(loc, _, _, _, _) =>
-      context.openScope {
-        val init = Option(node.init).map{init => translate(init, context)}.getOrElse(new NOP(loc))
-        val condition = (for(c <- Option(node.condition)) yield {
-          val conditionOpt = typed(c, context)
-          val expected = BasicType.BOOLEAN
-          for(condition <- conditionOpt; if condition.`type` != expected) {
-            report(INCOMPATIBLE_TYPE, node.condition, condition.`type`, expected)
-          }
-          conditionOpt.getOrElse(null)
-        }).getOrElse(new BoolValue(loc, true))
-        val update = Option(node.update).flatMap{update => typed(update, context)}.getOrElse(null)
-        var loop = translate(node.block, context)
-        if(update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
-        new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
-      }
-    case node@AST.IfExpression(loc, _, _, _) =>
-      context.openScope {
-        val conditionOpt = typed(node.condition, context)
-        val expected = BasicType.BOOLEAN
-        for(condition <- conditionOpt if condition.`type` != expected) {
-          report(INCOMPATIBLE_TYPE, node.condition, expected, condition.`type`)
-        }
-        val thenBlock = translate(node.thenBlock, context)
-        val elseBlock = if (node.elseBlock == null) null else translate(node.elseBlock, context)
-        conditionOpt.map{c => new IfStatement(c, thenBlock, elseBlock)}.getOrElse(new NOP(loc))
-      }
-    case node@AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
-      val binding = context.lookupOnlyCurrentScope(name)
-      if (binding != null) {
-        report(DUPLICATE_LOCAL_VARIABLE, node, name)
-        return new NOP(loc)
-      }
-      if (typeRef == null) {
-        val inferred = typed(init, context).getOrElse(null)
-        if (inferred == null) return new NOP(loc)
-        val inferredType = inferred.`type`
-        if (inferredType == BasicType.VOID) {
-          report(INCOMPATIBLE_TYPE, init, rootClass, inferredType)
-          return new NOP(loc)
-        }
-        val index = context.add(name, inferredType, isMutable = !Modifier.isFinal(modifiers))
-        new ExpressionActionStatement(new SetLocal(loc, 0, index, inferredType, inferred))
-      } else {
-        val lhsType = mapFrom(node.typeRef)
-        if (lhsType == null) return new NOP(loc)
-        val index = context.add(name, lhsType, isMutable = !Modifier.isFinal(modifiers))
-        var local: SetLocal = null
-        if (init != null) {
-          val valueNode = typed(init, context, lhsType)
-          valueNode match {
-            case None => return new NOP(loc)
-            case Some(v) =>
-              val value = processAssignable(init, lhsType, v)
-              if (value == null) return new NOP(loc)
-              local = new SetLocal(loc, 0, index, lhsType, value)
-          }
-        }
-        else {
-          local = new SetLocal(loc, 0, index, lhsType, defaultValue(lhsType))
-        }
-        new ExpressionActionStatement(local)
-      }
-    case node@AST.ReturnExpression(loc, _) =>
-      val returnType = context.returnType
-      if(node.result == null) {
-        val expected  = BasicType.VOID
-        if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
-        new Return(loc, null)
-      } else {
-        typed(node.result, context, returnType) match {
-          case None =>
-            new Return(loc, null)
-          case Some(returned) if returned.`type` == BasicType.VOID =>
-            report(CANNOT_RETURN_VALUE, node)
-            new Return(loc, null)
-          case Some(returned) =>
-            val value = processAssignable(node.result, returnType, returned)
-            if (value == null) new Return(loc, null) else new Return(loc, value)
-        }
-      }
-    case node@AST.SelectExpression(loc, _, _, _) =>
-      val conditionOpt = typed(node.condition, context)
-      if(conditionOpt == None) return new NOP(loc)
-      val condition = conditionOpt.get
-      val name = context.newName
-      val index = context.add(name, condition.`type`)
-      val statement = if(node.cases.length == 0) {
-        Option(node.elseBlock).map{e => translate(e, context)}.getOrElse(new NOP(loc))
-      }else {
-        val cases = node.cases
-        val nodes = Buffer[Term]()
-        val thens = Buffer[ActionStatement]()
-        for((expressions, thenClause)<- cases) {
-          val bind = context.lookup(name)
-          nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
-          thens += translate(thenClause, context)
-        }
-        var branches: ActionStatement = if(node.elseBlock != null) {
-          translate(node.elseBlock, context)
-        }else {
-          null
-        }
-        for(i <- (cases.length - 1) to (0, -1)) {
-          branches = new IfStatement(nodes(i), thens(i), branches)
-        }
-        branches
-      }
-      new StatementBlock(condition.location, new ExpressionActionStatement(condition.location, new SetLocal(0, index, condition.`type`, condition)), statement)
-    case node@AST.SynchronizedExpression(loc, _, _) =>
-      context.openScope {
-        val lock = typed(node.condition, context).getOrElse(null)
-        val block = translate(node.block, context)
-        report(UNIMPLEMENTED_FEATURE, node)
-        new Synchronized(node.location, lock, block)
-      }
-    case node@AST.ThrowExpression(loc, target) =>
-      val expressionOpt = typed(target, context)
-      for(expression <- expressionOpt) {
-        val expected = load("java.lang.Throwable")
-        val detected = expression.`type`
-        if (!TypeRules.isSuperType(expected, detected)) {
-          report(INCOMPATIBLE_TYPE, node, expected, detected)
-        }
-      }
-      new Throw(loc, expressionOpt.getOrElse(null))
-    case node@AST.TryExpression(loc, tryBlock, recClauses, finBlock) =>
-      val tryStatement = translate(tryBlock, context)
-      val binds = new Array[ClosureLocalBinding](recClauses.length)
-      val catchBlocks = new Array[ActionStatement](recClauses.length)
-      for(i <- 0 until recClauses.length) {
-        val (argument, body) = recClauses(i)
-        context.openScope {
-          val argType = addArgument(argument, context)
-          val expected = load("java.lang.Throwable")
-          if (!TypeRules.isSuperType(expected, argType)) {
-            report(INCOMPATIBLE_TYPE, argument, expected, argType)
-          }
-          binds(i) = context.lookupOnlyCurrentScope(argument.name)
-          catchBlocks(i) = translate(body, context)
-        }
-      }
-      new Try(loc, tryStatement, binds, catchBlocks)
-    case node@AST.WhileExpression(loc, _, _) =>
-      context.openScope {
-        val conditionOpt = typed(node.condition, context)
-        val expected = BasicType.BOOLEAN
-        for(condition <- conditionOpt) {
-          val actual = condition.`type`
-          if(actual != expected)  report(INCOMPATIBLE_TYPE, node, expected, actual)
-        }
-        val thenBlock = translate(node.block, context)
-        new ConditionalLoop(loc, conditionOpt.getOrElse(null), thenBlock)
-      }
-  }
   def defaultValue(typeRef: Type): Term = Term.defaultValue(typeRef)
   def addReturnNode(node: ActionStatement, returnType: Type): StatementBlock = {
     new StatementBlock(node, new Return(defaultValue(returnType)))
@@ -651,15 +434,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     method
   }
 
-  private def indexref(bind: ClosureLocalBinding, value: Term): Term =
-    new RefArray(new RefLocal(bind), value)
-  private def assign(bind: ClosureLocalBinding, value: Term): ActionStatement =
-    new ExpressionActionStatement(new SetLocal(bind, value))
-  private def ref(bind: ClosureLocalBinding): Term =
-    new RefLocal(bind)
-  private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
+  private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
     findMethod(node, target, name, new Array[Term](0))
-  private def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method = {
+  private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method = {
     val methods = MethodResolution.findMethods(target, name, params)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})

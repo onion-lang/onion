@@ -71,7 +71,7 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
 
 lazy val onionSettings = Seq(
   version := "0.2.0-SNAPSHOT",
-  scalaVersion := "3.6.2",
+  scalaVersion := "3.3.7",
   name := "onion",
   organization := "org.onion_lang",
   Compile / unmanagedSourceDirectories  := {

@@ -2,7 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.{AsmUtil, LocalVarContext, LoopContext}
+import onion.compiler.bytecode.{AsmUtil, ControlFlowEmitter, LocalVarContext, LoopContext}
 import TypedAST._
 
 /**
@@ -18,6 +18,7 @@ class AsmCodeGenerationVisitor(
 ) extends TypedASTVisitor[Unit]:
   
   private val loops = new LoopContext
+  private val controlFlow = new ControlFlowEmitter(gen, loops, asmType, visitTerm, visitStatement)
 
   import BinaryTerm.Constants._
   import UnaryTerm.Constants._
@@ -435,108 +436,33 @@ class AsmCodeGenerationVisitor(
   
   // Statement visitors
   override def visitStatementBlock(node: StatementBlock): Unit =
-    for stmt <- node.statements do
-      visitStatement(stmt)
+    controlFlow.emitStatementBlock(node)
   
   override def visitBreak(node: Break): Unit =
-    loops.currentEnd match
-      case Some(label) => gen.goTo(label)
-      case None => throw new RuntimeException("Break statement outside of loop")
+    controlFlow.emitBreak(node)
   
   override def visitContinue(node: Continue): Unit =
-    loops.currentStart match
-      case Some(label) => gen.goTo(label)
-      case None => throw new RuntimeException("Continue statement outside of loop")
+    controlFlow.emitContinue(node)
   
   override def visitExpressionActionStatement(node: ExpressionActionStatement): Unit =
-    visitTerm(node.term)
-    // Pop the result if it's not void
-    node.term.`type` match
-      case BasicType.VOID => // Nothing to pop
-      case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
-      case _ => gen.pop()
+    controlFlow.emitExpressionActionStatement(node)
   
   override def visitIfStatement(node: IfStatement): Unit =
-    val elseLabel = gen.newLabel()
-    val endLabel = gen.newLabel()
-    
-    visitTerm(node.condition)
-    gen.visitJumpInsn(Opcodes.IFEQ, elseLabel)
-    
-    visitStatement(node.thenStatement)
-    gen.visitJumpInsn(Opcodes.GOTO, endLabel)
-    
-    gen.visitLabel(elseLabel)
-    if node.elseStatement != null then
-      visitStatement(node.elseStatement)
-    
-    gen.visitLabel(endLabel)
+    controlFlow.emitIfStatement(node)
   
   override def visitConditionalLoop(node: ConditionalLoop): Unit =
-    val startLabel = gen.newLabel()
-    val endLabel = gen.newLabel()
-    loops.push(startLabel, endLabel)
-    try
-      gen.visitLabel(startLabel)
-      visitTerm(node.condition)
-      gen.visitJumpInsn(Opcodes.IFEQ, endLabel)
-      visitStatement(node.stmt)
-      gen.visitJumpInsn(Opcodes.GOTO, startLabel)
-      gen.visitLabel(endLabel)
-    finally
-      loops.pop()
+    controlFlow.emitConditionalLoop(node)
   
   override def visitNOP(node: NOP): Unit = ()
   
   override def visitReturn(node: Return): Unit =
-    if node.term != null then
-      visitTerm(node.term)
-    gen.returnValue()
+    controlFlow.emitReturn(node)
   
   override def visitSynchronized(node: Synchronized): Unit =
-    visitTerm(node.term)
-    gen.monitorEnter()
-    
-    val tryStart = gen.mark()
-    visitStatement(node.statement)
-    val tryEnd = gen.mark()
-    
-    visitTerm(node.term)
-    gen.monitorExit()
-    val endLabel = gen.newLabel()
-    gen.goTo(endLabel)
-    
-    // Exception handler to ensure monitor exit
-    val handlerStart = gen.mark()
-    visitTerm(node.term)
-    gen.monitorExit()
-    gen.throwException()
-    
-    gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
-    gen.visitLabel(endLabel)
+    controlFlow.emitSynchronized(node)
   
   override def visitThrow(node: Throw): Unit =
-    visitTerm(node.term)
-    gen.throwException()
+    controlFlow.emitThrow(node)
   
   override def visitTry(node: Try): Unit =
-    val tryStart = gen.mark()
-    visitStatement(node.tryStatement)
-    val tryEnd = gen.mark()
-    
-    // Jump to end if no exception
-    val endLabel = gen.newLabel()
-    gen.goTo(endLabel)
-    
-    // Exception handlers
-    for i <- node.catchTypes.indices do
-      val catchType = node.catchTypes(i)
-      val catchStmt = node.catchStatements(i)
-      val handlerStart = gen.mark()
-      // Store exception in local variable
-      val slot = gen.newLocal(asmType(catchType.tp))
-      gen.storeLocal(slot)
-      visitStatement(catchStmt)
-      gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
-    
-    gen.visitLabel(endLabel)
+    controlFlow.emitTry(node)

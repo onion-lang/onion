@@ -2,7 +2,7 @@ package onion.compiler
 
 import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.{AsmUtil, ControlFlowEmitter, LocalVarContext, LoopContext}
+import onion.compiler.bytecode.{AsmUtil, ControlFlowEmitter, LocalVarContext, LoopContext, TermEmitter}
 import TypedAST._
 
 /**
@@ -19,9 +19,7 @@ class AsmCodeGenerationVisitor(
   
   private val loops = new LoopContext
   private val controlFlow = new ControlFlowEmitter(gen, loops, asmType, visitTerm, visitStatement)
-
-  import BinaryTerm.Constants._
-  import UnaryTerm.Constants._
+  private val termEmitter = new TermEmitter(gen, asmType, visitTerm)
   
   // Helper method to convert TypedAST types to ASM types
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
@@ -59,169 +57,7 @@ class AsmCodeGenerationVisitor(
           case _ => gen.pop()
   
   override def visitBinaryTerm(node: BinaryTerm): Unit =
-    node.kind match
-      // Arithmetic operations
-      case ADD =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.ADD, asmType(node.`type`))
-      
-      case SUBTRACT =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.SUB, asmType(node.`type`))
-      
-      case MULTIPLY =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.MUL, asmType(node.`type`))
-      
-      case DIVIDE =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.DIV, asmType(node.`type`))
-      
-      case MOD =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.REM, asmType(node.`type`))
-      
-      // Logical operations
-      case LOGICAL_AND =>
-        val falseLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        visitTerm(node.lhs)
-        gen.visitJumpInsn(Opcodes.IFEQ, falseLabel)
-        visitTerm(node.rhs)
-        gen.visitJumpInsn(Opcodes.GOTO, endLabel)
-        gen.visitLabel(falseLabel)
-        gen.push(false)
-        gen.visitLabel(endLabel)
-      
-      case LOGICAL_OR =>
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        visitTerm(node.lhs)
-        gen.visitJumpInsn(Opcodes.IFNE, trueLabel)
-        visitTerm(node.rhs)
-        gen.visitJumpInsn(Opcodes.GOTO, endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      // Bitwise operations
-      case BIT_AND =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.AND, asmType(node.`type`))
-      
-      case BIT_OR =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.OR, asmType(node.`type`))
-      
-      case XOR =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.XOR, asmType(node.`type`))
-      
-      // Shift operations
-      case BIT_SHIFT_L2 =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.SHL, asmType(node.lhs.`type`))
-      
-      case BIT_SHIFT_R2 =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.SHR, asmType(node.lhs.`type`))
-      
-      case BIT_SHIFT_R3 =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        gen.math(GeneratorAdapter.USHR, asmType(node.lhs.`type`))
-      
-      // Comparison operations
-      case LESS_THAN =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.ifCmp(asmType(node.lhs.`type`), GeneratorAdapter.LT, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case GREATER_THAN =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.ifCmp(asmType(node.lhs.`type`), GeneratorAdapter.GT, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case LESS_OR_EQUAL =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.ifCmp(asmType(node.lhs.`type`), GeneratorAdapter.LE, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case GREATER_OR_EQUAL =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.ifCmp(asmType(node.lhs.`type`), GeneratorAdapter.GE, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case EQUAL =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.ifCmp(asmType(node.lhs.`type`), GeneratorAdapter.EQ, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case NOT_EQUAL =>
-        visitTerm(node.lhs)
-        visitTerm(node.rhs)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.ifCmp(asmType(node.lhs.`type`), GeneratorAdapter.NE, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case ELVIS =>
-        val endLabel = gen.newLabel()
-        visitTerm(node.lhs)
-        gen.dup()
-        gen.visitJumpInsn(Opcodes.IFNONNULL, endLabel)
-        gen.pop()
-        visitTerm(node.rhs)
-        gen.visitLabel(endLabel)
+    termEmitter.emitBinaryTerm(node)
   
   override def visitBoolValue(node: BoolValue): Unit = gen.push(node.value)
   override def visitByteValue(node: ByteValue): Unit = gen.push(node.value.toInt)
@@ -404,35 +240,7 @@ class AsmCodeGenerationVisitor(
   override def visitThis(node: This): Unit = gen.loadThis()
   
   override def visitUnaryTerm(node: UnaryTerm): Unit =
-    node.kind match
-      case PLUS => visitTerm(node.operand) // No-op
-      
-      case MINUS =>
-        visitTerm(node.operand)
-        gen.math(GeneratorAdapter.NEG, asmType(node.`type`))
-      
-      case NOT =>
-        visitTerm(node.operand)
-        val trueLabel = gen.newLabel()
-        val endLabel = gen.newLabel()
-        gen.visitJumpInsn(Opcodes.IFEQ, trueLabel)
-        gen.push(false)
-        gen.goTo(endLabel)
-        gen.visitLabel(trueLabel)
-        gen.push(true)
-        gen.visitLabel(endLabel)
-      
-      case BIT_NOT =>
-        visitTerm(node.operand)
-        node.`type` match
-          case BasicType.INT =>
-            gen.push(-1)
-            gen.math(GeneratorAdapter.XOR, AsmType.INT_TYPE)
-          case BasicType.LONG =>
-            gen.push(-1L)
-            gen.math(GeneratorAdapter.XOR, AsmType.LONG_TYPE)
-          case _ =>
-            throw new UnsupportedOperationException(s"Bitwise NOT not supported for type: ${node.`type`}")
+    termEmitter.emitUnaryTerm(node)
   
   // Statement visitors
   override def visitStatementBlock(node: StatementBlock): Unit =

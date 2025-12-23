@@ -6,6 +6,20 @@ compiles into JVM class files as in-memory or real files.
 Originally, Onion was written in Java.  It has been rewritten in Scala completely except Parser,
 using JavaCC.
 
+## Language Snapshot
+
+Local `val` / `var` declarations can omit types when an initializer is present, and control-flow constructs such as `if` are expressions.
+
+```onion
+val name = "Onion"
+val label = if name.length > 0 { "ok" } else { "empty" }
+
+def add(x: Int, y: Int): Int = x + y
+
+val double: Int -> Int = (x: Int) -> { return x * 2; }
+IO::println(double.call(21))
+```
+
 ## Architecture
 
 The compiler parses source code into an untyped AST and then performs type

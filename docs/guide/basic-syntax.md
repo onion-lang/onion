@@ -19,14 +19,17 @@ Currently, Onion supports C-style comments:
 
 ### Variable Declaration
 
-Variables are declared with `val` (immutable) or `var` (mutable). Type annotations are required:
+Variables are declared with `val` (immutable) or `var` (mutable). Local declarations can omit the type when an initializer is present; otherwise provide an explicit type:
 
 ```onion
-val name: String = "Alice"
+val name = "Alice"
+var count = 0
 val age: Int = 30
 val price: Double = 19.99
 val isActive: Boolean = true
 ```
+
+Assignments update existing variables; they do not declare new ones.
 
 ### Naming Conventions
 

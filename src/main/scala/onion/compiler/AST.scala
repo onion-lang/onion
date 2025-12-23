@@ -64,7 +64,7 @@ object AST {
   case class ModuleDeclaration(location: Location, name: String) extends Node
   case class ImportClause(location: Location, mapping: List[(String, String)]) extends Node
   abstract sealed class Toplevel extends Node
-  abstract sealed class Expression extends Node
+  abstract sealed class Expression extends Toplevel
   abstract sealed class BinaryExpression(val symbol: String) extends Expression {
     def lhs: Expression
     def rhs: Expression
@@ -143,7 +143,7 @@ object AST {
   }
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
 
-  abstract sealed class CompoundExpression extends Toplevel
+  abstract sealed class CompoundExpression extends Expression
   case class BlockExpression(location: Location, elements: List[CompoundExpression]) extends CompoundExpression
   case class BreakExpression(location: Location) extends CompoundExpression
   case class ContinueExpression(location: Location) extends CompoundExpression

@@ -82,15 +82,17 @@ Invalid identifiers:
 - **Interface types**: Java interfaces
 - **Array types**: `Type[]`
 - **Null type**: Type of `null` literal
+- **Bottom type**: `Nothing` for non-returning expressions
 
 ### Type Annotations
 
-Types are written after a colon in declarations (e.g., `val name: String`).
+Types are written after a colon in declarations (e.g., `val name: String`). Local `val` / `var` declarations can omit the type when an initializer is present.
 
 ```onion
 val name: String
 val age: Int
 val scores: Int[]
+val inferred = "Alice"
 ```
 
 ## Declarations
@@ -100,6 +102,8 @@ val scores: Int[]
 ```onion
 val identifier: Type = expression
 var identifier: Type = expression
+val identifier = expression       // local only
+var identifier = expression       // local only
 ```
 
 ### Function Declaration
@@ -166,6 +170,8 @@ static def staticMethod(params) :ReturnType {
 ```
 
 ## Statements
+
+Control-flow forms are expressions. Blocks evaluate to the last expression, `if`/`select`/`try` can appear where an expression is expected, and loops evaluate to `void`. `return`/`throw`/`break`/`continue` are bottom-typed (they never produce a value).
 
 ### Expression Statement
 

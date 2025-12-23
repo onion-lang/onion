@@ -6,7 +6,7 @@
 
 ## Key Features
 
-- **Statically Typed** - Catch errors at compile time with full type inference
+- **Statically Typed** - Catch errors at compile time with local type inference
 - **Object-Oriented** - Classes, inheritance, interfaces, and method overloading
 - **Functional Elements** - Lambda expressions, closures, and first-class functions
 - **Java Interoperability** - Direct access to Java libraries and frameworks
@@ -35,12 +35,12 @@ class Calculator : JFrame <: ActionListener {
 }
 
 // Lambda expressions
-val filter: (String) -> Boolean = (line: String) -> {
+val filter: String -> Boolean = (line: String) -> {
   return line.startsWith("ERROR");
 }
 
 // Pattern matching with select
-val value: Int = 3;
+val value = 3
 select value {
   case 0, 1, 2:
     IO::println("Low")

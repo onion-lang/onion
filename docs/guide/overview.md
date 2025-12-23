@@ -19,7 +19,7 @@ Onion was created with several goals in mind:
 Every variable and expression has a type known at compile time:
 
 ```onion
-val name: String = "Alice"  // Type annotation
+val name = "Alice"  // Inferred as String
 val age: Int = 30
 val scores: Int[] = new Int[10]
 ```
@@ -29,6 +29,7 @@ The type system includes:
 - Reference types: Classes and interfaces
 - Array types: `Type[]`
 - Null type: Special handling for `null` values
+- Bottom type: `Nothing` for non-returning expressions
 
 ### Object-Oriented
 
@@ -167,10 +168,11 @@ class Counter {
 
 ### Type Annotations with `:`
 
-Types are specified after a colon:
+Types are specified after a colon. Local declarations can omit the type when an initializer is present:
 
 ```onion
 val variable: Type = value
+val inferred = value
 def method(param: Type): ReturnType { }
 ```
 
@@ -216,7 +218,7 @@ select value {
 | Feature | Java | Onion |
 |---------|------|-------|
 | Field declarations | `Type field` | `val/var field: Type` |
-| Variable declarations | `Type variable` | `val variable: Type` |
+| Variable declarations | `Type variable` | `val/var variable[: Type] = value` |
 | Static access | `Class.method()` | `Class::method()` |
 | Type casting | `(Type) value` | `value$Type` |
 | Lambda syntax | `(x) -> x + 1` | `(x :Int) -> { return x + 1; }` |

@@ -18,6 +18,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private val expressionFormTyping = new ExpressionFormTyping(typing, this)
   private val closureTyping = new ClosureTyping(typing, this)
   private val statementTyping = new StatementTyping(typing, this)
+  private val controlExpressionTyping = new ControlExpressionTyping(typing, this)
   def run(): Unit = runUnit()
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
@@ -52,6 +53,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   }
   def processAssignable(node: AST.Node, a: Type, b: Term): Term = {
     if (b == null) return null
+    if (b.`type`.isBottomType) return b
     if (a == b.`type`) return b
     if (!TypeRules.isAssignable(a, b.`type`)) {
       report(INCOMPATIBLE_TYPE, node, a, b.`type`)
@@ -409,6 +411,37 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typeStringInterpolation(node, context)
     case node: AST.SuperMethodCall =>
       typeSuperMethodCall(node, context, expected)
+    case node: AST.BlockExpression =>
+      controlExpressionTyping.typeBlockExpression(node, context)
+    case node: AST.BreakExpression =>
+      controlExpressionTyping.typeBreakExpression(node, context)
+    case node: AST.ContinueExpression =>
+      controlExpressionTyping.typeContinueExpression(node, context)
+    case node: AST.EmptyExpression =>
+      controlExpressionTyping.typeEmptyExpression(node, context)
+    case node: AST.ExpressionBox =>
+      controlExpressionTyping.typeExpressionBox(node, context)
+    case node: AST.ForeachExpression =>
+      controlExpressionTyping.typeForeachExpression(node, context)
+    case node: AST.ForExpression =>
+      controlExpressionTyping.typeForExpression(node, context)
+    case node: AST.IfExpression =>
+      controlExpressionTyping.typeIfExpression(node, context)
+    case node: AST.LocalVariableDeclaration =>
+      report(UNIMPLEMENTED_FEATURE, node)
+      None
+    case node: AST.ReturnExpression =>
+      controlExpressionTyping.typeReturnExpression(node, context)
+    case node: AST.SelectExpression =>
+      controlExpressionTyping.typeSelectExpression(node, context)
+    case node: AST.SynchronizedExpression =>
+      controlExpressionTyping.typeSynchronizedExpression(node, context)
+    case node: AST.ThrowExpression =>
+      controlExpressionTyping.typeThrowExpression(node, context)
+    case node: AST.TryExpression =>
+      controlExpressionTyping.typeTryExpression(node, context)
+    case node: AST.WhileExpression =>
+      controlExpressionTyping.typeWhileExpression(node, context)
   }
   def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
     statementTyping.translate(node, context)

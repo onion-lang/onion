@@ -21,6 +21,8 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
       return null
     }
 
+    if (value.`type`.isBottomType) return value
+
     val frame = bind.frameIndex
     val index = bind.index
     val leftType = bind.tp
@@ -44,6 +46,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
         report(INCOMPATIBLE_TYPE, indexing.rhs, BasicType.INT, index.`type`)
         return null
       }
+      if (value.`type`.isBottomType) return value
       value = processAssignable(node.rhs, targetType.base, value)
       if (value == null) return null
       new SetArray(target, index, value)
@@ -52,9 +55,9 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
       tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "set", Array[Term](index, value)) match {
         case Left(_) =>
           report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
-          null
+          if (value.`type`.isBottomType) value else null
         case Right(method) =>
-          new Call(target, method, params)
+          if (value.`type`.isBottomType) value else new Call(target, method, params)
       }
     }
   }
@@ -81,15 +84,16 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
           }
           val classSubst = TypeSubstitution.classSubstitution(target.`type`)
           val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+          if (value.`type`.isBottomType) return value
           val term = processAssignable(expression, expected, value)
           if (term == null) return null
           return new SetField(target, field, term)
         }
         tryFindMethod(selection, targetType, setter(name), Array[Term](value)) match {
           case Right(method) =>
-            new Call(target, method, Array[Term](value))
+            if (value.`type`.isBottomType) value else new Call(target, method, Array[Term](value))
           case Left(_) =>
-            null
+            if (value.`type`.isBottomType) value else null
         }
       case _ =>
         report(UNIMPLEMENTED_FEATURE, node)

@@ -28,6 +28,7 @@ final class ControlFlowEmitter(
   def emitExpressionActionStatement(node: ExpressionActionStatement): Unit =
     visitTerm(node.term)
     node.term.`type` match
+      case t if t.isBottomType => ()
       case BasicType.VOID => ()
       case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
       case _ => gen.pop()

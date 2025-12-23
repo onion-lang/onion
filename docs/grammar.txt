@@ -1,5 +1,6 @@
 The following is an informal EBNF-style sketch of Onion’s current grammar.
 For the authoritative grammar, see `grammar/JJOnionParser.jj`.
+Control-flow forms are expressions and can appear wherever a term is expected.
 
 block_comment        ::= '/*' ... '*/'
 line_comment         ::= '//' ... EOL
@@ -22,7 +23,7 @@ modifiers             ::= modifier*
 
 primitive             ::= 'Byte' | 'Short' | 'Char' | 'Int' | 'Long' | 'Float' | 'Double' | 'Boolean' | 'Void'
 
-type                  ::= ['+'] (function_type | raw_or_param_type) array_suffix*
+type                  ::= ['+'] (function_type | raw_or_param_type) array_suffix* ['->' type]
 function_type         ::= '(' [type (',' type)*] ')' '->' type
 raw_or_param_type     ::= raw_type [type_arguments]
 raw_type              ::= primitive | id | fqcn
@@ -61,7 +62,7 @@ function_decl         ::= modifiers 'def' id type_params?
                          ['(' args? ')'] [':' return_type]
                          (block | '=' term eos | eos)
 global_var_decl       ::= modifiers ('val' | 'var') id ':' type ['=' term] eos
-local_var_stmt        ::= ('val' | 'var') id ':' type ['=' term] eos
+local_var_stmt        ::= ('val' | 'var') id (':' type ['=' term] | '=' term) eos
 
 args                  ::= argument (',' argument)*
 argument              ::= id ':' type

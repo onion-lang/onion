@@ -41,6 +41,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case ct: ClassType     => AsmUtil.objectType(ct.name)
     case at: ArrayType     => AsmType.getType("[" + asmType(at.component).getDescriptor)
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
+    case _: BottomType     => AsmType.VOID_TYPE
     case _                 => throw new RuntimeException(s"Unsupported type: $tp")
 
   private[compiler] def isReferenceAsmType(tp: AsmType): Boolean =

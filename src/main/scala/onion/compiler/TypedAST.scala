@@ -406,6 +406,14 @@ object TypedAST {
     }
   }
 
+  class StatementTerm(location: Location, val statement: TypedAST.ActionStatement, val termType: TypedAST.Type) extends Term(location) {
+    def this(statement: TypedAST.ActionStatement, termType: TypedAST.Type) = {
+      this(null, statement, termType)
+    }
+
+    def `type`: TypedAST.Type = termType
+  }
+
   /**
    * @author Kota Mizushima
    */
@@ -1129,6 +1137,24 @@ object TypedAST {
     def isObjectType: Boolean = false
   }
 
+  object BottomType {
+    val BOTTOM: TypedAST.BottomType = new TypedAST.BottomType("Nothing")
+  }
+
+  class BottomType(val name: String) extends Type {
+    def isArrayType: Boolean = false
+
+    def isBasicType: Boolean = false
+
+    def isClassType: Boolean = false
+
+    def isNullType: Boolean = false
+
+    override def isBottomType: Boolean = true
+
+    def isObjectType: Boolean = false
+  }
+
   /**
    * @author Kota Mizushima
    */
@@ -1191,11 +1217,15 @@ object TypedAST {
 
     def isArrayType: Boolean
 
+    def isBottomType: Boolean = false
+
     def isObjectType: Boolean
   }
 
   object TypeRules {
     def isSuperType(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
+      if (right.isBottomType) return true
+      if (left.isBottomType) return right.isBottomType
       val l = left match {
         case tv: TypedAST.TypeVariableType => tv.upperBound
         case _ => left
@@ -1275,6 +1305,7 @@ object TypedAST {
     }
 
     private def isSuperTypeForBasic(left: TypedAST.BasicType, right: TypedAST.BasicType): Boolean = {
+      if ((left eq BasicType.VOID) && (right eq BasicType.VOID)) return true
       if (left eq BasicType.DOUBLE) {
         return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT) || (right eq BasicType.DOUBLE))
       }

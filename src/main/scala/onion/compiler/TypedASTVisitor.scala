@@ -41,6 +41,7 @@ trait TypedASTVisitor[T]:
   def visitOuterThis(node: OuterThis): T
   def visitThis(node: This): T
   def visitUnaryTerm(node: UnaryTerm): T
+  def visitStatementTerm(node: StatementTerm): T
   
   // Statement visitors
   def visitStatementBlock(node: StatementBlock): T
@@ -90,6 +91,7 @@ trait TypedASTVisitor[T]:
     case n: OuterThis => visitOuterThis(n)
     case n: This => visitThis(n)
     case n: UnaryTerm => visitUnaryTerm(n)
+    case n: StatementTerm => visitStatementTerm(n)
     
   // Helper method to visit any ActionStatement
   def visitStatement(stmt: ActionStatement): T = stmt match
@@ -145,6 +147,7 @@ abstract class DefaultTypedASTVisitor[T] extends TypedASTVisitor[T]:
   override def visitOuterThis(node: OuterThis): T = defaultValue
   override def visitThis(node: This): T = defaultValue
   override def visitUnaryTerm(node: UnaryTerm): T = defaultValue
+  override def visitStatementTerm(node: StatementTerm): T = defaultValue
   override def visitStatementBlock(node: StatementBlock): T = defaultValue
   override def visitBreak(node: Break): T = defaultValue
   override def visitContinue(node: Continue): T = defaultValue

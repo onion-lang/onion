@@ -4,10 +4,11 @@ Onion is a statically-typed language, meaning every variable has a type determin
 
 ## Type Annotations
 
-Variables require explicit type annotations:
+Local `val` / `var` declarations can omit the type when an initializer is present. Use explicit type annotations for fields, top-level declarations, or when no initializer is provided:
 
 ```onion
-val name: String = "Alice"
+val name = "Alice"
+var count = 0
 val age: Int = 30
 val height: Double = 5.8
 ```
@@ -85,6 +86,10 @@ The `null` literal has a special null type:
 val maybeString: String = null
 val maybeObject: Object = null
 ```
+
+### Bottom Type (Nothing)
+
+`Nothing` is the subtype of all types and is used for expressions that never return, such as `return`, `throw`, `break`, and `continue`.
 
 ## Type Casting
 
@@ -207,7 +212,7 @@ val result: Double = MathUtils::square(5.0)
 
 ## Type Inference
 
-Onion can infer the type of **local** `val` / `var` declarations when an initializer is present:
+Onion can infer the type of **local** `val` / `var` declarations when an initializer is present (fields and top-level declarations still require explicit types):
 
 ```onion
 // With explicit type

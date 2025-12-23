@@ -52,6 +52,7 @@ class AsmCodeGenerationVisitor(
       // Pop intermediate results except the last one
       if i < node.terms.length - 1 then
         node.terms(i).`type` match
+          case t if t.isBottomType => // Nothing to pop
           case BasicType.VOID => // Nothing to pop
           case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
           case _ => gen.pop()
@@ -241,6 +242,9 @@ class AsmCodeGenerationVisitor(
   
   override def visitUnaryTerm(node: UnaryTerm): Unit =
     termEmitter.emitUnaryTerm(node)
+
+  override def visitStatementTerm(node: StatementTerm): Unit =
+    visitStatement(node.statement)
   
   // Statement visitors
   override def visitStatementBlock(node: StatementBlock): Unit =

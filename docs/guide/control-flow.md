@@ -4,6 +4,19 @@ Onion provides several control flow constructs for conditionals, loops, and patt
 
 ## Conditional Statements
 
+### Control Flow as Expressions
+
+Control-flow forms are expressions. Blocks evaluate to the last expression, and `return`/`throw`/`break`/`continue` are typed as bottom (they never produce a value). Loops evaluate to `void`.
+
+```onion
+val label: String = if age >= 18 { "Adult" } else { "Minor" }
+
+val word: String = {
+  val base = "a"
+  base + "!"
+}
+```
+
 ### If-Else
 
 Basic conditional execution:
@@ -147,6 +160,19 @@ select day {
     IO::println("Weekend")
   else:
     IO::println("Invalid day")
+}
+```
+
+Select can also produce a value:
+
+```onion
+val grade: String = select score {
+  case 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100:
+    "A"
+  case 80, 81, 82, 83, 84, 85, 86, 87, 88, 89:
+    "B"
+  else:
+    "F"
 }
 ```
 

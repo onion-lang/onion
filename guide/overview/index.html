@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2014,7 +2014,7 @@
 <h2 id="language-characteristics">Language Characteristics<a class="headerlink" href="#language-characteristics" title="Permanent link">&para;</a></h2>
 <h3 id="statically-typed">Statically Typed<a class="headerlink" href="#statically-typed" title="Permanent link">&para;</a></h3>
 <p>Every variable and expression has a type known at compile time:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val name: String = &quot;Alice&quot;  // Type annotation
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val name = &quot;Alice&quot;  // Inferred as String
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val age: Int = 30
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>val scores: Int[] = new Int[10]
 </span></code></pre></div>
@@ -2022,7 +2022,8 @@
 - Primitive types: <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Byte</code>, <code>Short</code>, <code>Char</code>
 - Reference types: Classes and interfaces
 - Array types: <code>Type[]</code>
-- Null type: Special handling for <code>null</code> values</p>
+- Null type: Special handling for <code>null</code> values
+- Bottom type: <code>Nothing</code> for non-returning expressions</p>
 <h3 id="object-oriented">Object-Oriented<a class="headerlink" href="#object-oriented" title="Permanent link">&para;</a></h3>
 <p>Onion fully supports object-oriented programming:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>class Animal {
@@ -2134,9 +2135,10 @@
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>}
 </span></code></pre></div>
 <h3 id="type-annotations-with">Type Annotations with <code>:</code><a class="headerlink" href="#type-annotations-with" title="Permanent link">&para;</a></h3>
-<p>Types are specified after a colon:</p>
+<p>Types are specified after a colon. Local declarations can omit the type when an initializer is present:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val variable: Type = value
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>def method(param: Type): ReturnType { }
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>val inferred = value
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>def method(param: Type): ReturnType { }
 </span></code></pre></div>
 <h3 id="static-access-with">Static Access with <code>::</code><a class="headerlink" href="#static-access-with" title="Permanent link">&para;</a></h3>
 <p>Static methods and fields use <code>::</code>:</p>
@@ -2144,6 +2146,7 @@
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Math::random()
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>System::out.println(&quot;Java style&quot;)
 </span></code></pre></div>
+<p>Default static imports make some class members available without <code>::</code> (for example, <code>println("Hello")</code> from <code>onion.IO</code>). The list lives in <code>src/main/resources/onion/default-static-imports.txt</code>.</p>
 <h3 id="type-casting-with">Type Casting with <code>$</code><a class="headerlink" href="#type-casting-with" title="Permanent link">&para;</a></h3>
 <p>Cast expressions use the <code>$</code> operator:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>val x: Double = 3.14
@@ -2181,7 +2184,7 @@
 <tr>
 <td>Variable declarations</td>
 <td><code>Type variable</code></td>
-<td><code>val variable: Type</code></td>
+<td><code>val/var variable[: Type] = value</code></td>
 </tr>
 <tr>
 <td>Static access</td>
@@ -2335,10 +2338,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

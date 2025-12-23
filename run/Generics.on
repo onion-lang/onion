@@ -1,13 +1,13 @@
 class Box[T] {
   val value: T;
 public:
-  def this(value :T) {
-    this.value = value;
+  def this(value: T) {
+    this.value = value
   }
-  def get :T {
-    return this.value;
+  def get: T {
+    return this.value
   }
 }
 
-val box: Box[String] = new Box[String]("Hello");
-System::out.println(box.get);
+val box: Box[String] = new Box[String]("Hello")
+IO::println(box.get)

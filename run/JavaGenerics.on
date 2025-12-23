@@ -1,8 +1,8 @@
 class JavaGenericsDemo {
 public:
-  static def main(args: String[]): String {
+  static def main(args: String[]): void {
     val list: ArrayList[String] = new ArrayList[String]
     list.add("ok")
-    return list.get(0)
+    IO::println(list.get(0))
   }
 }

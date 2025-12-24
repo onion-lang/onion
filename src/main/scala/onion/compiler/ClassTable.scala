@@ -17,22 +17,22 @@ import onion.compiler.environment.ReflectionRefs.ReflectClassType
  *
  */
 class ClassTable(classPath: String) {
-  val classes = new OrderedTable[IRT.ClassDefinition]
-  private val classFiles = new JHashMap[String, IRT.ClassType]
-  private val arrayClasses = new JHashMap[String, IRT.ArrayType]
+  val classes = new OrderedTable[TypedAST.ClassDefinition]
+  private val classFiles = new JHashMap[String, TypedAST.ClassType]
+  private val arrayClasses = new JHashMap[String, TypedAST.ArrayType]
   private val table = new ClassFileTable(classPath)
 
-  def loadArray(component: IRT.Type, dimension: Int): IRT.ArrayType = {
+  def loadArray(component: TypedAST.Type, dimension: Int): TypedAST.ArrayType = {
     val arrayName = "[" * dimension + component.name
-    var array: IRT.ArrayType = arrayClasses.get(arrayName)
+    var array: TypedAST.ArrayType = arrayClasses.get(arrayName)
     if (array != null) return array
-    array = new IRT.ArrayType(component, dimension, this)
+    array = new TypedAST.ArrayType(component, dimension, this)
     arrayClasses.put(arrayName, array)
     array
   }
 
-  def load(className: String): IRT.ClassType = {
-    var clazz: IRT.ClassType = lookup(className)
+  def load(className: String): TypedAST.ClassType = {
+    var clazz: TypedAST.ClassType = lookup(className)
     if (clazz == null) {
       val bytes = table.loadBytes(className)
       if (bytes != null) {
@@ -51,9 +51,9 @@ class ClassTable(classPath: String) {
     clazz
   }
 
-  def rootClass: IRT.ClassType = load("java.lang.Object")
+  def rootClass: TypedAST.ClassType = load("java.lang.Object")
 
-  def lookup(className: String): IRT.ClassType = {
+  def lookup(className: String): TypedAST.ClassType = {
     classes.get(className) match {
       case Some(ref) => ref
       case None => classFiles.get(className)

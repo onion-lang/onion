@@ -5,7 +5,7 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-class ClosureLocalBinding(val frameIndex: Int, index: Int, `type`: IRT.Type, isMutable: Boolean) extends LocalBinding(index, `type`, isMutable) {
+class ClosureLocalBinding(val frameIndex: Int, index: Int, `type`: TypedAST.Type, isMutable: Boolean) extends LocalBinding(index, `type`, isMutable) {
   override def equals(other: Any): Boolean = {
     other match {
       case bind: ClosureLocalBinding =>

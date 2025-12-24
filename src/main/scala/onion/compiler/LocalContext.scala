@@ -19,8 +19,8 @@ class LocalContext {
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
-  var method: IRT.Method                     = _
-  var constructor: IRT.ConstructorDefinition = _
+  var method: TypedAST.Method                     = _
+  var constructor: TypedAST.ConstructorDefinition = _
   private var isMethod: Boolean = false
 
   def setGlobal(isGlobal: Boolean): Unit = {
@@ -39,20 +39,20 @@ class LocalContext {
     generator.generate
   }
 
-  def returnType: IRT.Type = {
+  def returnType: TypedAST.Type = {
     if (isMethod) {
       method.returnType
     } else {
-      IRT.BasicType.VOID
+      TypedAST.BasicType.VOID
     }
   }
 
-  def setMethod(method: IRT.Method): Unit = {
+  def setMethod(method: TypedAST.Method): Unit = {
     this.method = method
     this.isMethod = true
   }
 
-  def setConstructor(constructor: IRT.ConstructorDefinition): Unit = {
+  def setConstructor(constructor: TypedAST.ConstructorDefinition): Unit = {
     this.constructor = constructor
     this.isMethod = false
   }
@@ -90,15 +90,15 @@ class LocalContext {
     contextFrame.lookupOnlyCurrentScope(name)
   }
 
-  def add(name: String, `type` : IRT.Type): Int = {
+  def add(name: String, `type` : TypedAST.Type): Int = {
     add(name, `type`, isMutable = true)
   }
 
-  def add(name: String, `type`: IRT.Type, isMutable: Boolean): Int = {
+  def add(name: String, `type`: TypedAST.Type, isMutable: Boolean): Int = {
     contextFrame.add(name, `type`, isMutable)
   }
 
-  def add(`type` : IRT.Type): String = {
+  def add(`type` : TypedAST.Type): String = {
     val name = newName
     contextFrame.add(name, `type`, isMutable = true)
     name

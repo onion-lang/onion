@@ -16,38 +16,38 @@ import org.objectweb.asm.Type
  *
  */
 object OnionTypeConversion {
-  private final val asmTypeTable: Map[Int, IRT.BasicType] = new HashMap[Int, IRT.BasicType]
-  private final val c2t: Map[Class[_], IRT.BasicType]     = new HashMap[Class[_], IRT.BasicType]
+  private final val asmTypeTable: Map[Int, TypedAST.BasicType] = new HashMap[Int, TypedAST.BasicType]
+  private final val c2t: Map[Class[_], TypedAST.BasicType]     = new HashMap[Class[_], TypedAST.BasicType]
 
-  asmTypeTable.put(Type.BYTE, IRT.BasicType.BYTE)
-  asmTypeTable.put(Type.SHORT, IRT.BasicType.SHORT)
-  asmTypeTable.put(Type.CHAR, IRT.BasicType.CHAR)
-  asmTypeTable.put(Type.INT, IRT.BasicType.INT)
-  asmTypeTable.put(Type.LONG, IRT.BasicType.LONG)
-  asmTypeTable.put(Type.FLOAT, IRT.BasicType.FLOAT)
-  asmTypeTable.put(Type.DOUBLE, IRT.BasicType.DOUBLE)
-  asmTypeTable.put(Type.BOOLEAN, IRT.BasicType.BOOLEAN)
-  asmTypeTable.put(Type.VOID, IRT.BasicType.VOID)
+  asmTypeTable.put(Type.BYTE, TypedAST.BasicType.BYTE)
+  asmTypeTable.put(Type.SHORT, TypedAST.BasicType.SHORT)
+  asmTypeTable.put(Type.CHAR, TypedAST.BasicType.CHAR)
+  asmTypeTable.put(Type.INT, TypedAST.BasicType.INT)
+  asmTypeTable.put(Type.LONG, TypedAST.BasicType.LONG)
+  asmTypeTable.put(Type.FLOAT, TypedAST.BasicType.FLOAT)
+  asmTypeTable.put(Type.DOUBLE, TypedAST.BasicType.DOUBLE)
+  asmTypeTable.put(Type.BOOLEAN, TypedAST.BasicType.BOOLEAN)
+  asmTypeTable.put(Type.VOID, TypedAST.BasicType.VOID)
 
-  c2t.put(classOf[Byte], IRT.BasicType.BYTE)
-  c2t.put(classOf[Short], IRT.BasicType.SHORT)
-  c2t.put(classOf[Char], IRT.BasicType.CHAR)
-  c2t.put(classOf[Int], IRT.BasicType.INT)
-  c2t.put(classOf[Long], IRT.BasicType.LONG)
-  c2t.put(classOf[Float], IRT.BasicType.FLOAT)
-  c2t.put(classOf[Double], IRT.BasicType.DOUBLE)
-  c2t.put(classOf[Boolean], IRT.BasicType.BOOLEAN)
-  c2t.put(classOf[Unit], IRT.BasicType.VOID)
+  c2t.put(classOf[Byte], TypedAST.BasicType.BYTE)
+  c2t.put(classOf[Short], TypedAST.BasicType.SHORT)
+  c2t.put(classOf[Char], TypedAST.BasicType.CHAR)
+  c2t.put(classOf[Int], TypedAST.BasicType.INT)
+  c2t.put(classOf[Long], TypedAST.BasicType.LONG)
+  c2t.put(classOf[Float], TypedAST.BasicType.FLOAT)
+  c2t.put(classOf[Double], TypedAST.BasicType.DOUBLE)
+  c2t.put(classOf[Boolean], TypedAST.BasicType.BOOLEAN)
+  c2t.put(classOf[Unit], TypedAST.BasicType.VOID)
 }
 
 class OnionTypeConversion(table: ClassTable) {
   import OnionTypeConversion._
 
-  def toOnionType(klass: Class[_]): IRT.Type = {
-    val returnType: IRT.Type = c2t.get(klass).asInstanceOf[IRT.Type]
+  def toOnionType(klass: Class[_]): TypedAST.Type = {
+    val returnType: TypedAST.Type = c2t.get(klass).asInstanceOf[TypedAST.Type]
     if (returnType != null) return returnType
     if (!klass.isArray) {
-      val symbol: IRT.ClassType = table.load(klass.getName)
+      val symbol: TypedAST.ClassType = table.load(klass.getName)
       if (symbol != null) {
         return symbol
       }
@@ -62,23 +62,23 @@ class OnionTypeConversion(table: ClassTable) {
         dimension += 1
         component = component.getComponentType
       }
-      val componentType: IRT.Type = toOnionType(component)
+      val componentType: TypedAST.Type = toOnionType(component)
       return table.loadArray(componentType, dimension)
     }
     null
   }
 
-  def toOnionType(asmType: Type): IRT.Type = {
+  def toOnionType(asmType: Type): TypedAST.Type = {
     asmType.getSort match {
-      case Type.VOID => IRT.BasicType.VOID
-      case Type.BOOLEAN => IRT.BasicType.BOOLEAN
-      case Type.BYTE => IRT.BasicType.BYTE
-      case Type.SHORT => IRT.BasicType.SHORT
-      case Type.CHAR => IRT.BasicType.CHAR
-      case Type.INT => IRT.BasicType.INT
-      case Type.LONG => IRT.BasicType.LONG
-      case Type.FLOAT => IRT.BasicType.FLOAT
-      case Type.DOUBLE => IRT.BasicType.DOUBLE
+      case Type.VOID => TypedAST.BasicType.VOID
+      case Type.BOOLEAN => TypedAST.BasicType.BOOLEAN
+      case Type.BYTE => TypedAST.BasicType.BYTE
+      case Type.SHORT => TypedAST.BasicType.SHORT
+      case Type.CHAR => TypedAST.BasicType.CHAR
+      case Type.INT => TypedAST.BasicType.INT
+      case Type.LONG => TypedAST.BasicType.LONG
+      case Type.FLOAT => TypedAST.BasicType.FLOAT
+      case Type.DOUBLE => TypedAST.BasicType.DOUBLE
       case Type.OBJECT =>
         val className = asmType.getClassName
         table.load(className)

@@ -1,6 +1,6 @@
 package onion.compiler.environment
 
-import onion.compiler.{IRT, Modifier, OnionTypeConversion, MultiTable, OrderedTable, ClassTable}
+import onion.compiler.{TypedAST, Modifier, OnionTypeConversion, MultiTable, OrderedTable, ClassTable}
 import org.objectweb.asm.{ClassReader, Opcodes, Type}
 import org.objectweb.asm.signature.{SignatureReader, SignatureVisitor}
 import org.objectweb.asm.tree.{ClassNode, MethodNode, FieldNode}
@@ -21,35 +21,35 @@ object AsmRefs {
 
   final val CONSTRUCTOR_NAME = "<init>"
 
-  private final class SignatureTypeMapper(table: ClassTable, baseEnv: Map[String, IRT.TypeVariableType], root0: () => IRT.ClassType) {
-    private def root: IRT.ClassType = root0()
+  private final class SignatureTypeMapper(table: ClassTable, baseEnv: Map[String, TypedAST.TypeVariableType], root0: () => TypedAST.ClassType) {
+    private def root: TypedAST.ClassType = root0()
 
-    private def typeParamEnv(typeParams: Array[IRT.TypeParameter]): Map[String, IRT.TypeVariableType] = {
-      val env = mutable.HashMap[String, IRT.TypeVariableType]() ++ baseEnv
+    private def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] = {
+      val env = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
       var i = 0
       while (i < typeParams.length) {
         val tp = typeParams(i)
         val upper = tp.upperBound match {
-          case Some(ap: IRT.AppliedClassType) => ap.raw
-          case Some(ct: IRT.ClassType) => ct
+          case Some(ap: TypedAST.AppliedClassType) => ap.raw
+          case Some(ct: TypedAST.ClassType) => ct
           case _ => root
         }
-        env += tp.name -> new IRT.TypeVariableType(tp.name, upper)
+        env += tp.name -> new TypedAST.TypeVariableType(tp.name, upper)
         i += 1
       }
       env.toMap
     }
 
-    final class TypeRefVisitor(onComplete: IRT.Type => Unit, env: Map[String, IRT.TypeVariableType])
+    final class TypeRefVisitor(onComplete: TypedAST.Type => Unit, env: Map[String, TypedAST.TypeVariableType])
       extends SignatureVisitor(Opcodes.ASM9) {
 
       private var arrayDim = 0
       private var internalName: String = null
       private val innerNames = mutable.ArrayBuffer[String]()
-      private val typeArgs = mutable.ArrayBuffer[IRT.Type]()
+      private val typeArgs = mutable.ArrayBuffer[TypedAST.Type]()
       private var done = false
 
-      private def finish(t: IRT.Type): Unit = {
+      private def finish(t: TypedAST.Type): Unit = {
         if (done) return
         done = true
         if (t == null) {
@@ -68,24 +68,24 @@ object AsmRefs {
       }
 
       override def visitBaseType(descriptor: Char): Unit = {
-        val tpe: IRT.Type =
+        val tpe: TypedAST.Type =
           descriptor match {
-            case 'V' => IRT.BasicType.VOID
-            case 'Z' => IRT.BasicType.BOOLEAN
-            case 'B' => IRT.BasicType.BYTE
-            case 'S' => IRT.BasicType.SHORT
-            case 'C' => IRT.BasicType.CHAR
-            case 'I' => IRT.BasicType.INT
-            case 'J' => IRT.BasicType.LONG
-            case 'F' => IRT.BasicType.FLOAT
-            case 'D' => IRT.BasicType.DOUBLE
+            case 'V' => TypedAST.BasicType.VOID
+            case 'Z' => TypedAST.BasicType.BOOLEAN
+            case 'B' => TypedAST.BasicType.BYTE
+            case 'S' => TypedAST.BasicType.SHORT
+            case 'C' => TypedAST.BasicType.CHAR
+            case 'I' => TypedAST.BasicType.INT
+            case 'J' => TypedAST.BasicType.LONG
+            case 'F' => TypedAST.BasicType.FLOAT
+            case 'D' => TypedAST.BasicType.DOUBLE
             case _ => null
           }
         finish(tpe)
       }
 
       override def visitTypeVariable(name: String): Unit = {
-        val tv = env.getOrElse(name, new IRT.TypeVariableType(name, root))
+        val tv = env.getOrElse(name, new TypedAST.TypeVariableType(name, root))
         finish(tv)
       }
 
@@ -98,7 +98,7 @@ object AsmRefs {
       }
 
       override def visitTypeArgument(): Unit = {
-        typeArgs += new IRT.WildcardType(root, None)
+        typeArgs += new TypedAST.WildcardType(root, None)
       }
 
       override def visitTypeArgument(wildcard: Char): SignatureVisitor = {
@@ -106,9 +106,9 @@ object AsmRefs {
           t =>
             wildcard match {
               case '+' =>
-                typeArgs += new IRT.WildcardType(if (t == null) root else t, None)
+                typeArgs += new TypedAST.WildcardType(if (t == null) root else t, None)
               case '-' =>
-                typeArgs += new IRT.WildcardType(root, Some(if (t == null) root else t))
+                typeArgs += new TypedAST.WildcardType(root, Some(if (t == null) root else t))
               case _ =>
                 typeArgs += (if (t == null) root else t)
             }
@@ -132,40 +132,40 @@ object AsmRefs {
           return
         }
         if (typeArgs.isEmpty) finish(raw)
-        else finish(IRT.AppliedClassType(raw, typeArgs.toList))
+        else finish(TypedAST.AppliedClassType(raw, typeArgs.toList))
       }
     }
 
     final case class ClassInfo(
-      typeParameters: Array[IRT.TypeParameter],
-      superClass: IRT.ClassType,
-      interfaces: Seq[IRT.ClassType],
-      env: Map[String, IRT.TypeVariableType]
+      typeParameters: Array[TypedAST.TypeParameter],
+      superClass: TypedAST.ClassType,
+      interfaces: Seq[TypedAST.ClassType],
+      env: Map[String, TypedAST.TypeVariableType]
     )
 
     def parseClass(signature: String, fallbackSuper: String, fallbackIfaces: java.util.List[String]): ClassInfo = {
-      val typeParamsBuf = mutable.ArrayBuffer[IRT.TypeParameter]()
+      val typeParamsBuf = mutable.ArrayBuffer[TypedAST.TypeParameter]()
       var currentName: String = null
-      var currentUpper: IRT.ClassType = null
-      var parsedSuper: IRT.ClassType = null
-      val parsedIfaces = mutable.ArrayBuffer[IRT.ClassType]()
+      var currentUpper: TypedAST.ClassType = null
+      var parsedSuper: TypedAST.ClassType = null
+      val parsedIfaces = mutable.ArrayBuffer[TypedAST.ClassType]()
 
       def finishTypeParam(): Unit = {
         if (currentName == null) return
         val upper = if (currentUpper == null) root else currentUpper
-        typeParamsBuf += IRT.TypeParameter(currentName, Some(upper))
+        typeParamsBuf += TypedAST.TypeParameter(currentName, Some(upper))
         currentName = null
         currentUpper = null
       }
 
-      val tmpEnv = mutable.HashMap[String, IRT.TypeVariableType]() ++ baseEnv
+      val tmpEnv = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
 
       val reader = new SignatureReader(signature)
       reader.accept(new SignatureVisitor(Opcodes.ASM9) {
         override def visitFormalTypeParameter(name: String): Unit = {
           finishTypeParam()
           currentName = name
-          tmpEnv += name -> new IRT.TypeVariableType(name, root)
+          tmpEnv += name -> new TypedAST.TypeVariableType(name, root)
         }
 
         override def visitClassBound(): SignatureVisitor =
@@ -173,8 +173,8 @@ object AsmRefs {
             t =>
               if (currentUpper == null) {
                 currentUpper = t match {
-                  case ap: IRT.AppliedClassType => ap.raw
-                  case ct: IRT.ClassType => ct
+                  case ap: TypedAST.AppliedClassType => ap.raw
+                  case ct: TypedAST.ClassType => ct
                   case _ => root
                 }
               },
@@ -186,8 +186,8 @@ object AsmRefs {
             t =>
               if (currentUpper == null) {
                 currentUpper = t match {
-                  case ap: IRT.AppliedClassType => ap.raw
-                  case ct: IRT.ClassType => ct
+                  case ap: TypedAST.AppliedClassType => ap.raw
+                  case ct: TypedAST.ClassType => ct
                   case _ => root
                 }
               },
@@ -203,7 +203,7 @@ object AsmRefs {
           new TypeRefVisitor(
             t =>
               parsedSuper = t match {
-                case ct: IRT.ClassType => ct
+                case ct: TypedAST.ClassType => ct
                 case _ => null
               },
             nextEnv
@@ -216,7 +216,7 @@ object AsmRefs {
           new TypeRefVisitor(
             t =>
               t match {
-                case ct: IRT.ClassType => parsedIfaces += ct
+                case ct: TypedAST.ClassType => parsedIfaces += ct
                 case _ =>
               },
             nextEnv
@@ -242,34 +242,34 @@ object AsmRefs {
     }
 
     final case class MethodInfo(
-      typeParameters: Array[IRT.TypeParameter],
-      arguments: Array[IRT.Type],
-      returnType: IRT.Type,
-      env: Map[String, IRT.TypeVariableType]
+      typeParameters: Array[TypedAST.TypeParameter],
+      arguments: Array[TypedAST.Type],
+      returnType: TypedAST.Type,
+      env: Map[String, TypedAST.TypeVariableType]
     )
 
     def parseMethod(signature: String, desc: String): MethodInfo = {
-      val typeParamsBuf = mutable.ArrayBuffer[IRT.TypeParameter]()
+      val typeParamsBuf = mutable.ArrayBuffer[TypedAST.TypeParameter]()
       var currentName: String = null
-      var currentUpper: IRT.ClassType = null
-      val argsBuf = mutable.ArrayBuffer[IRT.Type]()
-      var return0: IRT.Type = null
+      var currentUpper: TypedAST.ClassType = null
+      val argsBuf = mutable.ArrayBuffer[TypedAST.Type]()
+      var return0: TypedAST.Type = null
 
       def finishTypeParam(): Unit = {
         if (currentName == null) return
         val upper = if (currentUpper == null) root else currentUpper
-        typeParamsBuf += IRT.TypeParameter(currentName, Some(upper))
+        typeParamsBuf += TypedAST.TypeParameter(currentName, Some(upper))
         currentName = null
         currentUpper = null
       }
 
-      val tmpEnv = mutable.HashMap[String, IRT.TypeVariableType]() ++ baseEnv
+      val tmpEnv = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
       val reader = new SignatureReader(signature)
       reader.accept(new SignatureVisitor(Opcodes.ASM9) {
         override def visitFormalTypeParameter(name: String): Unit = {
           finishTypeParam()
           currentName = name
-          tmpEnv += name -> new IRT.TypeVariableType(name, root)
+          tmpEnv += name -> new TypedAST.TypeVariableType(name, root)
         }
 
         override def visitClassBound(): SignatureVisitor =
@@ -277,8 +277,8 @@ object AsmRefs {
             t =>
               if (currentUpper == null) {
                 currentUpper = t match {
-                  case ap: IRT.AppliedClassType => ap.raw
-                  case ct: IRT.ClassType => ct
+                  case ap: TypedAST.AppliedClassType => ap.raw
+                  case ct: TypedAST.ClassType => ct
                   case _ => root
                 }
               },
@@ -290,8 +290,8 @@ object AsmRefs {
             t =>
               if (currentUpper == null) {
                 currentUpper = t match {
-                  case ap: IRT.AppliedClassType => ap.raw
-                  case ct: IRT.ClassType => ct
+                  case ap: TypedAST.AppliedClassType => ap.raw
+                  case ct: TypedAST.ClassType => ct
                   case _ => root
                 }
               },
@@ -319,7 +319,7 @@ object AsmRefs {
       if (argsBuf.isEmpty && return0 == null) {
         val bridge = new OnionTypeConversion(table)
         val asmArgs = Type.getArgumentTypes(desc)
-        val argTypes = new Array[IRT.Type](asmArgs.length)
+        val argTypes = new Array[TypedAST.Type](asmArgs.length)
         var i = 0
         while (i < asmArgs.length) {
           argTypes(i) = bridge.toOnionType(asmArgs(i))
@@ -331,8 +331,8 @@ object AsmRefs {
       }
     }
 
-    def parseField(signature: String, desc: String): IRT.Type = {
-      var result: IRT.Type = null
+    def parseField(signature: String, desc: String): TypedAST.Type = {
+      var result: TypedAST.Type = null
       val reader = new SignatureReader(signature)
       reader.acceptType(new TypeRefVisitor(t => result = t, baseEnv))
       if (result == null) {
@@ -342,7 +342,7 @@ object AsmRefs {
     }
   }
 
-  class AsmMethodRef(method: MethodNode, override val affiliation: IRT.ClassType, table: ClassTable, classEnv: Map[String, IRT.TypeVariableType]) extends IRT.Method {
+  class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = method.name
     private val bridge = new OnionTypeConversion(table)
@@ -350,13 +350,13 @@ object AsmRefs {
     private val parsed =
       if (method.signature != null) mapper.parseMethod(method.signature, method.desc)
       else null
-    override val typeParameters: Array[IRT.TypeParameter] =
+    override val typeParameters: Array[TypedAST.TypeParameter] =
       if (parsed == null) Array()
       else parsed.typeParameters.clone()
-    private val argTypes: Array[IRT.Type] =
+    private val argTypes: Array[TypedAST.Type] =
       if (parsed == null) {
         val asmTypes = Type.getArgumentTypes(method.desc)
-        val result = new Array[IRT.Type](asmTypes.length)
+        val result = new Array[TypedAST.Type](asmTypes.length)
         var i = 0
         while (i < asmTypes.length) {
           result(i) = bridge.toOnionType(asmTypes(i))
@@ -366,24 +366,24 @@ object AsmRefs {
       } else {
         parsed.arguments
       }
-    override def arguments: Array[IRT.Type] = argTypes.clone()
-    override val returnType: IRT.Type =
+    override def arguments: Array[TypedAST.Type] = argTypes.clone()
+    override val returnType: TypedAST.Type =
       if (parsed == null) bridge.toOnionType(Type.getReturnType(method.desc))
       else parsed.returnType
     val underlying: MethodNode = method
   }
 
-  class AsmFieldRef(field: FieldNode, override val affiliation: IRT.ClassType, table: ClassTable, classEnv: Map[String, IRT.TypeVariableType]) extends IRT.FieldRef {
+  class AsmFieldRef(field: FieldNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.FieldRef {
     override val modifier: Int = toOnionModifier(field.access)
     override val name: String = field.name
     private val mapper = new SignatureTypeMapper(table, classEnv, () => table.load("java.lang.Object"))
-    override val `type`: IRT.Type =
+    override val `type`: TypedAST.Type =
       if (field.signature != null) mapper.parseField(field.signature, field.desc)
       else new OnionTypeConversion(table).toOnionType(Type.getType(field.desc))
     val underlying: FieldNode = field
   }
 
-  class AsmConstructorRef(method: MethodNode, override val affiliation: IRT.ClassType, table: ClassTable, classEnv: Map[String, IRT.TypeVariableType]) extends IRT.ConstructorRef {
+  class AsmConstructorRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.ConstructorRef {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = CONSTRUCTOR_NAME
     private val bridge = new OnionTypeConversion(table)
@@ -391,13 +391,13 @@ object AsmRefs {
     private val parsed =
       if (method.signature != null) mapper.parseMethod(method.signature, method.desc)
       else null
-    override val typeParameters: Array[IRT.TypeParameter] =
+    override val typeParameters: Array[TypedAST.TypeParameter] =
       if (parsed == null) Array()
       else parsed.typeParameters.clone()
     private val args0 =
       if (parsed == null) {
         val asmTypes = Type.getArgumentTypes(method.desc)
-        val result = new Array[IRT.Type](asmTypes.length)
+        val result = new Array[TypedAST.Type](asmTypes.length)
         var i = 0
         while (i < asmTypes.length) {
           result(i) = bridge.toOnionType(asmTypes(i))
@@ -407,11 +407,11 @@ object AsmRefs {
       } else {
         parsed.arguments
       }
-    override def getArgs: Array[IRT.Type] = args0.clone()
+    override def getArgs: Array[TypedAST.Type] = args0.clone()
     val underlying: MethodNode = method
   }
 
-  class AsmClassType(classBytes: Array[Byte], table: ClassTable) extends IRT.AbstractClassType {
+  class AsmClassType(classBytes: Array[Byte], table: ClassTable) extends TypedAST.AbstractClassType {
     private val node = {
       val cr = new ClassReader(classBytes)
       val n = new ClassNode()
@@ -420,7 +420,7 @@ object AsmRefs {
     }
 
     private val modifier_ = toOnionModifier(node.access)
-    private def root: IRT.ClassType = if (node.name == "java/lang/Object") this else table.load("java.lang.Object")
+    private def root: TypedAST.ClassType = if (node.name == "java/lang/Object") this else table.load("java.lang.Object")
     private val genericMapper = new SignatureTypeMapper(table, Map.empty, () => root)
     private lazy val classInfo =
       if (node.signature != null) genericMapper.parseClass(node.signature, node.superName, node.interfaces.asInstanceOf[java.util.List[String]])
@@ -431,11 +431,11 @@ object AsmRefs {
         genericMapper.ClassInfo(Array.empty, super0, ifaces0, Map.empty)
       }
 
-    override def typeParameters: Array[IRT.TypeParameter] = classInfo.typeParameters.clone()
-    private lazy val classEnv: Map[String, IRT.TypeVariableType] = classInfo.env
+    override def typeParameters: Array[TypedAST.TypeParameter] = classInfo.typeParameters.clone()
+    private lazy val classEnv: Map[String, TypedAST.TypeVariableType] = classInfo.env
 
-    private lazy val methods_ : MultiTable[IRT.Method] = {
-      val m = new MultiTable[IRT.Method]
+    private lazy val methods_ : MultiTable[TypedAST.Method] = {
+      val m = new MultiTable[TypedAST.Method]
       import scala.jdk.CollectionConverters._
       for (method <- node.methods.asInstanceOf[java.util.List[MethodNode]].asScala if method.name != CONSTRUCTOR_NAME) {
         m.add(new AsmMethodRef(method, this, table, classEnv))
@@ -443,8 +443,8 @@ object AsmRefs {
       m
     }
 
-    private lazy val fields_ : OrderedTable[IRT.FieldRef] = {
-      val f = new OrderedTable[IRT.FieldRef]
+    private lazy val fields_ : OrderedTable[TypedAST.FieldRef] = {
+      val f = new OrderedTable[TypedAST.FieldRef]
       import scala.jdk.CollectionConverters._
       for (field <- node.fields.asInstanceOf[java.util.List[FieldNode]].asScala) {
         f.add(new AsmFieldRef(field, this, table, classEnv))
@@ -452,7 +452,7 @@ object AsmRefs {
       f
     }
 
-    private lazy val constructors_ : Seq[IRT.ConstructorRef] = {
+    private lazy val constructors_ : Seq[TypedAST.ConstructorRef] = {
       import scala.jdk.CollectionConverters._
       node.methods.asInstanceOf[java.util.List[MethodNode]].asScala.collect {
         case m if m.name == CONSTRUCTOR_NAME => new AsmConstructorRef(m, this, table, classEnv)
@@ -462,17 +462,17 @@ object AsmRefs {
     def isInterface: Boolean = (node.access & Opcodes.ACC_INTERFACE) != 0
     def modifier: Int = modifier_
     def name: String = node.name.replace('/', '.')
-    def superClass: IRT.ClassType = {
+    def superClass: TypedAST.ClassType = {
       classInfo.superClass
     }
-    def interfaces: Seq[IRT.ClassType] = {
+    def interfaces: Seq[TypedAST.ClassType] = {
       classInfo.interfaces
     }
 
-    def methods: Seq[IRT.Method] = methods_.values
-    def methods(name: String): Array[IRT.Method] = methods_.get(name).toArray
-    def fields: Array[IRT.FieldRef] = fields_.values.toArray
-    def field(name: String): IRT.FieldRef = fields_.get(name).orNull
-    def constructors: Array[IRT.ConstructorRef] = constructors_.toArray
+    def methods: Seq[TypedAST.Method] = methods_.values
+    def methods(name: String): Array[TypedAST.Method] = methods_.get(name).toArray
+    def fields: Array[TypedAST.FieldRef] = fields_.values.toArray
+    def field(name: String): TypedAST.FieldRef = fields_.get(name).orNull
+    def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray
   }
 }

@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.environment
 
-import onion.compiler.{IRT, Modifier, OnionTypeConversion, MultiTable, OrderedTable, ClassTable}
+import onion.compiler.{TypedAST, Modifier, OnionTypeConversion, MultiTable, OrderedTable, ClassTable}
 import java.lang.reflect.{Constructor, Field, Method}
 import java.lang.reflect.{GenericArrayType, ParameterizedType, Type, TypeVariable, WildcardType}
 import java.util.{ArrayList, List}
@@ -29,50 +29,50 @@ object ReflectionRefs {
     private val bridge = new OnionTypeConversion(table)
     private val root = table.rootClass
 
-    def typeParamEnv(typeParams: Array[IRT.TypeParameter]): Map[String, IRT.TypeVariableType] = {
-      val env = scala.collection.mutable.HashMap[String, IRT.TypeVariableType]()
+    def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] = {
+      val env = scala.collection.mutable.HashMap[String, TypedAST.TypeVariableType]()
       var i = 0
       while (i < typeParams.length) {
         val tp = typeParams(i)
         val upper = tp.upperBound match {
-          case Some(ap: IRT.AppliedClassType) => ap.raw
-          case Some(ct: IRT.ClassType) => ct
+          case Some(ap: TypedAST.AppliedClassType) => ap.raw
+          case Some(ct: TypedAST.ClassType) => ct
           case _ => root
         }
-        env += tp.name -> new IRT.TypeVariableType(tp.name, upper)
+        env += tp.name -> new TypedAST.TypeVariableType(tp.name, upper)
         i += 1
       }
       env.toMap
     }
 
-    def typeParamsFrom(vars: Array[? <: TypeVariable[?]], baseEnv: Map[String, IRT.TypeVariableType]): (Array[IRT.TypeParameter], Map[String, IRT.TypeVariableType]) = {
-      val params = new Array[IRT.TypeParameter](vars.length)
-      val env = scala.collection.mutable.HashMap[String, IRT.TypeVariableType]() ++ baseEnv
+    def typeParamsFrom(vars: Array[? <: TypeVariable[?]], baseEnv: Map[String, TypedAST.TypeVariableType]): (Array[TypedAST.TypeParameter], Map[String, TypedAST.TypeVariableType]) = {
+      val params = new Array[TypedAST.TypeParameter](vars.length)
+      val env = scala.collection.mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
       var i = 0
       while (i < vars.length) {
         val tv = vars(i)
         val name = tv.getName
         val upper = erasedUpperBound(tv.getBounds, env.toMap)
-        val variable = new IRT.TypeVariableType(name, upper)
-        params(i) = IRT.TypeParameter(name, Some(upper))
+        val variable = new TypedAST.TypeVariableType(name, upper)
+        params(i) = TypedAST.TypeParameter(name, Some(upper))
         env += name -> variable
         i += 1
       }
       (params, env.toMap)
     }
 
-    private def erasedUpperBound(bounds: Array[Type], env: Map[String, IRT.TypeVariableType]): IRT.ClassType = {
+    private def erasedUpperBound(bounds: Array[Type], env: Map[String, TypedAST.TypeVariableType]): TypedAST.ClassType = {
       if (bounds == null || bounds.isEmpty) return root
       val mapped = toOnionType(bounds(0), env)
       mapped match {
-        case ap: IRT.AppliedClassType => ap.raw
-        case ct: IRT.ClassType => ct
-        case tv: IRT.TypeVariableType => tv.upperBound
+        case ap: TypedAST.AppliedClassType => ap.raw
+        case ct: TypedAST.ClassType => ct
+        case tv: TypedAST.TypeVariableType => tv.upperBound
         case _ => root
       }
     }
 
-    def toOnionType(tp: Type, env: Map[String, IRT.TypeVariableType]): IRT.Type = tp match {
+    def toOnionType(tp: Type, env: Map[String, TypedAST.TypeVariableType]): TypedAST.Type = tp match {
       case c: Class[?] =>
         bridge.toOnionType(c)
       case p: ParameterizedType =>
@@ -80,11 +80,11 @@ object ReflectionRefs {
         val raw = table.load(rawClass.getName)
         val args = p.getActualTypeArguments.map(a => toOnionType(a, env))
         if (raw == null || args.contains(null)) null
-        else IRT.AppliedClassType(raw, args.toList)
+        else TypedAST.AppliedClassType(raw, args.toList)
       case v: TypeVariable[_] =>
         env.getOrElse(
           v.getName,
-          new IRT.TypeVariableType(v.getName, erasedUpperBound(v.getBounds, env))
+          new TypedAST.TypeVariableType(v.getName, erasedUpperBound(v.getBounds, env))
         )
       case a: GenericArrayType =>
         var dim = 1
@@ -112,49 +112,49 @@ object ReflectionRefs {
           } else {
             None
           }
-        new IRT.WildcardType(upper, lower)
+        new TypedAST.WildcardType(upper, lower)
       case _ =>
         root
     }
   }
 
-  private class ReflectMethodRef(method: Method, override val affiliation: IRT.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, IRT.TypeVariableType]) extends IRT.Method {
+  private class ReflectMethodRef(method: Method, override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
     override val modifier: Int = toOnionModifier(method.getModifiers)
     override val name: String = method.getName
     private val (typeParams0, env0) = mapper.typeParamsFrom(method.getTypeParameters, baseEnv)
-    override val typeParameters: Array[IRT.TypeParameter] = typeParams0.clone()
-    private val argTypes: Array[IRT.Type] = method.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))
-    override def arguments: Array[IRT.Type] = argTypes.clone()
-    override val returnType: IRT.Type = mapper.toOnionType(method.getGenericReturnType, env0)
+    override val typeParameters: Array[TypedAST.TypeParameter] = typeParams0.clone()
+    private val argTypes: Array[TypedAST.Type] = method.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))
+    override def arguments: Array[TypedAST.Type] = argTypes.clone()
+    override val returnType: TypedAST.Type = mapper.toOnionType(method.getGenericReturnType, env0)
     val underlying: Method = method
   }
 
-  private class ReflectFieldRef(field: Field, override val affiliation: IRT.ClassType, mapper: GenericTypeMapper, env: Map[String, IRT.TypeVariableType]) extends IRT.FieldRef {
+  private class ReflectFieldRef(field: Field, override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, env: Map[String, TypedAST.TypeVariableType]) extends TypedAST.FieldRef {
     override val modifier: Int = toOnionModifier(field.getModifiers)
     override val name: String = field.getName
-    override val `type`: IRT.Type = mapper.toOnionType(field.getGenericType, env)
+    override val `type`: TypedAST.Type = mapper.toOnionType(field.getGenericType, env)
     val underlying: Field = field
   }
 
-  private class ReflectConstructorRef(constructor: Constructor[?], override val affiliation: IRT.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, IRT.TypeVariableType]) extends IRT.ConstructorRef {
+  private class ReflectConstructorRef(constructor: Constructor[?], override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.ConstructorRef {
     override val modifier: Int = toOnionModifier(constructor.getModifiers)
     override val name: String = "<init>"
     private val (typeParams0, env0) = mapper.typeParamsFrom(constructor.getTypeParameters, baseEnv)
-    override val typeParameters: Array[IRT.TypeParameter] = typeParams0.clone()
-    private val args0: Array[IRT.Type] = constructor.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))
-    override def getArgs: Array[IRT.Type] = args0.clone()
+    override val typeParameters: Array[TypedAST.TypeParameter] = typeParams0.clone()
+    private val args0: Array[TypedAST.Type] = constructor.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))
+    override def getArgs: Array[TypedAST.Type] = args0.clone()
     val underlying: Constructor[?] = constructor
   }
 
-  class ReflectClassType(klass: Class[?], table: ClassTable) extends IRT.AbstractClassType {
+  class ReflectClassType(klass: Class[?], table: ClassTable) extends TypedAST.AbstractClassType {
     private val mapper = new GenericTypeMapper(table)
     private val modifier_ : Int                          = toOnionModifier(klass.getModifiers)
-    private var methods_ : MultiTable[IRT.Method]        = _
-    private var fields_ : OrderedTable[IRT.FieldRef]     = _
-    private var constructors_ : List[IRT.ConstructorRef] = _
+    private var methods_ : MultiTable[TypedAST.Method]        = _
+    private var fields_ : OrderedTable[TypedAST.FieldRef]     = _
+    private var constructors_ : List[TypedAST.ConstructorRef] = _
 
     private lazy val (typeParameters0, classEnv0) = mapper.typeParamsFrom(klass.getTypeParameters, Map.empty)
-    override def typeParameters: Array[IRT.TypeParameter] = typeParameters0.clone()
+    override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters0.clone()
 
     def isInterface: Boolean = (klass.getModifiers & java.lang.reflect.Modifier.INTERFACE) != 0
 
@@ -162,38 +162,38 @@ object ReflectionRefs {
 
     def name: String = klass.getName
 
-    def superClass: IRT.ClassType = {
+    def superClass: TypedAST.ClassType = {
       val generic = klass.getGenericSuperclass
       if (generic == null) return table.rootClass
       mapper.toOnionType(generic, classEnv0) match {
-        case ct: IRT.ClassType if !(ct eq this) => ct
+        case ct: TypedAST.ClassType if !(ct eq this) => ct
         case _ => table.rootClass
       }
     }
 
-    def interfaces: Seq[IRT.ClassType] = {
+    def interfaces: Seq[TypedAST.ClassType] = {
       klass.getGenericInterfaces.toIndexedSeq.flatMap {
         case tpe =>
           mapper.toOnionType(tpe, classEnv0) match {
-            case ct: IRT.ClassType => Some(ct)
+            case ct: TypedAST.ClassType => Some(ct)
             case _ => None
           }
       }
     }
 
-    def methods: Seq[IRT.Method] = {
+    def methods: Seq[TypedAST.Method] = {
       requireMethodTable()
       methods_.values
     }
 
-    def methods(name: String): Array[IRT.Method] = {
+    def methods(name: String): Array[TypedAST.Method] = {
       requireMethodTable()
       methods_.get(name).toArray
     }
 
     private def requireMethodTable(): Unit = {
       if (methods_ == null) {
-        methods_ = new MultiTable[IRT.Method]
+        methods_ = new MultiTable[TypedAST.Method]
         for (method <- klass.getMethods if method.getName != CONSTRUCTOR_NAME) {
           val owner = table.load(method.getDeclaringClass.getName)
           val ownerEnv = mapper.typeParamEnv(owner.typeParameters)
@@ -202,19 +202,19 @@ object ReflectionRefs {
       }
     }
 
-    def fields: Array[IRT.FieldRef] = {
+    def fields: Array[TypedAST.FieldRef] = {
       requireFieldTable()
       fields_.values.toArray
     }
 
-    def field(name: String): IRT.FieldRef = {
+    def field(name: String): TypedAST.FieldRef = {
       requireFieldTable()
       fields_.get(name).orNull
     }
 
     private def requireFieldTable(): Unit = {
       if (fields_ == null) {
-        fields_ = new OrderedTable[IRT.FieldRef]
+        fields_ = new OrderedTable[TypedAST.FieldRef]
         for (field <- klass.getFields) {
           val owner = table.load(field.getDeclaringClass.getName)
           val ownerEnv = mapper.typeParamEnv(owner.typeParameters)
@@ -223,14 +223,14 @@ object ReflectionRefs {
       }
     }
 
-    def constructors: Array[IRT.ConstructorRef] = {
+    def constructors: Array[TypedAST.ConstructorRef] = {
       if (constructors_ == null) {
-        constructors_ = new ArrayList[IRT.ConstructorRef]
+        constructors_ = new ArrayList[TypedAST.ConstructorRef]
         for (ctor <- klass.getConstructors) {
           constructors_.add(new ReflectConstructorRef(ctor, this, mapper, classEnv0))
         }
       }
-      constructors_.toArray(new Array[IRT.ConstructorRef](0))
+      constructors_.toArray(new Array[TypedAST.ConstructorRef](0))
     }
   }
 }

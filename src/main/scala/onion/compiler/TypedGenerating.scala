@@ -2,7 +2,7 @@ package onion.compiler
 
 /**
  * Bridge generator that accepts typed AST and delegates to the old
- * CodeGeneration using IRT nodes. This eases migration away from IRT
+ * CodeGeneration using TypedAST nodes. This eases migration away from TypedAST
  * without rewriting the backend in one go.
  */
 class TypedGenerating(config: CompilerConfig)

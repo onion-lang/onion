@@ -43,11 +43,11 @@ class LocalFrame(val parent: LocalFrame) {
     binds.toSeq
   }
 
-  def add(name: String, `type` : IRT.Type): Int = {
+  def add(name: String, `type` : TypedAST.Type): Int = {
     add(name, `type`, isMutable = true)
   }
 
-  def add(name: String, `type`: IRT.Type, isMutable: Boolean): Int = {
+  def add(name: String, `type`: TypedAST.Type, isMutable: Boolean): Int = {
     val bind = scope.get(name)
     bind match {
       case Some(_) => -1

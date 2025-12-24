@@ -7,7 +7,7 @@
  * ************************************************************** */
 package onion.compiler.toolbox
 
-import onion.compiler.IRT
+import onion.compiler.TypedAST
 import onion.compiler.ClassTable
 
 /**
@@ -16,34 +16,34 @@ import onion.compiler.ClassTable
  */
 object Boxing {
   private final val TABLE: Array[Array[AnyRef]] = Array(
-    Array[AnyRef](IRT.BasicType.BOOLEAN, "java.lang.Boolean"),
-    Array[AnyRef](IRT.BasicType.BYTE, "java.lang.Byte"),
-    Array[AnyRef](IRT.BasicType.SHORT, "java.lang.Short"),
-    Array[AnyRef](IRT.BasicType.CHAR, "java.lang.Character"),
-    Array[AnyRef](IRT.BasicType.INT, "java.lang.Integer"),
-    Array[AnyRef](IRT.BasicType.LONG, "java.lang.Long"),
-    Array[AnyRef](IRT.BasicType.FLOAT, "java.lang.Float"),
-    Array[AnyRef](IRT.BasicType.DOUBLE, "java.lang.Double")
+    Array[AnyRef](TypedAST.BasicType.BOOLEAN, "java.lang.Boolean"),
+    Array[AnyRef](TypedAST.BasicType.BYTE, "java.lang.Byte"),
+    Array[AnyRef](TypedAST.BasicType.SHORT, "java.lang.Short"),
+    Array[AnyRef](TypedAST.BasicType.CHAR, "java.lang.Character"),
+    Array[AnyRef](TypedAST.BasicType.INT, "java.lang.Integer"),
+    Array[AnyRef](TypedAST.BasicType.LONG, "java.lang.Long"),
+    Array[AnyRef](TypedAST.BasicType.FLOAT, "java.lang.Float"),
+    Array[AnyRef](TypedAST.BasicType.DOUBLE, "java.lang.Double")
   )
 
-  private def boxedType(table: ClassTable, `type`: IRT.BasicType): IRT.ClassType = {
+  private def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
     for (row <- TABLE) {
       if (row(0) eq `type`) return table.load(row(1).asInstanceOf[String])
     }
     throw new RuntimeException("")
   }
 
-  def boxing(table: ClassTable, node: IRT.Term): IRT.Term = {
-    val `type`: IRT.Type = node.`type`
-    if ((!`type`.isBasicType) || (`type` eq IRT.BasicType.VOID)) {
+  def boxing(table: ClassTable, node: TypedAST.Term): TypedAST.Term = {
+    val `type`: TypedAST.Type = node.`type`
+    if ((!`type`.isBasicType) || (`type` eq TypedAST.BasicType.VOID)) {
       throw new IllegalArgumentException("node type must be boxable type")
     }
-    val aBoxedType: IRT.ClassType = boxedType(table, `type`.asInstanceOf[IRT.BasicType])
-    val cs: Array[IRT.ConstructorRef] = aBoxedType.constructors
+    val aBoxedType: TypedAST.ClassType = boxedType(table, `type`.asInstanceOf[TypedAST.BasicType])
+    val cs: Array[TypedAST.ConstructorRef] = aBoxedType.constructors
     for(i <- cs.indices) {
-      val args: Array[IRT.Type] = cs(i).getArgs
+      val args: Array[TypedAST.Type] = cs(i).getArgs
       if ((args.length == 1) && (args(i) eq `type`)) {
-        return new IRT.NewObject(cs(i), Array[IRT.Term](node))
+        return new TypedAST.NewObject(cs(i), Array[TypedAST.Term](node))
       }
     }
     throw new RuntimeException("couldn't find matched constructor")

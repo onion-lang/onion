@@ -55,6 +55,34 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     if (b == null) return null
     if (b.`type`.isBottomType) return b
     if (a == b.`type`) return b
+
+    // 1. プリミティブ型 → 参照型: オートボクシング
+    if (!a.isBasicType && b.`type`.isBasicType) {
+      val basicType = b.`type`.asInstanceOf[BasicType]
+      if (basicType == BasicType.VOID) {
+        report(IS_NOT_BOXABLE_TYPE, node, basicType)
+        return null
+      }
+      val boxed = Boxing.boxing(table_, b)
+      if (TypeRules.isAssignable(a, boxed.`type`)) {
+        return if (a == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, a)
+      }
+    }
+
+    // 2. 参照型 → プリミティブ型: オートアンボクシング
+    if (a.isBasicType && !b.`type`.isBasicType) {
+      val targetBasicType = a.asInstanceOf[BasicType]
+      if (targetBasicType == BasicType.VOID) {
+        report(INCOMPATIBLE_TYPE, node, a, b.`type`)
+        return null
+      }
+      val boxedType = Boxing.boxedType(table_, targetBasicType)
+      if (TypeRules.isAssignable(boxedType, b.`type`)) {
+        return Boxing.unboxing(table_, b, targetBasicType)
+      }
+    }
+
+    // 3. 既存のチェック
     if (!TypeRules.isAssignable(a, b.`type`)) {
       report(INCOMPATIBLE_TYPE, node, a, b.`type`)
       return null
@@ -358,6 +386,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typeBinaryAssignment(node, left, right, MOD, context)
     case node@AST.CharacterLiteral(loc, v) =>
       Some(new CharacterValue(loc, v))
+    case node@AST.ByteLiteral(loc, v) =>
+      Some(new ByteValue(loc, v))
+    case node@AST.ShortLiteral(loc, v) =>
+      Some(new ShortValue(loc, v))
     case node@AST.IntegerLiteral(loc, v) =>
       Some(new IntValue(loc, v))
     case node@AST.LongLiteral(loc, v) =>
@@ -481,7 +513,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
     findMethod(node, target, name, new Array[Term](0))
   private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method = {
-    val methods = MethodResolution.findMethods(target, name, params)
+    val methods = MethodResolution.findMethods(target, name, params, table_)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
       return null
@@ -491,7 +523,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private[typing] def types(terms: Array[Term]): Array[Type] = terms.map(term => term.`type`)
   private[typing] def typeNames(types: Array[Type]): Array[String] = types.map(_.name)
   private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Continuable, Method] = {
-    val methods = MethodResolution.findMethods(target, name, params)
+    val methods = MethodResolution.findMethods(target, name, params, table_)
     if (methods.length > 0) {
       if (methods.length > 1) {
         report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))

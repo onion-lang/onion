@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 import java.util.{TreeSet => JTreeSet}
 
@@ -24,12 +25,23 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
     val contextClass = definition_
-    val target = typed(node.target, context).getOrElse(null)
+    var target = typed(node.target, context).getOrElse(null)
     if (target == null) return None
-    if (target.`type`.isBasicType || target.`type`.isNullType) {
+    if (target.`type`.isNullType) {
       report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
       return None
     }
+
+    // プリミティブ型の場合はボクシング
+    if (target.`type`.isBasicType) {
+      val basicType = target.`type`.asInstanceOf[BasicType]
+      if (basicType == BasicType.VOID) {
+        report(INCOMPATIBLE_TYPE, node.target, rootClass, basicType)
+        return None
+      }
+      target = Boxing.boxing(table_, target)
+    }
+
     val targetType = target.`type`.asInstanceOf[ObjectType]
     if (!MemberAccess.ensureTypeAccessible(typing, node, targetType, contextClass)) return None
     val name = node.name
@@ -83,7 +95,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   }
 
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
-    val target = typed(node.target, context).getOrElse(null)
+    var target = typed(node.target, context).getOrElse(null)
     if (target == null) return None
     val params = typedTerms(node.args.toArray, context)
     if (params == null) return None
@@ -91,8 +103,13 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       case targetType: ObjectType =>
         return typeMethodCallOnObject(node, target, targetType, params, context, expected)
       case basicType: BasicType =>
-        report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
-        return None
+        // オートボクシング: プリミティブ型をラッパークラスに変換
+        if (basicType == BasicType.VOID) {
+          report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
+          return None
+        }
+        target = Boxing.boxing(table_, target)
+        return typeMethodCallOnObject(node, target, target.`type`.asInstanceOf[ObjectType], params, context, expected)
       case _ =>
         report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
         return None
@@ -101,7 +118,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
   private def typeMethodCallOnObject(node: AST.MethodCall, target: Term, targetType: ObjectType, params: Array[Term], context: LocalContext, expected: Type = null): Option[Term] = {
     val name = node.name
-    val methods = MethodResolution.findMethods(targetType, name, params)
+    val methods = MethodResolution.findMethods(targetType, name, params, table_)
     if (methods.length == 0) {
       report(METHOD_NOT_FOUND, node, targetType, name, types(params))
       None
@@ -147,7 +164,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     var params = typedTerms(node.args.toArray, context)
     if (params == null) return None
     val targetType = definition_
-    val methods = targetType.findMethod(node.name, params)
+    val methods = MethodResolution.findMethods(targetType, node.name, params, table_)
     if (methods.length == 0) {
       resolveStaticImportMethodCall(node, params, expected) match {
         case StaticImportFound(term) =>

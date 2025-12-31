@@ -26,7 +26,7 @@ object Boxing {
     Array[AnyRef](TypedAST.BasicType.DOUBLE, "java.lang.Double")
   )
 
-  private def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
+  def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
     for (row <- TABLE) {
       if (row(0) eq `type`) return table.load(row(1).asInstanceOf[String])
     }
@@ -39,13 +39,45 @@ object Boxing {
       throw new IllegalArgumentException("node type must be boxable type")
     }
     val aBoxedType: TypedAST.ClassType = boxedType(table, `type`.asInstanceOf[TypedAST.BasicType])
-    val cs: Array[TypedAST.ConstructorRef] = aBoxedType.constructors
-    for(i <- cs.indices) {
-      val args: Array[TypedAST.Type] = cs(i).getArgs
-      if ((args.length == 1) && (args(i) eq `type`)) {
-        return new TypedAST.NewObject(cs(i), Array[TypedAST.Term](node))
-      }
+
+    // valueOf静的メソッドを探す
+    val valueOfMethod = aBoxedType.findMethod("valueOf", Array[TypedAST.Term](node))
+    if (valueOfMethod.length == 1) {
+      return new TypedAST.CallStatic(aBoxedType, valueOfMethod(0), Array[TypedAST.Term](node))
     }
-    throw new RuntimeException("couldn't find matched constructor")
+
+    throw new RuntimeException(s"couldn't find valueOf method for ${aBoxedType.name}")
+  }
+
+  def unboxing(table: ClassTable, node: TypedAST.Term, targetType: TypedAST.BasicType): TypedAST.Term = {
+    val sourceType = node.`type`
+    if (!sourceType.isObjectType) {
+      throw new IllegalArgumentException("node type must be object type")
+    }
+
+    val aBoxedType = boxedType(table, targetType)
+    if (!TypedAST.TypeRules.isAssignable(aBoxedType, sourceType)) {
+      throw new IllegalArgumentException(s"cannot unbox ${sourceType} to ${targetType}")
+    }
+
+    // xxxValue()メソッドを呼び出す
+    val methodName = targetType match {
+      case TypedAST.BasicType.BOOLEAN => "booleanValue"
+      case TypedAST.BasicType.BYTE => "byteValue"
+      case TypedAST.BasicType.SHORT => "shortValue"
+      case TypedAST.BasicType.CHAR => "charValue"
+      case TypedAST.BasicType.INT => "intValue"
+      case TypedAST.BasicType.LONG => "longValue"
+      case TypedAST.BasicType.FLOAT => "floatValue"
+      case TypedAST.BasicType.DOUBLE => "doubleValue"
+      case _ => throw new IllegalArgumentException(s"cannot unbox to ${targetType}")
+    }
+
+    val unboxMethod = aBoxedType.findMethod(methodName, Array[TypedAST.Term]())
+    if (unboxMethod.length == 1) {
+      return new TypedAST.Call(node, unboxMethod(0), Array[TypedAST.Term]())
+    }
+
+    throw new RuntimeException(s"couldn't find ${methodName} method")
   }
 }

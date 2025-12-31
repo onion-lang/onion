@@ -79,6 +79,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val mainClasses = classes.map(generateClass)
     mainClasses ++ generatedClosures.toSeq
 
+  private def sourceFileName(classDef: ClassDefinition): String =
+    val simpleName = classDef.name.split('.').last
+    s"$simpleName.on"
+
   private def generateClass(classDef: ClassDefinition): CompiledClass =
     val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES)
     
@@ -101,9 +105,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     else 
       "java/lang/Object"
     val interfaces: Array[String] = classDef.interfaces.map(i => AsmUtil.internalName(i.name)).toArray
-    
+
     cw.visit(Opcodes.V17, access, name, null, superName, interfaces)
-    
+    cw.visitSource(sourceFileName(classDef), null)
+
     // Generate fields
     for field <- classDef.fields do
       val fieldAccess = toAsmModifier(field.modifier)
@@ -136,6 +141,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def codeConstructor(cw: ClassWriter, ctor: ConstructorDefinition, className: String): Unit =
     val argTypes = ctor.arguments.map(asmType)
     val gen = MethodEmitter.newGenerator(cw, toAsmModifier(ctor.modifier), "<init>", AsmType.VOID_TYPE, argTypes)
+
+    // Emit line number for constructor declaration
+    if ctor.location != null then
+      val label = gen.mark()
+      gen.visitLineNumber(ctor.location.line, label)
 
     val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
 
@@ -176,6 +186,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val argTypes = node.arguments.map(asmType)
     val returnType = asmType(node.returnType)
     val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes)
+
+    // Emit line number for method declaration
+    if node.location != null then
+      val label = gen.mark()
+      gen.visitLineNumber(node.location.line, label)
 
     val isStatic = (node.modifier & Modifier.STATIC) != 0
     val localVars = new LocalVarContext(gen).withParameters(isStatic, argTypes)

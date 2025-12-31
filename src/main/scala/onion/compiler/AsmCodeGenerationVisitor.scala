@@ -20,9 +20,22 @@ class AsmCodeGenerationVisitor(
   private val loops = new LoopContext
   private val controlFlow = new ControlFlowEmitter(gen, loops, asmType, visitTerm, visitStatement)
   private val termEmitter = new TermEmitter(gen, asmType, visitTerm)
-  
+
+  // Track last emitted line to avoid duplicate visitLineNumber calls
+  private var lastEmittedLine = -1
+
   // Helper method to convert TypedAST types to ASM types
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
+
+  // Emit line number if location exists and line changed
+  private def emitLineNumber(location: Location): Unit =
+    location match
+      case null => // No location info
+      case loc if loc.line != lastEmittedLine =>
+        val label = gen.mark()
+        gen.visitLineNumber(loc.line, label)
+        lastEmittedLine = loc.line
+      case _ => // Same line, skip
   
   // Expression visitors
   override def visitArrayLength(node: ArrayLength): Unit =
@@ -257,24 +270,31 @@ class AsmCodeGenerationVisitor(
     controlFlow.emitContinue(node)
   
   override def visitExpressionActionStatement(node: ExpressionActionStatement): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitExpressionActionStatement(node)
-  
+
   override def visitIfStatement(node: IfStatement): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitIfStatement(node)
-  
+
   override def visitConditionalLoop(node: ConditionalLoop): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitConditionalLoop(node)
-  
+
   override def visitNOP(node: NOP): Unit = ()
-  
+
   override def visitReturn(node: Return): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitReturn(node)
-  
+
   override def visitSynchronized(node: Synchronized): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitSynchronized(node)
-  
+
   override def visitThrow(node: Throw): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitThrow(node)
-  
+
   override def visitTry(node: Try): Unit =
+    emitLineNumber(node.location)
     controlFlow.emitTry(node)

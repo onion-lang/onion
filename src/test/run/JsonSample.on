@@ -1,0 +1,38 @@
+import { onion.Json; }
+
+class JsonSample {
+public:
+  static def main(args: String[]): String {
+    // Test 1: Parse and stringify
+    val json1 = "{\"name\":\"Alice\",\"age\":25}"
+    val obj1 = Json::parse(json1)
+    val result1 = Json::stringify(obj1)
+    println("Parse and stringify: " + result1)
+
+    // Test 2: Access values
+    val name = Json::getString(obj1, "name")
+    val age = Json::getInt(obj1, "age")
+    println("Name: " + name + ", Age: " + age.toString())
+
+    // Test 3: Build JSON object
+    val obj2 = Json::object()
+    obj2.put("city", "Tokyo")
+    obj2.put("country", "Japan")
+    val result2 = Json::stringify(obj2)
+    println("Built object: " + result2)
+
+    // Test 4: Parse array
+    val json3 = "[1,2,3,4,5]"
+    val obj3 = Json::parse(json3)
+    val result3 = Json::stringify(obj3)
+    println("Array round-trip: " + result3)
+
+    // Test 5: Pretty print
+    val obj4 = Json::parse("{\"a\":1,\"b\":2}")
+    val pretty = Json::stringifyPretty(obj4)
+    println("Pretty printed:")
+    println(pretty)
+
+    return "JSON tests completed"
+  }
+}

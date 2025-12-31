@@ -87,7 +87,19 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     if (target == null) return None
     val params = typedTerms(node.args.toArray, context)
     if (params == null) return None
-    val targetType = target.`type`.asInstanceOf[ObjectType]
+    target.`type` match {
+      case targetType: ObjectType =>
+        return typeMethodCallOnObject(node, target, targetType, params, context, expected)
+      case basicType: BasicType =>
+        report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
+        return None
+      case _ =>
+        report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+        return None
+    }
+  }
+
+  private def typeMethodCallOnObject(node: AST.MethodCall, target: Term, targetType: ObjectType, params: Array[Term], context: LocalContext, expected: Type = null): Option[Term] = {
     val name = node.name
     val methods = MethodResolution.findMethods(targetType, name, params)
     if (methods.length == 0) {

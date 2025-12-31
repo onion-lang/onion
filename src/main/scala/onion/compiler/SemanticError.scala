@@ -41,5 +41,7 @@ object SemanticError {
   case object UNIMPLEMENTED_ABSTRACT_METHOD extends SemanticError(37)
   case object ABSTRACT_CLASS_INSTANTIATION extends SemanticError(38)
   case object FINAL_METHOD_OVERRIDE extends SemanticError(39)
+  case object CANNOT_CALL_METHOD_ON_PRIMITIVE extends SemanticError(40)
+  case object INVALID_METHOD_CALL_TARGET extends SemanticError(41)
 }
 sealed abstract class SemanticError(code: Int)

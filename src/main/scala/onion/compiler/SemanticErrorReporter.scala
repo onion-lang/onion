@@ -103,6 +103,17 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(message("error.semantic.finalMethodOverride"), methodName, paramDescriptor, superClassName))
   }
 
+  private def reportCannotCallMethodOnPrimitive(position: Location, items: Array[AnyRef]): Unit = {
+    val primitiveType = items(0).asInstanceOf[TypedAST.Type]
+    val methodName = items(1).asInstanceOf[String]
+    problem(position, s"cannot call method ${methodName} on primitive type ${primitiveType}")
+  }
+
+  private def reportInvalidMethodCallTarget(position: Location, items: Array[AnyRef]): Unit = {
+    val targetType = items(0).asInstanceOf[TypedAST.Type]
+    problem(position, s"invalid method call target of type ${targetType}")
+  }
+
   private def reportVariableNotFound(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.variableNotFound"), items(0).asInstanceOf[String]))
   }
@@ -350,6 +361,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportAbstractClassInstantiation(position, items)
       case SemanticError.FINAL_METHOD_OVERRIDE =>
         reportFinalMethodOverride(position, items)
+      case SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE =>
+        reportCannotCallMethodOnPrimitive(position, items)
+      case SemanticError.INVALID_METHOD_CALL_TARGET =>
+        reportInvalidMethodCallTarget(position, items)
     }
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)

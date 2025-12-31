@@ -96,21 +96,75 @@ final class ControlFlowEmitter(
     gen.throwException()
 
   def emitTry(node: Try): Unit =
-    val tryStart = gen.mark()
-    visitStatement(node.tryStatement)
-    val tryEnd = gen.mark()
+    if (node.finallyStatement == null) {
+      // Simple try-catch without finally
+      val tryStart = gen.mark()
+      visitStatement(node.tryStatement)
+      val tryEnd = gen.mark()
 
-    val endLabel = gen.newLabel()
-    gen.goTo(endLabel)
+      val endLabel = gen.newLabel()
+      gen.goTo(endLabel)
 
-    for i <- node.catchTypes.indices do
-      val catchType = node.catchTypes(i)
-      val catchStmt = node.catchStatements(i)
-      val handlerStart = gen.mark()
-      val slot = gen.newLocal(asmType(catchType.tp))
-      gen.storeLocal(slot)
-      visitStatement(catchStmt)
-      gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+      for i <- node.catchTypes.indices do
+        val catchType = node.catchTypes(i)
+        val catchStmt = node.catchStatements(i)
+        gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+        val slot = gen.newLocal(asmType(catchType.tp))
+        gen.storeLocal(slot)
+        visitStatement(catchStmt)
+        gen.goTo(endLabel)
 
-    gen.visitLabel(endLabel)
+      gen.visitLabel(endLabel)
+    } else if (node.catchTypes.length == 0) {
+      // Simple try-finally without catch
+      val tryStart = gen.mark()
+      visitStatement(node.tryStatement)
+      val tryEnd = gen.mark()
+
+      // Normal completion: execute finally and jump to end
+      visitStatement(node.finallyStatement)
+      val endLabel = gen.newLabel()
+      gen.goTo(endLabel)
+
+      // Exception handler: save exception, execute finally, rethrow
+      gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+      val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+      gen.storeLocal(exSlot)
+      visitStatement(node.finallyStatement)
+      gen.loadLocal(exSlot)
+      gen.throwException()
+
+      gen.visitLabel(endLabel)
+    } else {
+      // Try-catch-finally: combine both patterns
+      val tryStart = gen.mark()
+      visitStatement(node.tryStatement)
+      val tryEnd = gen.mark()
+
+      // Normal completion: execute finally and jump to end
+      visitStatement(node.finallyStatement)
+      val endLabel = gen.newLabel()
+      gen.goTo(endLabel)
+
+      // Catch handlers for specific exceptions
+      for i <- node.catchTypes.indices do
+        val catchType = node.catchTypes(i)
+        val catchStmt = node.catchStatements(i)
+        gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
+        val slot = gen.newLocal(asmType(catchType.tp))
+        gen.storeLocal(slot)
+        visitStatement(catchStmt)
+        visitStatement(node.finallyStatement)  // Execute finally after catch
+        gen.goTo(endLabel)
+
+      // Catch-all handler for uncaught exceptions (finally + rethrow)
+      gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+      val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
+      gen.storeLocal(exSlot)
+      visitStatement(node.finallyStatement)
+      gen.loadLocal(exSlot)
+      gen.throwException()
+
+      gen.visitLabel(endLabel)
+    }
 }

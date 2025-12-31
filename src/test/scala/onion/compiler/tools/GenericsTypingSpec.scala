@@ -266,7 +266,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |
           |class PickerImpl <: Picker[String] {
           |public:
-          |  def pick(x: Object): String {
+          |  def pick(x: String): String {
           |    return "ok"
           |  }
           |

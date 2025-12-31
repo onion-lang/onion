@@ -1088,9 +1088,13 @@ AST.Expression primary() : {
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
 | LOOKAHEAD( "(" eols() ")" eols() <ARROW> ) e=arrow_anonymous_function()  {return e;}
 | LOOKAHEAD( "(" eols() <ID> ":" ) e=arrow_anonymous_function()           {return e;}
-| t="new" ty=type() (
-    "[" eols() (es=terms()) "]"                                           {return new AST.NewArray(p(t), ty, es);}
-  | ["(" eols() (es=terms()) ")"]                                         {return new AST.NewObject(p(t), ty, es);}
+| t="new" ty=type() {
+    ArrayBuffer<AST.Expression> sizes = new ArrayBuffer<AST.Expression>();
+  } (
+    "[" eols() e=term() { append(sizes, e); } "]"
+    ( "[" eols() e=term() { append(sizes, e); } "]" )*
+    { return new AST.NewArray(p(t), ty, toList(sizes)); }
+  | ["(" eols() (es=terms()) ")"]  { return new AST.NewObject(p(t), ty, es); }
   )
 | t="self"                                                                {return new AST.CurrentInstance(p(t));}
 | t="this"                                                                {return new AST.CurrentInstance(p(t));}

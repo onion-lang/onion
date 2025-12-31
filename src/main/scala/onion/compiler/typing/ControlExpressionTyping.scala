@@ -209,7 +209,20 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       catchStatements(i) = stmt
     }
 
-    val statement = new Try(node.location, tryStmt, binds, catchStatements)
+    // Type check finally block if present
+    val finallyStmt: ActionStatement =
+      if (node.finBlock != null) {
+        typeBlockExpression(node.finBlock, context) match {
+          case Some(finallyTerm) =>
+            termToStatement(node.finBlock, finallyTerm)
+          case None =>
+            null
+        }
+      } else {
+        null
+      }
+
+    val statement = new Try(node.location, tryStmt, binds, catchStatements, finallyStmt)
     if (resultVar == null) {
       Some(statementTerm(statement, resultType, node.location))
     } else {

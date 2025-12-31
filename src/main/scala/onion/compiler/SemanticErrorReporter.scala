@@ -84,6 +84,25 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(message("error.semantic.lValueRequired")))
   }
 
+  private def reportUnimplementedAbstractMethod(position: Location, items: Array[AnyRef]): Unit = {
+    val className = items(0).asInstanceOf[String]
+    val methodName = items(1).asInstanceOf[String]
+    val paramDescriptor = items(2).asInstanceOf[String]
+    problem(position, format(message("error.semantic.unimplementedAbstractMethod"), className, methodName, paramDescriptor))
+  }
+
+  private def reportAbstractClassInstantiation(position: Location, items: Array[AnyRef]): Unit = {
+    val className = (items(0).asInstanceOf[TypedAST.Type]).name
+    problem(position, format(message("error.semantic.abstractClassInstantiation"), className))
+  }
+
+  private def reportFinalMethodOverride(position: Location, items: Array[AnyRef]): Unit = {
+    val methodName = items(0).asInstanceOf[String]
+    val paramDescriptor = items(1).asInstanceOf[String]
+    val superClassName = items(2).asInstanceOf[String]
+    problem(position, format(message("error.semantic.finalMethodOverride"), methodName, paramDescriptor, superClassName))
+  }
+
   private def reportVariableNotFound(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.variableNotFound"), items(0).asInstanceOf[String]))
   }
@@ -325,6 +344,12 @@ class SemanticErrorReporter(threshold: Int) {
         reportIsNotBoxableType(position, items)
       case SemanticError.LVALUE_REQUIRED =>
         reportLValueRequired(position, items)
+      case SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD =>
+        reportUnimplementedAbstractMethod(position, items)
+      case SemanticError.ABSTRACT_CLASS_INSTANTIATION =>
+        reportAbstractClassInstantiation(position, items)
+      case SemanticError.FINAL_METHOD_OVERRIDE =>
+        reportFinalMethodOverride(position, items)
     }
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)

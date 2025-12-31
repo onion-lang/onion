@@ -1,0 +1,23 @@
+class Test1 {
+public:
+  static def main(args: String[]): Int {
+    // 2D array - Int
+    var arr2d: Int[][] = new Int[3][4];
+    arr2d[0][0] = 10;
+    arr2d[1][2] = 25;
+    arr2d[2][3] = 99;
+
+    var sum: Int = arr2d[0][0] + arr2d[1][2] + arr2d[2][3];
+    IO::println("2D array sum: " + sum);  // Should print 134
+
+    // 3D array - String
+    var arr3d: String[][][] = new String[2][3][4];
+    arr3d[0][0][0] = "Hello";
+    arr3d[1][2][3] = "World";
+
+    IO::println("3D [0][0][0]: " + arr3d[0][0][0]);
+    IO::println("3D [1][2][3]: " + arr3d[1][2][3]);
+
+    return sum;  // Should return 134
+  }
+}

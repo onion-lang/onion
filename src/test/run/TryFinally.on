@@ -1,0 +1,105 @@
+// Test 1: Normal completion with finally
+class Test1 {
+  public:
+    static def main(args: String[]): int {
+      var result: int = 0;
+      try {
+        result = 1;
+        IO::println("try block");
+      } finally {
+        IO::println("finally block");
+      }
+      IO::println("Result: " + result);
+      return 0;
+    }
+}
+
+// Test 2: Exception caught with finally
+class Test2 {
+  public:
+    static def main(args: String[]): int {
+      try {
+        IO::println("try block");
+        throw new Exception("test exception");
+      } catch e: Exception {
+        IO::println("catch block: " + e.getMessage());
+      } finally {
+        IO::println("finally block");
+      }
+      IO::println("After try-catch-finally");
+      return 0;
+    }
+}
+
+// Test 3: Exception uncaught with finally (should execute finally then rethrow)
+class Test3 {
+  public:
+    static def main(args: String[]): int {
+      try {
+        try {
+          IO::println("inner try");
+          throw new RuntimeException("test");
+        } finally {
+          IO::println("inner finally");
+        }
+      } catch e: RuntimeException {
+        IO::println("outer catch: " + e.getMessage());
+      }
+      return 0;
+    }
+}
+
+// Test 4: Return in try block (finally should still execute)
+class Test4 {
+  public:
+    static def test(): int {
+      try {
+        IO::println("try block");
+        return 42;
+      } finally {
+        IO::println("finally block");
+      }
+    }
+
+    static def main(args: String[]): int {
+      val result = test();
+      IO::println("Result: " + result);
+      return 0;
+    }
+}
+
+// Test 5: Nested try-finally
+class Test5 {
+  public:
+    static def main(args: String[]): int {
+      try {
+        IO::println("outer try");
+        try {
+          IO::println("inner try");
+        } finally {
+          IO::println("inner finally");
+        }
+      } finally {
+        IO::println("outer finally");
+      }
+      IO::println("Done");
+      return 0;
+    }
+}
+
+// Test 6: Resource cleanup pattern
+class Test6 {
+  public:
+    static def main(args: String[]): int {
+      var resource: String = null;
+      try {
+        resource = "resource opened";
+        IO::println(resource);
+      } finally {
+        if (resource != null) {
+          IO::println("resource closed");
+        }
+      }
+      return 0;
+    }
+}

@@ -701,9 +701,19 @@ object TypedAST {
     }
   }
 
-  class Try(location: Location, var tryStatement: TypedAST.ActionStatement, var catchTypes: Array[ClosureLocalBinding], var catchStatements: Array[TypedAST.ActionStatement]) extends ActionStatement(location) {
+  class Try(
+    location: Location,
+    var tryStatement: TypedAST.ActionStatement,
+    var catchTypes: Array[ClosureLocalBinding],
+    var catchStatements: Array[TypedAST.ActionStatement],
+    var finallyStatement: TypedAST.ActionStatement = null
+  ) extends ActionStatement(location) {
     def this(tryStatement: TypedAST.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[TypedAST.ActionStatement]) = {
-      this(null, tryStatement, catchTypes, catchStatements)
+      this(null, tryStatement, catchTypes, catchStatements, null)
+    }
+
+    def this(tryStatement: TypedAST.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[TypedAST.ActionStatement], finallyStatement: TypedAST.ActionStatement) = {
+      this(null, tryStatement, catchTypes, catchStatements, finallyStatement)
     }
   }
 

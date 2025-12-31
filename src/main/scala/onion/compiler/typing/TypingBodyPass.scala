@@ -221,11 +221,22 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     expressionFormTyping.typeStringInterpolation(node, context)
 
-  def unimplementedBinaryAssignment(node: AST.Expression, lhs: AST.Expression, rhs: AST.Expression, context: LocalContext): Option[Term] = {
-    typed(lhs, context)
-    typed(rhs, context)
-    report(UNIMPLEMENTED_FEATURE, node)
-    None
+  def typeBinaryAssignment(node: AST.Expression, lhs: AST.Expression, rhs: AST.Expression, binaryKind: Int, context: LocalContext): Option[Term] = {
+    // Desugar: a += b becomes a = a + b
+    // First, create the binary operation
+    val binaryOp = binaryKind match {
+      case ADD => new AST.Addition(node.location, lhs, rhs)
+      case SUBTRACT => new AST.Subtraction(node.location, lhs, rhs)
+      case MULTIPLY => new AST.Multiplication(node.location, lhs, rhs)
+      case DIVIDE => new AST.Division(node.location, lhs, rhs)
+      case MOD => new AST.Modulo(node.location, lhs, rhs)
+    }
+
+    // Then create the assignment: a = (a + b)
+    val assignment = new AST.Assignment(node.location, lhs, binaryOp)
+
+    // Type-check the assignment
+    typeAssignment(assignment, context)
   }
 
   def typeNumericBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] =
@@ -336,15 +347,15 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node: AST.Indexing =>
       typeIndexing(node, context)
     case node@AST.AdditionAssignment(_, left, right) =>
-      unimplementedBinaryAssignment(node, left, right, context)
+      typeBinaryAssignment(node, left, right, ADD, context)
     case node@AST.SubtractionAssignment(_, left, right) =>
-      unimplementedBinaryAssignment(node, left, right, context)
+      typeBinaryAssignment(node, left, right, SUBTRACT, context)
     case node@AST.MultiplicationAssignment(_, left, right) =>
-      unimplementedBinaryAssignment(node, left, right, context)
+      typeBinaryAssignment(node, left, right, MULTIPLY, context)
     case node@AST.DivisionAssignment(_, left, right) =>
-      unimplementedBinaryAssignment(node, left, right, context)
+      typeBinaryAssignment(node, left, right, DIVIDE, context)
     case node@AST.ModuloAssignment(_, left, right) =>
-      unimplementedBinaryAssignment(node, left, right, context)
+      typeBinaryAssignment(node, left, right, MOD, context)
     case node@AST.CharacterLiteral(loc, v) =>
       Some(new CharacterValue(loc, v))
     case node@AST.IntegerLiteral(loc, v) =>

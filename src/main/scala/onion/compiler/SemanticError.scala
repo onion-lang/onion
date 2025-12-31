@@ -38,5 +38,8 @@ object SemanticError {
   case object METHOD_TYPE_ARGUMENT_ARITY_MISMATCH extends SemanticError(34)
   case object ERASURE_SIGNATURE_COLLISION extends SemanticError(35)
   case object CANNOT_ASSIGN_TO_VAL extends SemanticError(36)
+  case object UNIMPLEMENTED_ABSTRACT_METHOD extends SemanticError(37)
+  case object ABSTRACT_CLASS_INSTANTIATION extends SemanticError(38)
+  case object FINAL_METHOD_OVERRIDE extends SemanticError(39)
 }
 sealed abstract class SemanticError(code: Int)

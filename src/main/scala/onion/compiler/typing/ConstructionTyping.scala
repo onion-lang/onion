@@ -45,6 +45,17 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
     val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
     val parameters = typedTerms(node.args.toArray, context)
     if (parameters == null || typeRef == null) return None
+
+    // Check if trying to instantiate an abstract class
+    val classToCheck = typeRef match {
+      case applied: TypedAST.AppliedClassType => applied.raw
+      case _ => typeRef
+    }
+    if (java.lang.reflect.Modifier.isAbstract(classToCheck.modifier)) {
+      report(ABSTRACT_CLASS_INSTANTIATION, node, typeRef)
+      return None
+    }
+
     val constructors = typeRef.findConstructor(parameters)
     if (constructors.length == 0) {
       report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters))

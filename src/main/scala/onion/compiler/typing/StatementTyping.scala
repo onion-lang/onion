@@ -217,7 +217,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
           catchBlocks(i) = translate(body, context)
         }
       }
-      new Try(node.location, tryStatement, binds, catchBlocks)
+      // Handle finally block
+      val finallyStatement = if (node.finBlock != null) translate(node.finBlock, context) else null
+      new Try(node.location, tryStatement, binds, catchBlocks, finallyStatement)
     case node: AST.WhileExpression =>
       context.openScope {
         val conditionOpt = typed(node.condition, context)

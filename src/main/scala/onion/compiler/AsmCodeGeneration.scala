@@ -39,7 +39,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case ap: AppliedClassType => asmType(ap.raw)
     case w: WildcardType      => asmType(w.upperBound)
     case ct: ClassType     => AsmUtil.objectType(ct.name)
-    case at: ArrayType     => AsmType.getType("[" + asmType(at.component).getDescriptor)
+    case at: ArrayType     =>
+      // Build descriptor with correct number of dimensions
+      val componentDescriptor = asmType(at.component).getDescriptor
+      AsmType.getType("[" * at.dimension + componentDescriptor)
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
     case _: BottomType     => AsmType.VOID_TYPE
     case _                 => throw new RuntimeException(s"Unsupported type: $tp")
@@ -326,7 +329,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           case _ => throw new RuntimeException(s"Cannot create array of type: ${newArr.arrayType.component}")
       else
         // Multi-dimensional array
-        throw new UnsupportedOperationException("Multi-dimensional array creation not yet implemented")
+        // Push all dimension sizes onto the stack
+        for (length <- newArr.parameters) {
+          emitExpressionWithContext(gen, length, className, localVars)
+        }
+        // Get the array type descriptor and create multi-dimensional array
+        val descriptor = asmType(newArr.arrayType).getDescriptor
+        gen.visitMultiANewArrayInsn(descriptor, newArr.parameters.length)
 
     case len: ArrayLength =>
       emitExpressionWithContext(gen, len.target, className, localVars)

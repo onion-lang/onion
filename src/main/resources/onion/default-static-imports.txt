@@ -3,3 +3,6 @@ java.lang.System
 java.lang.Runtime
 java.lang.Math
 onion.IO
+onion.Strings
+onion.Files
+onion.Iterables

@@ -415,6 +415,7 @@ TOKEN:
     "\""
   >
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
+| <QUOTED_ID: "`" (~["`"])+ "`" >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
 // | <FID:      "@" <ID>                                                    >  // Removed: @ syntax deprecated
 }
@@ -438,6 +439,12 @@ AST.CompilationUnit unit() :{
   }
 }
 
+// Helper to accept identifier or quoted identifier (for escaping reserved words)
+String id() :{Token t;}{
+    t=<ID> { return t.image; }
+  | t=<QUOTED_ID> { return t.image.substring(1, t.image.length() - 1); }
+}
+
 AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new StringBuffer();}{
   {enterSection();}
   t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append(t2.image);})* eos() {
@@ -446,17 +453,17 @@ AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new String
 }
 
 AST.ImportClause import_decl() :{
-  Token t = null, n;
+  Token t = null, star;
   StringBuffer sb;
-  String s = null;
+  String s = null, name = null;
   ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
 }{
   t="import" "{"
     ( {sb = new StringBuffer();enterSection();}
       ( LOOKAHEAD(2)
-        (n=<ID> {s = n.image;} "=" n=<ID> {sb.append(n.image);} ("." n=<ID> {sb.append("."); sb.append(n.image);})+ eos())
-      | ((LOOKAHEAD(2) n=<ID> "." {sb.append(n.image); sb.append(".");})+ (n=<ID> | n="*") eos() {
-           s = n.image; sb.append(s);
+        (s=id() "=" name=id() {sb.append(name);} ("." name=id() {sb.append("."); sb.append(name);})+ eos())
+      | ((LOOKAHEAD(2) name=id() "." {sb.append(name); sb.append(".");})+ (name=id() | star="*" {name = star.image;}) eos() {
+           s = name; sb.append(s);
          }
         )
       ){ append(imports, new Tuple2<String, String>(s, new String(sb))); }

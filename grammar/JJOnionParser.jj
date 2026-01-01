@@ -1040,8 +1040,10 @@ AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{
 
 AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
   e1=unary_prefix()
-( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
-| t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
+( LOOKAHEAD(2)
+  ( t="+" eols() e2=unary_prefix() {e1 = new AST.Addition(p(t), e1, e2);}
+  | t="-" eols() e2=unary_prefix() {e1 = new AST.Subtraction(p(t), e1, e2);}
+  )
 )* {return e1;}
 }
 
@@ -1067,18 +1069,20 @@ AST.Expression primary_suffix() : {
   AST.TypeNode type;
 }{
   e=primary()
-( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
-| t="." eols() n=id() (
-    LOOKAHEAD( type_arguments() eols() "(" )
-      tas=type_arguments() eols() "(" eols() args=terms() ")"
-        {e = new AST.MethodCall(p(t), e, c(n), args, tas);}
-  | LOOKAHEAD(1) "(" eols() args=terms() ")"
-        {e = new AST.MethodCall(p(t), e, c(n), args);}
-  | {e = new AST.MemberSelection(p(t), e, c(n));}
+( LOOKAHEAD(2)
+  ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
+  | t="." eols() n=id() (
+      LOOKAHEAD( type_arguments() eols() "(" )
+        tas=type_arguments() eols() "(" eols() args=terms() ")"
+          {e = new AST.MethodCall(p(t), e, c(n), args, tas);}
+    | LOOKAHEAD(1) "(" eols() args=terms() ")"
+          {e = new AST.MethodCall(p(t), e, c(n), args);}
+    | {e = new AST.MemberSelection(p(t), e, c(n));}
+    )
+  | t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
+  | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
+  | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
   )
-| t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
-| t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
-| t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
 )* {return e;}
 }
 
@@ -1091,7 +1095,7 @@ AST.Expression primary() : {
 }{
   LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
     t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"           {return new AST.SuperMethodCall(p(t), c(n), es, tas);}
-| t="super" eols() "." eols() n=id() ["(" es=terms() ")"]                                {return new AST.SuperMethodCall(p(t), c(n), es);}
+| t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]                                {return new AST.SuperMethodCall(p(t), c(n), es);}
 | LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es, tas);}
 | LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
 | LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
@@ -1104,10 +1108,10 @@ AST.Expression primary() : {
 | t="new" ty=type() {
     ArrayBuffer<AST.Expression> sizes = new ArrayBuffer<AST.Expression>();
   } (
-    "[" eols() e=term() { append(sizes, e); } "]"
-    ( "[" eols() e=term() { append(sizes, e); } "]" )*
+    LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]"
+    ( LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]" )*
     { return new AST.NewArray(p(t), ty, toList(sizes)); }
-  | ["(" eols() (es=terms()) ")"]  { return new AST.NewObject(p(t), ty, es); }
+  | [LOOKAHEAD(2) "(" eols() (es=terms()) ")"]  { return new AST.NewObject(p(t), ty, es); }
   )
 | t="self"                                                                {return new AST.CurrentInstance(p(t));}
 | t="this"                                                                {return new AST.CurrentInstance(p(t));}

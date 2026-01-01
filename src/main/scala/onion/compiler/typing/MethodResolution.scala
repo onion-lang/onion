@@ -1,6 +1,7 @@
 package onion.compiler.typing
 
 import onion.compiler.TypedAST.*
+import onion.compiler.{ClassTable, toolbox}
 
 import java.util.{TreeSet => JTreeSet}
 
@@ -8,12 +9,12 @@ import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.HashMap
 
 private[compiler] object MethodResolution {
-  def findMethods(target: ObjectType, name: String, params: Array[Term]): Array[Method] =
+  def findMethods(target: ObjectType, name: String, params: Array[Term], table: ClassTable): Array[Method] =
     target match
       case ct: ClassType =>
         val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
         if views.isEmpty then target.findMethod(name, params)
-        else findMethodsWithViews(ct, name, params, views)
+        else findMethodsWithViews(ct, name, params, views, table)
       case _ =>
         target.findMethod(name, params)
 
@@ -21,7 +22,8 @@ private[compiler] object MethodResolution {
     target: ObjectType,
     name: String,
     params: Array[Term],
-    views: scala.collection.immutable.Map[ClassType, AppliedClassType]
+    views: scala.collection.immutable.Map[ClassType, AppliedClassType],
+    table: ClassTable
   ): Array[Method] =
     val candidates = new JTreeSet[Method](new MethodComparator)
 
@@ -50,12 +52,32 @@ private[compiler] object MethodResolution {
         method.arguments.map(tp => TypeSubstitution.substituteType(tp, ownerViewSubst(method), scala.collection.immutable.Map.empty, defaultToBound = true))
       )
 
+    def isAssignableWithBoxing(target: Type, source: Type): Boolean =
+      // 通常の型チェック
+      if TypeRules.isSuperType(target, source) then return true
+
+      // プリミティブ型 → 参照型: ボクシング
+      if !target.isBasicType && source.isBasicType then
+        val basicType = source.asInstanceOf[BasicType]
+        if basicType == BasicType.VOID then return false
+        val boxedType = toolbox.Boxing.boxedType(table, basicType)
+        return TypeRules.isSuperType(target, boxedType)
+
+      // 参照型 → プリミティブ型: アンボクシング
+      if target.isBasicType && !source.isBasicType then
+        val targetBasicType = target.asInstanceOf[BasicType]
+        if targetBasicType == BasicType.VOID then return false
+        val boxedType = toolbox.Boxing.boxedType(table, targetBasicType)
+        return TypeRules.isSuperType(boxedType, source)
+
+      false
+
     def applicable(method: Method): Boolean =
       val expected = specializedArgs(method)
       if expected.length != params.length then return false
       var i = 0
       while i < expected.length do
-        if !TypeRules.isSuperType(expected(i), params(i).`type`) then return false
+        if !isAssignableWithBoxing(expected(i), params(i).`type`) then return false
         i += 1
       true
 

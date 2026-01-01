@@ -144,7 +144,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // Generate methods
     for method <- classDef.methods do
       val methodDef = method.asInstanceOf[MethodDefinition]
-      if classDef.isInterface then
+      if classDef.isInterface || Modifier.isAbstract(methodDef.modifier) then
         codeInterfaceMethod(cw, methodDef, name)
       else
         codeMethod(cw, methodDef, name)

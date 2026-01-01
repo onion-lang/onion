@@ -1,30 +1,45 @@
-def countLines(file: File): Int {
-  val reader: BufferedReader = new BufferedReader(new FileReader(file));
-  var count: Int = 0;
-  for var line: String = null; (line = reader.readLine) != null; {
-    count++;
-  }
-  return count;
+import {
+  java.io.File;
+  java.io.BufferedReader;
+  java.io.FileReader;
 }
 
-def process(file: File, callback: Function1) {
-  if(file == null) { return; }
-  foreach myFile: File in file.listFiles {
-    if myFile.isDirectory {
-      process(myFile, callback);
-    } else {
-      callback.call(myFile);
+class LineCounter {
+public:
+  static def countLines(file: File): Int {
+    val reader: BufferedReader = new BufferedReader(new FileReader(file));
+    var count: Int = 0;
+    for var line: String = null; (line = reader.readLine) != null; {
+      count++;
+    }
+    return count;
+  }
+
+  static def process(file: File, callback: (File) -> Object): void {
+    if(file == null) { return; }
+    foreach myFile: File in file.listFiles {
+      if myFile.isDirectory {
+        process(myFile, callback);
+      } else {
+        callback.call(myFile);
+      }
     }
   }
-}
 
-var lines: Int = 0;
-foreach file: File in [new File("src"), new File("run")] {
-  process(file, (file: Object) -> {
-    val f: File = file$File;
-    if f.name.endsWith(".scala") || f.name.endsWith(".java") || f.name.endsWith(".jj") {
-      lines = lines + countLines(f);
+  static def main(args: String[]): void {
+    val linesArray: Int[] = new Int[1];
+    linesArray[0] = 0;
+
+    val fileCounter: (File) -> Object = (f: File) -> {
+      if f.name.endsWith(".scala") || f.name.endsWith(".java") || f.name.endsWith(".jj") {
+        linesArray[0] = linesArray[0] + countLines(f);
+      }
+      return null;
+    };
+
+    foreach file: File in [new File("src"), new File("run")] {
+      process(file, fileCounter);
     }
-  });
+    IO::println("lines: " + linesArray[0]);
+  }
 }
-System::out.println("lines: " + lines);

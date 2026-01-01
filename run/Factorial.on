@@ -3,4 +3,4 @@ def fact(n :Int): Int {
   else { return n * fact(n - 1); }
 }
 
-System::out.println("fact(5) = " + fact(5));
+IO::println("fact(5) = " + fact(5));

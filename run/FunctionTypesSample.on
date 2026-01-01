@@ -6,6 +6,8 @@ public:
 
   static def main(args: String[]): JInteger {
     val inc: (JInteger) -> JInteger = (x: JInteger) -> { return new JInteger(x.intValue() + 1); };
-    return applyTwice(inc, new JInteger(10));
+    val result = applyTwice(inc, new JInteger(10));
+    IO::println("Result: " + result);
+    return result;
   }
 }

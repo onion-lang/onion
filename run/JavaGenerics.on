@@ -1,3 +1,7 @@
+import {
+  java.util.ArrayList;
+}
+
 class JavaGenericsDemo {
 public:
   static def main(args: String[]): void {

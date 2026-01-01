@@ -2,6 +2,7 @@ import {
 	javax.swing.*
 	java.awt.*
 	java.awt.event.*
+	java.lang.Long as JLong;
 }
 
 class Calculator : JFrame <: ActionListener {

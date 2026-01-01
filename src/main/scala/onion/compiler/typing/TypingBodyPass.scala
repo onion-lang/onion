@@ -83,6 +83,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       }
       context.setMethod(method)
       val arguments = method.arguments
+
+      // Scan for captured variables before processing the method body
+      val paramNames = node.args.map(_.name).toSet
+      val capturedVars = CapturedVariableScanner.scan(node.block, paramNames)
+      context.markAsBoxed(capturedVars)
+
       for(i <- 0 until arguments.length) {
         context.add(node.args(i).name, arguments(i))
       }
@@ -153,6 +159,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
     context.setMethod(function)
     val arguments = function.arguments
+
+    // Scan for captured variables before processing the function body
+    val paramNames = node.args.map(_.name).toSet
+    val capturedVars = CapturedVariableScanner.scan(node.block, paramNames)
+    context.markAsBoxed(capturedVars)
+
     for(i <- 0 until arguments.length) {
       context.add(node.args(i).name, arguments(i))
     }

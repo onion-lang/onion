@@ -1,19 +1,27 @@
-def filterLines(filter :Function1) :String {
-  val reader: BufferedReader = new BufferedReader(new InputStreamReader(System::in));
-  val buffer: StringBuffer = new StringBuffer;
-  var line: String = null;
-  while (line = reader.readLine) != null {
-    buffer.append(filter.call(line)$String);
-  }
-  return new String(buffer);
+import {
+  java.io.BufferedReader;
+  java.io.InputStreamReader;
 }
 
-var i: Int = 1;
+class LineFilter {
+public:
+  static def filterLines(filter :(String) -> String) :String {
+    val reader: BufferedReader = new BufferedReader(new InputStreamReader(System::in));
+    val buffer: StringBuffer = new StringBuffer;
+    var line: String = null;
+    while (line = reader.readLine) != null {
+      buffer.append(filter.call(line));
+    }
+    return new String(buffer);
+  }
 
-val lines: String = filterLines((line :Object) -> {
-  val newLine: String = i + ":" + line;
-  i++;
-  return newLine + System::getProperty("line.separator");
-});
+  static def main(args: String[]): void {
+    val lineFormatter: (String) -> String = (line: String) -> {
+      return ">> " + line + System::getProperty("line.separator");
+    };
 
-System::out.println(lines);
+    val lines: String = filterLines(lineFormatter);
+
+    IO::println(lines);
+  }
+}

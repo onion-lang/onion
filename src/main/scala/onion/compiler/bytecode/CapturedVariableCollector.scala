@@ -1,24 +1,40 @@
 package onion.compiler.bytecode
 
-import onion.compiler.LocalBinding
+import onion.compiler.{LocalBinding, ClosureLocalBinding}
 import onion.compiler.TypedAST
 import onion.compiler.TypedAST.*
 
 import scala.collection.mutable
 
 private[compiler] object CapturedVariableCollector {
-  def collect(stmt: ActionStatement): Seq[LocalBinding] = {
-    val captured = mutable.LinkedHashMap[Int, LocalBinding]()
+  def collect(stmt: ActionStatement, frame: onion.compiler.LocalFrame = null): Seq[ClosureLocalBinding] = {
+    val captured = mutable.LinkedHashMap[Int, ClosureLocalBinding]()
 
-    def record(index: Int, tp: TypedAST.Type): Unit =
-      captured.getOrElseUpdate(index, LocalBinding(index, tp, isMutable = true))
+    // Build index -> ClosureLocalBinding map from frame
+    val bindingsByIndex: Map[Int, ClosureLocalBinding] =
+      if (frame != null) {
+        frame.entries.collect {
+          case cb: ClosureLocalBinding => cb.index -> cb
+          case lb: LocalBinding => lb.index -> new ClosureLocalBinding(0, lb.index, lb.tp, lb.isMutable, lb.isBoxed)
+        }.toMap
+      } else Map.empty
+
+    def record(frameIndex: Int, index: Int, tp: TypedAST.Type): Unit =
+      captured.getOrElseUpdate(index, {
+        // Try to get the original binding with correct frame, isMutable, and isBoxed flags
+        bindingsByIndex.getOrElse(index,
+          new ClosureLocalBinding(frameIndex, index, tp, isMutable = true, isBoxed = false))
+      })
 
     def visitTerm(term: Term): Unit = term match {
       case ref: RefLocal =>
-        if ref.frame != 0 then record(ref.index, ref.`type`)
+        // Only capture variables from outer scopes (frame > 0)
+        // frame = 0 means current scope (closure's own locals/parameters)
+        if (ref.frame > 0) record(ref.frame, ref.index, ref.`type`)
 
       case set: SetLocal =>
-        if set.frame != 0 then record(set.index, set.`type`)
+        // Only capture variables from outer scopes (frame > 0)
+        if (set.frame > 0) record(set.frame, set.index, set.`type`)
         visitTerm(set.value)
 
       case begin: Begin =>

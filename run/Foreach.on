@@ -1,9 +1,13 @@
+import {
+  java.util.ArrayList;
+}
+
 val strings: ArrayList[String] = new ArrayList[String];
 
-strings << "Foo";
-strings << "Bar";
-strings << "Hoge";
+strings.add("Foo");
+strings.add("Bar");
+strings.add("Hoge");
 
 foreach object :String in strings {
-  System::out.println(object.toLowerCase);
+  IO::println(object.toLowerCase);
 }

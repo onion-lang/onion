@@ -47,6 +47,26 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     case _: BottomType     => AsmType.VOID_TYPE
     case _                 => throw new RuntimeException(s"Unsupported type: $tp")
 
+  /**
+   * Get the box class name for a given type (for boxed mutable variables)
+   */
+  private def boxClassName(tp: TypedAST.Type): String = tp match
+    case BasicType.INT     => "onion/runtime/IntBox"
+    case BasicType.LONG    => "onion/runtime/LongBox"
+    case BasicType.DOUBLE  => "onion/runtime/DoubleBox"
+    case BasicType.FLOAT   => "onion/runtime/FloatBox"
+    case _                 => "onion/runtime/ObjectBox"
+
+  private def boxAsmType(tp: TypedAST.Type): AsmType =
+    AsmType.getObjectType(boxClassName(tp))
+
+  private def boxedValueType(tp: TypedAST.Type): AsmType = tp match
+    case BasicType.INT     => AsmType.INT_TYPE
+    case BasicType.LONG    => AsmType.LONG_TYPE
+    case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
+    case BasicType.FLOAT   => AsmType.FLOAT_TYPE
+    case _                 => AsmUtil.objectType(AsmUtil.JavaLangObject)
+
   private[compiler] def isReferenceAsmType(tp: AsmType): Boolean =
     tp.getSort == AsmType.OBJECT || tp.getSort == AsmType.ARRAY
 
@@ -193,7 +213,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.visitLineNumber(node.location.line, label)
 
     val isStatic = (node.modifier & Modifier.STATIC) != 0
-    val localVars = new LocalVarContext(gen).withParameters(isStatic, argTypes)
+    val localVars = new LocalVarContext(gen)
+      .withParameters(isStatic, argTypes)
+      .withBoxedVariables(node.getFrame)
 
     if node.block != null then
       emitStatementsWithContext(gen, node.block.statements, className, localVars)
@@ -853,11 +875,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         closureCtx.capturedBinding(ref.index) match
           case Some(binding) =>
             gen.loadThis()
+            val fieldType = if binding.isBoxed then boxAsmType(binding.tp) else asmType(binding.tp)
             gen.getField(
               AsmUtil.objectType(closureCtx.closureClassName),
               closureCtx.capturedFieldName(binding.index),
-              asmType(binding.tp)
+              fieldType
             )
+            // If boxed, also get the value from the box
+            if binding.isBoxed then
+              gen.getField(boxAsmType(binding.tp), "value", boxedValueType(binding.tp))
           case None =>
             if closureCtx.isParameter(ref.index) then
               gen.loadArg(ref.index)
@@ -867,6 +893,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       case _ =>
         if localVars.isParameter(ref.index) then
           gen.loadArg(ref.index)
+        else if localVars.isBoxed(ref.index) then
+          // Boxed variable: load box, then get value field
+          val boxType = boxAsmType(ref.`type`)
+          val slot = localVars.slotOf(ref.index).getOrElse(localVars.getOrAllocateSlot(ref.index, boxType))
+          gen.loadLocal(slot)
+          gen.getField(boxType, "value", boxedValueType(ref.`type`))
         else
           val slot = localVars.slotOf(ref.index).getOrElse(localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
           gen.loadLocal(slot)
@@ -875,6 +907,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     localVars match
       case closureCtx: ClosureLocalVarContext =>
         closureCtx.capturedBinding(set.index) match
+          case Some(binding) if binding.isBoxed =>
+            // Boxed captured variable: load box, compute value, put value into box
+            gen.loadThis()
+            val boxType = boxAsmType(binding.tp)
+            gen.getField(
+              AsmUtil.objectType(closureCtx.closureClassName),
+              closureCtx.capturedFieldName(binding.index),
+              boxType
+            )
+            emitExpressionWithContext(gen, set.value, className, localVars)
+            val valueType = boxedValueType(set.`type`)
+            if valueType.getSize() == 2 then
+              gen.dup2X1()
+            else
+              gen.dupX1()
+            gen.putField(boxType, "value", valueType)
           case Some(binding) =>
             gen.loadThis()
             emitExpressionWithContext(gen, set.value, className, localVars)
@@ -897,11 +945,39 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
               val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, asmType(set.`type`)))
               gen.storeLocal(slot)
       case _ =>
-        emitExpressionWithContext(gen, set.value, className, localVars)
-        gen.dup()
         if localVars.isParameter(set.index) then
+          emitExpressionWithContext(gen, set.value, className, localVars)
+          gen.dup()
           gen.storeArg(set.index)
+        else if localVars.isBoxed(set.index) then
+          val boxType = boxAsmType(set.`type`)
+          val valueType = boxedValueType(set.`type`)
+          localVars.slotOf(set.index) match
+            case Some(slot) =>
+              // Update: load box, compute value, put into box.value
+              gen.loadLocal(slot)
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              if valueType.getSize() == 2 then
+                gen.dup2X1()
+              else
+                gen.dupX1()
+              gen.putField(boxType, "value", valueType)
+            case None =>
+              // Initialize: compute value, create box, store box, return value
+              emitExpressionWithContext(gen, set.value, className, localVars)
+              val tempSlot = gen.newLocal(valueType)
+              gen.storeLocal(tempSlot)
+              gen.newInstance(boxType)
+              gen.dup()
+              gen.loadLocal(tempSlot)
+              val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, valueType)
+              gen.invokeConstructor(boxType, AsmMethod("<init>", ctorDesc))
+              val slot = localVars.allocateSlot(set.index, boxType)
+              gen.storeLocal(slot)
+              gen.loadLocal(tempSlot) // Return the value
         else
+          emitExpressionWithContext(gen, set.value, className, localVars)
+          gen.dup()
           val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, asmType(set.`type`)))
           gen.storeLocal(slot)
 

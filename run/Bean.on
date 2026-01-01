@@ -45,4 +45,4 @@ encoder.close;
 
 val decoder: XMLDecoder = new XMLDecoder(new ByteArrayInputStream(out.toByteArray()));
 val bean: ExampleBean = decoder.readObject$ExampleBean;
-System::out.println(bean);
+IO::println(bean);

@@ -16,6 +16,7 @@ import toolbox.SymbolGenerator
 class LocalContext {
   private var contextFrame = new LocalFrame(null)
   private val generator = new SymbolGenerator("symbol#")
+  private val boxedVariables = scala.collection.mutable.Set[String]()
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
@@ -95,13 +96,35 @@ class LocalContext {
   }
 
   def add(name: String, `type`: TypedAST.Type, isMutable: Boolean): Int = {
-    contextFrame.add(name, `type`, isMutable)
+    val isBoxed = boxedVariables.contains(name)
+    contextFrame.add(name, `type`, isMutable, isBoxed)
   }
 
   def add(`type` : TypedAST.Type): String = {
     val name = newName
-    contextFrame.add(name, `type`, isMutable = true)
+    contextFrame.add(name, `type`, isMutable = true, isBoxed = false)
     name
+  }
+
+  /**
+   * Mark a variable as needing to be boxed (for closure capture)
+   */
+  def markAsBoxed(name: String): Unit = {
+    boxedVariables += name
+  }
+
+  /**
+   * Mark multiple variables as needing to be boxed
+   */
+  def markAsBoxed(names: Set[String]): Unit = {
+    boxedVariables ++= names
+  }
+
+  /**
+   * Check if a variable is boxed
+   */
+  def isBoxed(name: String): Boolean = {
+    boxedVariables.contains(name)
   }
 
 }

@@ -44,17 +44,21 @@ class LocalFrame(val parent: LocalFrame) {
   }
 
   def add(name: String, `type` : TypedAST.Type): Int = {
-    add(name, `type`, isMutable = true)
+    add(name, `type`, isMutable = true, isBoxed = false)
   }
 
   def add(name: String, `type`: TypedAST.Type, isMutable: Boolean): Int = {
+    add(name, `type`, isMutable, isBoxed = false)
+  }
+
+  def add(name: String, `type`: TypedAST.Type, isMutable: Boolean, isBoxed: Boolean): Int = {
     val bind = scope.get(name)
     bind match {
       case Some(_) => -1
       case None =>
         val index = maxIndex
         maxIndex += 1
-        scope.put(name, LocalBinding(index, `type`, isMutable))
+        scope.put(name, LocalBinding(index, `type`, isMutable, isBoxed))
         index
     }
   }
@@ -65,7 +69,7 @@ class LocalFrame(val parent: LocalFrame) {
     while (frame != null) {
       val binding = frame.scope.lookup(name)
       if (binding != null) {
-        return new ClosureLocalBinding(frameIndex, binding.index, binding.tp, binding.isMutable)
+        return new ClosureLocalBinding(frameIndex, binding.index, binding.tp, binding.isMutable, binding.isBoxed)
       }
       frameIndex += 1
       frame = frame.parent
@@ -75,7 +79,7 @@ class LocalFrame(val parent: LocalFrame) {
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     for(binding <- scope.get(name)) {
-      return new ClosureLocalBinding(0, binding.index, binding.tp, binding.isMutable)
+      return new ClosureLocalBinding(0, binding.index, binding.tp, binding.isMutable, binding.isBoxed)
     }
     null
   }

@@ -9,6 +9,7 @@ import scala.collection.mutable
 class LocalVarContext(gen: GeneratorAdapter) {
   private val indexMap = mutable.Map[Int, Int]()
   private val parameterSet = mutable.Set[Int]()
+  private val boxedSet = mutable.Set[Int]()
 
   def slotOf(typedIndex: Int): Option[Int] = indexMap.get(typedIndex)
 
@@ -22,6 +23,10 @@ class LocalVarContext(gen: GeneratorAdapter) {
   }
 
   def isParameter(typedIndex: Int): Boolean = parameterSet.contains(typedIndex)
+
+  def isBoxed(typedIndex: Int): Boolean = boxedSet.contains(typedIndex)
+
+  def markAsBoxed(typedIndex: Int): Unit = boxedSet += typedIndex
 
   /**
     * Register JVM parameter slots. Slot0 is `this` for instance methods.
@@ -38,19 +43,33 @@ class LocalVarContext(gen: GeneratorAdapter) {
     }
     this
   }
+
+  /**
+    * Mark variables as boxed based on LocalFrame information.
+    */
+  def withBoxedVariables(frame: onion.compiler.LocalFrame): LocalVarContext = {
+    if (frame != null) {
+      for (binding <- frame.entries) {
+        if (binding.isBoxed) {
+          boxedSet += binding.index
+        }
+      }
+    }
+    this
+  }
 }
 
 class ClosureLocalVarContext(
   gen: GeneratorAdapter,
   val closureClassName: String,
-  val capturedVars: Seq[LocalBinding]
+  val capturedVars: Seq[onion.compiler.ClosureLocalBinding]
 ) extends LocalVarContext(gen) {
-  private val capturedByIndex: Map[Int, LocalBinding] =
+  private val capturedByIndex: Map[Int, onion.compiler.ClosureLocalBinding] =
     capturedVars.map(b => b.index -> b).toMap
 
   def capturedFieldName(typedIndex: Int): String = s"captured_$typedIndex"
 
-  def capturedBinding(typedIndex: Int): Option[LocalBinding] = capturedByIndex.get(typedIndex)
+  def capturedBinding(typedIndex: Int): Option[onion.compiler.ClosureLocalBinding] = capturedByIndex.get(typedIndex)
 
   def isCapturedVariable(typedIndex: Int): Boolean = capturedByIndex.contains(typedIndex)
 

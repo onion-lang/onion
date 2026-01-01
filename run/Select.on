@@ -2,11 +2,11 @@ val random: Int = (Math::random() * 10)$Int;
 
 select random {
 case 0, 1, 2, 3:
-  System::out.println("[0-3]");
+  IO::println("[0-3]");
 case 4, 5, 6:
-  System::out.println("[4-6]");
+  IO::println("[4-6]");
 case 7, 8, 9:
-  System::out.println("[7-9]");
+  IO::println("[7-9]");
 else:
-  System::out.println("10");
+  IO::println("10");
 }

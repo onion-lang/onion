@@ -1,10 +1,10 @@
 val list: List = [];
 
-list << "a";
-list << "b";
-list << "c";
-list << "d";
+list.add("a");
+list.add("b");
+list.add("c");
+list.add("d");
 
 for var i: Int = 0; i < list.size; i = i + 1 {
-  System::out.println(list[i]);
+  IO::println(list[i]);
 }

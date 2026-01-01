@@ -381,9 +381,9 @@ TOKEN : {
 TOKEN:
 {
   <INTEGER:
-    <DECIMAL_LITERAL> (["L"])?
-  | <HEX_LITERAL> (["L"])?
-  | <OCTAL_LITERAL> (["L"])?
+    <DECIMAL_LITERAL> (["B","S","L"])?
+  | <HEX_LITERAL> (["B","S","L"])?
+  | <OCTAL_LITERAL> (["B","S","L"])?
   >
 | <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])* >
 | <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
@@ -1147,7 +1147,25 @@ AST.Expression null_literal() :{Token t;}{
 AST.Expression integer_literal() :{Token t; String s;}{
   t=<INTEGER> {
     s = t.image;
-    if(s.endsWith("L")){
+    if(s.endsWith("B")){
+      String content = chop(s);
+      byte value;
+      if(content.matches("0[xX].*")) {
+        value = (byte)Integer.parseInt(content.substring(2), 16);
+      } else {
+        value = Byte.parseByte(content);
+      }
+      return new AST.ByteLiteral(p(t), value);
+    }else if(s.endsWith("S")){
+      String content = chop(s);
+      short value;
+      if(content.matches("0[xX].*")) {
+        value = (short)Integer.parseInt(content.substring(2), 16);
+      } else {
+        value = Short.parseShort(content);
+      }
+      return new AST.ShortLiteral(p(t), value);
+    }else if(s.endsWith("L")){
       String content = chop(s);
       long value;
       if(content.matches("0[xX].*")) {
@@ -1155,7 +1173,7 @@ AST.Expression integer_literal() :{Token t; String s;}{
       } else {
         value = Long.parseLong(content);
       }
-      return new AST.LongLiteral(p(t), Long.parseLong(chop(s)));
+      return new AST.LongLiteral(p(t), value);
     }else{
       String content = s;
       int value;

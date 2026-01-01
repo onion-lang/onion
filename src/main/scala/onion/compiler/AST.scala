@@ -78,6 +78,7 @@ object AST {
   case class BitAnd(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&")
   case class BitOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("|")
   case class BooleanLiteral(location: Location, value: Boolean) extends Expression
+  case class ByteLiteral(location: Location, value: Byte) extends Expression
   case class Cast(location: Location, src: Expression, to: TypeNode) extends Expression
   case class CharacterLiteral(location: Location, value: Char) extends Expression
   case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
@@ -101,6 +102,7 @@ object AST {
   case class LogicalOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("||")
   case class LogicalRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>>")
   case class LongLiteral(location: Location, value: Long) extends Expression
+  case class ShortLiteral(location: Location, value: Short) extends Expression
   case class MathLeftShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<")
   case class MathRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>")
   case class MemberSelection(location: Location, target: Expression/*nullable*/, name: String) extends Expression

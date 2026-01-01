@@ -73,9 +73,14 @@ public class JJOnionParser implements Parser {
 
   /*
    * convenience method to get image of a Token
+   * For QUOTED_ID tokens, strips the backticks
    */
   private static String c(Token t) {
-    return t.image;
+    String s = t.image;
+    if (s.length() >= 2 && s.startsWith("`") && s.endsWith("`")) {
+      return s.substring(1, s.length() - 1);
+    }
+    return s;
   }
 
   /*
@@ -440,30 +445,31 @@ AST.CompilationUnit unit() :{
 }
 
 // Helper to accept identifier or quoted identifier (for escaping reserved words)
-String id() :{Token t;}{
-    t=<ID> { return t.image; }
-  | t=<QUOTED_ID> { return t.image.substring(1, t.image.length() - 1); }
+// Use c(token) to get the identifier name (strips backticks if present)
+Token id() :{Token t;}{
+    t=<ID> { return t; }
+  | t=<QUOTED_ID> { return t; }
 }
 
 AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new StringBuffer();}{
   {enterSection();}
-  t1="module" t2=<ID> {sb.append(t2.image);} ("." t2=<ID> {sb.append(t2.image);})* eos() {
+  t1="module" t2=id() {sb.append(c(t2));} ("." t2=id() {sb.append("."); sb.append(c(t2));})* eos() {
     return new AST.ModuleDeclaration(p(t1), new String(sb));
   }
 }
 
 AST.ImportClause import_decl() :{
-  Token t = null, star;
+  Token t = null, n, star;
   StringBuffer sb;
-  String s = null, name = null;
+  String s = null;
   ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
 }{
   t="import" "{"
     ( {sb = new StringBuffer();enterSection();}
       ( LOOKAHEAD(2)
-        (s=id() "=" name=id() {sb.append(name);} ("." name=id() {sb.append("."); sb.append(name);})+ eos())
-      | ((LOOKAHEAD(2) name=id() "." {sb.append(name); sb.append(".");})+ (name=id() | star="*" {name = star.image;}) eos() {
-           s = name; sb.append(s);
+        (n=id() {s=c(n);} "=" n=id() {sb.append(c(n));} ("." n=id() {sb.append("."); sb.append(c(n));})+ eos())
+      | ((LOOKAHEAD(2) n=id() "." {sb.append(c(n)); sb.append(".");})+ (n=id() | star="*" {n = star;}) eos() {
+           s = c(n); sb.append(s);
          }
         )
       ){ append(imports, new Tuple2<String, String>(s, new String(sb))); }
@@ -488,11 +494,11 @@ AST.GlobalVariableDeclaration var_decl(int modifiers) : {
   AST.Expression e = null;
 }{
   {enterSection();}
-  (keyword="val" | keyword="var") name=<ID> ":" ty=type() ["=" e=term()] eos() {
+  (keyword="val" | keyword="var") name=id() ":" ty=type() ["=" e=term()] eos() {
     int declMods = modifiers;
     if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
     return new AST.GlobalVariableDeclaration(
-      p(keyword), declMods, name.image, ty, e
+      p(keyword), declMods, c(name), ty, e
     );
   }
 }
@@ -504,13 +510,13 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   AST.BlockExpression b = null;
   AST.Expression e = null;
 }{
-  t1="def" t2=<ID> ["(" args=args() ")"] [":" ty=return_type()]
+  t1="def" t2=id() ["(" args=args() ")"] [":" ty=return_type()]
   (  (b=block() | {enterSection();} eos()) {
-       return new AST.FunctionDeclaration(p(t1), modifiers, t2.image, args, ty, b);
+       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
-         p(t1), modifiers, t1.image, args, ty,
+         p(t1), modifiers, c(t1), args, ty,
          new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)))
        );
      }
@@ -592,13 +598,13 @@ AST.ClassDeclaration class_decl(int mset) : {
   ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  t1="class" t2=<ID> [tparams=type_params()] [":" ty1=type()]
-  ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*] "{" 
+  t1="class" t2=id() [tparams=type_params()] [":" ty1=type()]
+  ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*] "{"
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
   "}" {
     return new AST.ClassDeclaration(
-      p(t1), mset, t2.image, ty1, toList(ty2s), sec3, toList(sec2s), tparams
+      p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams
     );
   }
 }
@@ -606,9 +612,9 @@ AST.ClassDeclaration class_decl(int mset) : {
 AST.RecordDeclaration record_decl(int mset) : {
   Token t1, t2; List<AST.Argument> args;
 }{
-  t1="record" t2=<ID> "(" args=args() ")" {
+  t1="record" t2=id() "(" args=args() ")" {
     return new AST.RecordDeclaration(
-      p(t1), mset, t2.image, args
+      p(t1), mset, c(t2), args
     );
   }
 }
@@ -621,15 +627,15 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
   ArrayBuffer<AST.MethodDeclaration> signatures = new ArrayBuffer<AST.MethodDeclaration>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  start = "interface" name = <ID> [tparams=type_params()]
+  start = "interface" name = id() [tparams=type_params()]
   [ "<:"
-    superType = type() {append(superTypes, superType);} 
+    superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
-  ] "{" 
+  ] "{"
     (signature = interface_method_decl() {append(signatures, signature); })*
   "}" {
     return new AST.InterfaceDeclaration(
-      p(start), mset, name.image, toList(superTypes), toList(signatures), tparams
+      p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
     );
   }
 }
@@ -653,13 +659,13 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.Expression e = null;
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  "def" t=<ID> [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()]
+  "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()]
   (  (b=block() | {enterSection();} eos() ) {
-       return new AST.MethodDeclaration(p(t), mset, t.image, args, ty, b, tparams);
+       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.MethodDeclaration(
-         p(t), mset, t.image, args, ty,
+         p(t), mset, c(t), args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
          tparams
        );
@@ -674,8 +680,8 @@ AST.MethodDeclaration interface_method_decl() : {
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
   {enterSection();}
-  "def" n=<ID> [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] eos() {
-    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), n.image, args, ty, null, tparams);
+  "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] eos() {
+    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams);
   }
 }
 
@@ -695,7 +701,7 @@ AST.TypeNode basic_type() : {
 
 AST.TypeNode class_type() : {Token n;}{
   n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true), false);}
-| n=<ID>   {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, false), false);}
+| n=id()   {return new AST.TypeNode(p(n), new AST.ReferenceType(c(n), false), false);}
 }
 
 AST.TypeNode raw_type() :{AST.TypeNode c;}{
@@ -707,8 +713,8 @@ List<AST.TypeParameter> type_params() : {
   ArrayBuffer<AST.TypeParameter> params = new ArrayBuffer<AST.TypeParameter>();
   Token name; AST.TypeNode bound = null;
 }{
-  "[" name=<ID> [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), name.image, option(bound))); }
-  ("," name=<ID> [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), name.image, option(bound))); })*
+  "[" name=id() [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), c(name), option(bound))); }
+  ("," name=id() [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), c(name), option(bound))); })*
   "]" { return toList(params); }
 }
 
@@ -774,7 +780,7 @@ AST.TypeNode return_type() :{AST.TypeNode type;}{
 }
 
 AST.Argument argument() :{Token t; AST.TypeNode type;}{
-  t=<ID> ":" type = type() {return new AST.Argument(p(t), t.image, type);}
+  t=id() ":" type = type() {return new AST.Argument(p(t), c(t), type);}
 }
 
 List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{
@@ -787,11 +793,11 @@ AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
   AST.Expression init = null;
 }{
   {enterSection();}
-  start="forward" (keyword="val" | keyword="var") name=<ID> ":" type = type()
+  start="forward" (keyword="val" | keyword="var") name=id() ":" type = type()
   ["=" eols() init=term()] eos() {
     int declMods = modifiers;
     if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
-    return new AST.DelegatedFieldDeclaration(p(start), declMods, name.image, type, init);
+    return new AST.DelegatedFieldDeclaration(p(start), declMods, c(name), type, init);
   }
 }
 
@@ -801,11 +807,11 @@ AST.FieldDeclaration field_decl(int modifiers):{
   AST.Expression init = null;
 }{
   {enterSection();}
-  (keyword="val" | keyword="var") name=<ID> ":" type=type()
+  (keyword="val" | keyword="var") name=id() ":" type=type()
   ["=" eols() init=term()] eos() {
     int declMods = modifiers;
     if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
-    return new AST.FieldDeclaration(p(keyword), declMods, name.image, type, init);
+    return new AST.FieldDeclaration(p(keyword), declMods, c(name), type, init);
   }
 }
 
@@ -845,12 +851,12 @@ void eos_or_block_end() :{} {
 AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;}{
   {enterSection();}
   (keyword="val" {declMods = AST.M_FINAL();} | keyword="var" {declMods = 0;})
-  t=<ID>
+  t=id()
   (
     ":" ty=type() ["=" eols() e=term()]
   | "=" eols() e=term()
   )
-  eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, t.image, ty, e);}
+  eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, c(t), ty, e);}
 }
 
 AST.BreakExpression break_statement() :{Token t;}{
@@ -936,7 +942,7 @@ AST.WhileExpression while_statement() :{Token t; AST.Expression e; AST.BlockExpr
 }
 
 AST.ForeachExpression foreach_statement() :{Token t; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{
-  t="foreach" a=argument() (LOOKAHEAD({la("in")}) <ID>) e=term() b=block() {
+  t="foreach" a=argument() (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
     return new AST.ForeachExpression(p(t), a, e, b);
   }
 }
@@ -1062,7 +1068,7 @@ AST.Expression primary_suffix() : {
 }{
   e=primary()
 ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
-| t="." eols() n=<ID> (
+| t="." eols() n=id() (
     LOOKAHEAD( type_arguments() eols() "(" )
       tas=type_arguments() eols() "(" eols() args=terms() ")"
         {e = new AST.MethodCall(p(t), e, c(n), args, tas);}
@@ -1083,18 +1089,18 @@ AST.Expression primary() : {
   List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
   AST.BlockExpression body;
 }{
-  LOOKAHEAD( "super" eols() "." eols() <ID> type_arguments() "(" )
-    t="super" eols() "." eols() n=<ID> tas=type_arguments() "(" es=terms() ")"           {return new AST.SuperMethodCall(p(t), c(n), es, tas);}
-| t="super" eols() "." eols() n=<ID> ["(" es=terms() ")"]                                {return new AST.SuperMethodCall(p(t), c(n), es);}
-| LOOKAHEAD( class_type() "::" <ID> type_arguments() "(" ) ty=class_type() t="::" n=<ID> tas=type_arguments() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es, tas);}
-| LOOKAHEAD(4) ty=class_type() t="::" n=<ID> "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
-| LOOKAHEAD(2) ty=class_type() t="::" n=<ID>                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
-| LOOKAHEAD( <ID> type_arguments() "(" ) t=<ID> tas=type_arguments() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas);}
-| LOOKAHEAD(2) t=<ID> "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
-| t=<ID>                                                            {return new AST.Id(p(t), c(t));}
+  LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
+    t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"           {return new AST.SuperMethodCall(p(t), c(n), es, tas);}
+| t="super" eols() "." eols() n=id() ["(" es=terms() ")"]                                {return new AST.SuperMethodCall(p(t), c(n), es);}
+| LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es, tas);}
+| LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
+| LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
+| LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas);}
+| LOOKAHEAD(2) t=id() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
+| t=id()                                                            {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
 | LOOKAHEAD( "(" eols() ")" eols() <ARROW> ) e=arrow_anonymous_function()  {return e;}
-| LOOKAHEAD( "(" eols() <ID> ":" ) e=arrow_anonymous_function()           {return e;}
+| LOOKAHEAD( "(" eols() id() ":" ) e=arrow_anonymous_function()           {return e;}
 | t="new" ty=type() {
     ArrayBuffer<AST.Expression> sizes = new ArrayBuffer<AST.Expression>();
   } (

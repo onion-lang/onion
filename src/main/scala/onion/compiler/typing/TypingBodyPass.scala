@@ -314,9 +314,41 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       var left = typed(node.lhs, context).getOrElse(null)
       var right = typed(node.rhs, context).getOrElse(null)
       if (left == null || right == null) return None
-      if (left.isBasicType && right.isBasicType) {
-        return Option(processNumericExpression(ADD, node, left, right))
+
+      // Helper to check if a BasicType is numeric
+      def isNumeric(t: BasicType): Boolean =
+        t == BasicType.BYTE || t == BasicType.SHORT || t == BasicType.CHAR ||
+          t == BasicType.INT || t == BasicType.LONG || t == BasicType.FLOAT || t == BasicType.DOUBLE
+
+      // Helper to get the numeric primitive type (either directly or via unboxing)
+      def numericType(term: Term): Option[BasicType] = {
+        if (term.isBasicType) {
+          val bt = term.`type`.asInstanceOf[BasicType]
+          if (isNumeric(bt)) Some(bt) else None
+        } else {
+          Boxing.unboxedType(table_, term.`type`).filter(isNumeric)
+        }
       }
+
+      val leftNumeric = numericType(left)
+      val rightNumeric = numericType(right)
+
+      // If both sides can be numeric, do numeric addition
+      (leftNumeric, rightNumeric) match {
+        case (Some(lbt), Some(rbt)) =>
+          // Unbox if needed
+          if (!left.isBasicType) {
+            left = Boxing.unboxing(table_, left, lbt)
+          }
+          if (!right.isBasicType) {
+            right = Boxing.unboxing(table_, right, rbt)
+          }
+          return Option(processNumericExpression(ADD, node, left, right))
+        case _ =>
+          // Fall through to string concatenation
+      }
+
+      // String concatenation
       if (left.isBasicType) {
         if (left.`type` == BasicType.VOID) {
           report(IS_NOT_BOXABLE_TYPE, node.lhs, left.`type`)

@@ -3,16 +3,24 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 final class ConstructionTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
   def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] = {
     val target = typed(node.lhs, context).getOrElse(null)
-    val index = typed(node.rhs, context).getOrElse(null)
+    var index = typed(node.rhs, context).getOrElse(null)
     if (target == null || index == null) return None
 
     if (target.isArrayType) {
+      // Try to unbox Integer to int for array index
+      if (!index.isBasicType) {
+        Boxing.unboxedType(table_, index.`type`) match {
+          case Some(bt) if bt.isInteger => index = Boxing.unboxing(table_, index, bt)
+          case _ => // will fail below
+        }
+      }
       if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
         report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
         return None

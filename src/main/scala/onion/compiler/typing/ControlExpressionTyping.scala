@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
 
@@ -42,11 +43,10 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] =
     context.openScope {
       val conditionOpt = typed(node.condition, context)
-      val condition = conditionOpt.getOrElse(null)
+      val condition = ensureBoolean(node.condition, conditionOpt.getOrElse(null))
       if (condition == null) {
         None
       } else {
-        ensureBoolean(node.condition, condition)
 
         val thenTermOpt = typeBlockExpression(node.thenBlock, context)
         val thenTerm = thenTermOpt.getOrElse(null)
@@ -275,10 +275,22 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   private def addArgument(arg: AST.Argument, context: LocalContext): Type =
     body.addArgument(arg, context)
 
-  private def ensureBoolean(node: AST.Node, term: Term): Unit =
-    if (term != null && term.`type` != BasicType.BOOLEAN) {
-      report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, term.`type`)
+  /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed). */
+  private def ensureBoolean(node: AST.Node, term: Term): Term = {
+    if (term == null) return null
+    var result = term
+    // Try to unbox Boolean wrapper type
+    if (!result.isBasicType) {
+      Boxing.unboxedType(table_, result.`type`) match {
+        case Some(BasicType.BOOLEAN) => result = Boxing.unboxing(table_, result, BasicType.BOOLEAN)
+        case _ => // will fail below
+      }
     }
+    if (result.`type` != BasicType.BOOLEAN) {
+      report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
+    }
+    result
+  }
 
   private def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
     case st: StatementTerm => st.statement

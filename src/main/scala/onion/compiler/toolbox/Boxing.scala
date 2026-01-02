@@ -27,10 +27,10 @@ object Boxing {
   )
 
   def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
-    for (row <- TABLE) {
-      if (row(0) eq `type`) return table.load(row(1).asInstanceOf[String])
+    TABLE.find(row => row(0) eq `type`) match {
+      case Some(row) => table.load(row(1).asInstanceOf[String])
+      case None => throw new RuntimeException("")
     }
-    throw new RuntimeException("")
   }
 
   def boxing(table: ClassTable, node: TypedAST.Term): TypedAST.Term = {
@@ -47,6 +47,19 @@ object Boxing {
     }
 
     throw new RuntimeException(s"couldn't find valueOf method for ${aBoxedType.name}")
+  }
+
+  /**
+   * Returns the primitive type that the given reference type can be unboxed to.
+   * Returns None if the type cannot be unboxed.
+   */
+  def unboxedType(table: ClassTable, `type`: TypedAST.Type): Option[TypedAST.BasicType] = {
+    if (!`type`.isObjectType) None
+    else TABLE.find { row =>
+      val boxedTypeName = row(1).asInstanceOf[String]
+      val boxedType = table.load(boxedTypeName)
+      TypedAST.TypeRules.isAssignable(boxedType, `type`)
+    }.map(row => row(0).asInstanceOf[TypedAST.BasicType])
   }
 
   def unboxing(table: ClassTable, node: TypedAST.Term, targetType: TypedAST.BasicType): TypedAST.Term = {

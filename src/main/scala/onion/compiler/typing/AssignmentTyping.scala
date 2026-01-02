@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 final class AssignmentTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
@@ -34,7 +35,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
     var value = typed(node.rhs, context).getOrElse(null)
     val indexing = node.lhs.asInstanceOf[AST.Indexing]
     val target = typed(indexing.lhs, context).getOrElse(null)
-    val index = typed(indexing.rhs, context).getOrElse(null)
+    var index = typed(indexing.rhs, context).getOrElse(null)
     if (value == null || target == null || index == null) return null
     if (target.isBasicType) {
       report(INCOMPATIBLE_TYPE, indexing.lhs, rootClass, target.`type`)
@@ -42,6 +43,13 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
     }
     if (target.isArrayType) {
       val targetType = target.`type`.asInstanceOf[ArrayType]
+      // Try to unbox Integer to int for array index
+      if (!index.isBasicType) {
+        Boxing.unboxedType(table_, index.`type`) match {
+          case Some(bt) if bt.isInteger => index = Boxing.unboxing(table_, index, bt)
+          case _ => // will fail below
+        }
+      }
       if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
         report(INCOMPATIBLE_TYPE, indexing.rhs, BasicType.INT, index.`type`)
         return null

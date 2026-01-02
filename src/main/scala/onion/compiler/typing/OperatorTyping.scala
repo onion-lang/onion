@@ -5,6 +5,7 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Constants.*
 import onion.compiler.TypedAST.UnaryTerm.Constants.*
+import onion.compiler.toolbox.Boxing
 
 final class OperatorTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
@@ -80,13 +81,28 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
   }
 
   def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
-    val left = typed(node.lhs, context).getOrElse(null)
-    val right = typed(node.rhs, context).getOrElse(null)
+    var left = typed(node.lhs, context).getOrElse(null)
+    var right = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
+
+    // Try to unbox wrapper types to numeric primitives
+    if (!left.isBasicType) {
+      Boxing.unboxedType(table_, left.`type`).filter(numeric) match {
+        case Some(bt) => left = Boxing.unboxing(table_, left, bt)
+        case None => // will fail below
+      }
+    }
+    if (!right.isBasicType) {
+      Boxing.unboxedType(table_, right.`type`).filter(numeric) match {
+        case Some(bt) => right = Boxing.unboxing(table_, right, bt)
+        case None => // will fail below
+      }
+    }
+
     val leftType = left.`type`
     val rightType = right.`type`
-    if ((!numeric(left.`type`)) || (!numeric(right.`type`))) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+    if ((!numeric(leftType)) || (!numeric(rightType))) {
+      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       null
     } else {
       val resultType = promote(leftType, rightType)
@@ -162,9 +178,25 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
   }
 
   def typeNumericBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
-    val left = typed(node.lhs, context).getOrElse(null)
-    val right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) None else Option(processNumericExpression(kind, node, left, right))
+    var left = typed(node.lhs, context).getOrElse(null)
+    var right = typed(node.rhs, context).getOrElse(null)
+    if (left == null || right == null) return None
+
+    // Try to unbox wrapper types to numeric primitives
+    if (!left.isBasicType) {
+      Boxing.unboxedType(table_, left.`type`).filter(numeric) match {
+        case Some(bt) => left = Boxing.unboxing(table_, left, bt)
+        case None => // will fail in processNumericExpression
+      }
+    }
+    if (!right.isBasicType) {
+      Boxing.unboxedType(table_, right.`type`).filter(numeric) match {
+        case Some(bt) => right = Boxing.unboxing(table_, right, bt)
+        case None => // will fail in processNumericExpression
+      }
+    }
+
+    Option(processNumericExpression(kind, node, left, right))
   }
 
   def typeLogicalBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
@@ -178,8 +210,17 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
   }
 
   def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] = {
-    val term = typed(node.term, context).getOrElse(null)
+    var term = typed(node.term, context).getOrElse(null)
     if (term == null) return None
+
+    // Try to unbox wrapper types to numeric primitives
+    if (!term.isBasicType) {
+      Boxing.unboxedType(table_, term.`type`).filter(numeric) match {
+        case Some(bt) => term = Boxing.unboxing(table_, term, bt)
+        case None => // will fail below
+      }
+    }
+
     if (!hasNumericType(term)) {
       report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
       None
@@ -189,8 +230,17 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
   }
 
   def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] = {
-    val term = typed(node.term, context).getOrElse(null)
+    var term = typed(node.term, context).getOrElse(null)
     if (term == null) return None
+
+    // Try to unbox Boolean wrapper type
+    if (!term.isBasicType) {
+      Boxing.unboxedType(table_, term.`type`) match {
+        case Some(BasicType.BOOLEAN) => term = Boxing.unboxing(table_, term, BasicType.BOOLEAN)
+        case _ => // will fail below
+      }
+    }
+
     if (term.`type` != BasicType.BOOLEAN) {
       report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
       None

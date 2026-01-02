@@ -4,11 +4,32 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Constants.*
+import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
 
 final class StatementTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
+
+  /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed) or null on error. */
+  private def ensureBooleanCondition(node: AST.Node, termOpt: Option[Term]): Term = {
+    termOpt match {
+      case None => null
+      case Some(term) =>
+        var result = term
+        // Try to unbox Boolean wrapper type
+        if (!result.isBasicType) {
+          Boxing.unboxedType(table_, result.`type`) match {
+            case Some(BasicType.BOOLEAN) => result = Boxing.unboxing(table_, result, BasicType.BOOLEAN)
+            case _ => // will fail below
+          }
+        }
+        if (result.`type` != BasicType.BOOLEAN) {
+          report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
+        }
+        result
+    }
+  }
 
   def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
     case AST.BlockExpression(_, elements) =>
@@ -79,14 +100,10 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     case node: AST.ForExpression =>
       context.openScope {
         val init = Option(node.init).map(init => translate(init, context)).getOrElse(new NOP(node.location))
-        val condition = (for (c <- Option(node.condition)) yield {
-          val conditionOpt = typed(c, context)
-          val expected = BasicType.BOOLEAN
-          for (condition <- conditionOpt; if condition.`type` != expected) {
-            report(INCOMPATIBLE_TYPE, node.condition, condition.`type`, expected)
-          }
-          conditionOpt.getOrElse(null)
-        }).getOrElse(new BoolValue(node.location, true))
+        val condition = Option(node.condition).map { c =>
+          val cond = ensureBooleanCondition(c, typed(c, context))
+          if (cond != null) cond else new BoolValue(node.location, true)
+        }.getOrElse(new BoolValue(node.location, true))
         val update = Option(node.update).flatMap(update => typed(update, context)).getOrElse(null)
         var loop = translate(node.block, context)
         if (update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
@@ -94,14 +111,10 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       }
     case node: AST.IfExpression =>
       context.openScope {
-        val conditionOpt = typed(node.condition, context)
-        val expected = BasicType.BOOLEAN
-        for (condition <- conditionOpt if condition.`type` != expected) {
-          report(INCOMPATIBLE_TYPE, node.condition, expected, condition.`type`)
-        }
+        val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
         val thenBlock = translate(node.thenBlock, context)
         val elseBlock = if (node.elseBlock == null) null else translate(node.elseBlock, context)
-        conditionOpt.map(c => new IfStatement(c, thenBlock, elseBlock)).getOrElse(new NOP(node.location))
+        if (condition != null) new IfStatement(condition, thenBlock, elseBlock) else new NOP(node.location)
       }
     case node: AST.LocalVariableDeclaration =>
       val binding = context.lookupOnlyCurrentScope(node.name)
@@ -222,14 +235,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       new Try(node.location, tryStatement, binds, catchBlocks, finallyStatement)
     case node: AST.WhileExpression =>
       context.openScope {
-        val conditionOpt = typed(node.condition, context)
-        val expected = BasicType.BOOLEAN
-        for (condition <- conditionOpt) {
-          val actual = condition.`type`
-          if (actual != expected) report(INCOMPATIBLE_TYPE, node, expected, actual)
-        }
+        val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
         val thenBlock = translate(node.block, context)
-        new ConditionalLoop(node.location, conditionOpt.getOrElse(null), thenBlock)
+        new ConditionalLoop(node.location, condition, thenBlock)
       }
   }
 

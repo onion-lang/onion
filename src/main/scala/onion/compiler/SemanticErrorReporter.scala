@@ -195,6 +195,8 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def reportIllegalInheritance(position: Location, items: Array[AnyRef]): Unit = {
+    val className = items(0).asInstanceOf[String]
+    problem(position, format(message("error.semantic.illegalInheritance"), className))
   }
 
   private def reportCannotReturnValue(position: Location, items: Array[AnyRef]): Unit = {

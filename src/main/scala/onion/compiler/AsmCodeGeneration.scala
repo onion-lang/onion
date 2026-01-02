@@ -73,7 +73,22 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private[compiler] def adaptValueOnStack(gen: GeneratorAdapter, actual: TypedAST.Type, expected: AsmType): Unit =
     actual match
       case bt: BasicType if isReferenceAsmType(expected) =>
-        gen.valueOf(asmType(bt))
+        val primitiveType = asmType(bt)
+        // long/double are 2-slot types - ASM's valueOf() doesn't handle them correctly
+        // Call the static valueOf methods directly instead
+        primitiveType.getSort match
+          case AsmType.LONG =>
+            gen.invokeStatic(
+              AsmType.getType(classOf[java.lang.Long]),
+              AsmMethod.getMethod("Long valueOf(long)")
+            )
+          case AsmType.DOUBLE =>
+            gen.invokeStatic(
+              AsmType.getType(classOf[java.lang.Double]),
+              AsmMethod.getMethod("Double valueOf(double)")
+            )
+          case _ =>
+            gen.valueOf(primitiveType)
       case _ if !actual.isBasicType && !isReferenceAsmType(expected) =>
         gen.unbox(expected)
       case _ =>
@@ -938,16 +953,18 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             )
           case None =>
             emitExpressionWithContext(gen, set.value, className, localVars)
-            gen.dup()
+            val valueType = asmType(set.`type`)
+            if valueType.getSize() == 2 then gen.dup2() else gen.dup()
             if closureCtx.isParameter(set.index) then
               gen.storeArg(set.index)
             else
-              val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, asmType(set.`type`)))
+              val slot = closureCtx.slotOf(set.index).getOrElse(closureCtx.getOrAllocateSlot(set.index, valueType))
               gen.storeLocal(slot)
       case _ =>
+        val setValueType = asmType(set.`type`)
         if localVars.isParameter(set.index) then
           emitExpressionWithContext(gen, set.value, className, localVars)
-          gen.dup()
+          if setValueType.getSize() == 2 then gen.dup2() else gen.dup()
           gen.storeArg(set.index)
         else if localVars.isBoxed(set.index) then
           val boxType = boxAsmType(set.`type`)
@@ -977,8 +994,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
               gen.loadLocal(tempSlot) // Return the value
         else
           emitExpressionWithContext(gen, set.value, className, localVars)
-          gen.dup()
-          val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, asmType(set.`type`)))
+          if setValueType.getSize() == 2 then gen.dup2() else gen.dup()
+          val slot = localVars.slotOf(set.index).getOrElse(localVars.getOrAllocateSlot(set.index, setValueType))
           gen.storeLocal(slot)
 
   def emitNewClosure(gen: GeneratorAdapter, closure: NewClosure, className: String, localVars: LocalVarContext): Unit =

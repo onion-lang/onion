@@ -445,7 +445,42 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node@AST.BooleanLiteral(loc, v) =>
       Some(new BoolValue(loc, v))
     case node@AST.ListLiteral(loc, elements) =>
-      Some(new ListLiteral(elements.map{e => typed(e, context).getOrElse(null)}.toArray, load("java.util.List")))
+      val typedElements = elements.map { e => typed(e, context).getOrElse(null) }
+      if (typedElements.exists(_ == null)) {
+        None
+      } else {
+        // Box basic types for list element type calculation
+        val elementTypes = typedElements.map { t =>
+          t.`type` match {
+            case bt: BasicType => Boxing.boxedType(table_, bt)
+            case other => other
+          }
+        }
+        val elementType: Type = if (elementTypes.isEmpty) {
+          rootClass // Empty list -> List<Object>
+        } else {
+          // Find least upper bound of all element types
+          elementTypes.reduce { (left, right) =>
+            if (left == null || right == null) null
+            else if (left.isBottomType) right
+            else if (right.isBottomType) left
+            else if (left eq right) left
+            else if (left.isNullType) right
+            else if (right.isNullType) left
+            else if (TypeRules.isSuperType(left, right)) left
+            else if (TypeRules.isSuperType(right, left)) right
+            else if (!left.isBasicType && !right.isBasicType) rootClass
+            else null
+          }
+        }
+        if (elementType == null) {
+          report(INCOMPATIBLE_TYPE, node, elementTypes.head, elementTypes.last)
+          None
+        } else {
+          val listType = AppliedClassType(load("java.util.List"), scala.collection.immutable.List(elementType))
+          Some(new ListLiteral(typedElements.toArray, listType))
+        }
+      }
     case node@AST.NullLiteral(loc) =>
       Some(new NullValue(loc))
     case node: AST.Cast =>

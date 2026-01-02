@@ -6,3 +6,6 @@ onion.IO
 onion.Strings
 onion.Files
 onion.Iterables
+onion.Regex
+onion.DateTime
+onion.Http

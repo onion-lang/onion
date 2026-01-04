@@ -74,9 +74,10 @@ private[compiler] object MethodResolution {
 
     def applicable(method: Method): Boolean =
       val expected = specializedArgs(method)
-      if expected.length != params.length then return false
+      // デフォルト引数を考慮: minArguments <= params.length <= expected.length
+      if params.length < method.minArguments || params.length > expected.length then return false
       var i = 0
-      while i < expected.length do
+      while i < params.length do
         if !isAssignableWithBoxing(expected(i), params(i).`type`) then return false
         i += 1
       true

@@ -278,6 +278,16 @@ object TypedAST {
     val constructors_ : List[TypedAST.ConstructorRef] = new ArrayList[TypedAST.ConstructorRef]
     var isResolutionComplete: Boolean            = false
     private var sourceFile: String = null
+    private val sealedSubtypes_ : List[TypedAST.ClassType] = new ArrayList[TypedAST.ClassType]
+
+    /** Returns all direct subtypes of this sealed type */
+    def sealedSubtypes: Array[TypedAST.ClassType] = sealedSubtypes_.toArray(new Array[TypedAST.ClassType](0))
+
+    /** Register a subtype of this sealed type */
+    def addSealedSubtype(subtype: TypedAST.ClassType): Unit = sealedSubtypes_.add(subtype)
+
+    /** Check if this is a sealed type */
+    def isSealed: Boolean = Modifier.isSealed(modifier)
 
     def this() = {
       this(null: Location, false, 0, null: String, null: TypedAST.ClassType, null)
@@ -567,10 +577,12 @@ object TypedAST {
     val arguments: Array[TypedAST.Type],
     val returnType: TypedAST.Type,
     var block: TypedAST.StatementBlock,
-    override val typeParameters: Array[TypedAST.TypeParameter] = Array()
+    override val typeParameters: Array[TypedAST.TypeParameter] = Array(),
+    val throwsTypes: Array[TypedAST.ClassType] = Array()
   ) extends Node with Method {
     private var closure: Boolean = false
     private var frame: LocalFrame = _
+    private var argsWithDefaults_ : Array[MethodArgument] = null
 
     def affiliation: TypedAST.ClassType = classType
 
@@ -585,6 +597,14 @@ object TypedAST {
     def setFrame(frame: LocalFrame): Unit =  this.frame = frame
 
     def getFrame: LocalFrame = frame
+
+    /** Set the arguments with default values */
+    def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit = argsWithDefaults_ = args
+
+    /** Get arguments with names and optional default values */
+    override def argumentsWithDefaults: Array[MethodArgument] =
+      if (argsWithDefaults_ != null) argsWithDefaults_
+      else super.argumentsWithDefaults
 
   }
 
@@ -703,17 +723,22 @@ object TypedAST {
 
   class Try(
     location: Location,
+    var resources: Array[(ClosureLocalBinding, Term)],
     var tryStatement: TypedAST.ActionStatement,
     var catchTypes: Array[ClosureLocalBinding],
     var catchStatements: Array[TypedAST.ActionStatement],
     var finallyStatement: TypedAST.ActionStatement = null
   ) extends ActionStatement(location) {
     def this(tryStatement: TypedAST.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[TypedAST.ActionStatement]) = {
-      this(null, tryStatement, catchTypes, catchStatements, null)
+      this(null, Array(), tryStatement, catchTypes, catchStatements, null)
     }
 
     def this(tryStatement: TypedAST.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[TypedAST.ActionStatement], finallyStatement: TypedAST.ActionStatement) = {
-      this(null, tryStatement, catchTypes, catchStatements, finallyStatement)
+      this(null, Array(), tryStatement, catchTypes, catchStatements, finallyStatement)
+    }
+
+    def this(resources: Array[(ClosureLocalBinding, Term)], tryStatement: TypedAST.ActionStatement, catchTypes: Array[ClosureLocalBinding], catchStatements: Array[TypedAST.ActionStatement], finallyStatement: TypedAST.ActionStatement) = {
+      this(null, resources, tryStatement, catchTypes, catchStatements, finallyStatement)
     }
   }
 
@@ -1104,6 +1129,11 @@ object TypedAST {
     private final val matcher: TypedAST.ParameterMatcher  = new TypedAST.StandardParameterMatcher
   }
 
+  /**
+   * Represents a method argument with optional default value.
+   */
+  case class MethodArgument(name: String, argType: Type, defaultValue: Option[Term] = None)
+
   trait Method extends MemberRef {
     def affiliation: TypedAST.ClassType
 
@@ -1112,6 +1142,14 @@ object TypedAST {
     def returnType: TypedAST.Type
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Arguments with names and optional default values. Override in subclasses that support defaults. */
+    def argumentsWithDefaults: Array[MethodArgument] = arguments.zipWithIndex.map { case (t, i) =>
+      MethodArgument(s"arg$i", t, None)
+    }
+
+    /** Minimum number of required arguments (without defaults) */
+    def minArguments: Int = argumentsWithDefaults.count(_.defaultValue.isEmpty)
   }
 
   class MethodComparator extends Comparator[TypedAST.Method] {

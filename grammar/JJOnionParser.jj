@@ -217,6 +217,74 @@ public class JJOnionParser implements Parser {
     
     return new AST.StringInterpolation(loc, toList(parts), toList(expressions));
   }
+
+  /**
+   * Parse a multi-line interpolated string (without unescape processing).
+   * Content is preserved as-is except for interpolation expressions.
+   */
+  private AST.Expression parseMultiLineInterpolatedString(Location loc, String str) {
+    // Remove the triple quotes (""" from start and end)
+    str = str.substring(3, str.length() - 3);
+
+    ArrayBuffer<String> parts = new ArrayBuffer<String>();
+    ArrayBuffer<AST.Expression> expressions = new ArrayBuffer<AST.Expression>();
+
+    int start = 0;
+    int pos = 0;
+
+    while (pos < str.length()) {
+      int interpStart = str.indexOf("#{", pos);
+      if (interpStart == -1) {
+        // No more interpolations - preserve content as-is
+        append(parts, str.substring(start));
+        break;
+      }
+
+      // Add the string part before interpolation (no unescape)
+      append(parts, str.substring(start, interpStart));
+
+      // Find the closing brace
+      int braceCount = 1;
+      int interpEnd = interpStart + 2;
+      while (interpEnd < str.length() && braceCount > 0) {
+        char c = str.charAt(interpEnd);
+        if (c == '{') braceCount++;
+        else if (c == '}') braceCount--;
+        interpEnd++;
+      }
+
+      if (braceCount > 0) {
+        throw new RuntimeException("Unclosed interpolation in multi-line string at " + loc);
+      }
+
+      // Parse the expression inside
+      String exprStr = str.substring(interpStart + 2, interpEnd - 1);
+      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(exprStr));
+      try {
+        AST.Expression expr = exprParser.term();
+        append(expressions, expr);
+      } catch (Exception e) {
+        throw new RuntimeException("Invalid expression in string interpolation: " + exprStr + " at " + loc, e);
+      }
+
+      start = interpEnd;
+      pos = interpEnd;
+    }
+
+    // If we ended with an expression, add an empty string part
+    if (parts.size() == expressions.size()) {
+      append(parts, "");
+    }
+
+    return new AST.StringInterpolation(loc, toList(parts), toList(expressions));
+  }
+
+  /**
+   * Extract content from multi-line string (remove triple quotes).
+   */
+  private static String chopMultiLineEdge(String s) {
+    return s.substring(3, s.length() - 3);
+  }
 }
 PARSER_END(JJOnionParser)
 
@@ -305,6 +373,7 @@ TOKEN:
 | <K_SHORT:        "Short"        >
 | <K_STATIC:       "static"       >
 | <K_SUPER:        "super"        >
+| <K_SEALED:       "sealed"       >
 | <K_SYNCHRONIZED: "synchronized" >
 | <K_THROW:        "throw"        >
 | <K_THROWS:       "throws"       >
@@ -419,6 +488,11 @@ TOKEN:
     )*
     "\""
   >
+| <MULTI_LINE_STRING:
+    "\"\"\""
+    ( ~["\""] | "\"" ~["\""] | "\"\"" ~["\""] )*
+    "\"\"\""
+  >
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
 | <QUOTED_ID: "`" (~["`"])+ "`" >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
@@ -509,18 +583,29 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   AST.TypeNode ty = null;
   AST.BlockExpression b = null;
   AST.Expression e = null;
+  List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
 }{
-  t1="def" t2=id() ["(" args=args() ")"] [":" ty=return_type()]
+  t1="def" t2=id() ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  (b=block() | {enterSection();} eos()) {
-       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b);
+       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, throwsTypes);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t1), args, ty,
-         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)))
+         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e))),
+         throwsTypes
        );
      }
   )
+}
+
+List<AST.TypeNode> throws_clause() : {
+  AST.TypeNode ty;
+  ArrayBuffer<AST.TypeNode> types = new ArrayBuffer<AST.TypeNode>();
+}{
+  "throws" ty=class_type() {append(types, ty);}
+  ("," ty=class_type() {append(types, ty);})*
+  {return toList(types);}
 }
 
 AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
@@ -542,7 +627,8 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
   | t = "abstract"     {mset = AST.M_ABSTRACT();}
   | t = "synchronized" {mset = AST.M_SYNCHRONIZED();}
   | t = "static"       {mset = AST.M_STATIC();}
-  | t = "override"    {mset = AST.M_OVERRIDE();}
+  | t = "override"     {mset = AST.M_OVERRIDE();}
+  | t = "sealed"       {mset = AST.M_SEALED();}
   )
   ( LOOKAHEAD(1,{no(AST.M_FINAL(), mset)})        t = "final"        { mset |= AST.M_FINAL(); }
   | LOOKAHEAD(1,{no(AST.M_INTERNAL(), mset)})     t = "internal"     { mset |= AST.M_INTERNAL(); }
@@ -550,7 +636,8 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
   | LOOKAHEAD(1,{no(AST.M_ABSTRACT(), mset)})     t = "abstract"     { mset |= AST.M_ABSTRACT(); }
   | LOOKAHEAD(1,{no(AST.M_SYNCHRONIZED(), mset)}) t = "synchronized" { mset |= AST.M_SYNCHRONIZED(); }
   | LOOKAHEAD(1,{no(AST.M_STATIC(), mset)})       t = "static"       { mset |= AST.M_STATIC(); }
-  | LOOKAHEAD(1,{no(AST.M_OVERRIDE(), mset)})    t = "override"    { mset |= AST.M_OVERRIDE(); }
+  | LOOKAHEAD(1,{no(AST.M_OVERRIDE(), mset)})     t = "override"     { mset |= AST.M_OVERRIDE(); }
+  | LOOKAHEAD(1,{no(AST.M_SEALED(), mset)})       t = "sealed"       { mset |= AST.M_SEALED(); }
   )* {return mset;}
 }
 
@@ -611,10 +698,16 @@ AST.ClassDeclaration class_decl(int mset) : {
 
 AST.RecordDeclaration record_decl(int mset) : {
   Token t1, t2; List<AST.Argument> args;
+  AST.TypeNode superType;
+  ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
 }{
-  t1="record" t2=id() "(" args=args() ")" {
+  t1="record" t2=id() "(" args=args() ")"
+  [ "<:"
+    superType = type() {append(superTypes, superType);}
+    ("," superType = type() {append(superTypes, superType);})*
+  ] {
     return new AST.RecordDeclaration(
-      p(t1), mset, c(t2), args
+      p(t1), mset, c(t2), args, toList(superTypes)
     );
   }
 }
@@ -658,16 +751,17 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.BlockExpression b = null;
   AST.Expression e = null;
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
+  List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
 }{
-  "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()]
+  "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  (b=block() | {enterSection();} eos() ) {
-       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams);
+       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
-         tparams
+         tparams, throwsTypes
        );
      }
   )
@@ -678,10 +772,11 @@ AST.MethodDeclaration interface_method_decl() : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty  = null;
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
+  List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
 }{
   {enterSection();}
-  "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] eos() {
-    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams);
+  "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()] eos() {
+    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams, throwsTypes);
   }
 }
 
@@ -779,8 +874,9 @@ AST.TypeNode return_type() :{AST.TypeNode type;}{
   (type = void_type() | type = type()) {return type;}
 }
 
-AST.Argument argument() :{Token t; AST.TypeNode type;}{
-  t=id() ":" type = type() {return new AST.Argument(p(t), c(t), type);}
+AST.Argument argument() :{Token t; AST.TypeNode type; AST.Expression defaultValue = null;}{
+  t=id() ":" type = type() ["=" eols() defaultValue = term()]
+  {return new AST.Argument(p(t), c(t), type, defaultValue);}
 }
 
 List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{
@@ -886,12 +982,29 @@ AST.ThrowExpression throw_expression() :{Token t; AST.Expression e;}{
   t="throw" e=term() {return new AST.ThrowExpression(p(t), e);}
 }
 
+AST.LocalVariableDeclaration resource_decl() :{
+  Token t; AST.TypeNode type = null; AST.Expression init;
+}{
+  t="val" eols() <ID> [":" type=type()] "=" eols() init=term()
+  {return new AST.LocalVariableDeclaration(p(t), 0, c(token), type, init);}
+}
+
+List<AST.LocalVariableDeclaration> resource_list() :{
+  AST.LocalVariableDeclaration r;
+  ArrayBuffer<AST.LocalVariableDeclaration> rs = new ArrayBuffer<AST.LocalVariableDeclaration>();
+}{
+  r=resource_decl() {append(rs, r);} (";" eols() r=resource_decl() {append(rs, r);})*
+  {return toList(rs);}
+}
+
 AST.TryExpression try_statement() :{
   Token t; AST.Argument a; AST.BlockExpression b1, b2, b3 = null;
+  List<AST.LocalVariableDeclaration> resources = (List<AST.LocalVariableDeclaration>)AST.NIL();
   ArrayBuffer<Tuple2<AST.Argument,AST.BlockExpression>> as = new ArrayBuffer<Tuple2<AST.Argument, AST.BlockExpression>>();
 }{
-  t="try"  b1=block() ("catch" a=argument() b2=block() {append(as, new Tuple2<AST.Argument, AST.BlockExpression>(a, b2));})*
-  ["finally" b3=block()] {return new AST.TryExpression(p(t), b1, toList(as), b3);}
+  t="try" [LOOKAHEAD(2) "(" resources=resource_list() ")"]
+  b1=block() ("catch" a=argument() b2=block() {append(as, new Tuple2<AST.Argument, AST.BlockExpression>(a, b2));})*
+  ["finally" b3=block()] {return new AST.TryExpression(p(t), resources, b1, toList(as), b3);}
 }
 
 AST.ExpressionBox exp_statement() :{AST.Expression e;}{
@@ -907,19 +1020,28 @@ AST.IfExpression if_statement() :{Token t; AST.Expression e; AST.BlockExpression
   t="if" e=term() b1=block() [LOOKAHEAD(2) "else" b2=block()] {return new AST.IfExpression(p(t), e, b1, b2);}
 }
 
+AST.Pattern case_pattern() :{
+  Token t; AST.Expression e; AST.TypeNode ty;
+}{
+  LOOKAHEAD(2, id() "is")
+  t=id() "is" ty=type() { return new AST.TypePattern(p(t), c(t), ty); }
+| e=term() { return new AST.ExpressionPattern(e); }
+}
+
 AST.SelectExpression select_statement() :{
-  Token t1, t2; AST.Expression e1, e2;
-  ArrayBuffer<AST.Expression> es = new ArrayBuffer<AST.Expression>();
+  Token t1, t2; AST.Expression e1; AST.Pattern p;
+  ArrayBuffer<AST.Pattern> patterns = new ArrayBuffer<AST.Pattern>();
   List<AST.CompoundExpression> ss = null;
-  ArrayBuffer<Tuple2<List<AST.Expression>, AST.BlockExpression>> branches = new ArrayBuffer<Tuple2<List<AST.Expression>, AST.BlockExpression>>();
+  ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>> branches = new ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>>();
   AST.BlockExpression elseBlock = null ;
 }{
-  t1="select" e1=term() "{"
-    ((t2="case" e2=term() {append(es, e2);} ("," e2=term() {append(es, e2);})* ":" ss=statements()) {
-      append(branches, new Tuple2<List<AST.Expression>, AST.BlockExpression>(toList(es), new AST.BlockExpression(p(t2), ss)));
+  t1="select" e1=term() eols() "{" (<EOL>)*
+    ((<EOL>)* t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" (<EOL>)* ss=statements() {
+      append(branches, new Tuple2<List<AST.Pattern>, AST.BlockExpression>(toList(patterns), new AST.BlockExpression(p(t2), ss)));
+      patterns = new ArrayBuffer<AST.Pattern>();
     })*
-    [t2="else" ":" [ss=statements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }]
-  "}" {
+    (<EOL>)* [t2="else" ":" (<EOL>)* [ss=statements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }]
+  (<EOL>)* "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);
   }
 }
@@ -1124,8 +1246,14 @@ AST.Expression primary() : {
 | "(" eols() e=term() eols() ")"                                          {return e;}
 }
 
+AST.Expression argument_expr() :{Token n; AST.Expression e;}{
+  LOOKAHEAD(2, id() "=")
+    n=id() "=" eols() e=term()  {return new AST.NamedArgument(p(n), c(n), e);}
+  | e=term()                    {return e;}
+}
+
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
-  [arg=term() {append(args, arg);} ("," arg=term() {append(args, arg);})*] {
+  [arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})*] {
     return toList(args);
   }
 }
@@ -1209,13 +1337,21 @@ AST.Expression boolean_literal() :{Token t;}{
 | t="false" {return new AST.BooleanLiteral(p(t), false);}
 }
 
-AST.Expression string_literal() :{Token t; AST.Expression e;}{
+AST.Expression string_literal() :{Token t; String str;}{
   t=<STRING> {
-    String str = t.image;
+    str = t.image;
     if (str.contains("#{")) {
       return parseInterpolatedString(p(t), str);
     } else {
       return new AST.StringLiteral(p(t), unescape(chopEdge(str)));
+    }
+  }
+| t=<MULTI_LINE_STRING> {
+    str = t.image;
+    if (str.contains("#{")) {
+      return parseMultiLineInterpolatedString(p(t), str);
+    } else {
+      return new AST.StringLiteral(p(t), chopMultiLineEdge(str));
     }
   }
 }

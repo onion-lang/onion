@@ -17,6 +17,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
+      case node: AST.RecordDeclaration => processRecordDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
       case _ =>
@@ -57,6 +58,56 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     }
   }
 
+  private def processRecordDeclaration(node: AST.RecordDeclaration): Unit = {
+    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+    mapper_ = find(definition_.name)
+
+    // Record extends Object, may implement interfaces
+    definition_.setSuperClass(rootClass)
+
+    // Process super interfaces if any
+    val interfaces = Buffer[ClassType]()
+    for (typeSpec <- node.superInterfaces) {
+      val superType = validateSuperType(typeSpec, mustBeInterface = true, mapper_)
+      if (superType != null) {
+        interfaces += superType
+        // Register this record as a subtype of sealed interfaces
+        superType match {
+          case classDef: ClassDefinition if classDef.isSealed =>
+            classDef.addSealedSubtype(definition_)
+          case _ =>
+        }
+      }
+    }
+    definition_.setInterfaces(interfaces.toArray)
+    definition_.setResolutionComplete(true)
+
+    // Process record components (args) to create fields and getters
+    val argsOption = typesOf(node.args)
+    for (args <- argsOption) {
+      val argTypes = args.toArray
+
+      // Create private final fields for each component
+      node.args.zip(argTypes).foreach { case (arg, argType) =>
+        val fieldModifier = Modifier.PRIVATE | Modifier.FINAL
+        val field = new FieldDefinition(node.location, fieldModifier, definition_, arg.name, argType)
+        definition_.add(field)
+      }
+
+      // Create public getter methods for each component
+      node.args.zip(argTypes).foreach { case (arg, argType) =>
+        val getterModifier = Modifier.PUBLIC
+        val getter = new MethodDefinition(node.location, getterModifier, definition_, arg.name, Array.empty, argType, null)
+        definition_.add(getter)
+      }
+
+      // Create constructor
+      val ctorModifier = Modifier.PUBLIC
+      val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, argTypes, null, null)
+      definition_.add(ctor)
+    }
+  }
+
   private def processAccessSection(section: AST.AccessSection): Unit = {
     access_ = section.modifiers
     section.members.foreach {
@@ -83,7 +134,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     for (args <- argsOption; returnType <- returnTypeOption) {
       val classType = loadTopClass.asInstanceOf[ClassDefinition]
       val modifier = node.modifiers | AST.M_PUBLIC
-      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null)
+      val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes)
       put(node, method)
       classType.add(method)
     }
@@ -107,6 +159,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       for (args <- argsOption; returnType <- returnTypeOption) {
         var modifier = node.modifiers | access_
         if (node.block == null) modifier |= AST.M_ABSTRACT
+        val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
         val method = new MethodDefinition(
           node.location,
           modifier,
@@ -115,7 +168,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
           args.toArray,
           returnType,
           null,
-          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
+          throwsTypes
         )
         put(node, method)
         definition_.add(method)
@@ -131,6 +185,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
       for (args <- argsOption; returnType <- returnTypeOption) {
         val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
+        val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
         val method = new MethodDefinition(
           node.location,
           modifier,
@@ -139,7 +194,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
           args.toArray,
           returnType,
           null,
-          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
+          throwsTypes
         )
         put(node, method)
         definition_.add(method)

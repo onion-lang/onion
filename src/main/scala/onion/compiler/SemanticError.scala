@@ -43,5 +43,9 @@ object SemanticError {
   case object FINAL_METHOD_OVERRIDE extends SemanticError(39)
   case object CANNOT_CALL_METHOD_ON_PRIMITIVE extends SemanticError(40)
   case object INVALID_METHOD_CALL_TARGET extends SemanticError(41)
+  case object NON_EXHAUSTIVE_PATTERN_MATCH extends SemanticError(42)
+  case object UNKNOWN_PARAMETER_NAME extends SemanticError(43)
+  case object DUPLICATE_ARGUMENT extends SemanticError(44)
+  case object POSITIONAL_AFTER_NAMED extends SemanticError(45)
 }
 sealed abstract class SemanticError(code: Int)

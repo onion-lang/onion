@@ -181,8 +181,13 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         val cases = node.cases
         val nodes = Buffer[Term]()
         val thens = Buffer[ActionStatement]()
-        for ((expressions, thenClause) <- cases) {
+        for ((patterns, thenClause) <- cases) {
           val bind = context.lookup(name)
+          // Extract expressions from patterns (for statement context, only ExpressionPattern is supported)
+          val expressions = patterns.collect { case AST.ExpressionPattern(e) => e }
+          if (expressions.length != patterns.length) {
+            report(UNIMPLEMENTED_FEATURE, node)
+          }
           nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
           thens += translate(thenClause, context)
         }
@@ -215,24 +220,52 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       }
       new Throw(node.location, expressionOpt.getOrElse(null))
     case node: AST.TryExpression =>
-      val tryStatement = translate(node.tryBlock, context)
-      val binds = new Array[ClosureLocalBinding](node.recClauses.length)
-      val catchBlocks = new Array[ActionStatement](node.recClauses.length)
-      for (i <- 0 until node.recClauses.length) {
-        val (argument, body) = node.recClauses(i)
-        context.openScope {
-          val argType = addArgument(argument, context)
-          val expected = load("java.lang.Throwable")
-          if (!TypeRules.isSuperType(expected, argType)) {
-            report(INCOMPATIBLE_TYPE, argument, expected, argType)
+      // リソースを処理（try-with-resources）
+      val resourceBindings = scala.collection.mutable.ArrayBuffer[(ClosureLocalBinding, Term)]()
+      val autoCloseable = load("java.lang.AutoCloseable")
+
+      context.openScope {
+        for (resource <- node.resources) {
+          val initOpt = typed(resource.init, context)
+          initOpt.foreach { init =>
+            val resourceType =
+              if (resource.typeRef != null) mapFrom(resource.typeRef)
+              else init.`type`
+
+            if (resourceType != null) {
+              // Always add the variable to scope so it can be referenced in try block
+              val index = context.add(resource.name, resourceType, isMutable = false)
+              val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
+
+              if (TypeRules.isSuperType(autoCloseable, resourceType)) {
+                resourceBindings += ((binding, init))
+              } else {
+                // Report error but still allow the variable to be used
+                report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+              }
+            }
           }
-          binds(i) = context.lookupOnlyCurrentScope(argument.name)
-          catchBlocks(i) = translate(body, context)
         }
+
+        val tryStatement = translate(node.tryBlock, context)
+        val binds = new Array[ClosureLocalBinding](node.recClauses.length)
+        val catchBlocks = new Array[ActionStatement](node.recClauses.length)
+        for (i <- 0 until node.recClauses.length) {
+          val (argument, body) = node.recClauses(i)
+          context.openScope {
+            val argType = addArgument(argument, context)
+            val expected = load("java.lang.Throwable")
+            if (!TypeRules.isSuperType(expected, argType)) {
+              report(INCOMPATIBLE_TYPE, argument, expected, argType)
+            }
+            binds(i) = context.lookupOnlyCurrentScope(argument.name)
+            catchBlocks(i) = translate(body, context)
+          }
+        }
+        // Handle finally block
+        val finallyStatement = if (node.finBlock != null) translate(node.finBlock, context) else null
+        new Try(node.location, resourceBindings.toArray, tryStatement, binds, catchBlocks, finallyStatement)
       }
-      // Handle finally block
-      val finallyStatement = if (node.finBlock != null) translate(node.finBlock, context) else null
-      new Try(node.location, tryStatement, binds, catchBlocks, finallyStatement)
     case node: AST.WhileExpression =>
       context.openScope {
         val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))

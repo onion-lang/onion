@@ -114,6 +114,27 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, s"invalid method call target of type ${targetType}")
   }
 
+  private def reportNonExhaustivePatternMatch(position: Location, items: Array[AnyRef]): Unit = {
+    val sealedType = items(0).asInstanceOf[TypedAST.Type]
+    val missingTypes = items(1).asInstanceOf[Array[TypedAST.Type]]
+    val missingNames = missingTypes.map(_.name).mkString(", ")
+    problem(position, s"パターンマッチが網羅的ではありません。sealed型 ${sealedType.name} に対して、次の型がカバーされていません: $missingNames")
+  }
+
+  private def reportUnknownParameterName(position: Location, items: Array[AnyRef]): Unit = {
+    val paramName = items(0).asInstanceOf[String]
+    problem(position, s"不明なパラメータ名: $paramName")
+  }
+
+  private def reportDuplicateArgument(position: Location, items: Array[AnyRef]): Unit = {
+    val paramName = items(0).asInstanceOf[String]
+    problem(position, s"引数が重複しています: $paramName")
+  }
+
+  private def reportPositionalAfterNamed(position: Location, items: Array[AnyRef]): Unit = {
+    problem(position, "名前付き引数の後に位置引数を使用することはできません")
+  }
+
   private def reportVariableNotFound(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.variableNotFound"), items(0).asInstanceOf[String]))
   }
@@ -367,6 +388,14 @@ class SemanticErrorReporter(threshold: Int) {
         reportCannotCallMethodOnPrimitive(position, items)
       case SemanticError.INVALID_METHOD_CALL_TARGET =>
         reportInvalidMethodCallTarget(position, items)
+      case SemanticError.NON_EXHAUSTIVE_PATTERN_MATCH =>
+        reportNonExhaustivePatternMatch(position, items)
+      case SemanticError.UNKNOWN_PARAMETER_NAME =>
+        reportUnknownParameterName(position, items)
+      case SemanticError.DUPLICATE_ARGUMENT =>
+        reportDuplicateArgument(position, items)
+      case SemanticError.POSITIONAL_AFTER_NAMED =>
+        reportPositionalAfterNamed(position, items)
     }
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)

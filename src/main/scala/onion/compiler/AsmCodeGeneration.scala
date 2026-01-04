@@ -202,7 +202,18 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.loadThis()
       gen.invokeConstructor(AsmUtil.objectType("java/lang/Object"), AsmMethod.getMethod("void <init>()"))
 
-    emitStatementsWithContext(gen, ctor.block.statements, className, localVars)
+    if ctor.block != null then
+      emitStatementsWithContext(gen, ctor.block.statements, className, localVars)
+    else
+      // Synthetic constructor for records: assign parameters to fields
+      val classType = ctor.classType.asInstanceOf[ClassDefinition]
+      val fields = classType.fields
+      var argIndex = 0
+      for field <- fields if (field.modifier & Modifier.STATIC) == 0 do
+        gen.loadThis()
+        gen.loadArg(argIndex)
+        gen.putField(AsmUtil.objectType(className), field.name, asmType(field.`type`))
+        argIndex += 1
     gen.returnValue()
     gen.endMethod()
     
@@ -212,15 +223,21 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val argTypes = node.arguments.map(asmType)
     val returnType = asmType(node.returnType)
     val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
-    
+
+    // Convert throws types to internal names
+    val exceptions = if (node.throwsTypes.isEmpty) null
+                     else node.throwsTypes.map(t => AsmUtil.internalName(t.name))
+
     // Just visit the method without any code
-    cw.visitMethod(access, node.name, desc, null, null)
+    cw.visitMethod(access, node.name, desc, null, exceptions)
 
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
     val access = toAsmModifier(node.modifier)
     val argTypes = node.arguments.map(asmType)
     val returnType = asmType(node.returnType)
-    val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes)
+    val exceptions = if (node.throwsTypes.isEmpty) null
+                     else node.throwsTypes.map(t => AsmUtil.internalName(t.name))
+    val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions)
 
     // Emit line number for method declaration
     if node.location != null then
@@ -232,11 +249,20 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       .withParameters(isStatic, argTypes)
       .withBoxedVariables(node.getFrame)
 
+    val isSyntheticGetter = node.block == null && !Modifier.isAbstract(node.modifier) && node.arguments.isEmpty && node.returnType != BasicType.VOID
+
     if node.block != null then
       emitStatementsWithContext(gen, node.block.statements, className, localVars)
+    else if isSyntheticGetter then
+      // Synthetic getter for records: return this.fieldName
+      gen.loadThis()
+      gen.getField(AsmUtil.objectType(className), node.name, returnType)
 
-    val needsDefault = node.block == null || !hasReturn(node.block.statements)
-    MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
+    if !isSyntheticGetter then
+      val needsDefault = node.block == null || !hasReturn(node.block.statements)
+      MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
+    else
+      gen.returnValue()
     try gen.endMethod()
     catch
       case e: Throwable =>

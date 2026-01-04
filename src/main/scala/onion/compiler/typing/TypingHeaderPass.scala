@@ -21,6 +21,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
         registerClass(declaration, moduleName, imports)
       case declaration: AST.InterfaceDeclaration =>
         registerInterface(declaration, moduleName, imports)
+      case declaration: AST.RecordDeclaration =>
+        registerRecord(declaration, moduleName, imports)
       case _ =>
         nonTypeCount += 1
     }
@@ -78,6 +80,20 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
 
   private def registerInterface(declaration: AST.InterfaceDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
+    node.setSourceFile(Paths.nameOf(unit.sourceFile))
+    if (table_.lookup(node.name) != null) {
+      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    } else {
+      table_.classes.add(node)
+      put(declaration, node)
+      add(node.name, new NameMapper(imports))
+    }
+  }
+
+  private def registerRecord(declaration: AST.RecordDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
+    // Records are compiled as final classes
+    val modifiers = declaration.modifiers | Modifier.FINAL
+    val node = ClassDefinition.newClass(declaration.location, modifiers, createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     if (table_.lookup(node.name) != null) {
       report(SemanticError.DUPLICATE_CLASS, declaration, node.name)

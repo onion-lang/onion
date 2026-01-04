@@ -1,0 +1,14 @@
+// Test record type
+record Person(name: String, age: Int);
+record Point(x: Int, y: Int);
+record Rectangle(topLeft: Point, bottomRight: Point);
+
+val p = new Person("Alice", 30);
+IO::println("Person: " + p.name() + ", " + p.age());
+
+val origin = new Point(0, 0);
+val corner = new Point(10, 20);
+IO::println("Point: " + origin.x() + ", " + origin.y());
+
+val rect = new Rectangle(origin, corner);
+IO::println("Rectangle: " + rect.topLeft().x() + "," + rect.topLeft().y() + " to " + rect.bottomRight().x() + "," + rect.bottomRight().y());

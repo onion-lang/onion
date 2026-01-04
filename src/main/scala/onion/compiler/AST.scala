@@ -13,6 +13,7 @@ object AST {
   val M_PROTECTED = 256
   val M_PRIVATE = 512
   val M_FORWARDED = 1024
+  val M_SEALED = 2048
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A): Unit = {
     buffer += element
@@ -57,7 +58,7 @@ object AST {
   val K_VOID = KVoid
   case class TypeNode(location: Location, desc: TypeDescriptor, isRelaxed: Boolean) extends Node
   abstract sealed class Node{ def location: Location }
-  case class Argument(location: Location, name: String, typeRef: TypeNode) extends Node
+  case class Argument(location: Location, name: String, typeRef: TypeNode, defaultValue: Expression = null) extends Node
   case class CompilationUnit(
     location: Location, sourceFile: String/*nullable*/, module: ModuleDeclaration/*nullable*/,
     imports: ImportClause, toplevels: List[Toplevel]) extends Node
@@ -130,6 +131,7 @@ object AST {
     def this(location: Location, name: String, args: List[Expression]) =
       this(location, name, args, Nil)
   }
+  case class NamedArgument(location: Location, name: String, value: Expression) extends Expression
   case class StaticMemberSelection(location: Location, typeRef: TypeNode, name: String) extends Expression
   case class StaticMethodCall(location: Location, typeRef: TypeNode, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
     def this(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) =
@@ -145,6 +147,11 @@ object AST {
   }
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
 
+  // Patterns for select/case
+  abstract sealed class Pattern extends Node
+  case class ExpressionPattern(expr: Expression) extends Pattern { def location: Location = expr.location }
+  case class TypePattern(location: Location, name: String, typeRef: TypeNode) extends Pattern
+
   abstract sealed class CompoundExpression extends Expression
   case class BlockExpression(location: Location, elements: List[CompoundExpression]) extends CompoundExpression
   case class BreakExpression(location: Location) extends CompoundExpression
@@ -156,21 +163,23 @@ object AST {
   case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
   case class LocalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode/*nullable*/, init: Expression/*nullable*/) extends CompoundExpression
   case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends CompoundExpression
-  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Expression], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
+  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Pattern], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
   case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
   case class ThrowExpression(location: Location, target: Expression) extends CompoundExpression
-  case class TryExpression(location: Location, tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends CompoundExpression
+  case class TryExpression(location: Location, resources: List[LocalVariableDeclaration], tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends CompoundExpression
   case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
 
-  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) extends Toplevel
+  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode] = Nil) extends Toplevel
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 
   abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
   case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None) extends Node
 
-  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil) extends MemberDeclaration {
+  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil) extends MemberDeclaration {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) =
-      this(location, modifiers, name, args, returnType, block, Nil)
+      this(location, modifiers, name, args, returnType, block, Nil, Nil)
+    def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter]) =
+      this(location, modifiers, name, args, returnType, block, typeParameters, Nil)
   }
   case class FieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends MemberDeclaration
   case class DelegatedFieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression) extends MemberDeclaration
@@ -178,7 +187,7 @@ object AST {
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument]) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], superInterfaces: List[TypeNode] = Nil) extends TypeDeclaration
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)

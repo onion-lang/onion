@@ -24,6 +24,7 @@ object Modifier {
   final val PROTECTED = 256
   final val PRIVATE = 512
   final val FORWARDED = 1024
+  final val SEALED = 2048
 
   def check(modifier: Int, bitFlag: Int): Boolean = {
      (modifier & bitFlag) != 0
@@ -71,6 +72,10 @@ object Modifier {
 
   def isForwarded(modifier: Int): Boolean = {
      check(modifier, FORWARDED)
+  }
+
+  def isSealed(modifier: Int): Boolean = {
+     check(modifier, SEALED)
   }
 
 }

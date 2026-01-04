@@ -21,6 +21,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private val controlExpressionTyping = new ControlExpressionTyping(typing, this)
   def run(): Unit = runUnit()
 
+  def createEqualsForRef(lhs: Term, rhs: Term): Term =
+    operatorTyping.createEquals(BinaryTerm.Constants.EQUAL, lhs, rhs)
+
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
     val expressions = new Array[Term](nodes.length)
     var error: Boolean = false
@@ -120,6 +123,16 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       for(i <- 0 until arguments.length) {
         context.add(node.args(i).name, arguments(i))
       }
+
+      // Process default argument values
+      val argsWithDefaults = node.args.zipWithIndex.map { case (arg, i) =>
+        val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
+          typed(expr, context, arguments(i))
+        }
+        TypedAST.MethodArgument(arg.name, arguments(i), defaultTerm)
+      }.toArray
+      method.setArgumentsWithDefaults(argsWithDefaults)
+
       val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], method.returnType)
       method.setBlock(block)
       method.setFrame(context.getContextFrame)
@@ -196,6 +209,16 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     for(i <- 0 until arguments.length) {
       context.add(node.args(i).name, arguments(i))
     }
+
+    // Process default argument values
+    val argsWithDefaults = node.args.zipWithIndex.map { case (arg, i) =>
+      val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
+        typed(expr, context, arguments(i))
+      }
+      TypedAST.MethodArgument(arg.name, arguments(i), defaultTerm)
+    }.toArray
+    function.setArgumentsWithDefaults(argsWithDefaults)
+
     val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], function.returnType)
     function.setBlock(block)
     function.setFrame(context.getContextFrame)
@@ -533,6 +556,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typeStringInterpolation(node, context)
     case node: AST.SuperMethodCall =>
       typeSuperMethodCall(node, context, expected)
+    case node: AST.NamedArgument =>
+      // NamedArgumentはメソッド呼び出しのコンテキストで処理される
+      // ここでは内部の値を型付けして返す
+      typed(node.value, context, expected)
     case node: AST.BlockExpression =>
       controlExpressionTyping.typeBlockExpression(node, context)
     case node: AST.BreakExpression =>

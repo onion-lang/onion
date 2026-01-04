@@ -96,8 +96,41 @@ final class ControlFlowEmitter(
     gen.throwException()
 
   def emitTry(node: Try): Unit =
-    if (node.finallyStatement == null) {
-      // Simple try-catch without finally
+    // リソースの初期化
+    val resourceSlots = new Array[Int](node.resources.length)
+    for i <- node.resources.indices do
+      val (binding, init) = node.resources(i)
+      visitTerm(init)
+      val slot = gen.newLocal(asmType(binding.tp))
+      resourceSlots(i) = slot
+      gen.storeLocal(slot)
+
+    // リソースを逆順でclose()するコードを生成するヘルパー
+    def emitCloseResources(): Unit =
+      for i <- (node.resources.length - 1) to 0 by -1 do
+        val (binding, _) = node.resources(i)
+        val slot = resourceSlots(i)
+        // if (resource != null) resource.close()
+        val skipClose = gen.newLabel()
+        gen.loadLocal(slot)
+        gen.ifNull(skipClose)
+        gen.loadLocal(slot)
+        // AutoCloseableのclose()を呼び出し
+        val closeMethod = AsmType.getType(classOf[AutoCloseable]).getInternalName
+        gen.invokeInterface(
+          AsmType.getType(classOf[AutoCloseable]),
+          new org.objectweb.asm.commons.Method("close", "()V")
+        )
+        gen.visitLabel(skipClose)
+
+    // ユーザー定義のfinallyと組み合わせ
+    // Java spec: resources are closed before finally block
+    def emitFinallyWithResources(): Unit =
+      emitCloseResources()
+      if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+
+    if (node.resources.isEmpty && node.finallyStatement == null) {
+      // Simple try-catch without finally and resources
       val tryStart = gen.mark()
       visitStatement(node.tryStatement)
       val tryEnd = gen.mark()
@@ -116,13 +149,13 @@ final class ControlFlowEmitter(
 
       gen.visitLabel(endLabel)
     } else if (node.catchTypes.length == 0) {
-      // Simple try-finally without catch
+      // Try-finally (with or without resources)
       val tryStart = gen.mark()
       visitStatement(node.tryStatement)
       val tryEnd = gen.mark()
 
       // Normal completion: execute finally and jump to end
-      visitStatement(node.finallyStatement)
+      emitFinallyWithResources()
       val endLabel = gen.newLabel()
       gen.goTo(endLabel)
 
@@ -130,19 +163,19 @@ final class ControlFlowEmitter(
       gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
       val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
       gen.storeLocal(exSlot)
-      visitStatement(node.finallyStatement)
+      emitFinallyWithResources()
       gen.loadLocal(exSlot)
       gen.throwException()
 
       gen.visitLabel(endLabel)
     } else {
-      // Try-catch-finally: combine both patterns
+      // Try-catch-finally (with or without resources)
       val tryStart = gen.mark()
       visitStatement(node.tryStatement)
       val tryEnd = gen.mark()
 
       // Normal completion: execute finally and jump to end
-      visitStatement(node.finallyStatement)
+      emitFinallyWithResources()
       val endLabel = gen.newLabel()
       gen.goTo(endLabel)
 
@@ -153,15 +186,18 @@ final class ControlFlowEmitter(
         gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
         val slot = gen.newLocal(asmType(catchType.tp))
         gen.storeLocal(slot)
+        // Close resources before catch block (Java try-with-resources spec)
+        emitCloseResources()
         visitStatement(catchStmt)
-        visitStatement(node.finallyStatement)  // Execute finally after catch
+        // Execute user finally after catch (but resources already closed)
+        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
         gen.goTo(endLabel)
 
       // Catch-all handler for uncaught exceptions (finally + rethrow)
       gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
       val exSlot = gen.newLocal(AsmType.getType(classOf[Throwable]))
       gen.storeLocal(exSlot)
-      visitStatement(node.finallyStatement)
+      emitFinallyWithResources()
       gen.loadLocal(exSlot)
       gen.throwException()
 

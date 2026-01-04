@@ -134,8 +134,10 @@ private[compiler] object CapturedVariableCollector {
         visitTerm(thr.term)
 
       case tr: Try =>
+        tr.resources.foreach { case (_, init) => visitTerm(init) }
         visitStatement(tr.tryStatement)
         tr.catchStatements.foreach(visitStatement)
+        if (tr.finallyStatement != null) visitStatement(tr.finallyStatement)
 
       case _: Break | _: Continue | _: NOP =>
         ()

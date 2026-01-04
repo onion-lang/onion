@@ -18,7 +18,7 @@ class AsmCodeGenerationVisitor(
 ) extends TypedASTVisitor[Unit]:
   
   private val loops = new LoopContext
-  private val controlFlow = new ControlFlowEmitter(gen, loops, asmType, visitTerm, visitStatement)
+  private val controlFlow = new ControlFlowEmitter(gen, loops, localVars, asmType, visitTerm, visitStatement)
   private val termEmitter = new TermEmitter(gen, asmType, visitTerm)
 
   // Track last emitted line to avoid duplicate visitLineNumber calls

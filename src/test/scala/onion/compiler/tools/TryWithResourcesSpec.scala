@@ -168,5 +168,78 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("closed") == result)
     }
+
+    it("should allow calling methods on resource variable") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class MyResource <: AutoCloseable {
+          |  var name: String;
+          |public:
+          |  def this(n: String) {
+          |    this.name = n;
+          |  }
+          |  def getName(): String {
+          |    return this.name;
+          |  }
+          |  def close(): Unit {
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    try (val res = new MyResource("hello")) {
+          |      return res.getName();
+          |    }
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("hello") == result)
+    }
+
+    it("should close multiple resources in reverse order") {
+      val result = shell.run(
+        """
+          |import { java.lang.AutoCloseable; }
+          |class Resource1 <: AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("1,");
+          |  }
+          |}
+          |class Resource2 <: AutoCloseable {
+          |  var log: StringBuilder;
+          |public:
+          |  def this(l: StringBuilder) {
+          |    this.log = l;
+          |  }
+          |  def close(): Unit {
+          |    this.log.append("2,");
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val log = new StringBuilder();
+          |    try (val r1 = new Resource1(log); val r2 = new Resource2(log)) {
+          |      log.append("try,");
+          |    }
+          |    return log.toString();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      // Resources should be closed in reverse order: r2 first, then r1
+      assert(Shell.Success("try,2,1,") == result)
+    }
   }
 }

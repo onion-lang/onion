@@ -7,6 +7,7 @@ import org.objectweb.asm.commons.GeneratorAdapter
 final class ControlFlowEmitter(
   gen: GeneratorAdapter,
   loops: LoopContext,
+  localVars: LocalVarContext,
   asmType: Type => AsmType,
   visitTerm: Term => Unit,
   visitStatement: ActionStatement => Unit
@@ -101,7 +102,9 @@ final class ControlFlowEmitter(
     for i <- node.resources.indices do
       val (binding, init) = node.resources(i)
       visitTerm(init)
-      val slot = gen.newLocal(asmType(binding.tp))
+      // Use getOrAllocateSlot to register the mapping from typing index to bytecode slot
+      // This allows user code in the try block to reference the resource variable
+      val slot = localVars.getOrAllocateSlot(binding.index, asmType(binding.tp))
       resourceSlots(i) = slot
       gen.storeLocal(slot)
 

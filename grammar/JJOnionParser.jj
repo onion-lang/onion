@@ -983,10 +983,10 @@ AST.ThrowExpression throw_expression() :{Token t; AST.Expression e;}{
 }
 
 AST.LocalVariableDeclaration resource_decl() :{
-  Token t; AST.TypeNode type = null; AST.Expression init;
+  Token t; Token name; AST.TypeNode type = null; AST.Expression init;
 }{
-  t="val" eols() <ID> [":" type=type()] "=" eols() init=term()
-  {return new AST.LocalVariableDeclaration(p(t), 0, c(token), type, init);}
+  t="val" eols() name=<ID> [":" type=type()] "=" eols() init=term()
+  {return new AST.LocalVariableDeclaration(p(t), 0, c(name), type, init);}
 }
 
 List<AST.LocalVariableDeclaration> resource_list() :{

@@ -205,8 +205,10 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     case node: AST.SynchronizedExpression =>
       context.openScope {
         val lock = typed(node.condition, context).getOrElse(null)
+        if (lock != null && lock.isBasicType) {
+          report(INCOMPATIBLE_TYPE, node.condition, load("java.lang.Object"), lock.`type`)
+        }
         val block = translate(node.block, context)
-        report(UNIMPLEMENTED_FEATURE, node)
         new Synchronized(node.location, lock, block)
       }
     case node: AST.ThrowExpression =>

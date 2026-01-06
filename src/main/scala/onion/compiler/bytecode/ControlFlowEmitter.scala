@@ -72,24 +72,31 @@ final class ControlFlowEmitter(
     gen.returnValue()
 
   def emitSynchronized(node: Synchronized): Unit =
+    // Store lock object in a local variable to avoid re-evaluating the expression
+    val lockSlot = gen.newLocal(AsmType.getType(classOf[Object]))
     visitTerm(node.term)
+    gen.storeLocal(lockSlot)
+
+    gen.loadLocal(lockSlot)
     gen.monitorEnter()
 
     val tryStart = gen.mark()
     visitStatement(node.statement)
     val tryEnd = gen.mark()
 
-    visitTerm(node.term)
+    // Normal exit: release monitor and jump to end
+    gen.loadLocal(lockSlot)
     gen.monitorExit()
     val endLabel = gen.newLabel()
     gen.goTo(endLabel)
 
-    val handlerStart = gen.mark()
-    visitTerm(node.term)
+    // Exception handler: release monitor and rethrow
+    // catchException creates label and registers handler at current position
+    gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+    gen.loadLocal(lockSlot)
     gen.monitorExit()
     gen.throwException()
 
-    gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
     gen.visitLabel(endLabel)
 
   def emitThrow(node: Throw): Unit =

@@ -1021,11 +1021,41 @@ AST.IfExpression if_statement() :{Token t; AST.Expression e; AST.BlockExpression
 }
 
 AST.Pattern case_pattern() :{
-  Token t; AST.Expression e; AST.TypeNode ty;
+  AST.Pattern p; AST.Expression guard = null;
 }{
-  LOOKAHEAD(2, id() "is")
+  p=simple_pattern() ["when" guard=logical_or() { p = new AST.GuardedPattern(p.location(), p, guard); }]
+  { return p; }
+}
+
+AST.Pattern simple_pattern() :{
+  Token t; AST.Expression e; AST.TypeNode ty;
+  List<AST.Pattern> bindings;
+}{
+  LOOKAHEAD({getToken(1).kind == ID && getToken(1).image.equals("_")})
+  t=<ID> { return new AST.WildcardPattern(p(t)); }
+| LOOKAHEAD(2, id() "(")
+  t=id() "(" bindings=destructuring_bindings() ")" { return new AST.DestructuringPattern(p(t), c(t), bindings); }
+| LOOKAHEAD(2, id() "is")
   t=id() "is" ty=type() { return new AST.TypePattern(p(t), c(t), ty); }
 | e=term() { return new AST.ExpressionPattern(e); }
+}
+
+// Patterns allowed inside destructuring: binding name, wildcard, or nested destructuring
+AST.Pattern destructuring_field_pattern() :{
+  Token t; List<AST.Pattern> bindings;
+}{
+  LOOKAHEAD({getToken(1).kind == ID && getToken(1).image.equals("_")})
+  t=<ID> { return new AST.WildcardPattern(p(t)); }
+| LOOKAHEAD(2, id() "(")
+  t=id() "(" bindings=destructuring_bindings() ")" { return new AST.DestructuringPattern(p(t), c(t), bindings); }
+| t=<ID> { return new AST.BindingPattern(p(t), c(t)); }
+}
+
+List<AST.Pattern> destructuring_bindings() :{
+  AST.Pattern pat; ArrayBuffer<AST.Pattern> bindings = new ArrayBuffer<AST.Pattern>();
+}{
+  [pat=destructuring_field_pattern() { append(bindings, pat); } ("," pat=destructuring_field_pattern() { append(bindings, pat); })*]
+  { return toList(bindings); }
 }
 
 AST.SelectExpression select_statement() :{

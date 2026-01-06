@@ -47,5 +47,7 @@ object SemanticError {
   case object UNKNOWN_PARAMETER_NAME extends SemanticError(43)
   case object DUPLICATE_ARGUMENT extends SemanticError(44)
   case object POSITIONAL_AFTER_NAMED extends SemanticError(45)
+  case object WRONG_BINDING_COUNT extends SemanticError(46)
+  case object NOT_A_RECORD_TYPE extends SemanticError(47)
 }
 sealed abstract class SemanticError(code: Int)

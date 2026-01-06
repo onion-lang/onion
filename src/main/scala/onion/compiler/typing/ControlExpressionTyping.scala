@@ -10,6 +10,19 @@ import scala.collection.mutable.Buffer
 final class ControlExpressionTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
+  // Pattern binding info for different pattern types
+  sealed trait PatternBindingInfo
+  case object NoBindings extends PatternBindingInfo
+  case class SingleBinding(name: String, tp: Type) extends PatternBindingInfo
+  // For nested patterns, we store the access path from root to each binding
+  case class AccessStep(castType: ClassType, getter: Method)
+  case class BindingEntry(name: String, tp: Type, accessPath: List[AccessStep])
+  case class MultiBindings(rootType: ClassType, bindings: List[BindingEntry], nestedConditions: List[Term] = Nil) extends PatternBindingInfo
+
+  // Guard info - stores both AST (for validation) and typed term (for code generation)
+  // The typed term is created in the same scope where the pattern bindings are set up
+  case class GuardInfo(guardAst: AST.Expression, guardTerm: Term = null)
+
   def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
     context.openScope {
       if (node.elements.isEmpty) {
@@ -94,27 +107,48 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     val caseConditions = Buffer[Term]()
     val caseTerms = Buffer[Term]()
     val caseNodes = Buffer[AST.BlockExpression]()
-    val caseBindings = Buffer[Option[ClosureLocalBinding]]()
+    // Store binding info along with created ClosureLocalBindings for code generation
+    val caseBindingData = Buffer[(PatternBindingInfo, List[ClosureLocalBinding], Option[GuardInfo])]()
     val matchedTypes = Buffer[Type]() // Track matched types for exhaustiveness check
+    var hasWildcardPattern = false // Track if any pattern has a wildcard
 
     var failed = false
     val cases = node.cases.iterator
     while (cases.hasNext && !failed) {
       val (patterns, thenBlock) = cases.next()
-      val (cond, typePatternInfo) = processPatterns(patterns.toArray, condition.`type`, bind, context)
+      val (cond, bindingInfo, hasWildcard, guardInfo) = processPatterns(patterns.toArray, condition.`type`, bind, context)
+      if (hasWildcard) hasWildcardPattern = true
       if (cond == null) {
         failed = true
       } else {
-        caseConditions += cond
+        // Combine base condition with nested conditions if any
+        val combinedCond = bindingInfo match {
+          case MultiBindings(_, _, nestedConds) if nestedConds.nonEmpty =>
+            nestedConds.foldLeft(cond) { (acc, nested) =>
+              new BinaryTerm(BinaryTerm.Constants.LOGICAL_AND, BasicType.BOOLEAN, acc, nested)
+            }
+          case _ => cond
+        }
+        caseConditions += combinedCond
 
-        // For type patterns, add the bound variable to context before typing the block
-        typePatternInfo match {
-          case Some((varName, varType)) =>
+        // Handle different binding types
+        bindingInfo match {
+          case SingleBinding(varName, varType) =>
             matchedTypes += varType // Track for exhaustiveness
             context.openScope {
               val varIndex = context.add(varName, varType, isMutable = false)
               val varBind = new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
-              caseBindings += Some(varBind)
+              // Type the guard in the same scope where the binding is set up
+              val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
+                val guardTermOpt = typed(guardAst, context)
+                val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
+                GuardInfo(guardAst, guardTerm)
+              }
+              caseBindingData += ((bindingInfo, List(varBind), typedGuardInfo))
+              // A type pattern without guard that matches the condition type is a catch-all
+              if (typedGuardInfo.isEmpty && TypeRules.isSuperType(varType, condition.`type`)) {
+                hasWildcardPattern = true
+              }
               typeBlockExpression(thenBlock, context) match {
                 case Some(term) =>
                   caseTerms += term
@@ -122,8 +156,42 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
                 case None => failed = true
               }
             }
-          case None =>
-            caseBindings += None
+
+          case MultiBindings(recordType, bindings, _) =>
+            matchedTypes += recordType // Track for exhaustiveness
+            context.openScope {
+              val varBinds = bindings.map { case BindingEntry(varName, varType, _) =>
+                val varIndex = context.add(varName, varType, isMutable = false)
+                new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
+              }
+              // Type the guard in the same scope where the bindings are set up
+              val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
+                val guardTermOpt = typed(guardAst, context)
+                val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
+                GuardInfo(guardAst, guardTerm)
+              }
+              caseBindingData += ((bindingInfo, varBinds, typedGuardInfo))
+              // A destructuring pattern without guard that matches the condition type is a catch-all
+              // (bindings don't affect whether the pattern is exhaustive - Box(v) catches all Box instances)
+              if (typedGuardInfo.isEmpty && TypeRules.isSuperType(recordType, condition.`type`)) {
+                hasWildcardPattern = true
+              }
+              typeBlockExpression(thenBlock, context) match {
+                case Some(term) =>
+                  caseTerms += term
+                  caseNodes += thenBlock
+                case None => failed = true
+              }
+            }
+
+          case NoBindings =>
+            // Type the guard (no bindings needed)
+            val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
+              val guardTermOpt = typed(guardAst, context)
+              val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
+              GuardInfo(guardAst, guardTerm)
+            }
+            caseBindingData += ((NoBindings, Nil, typedGuardInfo))
             typeBlockExpression(thenBlock, context) match {
               case Some(term) =>
                 caseTerms += term
@@ -136,8 +204,8 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     if (failed) return None
 
     // Exhaustiveness check for sealed types
-    var isExhaustive = false
-    if (node.elseBlock == null && matchedTypes.nonEmpty) {
+    var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
+    if (node.elseBlock == null && !hasWildcardPattern && matchedTypes.nonEmpty) {
       condition.`type` match {
         case classDef: ClassDefinition if classDef.isSealed =>
           val sealedSubtypes = classDef.sealedSubtypes
@@ -178,21 +246,6 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       if (resultType.isBottomType || resultType == BasicType.VOID) null
       else new ClosureLocalBinding(0, context.add(context.newName, resultType, isMutable = true), resultType, isMutable = true)
 
-    val caseStatements = caseTerms.indices.map { i =>
-      val term = caseTerms(i)
-      val baseStmt = if (resultVar == null) termToStatement(caseNodes(i), term)
-                     else assignBranch(caseNodes(i), term, resultVar, resultType)
-
-      // For type patterns, wrap the statement with variable binding
-      caseBindings(i) match {
-        case Some(varBind) =>
-          val cast = new AsInstanceOf(new RefLocal(bind), varBind.tp)
-          val setVar = new ExpressionActionStatement(new SetLocal(varBind, cast))
-          new StatementBlock(caseNodes(i).location, setVar, baseStmt)
-        case None => baseStmt
-      }
-    }
-
     val elseStatement =
       if (node.elseBlock == null && isExhaustive && resultVar != null) {
         // For exhaustive patterns, add unreachable fallback to satisfy JVM verifier
@@ -206,12 +259,70 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         assignBranch(node.elseBlock, elseTerm, resultVar, resultType)
       }
 
-    var branches: ActionStatement = elseStatement
-    if (caseStatements.isEmpty && branches == null) {
-      branches = new NOP(node.location)
+    // Build case statements using nested if-else structure
+    // Guards are checked AFTER bindings are set up, with fall-through to remaining cases on guard failure
+    def buildCaseBranches(caseIndex: Int, fallback: ActionStatement): ActionStatement = {
+      if (caseIndex >= caseTerms.length) {
+        fallback
+      } else {
+        val term = caseTerms(caseIndex)
+        val baseStmt = if (resultVar == null) termToStatement(caseNodes(caseIndex), term)
+                       else assignBranch(caseNodes(caseIndex), term, resultVar, resultType)
+
+        val (bindingInfo, varBinds, guardInfo) = caseBindingData(caseIndex)
+
+        // Build the inner body (after bindings are set up)
+        val innerBody: ActionStatement = guardInfo match {
+          case Some(GuardInfo(_, guardTerm)) if guardTerm != null =>
+            // Guard check: if guard passes, execute body; else fall through to remaining cases
+            val restOfCases = buildCaseBranches(caseIndex + 1, fallback)
+            new IfStatement(guardTerm, baseStmt, restOfCases)
+          case _ =>
+            baseStmt
+        }
+
+        val caseBody: ActionStatement = bindingInfo match {
+          case SingleBinding(_, varType) =>
+            val varBind = varBinds.head
+            val cast = new AsInstanceOf(new RefLocal(bind), varType)
+            val setVar = new ExpressionActionStatement(new SetLocal(varBind, cast))
+            new StatementBlock(caseNodes(caseIndex).location, setVar, innerBody)
+
+          case MultiBindings(recordType, bindings, nestedConditions) =>
+            val castValue = new AsInstanceOf(new RefLocal(bind), recordType)
+            val castVar = new ClosureLocalBinding(0, context.add(context.newName, recordType, isMutable = false), recordType, isMutable = false)
+            val setCast = new ExpressionActionStatement(new SetLocal(castVar, castValue))
+
+            // Build accessor for each binding following the access path
+            def buildAccessor(base: Term, path: List[AccessStep]): Term = path match {
+              case Nil => base
+              case AccessStep(castType, getter) :: rest =>
+                val cast = new AsInstanceOf(base, castType)
+                if (getter == null) buildAccessor(cast, rest)
+                else {
+                  val call = new Call(cast, getter, Array.empty)
+                  buildAccessor(call, rest)
+                }
+            }
+
+            val bindingStmts = varBinds.zip(bindings).map { case (varBind, BindingEntry(_, _, accessPath)) =>
+              val accessor = buildAccessor(new RefLocal(bind), accessPath)
+              new ExpressionActionStatement(new SetLocal(varBind, accessor))
+            }
+            new StatementBlock(caseNodes(caseIndex).location, (setCast +: bindingStmts :+ innerBody)*)
+
+          case NoBindings => innerBody
+        }
+
+        // Build: if (patternCond) { caseBody } else { restOfCases }
+        val restOfCases = buildCaseBranches(caseIndex + 1, fallback)
+        new IfStatement(caseConditions(caseIndex), caseBody, restOfCases)
+      }
     }
-    for (i <- caseStatements.indices.reverse) {
-      branches = new IfStatement(caseConditions(i), caseStatements(i), branches)
+
+    val branches: ActionStatement = {
+      val fallback = if (elseStatement == null && caseTerms.isEmpty) new NOP(node.location) else elseStatement
+      buildCaseBranches(0, fallback)
     }
 
     val init = new ExpressionActionStatement(new SetLocal(0, index, condition.`type`, condition))
@@ -224,20 +335,27 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     }
   }
 
-  /** Returns (condition, optional type pattern info: (name, type)) */
-  private def processPatterns(patterns: Array[AST.Pattern], conditionType: Type, bind: ClosureLocalBinding, context: LocalContext): (Term, Option[(String, Type)]) = {
-    var typePatternInfo: Option[(String, Type)] = None
+  /** Returns (condition, pattern binding info, hasWildcard, optional guard info) */
+  private def processPatterns(patterns: Array[AST.Pattern], conditionType: Type, bind: ClosureLocalBinding, context: LocalContext): (Term, PatternBindingInfo, Boolean, Option[GuardInfo]) = {
+    var bindingInfo: PatternBindingInfo = NoBindings
+    var hasWildcard = false
+    var guardInfo: Option[GuardInfo] = None
 
     // Process each pattern and combine with OR
     val conditions = patterns.map {
+      case AST.WildcardPattern(loc) =>
+        // Wildcard matches everything
+        hasWildcard = true
+        new BoolValue(loc, true)
+
       case AST.ExpressionPattern(expr) =>
         val exprOpt = typed(expr, context)
         val e = exprOpt.getOrElse(null)
-        if (e == null) return (null, None)
+        if (e == null) return (null, NoBindings, false, None)
 
         if (!TypeRules.isAssignable(conditionType, e.`type`)) {
           report(INCOMPATIBLE_TYPE, expr, conditionType, e.`type`)
-          return (null, None)
+          return (null, NoBindings, false, None)
         }
 
         val normalizedExpr =
@@ -253,30 +371,181 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
       case tp @ AST.TypePattern(_, name, typeRef) =>
         val mappedType = mapFrom(typeRef)
-        if (mappedType == null) return (null, None)
+        if (mappedType == null) return (null, NoBindings, false, None)
 
         if (!mappedType.isObjectType) {
           report(INCOMPATIBLE_TYPE, tp, table_.rootClass, mappedType)
-          return (null, None)
+          return (null, NoBindings, false, None)
         }
 
         // Create instanceof check
         val instanceOfCheck = new InstanceOf(new RefLocal(bind), mappedType.asInstanceOf[ObjectType])
 
         // Store type pattern info (name and type) - variable will be registered later
-        typePatternInfo = Some((name, mappedType))
+        bindingInfo = SingleBinding(name, mappedType)
 
         instanceOfCheck
+
+      case dp @ AST.DestructuringPattern(_, constructor, fieldPatterns) =>
+        // Look up the record type by constructor name
+        val recordType = load(constructor)
+        if (recordType == null) {
+          report(NOT_A_RECORD_TYPE, dp, constructor)
+          return (null, NoBindings, false, None)
+        }
+
+        val classDef = recordType match {
+          case cd: ClassDefinition => cd
+          case _ =>
+            report(NOT_A_RECORD_TYPE, dp, constructor)
+            return (null, NoBindings, false, None)
+        }
+
+        // Get fields in order (records store fields in insertion order)
+        val fields = classDef.fields
+        val fieldCount = fields.length
+
+        // Check binding count matches field count
+        if (fieldPatterns.length != fieldCount) {
+          report(WRONG_BINDING_COUNT, dp, Int.box(fieldCount), Int.box(fieldPatterns.length), constructor)
+          return (null, NoBindings, false, None)
+        }
+
+        // Create instanceof check
+        val instanceOfCheck = new InstanceOf(new RefLocal(bind), recordType.asInstanceOf[ObjectType])
+
+        // Process each field pattern recursively
+        val bindingEntries = scala.collection.mutable.ArrayBuffer[BindingEntry]()
+        val nestedConditions = scala.collection.mutable.ArrayBuffer[Term]()
+        val rootAccessPath = List(AccessStep(recordType.asInstanceOf[ClassType], null)) // placeholder for root cast
+
+        for ((fieldPattern, field) <- fieldPatterns.zip(fields)) {
+          val getters = classDef.methods(field.name)
+          if (getters.isEmpty) {
+            report(NOT_A_RECORD_TYPE, dp, constructor)
+            return (null, NoBindings, false, None)
+          }
+          val getter = getters.find(m => m.arguments.isEmpty).getOrElse(getters.head)
+          val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))
+
+          fieldPattern match {
+            case AST.WildcardPattern(_) =>
+              // Skip wildcard - no binding created
+
+            case AST.BindingPattern(_, name) =>
+              // Simple binding
+              bindingEntries += BindingEntry(name, field.`type`, currentPath)
+
+            case nested @ AST.DestructuringPattern(_, nestedCtor, nestedFieldPatterns) =>
+              // Nested destructuring pattern - recurse
+              val nestedType = load(nestedCtor)
+              if (nestedType == null) {
+                report(NOT_A_RECORD_TYPE, nested, nestedCtor)
+                return (null, NoBindings, false, None)
+              }
+
+              val nestedClassDef = nestedType match {
+                case cd: ClassDefinition => cd
+                case _ =>
+                  report(NOT_A_RECORD_TYPE, nested, nestedCtor)
+                  return (null, NoBindings, false, None)
+              }
+
+              val nestedFields = nestedClassDef.fields
+              if (nestedFieldPatterns.length != nestedFields.length) {
+                report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(nestedFieldPatterns.length), nestedCtor)
+                return (null, NoBindings, false, None)
+              }
+
+              // Build accessor for nested type check: ((RootType)bind).getter() instanceof NestedType
+              val rootCast = new AsInstanceOf(new RefLocal(bind), recordType.asInstanceOf[ObjectType])
+              val fieldAccess = new Call(rootCast, getter, Array.empty)
+              val nestedInstanceOf = new InstanceOf(fieldAccess, nestedType.asInstanceOf[ObjectType])
+              nestedConditions += nestedInstanceOf
+
+              // Process nested field patterns
+              for ((nestedFieldPattern, nestedField) <- nestedFieldPatterns.zip(nestedFields)) {
+                val nestedGetters = nestedClassDef.methods(nestedField.name)
+                if (nestedGetters.isEmpty) {
+                  report(NOT_A_RECORD_TYPE, nested, nestedCtor)
+                  return (null, NoBindings, false, None)
+                }
+                val nestedGetter = nestedGetters.find(m => m.arguments.isEmpty).getOrElse(nestedGetters.head)
+                val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
+
+                nestedFieldPattern match {
+                  case AST.WildcardPattern(_) =>
+                    // Skip
+
+                  case AST.BindingPattern(_, name) =>
+                    bindingEntries += BindingEntry(name, nestedField.`type`, nestedPath)
+
+                  case _ =>
+                    // Deeper nesting - for now, report error (could support more levels)
+                    report(NOT_A_RECORD_TYPE, nested, "deeply nested patterns not yet supported")
+                    return (null, NoBindings, false, None)
+                }
+              }
+
+            case other =>
+              // Other patterns not supported in destructuring position
+              report(NOT_A_RECORD_TYPE, dp, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
+              return (null, NoBindings, false, None)
+          }
+        }
+
+        bindingInfo = MultiBindings(recordType.asInstanceOf[ClassType], bindingEntries.toList, nestedConditions.toList)
+        instanceOfCheck
+
+      case AST.GuardedPattern(loc, innerPattern, guard) =>
+        // Process the inner pattern recursively
+        val (innerCond, innerBindingInfo, innerHasWildcard, _) = processPatterns(Array(innerPattern), conditionType, bind, context)
+        if (innerCond == null) return (null, NoBindings, false, None)
+
+        // Inherit binding info from inner pattern
+        bindingInfo = innerBindingInfo
+        if (innerHasWildcard) hasWildcard = true
+
+        // Type the guard expression in a temporary scope to verify it's valid and boolean
+        // We need to temporarily add bindings to context for type checking
+        val guardTermOpt = innerBindingInfo match {
+          case SingleBinding(varName, varType) =>
+            context.openScope {
+              context.add(varName, varType, isMutable = false)
+              typed(guard, context)
+            }
+          case MultiBindings(recordType, bindings, _) =>
+            context.openScope {
+              bindings.foreach { case BindingEntry(varName, varType, _) =>
+                context.add(varName, varType, isMutable = false)
+              }
+              typed(guard, context)
+            }
+          case NoBindings =>
+            typed(guard, context)
+        }
+
+        val guardTerm = guardTermOpt.getOrElse(null)
+        if (guardTerm == null) return (null, NoBindings, false, None)
+
+        // Ensure guard is boolean
+        val checkedGuard = ensureBoolean(guard, guardTerm)
+        if (checkedGuard == null) return (null, NoBindings, false, None)
+
+        // Store the AST expression - it will be re-typed with actual bindings later
+        // The guard check will happen after bindings are set up at code generation time
+        guardInfo = Some(GuardInfo(guard))
+        innerCond
     }
 
-    if (conditions.isEmpty) return (null, None)
+    if (conditions.isEmpty) return (null, NoBindings, false, None)
 
     // Combine conditions with OR
     val combined = conditions.reduceLeft { (acc, cond) =>
       new BinaryTerm(BinaryTerm.Constants.LOGICAL_OR, BasicType.BOOLEAN, acc, cond)
     }
 
-    (combined, typePatternInfo)
+    (combined, bindingInfo, hasWildcard, guardInfo)
   }
 
   def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] = {

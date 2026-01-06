@@ -135,6 +135,18 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, "名前付き引数の後に位置引数を使用することはできません")
   }
 
+  private def reportWrongBindingCount(position: Location, items: Array[AnyRef]): Unit = {
+    val expected = items(0).asInstanceOf[Int]
+    val actual = items(1).asInstanceOf[Int]
+    val typeName = items(2).asInstanceOf[String]
+    problem(position, s"デストラクチャリングパターンのバインディング数が一致しません。型 $typeName は $expected 個のフィールドがありますが、$actual 個のバインディングが指定されています。")
+  }
+
+  private def reportNotARecordType(position: Location, items: Array[AnyRef]): Unit = {
+    val typeName = items(0).asInstanceOf[String]
+    problem(position, s"$typeName はデストラクチャリングできないか、存在しない型です。")
+  }
+
   private def reportVariableNotFound(position: Location, items: Array[AnyRef]): Unit = {
     problem(position, format(message("error.semantic.variableNotFound"), items(0).asInstanceOf[String]))
   }
@@ -396,6 +408,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportDuplicateArgument(position, items)
       case SemanticError.POSITIONAL_AFTER_NAMED =>
         reportPositionalAfterNamed(position, items)
+      case SemanticError.WRONG_BINDING_COUNT =>
+        reportWrongBindingCount(position, items)
+      case SemanticError.NOT_A_RECORD_TYPE =>
+        reportNotARecordType(position, items)
     }
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)

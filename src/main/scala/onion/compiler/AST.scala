@@ -151,6 +151,11 @@ object AST {
   abstract sealed class Pattern extends Node
   case class ExpressionPattern(expr: Expression) extends Pattern { def location: Location = expr.location }
   case class TypePattern(location: Location, name: String, typeRef: TypeNode) extends Pattern
+  case class WildcardPattern(location: Location) extends Pattern
+  case class DestructuringPattern(location: Location, constructor: String, bindings: List[Pattern]) extends Pattern
+  // BindingPattern is a simple variable binding (used inside destructuring)
+  case class BindingPattern(location: Location, name: String) extends Pattern
+  case class GuardedPattern(location: Location, pattern: Pattern, guard: Expression) extends Pattern
 
   abstract sealed class CompoundExpression extends Expression
   case class BlockExpression(location: Location, elements: List[CompoundExpression]) extends CompoundExpression

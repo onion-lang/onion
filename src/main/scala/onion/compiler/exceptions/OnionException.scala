@@ -8,16 +8,12 @@
 package onion.compiler.exceptions
 
 /**
- * This class represents an exception while script is running.
+ * Base exception class for all Onion compiler and runtime exceptions.
  *
  * @author Kota Mizushima
- *
  */
-class ScriptException(message: String, cause: Throwable) extends OnionException(message, cause) {
-  /**
-   * @param cause
-   */
-  def this(cause: Throwable) = {
-    this(if (cause != null) cause.getMessage else "Script execution failed", cause)
-  }
+abstract class OnionException(message: String, cause: Throwable) extends RuntimeException(message, cause) {
+  def this(message: String) = this(message, null)
+  def this(cause: Throwable) = this(if (cause != null) cause.getMessage else null, cause)
+  def this() = this(null, null)
 }

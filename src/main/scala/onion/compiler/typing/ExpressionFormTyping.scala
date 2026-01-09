@@ -16,6 +16,9 @@ final class ExpressionFormTyping(private val typing: Typing, private val body: T
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] =
     constructionTyping.typeNewArray(node, context)
 
+  def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
+    constructionTyping.typeNewArrayWithValues(node, context)
+
   def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] =
     constructionTyping.typeNewObject(node, context)
 

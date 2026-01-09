@@ -122,6 +122,7 @@ object AST {
   case class MultiplicationAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("*=")
   case class Negate(location: Location, term: Expression) extends UnaryExpression("-")
   case class NewArray(location: Location, typeRef: TypeNode, args: List[Expression]) extends Expression
+  case class NewArrayWithValues(location: Location, typeRef: TypeNode, values: List[Expression]) extends Expression
   case class NewObject(location: Location, typeRef: TypeNode, args: List[Expression]) extends Expression
   case class Not(location: Location, term: Expression) extends UnaryExpression("!")
   case class NotEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("!=")

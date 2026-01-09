@@ -14,7 +14,7 @@ import collection.mutable.HashMap
  * @author Kota Mizushima
  *
  */
-final object Symbol {
+object Symbol {
   private val symbols = new HashMap[String, Symbol]
   def apply(name: String): Symbol = {
     symbols.get(name) match {

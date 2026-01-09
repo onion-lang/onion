@@ -171,7 +171,7 @@ class ScriptRunner {
         }
         value match {
           case Some(v) if v > 0 => Some(v)
-          case None =>
+          case Some(_) | None =>
             err.println(Message("error.command.requireNaturalNumber", MAX_ERROR))
             None
         }

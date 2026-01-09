@@ -35,25 +35,46 @@ object CompilationReporter {
         builder.append(s"$errorCodePrefix${error.message}")
       case Some(sourceFile) =>
         val lineNumber = locationOpt.map(_.line).getOrElse(0)
-        val lineNumText = if (lineNumber > 0) Integer.toString(lineNumber) else ""
+        val columnNumber = locationOpt.map(_.column).getOrElse(0)
+        val locationText = (lineNumber, columnNumber) match {
+          case (l, c) if l > 0 && c > 0 => s"$l:$c"
+          case (l, _) if l > 0 => l.toString
+          case _ => ""
+        }
         val lineText = locationOpt.flatMap(loc => readSourceLine(sourceFile, loc.line)).getOrElse("")
 
-        builder.append(s"$sourceFile:$lineNumText: $errorCodePrefix${error.message}")
+        // Header: file:line:column: [ECODE] message
+        builder.append(s"$sourceFile:$locationText: $errorCodePrefix${error.message}")
         builder.append(Systems.lineSeparator)
-        builder.append("\t\t")
-        builder.append(lineText)
-        builder.append(Systems.lineSeparator)
-        locationOpt.foreach { loc =>
-          builder.append("\t\t")
-          builder.append(cursorAt(loc.column))
+
+        // Source line with line number prefix
+        if (lineText.nonEmpty && lineNumber > 0) {
+          val lineNumWidth = lineNumber.toString.length
+          val prefix = s"  $lineNumber | "
+          builder.append(prefix)
+          builder.append(lineText)
+          builder.append(Systems.lineSeparator)
+
+          // Underline for error span
+          locationOpt.foreach { loc =>
+            val indentPrefix = " " * (lineNumWidth + 2) + " | "
+            builder.append(indentPrefix)
+            builder.append(underlineAt(loc))
+          }
         }
     }
     builder.toString
   }
 
-  private def cursorAt(column: Int): String = {
-    val safeColumn = max(column, 1)
-    " " * (safeColumn - 1) + "^"
+  private def underlineAt(loc: Location): String = {
+    val safeColumn = max(loc.column, 1)
+    val underlineLength = loc.spanLength
+    val spaces = " " * (safeColumn - 1)
+    if (underlineLength > 1) {
+      spaces + "~" * underlineLength
+    } else {
+      spaces + "^"
+    }
   }
 
   private def readSourceLine(sourceFile: String, lineNumber: Int): Option[String] = {

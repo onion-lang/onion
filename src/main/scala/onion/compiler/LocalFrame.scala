@@ -78,10 +78,9 @@ class LocalFrame(val parent: LocalFrame) {
   }
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
-    for(binding <- scope.get(name)) {
-      return new ClosureLocalBinding(0, binding.index, binding.tp, binding.isMutable, binding.isBoxed)
-    }
-    null
+    scope.get(name).map { binding =>
+      new ClosureLocalBinding(0, binding.index, binding.tp, binding.isMutable, binding.isBoxed)
+    }.orNull
   }
 
   /**

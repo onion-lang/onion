@@ -33,6 +33,7 @@ trait TypedASTVisitor[T]:
   def visitSetField(node: SetField): T
   def visitNewObject(node: NewObject): T
   def visitNewArray(node: NewArray): T
+  def visitNewArrayWithValues(node: NewArrayWithValues): T
   def visitNullValue(node: NullValue): T
   def visitShortValue(node: ShortValue): T
   def visitRefStaticField(node: RefStaticField): T
@@ -84,6 +85,7 @@ trait TypedASTVisitor[T]:
     case n: SetField => visitSetField(n)
     case n: NewObject => visitNewObject(n)
     case n: NewArray => visitNewArray(n)
+    case n: NewArrayWithValues => visitNewArrayWithValues(n)
     case n: NullValue => visitNullValue(n)
     case n: ShortValue => visitShortValue(n)
     case n: RefStaticField => visitRefStaticField(n)
@@ -141,6 +143,7 @@ abstract class DefaultTypedASTVisitor[T] extends TypedASTVisitor[T]:
   override def visitSetField(node: SetField): T = defaultValue
   override def visitNewObject(node: NewObject): T = defaultValue
   override def visitNewArray(node: NewArray): T = defaultValue
+  override def visitNewArrayWithValues(node: NewArrayWithValues): T = defaultValue
   override def visitNullValue(node: NullValue): T = defaultValue
   override def visitShortValue(node: ShortValue): T = defaultValue
   override def visitRefStaticField(node: RefStaticField): T = defaultValue

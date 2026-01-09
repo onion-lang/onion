@@ -278,6 +278,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] =
     expressionFormTyping.typeNewArray(node, context)
 
+  def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
+    expressionFormTyping.typeNewArrayWithValues(node, context)
+
   def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] =
     expressionFormTyping.typeNewObject(node, context)
 
@@ -551,6 +554,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typeUnaryNumeric(node, "-", MINUS, context)
     case node: AST.NewArray =>
       typeNewArray(node, context)
+    case node: AST.NewArrayWithValues =>
+      typeNewArrayWithValues(node, context)
     case node: AST.NewObject =>
       typeNewObject(node, context)
     case node@AST.Not(loc, target) =>

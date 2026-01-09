@@ -156,6 +156,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
   def load(name: String): ClassType = table_.load(name)
+  /** Option-returning version of load for safer null handling */
+  def loadOpt(name: String): Option[ClassType] = Option(table_.load(name))
   def loadTopClass: ClassType = table_.load(topClass)
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
@@ -171,9 +173,15 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     ixt2ast_(kernelNode) = astNode
   }
   private[compiler] def lookupAST(kernelNode: Node): AST.Node =  ixt2ast_.get(kernelNode).getOrElse(null)
+  /** Option-returning version of lookupAST */
+  private[compiler] def lookupASTOpt(kernelNode: Node): Option[AST.Node] = ixt2ast_.get(kernelNode)
   private[compiler] def lookupKernelNode(astNode: AST.Node): Node = ast2ixt_.get(astNode).getOrElse(null)
+  /** Option-returning version of lookupKernelNode */
+  private[compiler] def lookupKernelNodeOpt(astNode: AST.Node): Option[Node] = ast2ixt_.get(astNode)
   private[compiler] def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
   private[compiler] def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
+  /** Option-returning version of find */
+  private[compiler] def findOpt(className: String): Option[NameMapper] = mappers_.get(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
@@ -181,11 +189,24 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     if(result.forall(_ != null)) Some(result) else None
   }
   private[compiler] def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)
+  /** Option-returning version of mapFrom for safer null handling */
+  private[compiler] def mapFromOpt(typeNode: AST.TypeNode): Option[Type] = mapFromOpt(typeNode, mapper_)
   private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
     else validateTypeApplication(typeNode, mappedType)
     mappedType
+  }
+  /** Option-returning version of mapFrom for safer null handling */
+  private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameMapper): Option[Type] = {
+    val mappedType = mapper.resolveNode(typeNode)
+    if (mappedType == null) {
+      report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
+      None
+    } else {
+      validateTypeApplication(typeNode, mappedType)
+      Some(mappedType)
+    }
   }
 
   private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {

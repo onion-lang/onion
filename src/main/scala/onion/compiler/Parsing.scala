@@ -1,7 +1,7 @@
 package onion.compiler
 
 import collection.mutable.ArrayBuffer
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.io.{IOException, Reader}
 import java.util.Arrays.ArrayList
 import java.util.Collections

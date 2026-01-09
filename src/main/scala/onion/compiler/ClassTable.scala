@@ -51,6 +51,9 @@ class ClassTable(classPath: String) {
     clazz
   }
 
+  /** Option-returning version of load for safer null handling */
+  def loadOpt(className: String): Option[TypedAST.ClassType] = Option(load(className))
+
   def rootClass: TypedAST.ClassType = load("java.lang.Object")
 
   def lookup(className: String): TypedAST.ClassType = {
@@ -59,5 +62,8 @@ class ClassTable(classPath: String) {
       case None => classFiles.get(className)
     }
   }
+
+  /** Option-returning version of lookup for safer null handling */
+  def lookupOpt(className: String): Option[TypedAST.ClassType] = Option(lookup(className))
 
 }

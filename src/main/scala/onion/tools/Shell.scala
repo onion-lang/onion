@@ -52,20 +52,16 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
   }
 
   private def findFirstMainMethod(loader: OnionClassLoader, classes: Seq[CompiledClass]): Option[Method] = {
-    for (i <- 0 until classes.length) {
-      val className = classes(i).className
-      val clazz = Class.forName(className, true, loader)
+    classes.view.flatMap { compiled =>
+      val clazz = Class.forName(compiled.className, true, loader)
       try {
         val main = clazz.getMethod("main", classOf[Array[String]])
         val modifier = main.getModifiers
-        if ((modifier & Modifier.PUBLIC) != 0 && (modifier & Modifier.STATIC) != 0) {
-          return Some(main)
-        }
+        if ((modifier & Modifier.PUBLIC) != 0 && (modifier & Modifier.STATIC) != 0) Some(main) else None
       } catch {
-        case _: NoSuchMethodException =>
+        case _: NoSuchMethodException => None
       }
-    }
-    None
+    }.headOption
   }
 
   private def withContextClassLoader[T](loader: ClassLoader)(body: => T): T = {

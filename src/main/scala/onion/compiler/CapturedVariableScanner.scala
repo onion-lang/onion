@@ -107,9 +107,8 @@ object CapturedVariableScanner {
       case newArray: AST.NewArray =>
         newArray.args.foreach(visit)
 
-      case indexing: AST.Indexing =>
-        visit(indexing.lhs)
-        visit(indexing.rhs)
+      case newArrayWithValues: AST.NewArrayWithValues =>
+        newArrayWithValues.values.foreach(visit)
 
       case listLit: AST.ListLiteral =>
         listLit.elements.foreach(visit)
@@ -231,9 +230,8 @@ object CapturedVariableScanner {
       case newArray: AST.NewArray =>
         newArray.args.foreach(visit)
 
-      case indexing: AST.Indexing =>
-        visit(indexing.lhs)
-        visit(indexing.rhs)
+      case newArrayWithValues: AST.NewArrayWithValues =>
+        newArrayWithValues.values.foreach(visit)
 
       case listLit: AST.ListLiteral =>
         listLit.elements.foreach(visit)

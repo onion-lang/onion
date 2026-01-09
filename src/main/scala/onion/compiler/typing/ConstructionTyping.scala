@@ -49,6 +49,23 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
     Some(new NewArray(resultType, parameters))
   }
 
+  def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] = {
+    val elementType = mapFrom(node.typeRef, mapper_)
+    if (elementType == null) return None
+    val arrayType = loadArray(elementType, 1)
+    val typedValues = node.values.toArray.map { expr =>
+      typed(expr, context, elementType).flatMap { t =>
+        if (TypeRules.isAssignable(elementType, t.`type`)) Some(t)
+        else {
+          report(INCOMPATIBLE_TYPE, expr, elementType, t.`type`)
+          None
+        }
+      }
+    }
+    if (typedValues.exists(_.isEmpty)) return None
+    Some(new NewArrayWithValues(arrayType, typedValues.flatten))
+  }
+
   def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] = {
     val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
     val parameters = typedTerms(node.args.toArray, context)

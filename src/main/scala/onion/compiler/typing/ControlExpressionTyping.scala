@@ -6,6 +6,7 @@ import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
+import scala.util.boundary, boundary.break
 
 final class ControlExpressionTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
@@ -95,10 +96,10 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       }
     }
 
-  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext): Option[Term] = {
+  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext): Option[Term] = boundary {
     val conditionOpt = typed(node.condition, context)
     val condition = conditionOpt.getOrElse(null)
-    if (condition == null) return None
+    if (condition == null) break(None)
 
     val name = context.newName
     val index = context.add(name, condition.`type`, isMutable = true)
@@ -201,7 +202,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         }
       }
     }
-    if (failed) return None
+    if (failed) break(None)
 
     // Exhaustiveness check for sealed types
     var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
@@ -228,7 +229,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
     val elseTermOpt = Option(node.elseBlock).map(typeBlockExpression(_, context)).getOrElse(Some(statementTerm(new NOP(node.location), BasicType.VOID, node.location)))
     val elseTerm = elseTermOpt.getOrElse(null)
-    if (elseTerm == null) return None
+    if (elseTerm == null) break(None)
 
     val resultType =
       if (node.elseBlock == null && !isExhaustive) BasicType.VOID
@@ -240,7 +241,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         val branchTypes = caseTerms.map(_.`type`).toSeq :+ elseTerm.`type`
         foldLub(node, branchTypes).orNull
       }
-    if (resultType == null) return None
+    if (resultType == null) break(None)
 
     val resultVar =
       if (resultType.isBottomType || resultType == BasicType.VOID) null
@@ -336,7 +337,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   }
 
   /** Returns (condition, pattern binding info, hasWildcard, optional guard info) */
-  private def processPatterns(patterns: Array[AST.Pattern], conditionType: Type, bind: ClosureLocalBinding, context: LocalContext): (Term, PatternBindingInfo, Boolean, Option[GuardInfo]) = {
+  private def processPatterns(patterns: Array[AST.Pattern], conditionType: Type, bind: ClosureLocalBinding, context: LocalContext): (Term, PatternBindingInfo, Boolean, Option[GuardInfo]) = boundary {
     var bindingInfo: PatternBindingInfo = NoBindings
     var hasWildcard = false
     var guardInfo: Option[GuardInfo] = None
@@ -351,11 +352,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       case AST.ExpressionPattern(expr) =>
         val exprOpt = typed(expr, context)
         val e = exprOpt.getOrElse(null)
-        if (e == null) return (null, NoBindings, false, None)
+        if (e == null) break((null, NoBindings, false, None))
 
         if (!TypeRules.isAssignable(conditionType, e.`type`)) {
           report(INCOMPATIBLE_TYPE, expr, conditionType, e.`type`)
-          return (null, NoBindings, false, None)
+          break((null, NoBindings, false, None))
         }
 
         val normalizedExpr =
@@ -371,11 +372,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
       case tp @ AST.TypePattern(_, name, typeRef) =>
         val mappedType = mapFrom(typeRef)
-        if (mappedType == null) return (null, NoBindings, false, None)
+        if (mappedType == null) break((null, NoBindings, false, None))
 
         if (!mappedType.isObjectType) {
           report(INCOMPATIBLE_TYPE, tp, table_.rootClass, mappedType)
-          return (null, NoBindings, false, None)
+          break((null, NoBindings, false, None))
         }
 
         // Create instanceof check
@@ -397,14 +398,14 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         val recordType = load(constructor)
         if (recordType == null) {
           report(NOT_A_RECORD_TYPE, dp, constructor)
-          return (null, NoBindings, false, None)
+          break((null, NoBindings, false, None))
         }
 
         val classDef = recordType match {
           case cd: ClassDefinition => cd
           case _ =>
             report(NOT_A_RECORD_TYPE, dp, constructor)
-            return (null, NoBindings, false, None)
+            break((null, NoBindings, false, None))
         }
 
         // Get fields in order (records store fields in insertion order)
@@ -414,7 +415,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         // Check binding count matches field count
         if (fieldPatterns.length != fieldCount) {
           report(WRONG_BINDING_COUNT, dp, Int.box(fieldCount), Int.box(fieldPatterns.length), constructor)
-          return (null, NoBindings, false, None)
+          break((null, NoBindings, false, None))
         }
 
         // Create instanceof check
@@ -429,7 +430,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
           val getters = classDef.methods(field.name)
           if (getters.isEmpty) {
             report(NOT_A_RECORD_TYPE, dp, constructor)
-            return (null, NoBindings, false, None)
+            break((null, NoBindings, false, None))
           }
           val getter = getters.find(m => m.arguments.isEmpty).getOrElse(getters.head)
           val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))
@@ -447,20 +448,20 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
               val nestedType = load(nestedCtor)
               if (nestedType == null) {
                 report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-                return (null, NoBindings, false, None)
+                break((null, NoBindings, false, None))
               }
 
               val nestedClassDef = nestedType match {
                 case cd: ClassDefinition => cd
                 case _ =>
                   report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-                  return (null, NoBindings, false, None)
+                  break((null, NoBindings, false, None))
               }
 
               val nestedFields = nestedClassDef.fields
               if (nestedFieldPatterns.length != nestedFields.length) {
                 report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(nestedFieldPatterns.length), nestedCtor)
-                return (null, NoBindings, false, None)
+                break((null, NoBindings, false, None))
               }
 
               // Build accessor for nested type check: ((RootType)bind).getter() instanceof NestedType
@@ -474,7 +475,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
                 val nestedGetters = nestedClassDef.methods(nestedField.name)
                 if (nestedGetters.isEmpty) {
                   report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-                  return (null, NoBindings, false, None)
+                  break((null, NoBindings, false, None))
                 }
                 val nestedGetter = nestedGetters.find(m => m.arguments.isEmpty).getOrElse(nestedGetters.head)
                 val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
@@ -489,14 +490,14 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
                   case _ =>
                     // Deeper nesting - for now, report error (could support more levels)
                     report(NOT_A_RECORD_TYPE, nested, "deeply nested patterns not yet supported")
-                    return (null, NoBindings, false, None)
+                    break((null, NoBindings, false, None))
                 }
               }
 
             case other =>
               // Other patterns not supported in destructuring position
               report(NOT_A_RECORD_TYPE, dp, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
-              return (null, NoBindings, false, None)
+              break((null, NoBindings, false, None))
           }
         }
 
@@ -506,7 +507,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       case AST.GuardedPattern(loc, innerPattern, guard) =>
         // Process the inner pattern recursively
         val (innerCond, innerBindingInfo, innerHasWildcard, _) = processPatterns(Array(innerPattern), conditionType, bind, context)
-        if (innerCond == null) return (null, NoBindings, false, None)
+        if (innerCond == null) break((null, NoBindings, false, None))
 
         // Inherit binding info from inner pattern
         bindingInfo = innerBindingInfo
@@ -532,11 +533,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         }
 
         val guardTerm = guardTermOpt.getOrElse(null)
-        if (guardTerm == null) return (null, NoBindings, false, None)
+        if (guardTerm == null) break((null, NoBindings, false, None))
 
         // Ensure guard is boolean
         val checkedGuard = ensureBoolean(guard, guardTerm)
-        if (checkedGuard == null) return (null, NoBindings, false, None)
+        if (checkedGuard == null) break((null, NoBindings, false, None))
 
         // Store the AST expression - it will be re-typed with actual bindings later
         // The guard check will happen after bindings are set up at code generation time
@@ -544,7 +545,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         innerCond
     }
 
-    if (conditions.isEmpty) return (null, NoBindings, false, None)
+    if (conditions.isEmpty) break((null, NoBindings, false, None))
 
     // Combine conditions with OR
     val combined = conditions.reduceLeft { (acc, cond) =>
@@ -554,7 +555,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     (combined, bindingInfo, hasWildcard, guardInfo)
   }
 
-  def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] = {
+  def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] = boundary {
     // リソースを処理（try-with-resources）
     val resourceBindings = scala.collection.mutable.ArrayBuffer[(ClosureLocalBinding, Term)]()
     val autoCloseable = load("java.lang.AutoCloseable")
@@ -589,11 +590,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         }
       }
 
-      if (resourceFailed) return None
+      if (resourceFailed) break(None)
 
       val tryTermOpt = typeBlockExpression(node.tryBlock, context)
       val tryTerm = tryTermOpt.getOrElse(null)
-      if (tryTerm == null) return None
+      if (tryTerm == null) break(None)
 
       val binds = new Array[ClosureLocalBinding](node.recClauses.length)
       val catchTerms = new Array[Term](node.recClauses.length)
@@ -613,7 +614,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
           }
         }
       }
-      if (failed) return None
+      if (failed) break(None)
 
       val resultType =
         if (catchTerms.isEmpty) tryTerm.`type`
@@ -621,7 +622,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
           val types = tryTerm.`type` +: catchTerms.map(_.`type`).toSeq
           foldLub(node, types).orNull
         }
-      if (resultType == null) return None
+      if (resultType == null) break(None)
 
       val resultVar =
         if (resultType.isBottomType || resultType == BasicType.VOID) null
@@ -671,26 +672,27 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   def typeForeachExpression(node: AST.ForeachExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BasicType.VOID, node.location))
 
-  def typeSynchronizedExpression(node: AST.SynchronizedExpression, context: LocalContext): Option[Term] =
+  def typeSynchronizedExpression(node: AST.SynchronizedExpression, context: LocalContext): Option[Term] = boundary {
     context.openScope {
       // Type the lock expression
       val lock = typed(node.condition, context).getOrElse(null)
-      if (lock == null) return None
+      if (lock == null) break(None)
 
       // Lock must be object type, not primitive
       if (lock.isBasicType) {
         report(INCOMPATIBLE_TYPE, node.condition, load("java.lang.Object"), lock.`type`)
-        return None
+        break(None)
       }
 
       // Type the body as an expression (returns value)
       val bodyTermOpt = typeBlockExpression(node.block, context)
       val bodyTerm = bodyTermOpt.getOrElse(null)
-      if (bodyTerm == null) return None
+      if (bodyTerm == null) break(None)
 
       // Create SynchronizedTerm that returns the body's value
       Some(new SynchronizedTerm(node.location, lock, bodyTerm))
     }
+  }
 
   def typeReturnExpression(node: AST.ReturnExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BottomType.BOTTOM, node.location))

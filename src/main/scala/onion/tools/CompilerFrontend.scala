@@ -20,6 +20,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
+import scala.util.boundary, boundary.break
 
 /**
  *
@@ -108,7 +109,7 @@ class CompilerFrontend {
 
   private def outputPathOf(outDir: String, fqcn: String): String = outDir + Systems.fileSeparator + simpleNameOf(fqcn)+ ".class"
 
-  private def generateFiles(binaries: Seq[CompiledClass]): Boolean = {
+  private def generateFiles(binaries: Seq[CompiledClass]): Boolean = boundary {
     val generated: java.util.List[File] = new java.util.ArrayList[File]
     for(binary <- binaries) {
       val outDir: String = binary.outputPath
@@ -127,7 +128,7 @@ class CompilerFrontend {
           while (it.hasNext) {
             it.next.delete
           }
-          return false
+          break(false)
       }
     }
     true

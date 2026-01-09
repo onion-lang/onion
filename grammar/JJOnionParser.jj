@@ -1271,12 +1271,16 @@ AST.Expression primary() : {
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
 | LOOKAHEAD( "(" eols() ")" eols() <ARROW> ) e=arrow_anonymous_function()  {return e;}
 | LOOKAHEAD( "(" eols() id() ":" ) e=arrow_anonymous_function()           {return e;}
+| LOOKAHEAD("new" raw_type() "[" "]" "{") t="new" ty=raw_type() "[" "]" "{" eols() es=terms() "}"
+    { return new AST.NewArrayWithValues(p(t), ty, es); }
 | t="new" ty=type() {
     ArrayBuffer<AST.Expression> sizes = new ArrayBuffer<AST.Expression>();
   } (
+    // Handle: new Type[size] - array with size
     LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]"
     ( LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]" )*
     { return new AST.NewArray(p(t), ty, toList(sizes)); }
+    // Handle: new Type() or new Type - object creation
   | [LOOKAHEAD(2) "(" eols() (es=terms()) ")"]  { return new AST.NewObject(p(t), ty, es); }
   )
 | t="self"                                                                {return new AST.CurrentInstance(p(t));}

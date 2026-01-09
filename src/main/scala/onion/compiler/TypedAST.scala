@@ -634,6 +634,14 @@ object TypedAST {
     def `type`: TypedAST.Type = arrayType
   }
 
+  class NewArrayWithValues(location: Location, val arrayType: TypedAST.ArrayType, val values: Array[TypedAST.Term]) extends Term(location) {
+    def this(arrayType: TypedAST.ArrayType, values: Array[TypedAST.Term]) = {
+      this(null, arrayType, values)
+    }
+
+    def `type`: TypedAST.Type = arrayType
+  }
+
   class NOP(location: Location) extends ActionStatement(location) {
     def this() = {
       this(null)
@@ -1041,17 +1049,11 @@ object TypedAST {
 
   class FieldFinder {
     def find(target: TypedAST.ObjectType, name: String): TypedAST.FieldRef = {
-      if (target == null) return null
-      var field: TypedAST.FieldRef = target.field(name)
-      if (field != null) return field
-      field = find(target.superClass, name)
-      if (field != null) return field
-      val interfaces = target.interfaces
-      for (anInterface <- target.interfaces) {
-        field = find(anInterface, name)
-        if (field != null) return field
-      }
-      null
+      if (target == null) null
+      else Option(target.field(name))
+        .orElse(Option(find(target.superClass, name)))
+        .orElse(target.interfaces.view.map(i => find(i, name)).find(_ != null))
+        .orNull
     }
   }
 

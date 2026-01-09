@@ -416,6 +416,34 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         val descriptor = asmType(newArr.arrayType).getDescriptor
         gen.visitMultiANewArrayInsn(descriptor, newArr.parameters.length)
 
+    case newArr: NewArrayWithValues =>
+      // Create array with initialized values: new Type[]{v1, v2, ...}
+      val componentType = newArr.arrayType.component
+      val componentAsmType = asmType(componentType)
+
+      // Push array size and create array
+      gen.push(newArr.values.length)
+      componentType match
+        case BasicType.BOOLEAN => gen.newArray(AsmType.BOOLEAN_TYPE)
+        case BasicType.BYTE => gen.newArray(AsmType.BYTE_TYPE)
+        case BasicType.SHORT => gen.newArray(AsmType.SHORT_TYPE)
+        case BasicType.CHAR => gen.newArray(AsmType.CHAR_TYPE)
+        case BasicType.INT => gen.newArray(AsmType.INT_TYPE)
+        case BasicType.LONG => gen.newArray(AsmType.LONG_TYPE)
+        case BasicType.FLOAT => gen.newArray(AsmType.FLOAT_TYPE)
+        case BasicType.DOUBLE => gen.newArray(AsmType.DOUBLE_TYPE)
+        case ct: ClassType => gen.newArray(AsmUtil.objectType(ct.name))
+        case at: ArrayType => gen.newArray(asmType(at.component))
+        case _ => throw new RuntimeException(s"Cannot create array of type: $componentType")
+
+      // Store each value into the array
+      for (i <- newArr.values.indices) {
+        gen.dup() // duplicate array reference
+        gen.push(i) // push index
+        emitExpressionWithContext(gen, newArr.values(i), className, localVars)
+        gen.arrayStore(componentAsmType)
+      }
+
     case len: ArrayLength =>
       emitExpressionWithContext(gen, len.target, className, localVars)
       gen.arrayLength()

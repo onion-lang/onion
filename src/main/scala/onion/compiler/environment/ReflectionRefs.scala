@@ -66,11 +66,15 @@ object ReflectionRefs {
       val mapped = toOnionType(bounds(0), env)
       mapped match {
         case ap: TypedAST.AppliedClassType => ap.raw
-        case ct: TypedAST.ClassType => ct
         case tv: TypedAST.TypeVariableType => tv.upperBound
+        case ct: TypedAST.ClassType => ct
         case _ => root
       }
     }
+
+    /** Option-returning version of toOnionType for safer null handling */
+    def toOnionTypeOpt(tp: Type, env: Map[String, TypedAST.TypeVariableType]): Option[TypedAST.Type] =
+      Option(toOnionType(tp, env))
 
     def toOnionType(tp: Type, env: Map[String, TypedAST.TypeVariableType]): TypedAST.Type = tp match {
       case c: Class[?] =>

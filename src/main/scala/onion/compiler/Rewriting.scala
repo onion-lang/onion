@@ -10,7 +10,7 @@ import _root_.onion.compiler.exceptions.CompilationException
 import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
 import onion.compiler.AST.{ClassDeclaration, InterfaceDeclaration, RecordDeclaration}
 
-import _root_.scala.collection.JavaConverters._
+import _root_.scala.jdk.CollectionConverters._
 import scala.collection.mutable.{Buffer, Map, Set => MutableSet}
 
 class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[AST.CompilationUnit]] {

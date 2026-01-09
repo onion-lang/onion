@@ -230,7 +230,18 @@ class AsmCodeGenerationVisitor(
     else
       val dims = Array.fill(node.parameters.length)(AsmType.INT_TYPE)
       gen.visitMultiANewArrayInsn(asmType(node.arrayType).getDescriptor, node.parameters.length)
-  
+
+  override def visitNewArrayWithValues(node: NewArrayWithValues): Unit =
+    val componentType = asmType(node.arrayType.component)
+    gen.push(node.values.length)
+    gen.newArray(componentType)
+    for (i <- node.values.indices) {
+      gen.dup()
+      gen.push(i)
+      visitTerm(node.values(i))
+      gen.arrayStore(componentType)
+    }
+
   override def visitRefStaticField(node: RefStaticField): Unit =
     val ownerType = AsmUtil.objectType(node.target.name)
     gen.getStatic(ownerType, node.field.name, asmType(node.field.`type`))

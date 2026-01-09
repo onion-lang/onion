@@ -95,6 +95,9 @@ private[compiler] object CapturedVariableCollector {
       case newArr: NewArray =>
         newArr.parameters.foreach(visitTerm)
 
+      case newArrWithValues: NewArrayWithValues =>
+        newArrWithValues.values.foreach(visitTerm)
+
       case _: NewClosure =>
         () // Do not traverse nested closures.
 

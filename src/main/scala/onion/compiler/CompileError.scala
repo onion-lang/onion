@@ -11,4 +11,4 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-case class CompileError(sourceFile: String, location: Location, message: String)
+case class CompileError(sourceFile: String, location: Location, message: String, errorCode: Option[String] = None)

@@ -14,7 +14,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
     val id = node.lhs.asInstanceOf[AST.Id]
     val bind = context.lookup(id.name)
     if (bind == null) {
-      report(VARIABLE_NOT_FOUND, id, id.name)
+      report(VARIABLE_NOT_FOUND, id, id.name, context.allNames.toArray)
       return null
     }
     if (!bind.isMutable) {

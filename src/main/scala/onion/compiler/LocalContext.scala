@@ -87,6 +87,14 @@ class LocalContext {
     contextFrame.lookup(name)
   }
 
+  /**
+   * Gets all variable names visible from the current scope.
+   */
+  def allNames: Set[String] = {
+    if (contextFrame == null) Set.empty
+    else contextFrame.allNames
+  }
+
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     contextFrame.lookupOnlyCurrentScope(name)
   }

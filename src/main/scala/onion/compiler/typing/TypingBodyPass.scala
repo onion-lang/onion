@@ -533,7 +533,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node@AST.Id(loc, name) =>
       val bind = context.lookup(name)
       if (bind == null) {
-        report(VARIABLE_NOT_FOUND, node, node.name)
+        report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
         None
       }else {
         Some(new RefLocal(bind))

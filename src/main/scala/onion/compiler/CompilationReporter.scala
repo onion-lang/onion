@@ -28,16 +28,17 @@ object CompilationReporter {
   private def formatError(error: CompileError): String = {
     val locationOpt = Option(error.location)
     val sourceFileOpt = Option(error.sourceFile)
+    val errorCodePrefix = error.errorCode.map(code => s"[$code] ").getOrElse("")
     val builder = new StringBuilder
     sourceFileOpt match {
       case None =>
-        builder.append(error.message)
+        builder.append(s"$errorCodePrefix${error.message}")
       case Some(sourceFile) =>
         val lineNumber = locationOpt.map(_.line).getOrElse(0)
         val lineNumText = if (lineNumber > 0) Integer.toString(lineNumber) else ""
         val lineText = locationOpt.flatMap(loc => readSourceLine(sourceFile, loc.line)).getOrElse("")
 
-        builder.append(s"$sourceFile:$lineNumText: ${error.message}")
+        builder.append(s"$sourceFile:$lineNumText: $errorCodePrefix${error.message}")
         builder.append(Systems.lineSeparator)
         builder.append("\t\t")
         builder.append(lineText)

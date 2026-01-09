@@ -37,6 +37,24 @@ class LocalScope(val parent: LocalScope) {
   def contains(name: String): Boolean = bindings.contains(name)
 
   /**
+   * Gets all variable names in this scope.
+   * @return Set of variable names
+   */
+  def names: Set[String] = bindings.keySet.toSet
+
+  /**
+   * Gets all variable names in this scope and its ancestors.
+   * @return Set of variable names
+   */
+  def allNames: Set[String] = {
+    def collect(scope: LocalScope, acc: Set[String]): Set[String] = {
+      if (scope == null) acc
+      else collect(scope.parent, acc ++ scope.names)
+    }
+    collect(this, Set.empty)
+  }
+
+  /**
    * Registers binding object to this scope for the given name.
    * @param name
    * @param binding

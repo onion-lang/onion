@@ -21,6 +21,7 @@ class SemanticErrorReporter(threshold: Int) {
   private val problems = Buffer[CompileError]()
   private var sourceFile: String = null
   private var errorCount: Int = 0
+  private var currentError: SemanticError = null
 
   private def format(string: String): String = {
     MessageFormat.format(string)
@@ -106,49 +107,62 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportCannotCallMethodOnPrimitive(position: Location, items: Array[AnyRef]): Unit = {
     val primitiveType = items(0).asInstanceOf[TypedAST.Type]
     val methodName = items(1).asInstanceOf[String]
-    problem(position, s"cannot call method ${methodName} on primitive type ${primitiveType}")
+    problem(position, format(message("error.semantic.cannotCallMethodOnPrimitive"), primitiveType.name, methodName))
   }
 
   private def reportInvalidMethodCallTarget(position: Location, items: Array[AnyRef]): Unit = {
     val targetType = items(0).asInstanceOf[TypedAST.Type]
-    problem(position, s"invalid method call target of type ${targetType}")
+    problem(position, format(message("error.semantic.invalidMethodCallTarget"), targetType.name))
   }
 
   private def reportNonExhaustivePatternMatch(position: Location, items: Array[AnyRef]): Unit = {
     val sealedType = items(0).asInstanceOf[TypedAST.Type]
     val missingTypes = items(1).asInstanceOf[Array[TypedAST.Type]]
     val missingNames = missingTypes.map(_.name).mkString(", ")
-    problem(position, s"パターンマッチが網羅的ではありません。sealed型 ${sealedType.name} に対して、次の型がカバーされていません: $missingNames")
+    problem(position, format(message("error.semantic.nonExhaustivePatternMatch"), sealedType.name, missingNames))
   }
 
   private def reportUnknownParameterName(position: Location, items: Array[AnyRef]): Unit = {
     val paramName = items(0).asInstanceOf[String]
-    problem(position, s"不明なパラメータ名: $paramName")
+    problem(position, format(message("error.semantic.unknownParameterName"), paramName))
   }
 
   private def reportDuplicateArgument(position: Location, items: Array[AnyRef]): Unit = {
     val paramName = items(0).asInstanceOf[String]
-    problem(position, s"引数が重複しています: $paramName")
+    problem(position, format(message("error.semantic.duplicateArgument"), paramName))
   }
 
   private def reportPositionalAfterNamed(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, "名前付き引数の後に位置引数を使用することはできません")
+    problem(position, message("error.semantic.positionalAfterNamed"))
   }
 
   private def reportWrongBindingCount(position: Location, items: Array[AnyRef]): Unit = {
     val expected = items(0).asInstanceOf[Int]
     val actual = items(1).asInstanceOf[Int]
     val typeName = items(2).asInstanceOf[String]
-    problem(position, s"デストラクチャリングパターンのバインディング数が一致しません。型 $typeName は $expected 個のフィールドがありますが、$actual 個のバインディングが指定されています。")
+    problem(position, format(message("error.semantic.wrongBindingCount"), typeName, expected.toString, actual.toString))
   }
 
   private def reportNotARecordType(position: Location, items: Array[AnyRef]): Unit = {
     val typeName = items(0).asInstanceOf[String]
-    problem(position, s"$typeName はデストラクチャリングできないか、存在しない型です。")
+    problem(position, format(message("error.semantic.notARecordType"), typeName))
   }
 
   private def reportVariableNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.variableNotFound"), items(0).asInstanceOf[String]))
+    val name = items(0).asInstanceOf[String]
+    val baseMessage = format(message("error.semantic.variableNotFound"), name)
+
+    // Add suggestion if candidates are available
+    val suggestion = if (items.length > 1) {
+      val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    val fullMessage = suggestion match {
+      case Some(s) => s"$baseMessage $s"
+      case None => baseMessage
+    }
+    problem(position, fullMessage)
   }
 
   private def reportCannotAssignToVal(position: Location, items: Array[AnyRef]): Unit = {
@@ -310,11 +324,13 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   private def problem(position: Location, message: String): Unit = {
-    problems.append(new CompileError(sourceFile, position, message))
+    val errorCode = Option(currentError).map(_.errorCode)
+    problems.append(new CompileError(sourceFile, position, message, errorCode))
   }
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
     errorCount += 1
+    currentError = error
     error match {
       case SemanticError.ILLEGAL_METHOD_CALL =>
         reportIllegalMethodCall(position, items)

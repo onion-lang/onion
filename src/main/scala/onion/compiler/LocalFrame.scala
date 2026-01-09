@@ -84,6 +84,19 @@ class LocalFrame(val parent: LocalFrame) {
     null
   }
 
+  /**
+   * Gets all variable names visible from the current scope (including parent frames).
+   */
+  def allNames: Set[String] = {
+    var names = Set.empty[String]
+    var frame: LocalFrame = this
+    while (frame != null) {
+      names = names ++ frame.scope.allNames
+      frame = frame.parent
+    }
+    names
+  }
+
   def setAllClosed(closed: Boolean): Unit = {
     var frame: LocalFrame = this
     while (frame != null) {

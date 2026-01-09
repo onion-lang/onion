@@ -50,4 +50,7 @@ object SemanticError {
   case object WRONG_BINDING_COUNT extends SemanticError(46)
   case object NOT_A_RECORD_TYPE extends SemanticError(47)
 }
-sealed abstract class SemanticError(code: Int)
+sealed abstract class SemanticError(val code: Int) {
+  /** Returns the error code in format "E0001" */
+  def errorCode: String = f"E${code}%04d"
+}

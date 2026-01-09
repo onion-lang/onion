@@ -666,7 +666,25 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     Some(statementTerm(translate(node, context), BasicType.VOID, node.location))
 
   def typeSynchronizedExpression(node: AST.SynchronizedExpression, context: LocalContext): Option[Term] =
-    Some(statementTerm(translate(node, context), BasicType.VOID, node.location))
+    context.openScope {
+      // Type the lock expression
+      val lock = typed(node.condition, context).getOrElse(null)
+      if (lock == null) return None
+
+      // Lock must be object type, not primitive
+      if (lock.isBasicType) {
+        report(INCOMPATIBLE_TYPE, node.condition, load("java.lang.Object"), lock.`type`)
+        return None
+      }
+
+      // Type the body as an expression (returns value)
+      val bodyTermOpt = typeBlockExpression(node.block, context)
+      val bodyTerm = bodyTermOpt.getOrElse(null)
+      if (bodyTerm == null) return None
+
+      // Create SynchronizedTerm that returns the body's value
+      Some(new SynchronizedTerm(node.location, lock, bodyTerm))
+    }
 
   def typeReturnExpression(node: AST.ReturnExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BottomType.BOTTOM, node.location))

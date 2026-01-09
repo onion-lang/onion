@@ -203,13 +203,19 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       }
       new StatementBlock(condition.location, new ExpressionActionStatement(condition.location, new SetLocal(0, index, condition.`type`, condition)), statement)
     case node: AST.SynchronizedExpression =>
+      // SynchronizedExpression is now handled as an expression (SynchronizedTerm)
+      // This case converts it to a statement for contexts that need ActionStatement
       context.openScope {
         val lock = typed(node.condition, context).getOrElse(null)
         if (lock != null && lock.isBasicType) {
           report(INCOMPATIBLE_TYPE, node.condition, load("java.lang.Object"), lock.`type`)
+          new NOP(node.location)
+        } else if (lock == null) {
+          new NOP(node.location)
+        } else {
+          val block = translate(node.block, context)
+          new Synchronized(node.location, lock, block)
         }
-        val block = translate(node.block, context)
-        new Synchronized(node.location, lock, block)
       }
     case node: AST.ThrowExpression =>
       val expressionOpt = typed(node.target, context)

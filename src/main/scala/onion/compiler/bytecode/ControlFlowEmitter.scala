@@ -99,6 +99,44 @@ final class ControlFlowEmitter(
 
     gen.visitLabel(endLabel)
 
+  def emitSynchronizedTerm(node: SynchronizedTerm): Unit =
+    // Store lock object in a local variable to avoid re-evaluating the expression
+    val lockSlot = gen.newLocal(AsmType.getType(classOf[Object]))
+    visitTerm(node.lock)
+    gen.storeLocal(lockSlot)
+
+    gen.loadLocal(lockSlot)
+    gen.monitorEnter()
+
+    val tryStart = gen.mark()
+    // Evaluate body as an expression (leaves result on stack)
+    visitTerm(node.body)
+    val tryEnd = gen.mark()
+
+    // Save result to temporary variable (if not void)
+    val resultType = asmType(node.`type`)
+    val hasResult = node.`type` != BasicType.VOID && !node.`type`.isBottomType
+    val resultSlot = if (hasResult) {
+      val slot = gen.newLocal(resultType)
+      gen.storeLocal(slot)
+      slot
+    } else -1
+
+    // Normal exit: release monitor and restore result
+    gen.loadLocal(lockSlot)
+    gen.monitorExit()
+    if (hasResult) gen.loadLocal(resultSlot)
+    val endLabel = gen.newLabel()
+    gen.goTo(endLabel)
+
+    // Exception handler: release monitor and rethrow
+    gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
+    gen.loadLocal(lockSlot)
+    gen.monitorExit()
+    gen.throwException()
+
+    gen.visitLabel(endLabel)
+
   def emitThrow(node: Throw): Unit =
     visitTerm(node.term)
     gen.throwException()

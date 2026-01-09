@@ -258,7 +258,11 @@ class AsmCodeGenerationVisitor(
 
   override def visitStatementTerm(node: StatementTerm): Unit =
     visitStatement(node.statement)
-  
+
+  override def visitSynchronizedTerm(node: SynchronizedTerm): Unit =
+    emitLineNumber(node.location)
+    controlFlow.emitSynchronizedTerm(node)
+
   // Statement visitors
   override def visitStatementBlock(node: StatementBlock): Unit =
     controlFlow.emitStatementBlock(node)

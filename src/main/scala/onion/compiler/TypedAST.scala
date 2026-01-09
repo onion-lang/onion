@@ -425,6 +425,13 @@ object TypedAST {
   }
 
   /**
+   * SynchronizedTerm - synchronized block that returns a value
+   */
+  class SynchronizedTerm(location: Location, val lock: TypedAST.Term, val body: TypedAST.Term) extends Term(location) {
+    def `type`: TypedAST.Type = body.`type`
+  }
+
+  /**
    * @author Kota Mizushima
    */
   class FieldDefinition(val location: Location, val modifier: Int, val affiliation: TypedAST.ClassType, val name: String, val `type`: TypedAST.Type)

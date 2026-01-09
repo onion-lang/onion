@@ -45,8 +45,10 @@ object CompilerFrontend {
       println(s"Onion Compiler version $VERSION")
       return
     }
+    val verbose = args.exists(_ == "--verbose")
+    val filteredArgs = args.filterNot(_ == "--verbose")
     try {
-      new CompilerFrontend().run(args)
+      new CompilerFrontend().run(filteredArgs, verbose)
     } catch {
       case e: ScriptException => throw e.getCause
     }
@@ -57,6 +59,7 @@ object CompilerFrontend {
   private final val ENCODING: String = "-encoding"
   private final val OUTPUT: String = "-d"
   private final val MAX_ERROR: String = "-maxErrorReport"
+  private final val VERBOSE: String = "--verbose"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_OUTPUT: String = "."
@@ -69,7 +72,7 @@ class CompilerFrontend {
 
   private val commandLineParser = new CommandLineParser(config(CLASSPATH, true), config(SCRIPT_SUPER_CLASS, true), config(ENCODING, true), config(OUTPUT, true), config(MAX_ERROR, true))
 
-  def run(commandLine: Array[String]): Int = {
+  def run(commandLine: Array[String], verbose: Boolean = false): Int = {
     if (commandLine.length == 0) {
       printUsage()
       return -1
@@ -83,7 +86,7 @@ class CompilerFrontend {
           printUsage()
           return -1
         }
-        createConfig(success) match {
+        createConfig(success, verbose) match {
           case None => -1
           case Some(config) =>
             compile(config, params) match {
@@ -142,6 +145,7 @@ class CompilerFrontend {
          |  -encoding <encoding>        Specify source file encoding
          |  -maxErrorReport <number>    Set maximum number of errors to report
          |  -super <super class>        Specify script's super class
+         |  --verbose                   Show compilation phase timing
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -163,7 +167,7 @@ class CompilerFrontend {
     }
   }
 
-  private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
+  private def createConfig(result: ParseSuccess, verbose: Boolean = false): Option[CompilerConfig] = {
     val option: Map[String, CommandLineParam] = result.options.toMap
     val classpath: Array[String] = checkClasspath(
       option.get(CLASSPATH).collect{ case ValuedParam(value) => value }
@@ -178,7 +182,7 @@ class CompilerFrontend {
       option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
     )
     for (e <- encoding; m <- maxErrorReport) yield {
-      new CompilerConfig(classpath.toIndexedSeq, "", e, outputDirectory, m)
+      new CompilerConfig(classpath.toIndexedSeq, "", e, outputDirectory, m, verbose)
     }
   }
 

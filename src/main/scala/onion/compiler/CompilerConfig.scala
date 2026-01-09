@@ -12,4 +12,11 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-case class CompilerConfig(classPath: Seq[String], superClass: String, encoding: String, outputDirectory: String, maxErrorReports: Int)
+case class CompilerConfig(
+  classPath: Seq[String],
+  superClass: String,
+  encoding: String,
+  outputDirectory: String,
+  maxErrorReports: Int,
+  verbose: Boolean = false
+)

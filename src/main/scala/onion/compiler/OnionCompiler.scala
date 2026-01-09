@@ -22,6 +22,14 @@ class OnionCompiler(val config: CompilerConfig) {
   }
 
   def compile(srcs: Seq[InputSource]): CompilationOutcome = {
+    if (config.verbose) {
+      compileVerbose(srcs)
+    } else {
+      compileNormal(srcs)
+    }
+  }
+
+  private def compileNormal(srcs: Seq[InputSource]): CompilationOutcome = {
     val pipeline =
       new Parsing(config)
         .andThen(new Rewriting(config))
@@ -30,6 +38,40 @@ class OnionCompiler(val config: CompilerConfig) {
 
     try {
       Success(pipeline.process(srcs))
+    } catch {
+      case e: CompilationException =>
+        Failure(e.problems.toIndexedSeq)
+    }
+  }
+
+  private def compileVerbose(srcs: Seq[InputSource]): CompilationOutcome = {
+    import java.lang.System.{currentTimeMillis => now}
+
+    def timed[A](phaseName: String)(block: => A): A = {
+      val start = now()
+      val result = block
+      val elapsed = now() - start
+      System.err.println(f"[verbose] $phaseName: ${elapsed}ms")
+      result
+    }
+
+    try {
+      val totalStart = now()
+
+      val parsing = new Parsing(config)
+      val rewriting = new Rewriting(config)
+      val typing = new Typing(config)
+      val generating = new TypedGenerating(config)
+
+      val parsed = timed("Parsing")(parsing.process(srcs))
+      val rewritten = timed("Rewriting")(rewriting.process(parsed))
+      val typed = timed("Typing")(typing.process(rewritten))
+      val generated = timed("CodeGen")(generating.process(typed))
+
+      val totalElapsed = now() - totalStart
+      System.err.println(f"[verbose] Total: ${totalElapsed}ms (${srcs.size} source files)")
+
+      Success(generated)
     } catch {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)

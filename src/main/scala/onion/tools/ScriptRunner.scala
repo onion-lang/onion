@@ -40,8 +40,10 @@ object ScriptRunner {
       println(s"Onion Script Runner version $VERSION")
       return
     }
+    val verbose = args.exists(_ == "--verbose")
+    val filteredArgs = args.filterNot(_ == "--verbose")
     try {
-      new ScriptRunner().run(args)
+      new ScriptRunner().run(filteredArgs, verbose)
     }
     catch {
       case e: ScriptException => {
@@ -63,7 +65,7 @@ class ScriptRunner {
   import ScriptRunner._
   private[this] val parser = new CommandLineParser(conf(CLASSPATH, true), conf(SCRIPT_SUPER_CLASS, true), conf(ENCODING, true), conf(MAX_ERROR, true))
 
-  def run(commandLine: Array[String]): Int = {
+  def run(commandLine: Array[String], verbose: Boolean = false): Int = {
     if (commandLine.isEmpty) {
       printUsage()
       return -1
@@ -78,7 +80,7 @@ class ScriptRunner {
           printUsage()
           return -1
         }
-        createConfig(success) match {
+        createConfig(success, verbose) match {
           case None => -1
           case Some(config) =>
             val scriptArgs = params.drop(1).toArray
@@ -107,6 +109,7 @@ class ScriptRunner {
          |  -encoding <encoding>        Specify source file encoding
          |  -maxErrorReport <number>    Set maximum number of errors to report
          |  -super <super class>        Specify script's super class
+         |  --verbose                   Show compilation phase timing
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -121,13 +124,13 @@ class ScriptRunner {
     }
   }
 
-  private def createConfig(result: ParseSuccess): Option[CompilerConfig] = {
+  private def createConfig(result: ParseSuccess, verbose: Boolean = false): Option[CompilerConfig] = {
     val option: Map[String, CommandLineParam] = result.options.toMap
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH))
     for(
       encoding <- checkEncoding(option.get(ENCODING));
       maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR))
-    ) yield (new CompilerConfig(classpath.toIndexedSeq, "", encoding, ".", maxErrorReport))
+    ) yield (new CompilerConfig(classpath.toIndexedSeq, "", encoding, ".", maxErrorReport, verbose))
   }
 
   private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationOutcome = {

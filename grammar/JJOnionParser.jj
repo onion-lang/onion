@@ -424,6 +424,12 @@ TOKEN : {
 | <MULEQ:          "*="           >
 | <DIVEQ:          "/="           >
 | <MODEQ:          "%="           >
+| <ANDEQ:          "&="           >
+| <OREQ:           "|="           >
+| <XOREQ:          "^="           >
+| <LSHIFTEQ:       "<<="          >
+| <RSHIFTEQ:       ">>="          >
+| <URSHIFTEQ:      ">>>="         >
 | <PLUSPLUS:       "++"           >
 | <MINUSMINUS:     "--"           >
 | <COLON:          ":"            >
@@ -1037,6 +1043,8 @@ AST.Pattern simple_pattern() :{
   t=id() "(" bindings=destructuring_bindings() ")" { return new AST.DestructuringPattern(p(t), c(t), bindings); }
 | LOOKAHEAD(2, id() "is")
   t=id() "is" ty=type() { return new AST.TypePattern(p(t), c(t), ty); }
+| LOOKAHEAD(2, id() "when")
+  t=id() { return new AST.BindingPattern(p(t), c(t)); }
 | e=term() { return new AST.ExpressionPattern(e); }
 }
 
@@ -1134,6 +1142,12 @@ AST.Expression assignable() :{Token t; AST.Expression a, b; }{
     | t="*=" eols() b=expression() {a = new AST.MultiplicationAssignment(p(t), a, b);}
     | t="/=" eols() b=expression() {a = new AST.DivisionAssignment(p(t), a, b);}
     | t="%=" eols() b=expression() {a = new AST.ModuloAssignment(p(t), a, b);}
+    | t="&=" eols() b=expression() {a = new AST.BitAndAssignment(p(t), a, b);}
+    | t="|=" eols() b=expression() {a = new AST.BitOrAssignment(p(t), a, b);}
+    | t="^=" eols() b=expression() {a = new AST.XorAssignment(p(t), a, b);}
+    | t="<<=" eols() b=expression() {a = new AST.LeftShiftAssignment(p(t), a, b);}
+    | t=">>=" eols() b=expression() {a = new AST.MathRightShiftAssignment(p(t), a, b);}
+    | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(p(t), a, b);}
     )
   ]{return a;}
 }

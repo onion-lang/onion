@@ -386,6 +386,12 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
         instanceOfCheck
 
+      case AST.BindingPattern(loc, name) =>
+        // Simple binding pattern - matches everything and binds the value
+        hasWildcard = true
+        bindingInfo = SingleBinding(name, conditionType)
+        new BoolValue(loc, true)
+
       case dp @ AST.DestructuringPattern(_, constructor, fieldPatterns) =>
         // Look up the record type by constructor name
         val recordType = load(constructor)

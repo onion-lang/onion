@@ -170,38 +170,10 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         }
       }
     case node: AST.SelectExpression =>
-      val conditionOpt = typed(node.condition, context)
-      if (conditionOpt.isEmpty) return new NOP(node.location)
-      val condition = conditionOpt.get
-      val name = context.newName
-      val index = context.add(name, condition.`type`)
-      val statement = if (node.cases.length == 0) {
-        Option(node.elseBlock).map(e => translate(e, context)).getOrElse(new NOP(node.location))
-      } else {
-        val cases = node.cases
-        val nodes = Buffer[Term]()
-        val thens = Buffer[ActionStatement]()
-        for ((patterns, thenClause) <- cases) {
-          val bind = context.lookup(name)
-          // Extract expressions from patterns (for statement context, only ExpressionPattern is supported)
-          val expressions = patterns.collect { case AST.ExpressionPattern(e) => e }
-          if (expressions.length != patterns.length) {
-            report(UNIMPLEMENTED_FEATURE, node)
-          }
-          nodes += processNodes(expressions.toArray, condition.`type`, bind, context)
-          thens += translate(thenClause, context)
-        }
-        var branches: ActionStatement = if (node.elseBlock != null) {
-          translate(node.elseBlock, context)
-        } else {
-          null
-        }
-        for (i <- (cases.length - 1) to (0, -1)) {
-          branches = new IfStatement(nodes(i), thens(i), branches)
-        }
-        branches
-      }
-      new StatementBlock(condition.location, new ExpressionActionStatement(condition.location, new SetLocal(0, index, condition.`type`, condition)), statement)
+      // Delegate to ControlExpressionTyping which handles all pattern types
+      typed(node, context).map { e =>
+        new ExpressionActionStatement(node.location, e)
+      }.getOrElse(new NOP(node.location))
     case node: AST.SynchronizedExpression =>
       // SynchronizedExpression is now handled as an expression (SynchronizedTerm)
       // This case converts it to a statement for contexts that need ActionStatement

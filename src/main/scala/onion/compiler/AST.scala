@@ -77,7 +77,9 @@ object AST {
   case class AdditionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("+=")
   case class Assignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("=")
   case class BitAnd(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&")
+  case class BitAndAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&=")
   case class BitOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("|")
+  case class BitOrAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("|=")
   case class BooleanLiteral(location: Location, value: Boolean) extends Expression
   case class ByteLiteral(location: Location, value: Byte) extends Expression
   case class Cast(location: Location, src: Expression, to: TypeNode) extends Expression
@@ -97,15 +99,18 @@ object AST {
   case class IntegerLiteral(location: Location, value: Int) extends Expression
   case class IsInstance(location: Location, target: Expression, typeRef: TypeNode) extends Expression
   case class LessOrEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<=")
+  case class LeftShiftAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<=")
   case class LessThan(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<")
   case class ListLiteral(location: Location, elements: List[Expression]) extends Expression
   case class LogicalAnd(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&&")
   case class LogicalOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("||")
   case class LogicalRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>>")
+  case class LogicalRightShiftAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>>=")
   case class LongLiteral(location: Location, value: Long) extends Expression
   case class ShortLiteral(location: Location, value: Short) extends Expression
   case class MathLeftShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<")
   case class MathRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>")
+  case class MathRightShiftAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>=")
   case class MemberSelection(location: Location, target: Expression/*nullable*/, name: String) extends Expression
   case class MethodCall(location: Location, target: Expression/*nullable*/, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
     def this(location: Location, target: Expression, name: String, args: List[Expression]) =
@@ -146,6 +151,7 @@ object AST {
       this(location, name, args, Nil)
   }
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
+  case class XorAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^=")
 
   // Patterns for select/case
   abstract sealed class Pattern extends Node

@@ -77,7 +77,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     if (rightType != BasicType.INT) {
       right = new AsInstanceOf(right, BasicType.INT)
     }
-    new BinaryTerm(kind, BasicType.BOOLEAN, left, right)
+    new BinaryTerm(kind, leftResultType, left, right)
   }
 
   def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {

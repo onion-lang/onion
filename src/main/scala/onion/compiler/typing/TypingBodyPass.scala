@@ -293,6 +293,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       case MULTIPLY => new AST.Multiplication(node.location, lhs, rhs)
       case DIVIDE => new AST.Division(node.location, lhs, rhs)
       case MOD => new AST.Modulo(node.location, lhs, rhs)
+      case BIT_AND => new AST.BitAnd(node.location, lhs, rhs)
+      case BIT_OR => new AST.BitOr(node.location, lhs, rhs)
+      case XOR => new AST.XOR(node.location, lhs, rhs)
+      case BIT_SHIFT_L2 => new AST.MathLeftShift(node.location, lhs, rhs)
+      case BIT_SHIFT_R2 => new AST.MathRightShift(node.location, lhs, rhs)
+      case BIT_SHIFT_R3 => new AST.LogicalRightShift(node.location, lhs, rhs)
     }
 
     // Then create the assignment: a = (a + b)
@@ -451,6 +457,18 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typeBinaryAssignment(node, left, right, DIVIDE, context)
     case node@AST.ModuloAssignment(_, left, right) =>
       typeBinaryAssignment(node, left, right, MOD, context)
+    case node@AST.BitAndAssignment(_, left, right) =>
+      typeBinaryAssignment(node, left, right, BIT_AND, context)
+    case node@AST.BitOrAssignment(_, left, right) =>
+      typeBinaryAssignment(node, left, right, BIT_OR, context)
+    case node@AST.XorAssignment(_, left, right) =>
+      typeBinaryAssignment(node, left, right, XOR, context)
+    case node@AST.LeftShiftAssignment(_, left, right) =>
+      typeBinaryAssignment(node, left, right, BIT_SHIFT_L2, context)
+    case node@AST.MathRightShiftAssignment(_, left, right) =>
+      typeBinaryAssignment(node, left, right, BIT_SHIFT_R2, context)
+    case node@AST.LogicalRightShiftAssignment(_, left, right) =>
+      typeBinaryAssignment(node, left, right, BIT_SHIFT_R3, context)
     case node@AST.CharacterLiteral(loc, v) =>
       Some(new CharacterValue(loc, v))
     case node@AST.ByteLiteral(loc, v) =>

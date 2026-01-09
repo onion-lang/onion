@@ -228,8 +228,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val exceptions = if (node.throwsTypes.isEmpty) null
                      else node.throwsTypes.map(t => AsmUtil.internalName(t.name))
 
-    // Just visit the method without any code
-    cw.visitMethod(access, node.name, desc, null, exceptions)
+    // Just visit the method without any code (abstract method needs visitEnd but no code)
+    val mv = cw.visitMethod(access, node.name, desc, null, exceptions)
+    mv.visitEnd()
 
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
     val access = toAsmModifier(node.modifier)

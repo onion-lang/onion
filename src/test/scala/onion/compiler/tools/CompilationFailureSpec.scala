@@ -93,13 +93,50 @@ class CompilationFailureSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == result)
     }
 
-    // Note: Abstract class tests are disabled due to known bytecode generation issue
-    // with abstract methods (ClassFormatError: Code attribute in abstract methods)
-    // These tests verify the type checker correctly rejects the code, but execution
-    // fails due to the bytecode bug.
+    it("returns failure when trying to instantiate abstract class") {
+      val result = shell.run(
+        """
+          |abstract class Animal {
+          |public:
+          |  abstract def speak(): String;
+          |}
+          |class Test1 {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val a: Animal = new Animal();
+          |    return 0;
+          |  }
+          |}
+        """.stripMargin,
+        "AbstractInstantiation.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
 
-    // it("returns failure when trying to instantiate abstract class") { ... }
-    // it("returns failure when abstract method is not implemented") { ... }
+    it("returns failure when abstract method is not implemented") {
+      val result = shell.run(
+        """
+          |abstract class Animal {
+          |public:
+          |  abstract def speak(): String;
+          |}
+          |class Dog : Animal {
+          |public:
+          |  // Missing speak() implementation
+          |}
+          |class Test1 {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return 0;
+          |  }
+          |}
+        """.stripMargin,
+        "MissingAbstractImpl.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
 
     it("returns failure when assigning to val") {
       val result = shell.run(

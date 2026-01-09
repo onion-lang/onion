@@ -24,11 +24,22 @@ import onion.tools.option._
  *
  */
 object ScriptRunner {
+  val VERSION = "1.0.0"
+
   private def conf(optionName: String, requireArgument: Boolean) = OptionConfig(optionName, requireArgument)
 
   private def pathArray(path: String): Array[String] =  path.split(Systems.pathSeparator)
 
   def main(args: Array[String]): Unit = {
+    // Handle help and version flags early
+    if (args.exists(a => a == "-h" || a == "--help")) {
+      new ScriptRunner().printUsage()
+      return
+    }
+    if (args.exists(a => a == "-v" || a == "--version")) {
+      println(s"Onion Script Runner version $VERSION")
+      return
+    }
     try {
       new ScriptRunner().run(args)
     }
@@ -86,12 +97,22 @@ class ScriptRunner {
   }
 
   protected def printUsage(): Unit = {
-    err.println("""Usage: onion [-options] <source file> <command line arguments>
-                  |options:
-                  |-super <super class>        specify script's super class
-                  | -classpath <class path>     specify classpath
-                  | -encoding <encoding>        specify source file encoding
-                  | -maxErrorReport <number>    set number of errors reported""".stripMargin)
+    println(
+      s"""Onion Script Runner version ${ScriptRunner.VERSION}
+         |
+         |Usage: onion [options] <source_file> [arguments...]
+         |
+         |Options:
+         |  -classpath <path>           Specify classpath
+         |  -encoding <encoding>        Specify source file encoding
+         |  -maxErrorReport <number>    Set maximum number of errors to report
+         |  -super <super class>        Specify script's super class
+         |  -h, --help                  Show this help message
+         |  -v, --version               Show version information
+         |
+         |Examples:
+         |  onion Hello.on
+         |  onion -classpath lib/*.jar Script.on arg1 arg2""".stripMargin)
   }
 
   private def printFailure(failure: ParseFailure): Unit = {

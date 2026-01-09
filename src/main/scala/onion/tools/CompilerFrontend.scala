@@ -27,6 +27,8 @@ import onion.tools.option._
  *
  */
 object CompilerFrontend {
+  val VERSION = "1.0.0"
+
   private def config(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
 
   private def pathArray(path: String): Array[String] = path.split(Systems.pathSeparator)
@@ -34,6 +36,15 @@ object CompilerFrontend {
   private def printError(message: String): Unit = System.err.println(message)
 
   def main(args: Array[String]): Unit = {
+    // Handle help and version flags early
+    if (args.exists(a => a == "-h" || a == "--help")) {
+      new CompilerFrontend().printUsage()
+      return
+    }
+    if (args.exists(a => a == "-v" || a == "--version")) {
+      println(s"Onion Compiler version $VERSION")
+      return
+    }
     try {
       new CompilerFrontend().run(args)
     } catch {
@@ -120,14 +131,23 @@ class CompilerFrontend {
   }
 
   protected def printUsage(): Unit = {
-    printError(
-      """Usage: onionc [-options] source_file ...
-        |options:
-        | -super <super class>        specify script's super class
-        | -d <path>                   specify output directory
-        | -classpath <path>           specify classpath
-        | -encoding <encoding>        specify source file encoding
-        | -maxErrorReport <number>    set number of errors reported""".stripMargin)
+    println(
+      s"""Onion Compiler version ${CompilerFrontend.VERSION}
+         |
+         |Usage: onionc [options] source_file ...
+         |
+         |Options:
+         |  -classpath <path>           Specify classpath
+         |  -d <path>                   Specify output directory
+         |  -encoding <encoding>        Specify source file encoding
+         |  -maxErrorReport <number>    Set maximum number of errors to report
+         |  -super <super class>        Specify script's super class
+         |  -h, --help                  Show this help message
+         |  -v, --version               Show version information
+         |
+         |Examples:
+         |  onionc Hello.on
+         |  onionc -d out -classpath lib/*.jar *.on""".stripMargin)
   }
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {

@@ -19,7 +19,9 @@ import onion.compiler.CompilationReporter
 import onion.compiler.exceptions.ScriptException
 
 class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
-  private val config = new CompilerConfig(classpath, null, "Shift_JIS", "", 10)
+  private val encoding = Option(System.getenv("ONION_ENCODING"))
+    .getOrElse(java.nio.charset.Charset.defaultCharset().name())
+  private val config = new CompilerConfig(classpath, null, encoding, "", 10)
   def run(script: String, fileName: String, args: Array[String]): Shell.Result = {
     val compiler: OnionCompiler = new OnionCompiler(config)
     val outcome: CompilationOutcome = withContextClassLoader(classLoader) {

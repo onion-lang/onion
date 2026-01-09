@@ -59,7 +59,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
       case applied: TypedAST.AppliedClassType => applied.raw
       case _ => typeRef
     }
-    if (java.lang.reflect.Modifier.isAbstract(classToCheck.modifier)) {
+    if (Modifier.isAbstract(classToCheck.modifier)) {
       report(ABSTRACT_CLASS_INSTANTIATION, node, typeRef)
       return None
     }

@@ -36,7 +36,16 @@ class AsmCodeGenerationVisitor(
         gen.visitLineNumber(loc.line, label)
         lastEmittedLine = loc.line
       case _ => // Same line, skip
-  
+
+  // Emit method arguments with boxing/unboxing adaptation
+  private def emitArgumentsWithAdaptation(
+    params: Array[Term],
+    expectedTypes: Array[AsmType]
+  ): Unit =
+    for (param, expected) <- params.zip(expectedTypes) do
+      visitTerm(param)
+      asmCodeGen.adaptValueOnStack(gen, param.`type`, expected)
+
   // Expression visitors
   override def visitArrayLength(node: ArrayLength): Unit =
     visitTerm(node.target)
@@ -86,13 +95,7 @@ class AsmCodeGenerationVisitor(
   
   override def visitCall(node: Call): Unit =
     visitTerm(node.target)
-    val expectedArgs = node.method.arguments.map(asmType)
-    var i = 0
-    while i < node.parameters.length do
-      val param = node.parameters(i)
-      visitTerm(param)
-      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedArgs(i))
-      i += 1
+    emitArgumentsWithAdaptation(node.parameters, node.method.arguments.map(asmType))
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -105,13 +108,7 @@ class AsmCodeGenerationVisitor(
       gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
   
   override def visitCallStatic(node: CallStatic): Unit =
-    val expectedArgs = node.method.arguments.map(asmType)
-    var i = 0
-    while i < node.parameters.length do
-      val param = node.parameters(i)
-      visitTerm(param)
-      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedArgs(i))
-      i += 1
+    emitArgumentsWithAdaptation(node.parameters, node.method.arguments.map(asmType))
     val ownerType = AsmUtil.objectType(node.target.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -121,13 +118,7 @@ class AsmCodeGenerationVisitor(
   
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)
-    val expectedArgs = node.method.arguments.map(asmType)
-    var i = 0
-    while i < node.params.length do
-      val param = node.params(i)
-      visitTerm(param)
-      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedArgs(i))
-      i += 1
+    emitArgumentsWithAdaptation(node.params, node.method.arguments.map(asmType))
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -213,12 +204,7 @@ class AsmCodeGenerationVisitor(
     gen.newInstance(classType)
     gen.dup()
     val argTypes = node.constructor.getArgs.map(asmType)
-    var i = 0
-    while i < node.parameters.length do
-      val param = node.parameters(i)
-      visitTerm(param)
-      asmCodeGen.adaptValueOnStack(gen, param.`type`, argTypes(i))
-      i += 1
+    emitArgumentsWithAdaptation(node.parameters, argTypes)
     gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
   
   override def visitNewArray(node: NewArray): Unit =

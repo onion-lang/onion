@@ -14,8 +14,13 @@ import onion.compiler.toolbox.Message
 import onion.compiler.exceptions.CompilationException
 
 /**
- * @author Kota Mizushima
+ * Data-driven semantic error reporter.
  *
+ * Each error type is associated with an ErrorDef that specifies:
+ * - The message key for i18n lookup
+ * - Extractors that convert the items array to format arguments
+ *
+ * @author Kota Mizushima
  */
 class SemanticErrorReporter(threshold: Int) {
   private val problems = Buffer[CompileError]()
@@ -23,136 +28,255 @@ class SemanticErrorReporter(threshold: Int) {
   private var errorCount: Int = 0
   private var currentError: SemanticError = null
 
-  private def format(string: String): String = {
-    MessageFormat.format(string)
+  // ========== Type extractors ==========
+
+  private def typeName(item: AnyRef): String = item.asInstanceOf[TypedAST.Type].name
+  private def classTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ClassType].name
+  private def objectTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ObjectType].name
+  private def asString(item: AnyRef): String = item.asInstanceOf[String]
+  private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
+  private def typeNames(types: Array[TypedAST.Type]): String = {
+    if (types.isEmpty) "" else types.map(_.name).mkString(", ")
+  }
+  private def asTypeArray(item: AnyRef): Array[TypedAST.Type] = item.asInstanceOf[Array[TypedAST.Type]]
+
+  // ========== Message formatting ==========
+
+  private def message(property: String): String = Message(property)
+
+  private def format(template: String, args: Seq[String]): String = {
+    if (args.isEmpty) template
+    else MessageFormat.format(template, args.asInstanceOf[Seq[AnyRef]]: _*)
   }
 
-  private def format(string: String, arg: String): String = {
-    MessageFormat.format(string, arg)
+  private def problem(position: Location, message: String): Unit = {
+    val errorCode = Option(currentError).map(_.errorCode)
+    problems.append(new CompileError(sourceFile, position, message, errorCode))
   }
 
-  private def format(string: String, arg1: String, arg2: String): String = {
-    MessageFormat.format(string, arg1, arg2)
-  }
+  // ========== Error definitions ==========
 
-  private def format(string: String, arg1: String, arg2: String, arg3: String): String = {
-    MessageFormat.format(string, arg1, arg2, arg3)
-  }
+  /**
+   * Error definition with message key and argument extractors.
+   * Each extractor function takes the items array and returns a format argument.
+   */
+  private case class ErrorDef(
+    messageKey: String,
+    extractors: Seq[Array[AnyRef] => String]
+  )
 
-  private def format(string: String, arg1: String, arg2: String, arg3: String, arg4: String): String = {
-    MessageFormat.format(string, arg1, arg2, arg3, arg4)
-  }
+  /**
+   * Error definitions for standard errors.
+   * Special cases (with suggestions, complex formatting) are handled separately.
+   */
+  private val errorDefs: Map[SemanticError, ErrorDef] = Map(
+    // Type errors
+    SemanticError.ILLEGAL_METHOD_CALL -> ErrorDef(
+      "error.semantic.illegalMethodCall",
+      Seq(items => classTypeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.INCOMPATIBLE_TYPE -> ErrorDef(
+      "error.semantic.incompatibleType",
+      Seq(items => typeName(items(0)), items => typeName(items(1)))
+    ),
+    SemanticError.INCOMPATIBLE_OPERAND_TYPE -> ErrorDef(
+      "error.semantic.incompatibleOperandType",
+      Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.LVALUE_REQUIRED -> ErrorDef(
+      "error.semantic.lValueRequired",
+      Seq()
+    ),
+    SemanticError.CANNOT_ASSIGN_TO_VAL -> ErrorDef(
+      "error.semantic.cannotAssignToVal",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CANNOT_RETURN_VALUE -> ErrorDef(
+      "error.semantic.cannotReturnValue",
+      Seq()
+    ),
+    SemanticError.IS_NOT_BOXABLE_TYPE -> ErrorDef(
+      "error.semantic.isNotBoxableType",
+      Seq(items => typeName(items(0)))
+    ),
 
-  private def format(string: String, args: Array[String]): String = {
-    MessageFormat.format(string, args.asInstanceOf[Array[AnyRef]]:_*)
-  }
+    // Resolution errors
+    SemanticError.CLASS_NOT_FOUND -> ErrorDef(
+      "error.semantic.classNotFound",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.FIELD_NOT_FOUND -> ErrorDef(
+      "error.semantic.fieldNotFound",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.METHOD_NOT_FOUND -> ErrorDef(
+      "error.semantic.methodNotFound",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
+    SemanticError.CONSTRUCTOR_NOT_FOUND -> ErrorDef(
+      "error.semantic.constructorNotFound",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE -> ErrorDef(
+      "error.semantic.cannotCallMethodOnPrimitive",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.INVALID_METHOD_CALL_TARGET -> ErrorDef(
+      "error.semantic.invalidMethodCallTarget",
+      Seq(items => typeName(items(0)))
+    ),
 
-  private[this] def message(property: String): String = Message(property)
+    // Duplication errors
+    SemanticError.DUPLICATE_LOCAL_VARIABLE -> ErrorDef(
+      "error.semantic.duplicatedVariable",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_CLASS -> ErrorDef(
+      "error.semantic.duplicatedClass",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_FIELD -> ErrorDef(
+      "error.semantic.duplicatedField",
+      Seq(items => typeName(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.DUPLICATE_METHOD -> ErrorDef(
+      "error.semantic.duplicatedMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
+    SemanticError.DUPLICATE_GLOBAL_VARIABLE -> ErrorDef(
+      "error.semantic.duplicatedGlobalVariable",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_FUNCTION -> ErrorDef(
+      "error.semantic.duplicatedGlobalVariable",
+      Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.DUPLICATE_CONSTRUCTOR -> ErrorDef(
+      "error.semantic.duplicatedConstructor",
+      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
+    ),
+    SemanticError.DUPLICATE_TYPE_PARAMETER -> ErrorDef(
+      "error.semantic.duplicatedTypeParameter",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_GENERATED_METHOD -> ErrorDef(
+      "error.semantic.duplicateGeneratedMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
 
-  private def reportIllegalMethodCall(position: Location, items: Array[AnyRef]): Unit = {
-    val receiver = items(0).asInstanceOf[TypedAST.ClassType].name
-    val methodName= items(1).asInstanceOf[String]
-    problem(position, format(message("error.semantic.illegalMethodCall"), receiver, methodName))
-  }
+    // Access errors
+    SemanticError.METHOD_NOT_ACCESSIBLE -> ErrorDef(
+      "error.semantic.methodNotAccessible",
+      Seq(
+        items => objectTypeName(items(0)),
+        items => asString(items(1)),
+        items => typeNames(asTypeArray(items(2))),
+        items => classTypeName(items(3))
+      )
+    ),
+    SemanticError.FIELD_NOT_ACCESSIBLE -> ErrorDef(
+      "error.semantic.fieldNotAccessible",
+      Seq(items => classTypeName(items(0)), items => asString(items(1)), items => classTypeName(items(2)))
+    ),
+    SemanticError.CLASS_NOT_ACCESSIBLE -> ErrorDef(
+      "error.semantic.classNotAccessible",
+      Seq(items => classTypeName(items(0)), items => classTypeName(items(1)))
+    ),
 
-  private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
-    val expected: TypedAST.Type = items(0).asInstanceOf[TypedAST.Type]
-    val detected: TypedAST.Type = items(1).asInstanceOf[TypedAST.Type]
-    problem(position, format(message("error.semantic.incompatibleType"), expected.name, detected.name))
-  }
+    // Inheritance errors
+    SemanticError.CYCLIC_INHERITANCE -> ErrorDef(
+      "error.semantic.cyclicInheritance",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CYCLIC_DELEGATION -> ErrorDef(
+      "error.semantic.cyclicDelegation",
+      Seq()
+    ),
+    SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
+      "error.semantic.illegalInheritance",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.INTERFACE_REQUIRED -> ErrorDef(
+      "error.semantic.interfaceRequired",
+      Seq(items => typeName(items(0)))
+    ),
+    SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.unimplementedAbstractMethod",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
+      "error.semantic.abstractClassInstantiation",
+      Seq(items => typeName(items(0)))
+    ),
+    SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
+      "error.semantic.finalMethodOverride",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
 
-  private def names(types: Array[TypedAST.Type]): String = {
-    val buffer = new StringBuffer
-    if (types.length > 0) {
-      buffer.append(types(0).name)
-      var i: Int = 1
-      while (i < types.length) {
-        buffer.append(", ")
-        buffer.append(types(i).name)
-        i += 1
-      }
-    }
-    new String(buffer)
-  }
+    // Generic type errors
+    SemanticError.TYPE_NOT_GENERIC -> ErrorDef(
+      "error.semantic.typeNotGeneric",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.typeArgumentArityMismatch",
+      Seq(items => asString(items(0)), items => items(1).toString, items => items(2).toString)
+    ),
+    SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE -> ErrorDef(
+      "error.semantic.typeArgumentMustBeReference",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.METHOD_NOT_GENERIC -> ErrorDef(
+      "error.semantic.methodNotGeneric",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.methodTypeArgumentArityMismatch",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => items(2).toString, items => items(3).toString)
+    ),
+    SemanticError.ERASURE_SIGNATURE_COLLISION -> ErrorDef(
+      "error.semantic.erasureSignatureCollision",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
 
-  private def reportIncompatibleOperandType(position: Location, items: Array[AnyRef]): Unit = {
-    val operator: String = items(0).asInstanceOf[String]
-    val operands: Array[TypedAST.Type] = items(1).asInstanceOf[Array[TypedAST.Type]]
-    problem(position, format(message("error.semantic.incompatibleOperandType"), items(0).asInstanceOf[String], names(operands)))
-  }
+    // Pattern matching errors
+    SemanticError.UNKNOWN_PARAMETER_NAME -> ErrorDef(
+      "error.semantic.unknownParameterName",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_ARGUMENT -> ErrorDef(
+      "error.semantic.duplicateArgument",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.POSITIONAL_AFTER_NAMED -> ErrorDef(
+      "error.semantic.positionalAfterNamed",
+      Seq()
+    ),
+    SemanticError.WRONG_BINDING_COUNT -> ErrorDef(
+      "error.semantic.wrongBindingCount",
+      Seq(items => asString(items(2)), items => asInt(items(0)), items => asInt(items(1)))
+    ),
+    SemanticError.NOT_A_RECORD_TYPE -> ErrorDef(
+      "error.semantic.notARecordType",
+      Seq(items => asString(items(0)))
+    ),
 
-  private def reportLValueRequired(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.lValueRequired")))
-  }
+    // Other errors
+    SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(
+      "error.semantic.unimplementedFeature",
+      Seq()
+    )
+  )
 
-  private def reportUnimplementedAbstractMethod(position: Location, items: Array[AnyRef]): Unit = {
-    val className = items(0).asInstanceOf[String]
-    val methodName = items(1).asInstanceOf[String]
-    val paramDescriptor = items(2).asInstanceOf[String]
-    problem(position, format(message("error.semantic.unimplementedAbstractMethod"), className, methodName, paramDescriptor))
-  }
+  // ========== Special case handlers ==========
 
-  private def reportAbstractClassInstantiation(position: Location, items: Array[AnyRef]): Unit = {
-    val className = (items(0).asInstanceOf[TypedAST.Type]).name
-    problem(position, format(message("error.semantic.abstractClassInstantiation"), className))
-  }
-
-  private def reportFinalMethodOverride(position: Location, items: Array[AnyRef]): Unit = {
-    val methodName = items(0).asInstanceOf[String]
-    val paramDescriptor = items(1).asInstanceOf[String]
-    val superClassName = items(2).asInstanceOf[String]
-    problem(position, format(message("error.semantic.finalMethodOverride"), methodName, paramDescriptor, superClassName))
-  }
-
-  private def reportCannotCallMethodOnPrimitive(position: Location, items: Array[AnyRef]): Unit = {
-    val primitiveType = items(0).asInstanceOf[TypedAST.Type]
-    val methodName = items(1).asInstanceOf[String]
-    problem(position, format(message("error.semantic.cannotCallMethodOnPrimitive"), primitiveType.name, methodName))
-  }
-
-  private def reportInvalidMethodCallTarget(position: Location, items: Array[AnyRef]): Unit = {
-    val targetType = items(0).asInstanceOf[TypedAST.Type]
-    problem(position, format(message("error.semantic.invalidMethodCallTarget"), targetType.name))
-  }
-
-  private def reportNonExhaustivePatternMatch(position: Location, items: Array[AnyRef]): Unit = {
-    val sealedType = items(0).asInstanceOf[TypedAST.Type]
-    val missingTypes = items(1).asInstanceOf[Array[TypedAST.Type]]
-    val missingNames = missingTypes.map(_.name).mkString(", ")
-    problem(position, format(message("error.semantic.nonExhaustivePatternMatch"), sealedType.name, missingNames))
-  }
-
-  private def reportUnknownParameterName(position: Location, items: Array[AnyRef]): Unit = {
-    val paramName = items(0).asInstanceOf[String]
-    problem(position, format(message("error.semantic.unknownParameterName"), paramName))
-  }
-
-  private def reportDuplicateArgument(position: Location, items: Array[AnyRef]): Unit = {
-    val paramName = items(0).asInstanceOf[String]
-    problem(position, format(message("error.semantic.duplicateArgument"), paramName))
-  }
-
-  private def reportPositionalAfterNamed(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, message("error.semantic.positionalAfterNamed"))
-  }
-
-  private def reportWrongBindingCount(position: Location, items: Array[AnyRef]): Unit = {
-    val expected = items(0).asInstanceOf[Int]
-    val actual = items(1).asInstanceOf[Int]
-    val typeName = items(2).asInstanceOf[String]
-    problem(position, format(message("error.semantic.wrongBindingCount"), typeName, expected.toString, actual.toString))
-  }
-
-  private def reportNotARecordType(position: Location, items: Array[AnyRef]): Unit = {
-    val typeName = items(0).asInstanceOf[String]
-    problem(position, format(message("error.semantic.notARecordType"), typeName))
-  }
-
+  /**
+   * Handles VARIABLE_NOT_FOUND with optional suggestions.
+   */
   private def reportVariableNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    val name = items(0).asInstanceOf[String]
-    val baseMessage = format(message("error.semantic.variableNotFound"), name)
+    val name = asString(items(0))
+    val baseMessage = format(message("error.semantic.variableNotFound"), Seq(name))
 
-    // Add suggestion if candidates are available
     val suggestion = if (items.length > 1) {
       val candidates = items(1).asInstanceOf[Array[String]]
       toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
@@ -165,270 +289,76 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, fullMessage)
   }
 
-  private def reportCannotAssignToVal(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.cannotAssignToVal"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportClassNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.classNotFound"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportFieldNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.fieldNotFound"), (items(0).asInstanceOf[TypedAST.Type]).name, items(1).asInstanceOf[String]))
-  }
-
-  private def reportMethodNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.methodNotFound"), (items(0).asInstanceOf[TypedAST.Type]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[TypedAST.Type]]))))
-  }
-
+  /**
+   * Handles AMBIGUOUS_METHOD with complex item structure.
+   */
   private def reportAmbiguousMethod(position: Location, items: Array[AnyRef]): Unit = {
-    val item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
-    val item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
-    val target1: String = (item1(0).asInstanceOf[TypedAST.ObjectType]).name
-    val name1: String = item1(1).asInstanceOf[String]
-    val args1: String = names(item1(2).asInstanceOf[Array[TypedAST.Type]])
-    val target2: String = (item2(0).asInstanceOf[TypedAST.ObjectType]).name
-    val name2: String = item2(1).asInstanceOf[String]
-    val args2: String = names(item2(2).asInstanceOf[Array[TypedAST.Type]])
-    problem(position, format(message("error.semantic.ambiguousMethod"), Array[String](target1, name1, args2, target2, name2, args2)))
+    val item1 = items(0).asInstanceOf[Array[AnyRef]]
+    val item2 = items(1).asInstanceOf[Array[AnyRef]]
+    val target1 = objectTypeName(item1(0))
+    val name1 = asString(item1(1))
+    val args1 = typeNames(asTypeArray(item1(2)))
+    val target2 = objectTypeName(item2(0))
+    val name2 = asString(item2(1))
+    val args2 = typeNames(asTypeArray(item2(2)))
+    problem(position, format(message("error.semantic.ambiguousMethod"),
+      Seq(target1, name1, args1, target2, name2, args2)))
   }
 
-  private def reportDuplicateLocalVariable(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedVariable"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportDuplicateClass(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedClass"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportDuplicateField(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedField"), (items(0).asInstanceOf[TypedAST.Type]).name, items(1).asInstanceOf[String]))
-  }
-
-  private def reportDuplicateMethod(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedMethod"), (items(0).asInstanceOf[TypedAST.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[TypedAST.Type]])))
-  }
-
-  private def reportDuplicateGlobalVariable(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedGlobalVariable"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportDuplicateFunction(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedGlobalVariable"), items(0).asInstanceOf[String], names(items(1).asInstanceOf[Array[TypedAST.Type]])))
-  }
-
-  private def reportDuplicateConstructor(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedConstructor"), (items(0).asInstanceOf[TypedAST.Type]).name, names(items(1).asInstanceOf[Array[TypedAST.Type]])))
-  }
-
-  private def reportMethodNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.methodNotAccessible"), (items(0).asInstanceOf[TypedAST.ObjectType]).name, items(1).asInstanceOf[String], names((items(2).asInstanceOf[Array[TypedAST.Type]])), (items(3).asInstanceOf[TypedAST.ClassType]).name))
-  }
-
-  private def reportFieldNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.fieldNotAccessible"), (items(0).asInstanceOf[TypedAST.ClassType]).name, items(1).asInstanceOf[String], (items(2).asInstanceOf[TypedAST.ClassType]).name))
-  }
-
-  private def reportClassNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.classNotAccessible"), (items(0).asInstanceOf[TypedAST.ClassType]).name, (items(1).asInstanceOf[TypedAST.ClassType]).name))
-  }
-
-  private def reportCyclicInheritance(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.cyclicInheritance"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportCyclicDelegation(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, message("error.semantic.cyclicDelegation"))
-  }
-
-  private def reportIllegalInheritance(position: Location, items: Array[AnyRef]): Unit = {
-    val className = items(0).asInstanceOf[String]
-    problem(position, format(message("error.semantic.illegalInheritance"), className))
-  }
-
-  private def reportCannotReturnValue(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, message("error.semantic.cannotReturnValue"))
-  }
-
-  private def reportConstructorNotFound(position: Location, items: Array[AnyRef]): Unit = {
-    val `type` : String = (items(0).asInstanceOf[TypedAST.Type]).name
-    val args: String = names((items(1).asInstanceOf[Array[TypedAST.Type]]))
-    problem(position, format(message("error.semantic.constructorNotFound"), `type`, args))
-  }
-
+  /**
+   * Handles AMBIGUOUS_CONSTRUCTOR with complex item structure.
+   */
   private def reportAmbiguousConstructor(position: Location, items: Array[AnyRef]): Unit = {
-    val item1: Array[AnyRef] = items(0).asInstanceOf[Array[AnyRef]]
-    val item2: Array[AnyRef] = items(1).asInstanceOf[Array[AnyRef]]
-    val target1: String = (item1(0).asInstanceOf[TypedAST.ObjectType]).name
-    val args1: String = names(item1(1).asInstanceOf[Array[TypedAST.Type]])
-    val target2: String = (item2(0).asInstanceOf[TypedAST.ObjectType]).name
-    val args2: String = names(item2(1).asInstanceOf[Array[TypedAST.Type]])
-    problem(position, format(message("error.semantic.ambiguousConstructor"), target1, args2, target2, args2))
+    val item1 = items(0).asInstanceOf[Array[AnyRef]]
+    val item2 = items(1).asInstanceOf[Array[AnyRef]]
+    val target1 = objectTypeName(item1(0))
+    val args1 = typeNames(asTypeArray(item1(1)))
+    val target2 = objectTypeName(item2(0))
+    val args2 = typeNames(asTypeArray(item2(1)))
+    problem(position, format(message("error.semantic.ambiguousConstructor"),
+      Seq(target1, args1, target2, args2)))
   }
 
-  private def reportInterfaceRequied(position: Location, items: Array[AnyRef]): Unit = {
-    val `type` : TypedAST.Type = items(0).asInstanceOf[TypedAST.Type]
-    problem(position, format(message("error.semantic.interfaceRequired"), `type`.name))
+  /**
+   * Handles NON_EXHAUSTIVE_PATTERN_MATCH with type array formatting.
+   */
+  private def reportNonExhaustivePatternMatch(position: Location, items: Array[AnyRef]): Unit = {
+    val sealedType = items(0).asInstanceOf[TypedAST.Type]
+    val missingTypes = items(1).asInstanceOf[Array[TypedAST.Type]]
+    val missingNames = missingTypes.map(_.name).mkString(", ")
+    problem(position, format(message("error.semantic.nonExhaustivePatternMatch"),
+      Seq(sealedType.name, missingNames)))
   }
 
-  private def reportUnimplementedFeature(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, message("error.semantic.unimplementedFeature"))
-  }
-
-  private def reportDuplicateTypeParameter(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicatedTypeParameter"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportTypeNotGeneric(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.typeNotGeneric"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportTypeArgumentArityMismatch(position: Location, items: Array[AnyRef]): Unit = {
-    val typeName = items(0).asInstanceOf[String]
-    val expected = items(1).toString
-    val actual = items(2).toString
-    problem(position, format(message("error.semantic.typeArgumentArityMismatch"), Array[String](typeName, expected, actual)))
-  }
-
-  private def reportTypeArgumentMustBeReference(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.typeArgumentMustBeReference"), items(0).asInstanceOf[String]))
-  }
-
-  private def reportMethodNotGeneric(position: Location, items: Array[AnyRef]): Unit = {
-    val owner = items(0).asInstanceOf[String]
-    val name = items(1).asInstanceOf[String]
-    problem(position, format(message("error.semantic.methodNotGeneric"), owner, name))
-  }
-
-  private def reportMethodTypeArgumentArityMismatch(position: Location, items: Array[AnyRef]): Unit = {
-    val owner = items(0).asInstanceOf[String]
-    val name = items(1).asInstanceOf[String]
-    val expected = items(2).toString
-    val actual = items(3).toString
-    problem(position, format(message("error.semantic.methodTypeArgumentArityMismatch"), owner, name, expected, actual))
-  }
-
-  private def reportErasureSignatureCollision(position: Location, items: Array[AnyRef]): Unit = {
-    val owner = (items(0).asInstanceOf[TypedAST.Type]).name
-    val name = items(1).asInstanceOf[String]
-    val desc = items(2).asInstanceOf[String]
-    problem(position, format(message("error.semantic.erasureSignatureCollision"), owner, name, desc))
-  }
-
-  private def reportDuplicateGeneratedMethod(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.duplicateGeneratedMethod"), (items(0).asInstanceOf[TypedAST.Type]).name, items(1).asInstanceOf[String], names(items(2).asInstanceOf[Array[TypedAST.Type]])))
-  }
-
-  private def reportIsNotBoxableType(position: Location, items: Array[AnyRef]): Unit = {
-    problem(position, format(message("error.semantic.isNotBoxableType"), (items(0).asInstanceOf[TypedAST.Type]).name))
-  }
-
-  private def problem(position: Location, message: String): Unit = {
-    val errorCode = Option(currentError).map(_.errorCode)
-    problems.append(new CompileError(sourceFile, position, message, errorCode))
-  }
+  // ========== Main report method ==========
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
     errorCount += 1
     currentError = error
+
     error match {
-      case SemanticError.ILLEGAL_METHOD_CALL =>
-        reportIllegalMethodCall(position, items)
-      case SemanticError.INCOMPATIBLE_TYPE =>
-        reportIncompatibleType(position, items)
-      case SemanticError.INCOMPATIBLE_OPERAND_TYPE =>
-        reportIncompatibleOperandType(position, items)
+      // Special cases that need custom handling
       case SemanticError.VARIABLE_NOT_FOUND =>
         reportVariableNotFound(position, items)
-      case SemanticError.CANNOT_ASSIGN_TO_VAL =>
-        reportCannotAssignToVal(position, items)
-      case SemanticError.CLASS_NOT_FOUND =>
-        reportClassNotFound(position, items)
-      case SemanticError.FIELD_NOT_FOUND =>
-        reportFieldNotFound(position, items)
-      case SemanticError.METHOD_NOT_FOUND =>
-        reportMethodNotFound(position, items)
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
-      case SemanticError.DUPLICATE_LOCAL_VARIABLE =>
-        reportDuplicateLocalVariable(position, items)
-      case SemanticError.DUPLICATE_CLASS =>
-        reportDuplicateClass(position, items)
-      case SemanticError.DUPLICATE_FIELD =>
-        reportDuplicateField(position, items)
-      case SemanticError.DUPLICATE_METHOD =>
-        reportDuplicateMethod(position, items)
-      case SemanticError.DUPLICATE_GLOBAL_VARIABLE =>
-        reportDuplicateGlobalVariable(position, items)
-      case SemanticError.DUPLICATE_FUNCTION =>
-        reportDuplicateFunction(position, items)
-      case SemanticError.METHOD_NOT_ACCESSIBLE =>
-        reportMethodNotAccessible(position, items)
-      case SemanticError.FIELD_NOT_ACCESSIBLE =>
-        reportFieldNotAccessible(position, items)
-      case SemanticError.CLASS_NOT_ACCESSIBLE =>
-        reportClassNotAccessible(position, items)
-      case SemanticError.CYCLIC_INHERITANCE =>
-        reportCyclicInheritance(position, items)
-      case SemanticError.CYCLIC_DELEGATION =>
-        reportCyclicDelegation(position, items)
-      case SemanticError.ILLEGAL_INHERITANCE =>
-        reportIllegalInheritance(position, items)
-      case SemanticError.CANNOT_RETURN_VALUE =>
-        reportCannotReturnValue(position, items)
-      case SemanticError.CONSTRUCTOR_NOT_FOUND =>
-        reportConstructorNotFound(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>
         reportAmbiguousConstructor(position, items)
-      case SemanticError.INTERFACE_REQUIRED =>
-        reportInterfaceRequied(position, items)
-      case SemanticError.UNIMPLEMENTED_FEATURE =>
-        reportUnimplementedFeature(position, items)
-      case SemanticError.DUPLICATE_TYPE_PARAMETER =>
-        reportDuplicateTypeParameter(position, items)
-      case SemanticError.TYPE_NOT_GENERIC =>
-        reportTypeNotGeneric(position, items)
-      case SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH =>
-        reportTypeArgumentArityMismatch(position, items)
-      case SemanticError.TYPE_ARGUMENT_MUST_BE_REFERENCE =>
-        reportTypeArgumentMustBeReference(position, items)
-      case SemanticError.METHOD_NOT_GENERIC =>
-        reportMethodNotGeneric(position, items)
-      case SemanticError.METHOD_TYPE_ARGUMENT_ARITY_MISMATCH =>
-        reportMethodTypeArgumentArityMismatch(position, items)
-      case SemanticError.ERASURE_SIGNATURE_COLLISION =>
-        reportErasureSignatureCollision(position, items)
-      case SemanticError.DUPLICATE_CONSTRUCTOR =>
-        reportDuplicateConstructor(position, items)
-      case SemanticError.DUPLICATE_GENERATED_METHOD =>
-        reportDuplicateGeneratedMethod(position, items)
-      case SemanticError.IS_NOT_BOXABLE_TYPE =>
-        reportIsNotBoxableType(position, items)
-      case SemanticError.LVALUE_REQUIRED =>
-        reportLValueRequired(position, items)
-      case SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD =>
-        reportUnimplementedAbstractMethod(position, items)
-      case SemanticError.ABSTRACT_CLASS_INSTANTIATION =>
-        reportAbstractClassInstantiation(position, items)
-      case SemanticError.FINAL_METHOD_OVERRIDE =>
-        reportFinalMethodOverride(position, items)
-      case SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE =>
-        reportCannotCallMethodOnPrimitive(position, items)
-      case SemanticError.INVALID_METHOD_CALL_TARGET =>
-        reportInvalidMethodCallTarget(position, items)
       case SemanticError.NON_EXHAUSTIVE_PATTERN_MATCH =>
         reportNonExhaustivePatternMatch(position, items)
-      case SemanticError.UNKNOWN_PARAMETER_NAME =>
-        reportUnknownParameterName(position, items)
-      case SemanticError.DUPLICATE_ARGUMENT =>
-        reportDuplicateArgument(position, items)
-      case SemanticError.POSITIONAL_AFTER_NAMED =>
-        reportPositionalAfterNamed(position, items)
-      case SemanticError.WRONG_BINDING_COUNT =>
-        reportWrongBindingCount(position, items)
-      case SemanticError.NOT_A_RECORD_TYPE =>
-        reportNotARecordType(position, items)
+
+      // Data-driven cases
+      case _ =>
+        errorDefs.get(error) match {
+          case Some(defn) =>
+            val args = defn.extractors.map(_.apply(items))
+            problem(position, format(message(defn.messageKey), args))
+          case None =>
+            // Fallback for any unmapped error
+            problem(position, s"Unknown error: $error")
+        }
     }
+
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)
     }
@@ -439,6 +369,4 @@ class SemanticErrorReporter(threshold: Int) {
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile
   }
-
-
 }

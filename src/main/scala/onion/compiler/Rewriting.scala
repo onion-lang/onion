@@ -2,8 +2,8 @@ package onion.compiler
 
 import java.util.{TreeSet => JTreeSet}
 
-import _root_.onion.compiler.TypedAST.BinaryTerm.Constants._
-import _root_.onion.compiler.TypedAST.UnaryTerm.Constants._
+import _root_.onion.compiler.TypedAST.BinaryTerm.Kind._
+import _root_.onion.compiler.TypedAST.UnaryTerm.Kind._
 import _root_.onion.compiler.TypedAST._
 import _root_.onion.compiler.SemanticError._
 import _root_.onion.compiler.exceptions.CompilationException

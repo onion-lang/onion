@@ -63,19 +63,20 @@ class LocalFrame(val parent: LocalFrame) {
     }
   }
 
-  def lookup(name: String): ClosureLocalBinding = {
-    var frame: LocalFrame = this
-    var frameIndex: Int = 0
-    while (frame != null) {
-      val binding = frame.scope.lookup(name)
-      if (binding != null) {
-        return new ClosureLocalBinding(frameIndex, binding.index, binding.tp, binding.isMutable, binding.isBoxed)
-      }
-      frameIndex += 1
-      frame = frame.parent
+  /** Iterator over frame hierarchy starting from this frame */
+  private def frames: Iterator[LocalFrame] =
+    Iterator.iterate(this)(_.parent).takeWhile(_ != null)
+
+  /** Tail-recursive lookup through frame hierarchy */
+  @scala.annotation.tailrec
+  private def lookupInFrames(frame: LocalFrame, frameIndex: Int, name: String): ClosureLocalBinding =
+    if (frame == null) null
+    else frame.scope.lookup(name) match {
+      case null => lookupInFrames(frame.parent, frameIndex + 1, name)
+      case binding => new ClosureLocalBinding(frameIndex, binding.index, binding.tp, binding.isMutable, binding.isBoxed)
     }
-    null
-  }
+
+  def lookup(name: String): ClosureLocalBinding = lookupInFrames(this, 0, name)
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     scope.get(name).map { binding =>
@@ -83,36 +84,12 @@ class LocalFrame(val parent: LocalFrame) {
     }.orNull
   }
 
-  /**
-   * Gets all variable names visible from the current scope (including parent frames).
-   */
-  def allNames: Set[String] = {
-    var names = Set.empty[String]
-    var frame: LocalFrame = this
-    while (frame != null) {
-      names = names ++ frame.scope.allNames
-      frame = frame.parent
-    }
-    names
-  }
+  /** Gets all variable names visible from the current scope (including parent frames) */
+  def allNames: Set[String] = frames.flatMap(_.scope.allNames).toSet
 
-  def setAllClosed(closed: Boolean): Unit = {
-    var frame: LocalFrame = this
-    while (frame != null) {
-      frame.closed = closed
-      frame = frame.parent
-    }
-  }
+  def setAllClosed(closed: Boolean): Unit = frames.foreach(_.closed = closed)
 
-  def depth: Int = {
-    var frame: LocalFrame = this
-    var depth: Int = -1
-    while (frame != null) {
-      depth += 1
-      frame = frame.parent
-    }
-    depth
-  }
+  def depth: Int = frames.length - 1
 
   private def entrySet: mutable.Set[LocalBinding] = {
     val entries = new mutable.HashSet[LocalBinding]()

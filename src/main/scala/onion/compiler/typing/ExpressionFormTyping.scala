@@ -3,7 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.TypedAST.BinaryTerm.Constants.*
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
 
 final class ExpressionFormTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*

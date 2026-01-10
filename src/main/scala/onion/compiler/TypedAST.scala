@@ -83,33 +83,20 @@ object TypedAST {
    */
   object BinaryTerm {
 
-    object Constants {
-      final val ADD: Int = 0
-      final val SUBTRACT: Int = 1
-      final val MULTIPLY: Int = 2
-      final val DIVIDE: Int = 3
-      final val MOD: Int = 4
-      final val LOGICAL_AND: Int = 5
-      final val LOGICAL_OR: Int = 6
-      final val BIT_AND: Int = 7
-      final val BIT_OR: Int = 8
-      final val XOR: Int = 9
-      final val BIT_SHIFT_L2: Int = 10
-      final val BIT_SHIFT_R2: Int = 11
-      final val BIT_SHIFT_R3: Int = 12
-      final val LESS_THAN: Int = 13
-      final val GREATER_THAN: Int = 14
-      final val LESS_OR_EQUAL: Int = 15
-      final val GREATER_OR_EQUAL: Int = 16
-      final val EQUAL: Int = 17
-      final val NOT_EQUAL: Int = 18
-      final val ELVIS: Int = 19
-    }
+    /** Binary operator kinds */
+    enum Kind:
+      case ADD, SUBTRACT, MULTIPLY, DIVIDE, MOD
+      case LOGICAL_AND, LOGICAL_OR
+      case BIT_AND, BIT_OR, XOR
+      case BIT_SHIFT_L2, BIT_SHIFT_R2, BIT_SHIFT_R3
+      case LESS_THAN, GREATER_THAN, LESS_OR_EQUAL, GREATER_OR_EQUAL
+      case EQUAL, NOT_EQUAL
+      case ELVIS
 
   }
 
-  class BinaryTerm(location: Location, val kind: Int, val `type`: TypedAST.Type, val lhs: TypedAST.Term, val rhs: TypedAST.Term) extends Term(location) {
-    def this(kind: Int, `type`: TypedAST.Type, lhs: TypedAST.Term, rhs: TypedAST.Term) = {
+  class BinaryTerm(location: Location, val kind: BinaryTerm.Kind, val `type`: TypedAST.Type, val lhs: TypedAST.Term, val rhs: TypedAST.Term) extends Term(location) {
+    def this(kind: BinaryTerm.Kind, `type`: TypedAST.Type, lhs: TypedAST.Term, rhs: TypedAST.Term) = {
       this(null, kind, `type`, lhs, rhs)
     }
   }
@@ -759,17 +746,14 @@ object TypedAST {
 
   object UnaryTerm {
 
-    object Constants {
-      final val PLUS: Int = 0
-      final val MINUS: Int = 1
-      final val NOT: Int = 2
-      final val BIT_NOT: Int = 3
-    }
+    /** Unary operator kinds */
+    enum Kind:
+      case PLUS, MINUS, NOT, BIT_NOT
 
   }
 
-  class UnaryTerm(location: Location, val kind: Int, val `type`: TypedAST.Type, val operand: TypedAST.Term)  extends Term(location) {
-    def this(kind: Int, `type`: TypedAST.Type, operand: TypedAST.Term) = {
+  class UnaryTerm(location: Location, val kind: UnaryTerm.Kind, val `type`: TypedAST.Type, val operand: TypedAST.Term)  extends Term(location) {
+    def this(kind: UnaryTerm.Kind, `type`: TypedAST.Type, operand: TypedAST.Term) = {
       this(null, kind, `type`, operand)
     }
   }
@@ -973,13 +957,7 @@ object TypedAST {
     def find(target: TypedAST.ClassType, args: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef] = {
       val constructors: Set[TypedAST.ConstructorRef] = new TreeSet[TypedAST.ConstructorRef](new TypedAST.ConstructorComparator)
       if (target == null) return new Array[TypedAST.ConstructorRef](0)
-      val cs: Array[TypedAST.ConstructorRef] = target.constructors
-      var i: Int = 0
-      while (i < cs.length) {
-        val c: TypedAST.ConstructorRef = cs(i)
-        if (matcher.matches(c.getArgs, args)) constructors.add(c)
-        i += 1;
-      }
+      target.constructors.filter(c => matcher.matches(c.getArgs, args)).foreach(constructors.add)
       val selected: List[TypedAST.ConstructorRef] = new ArrayList[TypedAST.ConstructorRef]
       selected.addAll(constructors)
       Collections.sort(selected, sorter)
@@ -998,21 +976,12 @@ object TypedAST {
       sorter.compare(constructor1, constructor2) >= 0
     }
 
-    private def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean = {
-      var i: Int = 0
-      while (i < arg1.length) {
-        if (!TypeRules.isSuperType(arg1(i), arg2(i))) return false
-        i += 1
-      }
-      true
-    }
-
     private final val sorter: Comparator[TypedAST.ConstructorRef] = new Comparator[TypedAST.ConstructorRef] {
       def compare(c1: TypedAST.ConstructorRef, c2: TypedAST.ConstructorRef): Int = {
         val arg1: Array[TypedAST.Type] = c1.getArgs
         val arg2: Array[TypedAST.Type] = c2.getArgs
-        if (isAllSuperType(arg2, arg1)) return -1
-        if (isAllSuperType(arg1, arg2)) return 1
+        if (TypeRules.isAllSuperType(arg2, arg1)) return -1
+        if (TypeRules.isAllSuperType(arg1, arg2)) return 1
         0
       }
     }
@@ -1035,15 +1004,10 @@ object TypedAST {
       val args1: Array[TypedAST.Type] = c1.getArgs
       val args2: Array[TypedAST.Type] = c2.getArgs
       val result: Int = args1.length - args2.length
-      if (result != 0) {
-        return result
-      }
-      var i: Int = 0
-      while (i < args1.length) {
-        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
-        i += 1;
-      }
-      0
+      if (result != 0) return result
+      args1.zip(args2).find((a1, a2) => a1 ne a2) match
+        case Some((a1, a2)) => a1.name.compareTo(a2.name)
+        case None => 0
     }
   }
 
@@ -1080,19 +1044,7 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  object MethodFinder {
-    private def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean = {
-      var i: Int = 0
-      while (i < arg1.length) {
-        if (!TypeRules.isSuperType(arg1(i), arg2(i))) return false
-        i += 1
-      }
-      true
-    }
-  }
-
   class MethodFinder {
-    import MethodFinder._
     def find(target: TypedAST.ObjectType, name: String, arguments: Array[TypedAST.Term]): Array[TypedAST.Method] = {
       val methods: Set[TypedAST.Method] = new TreeSet[TypedAST.Method](new TypedAST.MethodComparator)
       find(methods, target, name, arguments)
@@ -1130,8 +1082,8 @@ object TypedAST {
       def compare(m1: TypedAST.Method, m2: TypedAST.Method): Int = {
         val arg1: Array[TypedAST.Type] = m1.arguments
         val arg2: Array[TypedAST.Type] = m2.arguments
-        if (isAllSuperType(arg2, arg1)) return -1
-        if (isAllSuperType(arg1, arg2)) return 1
+        if (TypeRules.isAllSuperType(arg2, arg1)) return -1
+        if (TypeRules.isAllSuperType(arg1, arg2)) return 1
         0
       }
     }
@@ -1169,12 +1121,9 @@ object TypedAST {
       val args2: Array[TypedAST.Type] = m2.arguments
       result = args1.length - args2.length
       if (result != 0) return result
-      var i: Int = 0
-      while (i < args1.length) {
-        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
-        i += 1
-      }
-      0
+      args1.zip(args2).find((a1, a2) => a1 ne a2) match
+        case Some((a1, a2)) => a1.name.compareTo(a2.name)
+        case None => 0
     }
   }
 
@@ -1246,21 +1195,9 @@ object TypedAST {
    * @author Kota Mizushima
    */
   class StandardParameterMatcher extends ParameterMatcher {
-    def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean = {
-      if (arguments.length != parameters.length) return false
-      val parameterTypes: Array[TypedAST.Type] = new Array[TypedAST.Type](parameters.length)
-      var i: Int = 0
-      while (i < parameters.length) {
-        parameterTypes(i) = parameters(i).`type`
-        i += 1
-      }
-      i = 0
-      while (i < arguments.length) {
-        if (!TypeRules.isSuperType(arguments(i), parameterTypes(i))) return false
-        i += 1;
-      }
-      true
-    }
+    def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean =
+      arguments.length == parameters.length &&
+        arguments.zip(parameters.map(_.`type`)).forall((arg, param) => TypeRules.isSuperType(arg, param))
   }
 
   abstract sealed class Type {
@@ -1334,60 +1271,45 @@ object TypedAST {
           return true
         case (lapp: TypedAST.AppliedClassType, rapp: TypedAST.AppliedClassType)
           if (lapp.raw eq rapp.raw) && lapp.typeArguments.length == rapp.typeArguments.length =>
-          var i = 0
-          while i < lapp.typeArguments.length do
-            val expectedArg = lapp.typeArguments(i)
-            val actualArg = rapp.typeArguments(i)
+          return lapp.typeArguments.zip(rapp.typeArguments).forall { (expectedArg, actualArg) =>
             expectedArg match
               case w: TypedAST.WildcardType =>
                 w.lowerBound match
-                  case Some(lb) =>
-                    if !isSuperType(actualArg, lb) then return false
-                  case None =>
-                    if !isSuperType(w.upperBound, actualArg) then return false
+                  case Some(lb) => isSuperType(actualArg, lb)
+                  case None => isSuperType(w.upperBound, actualArg)
               case tv: TypedAST.TypeVariableType =>
-                if !isSuperType(tv.upperBound, actualArg) then return false
+                isSuperType(tv.upperBound, actualArg)
               case _ =>
-                if !(expectedArg eq actualArg) then return false
-            i += 1
-          return true
+                expectedArg eq actualArg
+          }
         case _ =>
-      if (isSuperTypeForClass(left, right.superClass)) return true
-      var i: Int = 0
-      while (i < right.interfaces.length) {
-        if (isSuperTypeForClass(left, right.interfaces(i))) return true
-        i += 1
-      }
-      false
+      isSuperTypeForClass(left, right.superClass) ||
+        right.interfaces.exists(iface => isSuperTypeForClass(left, iface))
     }
 
-    private def isSuperTypeForBasic(left: TypedAST.BasicType, right: TypedAST.BasicType): Boolean = {
-      if ((left eq BasicType.VOID) && (right eq BasicType.VOID)) return true
-      if (left eq BasicType.DOUBLE) {
-        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT) || (right eq BasicType.DOUBLE))
-      }
-      if (left eq BasicType.FLOAT) {
-        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT))
-      }
-      if (left eq BasicType.LONG) {
-        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT) || (right eq BasicType.LONG))
-      }
-      if (left eq BasicType.INT) {
-        return ((right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) || (right eq BasicType.INT))
-      }
-      if (left eq BasicType.SHORT) {
-        return  ((right eq BasicType.BYTE) || (right eq BasicType.SHORT));
-      }
-      if ((left eq BasicType.BOOLEAN) && (right eq BasicType.BOOLEAN)) return true
-      if ((left eq BasicType.BYTE) && (right eq BasicType.BYTE)) return true
-      if ((left eq BasicType.CHAR) && (right eq BasicType.CHAR)) return true
-      false
+    // Map from a BasicType to the set of types that can be assigned to it
+    private val basicTypeAssignableFrom: scala.collection.immutable.Map[BasicType, scala.collection.immutable.Set[BasicType]] = {
+      import scala.collection.immutable.{Map => SMap, Set => SSet}
+      SMap(
+        BasicType.DOUBLE  -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG, BasicType.FLOAT, BasicType.DOUBLE),
+        BasicType.FLOAT   -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG, BasicType.FLOAT),
+        BasicType.LONG    -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG),
+        BasicType.INT     -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT),
+        BasicType.SHORT   -> SSet(BasicType.BYTE, BasicType.SHORT),
+        BasicType.BOOLEAN -> SSet(BasicType.BOOLEAN),
+        BasicType.BYTE    -> SSet(BasicType.BYTE),
+        BasicType.CHAR    -> SSet(BasicType.CHAR),
+        BasicType.VOID    -> SSet(BasicType.VOID)
+      )
     }
+
+    private def isSuperTypeForBasic(left: TypedAST.BasicType, right: TypedAST.BasicType): Boolean =
+      basicTypeAssignableFrom.get(left).exists(_.contains(right))
+
+    /** Check if all types in arg1 are supertypes of corresponding types in arg2 */
+    def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean =
+      arg1.zip(arg2).forall((a1, a2) => isSuperType(a1, a2))
   }
 
   class TypeRules
 }
-
-@deprecated("Use TypedAST", "0.1")
-object IRT:
-  export TypedAST.*

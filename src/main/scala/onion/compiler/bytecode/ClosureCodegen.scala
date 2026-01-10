@@ -12,16 +12,7 @@ final class ClosureCodegen(
   registerCompiledClass: CompiledClass => Unit
 ) {
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
-
-  private def boxClassName(tp: TypedAST.Type): String = tp match
-    case TypedAST.BasicType.INT     => "onion/runtime/IntBox"
-    case TypedAST.BasicType.LONG    => "onion/runtime/LongBox"
-    case TypedAST.BasicType.DOUBLE  => "onion/runtime/DoubleBox"
-    case TypedAST.BasicType.FLOAT   => "onion/runtime/FloatBox"
-    case _                          => "onion/runtime/ObjectBox"
-
-  private def boxAsmType(tp: TypedAST.Type): AsmType =
-    AsmType.getObjectType(boxClassName(tp))
+  private def boxAsmType(tp: TypedAST.Type): AsmType = asmCodeGen.boxAsmType(tp)
 
   private def capturedFieldType(capturedVar: ClosureLocalBinding): AsmType =
     if capturedVar.isBoxed then boxAsmType(capturedVar.tp) else asmType(capturedVar.tp)

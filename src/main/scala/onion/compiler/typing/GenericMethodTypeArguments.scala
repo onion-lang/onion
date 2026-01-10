@@ -38,15 +38,9 @@ private[typing] object GenericMethodTypeArguments {
       return None
     }
 
-    var subst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-    var i = 0
-    while (i < typeParams.length) {
-      subst = subst.updated(typeParams(i).name, mappedArgs(i))
-      i += 1
-    }
+    val subst = typeParams.zip(mappedArgs).map { case (p, a) => p.name -> a }.toMap
 
-    i = 0
-    while (i < typeParams.length) {
+    val allBoundsOk = typeParams.indices.forall { i =>
       val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
       val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
       val arg = mappedArgs(i)
@@ -55,10 +49,10 @@ private[typing] object GenericMethodTypeArguments {
           val position = if (typeArgNodes == null || i >= typeArgNodes.length) callNode else typeArgNodes(i)
           report(INCOMPATIBLE_TYPE, position, upper, arg)
         }
-        return None
-      }
-      i += 1
+        false
+      } else true
     }
+    if (!allBoundsOk) return None
 
     Some(subst)
   }
@@ -80,19 +74,19 @@ private[typing] object GenericMethodTypeArguments {
     classSubst: scala.collection.immutable.Map[String, Type]
   ): Option[scala.collection.immutable.Map[String, Type]] = {
     import typing.*
-    val mappedArgs = new Array[Type](typeArgs.length)
-    var i = 0
-    while (i < typeArgs.length) {
-      val mapped = mapFrom(typeArgs(i))
-      if (mapped == null) return None
-      if (mapped eq BasicType.VOID) {
-        report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mapped.name)
-        return None
+    val mappedArgsOpt = typeArgs.foldLeft(Option(Array.empty[Type])) { (accOpt, typeArg) =>
+      accOpt.flatMap { acc =>
+        val mapped = mapFrom(typeArg)
+        if (mapped == null) None
+        else if (mapped eq BasicType.VOID) {
+          report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name)
+          None
+        } else Some(acc :+ mapped)
       }
-      mappedArgs(i) = mapped
-      i += 1
     }
-    explicitFromMappedArgs(typing, callNode, method, mappedArgs, classSubst, typeArgNodes = typeArgs.toArray)
+    mappedArgsOpt.flatMap(mappedArgs =>
+      explicitFromMappedArgs(typing, callNode, method, mappedArgs, classSubst, typeArgNodes = typeArgs.toArray)
+    )
   }
 
   def infer(
@@ -175,11 +169,7 @@ private[typing] object GenericMethodTypeArguments {
         case apf: TypedAST.AppliedClassType =>
           def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
             if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
-              var i = 0
-              while (i < apf.typeArguments.length) {
-                unify(apf.typeArguments(i), apa.typeArguments(i), position)
-                i += 1
-              }
+              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position) }
 
           actual match
             case apa: TypedAST.AppliedClassType =>
@@ -206,11 +196,7 @@ private[typing] object GenericMethodTypeArguments {
 
     val formalArgs =
       method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-    var i = 0
-    while (i < formalArgs.length && i < args.length) {
-      unify(formalArgs(i), args(i).`type`, callNode)
-      i += 1
-    }
+    formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
 
     if (expectedReturn != null) {
       val formalReturn =

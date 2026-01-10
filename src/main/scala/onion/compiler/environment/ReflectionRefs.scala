@@ -13,15 +13,17 @@ import java.lang.reflect.{GenericArrayType, ParameterizedType, Type, TypeVariabl
 import java.util.{ArrayList, List}
 
 object ReflectionRefs {
-  private def toOnionModifier(src: Int): Int = {
-    ((if ((src & java.lang.reflect.Modifier.PRIVATE) != 0) Modifier.PRIVATE else 0)
-      | (if ((src & java.lang.reflect.Modifier.PROTECTED) != 0) Modifier.PROTECTED else 0)
-      | (if ((src & java.lang.reflect.Modifier.PUBLIC) != 0) Modifier.PUBLIC else 0)
-      | (if ((src & java.lang.reflect.Modifier.STATIC) != 0) Modifier.STATIC else 0)
-      | (if ((src & java.lang.reflect.Modifier.SYNCHRONIZED) != 0) Modifier.SYNCHRONIZED else 0)
-      | (if ((src & java.lang.reflect.Modifier.ABSTRACT) != 0) Modifier.ABSTRACT else 0)
-      | (if ((src & java.lang.reflect.Modifier.FINAL) != 0) Modifier.FINAL else 0))
-  }
+  import java.lang.reflect.{Modifier => JMod}
+  private val reflectModifierMappings = Seq(
+    JMod.PRIVATE -> Modifier.PRIVATE, JMod.PROTECTED -> Modifier.PROTECTED,
+    JMod.PUBLIC -> Modifier.PUBLIC, JMod.STATIC -> Modifier.STATIC,
+    JMod.SYNCHRONIZED -> Modifier.SYNCHRONIZED, JMod.ABSTRACT -> Modifier.ABSTRACT,
+    JMod.FINAL -> Modifier.FINAL
+  )
+  private def toOnionModifier(src: Int): Int =
+    reflectModifierMappings.foldLeft(0) { case (acc, (srcFlag, dstFlag)) =>
+      if ((src & srcFlag) != 0) acc | dstFlag else acc
+    }
 
   final val CONSTRUCTOR_NAME = "<init>"
 

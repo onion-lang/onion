@@ -3,7 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.TypedAST.BinaryTerm.Constants.*
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
@@ -16,14 +16,13 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     termOpt match {
       case None => null
       case Some(term) =>
-        var result = term
         // Try to unbox Boolean wrapper type
-        if (!result.isBasicType) {
-          Boxing.unboxedType(table_, result.`type`) match {
-            case Some(BasicType.BOOLEAN) => result = Boxing.unboxing(table_, result, BasicType.BOOLEAN)
-            case _ => // will fail below
+        val result = if (!term.isBasicType) {
+          Boxing.unboxedType(table_, term.`type`) match {
+            case Some(BasicType.BOOLEAN) => Boxing.unboxing(table_, term, BasicType.BOOLEAN)
+            case _ => term
           }
-        }
+        } else term
         if (result.`type` != BasicType.BOOLEAN) {
           report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
         }

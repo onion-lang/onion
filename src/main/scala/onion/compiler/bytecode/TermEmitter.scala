@@ -1,8 +1,8 @@
 package onion.compiler.bytecode
 
 import onion.compiler.TypedAST.*
-import onion.compiler.TypedAST.BinaryTerm.Constants.*
-import onion.compiler.TypedAST.UnaryTerm.Constants.*
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.TypedAST.UnaryTerm.Kind.*
 import org.objectweb.asm.{Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.GeneratorAdapter
 

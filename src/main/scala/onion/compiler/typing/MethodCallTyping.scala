@@ -9,6 +9,36 @@ import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
 
+/** Well-known method names used in method resolution */
+private object MethodNames {
+  val LENGTH = "length"
+  val SIZE = "size"
+  val GET_PREFIX = "get"
+  val IS_PREFIX = "is"
+}
+
+/** Type substitution helpers to reduce boilerplate */
+private object TypeSubst {
+  import scala.collection.immutable.Map
+
+  /** Substitute type with only class-level type parameters from target type */
+  def withClassOnly(typ: TypedAST.Type, targetType: TypedAST.Type): TypedAST.Type =
+    TypeSubstitution.substituteType(
+      typ,
+      TypeSubstitution.classSubstitution(targetType),
+      Map.empty,
+      defaultToBound = true
+    )
+
+  /** Substitute type with both class and method type parameters */
+  def apply(typ: TypedAST.Type, classSubst: Map[String, TypedAST.Type], methodSubst: Map[String, TypedAST.Type]): TypedAST.Type =
+    TypeSubstitution.substituteType(typ, classSubst, methodSubst, defaultToBound = true)
+
+  /** Substitute all argument types of a method */
+  def args(method: TypedAST.Method, classSubst: Map[String, TypedAST.Type], methodSubst: Map[String, TypedAST.Type]): Array[TypedAST.Type] =
+    method.arguments.map(tp => apply(tp, classSubst, methodSubst))
+}
+
 final class MethodCallTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
@@ -22,6 +52,82 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   private case class StaticImportAmbiguous(first: Method, second: Method) extends StaticImportResolution
   private case object StaticImportNoMatch extends StaticImportResolution
   private case class StaticApplicable(method: Method, expectedArgs: Array[Type], methodSubst: scala.collection.immutable.Map[String, Type])
+
+  /** Collects methods matching the filter from a type hierarchy into candidates set */
+  private def collectMethodsMatching(
+    tp: ObjectType,
+    name: String,
+    candidates: JTreeSet[Method],
+    filter: Method => Boolean
+  ): Unit = {
+    def collect(t: ObjectType): Unit = {
+      if (t == null) return
+      t.methods(name).foreach { m =>
+        if (filter(m)) candidates.add(m)
+      }
+      collect(t.superClass)
+      t.interfaces.foreach(collect)
+    }
+    collect(tp)
+  }
+
+  /** Filter for instance (non-static) methods */
+  private def isInstanceMethod(m: Method): Boolean = (m.modifier & AST.M_STATIC) == 0
+
+  /** Filter for static methods */
+  private def isStaticMethod(m: Method): Boolean = (m.modifier & AST.M_STATIC) != 0
+
+  /** Information extracted from named arguments */
+  private case class NamedArgInfo(namedArgNames: Set[String], positionalCount: Int)
+
+  /** Extract named argument information from expression list */
+  private def extractNamedArgInfo(args: Seq[AST.Expression]): NamedArgInfo = {
+    val namedArgNames = args.collect { case na: AST.NamedArgument => na.name }.toSet
+    val positionalCount = args.takeWhile(!_.isInstanceOf[AST.NamedArgument]).size
+    NamedArgInfo(namedArgNames, positionalCount)
+  }
+
+  /** Filter methods by named argument compatibility */
+  private def filterByNamedArgs(candidates: JTreeSet[Method], info: NamedArgInfo): List[Method] =
+    candidates.asScala.filter { method =>
+      val paramNames = method.argumentsWithDefaults.map(_.name).toSet
+      info.namedArgNames.subsetOf(paramNames) && info.positionalCount <= method.arguments.length
+    }.toList
+
+  /** Process parameters with type checking, returns None on error */
+  private def processParamsWithExpected(
+    node: AST.Node,
+    params: Array[Term],
+    expectedArgs: Array[Type]
+  ): Option[Array[Term]] = {
+    var i = 0
+    var hasError = false
+    while (i < params.length && !hasError) {
+      val processed = processAssignable(node, expectedArgs(i), params(i))
+      if (processed == null) {
+        hasError = true
+      } else {
+        params(i) = processed
+      }
+      i += 1
+    }
+    if (hasError) None else Some(params)
+  }
+
+  /** Process parameters with args and expected types, returns None on error */
+  private def processParamsWithArgs(
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    expectedArgs: Array[Type]
+  ): Option[Array[Term]] = {
+    var i = 0
+    var hasError = false
+    while i < params.length && !hasError do
+      params(i) = processAssignable(args(i), expectedArgs(i), params(i))
+      if params(i) == null then hasError = true
+      i += 1
+    if hasError then None else Some(params)
+  }
 
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
     val contextClass = definition_
@@ -46,7 +152,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     if (!MemberAccess.ensureTypeAccessible(typing, node, targetType, contextClass)) return None
     val name = node.name
     if (target.`type`.isArrayType) {
-      if (name.equals("length") || name.equals("size")) {
+      if (name.equals(MethodNames.LENGTH) || name.equals(MethodNames.SIZE)) {
         return Some(new ArrayLength(target))
       } else {
         return None
@@ -56,42 +162,25 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
       val ref = new RefField(target, field)
       val castType =
-        TypeSubstitution.substituteType(ref.`type`, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
+        TypeSubst.withClassOnly(ref.`type`, target.`type`)
       return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
     }
 
-    tryFindMethod(node, targetType, name, new Array[Term](0)) match {
-      case Right(method) =>
-        val call = new Call(target, method, new Array[Term](0))
-        val castType =
-          TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-        return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-      case Left(continuable) =>
-        if (!continuable) return None
+    // Try method name, then getter pattern, then boolean getter pattern
+    for (methodName <- Seq(name, getter(name), getterBoolean(name))) {
+      tryFindMethod(node, targetType, methodName, Array.empty) match {
+        case Right(method) =>
+          val call = new Call(target, method, Array.empty)
+          val castType = TypeSubst.withClassOnly(method.returnType, target.`type`)
+          return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        case Left(false) => return None
+        case Left(true) => // continue to next name
+      }
     }
-    tryFindMethod(node, targetType, getter(name), new Array[Term](0)) match {
-      case Right(method) =>
-        val call = new Call(target, method, new Array[Term](0))
-        val castType =
-          TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-        return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-      case Left(continuable) =>
-        if (!continuable) return None
-    }
-    tryFindMethod(node, targetType, getterBoolean(name), new Array[Term](0)) match {
-      case Right(method) =>
-        val call = new Call(target, method, new Array[Term](0))
-        val castType =
-          TypeSubstitution.substituteType(method.returnType, TypeSubstitution.classSubstitution(target.`type`), scala.collection.immutable.Map.empty, defaultToBound = true)
-        Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-      case Left(_) =>
-        if (field == null) {
-          report(FIELD_NOT_FOUND, node, targetType, node.name)
-        } else {
-          report(FIELD_NOT_ACCESSIBLE, node, targetType, node.name, definition_)
-        }
-        None
-    }
+    // None of the method patterns matched
+    if (field == null) report(FIELD_NOT_FOUND, node, targetType, node.name)
+    else report(FIELD_NOT_ACCESSIBLE, node, targetType, node.name, definition_)
+    None
   }
 
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
@@ -152,19 +241,16 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
         }
 
-      val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-      var i = 0
-      while (i < params.length) {
-        params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
-        if (params(i) == null) return None
-        i += 1
-      }
+      val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+      processParamsWithArgs(node.args, params, expectedArgs) match
+        case None => return None
+        case Some(_) => ()
 
       // デフォルト引数で足りない分を補完
       val finalParams = fillDefaultArguments(params, method)
 
       val call = new Call(target, method, finalParams)
-      val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+      val castType = TypeSubst(method.returnType, classSubst, methodSubst)
       Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
     }
   }
@@ -174,31 +260,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     // 名前付き引数がある場合は、全てのメソッドから名前でフィルタリング
     val candidates = new JTreeSet[Method](new MethodComparator)
-
-    def collectMethods(tp: ObjectType): Unit = {
-      if (tp == null) return
-      tp.methods(name).foreach { m =>
-        if ((m.modifier & AST.M_STATIC) == 0) candidates.add(m)
-      }
-      collectMethods(tp.superClass)
-      tp.interfaces.foreach(collectMethods)
-    }
-
-    collectMethods(targetType)
+    collectMethodsMatching(targetType, name, candidates, isInstanceMethod)
     if (candidates.isEmpty) {
       report(METHOD_NOT_FOUND, node, targetType, name, Array[Type]())
       return None
     }
 
-    // 名前付き引数の名前を取得
-    val namedArgNames = node.args.collect { case na: AST.NamedArgument => na.name }.toSet
-    val positionalCount = node.args.takeWhile(!_.isInstanceOf[AST.NamedArgument]).size
-
-    // パラメータ名が一致するメソッドをフィルタ
-    val applicable = candidates.asScala.filter { method =>
-      val paramNames = method.argumentsWithDefaults.map(_.name).toSet
-      namedArgNames.subsetOf(paramNames) && positionalCount <= method.arguments.length
-    }.toList
+    // 名前付き引数でフィルタリング
+    val info = extractNamedArgInfo(node.args)
+    val applicable = filterByNamedArgs(candidates, info)
 
     if (applicable.isEmpty) {
       report(METHOD_NOT_FOUND, node, targetType, name, Array[Type]())
@@ -228,23 +298,14 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
               GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
             }
 
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          var hasError = false
-          while (i < params.length && !hasError) {
-            val processed = processAssignable(node, expectedArgs(i), params(i))
-            if (processed == null) {
-              hasError = true
-            } else {
-              params(i) = processed
-            }
-            i += 1
+          val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+          processParamsWithExpected(node, params, expectedArgs) match {
+            case Some(processedParams) =>
+              val call = new Call(target, method, processedParams)
+              val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+            case None => None
           }
-          if (hasError) return None
-
-          val call = new Call(target, method, params)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
         case None =>
           None
       }
@@ -292,29 +353,26 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
         }
 
-      val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-      var i = 0
-      while (i < params.length) {
-        params(i) = processAssignable(node.args(i), expectedArgs(i), params(i))
-        if (params(i) == null) return None
-        i += 1
-      }
+      val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+      processParamsWithArgs(node.args, params, expectedArgs) match
+        case None => return None
+        case Some(_) => ()
 
       // デフォルト引数で足りない分を補完
       val finalParams = fillDefaultArguments(params, method)
 
       if ((methods(0).modifier & AST.M_STATIC) != 0) {
         val call = new CallStatic(targetType, method, finalParams)
-        val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+        val castType = TypeSubst(method.returnType, classSubst, methodSubst)
         Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
       } else {
         if (context.isClosure) {
           val call = new Call(new OuterThis(targetType), method, finalParams)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          val castType = TypeSubst(method.returnType, classSubst, methodSubst)
           Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
         } else {
           val call = new Call(new This(targetType), method, finalParams)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+          val castType = TypeSubst(method.returnType, classSubst, methodSubst)
           Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
         }
       }
@@ -326,29 +384,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     // 名前付き引数がある場合は、全てのメソッドから名前でフィルタリング
     val candidates = new JTreeSet[Method](new MethodComparator)
-
-    def collectMethods(tp: ObjectType): Unit = {
-      if (tp == null) return
-      tp.methods(node.name).foreach(candidates.add)
-      collectMethods(tp.superClass)
-      tp.interfaces.foreach(collectMethods)
-    }
-
-    collectMethods(targetType)
+    collectMethodsMatching(targetType, node.name, candidates, _ => true)
     if (candidates.isEmpty) {
       report(METHOD_NOT_FOUND, node, targetType, node.name, Array[Type]())
       return None
     }
 
-    // 名前付き引数の名前を取得
-    val namedArgNames = node.args.collect { case na: AST.NamedArgument => na.name }.toSet
-    val positionalCount = node.args.takeWhile(!_.isInstanceOf[AST.NamedArgument]).size
-
-    // パラメータ名が一致するメソッドをフィルタ
-    val applicable = candidates.asScala.filter { method =>
-      val paramNames = method.argumentsWithDefaults.map(_.name).toSet
-      namedArgNames.subsetOf(paramNames) && positionalCount <= method.arguments.length
-    }.toList
+    // 名前付き引数でフィルタリング
+    val info = extractNamedArgInfo(node.args)
+    val applicable = filterByNamedArgs(candidates, info)
 
     if (applicable.isEmpty) {
       report(METHOD_NOT_FOUND, node, targetType, node.name, Array[Type]())
@@ -378,34 +422,25 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
               GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
             }
 
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          var hasError = false
-          while (i < params.length && !hasError) {
-            val processed = processAssignable(node, expectedArgs(i), params(i))
-            if (processed == null) {
-              hasError = true
-            } else {
-              params(i) = processed
-            }
-            i += 1
-          }
-          if (hasError) return None
-
-          if ((method.modifier & AST.M_STATIC) != 0) {
-            val call = new CallStatic(targetType, method, params)
-            val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-            Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-          } else {
-            if (context.isClosure) {
-              val call = new Call(new OuterThis(targetType), method, params)
-              val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-            } else {
-              val call = new Call(new This(targetType), method, params)
-              val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
-            }
+          val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+          processParamsWithExpected(node, params, expectedArgs) match {
+            case Some(processedParams) =>
+              if ((method.modifier & AST.M_STATIC) != 0) {
+                val call = new CallStatic(targetType, method, processedParams)
+                val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+                Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+              } else {
+                if (context.isClosure) {
+                  val call = new Call(new OuterThis(targetType), method, processedParams)
+                  val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+                  Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+                } else {
+                  val call = new Call(new This(targetType), method, processedParams)
+                  val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+                  Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+                }
+              }
+            case None => None
           }
         case None =>
           None
@@ -468,17 +503,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   ): StaticImportResolution = {
     val name = node.name
     val candidates = new JTreeSet[Method](new MethodComparator)
-
-    def collectStatics(tp: ObjectType): Unit = {
-      if (tp == null) return
-      tp.methods(name).foreach { m =>
-        if ((m.modifier & AST.M_STATIC) != 0) candidates.add(m)
-      }
-      collectStatics(tp.superClass)
-      tp.interfaces.foreach(collectStatics)
-    }
-
-    collectStatics(typeRef)
+    collectMethodsMatching(typeRef, name, candidates, isStaticMethod)
     if (candidates.isEmpty) return StaticImportNoMatch
 
     val applicable = candidates.asScala.flatMap { method =>
@@ -497,7 +522,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           Some(GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected))
       }
       methodSubstOpt.flatMap { methodSubst =>
-        val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+        val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
         // デフォルト引数を考慮: minArguments <= params.length <= expectedArgs.length
         if (params.length < method.minArguments || params.length > expectedArgs.length) None
         else {
@@ -535,17 +560,10 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   ): Either[StaticImportAmbiguous, StaticApplicable] = {
     if (applicable.length == 1) return Right(applicable.head)
 
-    def isAllSuperType(a: Array[Type], b: Array[Type]): Boolean =
-      var i = 0
-      while i < a.length do
-        if !TypeRules.isSuperType(a(i), b(i)) then return false
-        i += 1
-      true
-
     val sorter: java.util.Comparator[StaticApplicable] = new java.util.Comparator[StaticApplicable] {
       def compare(a1: StaticApplicable, a2: StaticApplicable): Int =
-        if isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
-        else if isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
+        if TypeRules.isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
+        else if TypeRules.isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
         else 0
     }
 
@@ -588,7 +606,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     // デフォルト引数で足りない分を補完
     val finalParams = fillDefaultArguments(params, method)
     val call = new CallStatic(typeRef, method, finalParams)
-    val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+    val castType = TypeSubst(method.returnType, classSubst, methodSubst)
     if (castType eq method.returnType) call else new AsInstanceOf(call, castType)
   }
 
@@ -612,6 +630,19 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       Some(new RefStaticField(typeRef, field))
     }
   }
+
+  /** Create a CallStatic with type substitution and optional cast */
+  private def makeStaticCall(
+    typeRef: ClassType,
+    method: Method,
+    parameters: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    methodSubst: scala.collection.immutable.Map[String, Type]
+  ): Some[Term] =
+    val finalParams = fillDefaultArguments(parameters, method)
+    val call = new CallStatic(typeRef, method, finalParams)
+    val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+    Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
@@ -643,33 +674,16 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
               case None => return None
             }
 
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          while (i < parameters.length) {
-            parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
-            if (parameters(i) == null) return None
-            i += 1
-          }
+          val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+          processParamsWithArgs(node.args, parameters, expectedArgs) match
+            case None => return None
+            case Some(_) => ()
 
-          // デフォルト引数で足りない分を補完
-          val finalParams = fillDefaultArguments(parameters, method)
-          val call = new CallStatic(typeRef, method, finalParams)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          makeStaticCall(typeRef, method, parameters, classSubst, methodSubst)
         }
       } else {
         val candidates = new JTreeSet[Method](new MethodComparator)
-
-        def collectStatics(tp: ObjectType): Unit = {
-          if (tp == null) return
-          tp.methods(node.name).foreach { m =>
-            if ((m.modifier & AST.M_STATIC) != 0) candidates.add(m)
-          }
-          collectStatics(tp.superClass)
-          tp.interfaces.foreach(collectStatics)
-        }
-
-        collectStatics(typeRef)
+        collectMethodsMatching(typeRef, node.name, candidates, isStaticMethod)
         if (candidates.isEmpty) {
           report(METHOD_NOT_FOUND, node, typeRef, node.name, types(parameters))
           return None
@@ -680,18 +694,12 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         val applicable = candidates.asScala.flatMap { method =>
           val classSubst = TypeSubstitution.classSubstitution(typeRef)
           val methodSubst = GenericMethodTypeArguments.infer(typing, node, method, parameters, classSubst, expected)
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
+          val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
           // デフォルト引数を考慮: minArguments <= parameters.length <= expectedArgs.length
           if (parameters.length < method.minArguments || parameters.length > expectedArgs.length) None
-          else {
-            var ok = true
-            var i = 0
-            while (i < parameters.length && ok) {
-              ok = TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`)
-              i += 1
-            }
-            if (ok) Some(Applicable(method, expectedArgs, methodSubst)) else None
-          }
+          else Option.when(
+            parameters.indices.forall(i => TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`))
+          )(Applicable(method, expectedArgs, methodSubst))
         }.toList
 
         if (applicable.isEmpty) {
@@ -700,29 +708,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         } else if (applicable.length == 1) {
           val selected = applicable.head
           val classSubst = TypeSubstitution.classSubstitution(typeRef)
-          var i = 0
-          while (i < parameters.length) {
-            parameters(i) = processAssignable(node.args(i), selected.expectedArgs(i), parameters(i))
-            if (parameters(i) == null) return None
-            i += 1
-          }
-          // デフォルト引数で足りない分を補完
-          val finalParams = fillDefaultArguments(parameters, selected.method)
-          val call = new CallStatic(typeRef, selected.method, finalParams)
-          val castType = TypeSubstitution.substituteType(selected.method.returnType, classSubst, selected.methodSubst, defaultToBound = true)
-          Some(if (castType eq selected.method.returnType) call else new AsInstanceOf(call, castType))
+          processParamsWithArgs(node.args, parameters, selected.expectedArgs) match
+            case None => return None
+            case Some(_) => ()
+          makeStaticCall(typeRef, selected.method, parameters, classSubst, selected.methodSubst)
         } else {
-          def isAllSuperType(a: Array[Type], b: Array[Type]): Boolean =
-            var i = 0
-            while i < a.length do
-              if !TypeRules.isSuperType(a(i), b(i)) then return false
-              i += 1
-            true
-
           val sorter: java.util.Comparator[Applicable] = new java.util.Comparator[Applicable] {
             def compare(a1: Applicable, a2: Applicable): Int =
-              if isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
-              else if isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
+              if TypeRules.isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
+              else if TypeRules.isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
               else 0
           }
 
@@ -732,17 +726,10 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           if (selected.size < 2) {
             val only = selected.get(0)
             val classSubst = TypeSubstitution.classSubstitution(typeRef)
-            var i = 0
-            while (i < parameters.length) {
-              parameters(i) = processAssignable(node.args(i), only.expectedArgs(i), parameters(i))
-              if (parameters(i) == null) return None
-              i += 1
-            }
-            // デフォルト引数で足りない分を補完
-            val finalParams = fillDefaultArguments(parameters, only.method)
-            val call = new CallStatic(typeRef, only.method, finalParams)
-            val castType = TypeSubstitution.substituteType(only.method.returnType, classSubst, only.methodSubst, defaultToBound = true)
-            Some(if (castType eq only.method.returnType) call else new AsInstanceOf(call, castType))
+            processParamsWithArgs(node.args, parameters, only.expectedArgs) match
+              case None => return None
+              case Some(_) => ()
+            makeStaticCall(typeRef, only.method, parameters, classSubst, only.methodSubst)
           } else {
             val a1 = selected.get(0)
             val a2 = selected.get(1)
@@ -751,17 +738,10 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
               None
             } else {
               val classSubst = TypeSubstitution.classSubstitution(typeRef)
-              var i = 0
-              while (i < parameters.length) {
-                parameters(i) = processAssignable(node.args(i), a1.expectedArgs(i), parameters(i))
-                if (parameters(i) == null) return None
-                i += 1
-              }
-              // デフォルト引数で足りない分を補完
-              val finalParams = fillDefaultArguments(parameters, a1.method)
-              val call = new CallStatic(typeRef, a1.method, finalParams)
-              val castType = TypeSubstitution.substituteType(a1.method.returnType, classSubst, a1.methodSubst, defaultToBound = true)
-              Some(if (castType eq a1.method.returnType) call else new AsInstanceOf(call, castType))
+              processParamsWithArgs(node.args, parameters, a1.expectedArgs) match
+                case None => return None
+                case Some(_) => ()
+              makeStaticCall(typeRef, a1.method, parameters, classSubst, a1.methodSubst)
             }
           }
         }
@@ -772,30 +752,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   private def typeStaticMethodCallWithNamedArgs(node: AST.StaticMethodCall, typeRef: ClassType, context: LocalContext, expected: Type): Option[Term] = {
     val candidates = new JTreeSet[Method](new MethodComparator)
 
-    def collectStatics(tp: ObjectType): Unit = {
-      if (tp == null) return
-      tp.methods(node.name).foreach { m =>
-        if ((m.modifier & AST.M_STATIC) != 0) candidates.add(m)
-      }
-      collectStatics(tp.superClass)
-      tp.interfaces.foreach(collectStatics)
-    }
-
-    collectStatics(typeRef)
+    collectMethodsMatching(typeRef, node.name, candidates, isStaticMethod)
     if (candidates.isEmpty) {
       report(METHOD_NOT_FOUND, node, typeRef, node.name, Array[Type]())
       return None
     }
 
-    // 名前付き引数の名前を取得
-    val namedArgNames = node.args.collect { case na: AST.NamedArgument => na.name }.toSet
-    val positionalCount = node.args.takeWhile(!_.isInstanceOf[AST.NamedArgument]).size
-
-    // パラメータ名が一致するメソッドをフィルタ
-    val applicable = candidates.asScala.filter { method =>
-      val paramNames = method.argumentsWithDefaults.map(_.name).toSet
-      namedArgNames.subsetOf(paramNames) && positionalCount <= method.arguments.length
-    }.toList
+    // ヘルパーメソッドで名前付き引数情報を抽出・フィルタ
+    val info = extractNamedArgInfo(node.args)
+    val applicable = filterByNamedArgs(candidates, info)
 
     if (applicable.isEmpty) {
       report(METHOD_NOT_FOUND, node, typeRef, node.name, Array[Type]())
@@ -820,23 +785,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
               GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
             }
 
-          val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-          var i = 0
-          var hasError = false
-          while (i < params.length && !hasError) {
-            val processed = processAssignable(node, expectedArgs(i), params(i))
-            if (processed == null) {
-              hasError = true
-            } else {
-              params(i) = processed
-            }
-            i += 1
+          val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+          processParamsWithExpected(node, params, expectedArgs) match {
+            case Some(processedParams) =>
+              val call = new CallStatic(typeRef, method, processedParams)
+              val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+            case None =>
+              None
           }
-          if (hasError) return None
-
-          val call = new CallStatic(typeRef, method, params)
-          val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
         case None =>
           None
       }
@@ -860,17 +817,14 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             GenericMethodTypeArguments.infer(typing, node, method, parameters, classSubst, expected)
           }
 
-        val expectedArgs = method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, methodSubst, defaultToBound = true))
-        var i = 0
-        while (i < parameters.length) {
-          parameters(i) = processAssignable(node.args(i), expectedArgs(i), parameters(i))
-          if (parameters(i) == null) return None
-          i += 1
-        }
+        val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+        processParamsWithArgs(node.args, parameters, expectedArgs) match
+          case None => return None
+          case Some(_) => ()
         // デフォルト引数で足りない分を補完
         val finalParams = fillDefaultArguments(parameters, method)
         val call = new CallSuper(new This(contextClass), method, finalParams)
-        val castType = TypeSubstitution.substituteType(method.returnType, classSubst, methodSubst, defaultToBound = true)
+        val castType = TypeSubst(method.returnType, classSubst, methodSubst)
         Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
       case Left(_) =>
         report(METHOD_NOT_FOUND, node, contextClass, node.name, types(parameters))
@@ -897,10 +851,10 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     body.typeNames(types)
 
   private def getter(name: String): String =
-    "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
+    MethodNames.GET_PREFIX + Character.toUpperCase(name.charAt(0)) + name.substring(1)
 
   private def getterBoolean(name: String): String =
-    "is" + Character.toUpperCase(name.charAt(0)) + name.substring(1)
+    MethodNames.IS_PREFIX + Character.toUpperCase(name.charAt(0)) + name.substring(1)
 
   /**
    * 名前付き引数を含む引数リストを並べ替えて型付けする

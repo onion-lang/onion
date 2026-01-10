@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
@@ -126,7 +127,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         val combinedCond = bindingInfo match {
           case MultiBindings(_, _, nestedConds) if nestedConds.nonEmpty =>
             nestedConds.foldLeft(cond) { (acc, nested) =>
-              new BinaryTerm(BinaryTerm.Constants.LOGICAL_AND, BasicType.BOOLEAN, acc, nested)
+              new BinaryTerm(LOGICAL_AND, BasicType.BOOLEAN, acc, nested)
             }
           case _ => cond
         }
@@ -336,6 +337,12 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     }
   }
 
+  /** Find the getter method for a field in a record type */
+  private def findFieldGetter(classDef: ClassDefinition, fieldName: String): Option[Method] =
+    val getters = classDef.methods(fieldName)
+    if getters.isEmpty then None
+    else Some(getters.find(m => m.arguments.isEmpty).getOrElse(getters.head))
+
   /** Returns (condition, pattern binding info, hasWildcard, optional guard info) */
   private def processPatterns(patterns: Array[AST.Pattern], conditionType: Type, bind: ClosureLocalBinding, context: LocalContext): (Term, PatternBindingInfo, Boolean, Option[GuardInfo]) = boundary {
     var bindingInfo: PatternBindingInfo = NoBindings
@@ -367,7 +374,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         if (normalizedExpr.isReferenceType) {
           body.createEqualsForRef(new RefLocal(bind), normalizedExpr)
         } else {
-          new BinaryTerm(BinaryTerm.Constants.EQUAL, BasicType.BOOLEAN, new RefLocal(bind), normalizedExpr)
+          new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), normalizedExpr)
         }
 
       case tp @ AST.TypePattern(_, name, typeRef) =>
@@ -427,12 +434,10 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         val rootAccessPath = List(AccessStep(recordType.asInstanceOf[ClassType], null)) // placeholder for root cast
 
         for ((fieldPattern, field) <- fieldPatterns.zip(fields)) {
-          val getters = classDef.methods(field.name)
-          if (getters.isEmpty) {
+          val getter = findFieldGetter(classDef, field.name).getOrElse {
             report(NOT_A_RECORD_TYPE, dp, constructor)
             break((null, NoBindings, false, None))
           }
-          val getter = getters.find(m => m.arguments.isEmpty).getOrElse(getters.head)
           val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))
 
           fieldPattern match {
@@ -472,12 +477,10 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
               // Process nested field patterns
               for ((nestedFieldPattern, nestedField) <- nestedFieldPatterns.zip(nestedFields)) {
-                val nestedGetters = nestedClassDef.methods(nestedField.name)
-                if (nestedGetters.isEmpty) {
+                val nestedGetter = findFieldGetter(nestedClassDef, nestedField.name).getOrElse {
                   report(NOT_A_RECORD_TYPE, nested, nestedCtor)
                   break((null, NoBindings, false, None))
                 }
-                val nestedGetter = nestedGetters.find(m => m.arguments.isEmpty).getOrElse(nestedGetters.head)
                 val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
 
                 nestedFieldPattern match {
@@ -549,7 +552,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
     // Combine conditions with OR
     val combined = conditions.reduceLeft { (acc, cond) =>
-      new BinaryTerm(BinaryTerm.Constants.LOGICAL_OR, BasicType.BOOLEAN, acc, cond)
+      new BinaryTerm(LOGICAL_OR, BasicType.BOOLEAN, acc, cond)
     }
 
     (combined, bindingInfo, hasWildcard, guardInfo)
@@ -730,14 +733,13 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed). */
   private def ensureBoolean(node: AST.Node, term: Term): Term = {
     if (term == null) return null
-    var result = term
     // Try to unbox Boolean wrapper type
-    if (!result.isBasicType) {
-      Boxing.unboxedType(table_, result.`type`) match {
-        case Some(BasicType.BOOLEAN) => result = Boxing.unboxing(table_, result, BasicType.BOOLEAN)
-        case _ => // will fail below
+    val result = if (!term.isBasicType) {
+      Boxing.unboxedType(table_, term.`type`) match {
+        case Some(BasicType.BOOLEAN) => Boxing.unboxing(table_, term, BasicType.BOOLEAN)
+        case _ => term
       }
-    }
+    } else term
     if (result.`type` != BasicType.BOOLEAN) {
       report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
     }

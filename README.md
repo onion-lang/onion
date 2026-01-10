@@ -81,9 +81,6 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 * Currently, `onionc` has edge cases.  The compiler crashes sometimes.
   The source codes in example directory compiles and is executed correctly.
 
-* There are some partially supported features.  For example, `finally` clause
-  in try-catch is not supported yet.
-
 ## BuildHive (Jenkins)
 
 This software includes softwares developed by [Apache Software Foundation](http://www.apache.org/).

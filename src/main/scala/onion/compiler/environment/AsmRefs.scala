@@ -7,17 +7,16 @@ import org.objectweb.asm.tree.{ClassNode, MethodNode, FieldNode}
 import scala.collection.mutable
 
 object AsmRefs {
-  private def toOnionModifier(access: Int): Int = {
-    var mod = 0
-    if ((access & Opcodes.ACC_PRIVATE) != 0) mod |= Modifier.PRIVATE
-    if ((access & Opcodes.ACC_PROTECTED) != 0) mod |= Modifier.PROTECTED
-    if ((access & Opcodes.ACC_PUBLIC) != 0) mod |= Modifier.PUBLIC
-    if ((access & Opcodes.ACC_STATIC) != 0) mod |= Modifier.STATIC
-    if ((access & Opcodes.ACC_SYNCHRONIZED) != 0) mod |= Modifier.SYNCHRONIZED
-    if ((access & Opcodes.ACC_ABSTRACT) != 0) mod |= Modifier.ABSTRACT
-    if ((access & Opcodes.ACC_FINAL) != 0) mod |= Modifier.FINAL
-    mod
-  }
+  private val asmModifierMappings = Seq(
+    Opcodes.ACC_PRIVATE -> Modifier.PRIVATE, Opcodes.ACC_PROTECTED -> Modifier.PROTECTED,
+    Opcodes.ACC_PUBLIC -> Modifier.PUBLIC, Opcodes.ACC_STATIC -> Modifier.STATIC,
+    Opcodes.ACC_SYNCHRONIZED -> Modifier.SYNCHRONIZED, Opcodes.ACC_ABSTRACT -> Modifier.ABSTRACT,
+    Opcodes.ACC_FINAL -> Modifier.FINAL
+  )
+  private def toOnionModifier(access: Int): Int =
+    asmModifierMappings.foldLeft(0) { case (acc, (srcFlag, dstFlag)) =>
+      if ((access & srcFlag) != 0) acc | dstFlag else acc
+    }
 
   final val CONSTRUCTOR_NAME = "<init>"
 

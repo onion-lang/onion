@@ -3,14 +3,16 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.TypedAST.BinaryTerm.Constants.*
-import onion.compiler.TypedAST.UnaryTerm.Constants.*
+import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.TypedAST.UnaryTerm.Kind as UnaryKind
+import onion.compiler.TypedAST.UnaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
 
 final class OperatorTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
-  def createEquals(kind: Int, lhs: Term, rhs: Term): Term = {
+  def createEquals(kind: BinaryKind, lhs: Term, rhs: Term): Term = {
     val params = Array[Term](new AsInstanceOf(rhs, rootClass))
     val target = lhs.`type`.asInstanceOf[ObjectType]
     val methods = target.findMethod("equals", params)
@@ -21,7 +23,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     node
   }
 
-  def processEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+  def processEquals(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term = {
     var left: Term = typed(node.lhs, context).getOrElse(null)
     var right: Term = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
@@ -46,7 +48,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     new BinaryTerm(kind, BasicType.BOOLEAN, left, right)
   }
 
-  def processShiftExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+  def processShiftExpression(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term = {
     var left: Term = typed(node.lhs, context).getOrElse(null)
     var right: Term = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
@@ -81,23 +83,24 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
   }
 
   def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
-    var left = typed(node.lhs, context).getOrElse(null)
-    var right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return null
+    val leftRaw = typed(node.lhs, context).getOrElse(null)
+    val rightRaw = typed(node.rhs, context).getOrElse(null)
+    if (leftRaw == null || rightRaw == null) return null
 
     // Try to unbox wrapper types to numeric primitives
-    if (!left.isBasicType) {
-      Boxing.unboxedType(table_, left.`type`).filter(numeric) match {
-        case Some(bt) => left = Boxing.unboxing(table_, left, bt)
-        case None => // will fail below
+    val left = if (!leftRaw.isBasicType) {
+      Boxing.unboxedType(table_, leftRaw.`type`).filter(numeric) match {
+        case Some(bt) => Boxing.unboxing(table_, leftRaw, bt)
+        case None => leftRaw
       }
-    }
-    if (!right.isBasicType) {
-      Boxing.unboxedType(table_, right.`type`).filter(numeric) match {
-        case Some(bt) => right = Boxing.unboxing(table_, right, bt)
-        case None => // will fail below
+    } else leftRaw
+
+    val right = if (!rightRaw.isBasicType) {
+      Boxing.unboxedType(table_, rightRaw.`type`).filter(numeric) match {
+        case Some(bt) => Boxing.unboxing(table_, rightRaw, bt)
+        case None => rightRaw
       }
-    }
+    } else rightRaw
 
     val leftType = left.`type`
     val rightType = right.`type`
@@ -112,7 +115,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     }
   }
 
-  def processBitExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
+  def processBitExpression(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term = {
     val left = typed(node.lhs, context).getOrElse(null)
     val right = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
@@ -150,66 +153,68 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     }
   }
 
-  def processRefEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term = {
-    var left = typed(node.lhs, context).getOrElse(null)
-    var right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return null
-    val leftType = left.`type`
-    val rightType = right.`type`
-    if ((left.isBasicType && (!right.isBasicType)) || ((!left.isBasicType) && (right.isBasicType))) {
+  def processRefEquals(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term = {
+    val leftRaw = typed(node.lhs, context).getOrElse(null)
+    val rightRaw = typed(node.rhs, context).getOrElse(null)
+    if (leftRaw == null || rightRaw == null) return null
+    val leftType = leftRaw.`type`
+    val rightType = rightRaw.`type`
+    if ((leftRaw.isBasicType && (!rightRaw.isBasicType)) || ((!leftRaw.isBasicType) && (rightRaw.isBasicType))) {
       report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       return null
     }
-    if (left.isBasicType && right.isBasicType) {
-      if (hasNumericType(left) && hasNumericType(right)) {
+    val (left, right) = if (leftRaw.isBasicType && rightRaw.isBasicType) {
+      if (hasNumericType(leftRaw) && hasNumericType(rightRaw)) {
         val resultType: Type = promote(leftType, rightType)
-        if (resultType != left.`type`) {
-          left = new AsInstanceOf(left, resultType)
-        }
-        if (resultType != right.`type`) {
-          right = new AsInstanceOf(right, resultType)
-        }
+        val newLeft = if (resultType != leftRaw.`type`) new AsInstanceOf(leftRaw, resultType) else leftRaw
+        val newRight = if (resultType != rightRaw.`type`) new AsInstanceOf(rightRaw, resultType) else rightRaw
+        (newLeft, newRight)
       } else if (leftType != BasicType.BOOLEAN || rightType != BasicType.BOOLEAN) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
         return null
+      } else {
+        (leftRaw, rightRaw)
       }
+    } else {
+      (leftRaw, rightRaw)
     }
     new BinaryTerm(kind, BasicType.BOOLEAN, left, right)
   }
 
-  def typeNumericBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
-    var left = typed(node.lhs, context).getOrElse(null)
-    var right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return None
+  def typeNumericBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
+    val leftRaw = typed(node.lhs, context).getOrElse(null)
+    val rightRaw = typed(node.rhs, context).getOrElse(null)
+    if (leftRaw == null || rightRaw == null) return None
 
     // Try to unbox wrapper types to numeric primitives
-    if (!left.isBasicType) {
-      Boxing.unboxedType(table_, left.`type`).filter(numeric) match {
-        case Some(bt) => left = Boxing.unboxing(table_, left, bt)
-        case None => // will fail in processNumericExpression
+    val left = if (!leftRaw.isBasicType) {
+      Boxing.unboxedType(table_, leftRaw.`type`).filter(numeric) match {
+        case Some(bt) => Boxing.unboxing(table_, leftRaw, bt)
+        case None => leftRaw
       }
-    }
-    if (!right.isBasicType) {
-      Boxing.unboxedType(table_, right.`type`).filter(numeric) match {
-        case Some(bt) => right = Boxing.unboxing(table_, right, bt)
-        case None => // will fail in processNumericExpression
+    } else leftRaw
+
+    val right = if (!rightRaw.isBasicType) {
+      Boxing.unboxedType(table_, rightRaw.`type`).filter(numeric) match {
+        case Some(bt) => Boxing.unboxing(table_, rightRaw, bt)
+        case None => rightRaw
       }
-    }
+    } else rightRaw
 
     Option(processNumericExpression(kind, node, left, right))
   }
 
-  def typeLogicalBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
+  def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
     val ops = processLogicalExpression(node, context)
     if (ops == null) None else Some(new BinaryTerm(kind, BasicType.BOOLEAN, ops(0), ops(1)))
   }
 
-  def typeComparableBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] = {
+  def typeComparableBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
     val ops = processComparableExpression(node, context)
     if (ops == null) None else Some(new BinaryTerm(kind, BasicType.BOOLEAN, ops(0), ops(1)))
   }
 
-  def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] = {
+  def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] = {
     var term = typed(node.term, context).getOrElse(null)
     if (term == null) return None
 
@@ -229,7 +234,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     }
   }
 
-  def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] = {
+  def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] = {
     var term = typed(node.term, context).getOrElse(null)
     if (term == null) return None
 
@@ -249,7 +254,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     }
   }
 
-  def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: Int, context: LocalContext): Option[Term] = {
+  def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
     val operand = typed(termNode, context).getOrElse(null)
     if (operand == null) return None
     if ((!operand.isBasicType) || !hasNumericType(operand)) {
@@ -293,16 +298,14 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     })
   }
 
-  def processNumericExpression(kind: Int, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
-    var left = lt
-    var right = rt
-    if ((!hasNumericType(left)) || (!hasNumericType(right))) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+  def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
+    if ((!hasNumericType(lt)) || (!hasNumericType(rt))) {
+      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
       return null
     }
-    val resultType = promote(left.`type`, right.`type`)
-    if (left.`type` != resultType) left = new AsInstanceOf(left, resultType)
-    if (right.`type` != resultType) right = new AsInstanceOf(right, resultType)
+    val resultType = promote(lt.`type`, rt.`type`)
+    val left = if (lt.`type` != resultType) new AsInstanceOf(lt, resultType) else lt
+    val right = if (rt.`type` != resultType) new AsInstanceOf(rt, resultType) else rt
     new BinaryTerm(kind, resultType, left, right)
   }
 

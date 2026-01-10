@@ -86,19 +86,12 @@ private[compiler] object MethodResolution {
     if applicableMethods.isEmpty then return new Array[Method](0)
     if applicableMethods.length == 1 then return Array(applicableMethods.head)
 
-    def isAllSuperType(a: Array[Type], b: Array[Type]): Boolean =
-      var i = 0
-      while i < a.length do
-        if !TypeRules.isSuperType(a(i), b(i)) then return false
-        i += 1
-      true
-
     val sorter: java.util.Comparator[Method] = new java.util.Comparator[Method] {
       def compare(m1: Method, m2: Method): Int =
         val a1 = specializedArgs(m1)
         val a2 = specializedArgs(m2)
-        if isAllSuperType(a2, a1) then -1
-        else if isAllSuperType(a1, a2) then 1
+        if TypeRules.isAllSuperType(a2, a1) then -1
+        else if TypeRules.isAllSuperType(a1, a2) then 1
         else 0
     }
 

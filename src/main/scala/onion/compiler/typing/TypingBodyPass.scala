@@ -3,8 +3,10 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.TypedAST.BinaryTerm.Constants.*
-import onion.compiler.TypedAST.UnaryTerm.Constants.*
+import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.TypedAST.UnaryTerm.Kind as UnaryKind
+import onion.compiler.TypedAST.UnaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
 
 import scala.jdk.CollectionConverters.*
@@ -22,7 +24,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def run(): Unit = runUnit()
 
   def createEqualsForRef(lhs: Term, rhs: Term): Term =
-    operatorTyping.createEquals(BinaryTerm.Constants.EQUAL, lhs, rhs)
+    operatorTyping.createEquals(EQUAL, lhs, rhs)
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
     val expressions = new Array[Term](nodes.length)
@@ -42,7 +44,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
     if (!error) {
       var node: Term = if(expressions(0).isReferenceType) {
-        operatorTyping.createEquals(BinaryTerm.Constants.EQUAL, new RefLocal(bind), expressions(0))
+        operatorTyping.createEquals(EQUAL, new RefLocal(bind), expressions(0))
       } else {
         new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), expressions(0))
       }
@@ -102,40 +104,50 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
   }
   def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
+
+  /** Common logic for setting up context and processing method/function bodies */
+  private def processMethodLikeBody(
+    method: MethodDefinition,
+    args: List[AST.Argument],
+    block: AST.BlockExpression
+  ): Unit = {
+    val context = new LocalContext
+    if ((method.modifier & AST.M_STATIC) != 0) {
+      context.setStatic(true)
+    }
+    context.setMethod(method)
+    val arguments = method.arguments
+
+    // Scan for captured variables before processing the method body
+    val paramNames = args.map(_.name).toSet
+    val capturedVars = CapturedVariableScanner.scan(block, paramNames)
+    context.markAsBoxed(capturedVars)
+
+    for (i <- 0 until arguments.length) {
+      context.add(args(i).name, arguments(i))
+    }
+
+    // Process default argument values
+    val argsWithDefaults = args.zipWithIndex.map { case (arg, i) =>
+      val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
+        typed(expr, context, arguments(i))
+      }
+      TypedAST.MethodArgument(arg.name, arguments(i), defaultTerm)
+    }.toArray
+    method.setArgumentsWithDefaults(argsWithDefaults)
+
+    val translatedBlock = addReturnNode(translate(block, context).asInstanceOf[StatementBlock], method.returnType)
+    method.setBlock(translatedBlock)
+    method.setFrame(context.getContextFrame)
+  }
+
   def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
     val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (method == null) return
     if (node.block == null) return
     val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
     openTypeParams(typeParams_ ++ methodTypeParams) {
-      val context = new LocalContext
-      if((method.modifier & AST.M_STATIC) != 0) {
-        context.setStatic(true)
-      }
-      context.setMethod(method)
-      val arguments = method.arguments
-
-      // Scan for captured variables before processing the method body
-      val paramNames = node.args.map(_.name).toSet
-      val capturedVars = CapturedVariableScanner.scan(node.block, paramNames)
-      context.markAsBoxed(capturedVars)
-
-      for(i <- 0 until arguments.length) {
-        context.add(node.args(i).name, arguments(i))
-      }
-
-      // Process default argument values
-      val argsWithDefaults = node.args.zipWithIndex.map { case (arg, i) =>
-        val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-          typed(expr, context, arguments(i))
-        }
-        TypedAST.MethodArgument(arg.name, arguments(i), defaultTerm)
-      }.toArray
-      method.setArgumentsWithDefaults(argsWithDefaults)
-
-      val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], method.returnType)
-      method.setBlock(block)
-      method.setFrame(context.getContextFrame)
+      processMethodLikeBody(method, node.args, node.block)
     }
   }
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
@@ -168,24 +180,14 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     mapper_ = find(definition_.name)
     val classTypeParams = declaredTypeParams_.getOrElse(node, Seq())
     openTypeParams(emptyTypeParams ++ classTypeParams) {
-      for(section <- node.defaultSection; member <- section.members) {
+      for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
-          case member: AST.FieldDeclaration =>
+          case _: AST.FieldDeclaration =>
           case member: AST.MethodDeclaration =>
             processMethodDeclaration(member)
           case member: AST.ConstructorDeclaration =>
             processConstructorDeclaration(member)
-          case member: AST.DelegatedFieldDeclaration =>
-        }
-      }
-      for(section <- node.sections; member <- section.members) {
-        member match {
-          case member: AST.FieldDeclaration =>
-          case member: AST.MethodDeclaration =>
-            processMethodDeclaration(member)
-          case member: AST.ConstructorDeclaration =>
-            processConstructorDeclaration(member)
-          case member: AST.DelegatedFieldDeclaration =>
+          case _: AST.DelegatedFieldDeclaration =>
         }
       }
     }
@@ -194,34 +196,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
     val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (function == null) return
-    val context = new LocalContext
-    if ((function.modifier & AST.M_STATIC) != 0) {
-      context.setStatic(true)
-    }
-    context.setMethod(function)
-    val arguments = function.arguments
-
-    // Scan for captured variables before processing the function body
-    val paramNames = node.args.map(_.name).toSet
-    val capturedVars = CapturedVariableScanner.scan(node.block, paramNames)
-    context.markAsBoxed(capturedVars)
-
-    for(i <- 0 until arguments.length) {
-      context.add(node.args(i).name, arguments(i))
-    }
-
-    // Process default argument values
-    val argsWithDefaults = node.args.zipWithIndex.map { case (arg, i) =>
-      val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, arguments(i))
-      }
-      TypedAST.MethodArgument(arg.name, arguments(i), defaultTerm)
-    }.toArray
-    function.setArgumentsWithDefaults(argsWithDefaults)
-
-    val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], function.returnType)
-    function.setBlock(block)
-    function.setFrame(context.getContextFrame)
+    processMethodLikeBody(function, node.args, node.block)
   }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =
@@ -231,22 +206,22 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     assignmentTyping.processArrayAssign(node, context)
   def processMemberAssign(node: AST.Assignment, context: LocalContext): Term =
     assignmentTyping.processMemberAssign(node, context)
-  def processEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term =
+  def processEquals(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term =
     operatorTyping.processEquals(kind, node, context)
 
-  def processShiftExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term =
+  def processShiftExpression(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term =
     operatorTyping.processShiftExpression(kind, node, context)
 
   def processComparableExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] =
     operatorTyping.processComparableExpression(node, context)
 
-  def processBitExpression(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term =
+  def processBitExpression(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term =
     operatorTyping.processBitExpression(kind, node, context)
 
   def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] =
     operatorTyping.processLogicalExpression(node, context)
 
-  def processRefEquals(kind: Int, node: AST.BinaryExpression, context: LocalContext): Term =
+  def processRefEquals(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term =
     operatorTyping.processRefEquals(kind, node, context)
   def typedTerms(nodes: Array[AST.Expression], context: LocalContext): Array[Term] = {
     var failed = false
@@ -287,7 +262,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     expressionFormTyping.typeStringInterpolation(node, context)
 
-  def typeBinaryAssignment(node: AST.Expression, lhs: AST.Expression, rhs: AST.Expression, binaryKind: Int, context: LocalContext): Option[Term] = {
+  def typeBinaryAssignment(node: AST.Expression, lhs: AST.Expression, rhs: AST.Expression, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
     // Desugar: a += b becomes a = a + b
     // First, create the binary operation
     val binaryOp = binaryKind match {
@@ -302,6 +277,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       case BIT_SHIFT_L2 => new AST.MathLeftShift(node.location, lhs, rhs)
       case BIT_SHIFT_R2 => new AST.MathRightShift(node.location, lhs, rhs)
       case BIT_SHIFT_R3 => new AST.LogicalRightShift(node.location, lhs, rhs)
+      case _ => throw new IllegalArgumentException(s"Invalid compound assignment operator: $binaryKind")
     }
 
     // Then create the assignment: a = (a + b)
@@ -311,22 +287,22 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     typeAssignment(assignment, context)
   }
 
-  def typeNumericBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] =
+  def typeNumericBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeNumericBinary(node, kind, context)
 
-  def typeLogicalBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] =
+  def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeLogicalBinary(node, kind, context)
 
-  def typeComparableBinary(node: AST.BinaryExpression, kind: Int, context: LocalContext): Option[Term] =
+  def typeComparableBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeComparableBinary(node, kind, context)
 
-  def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] =
+  def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeUnaryNumeric(node, symbol, kind, context)
 
-  def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: Int, context: LocalContext): Option[Term] =
+  def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeUnaryBoolean(node, symbol, kind, context)
 
-  def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: Int, context: LocalContext): Option[Term] =
+  def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: BinaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typePostUpdate(node, termNode, symbol, binaryKind, context)
 
   def typeAssignment(node: AST.Assignment, context: LocalContext): Option[Term] =
@@ -668,7 +644,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
   }
 
-  private def processNumericExpression(kind: Int, node: AST.BinaryExpression, lt: Term, rt: Term): Term =
+  private def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term =
     operatorTyping.processNumericExpression(kind, node, lt, rt)
   private[typing] def addArgument(arg: AST.Argument, context: LocalContext): Type = {
     val name = arg.name

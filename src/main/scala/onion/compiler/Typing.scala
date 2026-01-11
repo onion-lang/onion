@@ -217,21 +217,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
               report(TYPE_ARGUMENT_ARITY_MISMATCH, typeNode, applied.raw.name, Integer.valueOf(rawParams.length), Integer.valueOf(applied.typeArguments.length))
               return
             }
-            var i = 0
-            while (i < rawParams.length) {
+            val hasError = rawParams.indices.exists { i =>
               val upper = rawParams(i).upperBound.getOrElse(rootClass)
               val arg = applied.typeArguments(i)
               if (arg eq BasicType.VOID) {
                 report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
-                return
+                true
+              } else {
+                val checkedArg = boxedTypeArgument(arg)
+                if (!TypeRules.isAssignable(upper, checkedArg)) {
+                  report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
+                  true
+                } else false
               }
-              val checkedArg = boxedTypeArgument(arg)
-              if (!TypeRules.isAssignable(upper, checkedArg)) {
-                report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
-                return
-              }
-              i += 1
             }
+            if (hasError) return
           case _ =>
         }
       case _ =>

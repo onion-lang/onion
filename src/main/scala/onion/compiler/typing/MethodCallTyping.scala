@@ -852,21 +852,19 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     if (hasError) return None
 
+    // 必須引数が全て指定されているか確認
+    val missingRequired = argsWithDefaults.indices.find(i => !filled(i) && argsWithDefaults(i).defaultValue.isEmpty)
+    if (missingRequired.isDefined) {
+      report(METHOD_NOT_FOUND, node, method.affiliation, method.name, argsWithDefaults.map(_.argType))
+      return None
+    }
+
     // 足りない引数をデフォルト値で補完
-    var i = 0
-    while (i < argsWithDefaults.length) {
+    argsWithDefaults.indices.foreach { i =>
       if (!filled(i)) {
-        argsWithDefaults(i).defaultValue match {
-          case Some(defaultTerm) =>
-            result(i) = defaultTerm
-            filled(i) = true
-          case None =>
-            // 必須引数が指定されていない
-            report(METHOD_NOT_FOUND, node, method.affiliation, method.name, argsWithDefaults.map(_.argType))
-            return None
-        }
+        result(i) = argsWithDefaults(i).defaultValue.get
+        filled(i) = true
       }
-      i += 1
     }
 
     Some(result)
@@ -888,13 +886,11 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     } else {
       val result = new Array[Term](argsWithDefaults.length)
       System.arraycopy(params, 0, result, 0, params.length)
-      var i = params.length
-      while (i < argsWithDefaults.length) {
+      (params.length until argsWithDefaults.length).foreach { i =>
         argsWithDefaults(i).defaultValue match {
           case Some(term) => result(i) = term
           case None => throw new IllegalStateException(s"Missing default value for argument ${argsWithDefaults(i).name}")
         }
-        i += 1
       }
       result
     }

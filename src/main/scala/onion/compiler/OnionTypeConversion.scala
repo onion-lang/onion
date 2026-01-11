@@ -10,6 +10,7 @@ package onion.compiler
 import java.util.HashMap
 import java.util.Map
 import org.objectweb.asm.Type
+import scala.annotation.tailrec
 
 /**
  * @author Kota Mizushima
@@ -56,12 +57,12 @@ class OnionTypeConversion(table: ClassTable) {
       }
     }
     if (klass.isArray) {
-      var dimension: Int = 0
-      var component: Class[_] = klass
-      while(component.isArray) {
-        dimension += 1
-        component = component.getComponentType
-      }
+      @tailrec
+      def extractArrayInfo(cls: Class[_], dim: Int): (Class[_], Int) =
+        if (cls.isArray) extractArrayInfo(cls.getComponentType, dim + 1)
+        else (cls, dim)
+
+      val (component, dimension) = extractArrayInfo(klass, 0)
       val componentType: TypedAST.Type = toOnionType(component)
       return table.loadArray(componentType, dimension)
     }

@@ -52,14 +52,11 @@ private[compiler] object DuplicationChecks {
               val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
               report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
 
-            var i = 0
-            while (i < specializedArgs.length && i < impl.arguments.length) {
-              val arg = specializedArgs(i)
-              val checkedArg = if (!impl.arguments(i).isBasicType && arg.isBasicType) boxedTypeArgument(arg) else arg
-              if (!TypeRules.isSuperType(impl.arguments(i), checkedArg)) {
-                report(SemanticError.INCOMPATIBLE_TYPE, location, specializedArgs(i), impl.arguments(i))
+            specializedArgs.zip(impl.arguments).foreach { case (arg, implArg) =>
+              val checkedArg = if (!implArg.isBasicType && arg.isBasicType) boxedTypeArgument(arg) else arg
+              if (!TypeRules.isSuperType(implArg, checkedArg)) {
+                report(SemanticError.INCOMPATIBLE_TYPE, location, arg, implArg)
               }
-              i += 1
             }
 
             if (!TypeRules.isAssignable(specializedRet, impl.returnType)) {

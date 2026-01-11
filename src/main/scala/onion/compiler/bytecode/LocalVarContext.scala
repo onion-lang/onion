@@ -32,14 +32,11 @@ class LocalVarContext(gen: GeneratorAdapter) {
     * Register JVM parameter slots. Slot0 is `this` for instance methods.
     */
   def withParameters(isStatic: Boolean, argTypes: Array[AsmType]): LocalVarContext = {
-    var slot = if isStatic then 0 else 1
-    var i = 0
-    while (i < argTypes.length) {
-      val tp = argTypes(i)
+    val startSlot = if isStatic then 0 else 1
+    argTypes.zipWithIndex.foldLeft(startSlot) { case (slot, (tp, i)) =>
       indexMap(i) = slot
       parameterSet += i
-      slot += tp.getSize
-      i += 1
+      slot + tp.getSize
     }
     this
   }

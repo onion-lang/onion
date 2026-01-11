@@ -2,7 +2,6 @@ package onion.compiler
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
-import scala.collection.mutable.ArrayBuffer
 
 object DefaultStaticImports {
   private val ResourcePath = "onion/default-static-imports.txt"
@@ -21,20 +20,16 @@ object DefaultStaticImports {
         Fallback
       case Some(input) =>
         val reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))
-        val entries = new ArrayBuffer[String]()
         try {
-          var line = reader.readLine()
-          while (line != null) {
-            val trimmed = line.trim
-            if (trimmed.nonEmpty && !trimmed.startsWith("#") && !trimmed.startsWith("//")) {
-              entries += trimmed
-            }
-            line = reader.readLine()
-          }
+          val entries = Iterator.continually(reader.readLine())
+            .takeWhile(_ != null)
+            .map(_.trim)
+            .filter(t => t.nonEmpty && !t.startsWith("#") && !t.startsWith("//"))
+            .toSeq
+          if (entries.nonEmpty) entries else Fallback
         } finally {
           reader.close()
         }
-        if (entries.nonEmpty) entries.toSeq else Fallback
     }
   }
 }

@@ -20,6 +20,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
+import scala.jdk.CollectionConverters.*
 import scala.util.boundary, boundary.break
 
 /**
@@ -124,10 +125,7 @@ class CompilerFrontend {
         }
       } catch {
         case e: IOException =>
-          val it = generated.iterator
-          while (it.hasNext) {
-            it.next.delete
-          }
+          generated.asScala.foreach(_.delete)
           break(false)
       }
     }

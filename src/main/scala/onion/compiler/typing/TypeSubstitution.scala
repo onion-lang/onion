@@ -9,13 +9,7 @@ private[compiler] object TypeSubstitution {
   def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
     case applied: TypedAST.AppliedClassType =>
       val rawParams = applied.raw.typeParameters
-      val mapping = HashMap[String, Type]()
-      var i = 0
-      while (i < rawParams.length && i < applied.typeArguments.length) {
-        mapping += rawParams(i).name -> applied.typeArguments(i)
-        i += 1
-      }
-      mapping.toMap
+      rawParams.map(_.name).zip(applied.typeArguments).toMap
     case _ =>
       scala.collection.immutable.Map.empty
   }

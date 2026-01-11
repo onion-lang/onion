@@ -99,96 +99,90 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     val matchedTypes = Buffer[Type]() // Track matched types for exhaustiveness check
     var hasWildcardPattern = false // Track if any pattern has a wildcard
 
-    var failed = false
-    val cases = node.cases.iterator
-    while (cases.hasNext && !failed) {
-      val (patterns, thenBlock) = cases.next()
+    for ((patterns, thenBlock) <- node.cases) {
       val (cond, bindingInfo, hasWildcard, guardInfo) = processPatterns(patterns.toArray, condition.`type`, bind, context)
       if (hasWildcard) hasWildcardPattern = true
-      if (cond == null) {
-        failed = true
-      } else {
-        // Combine base condition with nested conditions if any
-        val combinedCond = bindingInfo match {
-          case MultiBindings(_, _, nestedConds) if nestedConds.nonEmpty =>
-            nestedConds.foldLeft(cond) { (acc, nested) =>
-              new BinaryTerm(LOGICAL_AND, BasicType.BOOLEAN, acc, nested)
-            }
-          case _ => cond
-        }
-        caseConditions += combinedCond
+      if (cond == null) break(None)
 
-        // Handle different binding types
-        bindingInfo match {
-          case SingleBinding(varName, varType) =>
-            matchedTypes += varType // Track for exhaustiveness
-            context.openScope {
-              val varIndex = context.add(varName, varType, isMutable = false)
-              val varBind = new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
-              // Type the guard in the same scope where the binding is set up
-              val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
-                val guardTermOpt = typed(guardAst, context)
-                val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
-                GuardInfo(guardAst, guardTerm)
-              }
-              caseBindingData += ((bindingInfo, List(varBind), typedGuardInfo))
-              // A type pattern without guard that matches the condition type is a catch-all
-              if (typedGuardInfo.isEmpty && TypeRules.isSuperType(varType, condition.`type`)) {
-                hasWildcardPattern = true
-              }
-              typeBlockExpression(thenBlock, context) match {
-                case Some(term) =>
-                  caseTerms += term
-                  caseNodes += thenBlock
-                case None => failed = true
-              }
-            }
+      // Combine base condition with nested conditions if any
+      val combinedCond = bindingInfo match {
+        case MultiBindings(_, _, nestedConds) if nestedConds.nonEmpty =>
+          nestedConds.foldLeft(cond) { (acc, nested) =>
+            new BinaryTerm(LOGICAL_AND, BasicType.BOOLEAN, acc, nested)
+          }
+        case _ => cond
+      }
+      caseConditions += combinedCond
 
-          case MultiBindings(recordType, bindings, _) =>
-            matchedTypes += recordType // Track for exhaustiveness
-            context.openScope {
-              val varBinds = bindings.map { case BindingEntry(varName, varType, _) =>
-                val varIndex = context.add(varName, varType, isMutable = false)
-                new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
-              }
-              // Type the guard in the same scope where the bindings are set up
-              val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
-                val guardTermOpt = typed(guardAst, context)
-                val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
-                GuardInfo(guardAst, guardTerm)
-              }
-              caseBindingData += ((bindingInfo, varBinds, typedGuardInfo))
-              // A destructuring pattern without guard that matches the condition type is a catch-all
-              // (bindings don't affect whether the pattern is exhaustive - Box(v) catches all Box instances)
-              if (typedGuardInfo.isEmpty && TypeRules.isSuperType(recordType, condition.`type`)) {
-                hasWildcardPattern = true
-              }
-              typeBlockExpression(thenBlock, context) match {
-                case Some(term) =>
-                  caseTerms += term
-                  caseNodes += thenBlock
-                case None => failed = true
-              }
-            }
-
-          case NoBindings =>
-            // Type the guard (no bindings needed)
+      // Handle different binding types
+      bindingInfo match {
+        case SingleBinding(varName, varType) =>
+          matchedTypes += varType // Track for exhaustiveness
+          context.openScope {
+            val varIndex = context.add(varName, varType, isMutable = false)
+            val varBind = new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
+            // Type the guard in the same scope where the binding is set up
             val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
               val guardTermOpt = typed(guardAst, context)
               val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
               GuardInfo(guardAst, guardTerm)
             }
-            caseBindingData += ((NoBindings, Nil, typedGuardInfo))
+            caseBindingData += ((bindingInfo, List(varBind), typedGuardInfo))
+            // A type pattern without guard that matches the condition type is a catch-all
+            if (typedGuardInfo.isEmpty && TypeRules.isSuperType(varType, condition.`type`)) {
+              hasWildcardPattern = true
+            }
             typeBlockExpression(thenBlock, context) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
-              case None => failed = true
+              case None => break(None)
             }
-        }
+          }
+
+        case MultiBindings(recordType, bindings, _) =>
+          matchedTypes += recordType // Track for exhaustiveness
+          context.openScope {
+            val varBinds = bindings.map { case BindingEntry(varName, varType, _) =>
+              val varIndex = context.add(varName, varType, isMutable = false)
+              new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
+            }
+            // Type the guard in the same scope where the bindings are set up
+            val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
+              val guardTermOpt = typed(guardAst, context)
+              val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
+              GuardInfo(guardAst, guardTerm)
+            }
+            caseBindingData += ((bindingInfo, varBinds, typedGuardInfo))
+            // A destructuring pattern without guard that matches the condition type is a catch-all
+            // (bindings don't affect whether the pattern is exhaustive - Box(v) catches all Box instances)
+            if (typedGuardInfo.isEmpty && TypeRules.isSuperType(recordType, condition.`type`)) {
+              hasWildcardPattern = true
+            }
+            typeBlockExpression(thenBlock, context) match {
+              case Some(term) =>
+                caseTerms += term
+                caseNodes += thenBlock
+              case None => break(None)
+            }
+          }
+
+        case NoBindings =>
+          // Type the guard (no bindings needed)
+          val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
+            val guardTermOpt = typed(guardAst, context)
+            val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
+            GuardInfo(guardAst, guardTerm)
+          }
+          caseBindingData += ((NoBindings, Nil, typedGuardInfo))
+          typeBlockExpression(thenBlock, context) match {
+            case Some(term) =>
+              caseTerms += term
+              caseNodes += thenBlock
+            case None => break(None)
+          }
       }
     }
-    if (failed) break(None)
 
     // Exhaustiveness check for sealed types
     var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
@@ -786,16 +780,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     null
   }
 
-  private def foldLub(node: AST.Node, types: Seq[Type]): Option[Type] =
-    if (types.isEmpty) {
-      None
-    } else {
-      val it = types.iterator
-      var acc = it.next()
-      while (it.hasNext) {
-        acc = leastUpperBound(node, acc, it.next())
-        if (acc == null) return None
-      }
-      Some(acc)
+  private def foldLub(node: AST.Node, types: Seq[Type]): Option[Type] = boundary {
+    types.reduceOption { (acc, t) =>
+      val result = leastUpperBound(node, acc, t)
+      if (result == null) break(None)
+      result
     }
+  }
 }

@@ -11,6 +11,7 @@ import onion.compiler.{TypedAST, Modifier, OnionTypeConversion, MultiTable, Orde
 import java.lang.reflect.{Constructor, Field, Method}
 import java.lang.reflect.{GenericArrayType, ParameterizedType, Type, TypeVariable, WildcardType}
 import java.util.{ArrayList, List}
+import scala.annotation.tailrec
 
 object ReflectionRefs {
   import java.lang.reflect.{Modifier => JMod}
@@ -31,36 +32,26 @@ object ReflectionRefs {
     private val bridge = new OnionTypeConversion(table)
     private val root = table.rootClass
 
-    def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] = {
-      val env = scala.collection.mutable.HashMap[String, TypedAST.TypeVariableType]()
-      var i = 0
-      while (i < typeParams.length) {
-        val tp = typeParams(i)
+    def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] =
+      typeParams.map { tp =>
         val upper = tp.upperBound match {
           case Some(ap: TypedAST.AppliedClassType) => ap.raw
           case Some(ct: TypedAST.ClassType) => ct
           case _ => root
         }
-        env += tp.name -> new TypedAST.TypeVariableType(tp.name, upper)
-        i += 1
-      }
-      env.toMap
-    }
+        tp.name -> new TypedAST.TypeVariableType(tp.name, upper)
+      }.toMap
 
     def typeParamsFrom(vars: Array[? <: TypeVariable[?]], baseEnv: Map[String, TypedAST.TypeVariableType]): (Array[TypedAST.TypeParameter], Map[String, TypedAST.TypeVariableType]) = {
       val params = new Array[TypedAST.TypeParameter](vars.length)
-      val env = scala.collection.mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
-      var i = 0
-      while (i < vars.length) {
-        val tv = vars(i)
+      val finalEnv = vars.zipWithIndex.foldLeft(baseEnv) { case (env, (tv, i)) =>
         val name = tv.getName
-        val upper = erasedUpperBound(tv.getBounds, env.toMap)
+        val upper = erasedUpperBound(tv.getBounds, env)
         val variable = new TypedAST.TypeVariableType(name, upper)
         params(i) = TypedAST.TypeParameter(name, Some(upper))
-        env += name -> variable
-        i += 1
+        env + (name -> variable)
       }
-      (params, env.toMap)
+      (params, finalEnv)
     }
 
     private def erasedUpperBound(bounds: Array[Type], env: Map[String, TypedAST.TypeVariableType]): TypedAST.ClassType = {
@@ -93,12 +84,13 @@ object ReflectionRefs {
           new TypedAST.TypeVariableType(v.getName, erasedUpperBound(v.getBounds, env))
         )
       case a: GenericArrayType =>
-        var dim = 1
-        var component: Type = a.getGenericComponentType
-        while (component.isInstanceOf[GenericArrayType]) {
-          dim += 1
-          component = component.asInstanceOf[GenericArrayType].getGenericComponentType
-        }
+        @tailrec
+        def extractArrayInfo(tp: Type, dim: Int): (Type, Int) =
+          if (tp.isInstanceOf[GenericArrayType])
+            extractArrayInfo(tp.asInstanceOf[GenericArrayType].getGenericComponentType, dim + 1)
+          else (tp, dim)
+
+        val (component, dim) = extractArrayInfo(a.getGenericComponentType, 1)
         val componentType = toOnionType(component, env)
         if (componentType == null) null else table.loadArray(componentType, dim)
       case w: WildcardType =>

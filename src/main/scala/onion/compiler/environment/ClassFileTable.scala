@@ -7,10 +7,8 @@
  * ************************************************************** */
 package onion.compiler.environment
 
-import java.io._
-import java.net.{URL, URLClassLoader}
-import java.nio.file.{Files, Paths}
-import scala.jdk.CollectionConverters._
+import java.io.{File, IOException}
+import java.net.URLClassLoader
 
 /**
  * @author Kota Mizushima
@@ -36,16 +34,9 @@ class ClassFileTable(classPathString: String) {
     val resourcePath = className.replace('.', '/') + ".class"
     val inputStream = classLoader.getResourceAsStream(resourcePath)
     if (inputStream == null) return null
-    
+
     try {
-      val out = new ByteArrayOutputStream()
-      val buf = new Array[Byte](8192)
-      var len = inputStream.read(buf)
-      while (len != -1) {
-        out.write(buf, 0, len)
-        len = inputStream.read(buf)
-      }
-      out.toByteArray
+      inputStream.readAllBytes()
     } catch {
       case _: IOException => null
     } finally {

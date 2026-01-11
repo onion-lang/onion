@@ -292,30 +292,24 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
 
   private def hasNumericType(term: Term): Boolean = numeric(term.`type`)
 
+  private val numericTypes: Set[BasicType] = Set(
+    BasicType.BYTE, BasicType.SHORT, BasicType.CHAR, BasicType.INT,
+    BasicType.LONG, BasicType.FLOAT, BasicType.DOUBLE
+  )
+
   private def numeric(symbol: Type): Boolean =
-    symbol.isBasicType && (symbol == BasicType.BYTE || symbol == BasicType.SHORT || symbol == BasicType.CHAR || symbol == BasicType.INT || symbol == BasicType.LONG || symbol == BasicType.FLOAT || symbol == BasicType.DOUBLE)
+    symbol.isBasicType && numericTypes.contains(symbol.asInstanceOf[BasicType])
 
-  private def promote(left: Type, right: Type): Type = {
-    if (!numeric(left) || !numeric(right)) return null
-    if ((left eq BasicType.DOUBLE) || (right eq BasicType.DOUBLE)) {
-      return BasicType.DOUBLE
-    }
-    if ((left eq BasicType.FLOAT) || (right eq BasicType.FLOAT)) {
-      return BasicType.FLOAT
-    }
-    if ((left eq BasicType.LONG) || (right eq BasicType.LONG)) {
-      return BasicType.LONG
-    }
-    BasicType.INT
-  }
+  private def promote(left: Type, right: Type): Type =
+    if (!numeric(left) || !numeric(right)) null
+    else if ((left eq BasicType.DOUBLE) || (right eq BasicType.DOUBLE)) BasicType.DOUBLE
+    else if ((left eq BasicType.FLOAT) || (right eq BasicType.FLOAT)) BasicType.FLOAT
+    else if ((left eq BasicType.LONG) || (right eq BasicType.LONG)) BasicType.LONG
+    else BasicType.INT
 
-  private def promoteInteger(typeRef: Type): Type = {
-    if (typeRef == BasicType.BYTE || typeRef == BasicType.SHORT || typeRef == BasicType.CHAR || typeRef == BasicType.INT) {
-      return BasicType.INT
-    }
-    if (typeRef == BasicType.LONG) {
-      return BasicType.LONG
-    }
-    null
+  private def promoteInteger(typeRef: Type): Type = typeRef match {
+    case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR | BasicType.INT => BasicType.INT
+    case BasicType.LONG => BasicType.LONG
+    case _ => null
   }
 }

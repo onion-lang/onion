@@ -37,6 +37,14 @@ private object TypeSubst {
   /** Substitute all argument types of a method */
   def args(method: TypedAST.Method, classSubst: Map[String, TypedAST.Type], methodSubst: Map[String, TypedAST.Type]): Array[TypedAST.Type] =
     method.arguments.map(tp => apply(tp, classSubst, methodSubst))
+
+  /** Wrap term in AsInstanceOf if types differ, otherwise return as-is */
+  def withCast(term: Term, targetType: TypedAST.Type): Term =
+    if (targetType eq term.`type`) term else new AsInstanceOf(term, targetType)
+
+  /** Option-returning version of withCast */
+  def withCastOpt(term: Term, targetType: TypedAST.Type): Option[Term] =
+    Some(withCast(term, targetType))
 }
 
 final class MethodCallTyping(private val typing: Typing, private val body: TypingBodyPass) {
@@ -100,18 +108,10 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     params: Array[Term],
     expectedArgs: Array[Type]
   ): Option[Array[Term]] = {
-    var i = 0
-    var hasError = false
-    while (i < params.length && !hasError) {
-      val processed = processAssignable(node, expectedArgs(i), params(i))
-      if (processed == null) {
-        hasError = true
-      } else {
-        params(i) = processed
-      }
-      i += 1
+    val results = params.zipWithIndex.map { case (param, i) =>
+      processAssignable(node, expectedArgs(i), param)
     }
-    if (hasError) None else Some(params)
+    if (results.contains(null)) None else Some(results)
   }
 
   /** Process parameters with args and expected types, returns None on error */
@@ -120,13 +120,10 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     params: Array[Term],
     expectedArgs: Array[Type]
   ): Option[Array[Term]] = {
-    var i = 0
-    var hasError = false
-    while i < params.length && !hasError do
-      params(i) = processAssignable(args(i), expectedArgs(i), params(i))
-      if params(i) == null then hasError = true
-      i += 1
-    if hasError then None else Some(params)
+    val results = params.zipWithIndex.map { case (param, i) =>
+      processAssignable(args(i), expectedArgs(i), param)
+    }
+    if (results.contains(null)) None else Some(results)
   }
 
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
@@ -161,9 +158,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     val field = MemberAccess.findField(targetType, name)
     if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
       val ref = new RefField(target, field)
-      val castType =
-        TypeSubst.withClassOnly(ref.`type`, target.`type`)
-      return Some(if (castType eq ref.`type`) ref else new AsInstanceOf(ref, castType))
+      return TypeSubst.withCastOpt(ref, TypeSubst.withClassOnly(ref.`type`, target.`type`))
     }
 
     // Try method name, then getter pattern, then boolean getter pattern
@@ -171,8 +166,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       tryFindMethod(node, targetType, methodName, Array.empty) match {
         case Right(method) =>
           val call = new Call(target, method, Array.empty)
-          val castType = TypeSubst.withClassOnly(method.returnType, target.`type`)
-          return Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          return TypeSubst.withCastOpt(call, TypeSubst.withClassOnly(method.returnType, target.`type`))
         case Left(false) => return None
         case Left(true) => // continue to next name
       }
@@ -251,7 +245,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
       val call = new Call(target, method, finalParams)
       val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-      Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+      TypeSubst.withCastOpt(call, castType)
     }
   }
 
@@ -303,7 +297,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             case Some(processedParams) =>
               val call = new Call(target, method, processedParams)
               val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+              TypeSubst.withCastOpt(call, castType)
             case None => None
           }
         case None =>
@@ -364,16 +358,16 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       if ((methods(0).modifier & AST.M_STATIC) != 0) {
         val call = new CallStatic(targetType, method, finalParams)
         val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-        Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        TypeSubst.withCastOpt(call, castType)
       } else {
         if (context.isClosure) {
           val call = new Call(new OuterThis(targetType), method, finalParams)
           val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          TypeSubst.withCastOpt(call, castType)
         } else {
           val call = new Call(new This(targetType), method, finalParams)
           val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-          Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+          TypeSubst.withCastOpt(call, castType)
         }
       }
     }
@@ -428,16 +422,16 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
               if ((method.modifier & AST.M_STATIC) != 0) {
                 val call = new CallStatic(targetType, method, processedParams)
                 val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-                Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+                TypeSubst.withCastOpt(call, castType)
               } else {
                 if (context.isClosure) {
                   val call = new Call(new OuterThis(targetType), method, processedParams)
                   val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-                  Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+                  TypeSubst.withCastOpt(call, castType)
                 } else {
                   val call = new Call(new This(targetType), method, processedParams)
                   val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-                  Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+                  TypeSubst.withCastOpt(call, castType)
                 }
               }
             case None => None
@@ -592,7 +586,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     val finalParams = fillDefaultArguments(params, method)
     val call = new CallStatic(typeRef, method, finalParams)
     val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-    if (castType eq method.returnType) call else new AsInstanceOf(call, castType)
+    TypeSubst.withCast(call, castType)
   }
 
   private def reportAmbiguousMethod(node: AST.Node, first: Method, second: Method): Unit = {
@@ -627,7 +621,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     val finalParams = fillDefaultArguments(parameters, method)
     val call = new CallStatic(typeRef, method, finalParams)
     val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-    Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+    Some(TypeSubst.withCast(call, castType))
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
@@ -761,7 +755,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             case Some(processedParams) =>
               val call = new CallStatic(typeRef, method, processedParams)
               val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-              Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+              TypeSubst.withCastOpt(call, castType)
             case None =>
               None
           }
@@ -796,7 +790,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         val finalParams = fillDefaultArguments(parameters, method)
         val call = new CallSuper(new This(contextClass), method, finalParams)
         val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-        Some(if (castType eq method.returnType) call else new AsInstanceOf(call, castType))
+        TypeSubst.withCastOpt(call, castType)
       case Left(_) =>
         report(METHOD_NOT_FOUND, node, contextClass, node.name, types(parameters))
         None

@@ -8,38 +8,34 @@ import onion.compiler.toolbox.Boxing
 final class ConstructionTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
-  def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] = {
-    val target = typed(node.lhs, context).getOrElse(null)
-    var index = typed(node.rhs, context).getOrElse(null)
-    if (target == null || index == null) return None
-
-    if (target.isArrayType) {
-      // Try to unbox Integer to int for array index
-      if (!index.isBasicType) {
-        Boxing.unboxedType(table_, index.`type`) match {
-          case Some(bt) if bt.isInteger => index = Boxing.unboxing(table_, index, bt)
-          case _ => // will fail below
+  def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] =
+    for {
+      target <- typed(node.lhs, context)
+      indexRaw <- typed(node.rhs, context)
+      result <- {
+        if (target.isArrayType) {
+          val index = if (!indexRaw.isBasicType)
+            Boxing.unboxedType(table_, indexRaw.`type`).filter(_.isInteger).fold(indexRaw)(bt => Boxing.unboxing(table_, indexRaw, bt))
+          else indexRaw
+          if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
+            report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
+            None
+          } else Some(new RefArray(target, index))
+        } else if (target.isBasicType) {
+          report(INCOMPATIBLE_TYPE, node.lhs, rootClass, target.`type`)
+          None
+        } else {
+          val params = Array(indexRaw)
+          tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", params) match {
+            case Left(_) =>
+              report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+              None
+            case Right(method) =>
+              Some(new Call(target, method, params))
+          }
         }
       }
-      if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
-        report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
-        return None
-      }
-      Some(new RefArray(target, index))
-    } else if (target.isBasicType) {
-      report(INCOMPATIBLE_TYPE, node.lhs, rootClass, target.`type`)
-      None
-    } else {
-      val params = Array(index)
-      tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", Array[Term](index)) match {
-        case Left(_) =>
-          report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
-          None
-        case Right(method) =>
-          Some(new Call(target, method, params))
-      }
-    }
-  }
+    } yield result
 
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
     val typeRef = mapFrom(node.typeRef, mapper_)

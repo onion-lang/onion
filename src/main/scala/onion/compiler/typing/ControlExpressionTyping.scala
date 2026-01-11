@@ -57,50 +57,35 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
   def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] =
     context.openScope {
-      val conditionOpt = typed(node.condition, context)
-      val condition = ensureBoolean(node.condition, conditionOpt.getOrElse(null))
-      if (condition == null) {
-        None
-      } else {
-
-        val thenTermOpt = typeBlockExpression(node.thenBlock, context)
-        val thenTerm = thenTermOpt.getOrElse(null)
-        if (thenTerm == null) {
-          None
-        } else if (node.elseBlock == null) {
+      for {
+        conditionRaw <- typed(node.condition, context)
+        condition <- Option(ensureBoolean(node.condition, conditionRaw))
+        thenTerm <- typeBlockExpression(node.thenBlock, context)
+        result <- if (node.elseBlock == null) {
           val thenStmt = termToStatement(node.thenBlock, thenTerm)
-          val stmt = new IfStatement(condition, thenStmt, null)
-          Some(statementTerm(stmt, BasicType.VOID, node.location))
+          Some(statementTerm(new IfStatement(condition, thenStmt, null), BasicType.VOID, node.location))
         } else {
-          val elseTermOpt = typeBlockExpression(node.elseBlock, context)
-          val elseTerm = elseTermOpt.getOrElse(null)
-          if (elseTerm == null) {
-            None
-          } else {
-            val resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
-            if (resultType == null) {
-              None
-            } else if (resultType.isBottomType || resultType == BasicType.VOID) {
+          for {
+            elseTerm <- typeBlockExpression(node.elseBlock, context)
+            resultType <- Option(leastUpperBound(node, thenTerm.`type`, elseTerm.`type`))
+          } yield {
+            if (resultType.isBottomType || resultType == BasicType.VOID) {
               val thenStmt = termToStatement(node.thenBlock, thenTerm)
               val elseStmt = termToStatement(node.elseBlock, elseTerm)
-              val stmt = new IfStatement(condition, thenStmt, elseStmt)
-              Some(statementTerm(stmt, resultType, node.location))
+              statementTerm(new IfStatement(condition, thenStmt, elseStmt), resultType, node.location)
             } else {
               val resultVar = new ClosureLocalBinding(0, context.add(context.newName, resultType, isMutable = true), resultType, isMutable = true)
               val thenStmt = assignBranch(node.thenBlock, thenTerm, resultVar, resultType)
               val elseStmt = assignBranch(node.elseBlock, elseTerm, resultVar, resultType)
-              val stmt = new IfStatement(condition, thenStmt, elseStmt)
-              Some(new Begin(node.location, Array[Term](statementTerm(stmt, BasicType.VOID, node.location), new RefLocal(resultVar))))
+              new Begin(node.location, Array[Term](statementTerm(new IfStatement(condition, thenStmt, elseStmt), BasicType.VOID, node.location), new RefLocal(resultVar)))
             }
           }
         }
-      }
+      } yield result
     }
 
   def typeSelectExpression(node: AST.SelectExpression, context: LocalContext): Option[Term] = boundary {
-    val conditionOpt = typed(node.condition, context)
-    val condition = conditionOpt.getOrElse(null)
-    if (condition == null) break(None)
+    val condition = typed(node.condition, context).getOrElse(break(None))
 
     val name = context.newName
     val index = context.add(name, condition.`type`, isMutable = true)
@@ -678,8 +663,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   def typeSynchronizedExpression(node: AST.SynchronizedExpression, context: LocalContext): Option[Term] = boundary {
     context.openScope {
       // Type the lock expression
-      val lock = typed(node.condition, context).getOrElse(null)
-      if (lock == null) break(None)
+      val lock = typed(node.condition, context).getOrElse(break(None))
 
       // Lock must be object type, not primitive
       if (lock.isBasicType) {
@@ -688,9 +672,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       }
 
       // Type the body as an expression (returns value)
-      val bodyTermOpt = typeBlockExpression(node.block, context)
-      val bodyTerm = bodyTermOpt.getOrElse(null)
-      if (bodyTerm == null) break(None)
+      val bodyTerm = typeBlockExpression(node.block, context).getOrElse(break(None))
 
       // Create SynchronizedTerm that returns the body's value
       Some(new SynchronizedTerm(node.location, lock, bodyTerm))

@@ -560,41 +560,26 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   ): Either[StaticImportAmbiguous, StaticApplicable] = {
     if (applicable.length == 1) return Right(applicable.head)
 
-    val sorter: java.util.Comparator[StaticApplicable] = new java.util.Comparator[StaticApplicable] {
-      def compare(a1: StaticApplicable, a2: StaticApplicable): Int =
-        if TypeRules.isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
-        else if TypeRules.isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
-        else 0
-    }
+    def compareApplicable(a1: StaticApplicable, a2: StaticApplicable): Int =
+      if TypeRules.isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
+      else if TypeRules.isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
+      else 0
 
-    val selected = new java.util.ArrayList[StaticApplicable]()
-    selected.addAll(applicable.asJava)
-    java.util.Collections.sort(selected, sorter)
-    if (selected.size < 2) {
-      Right(selected.get(0))
-    } else {
-      val a1 = selected.get(0)
-      val a2 = selected.get(1)
-      if (sorter.compare(a1, a2) >= 0) Left(StaticImportAmbiguous(a1.method, a2.method))
-      else Right(a1)
-    }
+    val sorted = applicable.sortWith((a1, a2) => compareApplicable(a1, a2) < 0)
+    if (sorted.length < 2) Right(sorted.head)
+    else if (compareApplicable(sorted.head, sorted(1)) >= 0) Left(StaticImportAmbiguous(sorted.head.method, sorted(1).method))
+    else Right(sorted.head)
   }
 
-  private def mapTypeArgs(typeArgs: List[AST.TypeNode]): Option[Array[Type]] = {
-    val mapped = new Array[Type](typeArgs.length)
-    var i = 0
-    while (i < typeArgs.length) {
-      val mappedType = mapFrom(typeArgs(i))
-      if (mappedType == null) return None
-      if (mappedType eq BasicType.VOID) {
-        report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArgs(i), mappedType.name)
-        return None
+  private def mapTypeArgs(typeArgs: List[AST.TypeNode]): Option[Array[Type]] =
+    typeArgs.foldLeft(Option(List.empty[Type])) { (accOpt, typeArg) =>
+      accOpt.flatMap { acc =>
+        val mapped = mapFrom(typeArg)
+        if (mapped == null) None
+        else if (mapped eq BasicType.VOID) { report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name); None }
+        else Some(acc :+ mapped)
       }
-      mapped(i) = mappedType
-      i += 1
-    }
-    Some(mapped)
-  }
+    }.map(_.toArray)
 
   private def buildStaticCall(
     typeRef: ClassType,
@@ -713,36 +698,22 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             case Some(_) => ()
           makeStaticCall(typeRef, selected.method, parameters, classSubst, selected.methodSubst)
         } else {
-          val sorter: java.util.Comparator[Applicable] = new java.util.Comparator[Applicable] {
-            def compare(a1: Applicable, a2: Applicable): Int =
-              if TypeRules.isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
-              else if TypeRules.isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
-              else 0
-          }
+          def compareApplicable(a1: Applicable, a2: Applicable): Int =
+            if TypeRules.isAllSuperType(a2.expectedArgs, a1.expectedArgs) then -1
+            else if TypeRules.isAllSuperType(a1.expectedArgs, a2.expectedArgs) then 1
+            else 0
 
-          val selected = new java.util.ArrayList[Applicable]()
-          selected.addAll(applicable.asJava)
-          java.util.Collections.sort(selected, sorter)
-          if (selected.size < 2) {
-            val only = selected.get(0)
+          val sorted = applicable.sortWith((a1, a2) => compareApplicable(a1, a2) < 0)
+          val best = sorted.head
+          if (sorted.length >= 2 && compareApplicable(sorted.head, sorted(1)) >= 0) {
+            report(AMBIGUOUS_METHOD, node, node.name, typeNames(sorted.head.method.arguments), typeNames(sorted(1).method.arguments))
+            None
+          } else {
             val classSubst = TypeSubstitution.classSubstitution(typeRef)
-            processParamsWithArgs(node.args, parameters, only.expectedArgs) match
+            processParamsWithArgs(node.args, parameters, best.expectedArgs) match
               case None => return None
               case Some(_) => ()
-            makeStaticCall(typeRef, only.method, parameters, classSubst, only.methodSubst)
-          } else {
-            val a1 = selected.get(0)
-            val a2 = selected.get(1)
-            if (sorter.compare(a1, a2) >= 0) {
-              report(AMBIGUOUS_METHOD, node, node.name, typeNames(a1.method.arguments), typeNames(a2.method.arguments))
-              None
-            } else {
-              val classSubst = TypeSubstitution.classSubstitution(typeRef)
-              processParamsWithArgs(node.args, parameters, a1.expectedArgs) match
-                case None => return None
-                case Some(_) => ()
-              makeStaticCall(typeRef, a1.method, parameters, classSubst, a1.methodSubst)
-            }
+            makeStaticCall(typeRef, best.method, parameters, classSubst, best.methodSubst)
           }
         }
       }

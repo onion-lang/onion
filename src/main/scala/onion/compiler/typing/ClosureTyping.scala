@@ -4,7 +4,6 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 
-import scala.collection.mutable.Buffer
 import scala.jdk.CollectionConverters.*
 
 final class ClosureTyping(private val typing: Typing, private val body: TypingBodyPass) {
@@ -41,57 +40,49 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
               TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
 
             val candidates = typeRef.methods.filter(m => m.name == name && m.arguments.length == argTypes.length)
-            val method = candidates.find(m => sameTypes(substitutedArgs(m), argTypes)).getOrElse(null)
-            if (method == null) {
-              report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
-              None
-            } else {
-              val expectedArgs = substitutedArgs(method)
-              val expectedRet = substitutedReturn(method)
+            candidates.find(m => sameTypes(substitutedArgs(m), argTypes)) match {
+              case None =>
+                report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
+                None
+              case Some(method) =>
+                val expectedArgs = substitutedArgs(method)
+                val expectedRet = substitutedReturn(method)
 
-              val typedMethod = new Method {
-                def modifier: Int = method.modifier
-                def affiliation: ClassType = method.affiliation
-                def name: String = method.name
-                override def arguments: Array[Type] = expectedArgs.clone()
-                override def returnType: Type = expectedRet
-                override def typeParameters: Array[TypedAST.TypeParameter] = Array()
-              }
+                val typedMethod = new Method {
+                  def modifier: Int = method.modifier
+                  def affiliation: ClassType = method.affiliation
+                  def name: String = method.name
+                  override def arguments: Array[Type] = expectedArgs.clone()
+                  override def returnType: Type = expectedRet
+                  override def typeParameters: Array[TypedAST.TypeParameter] = Array()
+                }
 
-              context.setMethod(typedMethod)
-              context.getContextFrame.parent.setAllClosed(true)
+                context.setMethod(typedMethod)
+                context.getContextFrame.parent.setAllClosed(true)
 
-              val prologue = Buffer[ActionStatement]()
-              var i = 0
-              while (i < args.length) {
-                val bind = context.lookup(args(i).name)
-                if (bind != null) {
-                  val erased =
-                    TypeSubstitution.substituteType(
-                      method.arguments(i),
-                      scala.collection.immutable.Map.empty,
-                      scala.collection.immutable.Map.empty,
-                      defaultToBound = true
+                val prologue = args.zipWithIndex.flatMap { case (arg, i) =>
+                  Option(context.lookup(arg.name)).flatMap { bind =>
+                    val erased = TypeSubstitution.substituteType(
+                      method.arguments(i), Map.empty, Map.empty, defaultToBound = true
                     )
-                  val desired = expectedArgs(i)
-                  if (desired ne erased) {
-                    val rawBind = new ClosureLocalBinding(bind.frameIndex, bind.index, erased, bind.isMutable)
-                    val casted = new AsInstanceOf(new RefLocal(rawBind), desired)
-                    prologue += new ExpressionActionStatement(new SetLocal(bind, casted))
+                    val desired = expectedArgs(i)
+                    Option.when(desired ne erased) {
+                      val rawBind = new ClosureLocalBinding(bind.frameIndex, bind.index, erased, bind.isMutable)
+                      val casted = new AsInstanceOf(new RefLocal(rawBind), desired)
+                      new ExpressionActionStatement(new SetLocal(bind, casted))
+                    }
                   }
                 }
-                i += 1
-              }
 
-              var block: ActionStatement = body.translate(node.body, context)
-              if (prologue.nonEmpty) {
-                block = new StatementBlock((prologue.toIndexedSeq :+ block).asJava)
-              }
+                val baseBlock: ActionStatement = body.translate(node.body, context)
+                val block = if (prologue.nonEmpty)
+                  new StatementBlock((prologue :+ baseBlock).asJava)
+                else baseBlock
 
-              block = body.addReturnNode(block, expectedRet)
-              val result = new NewClosure(typeRef, method, block)
-              result.frame_=(context.getContextFrame)
-              Some(result)
+                val finalBlock = body.addReturnNode(block, expectedRet)
+                val result = new NewClosure(typeRef, method, finalBlock)
+                result.frame_=(context.getContextFrame)
+                Some(result)
             }
           }
         }

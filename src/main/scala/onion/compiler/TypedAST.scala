@@ -256,22 +256,22 @@ object TypedAST {
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
       typeParameters_ = typeParameters
 
-    def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray(new Array[TypedAST.ConstructorRef](0))
+    def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray
     def methods: Seq[TypedAST.Method] = methods_.values.toSeq
     def fields: Array[TypedAST.FieldRef] = fields_.values.toArray
 
     val fields_ : OrderedTable[TypedAST.FieldRef]     = new OrderedTable[TypedAST.FieldRef]
     val methods_ : MultiTable[TypedAST.Method]        = new MultiTable[TypedAST.Method]
-    val constructors_ : List[TypedAST.ConstructorRef] = new ArrayList[TypedAST.ConstructorRef]
+    val constructors_ : scala.collection.mutable.ArrayBuffer[TypedAST.ConstructorRef] = scala.collection.mutable.ArrayBuffer.empty
     var isResolutionComplete: Boolean            = false
     private var sourceFile: String = null
-    private val sealedSubtypes_ : List[TypedAST.ClassType] = new ArrayList[TypedAST.ClassType]
+    private val sealedSubtypes_ : scala.collection.mutable.ArrayBuffer[TypedAST.ClassType] = scala.collection.mutable.ArrayBuffer.empty
 
     /** Returns all direct subtypes of this sealed type */
-    def sealedSubtypes: Array[TypedAST.ClassType] = sealedSubtypes_.toArray(new Array[TypedAST.ClassType](0))
+    def sealedSubtypes: Array[TypedAST.ClassType] = sealedSubtypes_.toArray
 
     /** Register a subtype of this sealed type */
-    def addSealedSubtype(subtype: TypedAST.ClassType): Unit = sealedSubtypes_.add(subtype)
+    def addSealedSubtype(subtype: TypedAST.ClassType): Unit = sealedSubtypes_ += subtype
 
     /** Check if this is a sealed type */
     def isSealed: Boolean = Modifier.isSealed(modifier)
@@ -300,13 +300,11 @@ object TypedAST {
       fields_.add(field)
     }
 
-    def add(constructor: TypedAST.ConstructorRef): Unit = {
-      constructors_.add(constructor)
-    }
+    def add(constructor: TypedAST.ConstructorRef): Unit =
+      constructors_ += constructor
 
-    def addDefaultConstructor: Unit = {
-      constructors_.add(ConstructorDefinition.newDefaultConstructor(this))
-    }
+    def addDefaultConstructor: Unit =
+      constructors_ += ConstructorDefinition.newDefaultConstructor(this)
 
     def methods(name: String): Array[TypedAST.Method] = methods_.get(name).toArray
 
@@ -955,21 +953,12 @@ object TypedAST {
 
   class ConstructorFinder {
     def find(target: TypedAST.ClassType, args: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef] = {
-      val constructors: Set[TypedAST.ConstructorRef] = new TreeSet[TypedAST.ConstructorRef](new TypedAST.ConstructorComparator)
-      if (target == null) return new Array[TypedAST.ConstructorRef](0)
-      target.constructors.filter(c => matcher.matches(c.getArgs, args)).foreach(constructors.add)
-      val selected: List[TypedAST.ConstructorRef] = new ArrayList[TypedAST.ConstructorRef]
-      selected.addAll(constructors)
-      Collections.sort(selected, sorter)
-      if (selected.size < 2) {
-        return selected.toArray(new Array[TypedAST.ConstructorRef](0))
-      }
-      val constructor1: TypedAST.ConstructorRef = selected.get(0)
-      val constructor2: TypedAST.ConstructorRef = selected.get(1)
-      if (isAmbiguous(constructor1, constructor2)) {
-        return selected.toArray(new Array[TypedAST.ConstructorRef](0))
-      }
-      Array[TypedAST.ConstructorRef](constructor1)
+      if (target == null) return Array.empty
+      val matching = target.constructors.filter(c => matcher.matches(c.getArgs, args))
+      if (matching.isEmpty) return Array.empty
+      val sorted = matching.sortWith((c1, c2) => sorter.compare(c1, c2) < 0)
+      if (sorted.length < 2 || isAmbiguous(sorted(0), sorted(1))) sorted
+      else Array(sorted(0))
     }
 
     private def isAmbiguous(constructor1: TypedAST.ConstructorRef, constructor2: TypedAST.ConstructorRef): Boolean = {
@@ -1048,18 +1037,9 @@ object TypedAST {
     def find(target: TypedAST.ObjectType, name: String, arguments: Array[TypedAST.Term]): Array[TypedAST.Method] = {
       val methods: Set[TypedAST.Method] = new TreeSet[TypedAST.Method](new TypedAST.MethodComparator)
       find(methods, target, name, arguments)
-      val selectedMethods: List[TypedAST.Method] = new ArrayList[TypedAST.Method]
-      selectedMethods.addAll(methods)
-      Collections.sort(selectedMethods, sorter)
-      if (selectedMethods.size < 2) {
-        return selectedMethods.toArray(new Array[TypedAST.Method](0)).asInstanceOf[Array[TypedAST.Method]]
-      }
-      val method1: TypedAST.Method = selectedMethods.get(0)
-      val method2: TypedAST.Method = selectedMethods.get(1)
-      if (isAmbiguous(method1, method2)) {
-        return selectedMethods.toArray(new Array[TypedAST.Method](0)).asInstanceOf[Array[TypedAST.Method]]
-      }
-      Array[TypedAST.Method](method1)
+      val sorted = methods.asScala.toArray.sortWith((m1, m2) => sorter.compare(m1, m2) < 0)
+      if (sorted.length < 2 || isAmbiguous(sorted(0), sorted(1))) sorted
+      else Array(sorted(0))
     }
 
     def isAmbiguous(method1: TypedAST.Method, method2: TypedAST.Method): Boolean =  sorter.compare(method1, method2) >= 0

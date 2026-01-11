@@ -23,21 +23,15 @@ object AsmRefs {
   private final class SignatureTypeMapper(table: ClassTable, baseEnv: Map[String, TypedAST.TypeVariableType], root0: () => TypedAST.ClassType) {
     private def root: TypedAST.ClassType = root0()
 
-    private def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] = {
-      val env = mutable.HashMap[String, TypedAST.TypeVariableType]() ++ baseEnv
-      var i = 0
-      while (i < typeParams.length) {
-        val tp = typeParams(i)
+    private def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] =
+      baseEnv ++ typeParams.map { tp =>
         val upper = tp.upperBound match {
           case Some(ap: TypedAST.AppliedClassType) => ap.raw
           case Some(ct: TypedAST.ClassType) => ct
           case _ => root
         }
-        env += tp.name -> new TypedAST.TypeVariableType(tp.name, upper)
-        i += 1
-      }
-      env.toMap
-    }
+        tp.name -> new TypedAST.TypeVariableType(tp.name, upper)
+      }.toMap
 
     final class TypeRefVisitor(onComplete: TypedAST.Type => Unit, env: Map[String, TypedAST.TypeVariableType])
       extends SignatureVisitor(Opcodes.ASM9) {
@@ -317,13 +311,7 @@ object AsmRefs {
 
       if (argsBuf.isEmpty && return0 == null) {
         val bridge = new OnionTypeConversion(table)
-        val asmArgs = Type.getArgumentTypes(desc)
-        val argTypes = new Array[TypedAST.Type](asmArgs.length)
-        var i = 0
-        while (i < asmArgs.length) {
-          argTypes(i) = bridge.toOnionType(asmArgs(i))
-          i += 1
-        }
+        val argTypes = Type.getArgumentTypes(desc).map(bridge.toOnionType)
         MethodInfo(Array.empty, argTypes, bridge.toOnionType(Type.getReturnType(desc)), env)
       } else {
         MethodInfo(typeParams, argsBuf.toArray, return0, env)
@@ -353,18 +341,8 @@ object AsmRefs {
       if (parsed == null) Array()
       else parsed.typeParameters.clone()
     private val argTypes: Array[TypedAST.Type] =
-      if (parsed == null) {
-        val asmTypes = Type.getArgumentTypes(method.desc)
-        val result = new Array[TypedAST.Type](asmTypes.length)
-        var i = 0
-        while (i < asmTypes.length) {
-          result(i) = bridge.toOnionType(asmTypes(i))
-          i += 1
-        }
-        result
-      } else {
-        parsed.arguments
-      }
+      if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
+      else parsed.arguments
     override def arguments: Array[TypedAST.Type] = argTypes.clone()
     override val returnType: TypedAST.Type =
       if (parsed == null) bridge.toOnionType(Type.getReturnType(method.desc))
@@ -394,18 +372,8 @@ object AsmRefs {
       if (parsed == null) Array()
       else parsed.typeParameters.clone()
     private val args0 =
-      if (parsed == null) {
-        val asmTypes = Type.getArgumentTypes(method.desc)
-        val result = new Array[TypedAST.Type](asmTypes.length)
-        var i = 0
-        while (i < asmTypes.length) {
-          result(i) = bridge.toOnionType(asmTypes(i))
-          i += 1
-        }
-        result
-      } else {
-        parsed.arguments
-      }
+      if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
+      else parsed.arguments
     override def getArgs: Array[TypedAST.Type] = args0.clone()
     val underlying: MethodNode = method
   }

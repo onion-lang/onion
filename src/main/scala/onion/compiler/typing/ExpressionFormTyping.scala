@@ -25,34 +25,27 @@ final class ExpressionFormTyping(private val typing: Typing, private val body: T
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     stringInterpolationTyping.typeStringInterpolation(node, context)
 
-  def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] = {
-    val left = typed(node.lhs, context).getOrElse(null)
-    val right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return None
-    if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
-      None
-    } else {
-      Some(new BinaryTerm(ELVIS, left.`type`, left, right))
-    }
-  }
+  def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] =
+    for {
+      left <- typed(node.lhs, context)
+      right <- typed(node.rhs, context)
+      result <- if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
+        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+        None
+      } else Some(new BinaryTerm(ELVIS, left.`type`, left, right))
+    } yield result
 
-  def typeCast(node: AST.Cast, context: LocalContext): Option[Term] = {
-    val term = typed(node.src, context).getOrElse(null)
-    if (term == null) None
-    else {
-      val destination = mapFrom(node.to, mapper_)
-      if (destination == null) None
-      else Some(new AsInstanceOf(term, destination))
-    }
-  }
+  def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
+    for {
+      term <- typed(node.src, context)
+      destination <- Option(mapFrom(node.to, mapper_))
+    } yield new AsInstanceOf(term, destination)
 
-  def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] = {
-    val target = typed(node.target, context).getOrElse(null)
-    val destinationType = mapFrom(node.typeRef, mapper_)
-    if (target == null || destinationType == null) None
-    else Some(new InstanceOf(target, destinationType))
-  }
+  def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
+    for {
+      target <- typed(node.target, context)
+      destinationType <- Option(mapFrom(node.typeRef, mapper_))
+    } yield new InstanceOf(target, destinationType)
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     body.typed(node, context, expected)

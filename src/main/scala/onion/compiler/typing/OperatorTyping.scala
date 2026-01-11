@@ -88,19 +88,8 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     if (leftRaw == null || rightRaw == null) return null
 
     // Try to unbox wrapper types to numeric primitives
-    val left = if (!leftRaw.isBasicType) {
-      Boxing.unboxedType(table_, leftRaw.`type`).filter(numeric) match {
-        case Some(bt) => Boxing.unboxing(table_, leftRaw, bt)
-        case None => leftRaw
-      }
-    } else leftRaw
-
-    val right = if (!rightRaw.isBasicType) {
-      Boxing.unboxedType(table_, rightRaw.`type`).filter(numeric) match {
-        case Some(bt) => Boxing.unboxing(table_, rightRaw, bt)
-        case None => rightRaw
-      }
-    } else rightRaw
+    val left = Boxing.tryUnboxToNumeric(table_, leftRaw, numericTypes.contains)
+    val right = Boxing.tryUnboxToNumeric(table_, rightRaw, numericTypes.contains)
 
     val leftType = left.`type`
     val rightType = right.`type`
@@ -185,12 +174,8 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     for {
       leftRaw <- typed(node.lhs, context)
       rightRaw <- typed(node.rhs, context)
-      left = if (!leftRaw.isBasicType)
-        Boxing.unboxedType(table_, leftRaw.`type`).filter(numeric).fold(leftRaw)(bt => Boxing.unboxing(table_, leftRaw, bt))
-      else leftRaw
-      right = if (!rightRaw.isBasicType)
-        Boxing.unboxedType(table_, rightRaw.`type`).filter(numeric).fold(rightRaw)(bt => Boxing.unboxing(table_, rightRaw, bt))
-      else rightRaw
+      left = Boxing.tryUnboxToNumeric(table_, leftRaw, numericTypes.contains)
+      right = Boxing.tryUnboxToNumeric(table_, rightRaw, numericTypes.contains)
       result <- Option(processNumericExpression(kind, node, left, right))
     } yield result
 
@@ -206,9 +191,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
 
   def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = if (!termRaw.isBasicType)
-        Boxing.unboxedType(table_, termRaw.`type`).filter(numeric).fold(termRaw)(bt => Boxing.unboxing(table_, termRaw, bt))
-      else termRaw
+      val term = Boxing.tryUnboxToNumeric(table_, termRaw, numericTypes.contains)
       if (!hasNumericType(term)) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
@@ -217,9 +200,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
 
   def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = if (!termRaw.isBasicType)
-        Boxing.unboxedType(table_, termRaw.`type`).collect { case BasicType.BOOLEAN => Boxing.unboxing(table_, termRaw, BasicType.BOOLEAN) }.getOrElse(termRaw)
-      else termRaw
+      val term = Boxing.tryUnboxToBoolean(table_, termRaw)
       if (term.`type` != BasicType.BOOLEAN) {
         report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None

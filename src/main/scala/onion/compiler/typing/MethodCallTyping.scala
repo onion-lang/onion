@@ -87,6 +87,20 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       None
   }
 
+  /** Resolve method type arguments - explicit if provided, otherwise inferred */
+  private def resolveMethodTypeArgs(
+    node: AST.Node,
+    method: Method,
+    params: Array[Term],
+    typeArgs: List[AST.TypeNode],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    expected: Type
+  ): Option[scala.collection.immutable.Map[String, Type]] =
+    if (typeArgs.nonEmpty)
+      GenericMethodTypeArguments.explicit(typing, node, method, typeArgs, classSubst)
+    else
+      Some(GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected))
+
   /** Collects methods matching the filter from a type hierarchy into candidates set */
   private def collectMethodsMatching(
     tp: ObjectType,
@@ -241,15 +255,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         None
       case Some(method) =>
         val classSubst = TypeSubstitution.classSubstitution(target.`type`)
-        val methodSubst =
-          if (node.typeArgs.nonEmpty) {
-            GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-              case Some(subst) => subst
-              case None => return None
-            }
-          } else {
-            GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
-          }
+        val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
         processParamsWithArgs(node.args, params, expectedArgs) match
@@ -298,15 +304,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       // 名前付き引数を含めて処理
       processNamedArguments(node, node.args, method, context) match {
         case Some(params) =>
-          val methodSubst =
-            if (node.typeArgs.nonEmpty) {
-              GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-                case Some(subst) => subst
-                case None => return None
-              }
-            } else {
-              GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
-            }
+          val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
           val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
           processParamsWithExpected(node, params, expectedArgs) match {
@@ -348,15 +346,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     } else {
       val method = methods(0)
       val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-      val methodSubst =
-        if (node.typeArgs.nonEmpty) {
-          GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-            case Some(subst) => subst
-            case None => return None
-          }
-        } else {
-          GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
-        }
+      val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
       val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
       processParamsWithArgs(node.args, params, expectedArgs) match
@@ -417,15 +407,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       // 名前付き引数を含めて処理
       processNamedArguments(node, node.args, method, context) match {
         case Some(params) =>
-          val methodSubst =
-            if (node.typeArgs.nonEmpty) {
-              GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-                case Some(subst) => subst
-                case None => return None
-              }
-            } else {
-              GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
-            }
+          val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
           val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
           processParamsWithExpected(node, params, expectedArgs) match {
@@ -531,13 +513,8 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         // デフォルト引数を考慮: minArguments <= params.length <= expectedArgs.length
         if (params.length < method.minArguments || params.length > expectedArgs.length) None
         else {
-          var ok = true
-          var i = 0
-          while (i < params.length && ok) {
-            ok = TypeRules.isAssignable(expectedArgs(i), params(i).`type`)
-            i += 1
-          }
-          if (ok) Some(StaticApplicable(method, expectedArgs, methodSubst)) else None
+          val allAssignable = params.indices.forall(i => TypeRules.isAssignable(expectedArgs(i), params(i).`type`))
+          Option.when(allAssignable)(StaticApplicable(method, expectedArgs, methodSubst))
         }
       }
     }.toList
@@ -549,14 +526,9 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         StaticImportAmbiguous(amb.first, amb.second)
       case Right(chosen) =>
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        val adjusted = params.clone()
-        var i = 0
-        while (i < adjusted.length) {
-          adjusted(i) = processAssignable(node.args(i), chosen.expectedArgs(i), adjusted(i))
-          if (adjusted(i) == null) return StaticImportNoMatch
-          i += 1
-        }
-        StaticImportResolved(chosen.method, buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst))
+        val adjusted = params.indices.map(i => processAssignable(node.args(i), chosen.expectedArgs(i), params(i))).toArray
+        if (adjusted.contains(null)) StaticImportNoMatch
+        else StaticImportResolved(chosen.method, buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst))
     }
   }
 
@@ -658,11 +630,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         } else {
           val method = methods(0)
           val classSubst = TypeSubstitution.classSubstitution(typeRef)
-          val methodSubst =
-            GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-              case Some(subst) => subst
-              case None => return None
-            }
+          val methodSubst = GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst).getOrElse(return None)
 
           val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
           processParamsWithArgs(node.args, parameters, expectedArgs) match
@@ -751,15 +719,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       // 名前付き引数を含めて処理
       processNamedArguments(node, node.args, method, context) match {
         case Some(params) =>
-          val methodSubst =
-            if (node.typeArgs.nonEmpty) {
-              GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-                case Some(subst) => subst
-                case None => return None
-              }
-            } else {
-              GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
-            }
+          val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
           val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
           processParamsWithExpected(node, params, expectedArgs) match {
@@ -783,15 +743,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
       case Right(method) =>
         val classSubst = TypeSubstitution.classSubstitution(contextClass.superClass)
-        val methodSubst =
-          if (node.typeArgs.nonEmpty) {
-            GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-              case Some(subst) => subst
-              case None => return None
-            }
-          } else {
-            GenericMethodTypeArguments.infer(typing, node, method, parameters, classSubst, expected)
-          }
+        val methodSubst = resolveMethodTypeArgs(node, method, parameters, node.typeArgs, classSubst, expected).getOrElse(return None)
 
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
         processParamsWithArgs(node.args, parameters, expectedArgs) match

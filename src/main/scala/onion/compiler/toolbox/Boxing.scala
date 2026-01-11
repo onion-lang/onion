@@ -93,4 +93,28 @@ object Boxing {
 
     throw new RuntimeException(s"couldn't find ${methodName} method")
   }
+
+  /** Try to unbox a term to a numeric primitive, returning the original term if not possible */
+  def tryUnboxToNumeric(table: ClassTable, term: TypedAST.Term, isNumeric: TypedAST.BasicType => Boolean): TypedAST.Term =
+    if (term.isBasicType) term
+    else unboxedType(table, term.`type`).filter(isNumeric) match {
+      case Some(bt) => unboxing(table, term, bt)
+      case None => term
+    }
+
+  /** Try to unbox a term to boolean, returning the original term if not possible */
+  def tryUnboxToBoolean(table: ClassTable, term: TypedAST.Term): TypedAST.Term =
+    if (term.isBasicType) term
+    else unboxedType(table, term.`type`) match {
+      case Some(TypedAST.BasicType.BOOLEAN) => unboxing(table, term, TypedAST.BasicType.BOOLEAN)
+      case _ => term
+    }
+
+  /** Try to unbox a term to an integer primitive, returning the original term if not possible */
+  def tryUnboxToInteger(table: ClassTable, term: TypedAST.Term): TypedAST.Term =
+    if (term.isBasicType) term
+    else unboxedType(table, term.`type`).filter(_.isInteger) match {
+      case Some(bt) => unboxing(table, term, bt)
+      case None => term
+    }
 }

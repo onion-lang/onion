@@ -14,9 +14,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
       indexRaw <- typed(node.rhs, context)
       result <- {
         if (target.isArrayType) {
-          val index = if (!indexRaw.isBasicType)
-            Boxing.unboxedType(table_, indexRaw.`type`).filter(_.isInteger).fold(indexRaw)(bt => Boxing.unboxing(table_, indexRaw, bt))
-          else indexRaw
+          val index = Boxing.tryUnboxToInteger(table_, indexRaw)
           if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
             report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
             None

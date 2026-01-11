@@ -91,17 +91,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
           if (local != null) {
             local
           } else {
-            var resolved: ClassType = null
-            val it = imports.iterator
-            while (resolved == null && it.hasNext) {
-              it.next().matches(name) match {
-                case Some(fqcn) =>
-                  val mappedType = forName(fqcn, qualified = true)
-                  if (mappedType != null) resolved = mappedType
-                case None =>
-              }
-            }
-            resolved
+            imports.iterator
+              .flatMap(_.matches(name))
+              .map(fqcn => forName(fqcn, qualified = true))
+              .find(_ != null)
+              .orNull
           }
         }
       }

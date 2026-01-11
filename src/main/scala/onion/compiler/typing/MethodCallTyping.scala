@@ -61,6 +61,32 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   private case object StaticImportNoMatch extends StaticImportResolution
   private case class StaticApplicable(method: Method, expectedArgs: Array[Type], methodSubst: scala.collection.immutable.Map[String, Type])
 
+  /** Report ambiguous method error with standard format */
+  private def reportAmbiguousMethod(node: AST.Node, methods: Array[Method], name: String): Unit =
+    report(
+      AMBIGUOUS_METHOD,
+      node,
+      Array[AnyRef](methods(0).affiliation, name, methods(0).arguments),
+      Array[AnyRef](methods(1).affiliation, name, methods(1).arguments)
+    )
+
+  /** Select a single method, reporting errors if none found or ambiguous */
+  private def selectSingleMethod(
+    node: AST.Node,
+    targetType: ObjectType,
+    name: String,
+    methods: Array[Method],
+    argTypes: Array[Type]
+  ): Option[Method] = methods match {
+    case Array() =>
+      report(METHOD_NOT_FOUND, node, targetType, name, argTypes)
+      None
+    case Array(m) => Some(m)
+    case _ =>
+      reportAmbiguousMethod(node, methods, name)
+      None
+  }
+
   /** Collects methods matching the filter from a type hierarchy into candidates set */
   private def collectMethodsMatching(
     tp: ObjectType,
@@ -208,44 +234,34 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     }
 
     val methods = MethodResolution.findMethods(targetType, name, params, table_)
-    if (methods.length == 0) {
-      report(METHOD_NOT_FOUND, node, targetType, name, types(params))
-      None
-    } else if (methods.length > 1) {
-      report(
-        AMBIGUOUS_METHOD,
-        node,
-        Array[AnyRef](methods(0).affiliation, name, methods(0).arguments),
-        Array[AnyRef](methods(1).affiliation, name, methods(1).arguments)
-      )
-      None
-    } else if ((methods(0).modifier & AST.M_STATIC) != 0) {
-      report(ILLEGAL_METHOD_CALL, node, methods(0).affiliation, name, methods(0).arguments)
-      None
-    } else {
-      val method = methods(0)
-      val classSubst = TypeSubstitution.classSubstitution(target.`type`)
-      val methodSubst =
-        if (node.typeArgs.nonEmpty) {
-          GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
-            case Some(subst) => subst
-            case None => return None
+    selectSingleMethod(node, targetType, name, methods, types(params)) match {
+      case None => None
+      case Some(method) if (method.modifier & AST.M_STATIC) != 0 =>
+        report(ILLEGAL_METHOD_CALL, node, method.affiliation, name, method.arguments)
+        None
+      case Some(method) =>
+        val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+        val methodSubst =
+          if (node.typeArgs.nonEmpty) {
+            GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
+              case Some(subst) => subst
+              case None => return None
+            }
+          } else {
+            GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
           }
-        } else {
-          GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected)
-        }
 
-      val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
-      processParamsWithArgs(node.args, params, expectedArgs) match
-        case None => return None
-        case Some(_) => ()
+        val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+        processParamsWithArgs(node.args, params, expectedArgs) match
+          case None => return None
+          case Some(_) => ()
 
-      // デフォルト引数で足りない分を補完
-      val finalParams = fillDefaultArguments(params, method)
+        // デフォルト引数で足りない分を補完
+        val finalParams = fillDefaultArguments(params, method)
 
-      val call = new Call(target, method, finalParams)
-      val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-      TypeSubst.withCastOpt(call, castType)
+        val call = new Call(target, method, finalParams)
+        val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+        TypeSubst.withCastOpt(call, castType)
     }
   }
 
@@ -327,12 +343,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           None
       }
     } else if (methods.length > 1) {
-      report(
-        AMBIGUOUS_METHOD,
-        node,
-        Array[AnyRef](methods(0).affiliation, node.name, methods(0).arguments),
-        Array[AnyRef](methods(1).affiliation, node.name, methods(1).arguments)
-      )
+      reportAmbiguousMethod(node, methods, node.name)
       None
     } else {
       val method = methods(0)

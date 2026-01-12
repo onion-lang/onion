@@ -342,6 +342,7 @@ TOKEN:
 | <K_DEF:          "def"          >
 | <K_DOUBLE:       "Double"      >
 | <K_ELSE:         "else"         >
+| <K_ENUM:         "enum"         >
 | <K_FALSE:        "false"        >
 | <K_FINALLY:      "finally"      >
 | <K_FINAL:        "final"        >
@@ -437,6 +438,7 @@ TOKEN : {
 | <COLON2:         "::"           >
 | <SHARP:          "#"            >
 | <DOT:            "."            >
+| <ELLIPSIS:        "..."          >
 | <LBRACE:         "{"            >
 | <RBRACE:         "}"            >
 | <BACK_QUOTE:     "`"            >
@@ -615,7 +617,7 @@ List<AST.TypeNode> throws_clause() : {
 }
 
 AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
-  (ty=interface_decl(modifiers) | ty=class_decl(modifiers) | ty=record_decl(modifiers)) {return ty;}
+  (ty=interface_decl(modifiers) | ty=class_decl(modifiers) | ty=record_decl(modifiers) | ty=enum_decl(modifiers)) {return ty;}
 }
 
 AST.BlockExpression block():{Token t; List<AST.CompoundExpression> statements = (List<AST.CompoundExpression>)AST.NIL(); AST.BlockExpression s;}{
@@ -736,6 +738,31 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
     return new AST.InterfaceDeclaration(
       p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
     );
+  }
+}
+
+AST.EnumDeclaration enum_decl(int mset) : {
+  Token start, name;
+  AST.EnumConstant constant;
+  ArrayBuffer<AST.EnumConstant> constants = new ArrayBuffer<AST.EnumConstant>();
+}{
+  start = "enum" name = id() "{"
+    constant = enum_constant() {append(constants, constant);}
+    ("," constant = enum_constant() {append(constants, constant);})*
+    [","] // trailing comma allowed
+  "}" {
+    return new AST.EnumDeclaration(
+      p(start), mset, c(name), toList(constants)
+    );
+  }
+}
+
+AST.EnumConstant enum_constant() : {
+  Token name;
+  List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
+}{
+  name = id() ["(" args = terms() ")"] {
+    return new AST.EnumConstant(p(name), c(name), args);
   }
 }
 
@@ -880,9 +907,9 @@ AST.TypeNode return_type() :{AST.TypeNode type;}{
   (type = void_type() | type = type()) {return type;}
 }
 
-AST.Argument argument() :{Token t; AST.TypeNode type; AST.Expression defaultValue = null;}{
-  t=id() ":" type = type() ["=" eols() defaultValue = term()]
-  {return new AST.Argument(p(t), c(t), type, defaultValue);}
+AST.Argument argument() :{Token t; AST.TypeNode type; AST.Expression defaultValue = null; boolean isVararg = false;}{
+  t=id() ":" type = type() ["..." {isVararg = true;}] ["=" eols() defaultValue = term()]
+  {return new AST.Argument(p(t), c(t), type, defaultValue, isVararg);}
 }
 
 List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{

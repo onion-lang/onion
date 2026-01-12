@@ -166,6 +166,86 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     if (results.contains(null)) None else Some(results)
   }
 
+  /**
+   * Wrap parameters for vararg method call.
+   * If the method is vararg, wraps trailing arguments into an array.
+   * Returns the adjusted parameters array.
+   */
+  private def wrapVarargParams(
+    method: Method,
+    params: Array[Term],
+    expectedArgs: Array[Type]
+  ): Array[Term] = {
+    if (!method.isVararg || expectedArgs.isEmpty) return params
+
+    val fixedArgCount = expectedArgs.length - 1
+    val varargType = expectedArgs.last.asInstanceOf[ArrayType]
+    val componentType = varargType.base
+
+    if (params.length == expectedArgs.length) {
+      // Check if last param is already the correct array type
+      val lastParamType = params.last.`type`
+      if (lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType)) {
+        // Direct array pass - no wrapping needed
+        return params
+      }
+    }
+
+    // Wrap vararg elements into array
+    val fixedParams = params.take(fixedArgCount)
+    val varargElements = params.drop(fixedArgCount)
+    val arrayTerm = new NewArrayWithValues(varargType, varargElements)
+    fixedParams :+ arrayTerm
+  }
+
+  /**
+   * Process parameters for vararg method with type checking.
+   * Handles both fixed and vararg portions of the parameter list.
+   */
+  private def processVarargParamsWithExpected(
+    node: AST.Node,
+    method: Method,
+    params: Array[Term],
+    expectedArgs: Array[Type]
+  ): Option[Array[Term]] = {
+    if (!method.isVararg || expectedArgs.isEmpty) {
+      return processParamsWithExpected(node, params, expectedArgs)
+    }
+
+    val fixedArgCount = expectedArgs.length - 1
+    val varargType = expectedArgs.last.asInstanceOf[ArrayType]
+    val componentType = varargType.base
+
+    // Process fixed parameters
+    val fixedResults = (0 until fixedArgCount).map { i =>
+      if (i < params.length) processAssignable(node, expectedArgs(i), params(i)) else null
+    }.toArray
+
+    if (fixedResults.contains(null)) return None
+
+    // Process vararg portion
+    if (params.length == expectedArgs.length) {
+      // Could be direct array pass or single element
+      val lastParam = params.last
+      val lastParamType = lastParam.`type`
+      if (lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType)) {
+        // Direct array pass
+        val processedLast = processAssignable(node, varargType, lastParam)
+        if (processedLast == null) return None
+        return Some(fixedResults :+ processedLast)
+      }
+    }
+
+    // Wrap vararg elements
+    val varargElements = params.drop(fixedArgCount).map { param =>
+      processAssignable(node, componentType, param)
+    }
+    if (varargElements.contains(null)) return None
+
+    val arrayTerm = new NewArrayWithValues(varargType, varargElements)
+    Some(fixedResults :+ arrayTerm)
+  }
+
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
     val contextClass = definition_
     var target = typed(node.target, context).getOrElse(null)
@@ -258,12 +338,18 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
-        processParamsWithArgs(node.args, params, expectedArgs) match
-          case None => return None
-          case Some(_) => ()
+
+        // Handle vararg methods specially
+        val processedParams = if (method.isVararg) {
+          processVarargParamsWithExpected(node, method, params, expectedArgs).getOrElse(return None)
+        } else {
+          processParamsWithArgs(node.args, params, expectedArgs) match
+            case None => return None
+            case Some(processed) => processed
+        }
 
         // デフォルト引数で足りない分を補完
-        val finalParams = fillDefaultArguments(params, method)
+        val finalParams = if (method.isVararg) processedParams else fillDefaultArguments(processedParams, method)
 
         val call = new Call(target, method, finalParams)
         val castType = TypeSubst(method.returnType, classSubst, methodSubst)
@@ -349,12 +435,18 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       val methodSubst = resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected).getOrElse(return None)
 
       val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
-      processParamsWithArgs(node.args, params, expectedArgs) match
-        case None => return None
-        case Some(_) => ()
+
+      // Handle vararg methods specially
+      val processedParams = if (method.isVararg) {
+        processVarargParamsWithExpected(node, method, params, expectedArgs).getOrElse(return None)
+      } else {
+        processParamsWithArgs(node.args, params, expectedArgs) match
+          case None => return None
+          case Some(processed) => processed
+      }
 
       // デフォルト引数で足りない分を補完
-      val finalParams = fillDefaultArguments(params, method)
+      val finalParams = if (method.isVararg) processedParams else fillDefaultArguments(processedParams, method)
 
       if ((methods(0).modifier & AST.M_STATIC) != 0) {
         val call = new CallStatic(targetType, method, finalParams)
@@ -601,7 +693,13 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     classSubst: scala.collection.immutable.Map[String, Type],
     methodSubst: scala.collection.immutable.Map[String, Type]
   ): Some[Term] =
-    val finalParams = fillDefaultArguments(parameters, method)
+    val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+    val wrappedParams = if (method.isVararg) {
+      wrapVarargParams(method, parameters, expectedArgs)
+    } else {
+      parameters
+    }
+    val finalParams = if (method.isVararg) wrappedParams else fillDefaultArguments(wrappedParams, method)
     val call = new CallStatic(typeRef, method, finalParams)
     val castType = TypeSubst(method.returnType, classSubst, methodSubst)
     Some(TypeSubst.withCast(call, castType))
@@ -633,9 +731,12 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           val methodSubst = GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst).getOrElse(return None)
 
           val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
-          processParamsWithArgs(node.args, parameters, expectedArgs) match
-            case None => return None
-            case Some(_) => ()
+          // For vararg methods, skip standard param processing since makeStaticCall handles wrapping
+          if (!method.isVararg) {
+            processParamsWithArgs(node.args, parameters, expectedArgs) match
+              case None => return None
+              case Some(_) => ()
+          }
 
           makeStaticCall(typeRef, method, parameters, classSubst, methodSubst)
         }
@@ -653,11 +754,43 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           val classSubst = TypeSubstitution.classSubstitution(typeRef)
           val methodSubst = GenericMethodTypeArguments.infer(typing, node, method, parameters, classSubst, expected)
           val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
-          // デフォルト引数を考慮: minArguments <= parameters.length <= expectedArgs.length
-          if (parameters.length < method.minArguments || parameters.length > expectedArgs.length) None
-          else Option.when(
-            parameters.indices.forall(i => TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`))
-          )(Applicable(method, expectedArgs, methodSubst))
+
+          if (method.isVararg && expectedArgs.nonEmpty) {
+            // For vararg methods: allow any number of args >= fixedArgCount
+            val fixedArgCount = expectedArgs.length - 1
+            val varargType = expectedArgs.last.asInstanceOf[ArrayType]
+            val componentType = varargType.base
+
+            if (parameters.length < fixedArgCount) None
+            else {
+              // Check fixed args match
+              val fixedMatch = (0 until fixedArgCount).forall { i =>
+                TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`)
+              }
+              // Check vararg portion
+              val varargMatch = if (parameters.length == expectedArgs.length) {
+                val lastParamType = parameters.last.`type`
+                // Either direct array pass or single element
+                (lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType)) ||
+                  TypeRules.isAssignable(componentType, lastParamType)
+              } else if (parameters.length > expectedArgs.length) {
+                // Multiple vararg elements
+                (fixedArgCount until parameters.length).forall { i =>
+                  TypeRules.isAssignable(componentType, parameters(i).`type`)
+                }
+              } else {
+                // No vararg elements (empty array)
+                true
+              }
+              Option.when(fixedMatch && varargMatch)(Applicable(method, expectedArgs, methodSubst))
+            }
+          } else {
+            // Non-vararg method: original logic with default args
+            if (parameters.length < method.minArguments || parameters.length > expectedArgs.length) None
+            else Option.when(
+              parameters.indices.forall(i => TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`))
+            )(Applicable(method, expectedArgs, methodSubst))
+          }
         }.toList
 
         if (applicable.isEmpty) {
@@ -666,9 +799,12 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         } else if (applicable.length == 1) {
           val selected = applicable.head
           val classSubst = TypeSubstitution.classSubstitution(typeRef)
-          processParamsWithArgs(node.args, parameters, selected.expectedArgs) match
-            case None => return None
-            case Some(_) => ()
+          // For vararg methods, skip standard param processing since makeStaticCall handles wrapping
+          if (!selected.method.isVararg) {
+            processParamsWithArgs(node.args, parameters, selected.expectedArgs) match
+              case None => return None
+              case Some(_) => ()
+          }
           makeStaticCall(typeRef, selected.method, parameters, classSubst, selected.methodSubst)
         } else {
           def compareApplicable(a1: Applicable, a2: Applicable): Int =
@@ -683,9 +819,12 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             None
           } else {
             val classSubst = TypeSubstitution.classSubstitution(typeRef)
-            processParamsWithArgs(node.args, parameters, best.expectedArgs) match
-              case None => return None
-              case Some(_) => ()
+            // For vararg methods, skip standard param processing since makeStaticCall handles wrapping
+            if (!best.method.isVararg) {
+              processParamsWithArgs(node.args, parameters, best.expectedArgs) match
+                case None => return None
+                case Some(_) => ()
+            }
             makeStaticCall(typeRef, best.method, parameters, classSubst, best.methodSubst)
           }
         }

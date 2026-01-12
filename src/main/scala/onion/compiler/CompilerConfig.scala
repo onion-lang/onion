@@ -18,5 +18,7 @@ case class CompilerConfig(
   encoding: String,
   outputDirectory: String,
   maxErrorReports: Int,
-  verbose: Boolean = false
+  verbose: Boolean = false,
+  warningLevel: WarningLevel = WarningLevel.On,
+  suppressedWarnings: Set[WarningCategory] = Set.empty
 )

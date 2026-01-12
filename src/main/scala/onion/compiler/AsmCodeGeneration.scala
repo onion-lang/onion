@@ -126,7 +126,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       for ctorRef <- classDef.constructors do
         val ctor = ctorRef.asInstanceOf[ConstructorDefinition]
         codeConstructor(cw, ctor, name)
-    
+
+    // Generate static initializer for enums
+    if Modifier.isEnum(classDef.modifier) then
+      codeEnumClinit(cw, classDef, name)
+
     // Generate methods
     for method <- classDef.methods do
       val methodDef = method.asInstanceOf[MethodDefinition]
@@ -187,10 +191,37 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         argIndex += 1
     gen.returnValue()
     gen.endMethod()
-    
+
+  private def codeEnumClinit(cw: ClassWriter, classDef: ClassDefinition, className: String): Unit =
+    // Generate static initializer for enum
+    val gen = MethodEmitter.newGenerator(cw, Opcodes.ACC_STATIC, "<clinit>", AsmType.VOID_TYPE, Array.empty)
+    val enumType = AsmUtil.objectType(className)
+    val stringType = AsmType.getType("Ljava/lang/String;")
+
+    // Get enum constants (static final fields of the enum type)
+    val enumFields = classDef.fields.filter { field =>
+      Modifier.isStatic(field.modifier) && Modifier.isFinal(field.modifier) &&
+      field.`type`.name == classDef.name
+    }
+
+    // Initialize each enum constant
+    enumFields.zipWithIndex.foreach { case (field, ordinal) =>
+      // new EnumType(name, ordinal)
+      gen.newInstance(enumType)
+      gen.dup()
+      gen.push(field.name)  // name
+      gen.push(ordinal)     // ordinal
+      gen.invokeConstructor(enumType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, stringType, AsmType.INT_TYPE)))
+      gen.putStatic(enumType, field.name, enumType)
+    }
+
+    gen.returnValue()
+    gen.endMethod()
+
   private def codeInterfaceMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
     // Interface methods are abstract, so no method body
-    val access = toAsmModifier(node.modifier) | Opcodes.ACC_ABSTRACT
+    var access = toAsmModifier(node.modifier) | Opcodes.ACC_ABSTRACT
+    if (node.isVararg) access |= Opcodes.ACC_VARARGS
     val argTypes = node.arguments.map(asmType)
     val returnType = asmType(node.returnType)
     val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
@@ -204,7 +235,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     mv.visitEnd()
 
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
-    val access = toAsmModifier(node.modifier)
+    var access = toAsmModifier(node.modifier)
+    if (node.isVararg) access |= Opcodes.ACC_VARARGS
     val argTypes = node.arguments.map(asmType)
     val returnType = asmType(node.returnType)
     val exceptions = if (node.throwsTypes.isEmpty) null
@@ -221,7 +253,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       .withParameters(isStatic, argTypes)
       .withBoxedVariables(node.getFrame)
 
-    val isSyntheticGetter = node.block == null && !Modifier.isAbstract(node.modifier) && node.arguments.isEmpty && node.returnType != BasicType.VOID
+    // Synthetic getter for records: non-abstract, no block, no args, has return type, and NOT static
+    val isSyntheticGetter = node.block == null && !Modifier.isAbstract(node.modifier) &&
+                            node.arguments.isEmpty && node.returnType != BasicType.VOID && !isStatic
 
     if node.block != null then
       emitStatementsWithContext(gen, node.block.statements, className, localVars)

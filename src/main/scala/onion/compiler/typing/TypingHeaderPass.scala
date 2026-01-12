@@ -23,6 +23,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
         registerInterface(declaration, moduleName, imports)
       case declaration: AST.RecordDeclaration =>
         registerRecord(declaration, moduleName, imports)
+      case declaration: AST.EnumDeclaration =>
+        registerEnum(declaration, moduleName, imports)
       case _ =>
         nonTypeCount += 1
     }
@@ -93,6 +95,20 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
   private def registerRecord(declaration: AST.RecordDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     // Records are compiled as final classes
     val modifiers = declaration.modifiers | Modifier.FINAL
+    val node = ClassDefinition.newClass(declaration.location, modifiers, createFQCN(moduleName, declaration.name), null, null)
+    node.setSourceFile(Paths.nameOf(unit.sourceFile))
+    if (table_.lookup(node.name) != null) {
+      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    } else {
+      table_.classes.add(node)
+      put(declaration, node)
+      add(node.name, new NameMapper(imports))
+    }
+  }
+
+  private def registerEnum(declaration: AST.EnumDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
+    // Enums are compiled as final classes extending java.lang.Enum
+    val modifiers = declaration.modifiers | Modifier.FINAL | Modifier.ENUM
     val node = ClassDefinition.newClass(declaration.location, modifiers, createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     if (table_.lookup(node.name) != null) {

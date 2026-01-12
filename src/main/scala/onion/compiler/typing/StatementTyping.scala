@@ -130,11 +130,13 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
           return new NOP(node.location)
         }
         val index = context.add(node.name, inferredType, isMutable = !Modifier.isFinal(node.modifiers))
+        context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
         val lhsType = mapFrom(node.typeRef)
         if (lhsType == null) return new NOP(node.location)
         val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
+        context.recordDeclaration(node.name, node.location)
         var local: SetLocal = null
         if (node.init != null) {
           val valueNode = typed(node.init, context, lhsType)

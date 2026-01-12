@@ -74,13 +74,52 @@ private[compiler] object MethodResolution {
 
     def applicable(method: Method): Boolean =
       val expected = specializedArgs(method)
-      // デフォルト引数を考慮: minArguments <= params.length <= expected.length
-      if params.length < method.minArguments || params.length > expected.length then return false
-      var i = 0
-      while i < params.length do
-        if !isAssignableWithBoxing(expected(i), params(i).`type`) then return false
-        i += 1
-      true
+
+      if (method.isVararg && expected.nonEmpty) {
+        // For vararg methods
+        val fixedArgCount = expected.length - 1
+        val varargType = expected.last
+        if (!varargType.isArrayType) return false
+        val componentType = varargType.asInstanceOf[ArrayType].base
+
+        // Must have at least the fixed arguments
+        if (params.length < fixedArgCount) return false
+
+        // Check fixed args
+        var i = 0
+        while i < fixedArgCount do
+          if !isAssignableWithBoxing(expected(i), params(i).`type`) then return false
+          i += 1
+
+        // Check vararg portion
+        if (params.length == expected.length) {
+          // Could be direct array pass or single element
+          val lastParamType = params.last.`type`
+          if (lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType)) {
+            return true
+          }
+          // Single element case
+          isAssignableWithBoxing(componentType, lastParamType)
+        } else if (params.length > expected.length) {
+          // Multiple vararg elements
+          var j = fixedArgCount
+          while j < params.length do
+            if !isAssignableWithBoxing(componentType, params(j).`type`) then return false
+            j += 1
+          true
+        } else {
+          // No vararg elements (empty array)
+          true
+        }
+      } else {
+        // Non-vararg method: original logic with default args
+        if params.length < method.minArguments || params.length > expected.length then return false
+        var i = 0
+        while i < params.length do
+          if !isAssignableWithBoxing(expected(i), params(i).`type`) then return false
+          i += 1
+        true
+      }
 
     val applicableMethods = candidates.asScala.filter(applicable).toList
     if applicableMethods.isEmpty then return new Array[Method](0)

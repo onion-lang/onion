@@ -25,6 +25,7 @@ object Modifier {
   final val PRIVATE = 512
   final val FORWARDED = 1024
   final val SEALED = 2048
+  final val ENUM = 4096
 
   def check(modifier: Int, bitFlag: Int): Boolean = {
      (modifier & bitFlag) != 0
@@ -76,6 +77,10 @@ object Modifier {
 
   def isSealed(modifier: Int): Boolean = {
      check(modifier, SEALED)
+  }
+
+  def isEnum(modifier: Int): Boolean = {
+     check(modifier, ENUM)
   }
 
 }

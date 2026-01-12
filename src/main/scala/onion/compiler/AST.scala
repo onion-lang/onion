@@ -58,7 +58,7 @@ object AST {
   val K_VOID = KVoid
   case class TypeNode(location: Location, desc: TypeDescriptor, isRelaxed: Boolean) extends Node
   abstract sealed class Node{ def location: Location }
-  case class Argument(location: Location, name: String, typeRef: TypeNode, defaultValue: Expression = null) extends Node
+  case class Argument(location: Location, name: String, typeRef: TypeNode, defaultValue: Expression = null, isVararg: Boolean = false) extends Node
   case class CompilationUnit(
     location: Location, sourceFile: String/*nullable*/, module: ModuleDeclaration/*nullable*/,
     imports: ImportClause, toplevels: List[Toplevel]) extends Node
@@ -208,4 +208,10 @@ object AST {
     def this(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) =
       this(location, modifiers, name, superInterfaces, methods, Nil)
   }
+
+  /** An enum constant in an enum declaration */
+  case class EnumConstant(location: Location, name: String, args: List[Expression]) extends Node
+
+  /** An enum type declaration */
+  case class EnumDeclaration(location: Location, modifiers: Int, name: String, constants: List[EnumConstant]) extends TypeDeclaration
 }

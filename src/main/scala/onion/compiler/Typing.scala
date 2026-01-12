@@ -113,6 +113,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] var typeParams_ : TypeParamScope = emptyTypeParams
   private[compiler] val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
   private[compiler] val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
+  private[compiler] val warningReporter_ : WarningReporter = new WarningReporter(config.warningLevel, config.suppressedWarnings)
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
@@ -121,6 +122,17 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     for(unit <- source) processDuplication(unit)
     val problems = reporter_.getProblems
     if (problems.length > 0) throw new CompilationException(problems.toSeq)
+
+    // Print warnings
+    warningReporter_.printWarnings()
+
+    // If warnings are treated as errors and there are warnings, fail compilation
+    if (warningReporter_.treatAsErrors && warningReporter_.hasWarnings) {
+      throw new CompilationException(Seq(
+        CompileError("", null, s"${warningReporter_.warningCount} warning(s) treated as errors")
+      ))
+    }
+
     table_.classes.values.toSeq
   }
 
@@ -148,6 +160,17 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
     report_(items.toArray)
   }
+
+  def reportUnusedVariables(context: LocalContext): Unit = {
+    warningReporter_.setSourceFile(unit_.sourceFile)
+    for (v <- context.unusedLocalVariables) {
+      warningReporter_.unusedVariable(v.location, v.name)
+    }
+    for (p <- context.unusedParameters) {
+      warningReporter_.unusedParameter(p.location, p.name)
+    }
+  }
+
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
   def load(name: String): ClassType = table_.load(name)
   /** Option-returning version of load for safer null handling */
@@ -179,7 +202,15 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
-    val result = arguments.map{arg => mapFrom(arg.typeRef)}
+    val result = arguments.map { arg =>
+      val baseType = mapFrom(arg.typeRef)
+      if (baseType != null && arg.isVararg) {
+        // Convert vararg type to array type
+        table_.loadArray(baseType, 1)
+      } else {
+        baseType
+      }
+    }
     if(result.forall(_ != null)) Some(result) else None
   }
   private[compiler] def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)

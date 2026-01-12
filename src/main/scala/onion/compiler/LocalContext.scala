@@ -17,6 +17,7 @@ class LocalContext {
   private var contextFrame = new LocalFrame(null)
   private val generator = new SymbolGenerator("symbol#")
   private val boxedVariables = scala.collection.mutable.Set[String]()
+  private val usageTracker = new VariableUsageTracker()
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
@@ -133,6 +134,43 @@ class LocalContext {
    */
   def isBoxed(name: String): Boolean = {
     boxedVariables.contains(name)
+  }
+
+  // Variable usage tracking
+
+  /**
+   * Records a variable declaration for unused variable detection.
+   */
+  def recordDeclaration(name: String, location: Location, isParameter: Boolean = false): Unit = {
+    usageTracker.recordDeclaration(name, location, isParameter)
+  }
+
+  /**
+   * Records that a variable was used.
+   */
+  def recordUsage(name: String): Unit = {
+    usageTracker.recordUsage(name)
+  }
+
+  /**
+   * Gets all unused local variables (not parameters).
+   */
+  def unusedLocalVariables: Seq[VariableDecl] = {
+    usageTracker.unusedLocalVariables
+  }
+
+  /**
+   * Gets all unused parameters.
+   */
+  def unusedParameters: Seq[VariableDecl] = {
+    usageTracker.unusedParameters
+  }
+
+  /**
+   * Clears usage tracking data (call when starting a new method/function).
+   */
+  def clearUsageTracking(): Unit = {
+    usageTracker.clear()
   }
 
 }

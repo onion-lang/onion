@@ -125,6 +125,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
     for (i <- 0 until arguments.length) {
       context.add(args(i).name, arguments(i))
+      context.recordDeclaration(args(i).name, args(i).location, isParameter = true)
     }
 
     // Process default argument values
@@ -139,6 +140,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val translatedBlock = addReturnNode(translate(block, context).asInstanceOf[StatementBlock], method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
+
+    // Report unused variable warnings
+    typing.reportUnusedVariables(context)
   }
 
   def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
@@ -158,6 +162,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val args = constructor.getArgs
     for(i <- 0 until args.length) {
       context.add(node.args(i).name, args(i))
+      context.recordDeclaration(node.args(i).name, node.args(i).location, isParameter = true)
     }
     val params = typedTerms(node.superInits.toArray, context)
     val currentClass = definition_
@@ -174,6 +179,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       constructor.block = block
       constructor.frame = context.getContextFrame
     }
+
+    // Report unused variable warnings
+    typing.reportUnusedVariables(context)
   }
   def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
     definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
@@ -193,6 +201,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
   }
   def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit = { () }
+  def processEnumDeclaration(node: AST.EnumDeclaration, context: LocalContext): Unit = { () }
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
     val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (function == null) return
@@ -515,6 +524,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
         None
       }else {
+        context.recordUsage(name)
         Some(new RefLocal(bind))
       }
     case node: AST.UnqualifiedFieldReference =>
@@ -679,6 +689,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
           element match {
             case node: AST.ClassDeclaration => processClassDeclaration(node, context)
             case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
+            case node: AST.EnumDeclaration => processEnumDeclaration(node, context)
             case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
             case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
             case _ =>

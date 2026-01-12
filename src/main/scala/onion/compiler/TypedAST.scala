@@ -570,13 +570,16 @@ object TypedAST {
     val returnType: TypedAST.Type,
     var block: TypedAST.StatementBlock,
     override val typeParameters: Array[TypedAST.TypeParameter] = Array(),
-    val throwsTypes: Array[TypedAST.ClassType] = Array()
+    val throwsTypes: Array[TypedAST.ClassType] = Array(),
+    private val vararg: Boolean = false
   ) extends Node with Method {
     private var closure: Boolean = false
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null
 
     def affiliation: TypedAST.ClassType = classType
+
+    override def isVararg: Boolean = vararg
 
     def getBlock: TypedAST.StatementBlock = block
 
@@ -1049,6 +1052,7 @@ object TypedAST {
       val ms: Array[TypedAST.Method] = target.methods(name)
       for (m <- target.methods(name)) {
         if (matcher.matches(m.arguments, params)) methods.add(m)
+        else if (m.isVararg && matcher.matchesVararg(m.arguments, params)) methods.add(m)
       }
       val superClass: TypedAST.ClassType = target.superClass
       find(methods, superClass, name, params)
@@ -1083,6 +1087,9 @@ object TypedAST {
     def returnType: TypedAST.Type
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Whether this method accepts variable-length arguments (last parameter is vararg) */
+    def isVararg: Boolean = false
 
     /** Arguments with names and optional default values. Override in subclasses that support defaults. */
     def argumentsWithDefaults: Array[MethodArgument] = arguments.zipWithIndex.map { case (t, i) =>
@@ -1169,6 +1176,7 @@ object TypedAST {
    */
   trait ParameterMatcher {
     def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean
+    def matchesVararg(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean
   }
 
   /**
@@ -1178,6 +1186,49 @@ object TypedAST {
     def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean =
       arguments.length == parameters.length &&
         arguments.zip(parameters.map(_.`type`)).forall((arg, param) => TypeRules.isSuperType(arg, param))
+
+    def matchesVararg(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean = {
+      if (arguments.isEmpty) return false
+      val lastArgType = arguments.last
+      // Vararg parameter must be an array type
+      if (!lastArgType.isArrayType) return false
+      val arrayType = lastArgType.asInstanceOf[ArrayType]
+      val componentType = arrayType.base
+
+      val fixedArgCount = arguments.length - 1
+      val paramTypes = parameters.map(_.`type`)
+
+      // Must have at least the fixed arguments
+      if (paramTypes.length < fixedArgCount) return false
+
+      // Check fixed arguments match
+      val fixedArgsMatch = (0 until fixedArgCount).forall { i =>
+        TypeRules.isSuperType(arguments(i), paramTypes(i))
+      }
+      if (!fixedArgsMatch) return false
+
+      // Check vararg portion
+      if (paramTypes.length == arguments.length) {
+        // Could be either: passing an array directly, or passing one element
+        val lastParamType = paramTypes.last
+        // Check if it's a direct array pass
+        if (lastParamType.isArrayType && TypeRules.isSuperType(lastArgType, lastParamType)) {
+          return true
+        }
+        // Check if it's a single element that matches component type
+        TypeRules.isSuperType(componentType, lastParamType)
+      } else if (paramTypes.length > arguments.length) {
+        // Multiple vararg elements - all must match component type
+        (fixedArgCount until paramTypes.length).forall { i =>
+          TypeRules.isSuperType(componentType, paramTypes(i))
+        }
+      } else if (paramTypes.length == fixedArgCount) {
+        // No vararg elements - empty array will be passed
+        true
+      } else {
+        false
+      }
+    }
   }
 
   abstract sealed class Type {

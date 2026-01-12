@@ -18,6 +18,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
       case node: AST.RecordDeclaration => processRecordDeclaration(node)
+      case node: AST.EnumDeclaration => processEnumDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
       case _ =>
@@ -108,6 +109,65 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     }
   }
 
+  private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = {
+    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+    mapper_ = find(definition_.name)
+
+    // Enum extends java.lang.Enum<E>
+    val enumClass = load("java.lang.Enum")
+    if (enumClass != null) {
+      definition_.setSuperClass(enumClass)
+    } else {
+      // Fallback to Object if Enum not found
+      definition_.setSuperClass(rootClass)
+    }
+    definition_.setInterfaces(Array.empty)
+    definition_.setResolutionComplete(true)
+
+    // Create static final fields for each enum constant
+    node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
+      val fieldModifier = Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL
+      val field = new FieldDefinition(constant.location, fieldModifier, definition_, constant.name, definition_)
+      definition_.add(field)
+    }
+
+    // Create values() static method that returns array of all constants
+    val valuesModifier = Modifier.PUBLIC | Modifier.STATIC
+    val valuesMethod = new MethodDefinition(
+      node.location, valuesModifier, definition_, "values",
+      Array.empty, table_.loadArray(definition_, 1), null
+    )
+    definition_.add(valuesMethod)
+
+    // Create valueOf(String) static method
+    val stringType = load("java.lang.String")
+    if (stringType != null) {
+      val valueOfModifier = Modifier.PUBLIC | Modifier.STATIC
+      val valueOfMethod = new MethodDefinition(
+        node.location, valueOfModifier, definition_, "valueOf",
+        Array(stringType), definition_, null
+      )
+      definition_.add(valueOfMethod)
+    }
+
+    // Create private constructor(String name, int ordinal)
+    // The constructor calls super(name, ordinal) on java.lang.Enum
+    val ctorModifier = Modifier.PRIVATE
+    if (stringType != null) {
+      val ctorArgs = Array[Type](stringType, BasicType.INT)
+      // Create super initializer that passes both parameters to Enum constructor
+      val superArgs = Array[Type](stringType, BasicType.INT)
+      // Reference to constructor parameters (index 0 = name, index 1 = ordinal)
+      val superTerms = Array[Term](
+        new RefLocal(new ClosureLocalBinding(0, 0, stringType, false)),
+        new RefLocal(new ClosureLocalBinding(0, 1, BasicType.INT, false))
+      )
+      val superInit = new TypedAST.Super(definition_.superClass, superArgs, superTerms)
+      val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, ctorArgs, null, superInit)
+      definition_.add(ctor)
+    }
+  }
+
   private def processAccessSection(section: AST.AccessSection): Unit = {
     access_ = section.modifiers
     section.members.foreach {
@@ -135,7 +195,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       val classType = loadTopClass.asInstanceOf[ClassDefinition]
       val modifier = node.modifiers | AST.M_PUBLIC
       val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
-      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes)
+      val hasVararg = node.args.lastOption.exists(_.isVararg)
+      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes, hasVararg)
       put(node, method)
       classType.add(method)
     }
@@ -160,6 +221,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
         var modifier = node.modifiers | access_
         if (node.block == null) modifier |= AST.M_ABSTRACT
         val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+        val hasVararg = node.args.lastOption.exists(_.isVararg)
         val method = new MethodDefinition(
           node.location,
           modifier,
@@ -169,7 +231,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
           returnType,
           null,
           methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
-          throwsTypes
+          throwsTypes,
+          hasVararg
         )
         put(node, method)
         definition_.add(method)
@@ -186,6 +249,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       for (args <- argsOption; returnType <- returnTypeOption) {
         val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
         val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+        val hasVararg = node.args.lastOption.exists(_.isVararg)
         val method = new MethodDefinition(
           node.location,
           modifier,
@@ -195,7 +259,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
           returnType,
           null,
           methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
-          throwsTypes
+          throwsTypes,
+          hasVararg
         )
         put(node, method)
         definition_.add(method)

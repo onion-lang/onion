@@ -169,6 +169,4 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 
 ## Known Limitations (per README.md)
 
-- Some compile-time checks not fully implemented (abstract methods, final method overriding)
 - Compiler may crash on certain code patterns (examples in `run/` are verified to work)
-- Finally clause in try-catch not yet supported

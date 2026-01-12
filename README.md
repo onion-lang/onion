@@ -73,11 +73,6 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 
 ## Limitations
 
-* Some compilation-time checks is not implemented yet.  For example,
-  It's not checked that abstract methods are implemented. Compiled
-  codes maybe rejected by class file verifiers sometimes.  If you
-  find the problem, reporting it to help me.
-
 * Currently, `onionc` has edge cases.  The compiler crashes sometimes.
   The source codes in example directory compiles and is executed correctly.
 

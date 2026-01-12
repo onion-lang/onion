@@ -100,6 +100,14 @@ class LocalContext {
     contextFrame.lookupOnlyCurrentScope(name)
   }
 
+  /**
+   * Checks if a variable with the given name exists in an outer scope (not the current scope).
+   * Returns the location of the shadowed variable, or None if not shadowing.
+   */
+  def checkShadowing(name: String): Option[Location] = {
+    contextFrame.lookupInOuterScopes(name)
+  }
+
   def add(name: String, `type` : TypedAST.Type): Int = {
     add(name, `type`, isMutable = true)
   }

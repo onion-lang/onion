@@ -171,6 +171,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
   }
 
+  /**
+   * Reports a variable shadowing warning if the given name shadows an outer variable.
+   */
+  def checkAndReportShadowing(name: String, location: Location, context: LocalContext): Unit = {
+    // Skip synthetic/generated names
+    if (name.startsWith("symbol#") || name.startsWith("$")) return
+
+    warningReporter_.setSourceFile(unit_.sourceFile)
+    context.checkShadowing(name) match {
+      case Some(originalLocation) =>
+        warningReporter_.shadowedVariable(location, name, originalLocation)
+      case None => // No shadowing
+    }
+  }
+
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
   def load(name: String): ClassType = table_.load(name)
   /** Option-returning version of load for safer null handling */

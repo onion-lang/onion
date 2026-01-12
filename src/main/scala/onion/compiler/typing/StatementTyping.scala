@@ -30,10 +30,39 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     }
   }
 
+  /**
+   * Checks if a statement is "terminating" (never falls through to the next statement).
+   */
+  private def isTerminating(stmt: ActionStatement): Boolean = stmt match {
+    case _: Return | _: Throw | _: Break | _: Continue => true
+    case block: StatementBlock =>
+      block.statements.nonEmpty && isTerminating(block.statements.last)
+    case ifStmt: IfStatement =>
+      // If statement only terminates if both branches exist and both terminate
+      ifStmt.elseStatement != null &&
+        isTerminating(ifStmt.thenStatement) &&
+        isTerminating(ifStmt.elseStatement)
+    case _ => false
+  }
+
   def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
-    case AST.BlockExpression(_, elements) =>
+    case AST.BlockExpression(loc, elements) =>
       context.openScope {
-        new StatementBlock(elements.map(e => translate(e, context)).toIndexedSeq*)
+        val statements = Buffer[ActionStatement]()
+        var foundTerminating = false
+        for (elem <- elements) {
+          if (foundTerminating) {
+            // Report unreachable code
+            warningReporter_.setSourceFile(typing.unit_.sourceFile)
+            warningReporter_.unreachableCode(elem.location)
+          }
+          val stmt = translate(elem, context)
+          statements += stmt
+          if (!foundTerminating && isTerminating(stmt)) {
+            foundTerminating = true
+          }
+        }
+        new StatementBlock(statements.toIndexedSeq*)
       }
     case node: AST.BreakExpression =>
       new Break(node.location)
@@ -129,12 +158,14 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
           report(INCOMPATIBLE_TYPE, node.init, rootClass, inferredType)
           return new NOP(node.location)
         }
+        checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, inferredType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
         val lhsType = mapFrom(node.typeRef)
         if (lhsType == null) return new NOP(node.location)
+        checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
         var local: SetLocal = null

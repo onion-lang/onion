@@ -84,6 +84,23 @@ class LocalFrame(val parent: LocalFrame) {
     }.orNull
   }
 
+  /**
+   * Checks if a variable with the given name exists in outer scopes (not the current scope).
+   * Returns Some(location) if found in outer scope, None otherwise.
+   * Note: Currently returns None for location since LocalBinding doesn't track locations.
+   */
+  def lookupInOuterScopes(name: String): Option[Location] = {
+    // Check parent scopes within this frame
+    if (scope.parent != null && scope.parent.lookup(name) != null) {
+      return Some(null) // Found in outer scope, but no location available
+    }
+    // Check parent frames
+    if (parent != null && parent.lookup(name) != null) {
+      return Some(null) // Found in parent frame, but no location available
+    }
+    None
+  }
+
   /** Gets all variable names visible from the current scope (including parent frames) */
   def allNames: Set[String] = frames.flatMap(_.scope.allNames).toSet
 

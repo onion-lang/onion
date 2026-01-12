@@ -19,6 +19,14 @@ fullRunInputTask(
   "onion.tools.ScriptRunner"
 )
 
+lazy val repl = inputKey[Unit]("Starts the interactive REPL")
+
+fullRunInputTask(
+  repl,
+  Compile,
+  "onion.tools.Repl"
+)
+
 def isArchive(file: File): Boolean = {
   val fileName = file.getName
   val lc = fileName.toLowerCase
@@ -85,6 +93,8 @@ lazy val onionSettings = Seq(
     "org.ow2.asm" % "asm-tree" % "9.8",
     "org.ow2.asm" % "asm-util" % "9.8",
     "net.java.dev.javacc" % "javacc" % "5.0",
+    "org.jline" % "jline" % "3.25.1",
+    "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.21.1",
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.2.19" % "test"
   ),

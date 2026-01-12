@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Use java from PATH if JAVA_HOME is not set
+if [ -z "$JAVA_HOME" ]; then
+    JAVA_CMD="java"
+else
+    JAVA_CMD="$JAVA_HOME/bin/java"
+fi
+
+# Check if java is available
+if ! command -v "$JAVA_CMD" > /dev/null 2>&1; then
+    echo "Error: Java not found. Please install Java or set JAVA_HOME environment variable."
+    exit 1
+fi
+
+# Save user's original classpath
+USER_CLASSPATH="$CLASSPATH"
+
+# Build classpath with all jars in lib directory
+CLASSPATH="$ONION_HOME/onion.jar"
+if [ -d "$ONION_HOME/lib" ]; then
+    for jar in "$ONION_HOME/lib"/*.jar; do
+        if [ -f "$jar" ]; then
+            CLASSPATH="$CLASSPATH:$jar"
+        fi
+    done
+fi
+
+# Add user classpath if set
+if [ -n "$USER_CLASSPATH" ]; then
+    CLASSPATH="$CLASSPATH:$USER_CLASSPATH"
+fi
+
+# Run the Onion REPL
+exec "$JAVA_CMD" -classpath "$CLASSPATH" onion.tools.Repl "$@"

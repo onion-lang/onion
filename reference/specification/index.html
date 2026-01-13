@@ -2899,10 +2899,9 @@
 <h2 id="current-limitations">Current Limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
 <p>As documented in the README:</p>
 <ol>
-<li><strong>Abstract methods</strong>: Not fully validated at compile time</li>
-<li><strong>Final methods</strong>: Override checking not complete</li>
-<li><strong>Finally clause</strong>: Not yet supported in try-catch</li>
-<li><strong>Edge cases</strong>: Compiler may crash on certain patterns</li>
+<li><strong>Edge cases</strong>: The compiler may still crash on certain patterns</li>
+<li><strong>Erasure generics</strong>: No variance, wildcards, or reified type info</li>
+<li><strong>Diagnostics</strong>: Some errors are reported later in the pipeline</li>
 </ol>
 <h2 id="grammar-reference">Grammar Reference<a class="headerlink" href="#grammar-reference" title="Permanent link">&para;</a></h2>
 <p>The complete grammar is defined in <code>grammar/JJOnionParser.jj</code> using JavaCC syntax.</p>

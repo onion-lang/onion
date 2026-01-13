@@ -137,8 +137,9 @@ class AsmCodeGenerationVisitor(
     (node.target.`type`, node.destination) match
       case (from: BasicType, to: BasicType) =>
         gen.cast(asmType(from), asmType(to))
-      case (_: BasicType, _: ObjectType | _: ArrayType | _: NullType) =>
-        throw new RuntimeException(s"Unsupported cast from basic to reference: ${node.target.`type`} => ${node.destination}")
+      case (from: BasicType, _: ObjectType | _: ArrayType | _: NullType) =>
+        gen.box(asmType(from))
+        gen.checkCast(asmType(node.destination))
       case (_: ObjectType | _: ArrayType | _: NullType, to: BasicType) =>
         gen.unbox(asmType(to))
       case _ =>

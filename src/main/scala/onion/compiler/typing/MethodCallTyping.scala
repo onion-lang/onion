@@ -349,7 +349,9 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         }
 
         // デフォルト引数で足りない分を補完
-        val finalParams = if (method.isVararg) processedParams else fillDefaultArguments(processedParams, method)
+        val finalParams =
+          if (method.isVararg) processedParams
+          else fillDefaultArguments(processedParams, method).getOrElse(return None)
 
         val call = new Call(target, method, finalParams)
         val castType = TypeSubst(method.returnType, classSubst, methodSubst)
@@ -446,7 +448,9 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       }
 
       // デフォルト引数で足りない分を補完
-      val finalParams = if (method.isVararg) processedParams else fillDefaultArguments(processedParams, method)
+      val finalParams =
+        if (method.isVararg) processedParams
+        else fillDefaultArguments(processedParams, method).getOrElse(return None)
 
       if ((methods(0).modifier & AST.M_STATIC) != 0) {
         val call = new CallStatic(targetType, method, finalParams)
@@ -620,7 +624,12 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
         val adjusted = params.indices.map(i => processAssignable(node.args(i), chosen.expectedArgs(i), params(i))).toArray
         if (adjusted.contains(null)) StaticImportNoMatch
-        else StaticImportResolved(chosen.method, buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst))
+        else {
+          buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst) match {
+            case Some(term) => StaticImportResolved(chosen.method, term)
+            case None => StaticImportNoMatch
+          }
+        }
     }
   }
 
@@ -656,12 +665,13 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     params: Array[Term],
     classSubst: scala.collection.immutable.Map[String, Type],
     methodSubst: scala.collection.immutable.Map[String, Type]
-  ): Term = {
+  ): Option[Term] = {
     // デフォルト引数で足りない分を補完
-    val finalParams = fillDefaultArguments(params, method)
-    val call = new CallStatic(typeRef, method, finalParams)
-    val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-    TypeSubst.withCast(call, castType)
+    fillDefaultArguments(params, method).map { finalParams =>
+      val call = new CallStatic(typeRef, method, finalParams)
+      val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+      TypeSubst.withCast(call, castType)
+    }
   }
 
   private def reportAmbiguousMethod(node: AST.Node, first: Method, second: Method): Unit = {
@@ -692,17 +702,21 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     parameters: Array[Term],
     classSubst: scala.collection.immutable.Map[String, Type],
     methodSubst: scala.collection.immutable.Map[String, Type]
-  ): Some[Term] =
+  ): Option[Term] =
     val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
     val wrappedParams = if (method.isVararg) {
       wrapVarargParams(method, parameters, expectedArgs)
     } else {
       parameters
     }
-    val finalParams = if (method.isVararg) wrappedParams else fillDefaultArguments(wrappedParams, method)
-    val call = new CallStatic(typeRef, method, finalParams)
-    val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-    Some(TypeSubst.withCast(call, castType))
+    val finalParamsOpt =
+      if (method.isVararg) Some(wrappedParams)
+      else fillDefaultArguments(wrappedParams, method)
+    finalParamsOpt.map { finalParams =>
+      val call = new CallStatic(typeRef, method, finalParams)
+      val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+      TypeSubst.withCast(call, castType)
+    }
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
@@ -889,7 +903,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           case None => return None
           case Some(_) => ()
         // デフォルト引数で足りない分を補完
-        val finalParams = fillDefaultArguments(parameters, method)
+        val finalParams = fillDefaultArguments(parameters, method).getOrElse(return None)
         val call = new CallSuper(new This(contextClass), method, finalParams)
         val castType = TypeSubst(method.returnType, classSubst, methodSubst)
         TypeSubst.withCastOpt(call, castType)
@@ -1018,20 +1032,20 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   /**
    * デフォルト引数で足りない分を補完する
    */
-  private def fillDefaultArguments(params: Array[Term], method: Method): Array[Term] = {
+  private def fillDefaultArguments(params: Array[Term], method: Method): Option[Array[Term]] = {
     val argsWithDefaults = method.argumentsWithDefaults
     if (params.length >= argsWithDefaults.length) {
-      params
+      Some(params)
     } else {
       val result = new Array[Term](argsWithDefaults.length)
       System.arraycopy(params, 0, result, 0, params.length)
       (params.length until argsWithDefaults.length).foreach { i =>
         argsWithDefaults(i).defaultValue match {
           case Some(term) => result(i) = term
-          case None => throw new IllegalStateException(s"Missing default value for argument ${argsWithDefaults(i).name}")
+          case None => return None
         }
       }
-      result
+      Some(result)
     }
   }
 }

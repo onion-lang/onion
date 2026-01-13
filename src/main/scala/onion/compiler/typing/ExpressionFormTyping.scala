@@ -36,10 +36,16 @@ final class ExpressionFormTyping(private val typing: Typing, private val body: T
     } yield result
 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
-    for {
-      term <- typed(node.src, context)
-      destination <- Option(mapFrom(node.to, mapper_))
-    } yield new AsInstanceOf(term, destination)
+    typed(node.src, context).flatMap { term =>
+      Option(mapFrom(node.to, mapper_)).flatMap { destination =>
+        if (term.`type`.isBasicType && !destination.isBasicType) {
+          report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+          None
+        } else {
+          Some(new AsInstanceOf(term, destination))
+        }
+      }
+    }
 
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     for {

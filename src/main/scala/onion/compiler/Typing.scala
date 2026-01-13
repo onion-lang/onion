@@ -78,7 +78,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         if (functionType == null) return null
         TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
-      case unknown => throw new RuntimeException("Unknown type descriptor: " + unknown)
+      case _ => null
     }
     private def forName(name: String, qualified: Boolean): ClassType = {
       if (qualified) {

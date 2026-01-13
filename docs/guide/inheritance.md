@@ -264,16 +264,15 @@ foreach list: List in lists {
 
 ### Note on Abstract Methods
 
-Onion currently has limited support for abstract method validation. Abstract methods may not be enforced at compile time:
+The compiler enforces abstract method implementation at compile time. Concrete subclasses must implement abstract members or be declared `abstract`:
 
 ```onion
-// Abstract pattern (not fully enforced)
-class AbstractShape {
+abstract class Shape {
   public:
-    def area: Double = 0.0  // Should be overridden by subclasses
+    abstract def area(): Double;
 }
 
-class Circle : AbstractShape {
+class Circle : Shape {
   val radius: Double
 
   public:
@@ -281,7 +280,7 @@ class Circle : AbstractShape {
       this.radius = r
     }
 
-    def area: Double = 3.14159 * this.radius * this.radius
+    def area(): Double = 3.14159 * this.radius * this.radius
 }
 ```
 

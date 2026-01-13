@@ -104,7 +104,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
             if (value.`type`.isBottomType) value else null
         }
       case _ =>
-        report(UNIMPLEMENTED_FEATURE, node)
+        report(LVALUE_REQUIRED, node)
         null
     }
   }
@@ -113,7 +113,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
     node.lhs match {
       case _: AST.Id =>
         Option(processLocalAssign(node, context))
-      // Removed: UnqualifiedFieldReference case - use this.field or self.field instead
+      // Unqualified field assignments are not supported; use this.field or self.field.
       case _: AST.Indexing =>
         Option(processArrayAssign(node, context))
       case _: AST.MemberSelection =>

@@ -250,6 +250,8 @@ class ButtonHandler <: ActionListener {
 }
 ```
 
+`this` and `self` are only available in instance contexts; static methods and static fields cannot reference them.
+
 ## Next Steps
 
 - [Inheritance](inheritance.md) - Extending classes and implementing interfaces

@@ -9,6 +9,7 @@ package onion.compiler
 
 import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.exceptions.CompilationException
+import scala.util.control.NonFatal
 
 /**
  * @author Kota Mizushima
@@ -41,6 +42,9 @@ class OnionCompiler(val config: CompilerConfig) {
     } catch {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)
+      case NonFatal(e) =>
+        val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
+        Failure(Seq(CompileError("", null, s"Internal compiler error: $message")))
     }
   }
 
@@ -75,6 +79,9 @@ class OnionCompiler(val config: CompilerConfig) {
     } catch {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)
+      case NonFatal(e) =>
+        val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
+        Failure(Seq(CompileError("", null, s"Internal compiler error: $message")))
     }
   }
 

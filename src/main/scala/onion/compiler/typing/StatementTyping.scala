@@ -65,9 +65,19 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         new StatementBlock(statements.toIndexedSeq*)
       }
     case node: AST.BreakExpression =>
-      new Break(node.location)
+      if (!context.inLoop) {
+        report(BREAK_OUTSIDE_LOOP, node)
+        new NOP(node.location)
+      } else {
+        new Break(node.location)
+      }
     case node: AST.ContinueExpression =>
-      new Continue(node.location)
+      if (!context.inLoop) {
+        report(CONTINUE_OUTSIDE_LOOP, node)
+        new NOP(node.location)
+      } else {
+        new Continue(node.location)
+      }
     case node: AST.EmptyExpression =>
       new NOP(node.location)
     case node@AST.ExpressionBox(_, body) =>
@@ -77,7 +87,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         val collection = typed(node.collection, context).getOrElse(null)
         val arg = node.arg
         addArgument(arg, context)
-        var block = translate(node.statement, context)
+        var block = context.openLoop {
+          translate(node.statement, context)
+        }
         if (collection == null) {
           new NOP(node.location)
         } else if (collection.isBasicType) {
@@ -133,7 +145,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
           if (cond != null) cond else new BoolValue(node.location, true)
         }.getOrElse(new BoolValue(node.location, true))
         val update = Option(node.update).flatMap(update => typed(update, context)).getOrElse(null)
-        var loop = translate(node.block, context)
+        var loop = context.openLoop {
+          translate(node.block, context)
+        }
         if (update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
         new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
       }
@@ -281,7 +295,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     case node: AST.WhileExpression =>
       context.openScope {
         val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
-        val thenBlock = translate(node.block, context)
+        val thenBlock = context.openLoop {
+          translate(node.block, context)
+        }
         new ConditionalLoop(node.location, condition, thenBlock)
       }
   }

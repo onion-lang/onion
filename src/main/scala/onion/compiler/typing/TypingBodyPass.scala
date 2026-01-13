@@ -190,12 +190,14 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     openTypeParams(emptyTypeParams ++ classTypeParams) {
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
-          case _: AST.FieldDeclaration =>
+          case field: AST.FieldDeclaration =>
+            processFieldInitializer(field)
           case member: AST.MethodDeclaration =>
             processMethodDeclaration(member)
           case member: AST.ConstructorDeclaration =>
             processConstructorDeclaration(member)
-          case _: AST.DelegatedFieldDeclaration =>
+          case field: AST.DelegatedFieldDeclaration =>
+            processDelegatedFieldInitializer(field)
         }
       }
     }
@@ -206,6 +208,31 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (function == null) return
     processMethodLikeBody(function, node.args, node.block)
+  }
+  private def processFieldInitializer(node: AST.FieldDeclaration): Unit = {
+    if (node.init == null) return
+    val context = new LocalContext
+    context.setStatic(Modifier.isStatic(node.modifiers))
+    val fieldType = mapFrom(node.typeRef)
+    if (fieldType == null) return
+    typed(node.init, context, fieldType) match {
+      case Some(term) =>
+        processAssignable(node.init, fieldType, term)
+      case None => ()
+    }
+  }
+
+  private def processDelegatedFieldInitializer(node: AST.DelegatedFieldDeclaration): Unit = {
+    if (node.init == null) return
+    val context = new LocalContext
+    context.setStatic(Modifier.isStatic(node.modifiers))
+    val fieldType = mapFrom(node.typeRef)
+    if (fieldType == null) return
+    typed(node.init, context, fieldType) match {
+      case Some(term) =>
+        processAssignable(node.init, fieldType, term)
+      case None => ()
+    }
   }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =
@@ -517,7 +544,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node: AST.ClosureExpression =>
       closureTyping.typeClosure(node, context, expected)
     case node@AST.CurrentInstance(loc) =>
-      if(context.isStatic) None else Some(new This(loc, definition_))
+      if (context.isStatic) {
+        report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
+        None
+      } else {
+        Some(new This(loc, definition_))
+      }
     case node@AST.Id(loc, name) =>
       val bind = context.lookup(name)
       if (bind == null) {
@@ -528,8 +560,13 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         Some(new RefLocal(bind))
       }
     case node: AST.UnqualifiedFieldReference =>
-      report(UNIMPLEMENTED_FEATURE, node)
-      None
+      if (context.isStatic) {
+        report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+        None
+      } else {
+        val selection = AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name)
+        typeMemberSelection(selection, context)
+      }
     case node: AST.IsInstance =>
       typeIsInstance(node, context)
     case node: AST.MemberSelection =>
@@ -552,7 +589,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typePostUpdate(node, node.term, "--", SUBTRACT, context)
     case node@AST.PostIncrement(loc, target) =>
       typePostUpdate(node, node.term, "++", ADD, context)
-    // Removed: UnqualifiedFieldReference - use this.field or self.field instead
+    // Prefer this.field or self.field for field access; unqualified form is handled above for compatibility.
     case node: AST.UnqualifiedMethodCall =>
       typeUnqualifiedMethodCall(node, context, expected)
     case node: AST.StaticMemberSelection =>
@@ -586,8 +623,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node: AST.IfExpression =>
       controlExpressionTyping.typeIfExpression(node, context)
     case node: AST.LocalVariableDeclaration =>
-      report(UNIMPLEMENTED_FEATURE, node)
-      None
+      val statement = statementTyping.translate(node, context)
+      Some(new StatementTerm(node.location, statement, BasicType.VOID))
     case node: AST.ReturnExpression =>
       controlExpressionTyping.typeReturnExpression(node, context)
     case node: AST.SelectExpression =>

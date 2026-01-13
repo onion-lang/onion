@@ -24,6 +24,7 @@ class LocalContext {
   var method: TypedAST.Method                     = _
   var constructor: TypedAST.ConstructorDefinition = _
   private var isMethod: Boolean = false
+  private var loopDepth: Int = 0
 
   def setGlobal(isGlobal: Boolean): Unit = {
     this.isGlobal = isGlobal
@@ -83,6 +84,14 @@ class LocalContext {
   }
 
   def openScope[A](body: => A): A = contextFrame.open(body)
+
+  def openLoop[A](body: => A): A = {
+    loopDepth += 1
+    try body
+    finally loopDepth -= 1
+  }
+
+  def inLoop: Boolean = loopDepth > 0
 
   def lookup(name: String): ClosureLocalBinding = {
     contextFrame.lookup(name)

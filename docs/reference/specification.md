@@ -381,10 +381,9 @@ val i: Int = d$Int
 
 As documented in the README:
 
-1. **Abstract methods**: Not fully validated at compile time
-2. **Final methods**: Override checking not complete
-3. **Finally clause**: Not yet supported in try-catch
-4. **Edge cases**: Compiler may crash on certain patterns
+1. **Edge cases**: The compiler may still crash on certain patterns
+2. **Erasure generics**: No variance, wildcards, or reified type info
+3. **Diagnostics**: Some errors are reported later in the pipeline
 
 ## Grammar Reference
 

@@ -49,6 +49,9 @@ object SemanticError {
   case object POSITIONAL_AFTER_NAMED extends SemanticError(45)
   case object WRONG_BINDING_COUNT extends SemanticError(46)
   case object NOT_A_RECORD_TYPE extends SemanticError(47)
+  case object BREAK_OUTSIDE_LOOP extends SemanticError(48)
+  case object CONTINUE_OUTSIDE_LOOP extends SemanticError(49)
+  case object CURRENT_INSTANCE_NOT_AVAILABLE extends SemanticError(50)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

@@ -155,5 +155,107 @@ class CompilationFailureSpec extends AbstractShellSpec {
       )
       assert(Shell.Failure(-1) == result)
     }
+
+    it("returns failure when break is used outside a loop") {
+      val result = shell.run(
+        """
+          |class BreakOutside {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    break
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "BreakOutside.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("returns failure when continue is used outside a loop") {
+      val result = shell.run(
+        """
+          |class ContinueOutside {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    continue
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "ContinueOutside.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("returns failure when this is used in a static context") {
+      val result = shell.run(
+        """
+          |class StaticThis {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x: Object = this
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "StaticThis.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("returns failure when self is used in a static context") {
+      val result = shell.run(
+        """
+          |class StaticSelf {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x: Object = self
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "StaticSelf.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("returns failure when this is used in a static field initializer") {
+      val result = shell.run(
+        """
+          |class StaticFieldThis {
+          |public:
+          |  static val value: Object = this
+          |  static def main(args: String[]): Int {
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "StaticFieldThis.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("returns failure when self is used in a static field initializer") {
+      val result = shell.run(
+        """
+          |class StaticFieldSelf {
+          |public:
+          |  static val value: Object = self
+          |  static def main(args: String[]): Int {
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "StaticFieldSelf.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
   }
 }

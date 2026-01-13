@@ -231,9 +231,9 @@ select value {
 
 As documented in the README:
 
-1. **Incomplete validation** - Some compile-time checks (abstract method implementation, final method overriding) are not fully implemented
-2. **Edge cases** - The compiler may crash on certain code patterns
-3. **Partial features** - Some features like `finally` clauses are not yet supported
+1. **Edge cases** - The compiler may crash on certain code patterns
+2. **Erasure generics** - No variance, wildcards, or reified type info
+3. **Diagnostics** - Some errors are reported later in the pipeline
 
 The examples in the `run/` directory are verified to compile and execute correctly.
 

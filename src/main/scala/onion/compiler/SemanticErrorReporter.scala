@@ -261,6 +261,19 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(items => asString(items(0)))
     ),
 
+    SemanticError.BREAK_OUTSIDE_LOOP -> ErrorDef(
+      "error.semantic.breakOutsideLoop",
+      Seq()
+    ),
+    SemanticError.CONTINUE_OUTSIDE_LOOP -> ErrorDef(
+      "error.semantic.continueOutsideLoop",
+      Seq()
+    ),
+    SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE -> ErrorDef(
+      "error.semantic.currentInstanceNotAvailable",
+      Seq()
+    ),
+
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(
       "error.semantic.unimplementedFeature",

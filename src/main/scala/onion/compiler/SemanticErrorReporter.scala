@@ -10,7 +10,7 @@ package onion.compiler
 
 import java.text.MessageFormat
 import scala.collection.mutable.Buffer
-import onion.compiler.toolbox.Message
+import onion.compiler.toolbox.{Message, Systems}
 import onion.compiler.exceptions.CompilationException
 
 /**
@@ -48,6 +48,12 @@ class SemanticErrorReporter(threshold: Int) {
     if (args.isEmpty) template
     else MessageFormat.format(template, args.asInstanceOf[Seq[AnyRef]]: _*)
   }
+
+  private def appendSuggestion(baseMessage: String, suggestion: Option[String]): String =
+    suggestion match {
+      case Some(text) => s"$baseMessage${Systems.lineSeparator}  $text"
+      case None => baseMessage
+    }
 
   private def problem(position: Location, message: String): Unit = {
     val errorCode = Option(currentError).map(_.errorCode)
@@ -295,11 +301,30 @@ class SemanticErrorReporter(threshold: Int) {
       toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
     } else None
 
-    val fullMessage = suggestion match {
-      case Some(s) => s"$baseMessage $s"
-      case None => baseMessage
-    }
-    problem(position, fullMessage)
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  private def reportMethodNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val targetType = items(0).asInstanceOf[TypedAST.Type]
+    val name = asString(items(1))
+    val args = typeNames(asTypeArray(items(2)))
+    val baseMessage = format(message("error.semantic.methodNotFound"), Seq(typeName(targetType), name, args))
+    val candidates = targetType match
+      case obj: TypedAST.ObjectType => obj.methods.map(_.name).distinct.toSeq
+      case _ => Seq.empty
+    val suggestion = toolbox.Suggestions.formatSuggestion(name, candidates)
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  private def reportFieldNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val targetType = items(0).asInstanceOf[TypedAST.Type]
+    val name = asString(items(1))
+    val baseMessage = format(message("error.semantic.fieldNotFound"), Seq(typeName(targetType), name))
+    val candidates = targetType match
+      case obj: TypedAST.ObjectType => obj.fields.map(_.name).distinct.toSeq
+      case _ => Seq.empty
+    val suggestion = toolbox.Suggestions.formatSuggestion(name, candidates)
+    problem(position, appendSuggestion(baseMessage, suggestion))
   }
 
   /**
@@ -353,6 +378,10 @@ class SemanticErrorReporter(threshold: Int) {
       // Special cases that need custom handling
       case SemanticError.VARIABLE_NOT_FOUND =>
         reportVariableNotFound(position, items)
+      case SemanticError.METHOD_NOT_FOUND =>
+        reportMethodNotFound(position, items)
+      case SemanticError.FIELD_NOT_FOUND =>
+        reportFieldNotFound(position, items)
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>

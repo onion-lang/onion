@@ -43,6 +43,10 @@ onionc [options] source files...
 * -encoding <encoding> Set encoding of source files.
 * -d <output directory> Set output directory of results.
 * -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
+* --dump-ast Print parsed AST to stderr.
+* --dump-typed-ast Print typed AST summary to stderr.
+* --warn <off|on|error> Set warning level.
+* --Wno <codes> Suppress warnings (e.g., W0001,unused-parameter).
 
 `onionc` compiles source files into class files in the directorys corresponding to module names
 of source files rooted by "-d" option.  If "-d" is not specified, the value of "-d" is specified as the current directory.
@@ -64,6 +68,10 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 * -classpath <classpath> classpath of source files in compilation.
 * -encoding <encoding> encoding of source files.
 * -maxErrorReports <error count> the maximum number of comiplation errors reported.
+* --dump-ast Print parsed AST to stderr.
+* --dump-typed-ast Print typed AST summary to stderr.
+* --warn <off|on|error> Set warning level.
+* --Wno <codes> Suppress warnings (e.g., W0001,unused-parameter).
 
 `onion` compiles source files into in-memory class files and execute them.  The entry point is:
 

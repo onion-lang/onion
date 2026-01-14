@@ -20,5 +20,7 @@ case class CompilerConfig(
   maxErrorReports: Int,
   verbose: Boolean = false,
   warningLevel: WarningLevel = WarningLevel.On,
-  suppressedWarnings: Set[WarningCategory] = Set.empty
+  suppressedWarnings: Set[WarningCategory] = Set.empty,
+  dumpAst: Boolean = false,
+  dumpTypedAst: Boolean = false
 )

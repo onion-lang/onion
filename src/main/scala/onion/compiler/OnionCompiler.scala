@@ -37,14 +37,20 @@ class OnionCompiler(val config: CompilerConfig) {
   }
 
   private def compileNormal(srcs: Seq[InputSource]): CompilationOutcome = {
-    val pipeline =
-      new Parsing(config)
-        .andThen(new Rewriting(config))
-        .andThen(new Typing(config))
-        .andThen(new TypedGenerating(config))
-
     try {
-      Success(pipeline.process(srcs))
+      val parsing = new Parsing(config)
+      val rewriting = new Rewriting(config)
+      val typing = new Typing(config)
+      val generating = new TypedGenerating(config)
+
+      val parsed = parsing.process(srcs)
+      if (config.dumpAst) DiagnosticsPrinter.dumpAst(parsed)
+      val rewritten = rewriting.process(parsed)
+      val typed = typing.process(rewritten)
+      if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
+      val generated = generating.process(typed)
+
+      Success(generated)
     } catch {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)
@@ -73,8 +79,10 @@ class OnionCompiler(val config: CompilerConfig) {
       val generating = new TypedGenerating(config)
 
       val parsed = timed("Parsing")(parsing.process(srcs))
+      if (config.dumpAst) DiagnosticsPrinter.dumpAst(parsed)
       val rewritten = timed("Rewriting")(rewriting.process(parsed))
       val typed = timed("Typing")(typing.process(rewritten))
+      if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
       val generated = timed("CodeGen")(generating.process(typed))
 
       val totalElapsed = now() - totalStart

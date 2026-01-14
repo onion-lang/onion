@@ -12,7 +12,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.UnsupportedEncodingException
-import onion.compiler.{CompiledClass, CompilerConfig, OnionCompiler}
+import onion.compiler.{CompiledClass, CompilerConfig, OnionCompiler, WarningCategory, WarningLevel}
 import onion.compiler.CompilationOutcome
 import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.CompilationReporter
@@ -62,6 +62,10 @@ object CompilerFrontend {
   private final val OUTPUT: String = "-d"
   private final val MAX_ERROR: String = "-maxErrorReport"
   private final val VERBOSE: String = "--verbose"
+  private final val DUMP_AST: String = "--dump-ast"
+  private final val DUMP_TYPED_AST: String = "--dump-typed-ast"
+  private final val WARN_LEVEL: String = "--warn"
+  private final val SUPPRESS_WARNINGS: String = "--Wno"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_OUTPUT: String = "."
@@ -72,7 +76,17 @@ class CompilerFrontend {
 
   import CompilerFrontend._
 
-  private val commandLineParser = new CommandLineParser(config(CLASSPATH, true), config(SCRIPT_SUPER_CLASS, true), config(ENCODING, true), config(OUTPUT, true), config(MAX_ERROR, true))
+  private val commandLineParser = new CommandLineParser(
+    config(CLASSPATH, true),
+    config(SCRIPT_SUPER_CLASS, true),
+    config(ENCODING, true),
+    config(OUTPUT, true),
+    config(MAX_ERROR, true),
+    config(DUMP_AST, false),
+    config(DUMP_TYPED_AST, false),
+    config(WARN_LEVEL, true),
+    config(SUPPRESS_WARNINGS, true)
+  )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
     if (commandLine.length == 0) {
@@ -145,6 +159,10 @@ class CompilerFrontend {
          |  -maxErrorReport <number>    Set maximum number of errors to report
          |  -super <super class>        Specify script's super class
          |  --verbose                   Show compilation phase timing
+         |  --dump-ast                  Print parsed AST to stderr
+         |  --dump-typed-ast            Print typed AST summary to stderr
+         |  --warn <off|on|error>       Set warning level
+         |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -180,8 +198,28 @@ class CompilerFrontend {
     val maxErrorReport: Option[Int] = checkMaxErrorReport(
       option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
     )
-    for (e <- encoding; m <- maxErrorReport) yield {
-      new CompilerConfig(classpath.toIndexedSeq, "", e, outputDirectory, m, verbose)
+    val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
+    val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
+    val warningLevel = parseWarningLevel(option.get(WARN_LEVEL))
+    val suppressedWarnings = parseSuppressedWarnings(option.get(SUPPRESS_WARNINGS))
+    for {
+      e <- encoding
+      m <- maxErrorReport
+      level <- warningLevel
+      suppressed <- suppressedWarnings
+    } yield {
+      new CompilerConfig(
+        classpath.toIndexedSeq,
+        "",
+        e,
+        outputDirectory,
+        m,
+        verbose = verbose,
+        warningLevel = level,
+        suppressedWarnings = suppressed,
+        dumpAst = dumpAst,
+        dumpTypedAst = dumpTypedAst
+      )
     }
   }
 
@@ -221,6 +259,44 @@ class CompilerFrontend {
       case e: NumberFormatException =>
         printError(Message.apply("error.command.requireNaturalNumber", MAX_ERROR))
         None
+    }
+  }
+
+  private def parseWarningLevel(param: Option[CommandLineParam]): Option[WarningLevel] = {
+    param match {
+      case Some(ValuedParam(value)) =>
+        value.toLowerCase match {
+          case "off" => Some(WarningLevel.Off)
+          case "on" => Some(WarningLevel.On)
+          case "error" => Some(WarningLevel.Error)
+          case _ =>
+            printError(Message.apply("error.command.invalidArgument", WARN_LEVEL))
+            None
+        }
+      case Some(NoValuedParam) =>
+        printError(Message.apply("error.command.noArgument", WARN_LEVEL))
+        None
+      case None =>
+        Some(WarningLevel.On)
+    }
+  }
+
+  private def parseSuppressedWarnings(param: Option[CommandLineParam]): Option[Set[WarningCategory]] = {
+    param match {
+      case Some(ValuedParam(value)) =>
+        val tokens = value.split(",").map(_.trim).filter(_.nonEmpty)
+        val parsed = tokens.flatMap(t => WarningCategory.fromString(t))
+        if (parsed.length != tokens.length) {
+          printError(Message.apply("error.command.invalidArgument", SUPPRESS_WARNINGS))
+          None
+        } else {
+          Some(parsed.toSet)
+        }
+      case Some(NoValuedParam) =>
+        printError(Message.apply("error.command.noArgument", SUPPRESS_WARNINGS))
+        None
+      case None =>
+        Some(Set.empty)
     }
   }
 

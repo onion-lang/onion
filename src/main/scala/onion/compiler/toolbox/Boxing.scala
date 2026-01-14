@@ -7,6 +7,7 @@
  * ************************************************************** */
 package onion.compiler.toolbox
 
+import java.util.{WeakHashMap => JWeakHashMap}
 import onion.compiler.TypedAST
 import onion.compiler.ClassTable
 
@@ -26,11 +27,39 @@ object Boxing {
     Array[AnyRef](TypedAST.BasicType.DOUBLE, "java.lang.Double")
   )
 
-  def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
-    TABLE.find(row => row(0) eq `type`) match {
-      case Some(row) => table.load(row(1).asInstanceOf[String])
-      case None => throw new RuntimeException("")
+  private val basicToIndex: Map[TypedAST.BasicType, Int] =
+    TABLE.zipWithIndex.map { (row, index) =>
+      row(0).asInstanceOf[TypedAST.BasicType] -> index
+    }.toMap
+
+  private val boxedNameToBasic: Map[String, TypedAST.BasicType] =
+    TABLE.map { row =>
+      row(1).asInstanceOf[String] -> row(0).asInstanceOf[TypedAST.BasicType]
+    }.toMap
+
+  private val boxedTypeCache = new JWeakHashMap[ClassTable, Array[TypedAST.ClassType]]()
+
+  private def boxedTypeIndex(`type`: TypedAST.BasicType): Int =
+    basicToIndex.getOrElse(`type`, throw new RuntimeException("unknown boxed type"))
+
+  private def cachedBoxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
+    val index = boxedTypeIndex(`type`)
+    var cache = boxedTypeCache.get(table)
+    if (cache == null) {
+      cache = new Array[TypedAST.ClassType](TABLE.length)
+      boxedTypeCache.put(table, cache)
     }
+    var boxed = cache(index)
+    if (boxed == null) {
+      val boxedName = TABLE(index)(1).asInstanceOf[String]
+      boxed = table.load(boxedName)
+      cache(index) = boxed
+    }
+    boxed
+  }
+
+  def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
+    cachedBoxedType(table, `type`)
   }
 
   def boxing(table: ClassTable, node: TypedAST.Term): TypedAST.Term = {
@@ -55,11 +84,20 @@ object Boxing {
    */
   def unboxedType(table: ClassTable, `type`: TypedAST.Type): Option[TypedAST.BasicType] = {
     if (!`type`.isObjectType) None
-    else TABLE.find { row =>
-      val boxedTypeName = row(1).asInstanceOf[String]
-      val boxedType = table.load(boxedTypeName)
-      TypedAST.TypeRules.isAssignable(boxedType, `type`)
-    }.map(row => row(0).asInstanceOf[TypedAST.BasicType])
+    else {
+      `type` match {
+        case ct: TypedAST.ClassType =>
+          boxedNameToBasic.get(ct.name) match {
+            case some @ Some(_) => return some
+            case None =>
+          }
+        case _ =>
+      }
+      TABLE.find { row =>
+        val boxedType = cachedBoxedType(table, row(0).asInstanceOf[TypedAST.BasicType])
+        TypedAST.TypeRules.isAssignable(boxedType, `type`)
+      }.map(row => row(0).asInstanceOf[TypedAST.BasicType])
+    }
   }
 
   def unboxing(table: ClassTable, node: TypedAST.Term, targetType: TypedAST.BasicType): TypedAST.Term = {

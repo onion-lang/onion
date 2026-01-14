@@ -168,6 +168,27 @@ class AutoBoxingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(42) == result)
     }
+
+    it("unboxes Boolean in conditions") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val b: JBoolean = new JBoolean(true)
+          |    if (b) {
+          |      return "ok"
+          |    } else {
+          |      return "ng"
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "BooleanConditionUnboxing.on",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
   }
 
   describe("Method calls on primitives") {

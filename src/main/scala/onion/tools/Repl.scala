@@ -59,7 +59,7 @@ object Repl {
 
   // REPL commands
   val COMMANDS: Array[String] = Array(
-    ":help", ":quit", ":exit", ":clear", ":history", ":type", ":reset", ":paste"
+    ":help", ":quit", ":exit", ":clear", ":history", ":type", ":ast", ":typed", ":reset", ":paste"
   )
 
   def main(args: Array[String]): Unit = {
@@ -176,6 +176,20 @@ class Repl(classpath: Seq[String]) {
         }
         true
 
+      case ":ast" =>
+        arg match {
+          case Some(expr) => showAst(expr)
+          case None => println(Colors.RED + "Usage: :ast <expression>" + Colors.RESET)
+        }
+        true
+
+      case ":typed" =>
+        arg match {
+          case Some(expr) => showTyped(expr)
+          case None => println(Colors.RED + "Usage: :typed <expression>" + Colors.RESET)
+        }
+        true
+
       case ":reset" =>
         sessionCounter = 0
         println(Colors.GREEN + "Session reset." + Colors.RESET)
@@ -214,6 +228,8 @@ class Repl(classpath: Seq[String]) {
     |  ${Colors.YELLOW}:clear${Colors.RESET}, :cls      Clear the screen
     |  ${Colors.YELLOW}:history${Colors.RESET}          Show command history
     |  ${Colors.YELLOW}:type${Colors.RESET} <expr>      Show the type of an expression
+    |  ${Colors.YELLOW}:ast${Colors.RESET} <expr>       Show the parsed AST
+    |  ${Colors.YELLOW}:typed${Colors.RESET} <expr>     Show the typed AST summary
     |  ${Colors.YELLOW}:reset${Colors.RESET}            Reset the session
     |  ${Colors.YELLOW}:paste${Colors.RESET}, :p        Enter paste mode
     |
@@ -291,6 +307,36 @@ class Repl(classpath: Seq[String]) {
         println("(Full type inference requires direct type checker access)")
       case Failure(errors) =>
         CompilationReporter.printErrors(errors)
+    }
+  }
+
+  private def showAst(expr: String): Unit = {
+    val code = wrapCode(expr, sessionCounter + 1)
+    val fileName = s"repl_ast_${sessionCounter + 1}.on"
+    try {
+      val parsing = new Parsing(config)
+      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(code), fileName)))
+      DiagnosticsPrinter.dumpAst(parsed)
+    } catch {
+      case e: onion.compiler.exceptions.CompilationException =>
+        CompilationReporter.printErrors(e.problems.toIndexedSeq)
+    }
+  }
+
+  private def showTyped(expr: String): Unit = {
+    val code = wrapCode(expr, sessionCounter + 1)
+    val fileName = s"repl_typed_${sessionCounter + 1}.on"
+    try {
+      val parsing = new Parsing(config)
+      val rewriting = new Rewriting(config)
+      val typing = new Typing(config)
+      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(code), fileName)))
+      val rewritten = rewriting.process(parsed)
+      val typed = typing.process(rewritten)
+      DiagnosticsPrinter.dumpTyped(typed)
+    } catch {
+      case e: onion.compiler.exceptions.CompilationException =>
+        CompilationReporter.printErrors(e.problems.toIndexedSeq)
     }
   }
 

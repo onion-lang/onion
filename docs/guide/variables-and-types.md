@@ -253,7 +253,7 @@ Functions are represented by `Function0` through `Function10` interfaces:
 
 ```onion
 val func: (Int) -> Int = (x: Int) -> { return x * 2; }
-val result: Int = func.call(5)$Int  // 10
+val result: Int = func.call(5)  // 10
 ```
 
 - `Function0` - No parameters

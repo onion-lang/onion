@@ -63,7 +63,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
                 val prologue = args.zipWithIndex.flatMap { case (arg, i) =>
                   Option(context.lookup(arg.name)).flatMap { bind =>
                     val erased = TypeSubstitution.substituteType(
-                      method.arguments(i), Map.empty, Map.empty, defaultToBound = true
+                      typedMethod.arguments(i), Map.empty, Map.empty, defaultToBound = true
                     )
                     val desired = expectedArgs(i)
                     Option.when(desired ne erased) {
@@ -80,7 +80,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
                 else baseBlock
 
                 val finalBlock = body.addReturnNode(block, expectedRet)
-                val result = new NewClosure(typeRef, method, finalBlock)
+                val result = new NewClosure(typeRef, typedMethod, finalBlock)
                 result.frame_=(context.getContextFrame)
                 Some(result)
             }

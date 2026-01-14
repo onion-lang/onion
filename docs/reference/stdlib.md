@@ -165,7 +165,7 @@ val e: Double = Math::E         // 2.71828...
 
 ## Function Interfaces
 
-Built-in function types for lambdas and closures.
+Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
 
 ### Function0
 

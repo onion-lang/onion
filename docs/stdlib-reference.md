@@ -535,6 +535,8 @@ if (parsed.isOk()) {
 
 Onion provides function interfaces for closures (Function0 through Function10).
 
+Function values can be invoked with `f(args)` as shorthand for `f.call(args)`.
+
 ```
 interface Function0[R] { def call(): R }
 interface Function1[T, R] { def call(arg: T): R }

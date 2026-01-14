@@ -425,8 +425,13 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         case StaticImportError =>
           None
         case StaticImportNotFound =>
-          report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
-          None
+          resolveCallableValue(node, params, context, expected) match {
+            case Some(term) =>
+              Some(term)
+            case None =>
+              report(METHOD_NOT_FOUND, node, targetType, node.name, types(params))
+              None
+          }
       }
     } else if (methods.length > 1) {
       reportAmbiguousMethod(node, methods, node.name)
@@ -468,6 +473,41 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         }
       }
     }
+  }
+
+  private def resolveCallableValue(
+    node: AST.UnqualifiedMethodCall,
+    params: Array[Term],
+    context: LocalContext,
+    expected: Type
+  ): Option[Term] = {
+    if (node.typeArgs.nonEmpty) return None
+
+    def callOnTarget(target: Term, targetType: ObjectType): Option[Term] = {
+      if (targetType.methods("call").isEmpty) return None
+      val callNode = new AST.MethodCall(node.location, new AST.Id(node.location, node.name), "call", node.args, Nil)
+      typeMethodCallOnObject(callNode, target, targetType, params, context, expected)
+    }
+
+    val local = context.lookup(node.name)
+    if (local != null) {
+      context.recordUsage(node.name)
+      local.tp match
+        case targetType: ObjectType => return callOnTarget(new RefLocal(local), targetType)
+        case _ => return None
+    }
+
+    if (!context.isStatic) {
+      val field = MemberAccess.findField(definition_, node.name)
+      if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
+        field.`type` match
+          case targetType: ObjectType =>
+            return callOnTarget(new RefField(new This(definition_), field), targetType)
+          case _ =>
+      }
+    }
+
+    None
   }
 
   private def typeUnqualifiedMethodCallWithNamedArgs(node: AST.UnqualifiedMethodCall, context: LocalContext, expected: Type): Option[Term] = {

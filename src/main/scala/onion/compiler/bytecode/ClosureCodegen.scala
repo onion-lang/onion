@@ -111,9 +111,62 @@ final class ClosureCodegen(
 
     generateClosureConstructor(cw, className, capturedVars)
     generateClosureMethod(cw, className, method, block, capturedVars)
+    generateBridgeMethod(cw, className, interfaceType, method)
 
     cw.visitEnd()
     cw.toByteArray
+  }
+
+  private def findInterfaceMethod(interfaceType: ClassType, name: String, argCount: Int): Option[TypedAST.Method] =
+    interfaceType.methods(name).find(_.arguments.length == argCount)
+
+  private def generateBridgeMethod(
+    cw: ClassWriter,
+    className: String,
+    interfaceType: ClassType,
+    implMethod: TypedAST.Method
+  ): Unit = {
+    val rawMethodOpt = findInterfaceMethod(interfaceType, implMethod.name, implMethod.arguments.length)
+    rawMethodOpt match
+      case Some(rawMethod) if (rawMethod.modifier & AST.M_STATIC) == 0 =>
+        val bridgeArgTypes = rawMethod.arguments.map(asmType)
+        val bridgeReturnType = asmType(rawMethod.returnType)
+        val implArgTypes = implMethod.arguments.map(asmType)
+        val implReturnType = asmType(implMethod.returnType)
+
+        val bridgeDesc = AsmType.getMethodDescriptor(bridgeReturnType, bridgeArgTypes*)
+        val implDesc = AsmType.getMethodDescriptor(implReturnType, implArgTypes*)
+        if bridgeDesc != implDesc then
+          val access = Opcodes.ACC_PUBLIC | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
+          val gen = MethodEmitter.newGenerator(cw, access, implMethod.name, bridgeReturnType, bridgeArgTypes)
+
+          val ownerType = AsmUtil.objectType(className)
+          gen.loadThis()
+          var i = 0
+          while i < bridgeArgTypes.length do
+            gen.loadArg(i)
+            val desired = implArgTypes(i)
+            val provided = bridgeArgTypes(i)
+            if desired != provided then
+              if asmCodeGen.isReferenceAsmType(provided) && !asmCodeGen.isReferenceAsmType(desired) then
+                gen.unbox(desired)
+              else if !asmCodeGen.isReferenceAsmType(provided) && asmCodeGen.isReferenceAsmType(desired) then
+                gen.valueOf(provided)
+              else if asmCodeGen.isReferenceAsmType(desired) then
+                gen.checkCast(desired)
+              else
+                gen.cast(provided, desired)
+            i += 1
+
+          gen.invokeVirtual(ownerType, AsmMethod(implMethod.name, implDesc))
+          if implReturnType != AsmType.VOID_TYPE &&
+            !asmCodeGen.isReferenceAsmType(implReturnType) &&
+            asmCodeGen.isReferenceAsmType(bridgeReturnType)
+          then
+            gen.valueOf(implReturnType)
+          gen.returnValue()
+          gen.endMethod()
+      case _ => ()
   }
 
   private def generateClosureConstructor(cw: ClassWriter, className: String, capturedVars: Seq[ClosureLocalBinding]): Unit = {
@@ -170,4 +223,3 @@ final class ClosureCodegen(
     gen.endMethod()
   }
 }
-

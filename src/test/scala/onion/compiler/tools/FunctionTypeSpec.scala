@@ -4,6 +4,23 @@ import onion.tools.Shell
 
 class FunctionTypeSpec extends AbstractShellSpec {
   describe("Function type syntax") {
+    it("allows function call syntax sugar") {
+      val result = shell.run(
+        """
+          |class FunctionCallSugar {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val f: Int -> Int = (x: Int) -> { return x + 1; }
+          |    return f(100)
+          |  }
+          |}
+          |""".stripMargin,
+        "FunctionCallSugar.on",
+        Array()
+      )
+      assert(Shell.Success(101) == result)
+    }
+
     it("accepts shorthand single-argument function types") {
       val result = shell.run(
         """

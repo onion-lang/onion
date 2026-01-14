@@ -17,7 +17,7 @@ val label = if name.length > 0 { "ok" } else { "empty" }
 def add(x: Int, y: Int): Int = x + y
 
 val double: Int -> Int = (x: Int) -> { return x * 2; }
-IO::println(double.call(21))
+IO::println(double(21))
 ```
 
 ## Architecture

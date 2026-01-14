@@ -188,17 +188,23 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     mapper_ = find(definition_.name)
     val classTypeParams = declaredTypeParams_.getOrElse(node, Seq())
     openTypeParams(emptyTypeParams ++ classTypeParams) {
+      val instanceInitializers = Buffer[ActionStatement]()
+      val staticInitializers = Buffer[ActionStatement]()
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>
-            processFieldInitializer(field)
+            collectFieldInitializer(field, instanceInitializers, staticInitializers)
           case member: AST.MethodDeclaration =>
             processMethodDeclaration(member)
           case member: AST.ConstructorDeclaration =>
             processConstructorDeclaration(member)
           case field: AST.DelegatedFieldDeclaration =>
-            processDelegatedFieldInitializer(field)
+            collectDelegatedFieldInitializer(field, instanceInitializers, staticInitializers)
         }
+      }
+      injectInstanceInitializers(definition_, instanceInitializers.toSeq)
+      if (staticInitializers.nonEmpty) {
+        definition_.setStaticInitializers(staticInitializers.toArray)
       }
     }
   }
@@ -209,29 +215,64 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     if (function == null) return
     processMethodLikeBody(function, node.args, node.block)
   }
-  private def processFieldInitializer(node: AST.FieldDeclaration): Unit = {
+  private def collectFieldInitializer(
+    node: AST.FieldDeclaration,
+    instanceInitializers: Buffer[ActionStatement],
+    staticInitializers: Buffer[ActionStatement]
+  ): Unit = {
     if (node.init == null) return
+    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
+    if (field == null) return
     val context = new LocalContext
-    context.setStatic(Modifier.isStatic(node.modifiers))
-    val fieldType = mapFrom(node.typeRef)
-    if (fieldType == null) return
+    val isStatic = Modifier.isStatic(node.modifiers)
+    context.setStatic(isStatic)
+    val fieldType = field.`type`
     typed(node.init, context, fieldType) match {
       case Some(term) =>
-        processAssignable(node.init, fieldType, term)
+        val value = processAssignable(node.init, fieldType, term)
+        if (value != null) {
+          val statement =
+            if (isStatic) new ExpressionActionStatement(new SetStaticField(definition_, field, value))
+            else new ExpressionActionStatement(new SetField(new This(definition_), field, value))
+          if (isStatic) staticInitializers += statement else instanceInitializers += statement
+        }
       case None => ()
     }
   }
 
-  private def processDelegatedFieldInitializer(node: AST.DelegatedFieldDeclaration): Unit = {
+  private def collectDelegatedFieldInitializer(
+    node: AST.DelegatedFieldDeclaration,
+    instanceInitializers: Buffer[ActionStatement],
+    staticInitializers: Buffer[ActionStatement]
+  ): Unit = {
     if (node.init == null) return
+    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
+    if (field == null) return
     val context = new LocalContext
-    context.setStatic(Modifier.isStatic(node.modifiers))
-    val fieldType = mapFrom(node.typeRef)
-    if (fieldType == null) return
+    val isStatic = Modifier.isStatic(node.modifiers)
+    context.setStatic(isStatic)
+    val fieldType = field.`type`
     typed(node.init, context, fieldType) match {
       case Some(term) =>
-        processAssignable(node.init, fieldType, term)
+        val value = processAssignable(node.init, fieldType, term)
+        if (value != null) {
+          val statement =
+            if (isStatic) new ExpressionActionStatement(new SetStaticField(definition_, field, value))
+            else new ExpressionActionStatement(new SetField(new This(definition_), field, value))
+          if (isStatic) staticInitializers += statement else instanceInitializers += statement
+        }
       case None => ()
+    }
+  }
+
+  private def injectInstanceInitializers(classDef: ClassDefinition, initializers: Seq[ActionStatement]): Unit = {
+    if (initializers.isEmpty) return
+    classDef.constructors.foreach {
+      case ctor: ConstructorDefinition =>
+        val existing = Option(ctor.block).map(_.statements.toIndexedSeq).getOrElse(Seq.empty)
+        val combined = (initializers ++ existing).toArray
+        ctor.block = new StatementBlock(combined: _*)
+      case _ => ()
     }
   }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}

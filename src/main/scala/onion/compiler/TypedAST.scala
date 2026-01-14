@@ -250,11 +250,17 @@ object TypedAST {
     extends TypedAST.AbstractClassType() with Node with Named {
 
     private var typeParameters_ = typeParameters0
+    private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
       typeParameters_ = typeParameters
+
+    def staticInitializers: Array[TypedAST.ActionStatement] = staticInitializers_
+
+    def setStaticInitializers(initializers: Array[TypedAST.ActionStatement]): Unit =
+      staticInitializers_ = initializers
 
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray
     def methods: Seq[TypedAST.Method] = methods_.values.toSeq

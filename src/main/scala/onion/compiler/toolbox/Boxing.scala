@@ -38,6 +38,9 @@ object Boxing {
     }.toMap
 
   private val boxedTypeCache = new JWeakHashMap[ClassTable, Array[TypedAST.ClassType]]()
+  private val valueOfMethodCache = new JWeakHashMap[ClassTable, Array[TypedAST.Method]]()
+  private val unboxMethodCache = new JWeakHashMap[ClassTable, Array[TypedAST.Method]]()
+  private val emptyTerms = Array.empty[TypedAST.Term]
 
   private def boxedTypeIndex(`type`: TypedAST.BasicType): Int =
     basicToIndex.getOrElse(`type`, throw new RuntimeException("unknown boxed type"))
@@ -58,6 +61,53 @@ object Boxing {
     boxed
   }
 
+  private def cachedMethod(
+    cache: JWeakHashMap[ClassTable, Array[TypedAST.Method]],
+    table: ClassTable
+  ): Array[TypedAST.Method] = {
+    var methods = cache.get(table)
+    if (methods == null) {
+      methods = new Array[TypedAST.Method](TABLE.length)
+      cache.put(table, methods)
+    }
+    methods
+  }
+
+  private def cachedValueOfMethod(table: ClassTable, node: TypedAST.Term, `type`: TypedAST.BasicType): TypedAST.Method = {
+    val index = boxedTypeIndex(`type`)
+    val methods = cachedMethod(valueOfMethodCache, table)
+    var method = methods(index)
+    if (method == null) {
+      val boxed = cachedBoxedType(table, `type`)
+      val args = Array[TypedAST.Term](node)
+      val candidates = boxed.findMethod("valueOf", args)
+      if (candidates.length == 1) {
+        method = candidates(0)
+        methods(index) = method
+      } else {
+        throw new RuntimeException(s"couldn't find valueOf method for ${boxed.name}")
+      }
+    }
+    method
+  }
+
+  private def cachedUnboxMethod(table: ClassTable, `type`: TypedAST.BasicType, methodName: String): TypedAST.Method = {
+    val index = boxedTypeIndex(`type`)
+    val methods = cachedMethod(unboxMethodCache, table)
+    var method = methods(index)
+    if (method == null) {
+      val boxed = cachedBoxedType(table, `type`)
+      val candidates = boxed.findMethod(methodName, emptyTerms)
+      if (candidates.length == 1) {
+        method = candidates(0)
+        methods(index) = method
+      } else {
+        throw new RuntimeException(s"couldn't find ${methodName} method")
+      }
+    }
+    method
+  }
+
   def boxedType(table: ClassTable, `type`: TypedAST.BasicType): TypedAST.ClassType = {
     cachedBoxedType(table, `type`)
   }
@@ -67,15 +117,12 @@ object Boxing {
     if ((!`type`.isBasicType) || (`type` eq TypedAST.BasicType.VOID)) {
       throw new IllegalArgumentException("node type must be boxable type")
     }
-    val aBoxedType: TypedAST.ClassType = boxedType(table, `type`.asInstanceOf[TypedAST.BasicType])
-
+    val basicType = `type`.asInstanceOf[TypedAST.BasicType]
+    val aBoxedType: TypedAST.ClassType = boxedType(table, basicType)
     // valueOf静的メソッドを探す
-    val valueOfMethod = aBoxedType.findMethod("valueOf", Array[TypedAST.Term](node))
-    if (valueOfMethod.length == 1) {
-      return new TypedAST.CallStatic(aBoxedType, valueOfMethod(0), Array[TypedAST.Term](node))
-    }
-
-    throw new RuntimeException(s"couldn't find valueOf method for ${aBoxedType.name}")
+    val valueOfMethod = cachedValueOfMethod(table, node, basicType)
+    val args = Array[TypedAST.Term](node)
+    new TypedAST.CallStatic(aBoxedType, valueOfMethod, args)
   }
 
   /**
@@ -124,12 +171,8 @@ object Boxing {
       case _ => throw new IllegalArgumentException(s"cannot unbox to ${targetType}")
     }
 
-    val unboxMethod = aBoxedType.findMethod(methodName, Array[TypedAST.Term]())
-    if (unboxMethod.length == 1) {
-      return new TypedAST.Call(node, unboxMethod(0), Array[TypedAST.Term]())
-    }
-
-    throw new RuntimeException(s"couldn't find ${methodName} method")
+    val cached = cachedUnboxMethod(table, targetType, methodName)
+    new TypedAST.Call(node, cached, emptyTerms)
   }
 
   /** Try to unbox a term to a numeric primitive, returning the original term if not possible */

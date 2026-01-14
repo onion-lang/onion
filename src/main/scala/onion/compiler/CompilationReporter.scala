@@ -27,7 +27,7 @@ object CompilationReporter {
 
   private def formatError(error: CompileError): String = {
     val locationOpt = Option(error.location)
-    val sourceFileOpt = Option(error.sourceFile)
+    val sourceFileOpt = Option(error.sourceFile).filter(_.nonEmpty)
     val errorCodePrefix = error.errorCode.map(code => s"[$code] ").getOrElse("")
     val builder = new StringBuilder
     sourceFileOpt match {

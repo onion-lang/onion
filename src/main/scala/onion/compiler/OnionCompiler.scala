@@ -16,6 +16,12 @@ import scala.util.control.NonFatal
  *
  */
 class OnionCompiler(val config: CompilerConfig) {
+  private val InternalErrorCode = "I0000"
+
+  private def internalError(e: Throwable): CompileError = {
+    val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
+    CompileError(null, null, s"Internal compiler error: $message", Some(InternalErrorCode))
+  }
 
   def compile(fileNames: Array[String]): CompilationOutcome = {
     val sources = fileNames.iterator.map(new FileInputSource(_)).toSeq
@@ -43,8 +49,7 @@ class OnionCompiler(val config: CompilerConfig) {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)
       case NonFatal(e) =>
-        val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
-        Failure(Seq(CompileError("", null, s"Internal compiler error: $message")))
+        Failure(Seq(internalError(e)))
     }
   }
 
@@ -80,8 +85,7 @@ class OnionCompiler(val config: CompilerConfig) {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)
       case NonFatal(e) =>
-        val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
-        Failure(Seq(CompileError("", null, s"Internal compiler error: $message")))
+        Failure(Seq(internalError(e)))
     }
   }
 

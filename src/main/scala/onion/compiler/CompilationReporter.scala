@@ -9,8 +9,7 @@ package onion.compiler
 
 import onion.compiler.toolbox.{Inputs, Message, Systems}
 
-import java.io.FileNotFoundException
-import java.io.IOException
+import java.io.{FileNotFoundException, IOException, PrintStream}
 import scala.math.max
 import scala.util.Using
 
@@ -19,10 +18,10 @@ import scala.util.Using
  */
 object CompilationReporter {
 
-  def printErrors(errors: Seq[CompileError]): Unit = {
+  def printErrors(errors: Seq[CompileError], out: PrintStream = Console.err): Unit = {
     if (errors.isEmpty) return
-    errors.map(formatError).foreach(System.err.println)
-    System.err.println(Message("error.count", errors.size))
+    errors.map(formatError).foreach(out.println)
+    out.println(Message("error.count", errors.size))
   }
 
   private def formatError(error: CompileError): String = {

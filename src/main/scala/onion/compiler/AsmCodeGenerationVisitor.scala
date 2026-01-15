@@ -157,13 +157,13 @@ class AsmCodeGenerationVisitor(
   
   override def visitListLiteral(node: ListLiteral): Unit =
     // Create ArrayList
-    gen.newInstance(AsmUtil.objectType("java.util.ArrayList"))
+    val listType = AsmUtil.objectType(AsmUtil.JavaUtilArrayList)
+    val listCtor = AsmMethod.getMethod("void <init>(int)")
+    val listAdd = AsmMethod.getMethod("boolean add(Object)")
+    gen.newInstance(listType)
     gen.dup()
     gen.push(node.elements.length)
-    gen.invokeConstructor(
-      AsmUtil.objectType("java.util.ArrayList"),
-      AsmMethod.getMethod("void <init>(int)")
-    )
+    gen.invokeConstructor(listType, listCtor)
     
     // Add elements
     for elem <- node.elements do
@@ -173,10 +173,7 @@ class AsmCodeGenerationVisitor(
       elem.`type` match
         case bt: BasicType => gen.box(asmType(bt))
         case _ => // Already an object
-      gen.invokeVirtual(
-        AsmUtil.objectType("java.util.ArrayList"),
-        AsmMethod.getMethod("boolean add(Object)")
-      )
+      gen.invokeVirtual(listType, listAdd)
       gen.pop() // Pop boolean result
   
   override def visitRefLocal(node: RefLocal): Unit =

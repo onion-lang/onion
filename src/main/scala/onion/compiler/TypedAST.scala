@@ -1100,13 +1100,31 @@ object TypedAST {
     /** Whether this method accepts variable-length arguments (last parameter is vararg) */
     def isVararg: Boolean = false
 
-    /** Arguments with names and optional default values. Override in subclasses that support defaults. */
-    def argumentsWithDefaults: Array[MethodArgument] = arguments.zipWithIndex.map { case (t, i) =>
-      MethodArgument(s"arg$i", t, None)
+    private lazy val defaultArgumentsWithDefaults: Array[MethodArgument] = {
+      val args = arguments
+      val result = new Array[MethodArgument](args.length)
+      var i = 0
+      while (i < args.length) {
+        result(i) = MethodArgument(s"arg$i", args(i), None)
+        i += 1
+      }
+      result
     }
 
+    /** Arguments with names and optional default values. Override in subclasses that support defaults. */
+    def argumentsWithDefaults: Array[MethodArgument] = defaultArgumentsWithDefaults
+
     /** Minimum number of required arguments (without defaults) */
-    def minArguments: Int = argumentsWithDefaults.count(_.defaultValue.isEmpty)
+    def minArguments: Int = {
+      val args = argumentsWithDefaults
+      var count = 0
+      var i = 0
+      while (i < args.length) {
+        if (args(i).defaultValue.isEmpty) count += 1
+        i += 1
+      }
+      count
+    }
   }
 
   class MethodComparator extends Comparator[TypedAST.Method] {

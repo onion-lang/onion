@@ -1342,8 +1342,13 @@ object TypedAST {
           return true
         case (lapp: TypedAST.AppliedClassType, rapp: TypedAST.AppliedClassType)
           if (lapp.raw eq rapp.raw) && lapp.typeArguments.length == rapp.typeArguments.length =>
-          return lapp.typeArguments.zip(rapp.typeArguments).forall { (expectedArg, actualArg) =>
-            expectedArg match
+          val expectedArgs = lapp.typeArguments
+          val actualArgs = rapp.typeArguments
+          var i = 0
+          while (i < expectedArgs.length) {
+            val expectedArg = expectedArgs(i)
+            val actualArg = actualArgs(i)
+            val matches = expectedArg match
               case w: TypedAST.WildcardType =>
                 w.lowerBound match
                   case Some(lb) => isSuperType(actualArg, lb)
@@ -1352,34 +1357,51 @@ object TypedAST {
                 isSuperType(tv.upperBound, actualArg)
               case _ =>
                 expectedArg eq actualArg
+            if (!matches) return false
+            i += 1
           }
+          return true
         case _ =>
       isSuperTypeForClass(left, right.superClass) ||
         right.interfaces.exists(iface => isSuperTypeForClass(left, iface))
     }
 
-    // Map from a BasicType to the set of types that can be assigned to it
-    private val basicTypeAssignableFrom: scala.collection.immutable.Map[BasicType, scala.collection.immutable.Set[BasicType]] = {
-      import scala.collection.immutable.{Map => SMap, Set => SSet}
-      SMap(
-        BasicType.DOUBLE  -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG, BasicType.FLOAT, BasicType.DOUBLE),
-        BasicType.FLOAT   -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG, BasicType.FLOAT),
-        BasicType.LONG    -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG),
-        BasicType.INT     -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT),
-        BasicType.SHORT   -> SSet(BasicType.BYTE, BasicType.SHORT),
-        BasicType.BOOLEAN -> SSet(BasicType.BOOLEAN),
-        BasicType.BYTE    -> SSet(BasicType.BYTE),
-        BasicType.CHAR    -> SSet(BasicType.CHAR),
-        BasicType.VOID    -> SSet(BasicType.VOID)
-      )
-    }
-
     private def isSuperTypeForBasic(left: TypedAST.BasicType, right: TypedAST.BasicType): Boolean =
-      basicTypeAssignableFrom.get(left).exists(_.contains(right))
+      left match
+        case BasicType.DOUBLE =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT) ||
+            (right eq BasicType.DOUBLE)
+        case BasicType.FLOAT =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT)
+        case BasicType.LONG =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT) || (right eq BasicType.LONG)
+        case BasicType.INT =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT)
+        case BasicType.SHORT =>
+          (right eq BasicType.BYTE) || (right eq BasicType.SHORT)
+        case BasicType.BOOLEAN =>
+          right eq BasicType.BOOLEAN
+        case BasicType.BYTE =>
+          right eq BasicType.BYTE
+        case BasicType.CHAR =>
+          right eq BasicType.CHAR
+        case BasicType.VOID =>
+          right eq BasicType.VOID
 
     /** Check if all types in arg1 are supertypes of corresponding types in arg2 */
-    def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean =
-      arg1.zip(arg2).forall((a1, a2) => isSuperType(a1, a2))
+    def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean = {
+      val limit = if (arg1.length < arg2.length) arg1.length else arg2.length
+      var i = 0
+      while (i < limit) {
+        if (!isSuperType(arg1(i), arg2(i))) return false
+        i += 1
+      }
+      true
+    }
   }
 
   class TypeRules

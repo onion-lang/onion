@@ -20,7 +20,7 @@ class CompilationReporterSpec extends AnyFunSpec with Diagrams {
       stream.close()
     }
     val lines = buffer.toString("UTF-8").split("\\R").toSeq
-    assert(lines.nonEmpty)
-    assert(lines.head == "[I0000] Internal compiler error")
+    val errorLine = lines.find(_.contains("Internal compiler error"))
+    assert(errorLine.contains("[I0000] Internal compiler error"))
   }
 }

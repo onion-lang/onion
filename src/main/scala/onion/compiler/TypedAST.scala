@@ -1003,9 +1003,12 @@ object TypedAST {
       val args2: Array[TypedAST.Type] = c2.getArgs
       val result: Int = args1.length - args2.length
       if (result != 0) return result
-      args1.zip(args2).find((a1, a2) => a1 ne a2) match
-        case Some((a1, a2)) => a1.name.compareTo(a2.name)
-        case None => 0
+      var i = 0
+      while (i < args1.length) {
+        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
+        i += 1
+      }
+      0
     }
   }
 
@@ -1056,7 +1059,7 @@ object TypedAST {
     private def find(methods: Set[TypedAST.Method], target: TypedAST.ObjectType, name: String, params: Array[TypedAST.Term]): Unit = {
       if (target == null) return
       val ms: Array[TypedAST.Method] = target.methods(name)
-      for (m <- target.methods(name)) {
+      for (m <- ms) {
         if (matcher.matches(m.arguments, params)) methods.add(m)
         else if (m.isVararg && matcher.matchesVararg(m.arguments, params)) methods.add(m)
       }
@@ -1114,9 +1117,12 @@ object TypedAST {
       val args2: Array[TypedAST.Type] = m2.arguments
       result = args1.length - args2.length
       if (result != 0) return result
-      args1.zip(args2).find((a1, a2) => a1 ne a2) match
-        case Some((a1, a2)) => a1.name.compareTo(a2.name)
-        case None => 0
+      var i = 0
+      while (i < args1.length) {
+        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
+        i += 1
+      }
+      0
     }
   }
 
@@ -1190,8 +1196,15 @@ object TypedAST {
    */
   class StandardParameterMatcher extends ParameterMatcher {
     def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean =
-      arguments.length == parameters.length &&
-        arguments.zip(parameters.map(_.`type`)).forall((arg, param) => TypeRules.isSuperType(arg, param))
+      if (arguments.length != parameters.length) false
+      else {
+        var i = 0
+        while (i < arguments.length) {
+          if (!TypeRules.isSuperType(arguments(i), parameters(i).`type`)) return false
+          i += 1
+        }
+        true
+      }
 
     def matchesVararg(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean = {
       if (arguments.isEmpty) return false
@@ -1202,33 +1215,36 @@ object TypedAST {
       val componentType = arrayType.base
 
       val fixedArgCount = arguments.length - 1
-      val paramTypes = parameters.map(_.`type`)
 
       // Must have at least the fixed arguments
-      if (paramTypes.length < fixedArgCount) return false
+      if (parameters.length < fixedArgCount) return false
 
       // Check fixed arguments match
-      val fixedArgsMatch = (0 until fixedArgCount).forall { i =>
-        TypeRules.isSuperType(arguments(i), paramTypes(i))
+      var i = 0
+      while (i < fixedArgCount) {
+        if (!TypeRules.isSuperType(arguments(i), parameters(i).`type`)) return false
+        i += 1
       }
-      if (!fixedArgsMatch) return false
 
       // Check vararg portion
-      if (paramTypes.length == arguments.length) {
+      if (parameters.length == arguments.length) {
         // Could be either: passing an array directly, or passing one element
-        val lastParamType = paramTypes.last
+        val lastParamType = parameters.last.`type`
         // Check if it's a direct array pass
         if (lastParamType.isArrayType && TypeRules.isSuperType(lastArgType, lastParamType)) {
           return true
         }
         // Check if it's a single element that matches component type
         TypeRules.isSuperType(componentType, lastParamType)
-      } else if (paramTypes.length > arguments.length) {
+      } else if (parameters.length > arguments.length) {
         // Multiple vararg elements - all must match component type
-        (fixedArgCount until paramTypes.length).forall { i =>
-          TypeRules.isSuperType(componentType, paramTypes(i))
+        i = fixedArgCount
+        while (i < parameters.length) {
+          if (!TypeRules.isSuperType(componentType, parameters(i).`type`)) return false
+          i += 1
         }
-      } else if (paramTypes.length == fixedArgCount) {
+        true
+      } else if (parameters.length == fixedArgCount) {
         // No vararg elements - empty array will be passed
         true
       } else {

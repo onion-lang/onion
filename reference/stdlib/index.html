@@ -1816,6 +1816,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#option-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option Module
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#result-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result Module
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2468,6 +2490,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#option-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option Module
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#result-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result Module
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2593,7 +2637,7 @@
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>val e: Double = Math::E         // 2.71828...
 </span></code></pre></div>
 <h2 id="function-interfaces">Function Interfaces<a class="headerlink" href="#function-interfaces" title="Permanent link">&para;</a></h2>
-<p>Built-in function types for lambdas and closures.</p>
+<p>Built-in function types for lambdas and closures. You can call them with <code>f(args)</code> as a shorthand for <code>f.call(args)</code>.</p>
 <h3 id="function0">Function0<a class="headerlink" href="#function0" title="Permanent link">&para;</a></h3>
 <p>Function with no parameters:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>val func: Function0[Int] = () -&gt; { return 42; }
@@ -2728,7 +2772,29 @@
 </span></code></pre></div>
 <h2 id="iterables-module">Iterables Module<a class="headerlink" href="#iterables-module" title="Permanent link">&para;</a></h2>
 <p>Provided via <code>onion.Iterables</code> (Java interface).</p>
-<p>Access iteration utilities for collections and arrays.</p>
+<p>Access iteration utilities for collections and arrays:</p>
+<ul>
+<li><code>Iterables::map(list|iterable, f)</code></li>
+<li><code>Iterables::filter(list|iterable, predicate)</code></li>
+<li><code>Iterables::foldl(iterable, init, f)</code></li>
+<li><code>Iterables::exists(iterable, predicate)</code></li>
+<li><code>Iterables::forAll(iterable, predicate)</code></li>
+<li><code>Iterables::listOf(elements...)</code></li>
+</ul>
+<h2 id="option-module">Option Module<a class="headerlink" href="#option-module" title="Permanent link">&para;</a></h2>
+<p>Provided via <code>onion.Option</code>.</p>
+<ul>
+<li><code>Option::some(value)</code> / <code>Option::none()</code> / <code>Option::of(value)</code></li>
+<li><code>opt.getOrElse(defaultValue)</code></li>
+<li><code>opt.map(f)</code> / <code>opt.flatMap(f)</code> / <code>opt.filter(predicate)</code></li>
+</ul>
+<h2 id="result-module">Result Module<a class="headerlink" href="#result-module" title="Permanent link">&para;</a></h2>
+<p>Provided via <code>onion.Result</code>.</p>
+<ul>
+<li><code>Result::ok(value)</code> / <code>Result::err(error)</code></li>
+<li><code>Result::ofNullable(value, errorIfNull)</code> / <code>Result::trying(operation)</code></li>
+<li><code>res.map(f)</code> / <code>res.mapError(f)</code> / <code>res.flatMap(f)</code> / <code>res.toOption()</code></li>
+</ul>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../specification/">Language Specification</a> - Formal language spec</li>

@@ -2368,8 +2368,9 @@
 <h2 id="function-types">Function Types<a class="headerlink" href="#function-types" title="Permanent link">&para;</a></h2>
 <p>Functions are represented by <code>Function0</code> through <code>Function10</code> interfaces:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>val func: (Int) -&gt; Int = (x: Int) -&gt; { return x * 2; }
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>val result: Int = func.call(5)$Int  // 10
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>val result: Int = func(5)  // 10
 </span></code></pre></div>
+<p>When the target function type is known, lambda parameters can omit types. If no explicit function type is provided, the return type is inferred from the body.</p>
 <ul>
 <li><code>Function0</code> - No parameters</li>
 <li><code>Function1</code> - One parameter</li>

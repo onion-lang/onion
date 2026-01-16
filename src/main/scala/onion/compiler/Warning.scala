@@ -28,6 +28,27 @@ enum WarningCategory(val code: String, val description: String):
   case EmptyBlock        extends WarningCategory("W0007", "Empty block")
   case RedundantCast     extends WarningCategory("W0008", "Redundant cast")
 
+object WarningCategory:
+  private val aliases: Map[String, WarningCategory] = Map(
+    "unused-variable" -> WarningCategory.UnusedVariable,
+    "unused-import" -> WarningCategory.UnusedImport,
+    "unreachable-code" -> WarningCategory.UnreachableCode,
+    "deprecated" -> WarningCategory.DeprecatedFeature,
+    "deprecated-feature" -> WarningCategory.DeprecatedFeature,
+    "shadowed-variable" -> WarningCategory.ShadowedVariable,
+    "unused-parameter" -> WarningCategory.UnusedParameter,
+    "empty-block" -> WarningCategory.EmptyBlock,
+    "redundant-cast" -> WarningCategory.RedundantCast
+  )
+
+  def fromString(value: String): Option[WarningCategory] =
+    val key = value.trim.toLowerCase
+    if key.isEmpty then None
+    else
+      WarningCategory.values.find(_.code.equalsIgnoreCase(key))
+        .orElse(WarningCategory.values.find(_.toString.toLowerCase == key))
+        .orElse(aliases.get(key))
+
 /**
  * A compiler warning with location and message.
  */

@@ -327,22 +327,26 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     dp: AST.DestructuringPattern,
     bind: ClosureLocalBinding,
     context: LocalContext
-  ): Option[(Term, PatternBindingInfo)] = {
+  ): Option[(Term, PatternBindingInfo)] = boundary {
     val AST.DestructuringPattern(_, constructor, fieldPatterns) = dp
 
-    // Look up the record type by constructor name
-    val recordType = load(constructor)
-    if (recordType == null) {
-      report(NOT_A_RECORD_TYPE, dp, constructor)
-      return None
+    def resolveRecordClass(node: AST.Node, name: String): ClassDefinition = {
+      val recordType = load(name)
+      recordType match {
+        case null =>
+          report(NOT_A_RECORD_TYPE, node, name)
+          break(None)
+        case cd: ClassDefinition =>
+          cd
+        case _ =>
+          report(NOT_A_RECORD_TYPE, node, name)
+          break(None)
+      }
     }
 
-    val classDef = recordType match {
-      case cd: ClassDefinition => cd
-      case _ =>
-        report(NOT_A_RECORD_TYPE, dp, constructor)
-        return None
-    }
+    // Look up the record type by constructor name
+    val classDef = resolveRecordClass(dp, constructor)
+    val recordType = classDef
 
     // Get fields in order (records store fields in insertion order)
     val fields = classDef.fields
@@ -351,7 +355,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     // Check binding count matches field count
     if (fieldPatterns.length != fieldCount) {
       report(WRONG_BINDING_COUNT, dp, Int.box(fieldCount), Int.box(fieldPatterns.length), constructor)
-      return None
+      break(None)
     }
 
     // Create instanceof check
@@ -364,7 +368,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     for ((fieldPattern, field) <- fieldPatterns.zip(fields)) {
       val getter = findFieldGetter(classDef, field.name).getOrElse {
         report(NOT_A_RECORD_TYPE, dp, constructor)
-        return None
+        break(None)
       }
       val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))
 
@@ -378,23 +382,13 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
         case nested @ AST.DestructuringPattern(_, nestedCtor, nestedFieldPatterns) =>
           // Nested destructuring pattern - recurse
-          val nestedType = load(nestedCtor)
-          if (nestedType == null) {
-            report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-            return None
-          }
-
-          val nestedClassDef = nestedType match {
-            case cd: ClassDefinition => cd
-            case _ =>
-              report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-              return None
-          }
+          val nestedClassDef = resolveRecordClass(nested, nestedCtor)
+          val nestedType = nestedClassDef
 
           val nestedFields = nestedClassDef.fields
           if (nestedFieldPatterns.length != nestedFields.length) {
             report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(nestedFieldPatterns.length), nestedCtor)
-            return None
+            break(None)
           }
 
           // Build accessor for nested type check: ((RootType)bind).getter() instanceof NestedType
@@ -407,7 +401,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
           for ((nestedFieldPattern, nestedField) <- nestedFieldPatterns.zip(nestedFields)) {
             val nestedGetter = findFieldGetter(nestedClassDef, nestedField.name).getOrElse {
               report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-              return None
+              break(None)
             }
             val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
 
@@ -421,14 +415,14 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
               case _ =>
                 // Deeper nesting - for now, report error (could support more levels)
                 report(NOT_A_RECORD_TYPE, nested, "deeply nested patterns not yet supported")
-                return None
+                break(None)
             }
           }
 
         case other =>
           // Other patterns not supported in destructuring position
           report(NOT_A_RECORD_TYPE, dp, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
-          return None
+          break(None)
       }
     }
 

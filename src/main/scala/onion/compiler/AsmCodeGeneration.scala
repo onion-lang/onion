@@ -50,13 +50,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         primitiveType.getSort match
           case AsmType.LONG =>
             gen.invokeStatic(
-              AsmType.getType(classOf[java.lang.Long]),
-              AsmMethod.getMethod("Long valueOf(long)")
+              AsmCodeGeneration.LongBoxedType,
+              AsmCodeGeneration.LongValueOfMethod
             )
           case AsmType.DOUBLE =>
             gen.invokeStatic(
-              AsmType.getType(classOf[java.lang.Double]),
-              AsmMethod.getMethod("Double valueOf(double)")
+              AsmCodeGeneration.DoubleBoxedType,
+              AsmCodeGeneration.DoubleValueOfMethod
             )
           case _ =>
             gen.valueOf(primitiveType)
@@ -127,9 +127,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         val ctor = ctorRef.asInstanceOf[ConstructorDefinition]
         codeConstructor(cw, ctor, name)
 
+    val staticInitializers = classDef.staticInitializers
     // Generate static initializer for enums
     if Modifier.isEnum(classDef.modifier) then
-      codeEnumClinit(cw, classDef, name)
+      codeEnumClinit(cw, classDef, name, staticInitializers)
+    else if staticInitializers.nonEmpty then
+      codeStaticInitializer(cw, name, staticInitializers)
 
     // Generate methods
     for method <- classDef.methods do
@@ -192,7 +195,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     gen.returnValue()
     gen.endMethod()
 
-  private def codeEnumClinit(cw: ClassWriter, classDef: ClassDefinition, className: String): Unit =
+  private def codeEnumClinit(
+    cw: ClassWriter,
+    classDef: ClassDefinition,
+    className: String,
+    staticInitializers: Array[ActionStatement]
+  ): Unit =
     // Generate static initializer for enum
     val gen = MethodEmitter.newGenerator(cw, Opcodes.ACC_STATIC, "<clinit>", AsmType.VOID_TYPE, Array.empty)
     val enumType = AsmUtil.objectType(className)
@@ -215,6 +223,21 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.putStatic(enumType, field.name, enumType)
     }
 
+    if staticInitializers.nonEmpty then
+      val localVars = new LocalVarContext(gen).withParameters(true, Array.empty)
+      emitStatementsWithContext(gen, staticInitializers, className, localVars)
+
+    gen.returnValue()
+    gen.endMethod()
+
+  private def codeStaticInitializer(
+    cw: ClassWriter,
+    className: String,
+    staticInitializers: Array[ActionStatement]
+  ): Unit =
+    val gen = MethodEmitter.newGenerator(cw, Opcodes.ACC_STATIC, "<clinit>", AsmType.VOID_TYPE, Array.empty)
+    val localVars = new LocalVarContext(gen).withParameters(true, Array.empty)
+    emitStatementsWithContext(gen, staticInitializers, className, localVars)
     gen.returnValue()
     gen.endMethod()
 
@@ -436,8 +459,14 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
  * These are used by both AsmCodeGeneration and other packages (e.g., generics.Erasure).
  */
 object AsmCodeGeneration:
+  import org.objectweb.asm.commons.{Method => AsmMethod}
   import TypedAST._
   import bytecode.AsmUtil
+
+  private[compiler] val LongBoxedType: AsmType = AsmType.getType(classOf[java.lang.Long])
+  private[compiler] val DoubleBoxedType: AsmType = AsmType.getType(classOf[java.lang.Double])
+  private[compiler] val LongValueOfMethod: AsmMethod = AsmMethod.getMethod("Long valueOf(long)")
+  private[compiler] val DoubleValueOfMethod: AsmMethod = AsmMethod.getMethod("Double valueOf(double)")
 
   def asmType(tp: TypedAST.Type): AsmType = tp match
     case BasicType.VOID    => AsmType.VOID_TYPE

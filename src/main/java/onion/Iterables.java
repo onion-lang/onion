@@ -11,7 +11,6 @@ import java.util.Set;
 
 public class Iterables {
   private static <A, B> void _map(Iterable<A> it, Function1<A, B> f, Collection<B> result) {
-    List<B> newList = new ArrayList<B>();
     for(A arg: it) result.add(f.call(arg));
   }
   public static <A, B> List<B> map(List<A> list, Function1<A, B> f) {
@@ -20,7 +19,9 @@ public class Iterables {
     return result;
   }
   public static <A, B> Iterable<B> map(Iterable<A> list, Function1<A, B> f) {
-    return map(list, f);
+    List<B> result = new ArrayList<B>();
+    _map(list, f, result);
+    return result;
   }
   public static <A, B> Set<B> map(Set<A> set, Function1<A, B> f) {
     Set<B> result = new HashSet<B>();
@@ -45,6 +46,18 @@ public class Iterables {
   public static <T> List<T> filter(List<T> list, Function1<T, Boolean> predicate) {
     List<T> result = new ArrayList<>();
     for (T item : list) {
+      Boolean keep = predicate.call(item);
+      if (keep != null && keep) {
+        result.add(item);
+      }
+    }
+    return result;
+  }
+
+  // Filter iterable elements
+  public static <T> Iterable<T> filter(Iterable<T> iterable, Function1<T, Boolean> predicate) {
+    List<T> result = new ArrayList<>();
+    for (T item : iterable) {
       Boolean keep = predicate.call(item);
       if (keep != null && keep) {
         result.add(item);

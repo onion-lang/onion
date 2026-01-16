@@ -52,6 +52,8 @@ object SemanticError {
   case object BREAK_OUTSIDE_LOOP extends SemanticError(48)
   case object CONTINUE_OUTSIDE_LOOP extends SemanticError(49)
   case object CURRENT_INSTANCE_NOT_AVAILABLE extends SemanticError(50)
+  case object RETURN_TYPE_REQUIRED extends SemanticError(51)
+  case object LAMBDA_PARAM_TYPE_REQUIRED extends SemanticError(52)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

@@ -17,6 +17,22 @@ val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
 ```
 
+## Type Inference
+
+When the target function type is known, parameter types can be omitted:
+
+```onion
+val add: (Int, Int) -> Int = (x, y) -> { return x + y; }
+```
+
+If the lambda has no explicit function type, the return type is inferred from its body:
+
+```onion
+val upper = (s: String) -> { return s.toUpperCase(); }
+```
+
+When no target function type is available, parameter types must be explicit.
+
 ## Calling Lambdas
 
 Use the `.call()` method to invoke a lambda:

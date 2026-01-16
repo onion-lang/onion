@@ -71,12 +71,24 @@ def square(x: Int): Int = x * x
 
 ### Lambda Syntax
 
-Anonymous functions use the `(params) -> { body }` syntax:
+Anonymous functions use the `(params) -> { body }` syntax. Function values can be invoked with `f(args)`, which is shorthand for `f.call(args)`:
 
 ```onion
 val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 
-val result: Int = double.call(5)  // 10
+val result: Int = double(5)  // 10
+```
+
+If the target function type is known, parameter types can be omitted:
+
+```onion
+val double: (Int) -> Int = (x) -> { return x * 2; }
+```
+
+When no explicit function type is provided, the return type is inferred:
+
+```onion
+val upper = (s: String) -> { return s.toUpperCase(); }
 ```
 
 ### Lambda with Multiple Parameters
@@ -84,7 +96,7 @@ val result: Int = double.call(5)  // 10
 ```onion
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
-val sum: Int = add.call(3, 7)  // 10
+val sum: Int = add(3, 7)  // 10
 ```
 
 ### Lambda with No Parameters
@@ -92,7 +104,7 @@ val sum: Int = add.call(3, 7)  // 10
 ```onion
 val sayHello: () -> String = () -> { IO::println("Hello!"); return "done"; }
 
-sayHello.call()
+sayHello()
 ```
 
 ## Closures
@@ -109,9 +121,9 @@ def makeCounter(): () -> Int {
 }
 
 val counter: () -> Int = makeCounter()
-IO::println(counter.call())  // 1
-IO::println(counter.call())  // 2
-IO::println(counter.call())  // 3
+IO::println(counter())  // 1
+IO::println(counter())  // 2
+IO::println(counter())  // 3
 ```
 
 ### Capturing Loop Variables

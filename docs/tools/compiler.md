@@ -46,6 +46,38 @@ Limit the number of compilation errors reported. Useful for large projects with 
 onionc -maxErrorReports 10 MyProgram.on
 ```
 
+### `--dump-ast`
+
+Print the parsed AST to stderr. Useful when debugging syntax and parsing.
+
+```bash
+onionc --dump-ast MyProgram.on
+```
+
+### `--dump-typed-ast`
+
+Print a typed AST summary (classes, fields, methods) to stderr.
+
+```bash
+onionc --dump-typed-ast MyProgram.on
+```
+
+### `--warn <off|on|error>`
+
+Control warning reporting. `error` treats warnings as compilation errors.
+
+```bash
+onionc --warn error MyProgram.on
+```
+
+### `--Wno <codes>`
+
+Suppress specific warning categories by code or name.
+
+```bash
+onionc --Wno W0001,unused-parameter MyProgram.on
+```
+
 ## Examples
 
 ### Basic Compilation

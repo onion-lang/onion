@@ -1,7 +1,7 @@
 class FunctionTypesSample {
 public:
   static def applyTwice(f: (JInteger) -> JInteger, x: JInteger): JInteger {
-    return f.call(f.call(x));
+    return f(f(x));
   }
 
   static def main(args: String[]): JInteger {

@@ -1,0 +1,8 @@
+class PrimitivePrint {
+public:
+  static def main(args: String[]): Int {
+    IO::println(1);
+    IO::print(2);
+    return 0;
+  }
+}

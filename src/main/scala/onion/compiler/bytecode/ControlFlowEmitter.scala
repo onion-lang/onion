@@ -71,22 +71,33 @@ final class ControlFlowEmitter(
       visitTerm(node.term)
     gen.returnValue()
 
-  def emitSynchronized(node: Synchronized): Unit =
+  private def storeResultIfNeeded(resultType: Type): Option[Int] =
+    if (resultType == BasicType.VOID || resultType.isBottomType) None
+    else {
+      val slot = gen.newLocal(asmType(resultType))
+      gen.storeLocal(slot)
+      Some(slot)
+    }
+
+  private def emitSynchronizedBlock(lockTerm: Term, resultType: Type)(emitBody: => Unit): Unit =
     // Store lock object in a local variable to avoid re-evaluating the expression
     val lockSlot = gen.newLocal(AsmType.getType(classOf[Object]))
-    visitTerm(node.term)
+    visitTerm(lockTerm)
     gen.storeLocal(lockSlot)
 
     gen.loadLocal(lockSlot)
     gen.monitorEnter()
 
     val tryStart = gen.mark()
-    visitStatement(node.statement)
+    emitBody
     val tryEnd = gen.mark()
 
-    // Normal exit: release monitor and jump to end
+    val resultSlot = storeResultIfNeeded(resultType)
+
+    // Normal exit: release monitor and restore result (if any)
     gen.loadLocal(lockSlot)
     gen.monitorExit()
+    resultSlot.foreach(gen.loadLocal)
     val endLabel = gen.newLabel()
     gen.goTo(endLabel)
 
@@ -99,43 +110,16 @@ final class ControlFlowEmitter(
 
     gen.visitLabel(endLabel)
 
+  def emitSynchronized(node: Synchronized): Unit =
+    emitSynchronizedBlock(node.term, BasicType.VOID) {
+      visitStatement(node.statement)
+    }
+
   def emitSynchronizedTerm(node: SynchronizedTerm): Unit =
-    // Store lock object in a local variable to avoid re-evaluating the expression
-    val lockSlot = gen.newLocal(AsmType.getType(classOf[Object]))
-    visitTerm(node.lock)
-    gen.storeLocal(lockSlot)
-
-    gen.loadLocal(lockSlot)
-    gen.monitorEnter()
-
-    val tryStart = gen.mark()
-    // Evaluate body as an expression (leaves result on stack)
-    visitTerm(node.body)
-    val tryEnd = gen.mark()
-
-    // Save result to temporary variable (if not void)
-    val resultType = asmType(node.`type`)
-    val hasResult = node.`type` != BasicType.VOID && !node.`type`.isBottomType
-    val resultSlot = if (hasResult) {
-      val slot = gen.newLocal(resultType)
-      gen.storeLocal(slot)
-      slot
-    } else -1
-
-    // Normal exit: release monitor and restore result
-    gen.loadLocal(lockSlot)
-    gen.monitorExit()
-    if (hasResult) gen.loadLocal(resultSlot)
-    val endLabel = gen.newLabel()
-    gen.goTo(endLabel)
-
-    // Exception handler: release monitor and rethrow
-    gen.catchException(tryStart, tryEnd, AsmType.getType(classOf[Throwable]))
-    gen.loadLocal(lockSlot)
-    gen.monitorExit()
-    gen.throwException()
-
-    gen.visitLabel(endLabel)
+    emitSynchronizedBlock(node.lock, node.`type`) {
+      // Evaluate body as an expression (leaves result on stack)
+      visitTerm(node.body)
+    }
 
   def emitThrow(node: Throw): Unit =
     visitTerm(node.term)

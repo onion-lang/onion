@@ -42,9 +42,12 @@ class AsmCodeGenerationVisitor(
     params: Array[Term],
     expectedTypes: Array[AsmType]
   ): Unit =
-    for (param, expected) <- params.zip(expectedTypes) do
+    var i = 0
+    while i < params.length do
+      val param = params(i)
       visitTerm(param)
-      asmCodeGen.adaptValueOnStack(gen, param.`type`, expected)
+      asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedTypes(i))
+      i += 1
 
   // Expression visitors
   override def visitArrayLength(node: ArrayLength): Unit =
@@ -95,11 +98,12 @@ class AsmCodeGenerationVisitor(
   
   override def visitCall(node: Call): Unit =
     visitTerm(node.target)
-    emitArgumentsWithAdaptation(node.parameters, node.method.arguments.map(asmType))
+    val argTypes = node.method.arguments.map(asmType)
+    emitArgumentsWithAdaptation(node.parameters, argTypes)
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
-      node.method.arguments.map(asmType)*
+      argTypes*
     )
     val isInterface = node.method.affiliation.isInterface
     if isInterface then
@@ -108,21 +112,23 @@ class AsmCodeGenerationVisitor(
       gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
   
   override def visitCallStatic(node: CallStatic): Unit =
-    emitArgumentsWithAdaptation(node.parameters, node.method.arguments.map(asmType))
+    val argTypes = node.method.arguments.map(asmType)
+    emitArgumentsWithAdaptation(node.parameters, argTypes)
     val ownerType = AsmUtil.objectType(node.target.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
-      node.method.arguments.map(asmType)*
+      argTypes*
     )
     gen.invokeStatic(ownerType, AsmMethod(node.method.name, methodDesc))
   
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)
-    emitArgumentsWithAdaptation(node.params, node.method.arguments.map(asmType))
+    val argTypes = node.method.arguments.map(asmType)
+    emitArgumentsWithAdaptation(node.params, argTypes)
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
-      node.method.arguments.map(asmType)*
+      argTypes*
     )
     gen.visitMethodInsn(
       Opcodes.INVOKESPECIAL,
@@ -151,13 +157,13 @@ class AsmCodeGenerationVisitor(
   
   override def visitListLiteral(node: ListLiteral): Unit =
     // Create ArrayList
-    gen.newInstance(AsmUtil.objectType("java.util.ArrayList"))
+    val listType = AsmUtil.objectType(AsmUtil.JavaUtilArrayList)
+    val listCtor = AsmMethod.getMethod("void <init>(int)")
+    val listAdd = AsmMethod.getMethod("boolean add(Object)")
+    gen.newInstance(listType)
     gen.dup()
     gen.push(node.elements.length)
-    gen.invokeConstructor(
-      AsmUtil.objectType("java.util.ArrayList"),
-      AsmMethod.getMethod("void <init>(int)")
-    )
+    gen.invokeConstructor(listType, listCtor)
     
     // Add elements
     for elem <- node.elements do
@@ -167,10 +173,7 @@ class AsmCodeGenerationVisitor(
       elem.`type` match
         case bt: BasicType => gen.box(asmType(bt))
         case _ => // Already an object
-      gen.invokeVirtual(
-        AsmUtil.objectType("java.util.ArrayList"),
-        AsmMethod.getMethod("boolean add(Object)")
-      )
+      gen.invokeVirtual(listType, listAdd)
       gen.pop() // Pop boolean result
   
   override def visitRefLocal(node: RefLocal): Unit =

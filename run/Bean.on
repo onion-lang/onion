@@ -20,11 +20,11 @@ public:
     return this.name;
   }
 
-  def setName(name :String) {
+  def setName(name :String) :void {
     this.name = name;
   }
 
-  def setValue(value :Int) {
+  def setValue(value :Int) :void {
     this.value = value;
   }
 

@@ -34,6 +34,38 @@ Limit the number of compilation errors reported.
 onion -maxErrorReports 10 MyScript.on
 ```
 
+### `--dump-ast`
+
+Print the parsed AST to stderr before running the script.
+
+```bash
+onion --dump-ast MyScript.on
+```
+
+### `--dump-typed-ast`
+
+Print a typed AST summary (classes, fields, methods) to stderr before running the script.
+
+```bash
+onion --dump-typed-ast MyScript.on
+```
+
+### `--warn <off|on|error>`
+
+Control warning reporting. `error` treats warnings as compilation errors.
+
+```bash
+onion --warn error MyScript.on
+```
+
+### `--Wno <codes>`
+
+Suppress specific warning categories by code or name.
+
+```bash
+onion --Wno W0001,unused-parameter MyScript.on
+```
+
 ## Program Arguments
 
 Arguments after the source file(s) are passed to your program:

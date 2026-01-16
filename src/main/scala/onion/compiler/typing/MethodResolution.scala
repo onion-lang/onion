@@ -35,21 +35,35 @@ private[compiler] object MethodResolution {
 
     collectMethods(target)
     val specializedArgsCache = HashMap[Method, Array[Type]]()
+    val viewSubstCache = HashMap[ClassType, scala.collection.immutable.Map[String, Type]]()
+    val emptySubst = scala.collection.immutable.Map.empty[String, Type]
 
     def ownerViewSubst(method: Method): scala.collection.immutable.Map[String, Type] =
       val owner0 = method.affiliation match
         case ap: AppliedClassType => ap.raw
         case ct: ClassType => ct
-      views.get(owner0) match
-        case Some(view) =>
-          view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
-        case None =>
-          scala.collection.immutable.Map.empty
+      viewSubstCache.getOrElseUpdate(
+        owner0,
+        views.get(owner0) match
+          case Some(view) =>
+            view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
+          case None =>
+            emptySubst
+      )
 
     def specializedArgs(method: Method): Array[Type] =
       specializedArgsCache.getOrElseUpdate(
         method,
-        method.arguments.map(tp => TypeSubstitution.substituteType(tp, ownerViewSubst(method), scala.collection.immutable.Map.empty, defaultToBound = true))
+        {
+          val args = method.arguments
+          val substituted = new Array[Type](args.length)
+          val ownerSubst = ownerViewSubst(method)
+          var i = 0
+          while i < args.length do
+            substituted(i) = TypeSubstitution.substituteType(args(i), ownerSubst, emptySubst, defaultToBound = true)
+            i += 1
+          substituted
+        }
       )
 
     def isAssignableWithBoxing(target: Type, source: Type): Boolean =
@@ -147,4 +161,3 @@ private[compiler] object MethodResolution {
       else
         Array[Method](m1)
 }
-

@@ -19,9 +19,9 @@ class BeanSpec extends AbstractShellSpec {
           |
           |   def getValue :Int = this.value
           |
-          |   def setValue(value :Int) {
-          |     this.value = value
-          |   }
+          |   def setValue(value :Int) : void {
+            |     this.value = value
+            |   }
           |
           |   def toString :String = "Bean(value = " + this.value + ")"
           |

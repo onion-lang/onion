@@ -16,7 +16,7 @@ import org.jline.terminal.{Terminal, TerminalBuilder}
 import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
 
-import java.io.StringReader
+import java.io.{BufferedReader, File, FileInputStream, FileOutputStream, InputStreamReader, StringReader}
 import java.nio.file.Paths
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
@@ -59,7 +59,7 @@ object Repl {
 
   // REPL commands
   val COMMANDS: Array[String] = Array(
-    ":help", ":quit", ":exit", ":clear", ":history", ":type", ":reset", ":paste"
+    ":help", ":quit", ":exit", ":clear", ":history", ":imports", ":type", ":ast", ":typed", ":reset", ":paste"
   )
 
   def main(args: Array[String]): Unit = {
@@ -70,39 +70,135 @@ object Repl {
 class Repl(classpath: Seq[String]) {
   import Repl._
 
+  private sealed trait Snippet {
+    def code: String
+  }
+  private case class RawSnippet(code: String) extends Snippet
+  private case class ExprSnippet(code: String, name: String) extends Snippet
+
+  private case class TerminalContext(terminal: Terminal, useJLine: Boolean)
+
   private val encoding = Option(System.getenv("ONION_ENCODING"))
     .getOrElse(java.nio.charset.Charset.defaultCharset().name())
   private val config = new CompilerConfig(classpath, null, encoding, "", 10)
   private val shell = Shell(classpath)
   private val history = ArrayBuffer[String]()
-  private var sessionCounter = 0
+  private val sessionSnippets = ArrayBuffer[Snippet]()
+  private val sessionImports = ArrayBuffer[(String, String)]()
+  private var sessionModule: Option[String] = None
+  private var resultCounter = 0
+  private var inputCounter = 0
+  private var dummyCounter = 0
 
   def run(): Unit = {
-    val terminal = TerminalBuilder.builder()
-      .name("Onion REPL")
-      .system(true)
-      .build()
+    val context = buildTerminal()
+    val terminal = context.terminal
+    try {
+      printBanner()
+      if (context.useJLine) {
+        val reader = buildLineReader(terminal)
+        runWithReader(reader, terminal)
+      } else {
+        printDumbWarning()
+        runPlain(terminal)
+      }
+    } finally {
+      terminal.close()
+    }
+  }
 
+  private def buildTerminal(): TerminalContext = {
+    val preferred = firstNonDumb(Seq(
+      () => openTtyTerminal(Some("exec")),
+      () => openSystemTerminal(Some("exec")),
+      () => openTtyTerminal(None),
+      () => openSystemTerminal(None)
+    ))
+    preferred match {
+      case Some(terminal) => TerminalContext(terminal, useJLine = true)
+      case None =>
+        openSystemTerminal(None) match {
+          case Some(fallback) => TerminalContext(fallback, useJLine = false)
+          case None =>
+            val dumb = TerminalBuilder.builder()
+              .name("Onion REPL")
+              .system(true)
+              .dumb(true)
+              .build()
+            TerminalContext(dumb, useJLine = false)
+        }
+    }
+  }
+
+  private def firstNonDumb(builders: Seq[() => Option[Terminal]]): Option[Terminal] = {
+    val iter = builders.iterator
+    while (iter.hasNext) {
+      val terminal = iter.next()()
+      terminal match {
+        case Some(value) if value.getType != Terminal.TYPE_DUMB =>
+          return Some(value)
+        case Some(value) =>
+          value.close()
+        case None =>
+      }
+    }
+    None
+  }
+
+  private def openSystemTerminal(provider: Option[String]): Option[Terminal] = {
+    try {
+      val builder = TerminalBuilder.builder()
+        .name("Onion REPL")
+        .system(true)
+      provider.foreach(builder.provider)
+      Some(builder.build())
+    } catch {
+      case _: Exception => None
+    }
+  }
+
+  private def openTtyTerminal(provider: Option[String]): Option[Terminal] = {
+    val ttyFile = new File("/dev/tty")
+    if (!ttyFile.exists() || !ttyFile.canRead || !ttyFile.canWrite) return None
+    var in: FileInputStream = null
+    var out: FileOutputStream = null
+    try {
+      in = new FileInputStream(ttyFile)
+      out = new FileOutputStream(ttyFile)
+      val builder = TerminalBuilder.builder()
+        .name("Onion REPL")
+        .streams(in, out)
+        .system(false)
+      provider.foreach(builder.provider)
+      Some(builder.build())
+    } catch {
+      case _: Exception =>
+        if (in != null) in.close()
+        if (out != null) out.close()
+        None
+    }
+  }
+
+  private def buildLineReader(terminal: Terminal): LineReader = {
     val completer = new OnionCompleter()
     val highlighter = new OnionHighlighter()
-
-    val reader = LineReaderBuilder.builder()
+    LineReaderBuilder.builder()
       .terminal(terminal)
       .completer(completer)
       .highlighter(highlighter)
-      .parser(new MultilineParser())
+      .parser(new DefaultParser())
       .variable(LineReader.HISTORY_FILE, Paths.get(System.getProperty("user.home"), ".onion_history"))
       .variable(LineReader.HISTORY_SIZE, 1000)
       .option(LineReader.Option.HISTORY_BEEP, false)
       .option(LineReader.Option.HISTORY_IGNORE_DUPS, true)
       .build()
+  }
 
-    printBanner()
-
+  private def runWithReader(reader: LineReader, terminal: Terminal): Unit = {
     var running = true
     while (running) {
       try {
-        val line = reader.readLine(PROMPT)
+        val line = readInput(reader)
         if (line != null) {
           val trimmed = line.trim
           if (trimmed.nonEmpty) {
@@ -118,8 +214,56 @@ class Repl(classpath: Seq[String]) {
           running = false
       }
     }
+  }
 
-    terminal.close()
+  private def runPlain(terminal: Terminal): Unit = {
+    val reader = new BufferedReader(new InputStreamReader(terminal.input(), terminal.encoding()))
+    var running = true
+    while (running) {
+      terminal.writer().print(PROMPT)
+      terminal.writer().flush()
+      val line = readPlainInput(reader, terminal)
+      if (line == null) {
+        println(Colors.GREEN + "\nGoodbye!" + Colors.RESET)
+        running = false
+      } else {
+        val trimmed = line.trim
+        if (trimmed.nonEmpty) {
+          history += trimmed
+          running = processInput(trimmed, terminal)
+        }
+      }
+    }
+  }
+
+  private def readPlainInput(reader: BufferedReader, terminal: Terminal): String = {
+    val first = reader.readLine()
+    if (first == null) return null
+    val buffer = new StringBuilder(first)
+    while (requiresContinuation(buffer.toString())) {
+      terminal.writer().print(CONTINUATION_PROMPT)
+      terminal.writer().flush()
+      val next = reader.readLine()
+      if (next == null) return buffer.toString()
+      buffer.append("\n").append(next)
+    }
+    buffer.toString()
+  }
+
+  private def printDumbWarning(): Unit = {
+    println("Warning: running without a full-featured terminal. Line editing is disabled.")
+  }
+
+  private def readInput(reader: LineReader): String = {
+    val first = reader.readLine(PROMPT)
+    if (first == null) return null
+    val buffer = new StringBuilder(first)
+    while (requiresContinuation(buffer.toString())) {
+      val next = reader.readLine(CONTINUATION_PROMPT)
+      if (next == null) return buffer.toString()
+      buffer.append("\n").append(next)
+    }
+    buffer.toString()
   }
 
   private def printBanner(): Unit = {
@@ -169,6 +313,10 @@ class Repl(classpath: Seq[String]) {
         }
         true
 
+      case ":imports" =>
+        printImports()
+        true
+
       case ":type" | ":t" =>
         arg match {
           case Some(expr) => showType(expr)
@@ -176,8 +324,26 @@ class Repl(classpath: Seq[String]) {
         }
         true
 
+      case ":ast" =>
+        arg match {
+          case Some(expr) => showAst(expr)
+          case None => println(Colors.RED + "Usage: :ast <expression>" + Colors.RESET)
+        }
+        true
+
+      case ":typed" =>
+        arg match {
+          case Some(expr) => showTyped(expr)
+          case None => println(Colors.RED + "Usage: :typed <expression>" + Colors.RESET)
+        }
+        true
+
       case ":reset" =>
-        sessionCounter = 0
+        sessionSnippets.clear()
+        sessionImports.clear()
+        sessionModule = None
+        resultCounter = 0
+        inputCounter = 0
         println(Colors.GREEN + "Session reset." + Colors.RESET)
         true
 
@@ -185,7 +351,7 @@ class Repl(classpath: Seq[String]) {
         println(Colors.YELLOW + "Entering paste mode (Ctrl-D to finish):" + Colors.RESET)
         val lines = ArrayBuffer[String]()
         var reading = true
-        val reader = new java.io.BufferedReader(new java.io.InputStreamReader(System.in))
+        val reader = new BufferedReader(new InputStreamReader(terminal.input(), terminal.encoding()))
         while (reading) {
           val line = reader.readLine()
           if (line == null) {
@@ -213,7 +379,10 @@ class Repl(classpath: Seq[String]) {
     |  ${Colors.YELLOW}:quit${Colors.RESET}, :exit, :q  Exit the REPL
     |  ${Colors.YELLOW}:clear${Colors.RESET}, :cls      Clear the screen
     |  ${Colors.YELLOW}:history${Colors.RESET}          Show command history
+    |  ${Colors.YELLOW}:imports${Colors.RESET}          Show current imports
     |  ${Colors.YELLOW}:type${Colors.RESET} <expr>      Show the type of an expression
+    |  ${Colors.YELLOW}:ast${Colors.RESET} <expr>       Show the parsed AST
+    |  ${Colors.YELLOW}:typed${Colors.RESET} <expr>     Show the typed AST summary
     |  ${Colors.YELLOW}:reset${Colors.RESET}            Reset the session
     |  ${Colors.YELLOW}:paste${Colors.RESET}, :p        Enter paste mode
     |
@@ -226,71 +395,304 @@ class Repl(classpath: Seq[String]) {
     |""".stripMargin)
   }
 
+  private sealed trait InputKind
+  private case class ModuleInput(name: String) extends InputKind
+  private case class ImportInput(entries: Seq[(String, String)]) extends InputKind
+  private case class DeclarationInput(code: String) extends InputKind
+  private case class ExpressionInput(code: String) extends InputKind
+
   private def executeCode(code: String): Unit = {
-    sessionCounter += 1
-    val wrappedCode = wrapCode(code, sessionCounter)
-    val fileName = s"repl_$sessionCounter.on"
+    val inputId = inputCounter + 1
+    val fileName = s"repl_input_$inputId.on"
+    val unit = parseSnippet(code, fileName)
+    if (unit.isEmpty) return
 
-    val compiler = new OnionCompiler(config)
-    val outcome = compiler.compile(Seq(new StreamInputSource(new StringReader(wrappedCode), fileName)))
-
-    outcome match {
-      case Success(classes) =>
-        shell.run(classes, Array()) match {
-          case Shell.Success(result) =>
-            if (result != null && result != ()) {
-              println(s"${Colors.GREEN}res$sessionCounter${Colors.RESET} = $result")
+    classifySnippet(unit.get, code) match {
+      case Left(message) =>
+        println(Colors.RED + message + Colors.RESET)
+      case Right(action) =>
+        action match {
+          case ModuleInput(name) =>
+            if (sessionModule.exists(_ != name)) {
+              println(Colors.RED + s"Module already set to ${sessionModule.get}." + Colors.RESET)
+              return
             }
-          case Shell.Failure(_) =>
-            // Runtime error handled by exception
+            val nextModule = Some(name)
+            val source = buildSessionSource(nextModule, sessionImports.toSeq, sessionSnippets.toSeq, printLastResult = false)
+            compileSession(source, fileName) match {
+              case Right(_) =>
+                sessionModule = nextModule
+                inputCounter += 1
+              case Left(errors) =>
+                CompilationReporter.printErrors(errors)
+            }
+          case ImportInput(entries) =>
+            val nextImports = mergeImports(sessionImports.toSeq, entries)
+            val source = buildSessionSource(sessionModule, nextImports, sessionSnippets.toSeq, printLastResult = false)
+            compileSession(source, fileName) match {
+              case Right(_) =>
+                sessionImports.clear()
+                sessionImports ++= nextImports
+                inputCounter += 1
+              case Left(errors) =>
+                CompilationReporter.printErrors(errors)
+            }
+          case DeclarationInput(snippet) =>
+            val nextSnippets = sessionSnippets.toSeq :+ RawSnippet(snippet)
+            val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = false)
+            compileSession(source, fileName) match {
+              case Right(_) =>
+                sessionSnippets += RawSnippet(snippet)
+                inputCounter += 1
+              case Left(errors) =>
+                CompilationReporter.printErrors(errors)
+            }
+          case ExpressionInput(snippet) =>
+            val resName = s"res$resultCounter"
+            val exprSnippet = ExprSnippet(snippet, resName)
+            val nextSnippets = sessionSnippets.toSeq :+ exprSnippet
+            val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = true)
+            compileSession(source, fileName) match {
+              case Right(classes) =>
+                shell.run(classes, Array()) match {
+                  case Shell.Success(_) => ()
+                  case Shell.Failure(_) => ()
+                }
+                sessionSnippets += exprSnippet
+                resultCounter += 1
+                inputCounter += 1
+              case Left(errors) if isVoidAssignmentErrors(errors) =>
+                val rawSnippet = RawSnippet(snippet)
+                val fallbackSnippets = sessionSnippets.toSeq :+ rawSnippet
+                val fallbackSource = buildSessionSource(sessionModule, sessionImports.toSeq, fallbackSnippets, printLastResult = false)
+                compileSession(fallbackSource, fileName) match {
+                  case Right(classes) =>
+                    shell.run(classes, Array()) match {
+                      case Shell.Success(_) => ()
+                      case Shell.Failure(_) => ()
+                    }
+                    sessionSnippets += rawSnippet
+                    inputCounter += 1
+                  case Left(fallbackErrors) =>
+                    CompilationReporter.printErrors(fallbackErrors)
+                }
+              case Left(errors) =>
+                CompilationReporter.printErrors(errors)
+            }
         }
-      case Failure(errors) =>
-        // Try without wrapping (might be a complete program)
-        val outcome2 = compiler.compile(Seq(new StreamInputSource(new StringReader(code), fileName)))
-        outcome2 match {
-          case Success(classes) =>
-            shell.run(classes, Array())
-          case Failure(errors2) =>
-            CompilationReporter.printErrors(errors)
-        }
-    }
-  }
-
-  private def wrapCode(code: String, id: Int): String = {
-    // Check if it looks like a complete program
-    if (code.contains("class ") || code.contains("def main") || code.contains("interface ")) {
-      code
-    } else {
-      // Wrap as a script expression
-      s"""class Repl$id {
-         |public:
-         |  static def main(args: String[]): Unit {
-         |    $code
-         |  }
-         |}""".stripMargin
     }
   }
 
   private def showType(expr: String): Unit = {
-    // For now, just compile and extract type from error message or success
-    // A more sophisticated implementation would use the type checker directly
-    val code = s"""class TypeCheck {
-      |public:
-      |  static def main(args: String[]): Unit {
-      |    val __result__ = $expr
-      |    IO::println(__result__)
-      |  }
-      |}""".stripMargin
-
-    val compiler = new OnionCompiler(config)
-    val outcome = compiler.compile(Seq(new StreamInputSource(new StringReader(code), "typecheck.on")))
-
-    outcome match {
-      case Success(_) =>
+    val resName = "__repl_type__"
+    val source = buildSessionSource(
+      sessionModule,
+      sessionImports.toSeq,
+      sessionSnippets.toSeq :+ ExprSnippet(expr, resName),
+      printLastResult = false
+    )
+    compileSession(source, "typecheck.on") match {
+      case Right(_) =>
         println(s"${Colors.CYAN}Expression compiles successfully${Colors.RESET}")
         println("(Full type inference requires direct type checker access)")
-      case Failure(errors) =>
+      case Left(errors) =>
         CompilationReporter.printErrors(errors)
+    }
+  }
+
+  private def showAst(expr: String): Unit = {
+    val resName = "__repl_ast__"
+    val source = buildSessionSource(
+      sessionModule,
+      sessionImports.toSeq,
+      sessionSnippets.toSeq :+ ExprSnippet(expr, resName),
+      printLastResult = false
+    )
+    val fileName = s"repl_ast_${inputCounter + 1}.on"
+    try {
+      val parsing = new Parsing(config)
+      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(source), fileName)))
+      DiagnosticsPrinter.dumpAst(parsed)
+    } catch {
+      case e: onion.compiler.exceptions.CompilationException =>
+        CompilationReporter.printErrors(e.problems.toIndexedSeq)
+    }
+  }
+
+  private def showTyped(expr: String): Unit = {
+    val resName = "__repl_typed__"
+    val source = buildSessionSource(
+      sessionModule,
+      sessionImports.toSeq,
+      sessionSnippets.toSeq :+ ExprSnippet(expr, resName),
+      printLastResult = false
+    )
+    val fileName = s"repl_typed_${inputCounter + 1}.on"
+    try {
+      val parsing = new Parsing(config)
+      val rewriting = new Rewriting(config)
+      val typing = new Typing(config)
+      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(source), fileName)))
+      val rewritten = rewriting.process(parsed)
+      val typed = typing.process(rewritten)
+      DiagnosticsPrinter.dumpTyped(typed)
+    } catch {
+      case e: onion.compiler.exceptions.CompilationException =>
+        CompilationReporter.printErrors(e.problems.toIndexedSeq)
+    }
+  }
+
+  private def printImports(): Unit = {
+    sessionModule.foreach { name =>
+      println(s"${Colors.CYAN}module${Colors.RESET} $name")
+    }
+    if (sessionImports.isEmpty) {
+      println("No imports.")
+    } else {
+      sessionImports.foreach { case (alias, path) =>
+        println(s"${Colors.CYAN}-${Colors.RESET} ${renderImportEntry(alias, path)}")
+      }
+    }
+  }
+
+  private def parseSnippet(code: String, fileName: String): Option[AST.CompilationUnit] = {
+    tryParse(code, fileName) match {
+      case Right(unit) => Some(unit)
+      case Left(errors) if looksLikeHeaderOnly(code) =>
+        dummyCounter += 1
+        val dummyName = s"__ReplDummy${dummyCounter}__"
+        val wrapped = s"$code\nclass $dummyName {}"
+        tryParse(wrapped, fileName) match {
+          case Right(unit) =>
+            val filtered = unit.toplevels.filterNot {
+              case decl: AST.ClassDeclaration if decl.name == dummyName => true
+              case _ => false
+            }
+            Some(unit.copy(toplevels = filtered))
+          case Left(nextErrors) =>
+            CompilationReporter.printErrors(nextErrors)
+            None
+        }
+      case Left(errors) =>
+        CompilationReporter.printErrors(errors)
+        None
+    }
+  }
+
+  private def tryParse(code: String, fileName: String): Either[IndexedSeq[CompileError], AST.CompilationUnit] = {
+    try {
+      val parsing = new Parsing(config)
+      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(code), fileName)))
+      Right(parsed.head)
+    } catch {
+      case e: onion.compiler.exceptions.CompilationException =>
+        Left(e.problems.toIndexedSeq)
+    }
+  }
+
+  private def looksLikeHeaderOnly(code: String): Boolean = {
+    val trimmed = code.trim
+    trimmed.startsWith("import") || trimmed.startsWith("module")
+  }
+
+  private def classifySnippet(unit: AST.CompilationUnit, code: String): Either[String, InputKind] = {
+    if (unit.module != null) {
+      if (unit.imports != null || unit.toplevels.nonEmpty) {
+        Left("Module declaration must be a standalone input.")
+      } else {
+        Right(ModuleInput(unit.module.name))
+      }
+    } else if (unit.imports != null) {
+      if (unit.toplevels.nonEmpty) {
+        Left("Import clause must be a standalone input.")
+      } else {
+        Right(ImportInput(unit.imports.mapping))
+      }
+    } else if (unit.toplevels.isEmpty) {
+      Left("No input to evaluate.")
+    } else if (unit.toplevels.length == 1 && isValueExpression(unit.toplevels.head)) {
+      Right(ExpressionInput(code))
+    } else {
+      Right(DeclarationInput(code))
+    }
+  }
+
+  private def isValueExpression(node: AST.Toplevel): Boolean = node match {
+    case _: AST.LocalVariableDeclaration => false
+    case _: AST.ReturnExpression => false
+    case _: AST.BreakExpression => false
+    case _: AST.ContinueExpression => false
+    case _: AST.CompoundExpression => true
+    case _ => false
+  }
+
+  private def isVoidAssignmentErrors(errors: Seq[CompileError]): Boolean = {
+    errors.exists { error =>
+      val msg = error.message
+      msg.contains("java.lang.Object") && msg.contains("void")
+    }
+  }
+
+  private def mergeImports(existing: Seq[(String, String)], incoming: Seq[(String, String)]): Seq[(String, String)] = {
+    val merged = ArrayBuffer[(String, String)]()
+    existing.foreach(merged += _)
+    incoming.foreach { entry =>
+      if (!merged.contains(entry)) merged += entry
+    }
+    merged.toSeq
+  }
+
+  private def buildSessionSource(
+    moduleName: Option[String],
+    imports: Seq[(String, String)],
+    snippets: Seq[Snippet],
+    printLastResult: Boolean
+  ): String = {
+    val builder = new StringBuilder()
+    moduleName.foreach { name =>
+      builder.append("module ").append(name).append("\n")
+    }
+    if (imports.nonEmpty) {
+      builder.append("import {\n")
+      imports.foreach { case (alias, path) =>
+        builder.append("  ").append(renderImportEntry(alias, path)).append(";\n")
+      }
+      builder.append("}\n")
+    }
+    snippets.zipWithIndex.foreach { case (snippet, idx) =>
+      snippet match {
+        case RawSnippet(code) =>
+          builder.append(code).append("\n")
+        case ExprSnippet(code, name) =>
+          builder.append("val ").append(name).append(" = {\n")
+          builder.append(code).append("\n")
+          builder.append("}\n")
+          if (printLastResult && idx == snippets.length - 1) {
+            builder.append("IO::println(\"").append(name).append(" = \" + ").append(name).append(")\n")
+          }
+      }
+    }
+    if (snippets.isEmpty) {
+      builder.append("0\n")
+    }
+    builder.toString()
+  }
+
+  private def renderImportEntry(alias: String, path: String): String = {
+    val last = lastSegment(path)
+    if (alias == "*" || alias == last) path else s"$alias = $path"
+  }
+
+  private def lastSegment(path: String): String = {
+    val index = path.lastIndexOf(".")
+    if (index < 0) path else path.substring(index + 1)
+  }
+
+  private def compileSession(source: String, fileName: String): Either[Seq[CompileError], Seq[CompiledClass]] = {
+    val compiler = new OnionCompiler(config)
+    compiler.compile(Seq(new StreamInputSource(new StringReader(source), fileName))) match {
+      case Success(classes) => Right(classes)
+      case Failure(errors) => Left(errors)
     }
   }
 
@@ -412,43 +814,59 @@ class Repl(classpath: Seq[String]) {
     }
   }
 
-  /**
-   * Parser that handles multi-line input (e.g., unmatched braces)
-   */
-  private class MultilineParser extends org.jline.reader.Parser {
-    private val defaultParser = new DefaultParser()
+  private def requiresContinuation(text: String): Boolean = {
+    var braceCount = 0
+    var parenCount = 0
+    var bracketCount = 0
+    var inString = false
+    var inTripleString = false
+    var i = 0
 
-    override def parse(line: String, cursor: Int, context: Parser.ParseContext): ParsedLine = {
-      // Check for unbalanced braces/parens
-      if (context == Parser.ParseContext.ACCEPT_LINE) {
-        var braceCount = 0
-        var parenCount = 0
-        var bracketCount = 0
-        var inString = false
-
-        for (c <- line) {
-          if (!inString) {
-            c match {
-              case '"' => inString = true
-              case '{' => braceCount += 1
-              case '}' => braceCount -= 1
-              case '(' => parenCount += 1
-              case ')' => parenCount -= 1
-              case '[' => bracketCount += 1
-              case ']' => bracketCount -= 1
-              case _ =>
-            }
-          } else if (c == '"') {
-            inString = false
+    while (i < text.length) {
+      val c = text.charAt(i)
+      if (inTripleString) {
+        if (c == '"' && i + 2 < text.length && text.charAt(i + 1) == '"' && text.charAt(i + 2) == '"') {
+          inTripleString = false
+          i += 2
+        }
+      } else if (inString) {
+        if (c == '"' && (i == 0 || text.charAt(i - 1) != '\\')) {
+          inString = false
+        }
+      } else {
+        if (c == '"' && i + 2 < text.length && text.charAt(i + 1) == '"' && text.charAt(i + 2) == '"') {
+          inTripleString = true
+          i += 2
+        } else if (c == '"') {
+          inString = true
+        } else {
+          c match {
+            case '{' => braceCount += 1
+            case '}' => braceCount -= 1
+            case '(' => parenCount += 1
+            case ')' => parenCount -= 1
+            case '[' => bracketCount += 1
+            case ']' => bracketCount -= 1
+            case _ =>
           }
         }
-
-        if (braceCount > 0 || parenCount > 0 || bracketCount > 0) {
-          throw new EOFError(-1, cursor, "Unclosed bracket")
-        }
       }
-
-      defaultParser.parse(line, cursor, context)
+      i += 1
     }
+
+    if (braceCount > 0 || parenCount > 0 || bracketCount > 0 || inString || inTripleString) return true
+
+    val trimmed = text.trim
+    if (trimmed.isEmpty) return false
+    if (trimmed.endsWith("++") || trimmed.endsWith("--")) return false
+
+    val multiChar = Seq(
+      ">>>=", ">>=", "<<=", "&&", "||", "==", "!=", "<=", ">=", "+=", "-=",
+      "*=", "/=", "%=", "&=", "|=", "^=", ">>>", ">>", "<<", "::", "->"
+    )
+    if (multiChar.exists(trimmed.endsWith)) return true
+
+    val singleChar = Set('+', '-', '*', '/', '%', '=', ',', '.', ':', '&', '|', '^')
+    singleChar.contains(trimmed.last)
   }
 }

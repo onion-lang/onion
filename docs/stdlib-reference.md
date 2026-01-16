@@ -13,6 +13,9 @@ This document describes the standard library classes available in Onion programs
 | `Http` | HTTP client |
 | `DateTime` | Date and time utilities |
 | `Regex` | Regular expressions |
+| `Iterables` | Collection helpers |
+| `Option` | Optional values |
+| `Result` | Success/error values |
 
 ---
 
@@ -427,14 +430,117 @@ if (Regex::matches("hello123", "[a-z]+\\d+")) {
 
 ---
 
+## Iterables
+
+Collection helpers for Java lists, sets, and iterables.
+
+### Transform
+
+```
+Iterables::map(list, f): List
+Iterables::map(iterable, f): Iterable
+Iterables::filter(list, predicate): List
+Iterables::filter(iterable, predicate): Iterable
+Iterables::foldl(iterable, init, f): Object
+```
+
+### Queries and Utilities
+
+```
+Iterables::exists(iterable, predicate): Boolean
+Iterables::forAll(iterable, predicate): Boolean
+Iterables::listOf(elements...): List
+Iterables::newList(size): List
+Iterables::first(list): Object
+Iterables::last(list): Object
+Iterables::reverse(list): List
+Iterables::take(list, n): List
+Iterables::drop(list, n): List
+```
+
+### Example
+
+```
+val list: ArrayList[String] = new ArrayList[String];
+list.add("a");
+list.add("bb");
+val longOnes = Iterables::filter(list, (s: String) -> { return s.length > 1; });
+```
+
+---
+
+## Option
+
+Optional values for null-safe code.
+
+```
+Option::some(value): Option
+Option::none(): Option
+Option::of(value): Option
+
+opt.isDefined(): Boolean
+opt.isEmpty(): Boolean
+opt.get(): Object
+opt.getOrElse(defaultValue): Object
+opt.map(f): Option
+opt.flatMap(f): Option
+opt.filter(predicate): Option
+opt.forEach(action): void
+opt.orElseThrow(): Object
+```
+
+### Example
+
+```
+val nameOpt = Option::of(userName);
+val display = nameOpt.getOrElse("unknown");
+```
+
+---
+
+## Result
+
+Success/error container without exceptions.
+
+```
+Result::ok(value): Result
+Result::err(error): Result
+Result::ofNullable(value, errorIfNull): Result
+Result::trying(operation): Result
+
+res.isOk(): Boolean
+res.isErr(): Boolean
+res.get(): Object
+res.getError(): Object
+res.getOrElse(defaultValue): Object
+res.map(f): Result
+res.mapError(f): Result
+res.flatMap(f): Result
+res.orElse(alternative): Result
+res.toOption(): Option
+```
+
+### Example
+
+```
+val parsed = Result::trying(() -> { return JInteger::parseInt("42"); });
+if (parsed.isOk()) {
+  IO::println(parsed.get());
+}
+```
+
+---
+
 ## Function Interfaces
 
 Onion provides function interfaces for closures (Function0 through Function10).
 
+Function values can be invoked with `f(args)` as shorthand for `f.call(args)`.
+
 ```
-interface Function0[R] { def apply(): R }
-interface Function1[T, R] { def apply(arg: T): R }
-interface Function2[T1, T2, R] { def apply(arg1: T1, arg2: T2): R }
+interface Function0[R] { def call(): R }
+interface Function1[T, R] { def call(arg: T): R }
+interface Function2[T1, T2, R] { def call(arg1: T1, arg2: T2): R }
 // ... up to Function10
 ```
 
@@ -442,7 +548,7 @@ interface Function2[T1, T2, R] { def apply(arg1: T1, arg2: T2): R }
 
 ```
 val add: Function2[Int, Int, Int] = (a: Int, b: Int) -> { return a + b; };
-val result: Int = add.apply(3, 4);  // 7
+val result: Int = add.call(3, 4);  // 7
 ```
 
 ---

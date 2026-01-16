@@ -15,9 +15,9 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |  def this {
           |  }
           |
-          |  def set(v: T) {
-          |    this.value = v
-          |  }
+          |  def set(v: T) : void {
+            |    this.value = v
+            |  }
           |
           |  def get(): T {
           |    return this.value
@@ -48,9 +48,9 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |  def this {
           |  }
           |
-          |  def set(v: T) {
-          |    this.value = v
-          |  }
+          |  def set(v: T) : void {
+            |    this.value = v
+            |  }
           |
           |  def get(): T {
           |    return this.value

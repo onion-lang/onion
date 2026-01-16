@@ -250,11 +250,17 @@ object TypedAST {
     extends TypedAST.AbstractClassType() with Node with Named {
 
     private var typeParameters_ = typeParameters0
+    private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
       typeParameters_ = typeParameters
+
+    def staticInitializers: Array[TypedAST.ActionStatement] = staticInitializers_
+
+    def setStaticInitializers(initializers: Array[TypedAST.ActionStatement]): Unit =
+      staticInitializers_ = initializers
 
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray
     def methods: Seq[TypedAST.Method] = methods_.values.toSeq
@@ -997,9 +1003,12 @@ object TypedAST {
       val args2: Array[TypedAST.Type] = c2.getArgs
       val result: Int = args1.length - args2.length
       if (result != 0) return result
-      args1.zip(args2).find((a1, a2) => a1 ne a2) match
-        case Some((a1, a2)) => a1.name.compareTo(a2.name)
-        case None => 0
+      var i = 0
+      while (i < args1.length) {
+        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
+        i += 1
+      }
+      0
     }
   }
 
@@ -1050,7 +1059,7 @@ object TypedAST {
     private def find(methods: Set[TypedAST.Method], target: TypedAST.ObjectType, name: String, params: Array[TypedAST.Term]): Unit = {
       if (target == null) return
       val ms: Array[TypedAST.Method] = target.methods(name)
-      for (m <- target.methods(name)) {
+      for (m <- ms) {
         if (matcher.matches(m.arguments, params)) methods.add(m)
         else if (m.isVararg && matcher.matchesVararg(m.arguments, params)) methods.add(m)
       }
@@ -1091,13 +1100,31 @@ object TypedAST {
     /** Whether this method accepts variable-length arguments (last parameter is vararg) */
     def isVararg: Boolean = false
 
-    /** Arguments with names and optional default values. Override in subclasses that support defaults. */
-    def argumentsWithDefaults: Array[MethodArgument] = arguments.zipWithIndex.map { case (t, i) =>
-      MethodArgument(s"arg$i", t, None)
+    private lazy val defaultArgumentsWithDefaults: Array[MethodArgument] = {
+      val args = arguments
+      val result = new Array[MethodArgument](args.length)
+      var i = 0
+      while (i < args.length) {
+        result(i) = MethodArgument(s"arg$i", args(i), None)
+        i += 1
+      }
+      result
     }
 
+    /** Arguments with names and optional default values. Override in subclasses that support defaults. */
+    def argumentsWithDefaults: Array[MethodArgument] = defaultArgumentsWithDefaults
+
     /** Minimum number of required arguments (without defaults) */
-    def minArguments: Int = argumentsWithDefaults.count(_.defaultValue.isEmpty)
+    def minArguments: Int = {
+      val args = argumentsWithDefaults
+      var count = 0
+      var i = 0
+      while (i < args.length) {
+        if (args(i).defaultValue.isEmpty) count += 1
+        i += 1
+      }
+      count
+    }
   }
 
   class MethodComparator extends Comparator[TypedAST.Method] {
@@ -1108,9 +1135,12 @@ object TypedAST {
       val args2: Array[TypedAST.Type] = m2.arguments
       result = args1.length - args2.length
       if (result != 0) return result
-      args1.zip(args2).find((a1, a2) => a1 ne a2) match
-        case Some((a1, a2)) => a1.name.compareTo(a2.name)
-        case None => 0
+      var i = 0
+      while (i < args1.length) {
+        if (args1(i) ne args2(i)) return args1(i).name.compareTo(args2(i).name)
+        i += 1
+      }
+      0
     }
   }
 
@@ -1184,8 +1214,15 @@ object TypedAST {
    */
   class StandardParameterMatcher extends ParameterMatcher {
     def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean =
-      arguments.length == parameters.length &&
-        arguments.zip(parameters.map(_.`type`)).forall((arg, param) => TypeRules.isSuperType(arg, param))
+      if (arguments.length != parameters.length) false
+      else {
+        var i = 0
+        while (i < arguments.length) {
+          if (!TypeRules.isSuperType(arguments(i), parameters(i).`type`)) return false
+          i += 1
+        }
+        true
+      }
 
     def matchesVararg(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean = {
       if (arguments.isEmpty) return false
@@ -1196,33 +1233,36 @@ object TypedAST {
       val componentType = arrayType.base
 
       val fixedArgCount = arguments.length - 1
-      val paramTypes = parameters.map(_.`type`)
 
       // Must have at least the fixed arguments
-      if (paramTypes.length < fixedArgCount) return false
+      if (parameters.length < fixedArgCount) return false
 
       // Check fixed arguments match
-      val fixedArgsMatch = (0 until fixedArgCount).forall { i =>
-        TypeRules.isSuperType(arguments(i), paramTypes(i))
+      var i = 0
+      while (i < fixedArgCount) {
+        if (!TypeRules.isSuperType(arguments(i), parameters(i).`type`)) return false
+        i += 1
       }
-      if (!fixedArgsMatch) return false
 
       // Check vararg portion
-      if (paramTypes.length == arguments.length) {
+      if (parameters.length == arguments.length) {
         // Could be either: passing an array directly, or passing one element
-        val lastParamType = paramTypes.last
+        val lastParamType = parameters.last.`type`
         // Check if it's a direct array pass
         if (lastParamType.isArrayType && TypeRules.isSuperType(lastArgType, lastParamType)) {
           return true
         }
         // Check if it's a single element that matches component type
         TypeRules.isSuperType(componentType, lastParamType)
-      } else if (paramTypes.length > arguments.length) {
+      } else if (parameters.length > arguments.length) {
         // Multiple vararg elements - all must match component type
-        (fixedArgCount until paramTypes.length).forall { i =>
-          TypeRules.isSuperType(componentType, paramTypes(i))
+        i = fixedArgCount
+        while (i < parameters.length) {
+          if (!TypeRules.isSuperType(componentType, parameters(i).`type`)) return false
+          i += 1
         }
-      } else if (paramTypes.length == fixedArgCount) {
+        true
+      } else if (parameters.length == fixedArgCount) {
         // No vararg elements - empty array will be passed
         true
       } else {
@@ -1302,8 +1342,13 @@ object TypedAST {
           return true
         case (lapp: TypedAST.AppliedClassType, rapp: TypedAST.AppliedClassType)
           if (lapp.raw eq rapp.raw) && lapp.typeArguments.length == rapp.typeArguments.length =>
-          return lapp.typeArguments.zip(rapp.typeArguments).forall { (expectedArg, actualArg) =>
-            expectedArg match
+          val expectedArgs = lapp.typeArguments
+          val actualArgs = rapp.typeArguments
+          var i = 0
+          while (i < expectedArgs.length) {
+            val expectedArg = expectedArgs(i)
+            val actualArg = actualArgs(i)
+            val matches = expectedArg match
               case w: TypedAST.WildcardType =>
                 w.lowerBound match
                   case Some(lb) => isSuperType(actualArg, lb)
@@ -1312,34 +1357,51 @@ object TypedAST {
                 isSuperType(tv.upperBound, actualArg)
               case _ =>
                 expectedArg eq actualArg
+            if (!matches) return false
+            i += 1
           }
+          return true
         case _ =>
       isSuperTypeForClass(left, right.superClass) ||
         right.interfaces.exists(iface => isSuperTypeForClass(left, iface))
     }
 
-    // Map from a BasicType to the set of types that can be assigned to it
-    private val basicTypeAssignableFrom: scala.collection.immutable.Map[BasicType, scala.collection.immutable.Set[BasicType]] = {
-      import scala.collection.immutable.{Map => SMap, Set => SSet}
-      SMap(
-        BasicType.DOUBLE  -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG, BasicType.FLOAT, BasicType.DOUBLE),
-        BasicType.FLOAT   -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG, BasicType.FLOAT),
-        BasicType.LONG    -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT, BasicType.LONG),
-        BasicType.INT     -> SSet(BasicType.CHAR, BasicType.BYTE, BasicType.SHORT, BasicType.INT),
-        BasicType.SHORT   -> SSet(BasicType.BYTE, BasicType.SHORT),
-        BasicType.BOOLEAN -> SSet(BasicType.BOOLEAN),
-        BasicType.BYTE    -> SSet(BasicType.BYTE),
-        BasicType.CHAR    -> SSet(BasicType.CHAR),
-        BasicType.VOID    -> SSet(BasicType.VOID)
-      )
-    }
-
     private def isSuperTypeForBasic(left: TypedAST.BasicType, right: TypedAST.BasicType): Boolean =
-      basicTypeAssignableFrom.get(left).exists(_.contains(right))
+      left match
+        case BasicType.DOUBLE =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT) ||
+            (right eq BasicType.DOUBLE)
+        case BasicType.FLOAT =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT) || (right eq BasicType.LONG) || (right eq BasicType.FLOAT)
+        case BasicType.LONG =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT) || (right eq BasicType.LONG)
+        case BasicType.INT =>
+          (right eq BasicType.CHAR) || (right eq BasicType.BYTE) || (right eq BasicType.SHORT) ||
+            (right eq BasicType.INT)
+        case BasicType.SHORT =>
+          (right eq BasicType.BYTE) || (right eq BasicType.SHORT)
+        case BasicType.BOOLEAN =>
+          right eq BasicType.BOOLEAN
+        case BasicType.BYTE =>
+          right eq BasicType.BYTE
+        case BasicType.CHAR =>
+          right eq BasicType.CHAR
+        case BasicType.VOID =>
+          right eq BasicType.VOID
 
     /** Check if all types in arg1 are supertypes of corresponding types in arg2 */
-    def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean =
-      arg1.zip(arg2).forall((a1, a2) => isSuperType(a1, a2))
+    def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean = {
+      val limit = if (arg1.length < arg2.length) arg1.length else arg2.length
+      var i = 0
+      while (i < limit) {
+        if (!isSuperType(arg1(i), arg2(i))) return false
+        i += 1
+      }
+      true
+    }
   }
 
   class TypeRules

@@ -30,5 +30,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs JavaCollectionsSample.on") {
       assert(Shell.Success("a") == runSample("run/JavaCollectionsSample.on"))
     }
+
+    it("runs PrimitivePrint.on") {
+      assert(Shell.Success(0) == runSample("run/PrimitivePrint.on"))
+    }
   }
 }

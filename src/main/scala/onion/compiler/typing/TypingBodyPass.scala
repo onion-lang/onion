@@ -28,82 +28,134 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
     val expressions = new Array[Term](nodes.length)
-    var error: Boolean = false
-    for(i <- 0 until nodes.length){
-      val expressionOpt = typed(nodes(i), context)
-      expressions(i) = expressionOpt.getOrElse(null)
-      if(expressions(i) == null) {
+    var error = false
+    var i = 0
+    while (i < nodes.length) {
+      val expression = typed(nodes(i), context).getOrElse(null)
+      expressions(i) = expression
+      if (expression == null) {
         error = true
-      } else if (!TypeRules.isAssignable(typeRef, expressions(i).`type`)) {
-        report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expressions(i).`type`)
+      } else if (!TypeRules.isAssignable(typeRef, expression.`type`)) {
+        report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expression.`type`)
         error = true
       } else {
-        if (expressions(i).isBasicType && expressions(i).`type` != typeRef) expressions(i) = new AsInstanceOf(expressions(i), typeRef)
-        if (expressions(i).isReferenceType && expressions(i).`type` != rootClass) expressions(i) = new AsInstanceOf(expressions(i), rootClass)
+        expressions(i) = normalizePatternTerm(expression, typeRef)
       }
+      i += 1
     }
-    if (!error) {
-      var node: Term = if(expressions(0).isReferenceType) {
-        operatorTyping.createEquals(EQUAL, new RefLocal(bind), expressions(0))
-      } else {
-        new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), expressions(0))
-      }
-      for(i <- 1 until expressions.length) {
-        node = new BinaryTerm(LOGICAL_OR, BasicType.BOOLEAN, node, new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), expressions(i)))
-      }
-      node
-    } else {
-      null
-    }
+    if (error) null else buildEqualsChain(expressions, bind)
   }
-  def processAssignable(node: AST.Node, a: Type, b: Term): Term = {
-    if (b == null) return null
-    if (b.`type`.isBottomType) return b
-    if (a == b.`type`) return b
+
+  private def normalizePatternTerm(term: Term, expected: Type): Term = {
+    var normalized = term
+    if (normalized.isBasicType && normalized.`type` != expected) {
+      normalized = new AsInstanceOf(normalized, expected)
+    }
+    if (normalized.isReferenceType && normalized.`type` != rootClass) {
+      normalized = new AsInstanceOf(normalized, rootClass)
+    }
+    normalized
+  }
+
+  private def buildEqualsChain(expressions: Array[Term], bind: ClosureLocalBinding): Term = {
+    val ref = new RefLocal(bind)
+    var node: Term =
+      if (expressions(0).isReferenceType) operatorTyping.createEquals(EQUAL, ref, expressions(0))
+      else new BinaryTerm(EQUAL, BasicType.BOOLEAN, ref, expressions(0))
+    var i = 1
+    while (i < expressions.length) {
+      node = new BinaryTerm(
+        LOGICAL_OR,
+        BasicType.BOOLEAN,
+        node,
+        new BinaryTerm(EQUAL, BasicType.BOOLEAN, ref, expressions(i))
+      )
+      i += 1
+    }
+    node
+  }
+
+  def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
+    if (actual == null) return null
+    if (actual.`type`.isBottomType) return actual
+    if (expected == actual.`type`) return actual
 
     // 1. プリミティブ型 → 参照型: オートボクシング
-    if (!a.isBasicType && b.`type`.isBasicType) {
-      val basicType = b.`type`.asInstanceOf[BasicType]
+    if (!expected.isBasicType && actual.`type`.isBasicType) {
+      val basicType = actual.`type`.asInstanceOf[BasicType]
       if (basicType == BasicType.VOID) {
         report(IS_NOT_BOXABLE_TYPE, node, basicType)
         return null
       }
-      val boxed = Boxing.boxing(table_, b)
-      if (TypeRules.isAssignable(a, boxed.`type`)) {
-        return if (a == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, a)
+      val boxed = Boxing.boxing(table_, actual)
+      if (TypeRules.isAssignable(expected, boxed.`type`)) {
+        return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
       }
     }
 
     // 2. 参照型 → プリミティブ型: オートアンボクシング
-    if (a.isBasicType && !b.`type`.isBasicType) {
-      val targetBasicType = a.asInstanceOf[BasicType]
+    if (expected.isBasicType && !actual.`type`.isBasicType) {
+      val targetBasicType = expected.asInstanceOf[BasicType]
       if (targetBasicType == BasicType.VOID) {
-        report(INCOMPATIBLE_TYPE, node, a, b.`type`)
+        report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
         return null
       }
       val boxedType = Boxing.boxedType(table_, targetBasicType)
-      if (TypeRules.isAssignable(boxedType, b.`type`)) {
-        return Boxing.unboxing(table_, b, targetBasicType)
+      if (TypeRules.isAssignable(boxedType, actual.`type`)) {
+        return Boxing.unboxing(table_, actual, targetBasicType)
       }
     }
 
     // 3. 既存のチェック
-    if (!TypeRules.isAssignable(a, b.`type`)) {
-      report(INCOMPATIBLE_TYPE, node, a, b.`type`)
+    if (!TypeRules.isAssignable(expected, actual.`type`)) {
+      report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
       return null
     }
-    new AsInstanceOf(node.location, b, a)
+    new AsInstanceOf(node.location, actual, expected)
   }
   def openClosure[A](context: LocalContext)(block: => A): A = {
     val tmp = context.isClosure
+    val collecting = context.hasReturnTypeCollector
+    if (collecting) context.pushReturnTypeCollectionDepth()
     try {
       context.setClosure(true)
       block
     }finally{
+      if (collecting) context.popReturnTypeCollectionDepth()
       context.setClosure(tmp)
     }
   }
   def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
+
+  private def bindParameters(context: LocalContext, args: List[AST.Argument], types: Array[Type]): Unit = {
+    var i = 0
+    args.foreach { arg =>
+      context.add(arg.name, types(i))
+      context.recordDeclaration(arg.name, arg.location, isParameter = true)
+      i += 1
+    }
+  }
+
+  private def markCapturedVariables(context: LocalContext, args: List[AST.Argument], block: AST.BlockExpression): Unit = {
+    val paramNames = args.map(_.name).toSet
+    val capturedVars = CapturedVariableScanner.scan(block, paramNames)
+    context.markAsBoxed(capturedVars)
+  }
+
+  private def buildArgumentsWithDefaults(
+    args: List[AST.Argument],
+    types: Array[Type],
+    context: LocalContext
+  ): Array[TypedAST.MethodArgument] =
+    args.zipWithIndex.map { case (arg, i) =>
+      val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
+        typed(expr, context, types(i))
+      }
+      TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
+    }.toArray
+
+  private def reportUnused(context: LocalContext): Unit =
+    typing.reportUnusedVariables(context)
 
   /** Common logic for setting up context and processing method/function bodies */
   private def processMethodLikeBody(
@@ -119,22 +171,11 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val arguments = method.arguments
 
     // Scan for captured variables before processing the method body
-    val paramNames = args.map(_.name).toSet
-    val capturedVars = CapturedVariableScanner.scan(block, paramNames)
-    context.markAsBoxed(capturedVars)
-
-    for (i <- 0 until arguments.length) {
-      context.add(args(i).name, arguments(i))
-      context.recordDeclaration(args(i).name, args(i).location, isParameter = true)
-    }
+    markCapturedVariables(context, args, block)
+    bindParameters(context, args, arguments)
 
     // Process default argument values
-    val argsWithDefaults = args.zipWithIndex.map { case (arg, i) =>
-      val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, arguments(i))
-      }
-      TypedAST.MethodArgument(arg.name, arguments(i), defaultTerm)
-    }.toArray
+    val argsWithDefaults = buildArgumentsWithDefaults(args, arguments, context)
     method.setArgumentsWithDefaults(argsWithDefaults)
 
     val translatedBlock = addReturnNode(translate(block, context).asInstanceOf[StatementBlock], method.returnType)
@@ -142,7 +183,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     method.setFrame(context.getContextFrame)
 
     // Report unused variable warnings
-    typing.reportUnusedVariables(context)
+    reportUnused(context)
   }
 
   def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
@@ -160,10 +201,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val context = new LocalContext
     context.setConstructor(constructor)
     val args = constructor.getArgs
-    for(i <- 0 until args.length) {
-      context.add(node.args(i).name, args(i))
-      context.recordDeclaration(node.args(i).name, node.args(i).location, isParameter = true)
-    }
+    bindParameters(context, node.args, args)
     val params = typedTerms(node.superInits.toArray, context)
     val currentClass = definition_
     val superClass = currentClass.superClass
@@ -181,24 +219,30 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
 
     // Report unused variable warnings
-    typing.reportUnusedVariables(context)
+    reportUnused(context)
   }
   def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
     definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
     mapper_ = find(definition_.name)
     val classTypeParams = declaredTypeParams_.getOrElse(node, Seq())
     openTypeParams(emptyTypeParams ++ classTypeParams) {
+      val instanceInitializers = Buffer[ActionStatement]()
+      val staticInitializers = Buffer[ActionStatement]()
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>
-            processFieldInitializer(field)
+            collectFieldInitializer(field, instanceInitializers, staticInitializers)
           case member: AST.MethodDeclaration =>
             processMethodDeclaration(member)
           case member: AST.ConstructorDeclaration =>
             processConstructorDeclaration(member)
           case field: AST.DelegatedFieldDeclaration =>
-            processDelegatedFieldInitializer(field)
+            collectDelegatedFieldInitializer(field, instanceInitializers, staticInitializers)
         }
+      }
+      injectInstanceInitializers(definition_, instanceInitializers.toSeq)
+      if (staticInitializers.nonEmpty) {
+        definition_.setStaticInitializers(staticInitializers.toArray)
       }
     }
   }
@@ -209,29 +253,64 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     if (function == null) return
     processMethodLikeBody(function, node.args, node.block)
   }
-  private def processFieldInitializer(node: AST.FieldDeclaration): Unit = {
+  private def collectFieldInitializer(
+    node: AST.FieldDeclaration,
+    instanceInitializers: Buffer[ActionStatement],
+    staticInitializers: Buffer[ActionStatement]
+  ): Unit = {
     if (node.init == null) return
+    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
+    if (field == null) return
     val context = new LocalContext
-    context.setStatic(Modifier.isStatic(node.modifiers))
-    val fieldType = mapFrom(node.typeRef)
-    if (fieldType == null) return
+    val isStatic = Modifier.isStatic(node.modifiers)
+    context.setStatic(isStatic)
+    val fieldType = field.`type`
     typed(node.init, context, fieldType) match {
       case Some(term) =>
-        processAssignable(node.init, fieldType, term)
+        val value = processAssignable(node.init, fieldType, term)
+        if (value != null) {
+          val statement =
+            if (isStatic) new ExpressionActionStatement(new SetStaticField(definition_, field, value))
+            else new ExpressionActionStatement(new SetField(new This(definition_), field, value))
+          if (isStatic) staticInitializers += statement else instanceInitializers += statement
+        }
       case None => ()
     }
   }
 
-  private def processDelegatedFieldInitializer(node: AST.DelegatedFieldDeclaration): Unit = {
+  private def collectDelegatedFieldInitializer(
+    node: AST.DelegatedFieldDeclaration,
+    instanceInitializers: Buffer[ActionStatement],
+    staticInitializers: Buffer[ActionStatement]
+  ): Unit = {
     if (node.init == null) return
+    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
+    if (field == null) return
     val context = new LocalContext
-    context.setStatic(Modifier.isStatic(node.modifiers))
-    val fieldType = mapFrom(node.typeRef)
-    if (fieldType == null) return
+    val isStatic = Modifier.isStatic(node.modifiers)
+    context.setStatic(isStatic)
+    val fieldType = field.`type`
     typed(node.init, context, fieldType) match {
       case Some(term) =>
-        processAssignable(node.init, fieldType, term)
+        val value = processAssignable(node.init, fieldType, term)
+        if (value != null) {
+          val statement =
+            if (isStatic) new ExpressionActionStatement(new SetStaticField(definition_, field, value))
+            else new ExpressionActionStatement(new SetField(new This(definition_), field, value))
+          if (isStatic) staticInitializers += statement else instanceInitializers += statement
+        }
       case None => ()
+    }
+  }
+
+  private def injectInstanceInitializers(classDef: ClassDefinition, initializers: Seq[ActionStatement]): Unit = {
+    if (initializers.isEmpty) return
+    classDef.constructors.foreach {
+      case ctor: ConstructorDefinition =>
+        val existing = Option(ctor.block).map(_.statements.toIndexedSeq).getOrElse(Seq.empty)
+        val combined = (initializers ++ existing).toArray
+        ctor.block = new StatementBlock(combined: _*)
+      case _ => ()
     }
   }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
@@ -353,69 +432,65 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     expressionFormTyping.typeIsInstance(node, context)
 
+  private def typeAddition(node: AST.Addition, context: LocalContext): Option[Term] = {
+    val left = typed(node.lhs, context).getOrElse(null)
+    val right = typed(node.rhs, context).getOrElse(null)
+    if (left == null || right == null) return None
+
+    tryNumericAddition(node, left, right).orElse(typeStringConcatenation(node, left, right))
+  }
+
+  private def tryNumericAddition(node: AST.Addition, left: Term, right: Term): Option[Term] =
+    (numericBasicType(left), numericBasicType(right)) match {
+      case (Some(lbt), Some(rbt)) =>
+        val leftTerm = if (left.isBasicType) left else Boxing.unboxing(table_, left, lbt)
+        val rightTerm = if (right.isBasicType) right else Boxing.unboxing(table_, right, rbt)
+        Some(processNumericExpression(ADD, node, leftTerm, rightTerm))
+      case _ => None
+    }
+
+  private def typeStringConcatenation(node: AST.Addition, left: Term, right: Term): Option[Term] = {
+    val leftBoxed = boxForConcat(node.lhs, left)
+    val rightBoxed = boxForConcat(node.rhs, right)
+    if (leftBoxed.isEmpty || rightBoxed.isEmpty) return None
+
+    val leftString = toStringCall(node.lhs, leftBoxed.get)
+    val rightString = toStringCall(node.rhs, rightBoxed.get)
+    val concat = findMethod(node, leftString.`type`.asInstanceOf[ObjectType], "concat", Array[Term](rightString))
+    Some(new Call(leftString, concat, Array[Term](rightString)))
+  }
+
+  private def boxForConcat(node: AST.Expression, term: Term): Option[Term] =
+    if (!term.isBasicType) Some(term)
+    else if (term.`type` == BasicType.VOID) {
+      report(IS_NOT_BOXABLE_TYPE, node, term.`type`)
+      None
+    } else {
+      Some(Boxing.boxing(table_, term))
+    }
+
+  private def toStringCall(node: AST.Expression, term: Term): Term = {
+    val toStringMethod = findMethod(node, term.`type`.asInstanceOf[ObjectType], "toString")
+    new Call(term, toStringMethod, Array.empty)
+  }
+
+  private def numericBasicType(term: Term): Option[BasicType] = {
+    if (term.isBasicType) {
+      val bt = term.`type`.asInstanceOf[BasicType]
+      if (isNumeric(bt)) Some(bt) else None
+    } else {
+      Boxing.unboxedType(table_, term.`type`).filter(isNumeric)
+    }
+  }
+
+  private def isNumeric(t: BasicType): Boolean =
+    (t eq BasicType.BYTE) || (t eq BasicType.SHORT) || (t eq BasicType.CHAR) ||
+      (t eq BasicType.INT) || (t eq BasicType.LONG) || (t eq BasicType.FLOAT) ||
+      (t eq BasicType.DOUBLE)
+
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = node match {
-    case node@AST.Addition(loc, _, _) =>
-      var left = typed(node.lhs, context).getOrElse(null)
-      var right = typed(node.rhs, context).getOrElse(null)
-      if (left == null || right == null) return None
-
-      // Helper to check if a BasicType is numeric
-      def isNumeric(t: BasicType): Boolean =
-        t == BasicType.BYTE || t == BasicType.SHORT || t == BasicType.CHAR ||
-          t == BasicType.INT || t == BasicType.LONG || t == BasicType.FLOAT || t == BasicType.DOUBLE
-
-      // Helper to get the numeric primitive type (either directly or via unboxing)
-      def numericType(term: Term): Option[BasicType] = {
-        if (term.isBasicType) {
-          val bt = term.`type`.asInstanceOf[BasicType]
-          if (isNumeric(bt)) Some(bt) else None
-        } else {
-          Boxing.unboxedType(table_, term.`type`).filter(isNumeric)
-        }
-      }
-
-      val leftNumeric = numericType(left)
-      val rightNumeric = numericType(right)
-
-      // If both sides can be numeric, do numeric addition
-      (leftNumeric, rightNumeric) match {
-        case (Some(lbt), Some(rbt)) =>
-          // Unbox if needed
-          if (!left.isBasicType) {
-            left = Boxing.unboxing(table_, left, lbt)
-          }
-          if (!right.isBasicType) {
-            right = Boxing.unboxing(table_, right, rbt)
-          }
-          return Option(processNumericExpression(ADD, node, left, right))
-        case _ =>
-          // Fall through to string concatenation
-      }
-
-      // String concatenation
-      if (left.isBasicType) {
-        if (left.`type` == BasicType.VOID) {
-          report(IS_NOT_BOXABLE_TYPE, node.lhs, left.`type`)
-          return None
-        } else {
-          left = Boxing.boxing(table_, left)
-        }
-      }
-      if (right.isBasicType) {
-        if (right.`type` == BasicType.VOID) {
-          report(IS_NOT_BOXABLE_TYPE, node.rhs, right.`type`)
-          return None
-        }
-        else {
-          right = Boxing.boxing(table_, right)
-        }
-      }
-      val toStringL = findMethod(node.lhs, left.`type`.asInstanceOf[ObjectType], "toString")
-      val toStringR = findMethod(node.rhs, right.`type`.asInstanceOf[ObjectType], "toString")
-      left = new Call(left, toStringL, new Array[Term](0))
-      right = new Call(right, toStringR, new Array[Term](0))
-      val concat: Method = findMethod(node, left.`type`.asInstanceOf[ObjectType], "concat", Array[Term](right))
-      Some(new Call(left, concat, Array[Term](right)))
+    case node: AST.Addition =>
+      typeAddition(node, context)
     case node@AST.Subtraction(loc, left, right) =>
       typeNumericBinary(node, SUBTRACT, context)
     case node@AST.Multiplication(loc, left, right) =>

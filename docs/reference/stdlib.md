@@ -165,7 +165,7 @@ val e: Double = Math::E         // 2.71828...
 
 ## Function Interfaces
 
-Built-in function types for lambdas and closures.
+Built-in function types for lambdas and closures. You can call them with `f(args)` as a shorthand for `f.call(args)`.
 
 ### Function0
 
@@ -365,7 +365,30 @@ writer.close()
 
 Provided via `onion.Iterables` (Java interface).
 
-Access iteration utilities for collections and arrays.
+Access iteration utilities for collections and arrays:
+
+- `Iterables::map(list|iterable, f)`
+- `Iterables::filter(list|iterable, predicate)`
+- `Iterables::foldl(iterable, init, f)`
+- `Iterables::exists(iterable, predicate)`
+- `Iterables::forAll(iterable, predicate)`
+- `Iterables::listOf(elements...)`
+
+## Option Module
+
+Provided via `onion.Option`.
+
+- `Option::some(value)` / `Option::none()` / `Option::of(value)`
+- `opt.getOrElse(defaultValue)`
+- `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+
+## Result Module
+
+Provided via `onion.Result`.
+
+- `Result::ok(value)` / `Result::err(error)`
+- `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
+- `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
 
 ## Next Steps
 

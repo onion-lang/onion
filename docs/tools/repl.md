@@ -119,13 +119,13 @@ onion> p.distance()
 onion> val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 double: (Int) -> Int
 
-onion> double.call(5)
+onion> double(5)
 10
 
 onion> val add: (Int, Int) -> Int = (a: Int, b: Int) -> { return a + b; }
 add: (Int, Int) -> Int
 
-onion> add.call(3, 7)
+onion> add(3, 7)
 10
 ```
 
@@ -171,7 +171,8 @@ Available commands:
   :help    - Show this help message
   :quit    - Exit the REPL
   :reset   - Reset the session
-  :imports - Show current imports
+  :ast     - Show parsed AST for an expression
+  :typed   - Show typed AST summary for an expression
 ```
 
 ### Show Imports

@@ -142,3 +142,6 @@ lazy val onionSettings = Seq(
 )
 
 fork in run := true
+run / connectInput := true
+repl / fork := true
+repl / connectInput := true

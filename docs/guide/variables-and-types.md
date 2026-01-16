@@ -256,6 +256,8 @@ val func: (Int) -> Int = (x: Int) -> { return x * 2; }
 val result: Int = func(5)  // 10
 ```
 
+When the target function type is known, lambda parameters can omit types. If no explicit function type is provided, the return type is inferred from the body.
+
 - `Function0` - No parameters
 - `Function1` - One parameter
 - `Function2` - Two parameters

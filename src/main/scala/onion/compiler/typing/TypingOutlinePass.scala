@@ -190,7 +190,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
 
   private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
     val argsOption = typesOf(node.args)
-    val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+    val returnTypeOption =
+      if (node.returnType == null) {
+        report(SemanticError.RETURN_TYPE_REQUIRED, node, node.name)
+        None
+      } else Option(mapFrom(node.returnType))
     for (args <- argsOption; returnType <- returnTypeOption) {
       val classType = loadTopClass.asInstanceOf[ClassDefinition]
       val modifier = node.modifiers | AST.M_PUBLIC
@@ -216,7 +220,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     declaredTypeParams_(node) = methodTypeParams
     openTypeParams(typeParams_ ++ methodTypeParams) {
       val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+      val returnTypeOption =
+        if (node.returnType == null) {
+          report(SemanticError.RETURN_TYPE_REQUIRED, node, s"${definition_.name}.${node.name}")
+          None
+        } else Option(mapFrom(node.returnType))
       for (args <- argsOption; returnType <- returnTypeOption) {
         var modifier = node.modifiers | access_
         if (node.block == null) modifier |= AST.M_ABSTRACT
@@ -245,7 +253,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     declaredTypeParams_(node) = methodTypeParams
     openTypeParams(typeParams_ ++ methodTypeParams) {
       val argsOption = typesOf(node.args)
-      val returnTypeOption = Option(if (node.returnType != null) mapFrom(node.returnType) else BasicType.VOID)
+      val returnTypeOption =
+        if (node.returnType == null) {
+          report(SemanticError.RETURN_TYPE_REQUIRED, node, s"${definition_.name}.${node.name}")
+          None
+        } else Option(mapFrom(node.returnType))
       for (args <- argsOption; returnType <- returnTypeOption) {
         val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
         val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
@@ -365,4 +377,3 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     }
   }
 }
-

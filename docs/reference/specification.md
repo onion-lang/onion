@@ -282,7 +282,7 @@ continue
 ### Lambda Expressions
 
 ```onion
-(param :Type, ...) -> { body }
+(param [:Type], ...) -> { body }
 ```
 
 ### Type Casting

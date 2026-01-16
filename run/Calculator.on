@@ -12,9 +12,9 @@ class Calculator : JFrame <: ActionListener {
 	var operator: String
 	var isError: Boolean
 public:
-	def setValue(value : Long) { this.text.setText(JLong::toString(value)); }
-	def setValue(value : String) { this.text.setText(value); }
-	def actionPerformed(event : ActionEvent) {
+	def setValue(value : Long) : void { this.text.setText(JLong::toString(value)); }
+	def setValue(value : String) : void { this.text.setText(value); }
+	def actionPerformed(event : ActionEvent) : void {
 		val label: String = event.source$JButton.label
 		if label == "C" {
 			this.left = 0
@@ -55,7 +55,7 @@ public:
 		pane.add(center, BorderLayout::CENTER)
 	}
 
-	static def main(args :String[]){
+	static def main(args :String[]) : void {
 		val frame: Calculator = new Calculator
 		frame.pack
 		frame.setVisible(true)

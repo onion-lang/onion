@@ -79,6 +79,18 @@ val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 val result: Int = double(5)  // 10
 ```
 
+If the target function type is known, parameter types can be omitted:
+
+```onion
+val double: (Int) -> Int = (x) -> { return x * 2; }
+```
+
+When no explicit function type is provided, the return type is inferred:
+
+```onion
+val upper = (s: String) -> { return s.toUpperCase(); }
+```
+
 ### Lambda with Multiple Parameters
 
 ```onion

@@ -207,6 +207,39 @@ class CompilationFailureSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == result)
     }
 
+    it("returns failure when method return type is omitted") {
+      val result = shell.run(
+        """
+          |class MissingReturnType {
+          |public:
+          |  static def main(args: String[]) {
+          |    return 0
+          |  }
+          |}
+        """.stripMargin,
+        "MissingReturnType.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("returns failure when lambda parameter type is omitted without expected type") {
+      val result = shell.run(
+        """
+          |class LambdaParamMissing {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val f = (x) -> { return x + 1; }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin,
+        "LambdaParamMissing.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
     it("returns failure when self is used in a static context") {
       val result = shell.run(
         """

@@ -916,6 +916,22 @@ List<AST.Argument> args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.A
   [a = argument() {append(as, a);} ("," a = argument() {append(as, a);})*] {return toList(as);}
 }
 
+AST.Argument lambda_argument() :{Token t; AST.TypeNode type = null;}{
+  t=id() [":" type = type()] {return new AST.Argument(p(t), c(t), type, null, false);}
+}
+
+List<AST.Argument> lambda_args() :{ArrayBuffer<AST.Argument> as = new ArrayBuffer<AST.Argument>(); AST.Argument a;}{
+  [a = lambda_argument() {append(as, a);} ("," a = lambda_argument() {append(as, a);})*] {return toList(as);}
+}
+
+void lambda_arg_head() :{}{
+  id() [":" type()]
+}
+
+void lambda_head() :{}{
+  "(" eols() [lambda_arg_head() ("," eols() lambda_arg_head())*] eols() ")" eols() <ARROW>
+}
+
 AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
   Token start, keyword, name;
   AST.TypeNode type = null;
@@ -1296,8 +1312,7 @@ AST.Expression primary() : {
 | LOOKAHEAD(2) t=id() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
 | t=id()                                                            {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
-| LOOKAHEAD( "(" eols() ")" eols() <ARROW> ) e=arrow_anonymous_function()  {return e;}
-| LOOKAHEAD( "(" eols() id() ":" ) e=arrow_anonymous_function()           {return e;}
+| LOOKAHEAD( lambda_head() ) e=arrow_anonymous_function()                 {return e;}
 | LOOKAHEAD("new" raw_type() "[" "]" "{") t="new" ty=raw_type() "[" "]" "{" eols() es=terms() "}"
     { return new AST.NewArrayWithValues(p(t), ty, es); }
 | t="new" ty=type() {
@@ -1340,7 +1355,7 @@ AST.ClosureExpression arrow_anonymous_function() :{
   AST.TypeNode ty = null;
 }{
   {enterDefault();}
-  t="(" args=args() ")" eols() <ARROW> eols() body=block() {
+  t="(" args=lambda_args() ")" eols() <ARROW> eols() body=block() {
     ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
     leaveDefault();
     return new AST.ClosureExpression(p(t), ty, "call", args, null, body);

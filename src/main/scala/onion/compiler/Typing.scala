@@ -114,6 +114,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
   private[compiler] val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   private[compiler] val warningReporter_ : WarningReporter = new WarningReporter(config.warningLevel, config.suppressedWarnings)
+  private var suppressReporting: Int = 0
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
@@ -150,10 +151,19 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def processDuplication(node: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingDuplicationPass(this, node).run()
 
+  def withSuppressedReporting[A](block: => A): A = {
+    suppressReporting += 1
+    try block
+    finally suppressReporting -= 1
+  }
+
+  private def reportingEnabled: Boolean = suppressReporting == 0
+
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit = {
     report(error, node.location, items*)
   }
   def report(error: SemanticError, location: Location, items: AnyRef*): Unit = {
+    if (!reportingEnabled) return
     def report_(items: Array[AnyRef]): Unit = {
       reporter_.setSourceFile(unit_.sourceFile)
       reporter_.report(error, location, items)
@@ -162,6 +172,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   def reportUnusedVariables(context: LocalContext): Unit = {
+    if (!reportingEnabled) return
     warningReporter_.setSourceFile(unit_.sourceFile)
     for (v <- context.unusedLocalVariables) {
       warningReporter_.unusedVariable(v.location, v.name)
@@ -175,6 +186,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
    * Reports a variable shadowing warning if the given name shadows an outer variable.
    */
   def checkAndReportShadowing(name: String, location: Location, context: LocalContext): Unit = {
+    if (!reportingEnabled) return
     // Skip synthetic/generated names
     if (name.startsWith("symbol#") || name.startsWith("$")) return
 

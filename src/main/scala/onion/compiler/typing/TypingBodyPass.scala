@@ -115,10 +115,13 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   }
   def openClosure[A](context: LocalContext)(block: => A): A = {
     val tmp = context.isClosure
+    val collecting = context.hasReturnTypeCollector
+    if (collecting) context.pushReturnTypeCollectionDepth()
     try {
       context.setClosure(true)
       block
     }finally{
+      if (collecting) context.popReturnTypeCollectionDepth()
       context.setClosure(tmp)
     }
   }

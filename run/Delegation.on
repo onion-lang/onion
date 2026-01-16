@@ -13,7 +13,7 @@ public:
 	def get(index: Int): Object { return this.items.get(index); }
 	def size(): Int { return this.items.size; }
 
-	static def main(args: String[]){
+	static def main(args: String[]): void {
 		val list: Delegation = new Delegation;
 		list.add("a");
 		list.add("b");

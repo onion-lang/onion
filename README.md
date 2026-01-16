@@ -16,7 +16,8 @@ val label = if name.length > 0 { "ok" } else { "empty" }
 
 def add(x: Int, y: Int): Int = x + y
 
-val double: Int -> Int = (x: Int) -> { return x * 2; }
+val double: Int -> Int = (x) -> { return x * 2; }
+val inc = (x: Int) -> { return x + 1; }
 IO::println(double(21))
 ```
 

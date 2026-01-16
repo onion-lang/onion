@@ -266,6 +266,26 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     }
   }
 
+  private def isAssignableWithBoxing(target: Type, source: Type): Boolean = {
+    if (TypeRules.isAssignable(target, source)) return true
+
+    if (!target.isBasicType && source.isBasicType) {
+      val basicType = source.asInstanceOf[BasicType]
+      if (basicType == BasicType.VOID) return false
+      val boxedType = Boxing.boxedType(table_, basicType)
+      return TypeRules.isAssignable(target, boxedType)
+    }
+
+    if (target.isBasicType && !source.isBasicType) {
+      val targetBasicType = target.asInstanceOf[BasicType]
+      if (targetBasicType == BasicType.VOID) return false
+      val boxedType = Boxing.boxedType(table_, targetBasicType)
+      return TypeRules.isAssignable(boxedType, source)
+    }
+
+    false
+  }
+
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] = {
     val contextClass = definition_
     var target = typed(node.target, context).getOrElse(null)
@@ -625,7 +645,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         // デフォルト引数を考慮: minArguments <= params.length <= expectedArgs.length
         if (params.length < method.minArguments || params.length > expectedArgs.length) None
         else {
-          val allAssignable = params.indices.forall(i => TypeRules.isAssignable(expectedArgs(i), params(i).`type`))
+        val allAssignable = params.indices.forall(i => isAssignableWithBoxing(expectedArgs(i), params(i).`type`))
           Option.when(allAssignable)(StaticApplicable(method, expectedArgs, methodSubst))
         }
       }
@@ -790,18 +810,18 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             else {
               // Check fixed args match
               val fixedMatch = (0 until fixedArgCount).forall { i =>
-                TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`)
+                isAssignableWithBoxing(expectedArgs(i), parameters(i).`type`)
               }
               // Check vararg portion
               val varargMatch = if (parameters.length == expectedArgs.length) {
                 val lastParamType = parameters.last.`type`
                 // Either direct array pass or single element
                 (lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType)) ||
-                  TypeRules.isAssignable(componentType, lastParamType)
+                isAssignableWithBoxing(componentType, lastParamType)
               } else if (parameters.length > expectedArgs.length) {
                 // Multiple vararg elements
                 (fixedArgCount until parameters.length).forall { i =>
-                  TypeRules.isAssignable(componentType, parameters(i).`type`)
+                  isAssignableWithBoxing(componentType, parameters(i).`type`)
                 }
               } else {
                 // No vararg elements (empty array)
@@ -813,7 +833,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
             // Non-vararg method: original logic with default args
             if (parameters.length < method.minArguments || parameters.length > expectedArgs.length) None
             else Option.when(
-              parameters.indices.forall(i => TypeRules.isAssignable(expectedArgs(i), parameters(i).`type`))
+              parameters.indices.forall(i => isAssignableWithBoxing(expectedArgs(i), parameters(i).`type`))
             )(Applicable(method, expectedArgs, methodSubst))
           }
         }.toList

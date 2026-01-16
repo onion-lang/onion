@@ -279,6 +279,14 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.currentInstanceNotAvailable",
       Seq()
     ),
+    SemanticError.RETURN_TYPE_REQUIRED -> ErrorDef(
+      "error.semantic.returnTypeRequired",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.LAMBDA_PARAM_TYPE_REQUIRED -> ErrorDef(
+      "error.semantic.lambdaParamTypeRequired",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

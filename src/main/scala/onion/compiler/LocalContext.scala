@@ -8,6 +8,7 @@
 package onion.compiler
 
 import toolbox.SymbolGenerator
+import scala.collection.mutable
 
 /**
  * @author Kota Mizushima
@@ -18,6 +19,8 @@ class LocalContext {
   private val generator = new SymbolGenerator("symbol#")
   private val boxedVariables = scala.collection.mutable.Set[String]()
   private val usageTracker = new VariableUsageTracker()
+  private var returnTypeCollector: mutable.Buffer[TypedAST.Type] = null
+  private var returnTypeCollectionDepth: Int = 0
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
@@ -189,5 +192,37 @@ class LocalContext {
   def clearUsageTracking(): Unit = {
     usageTracker.clear()
   }
+
+  def startReturnTypeCollection(): mutable.Buffer[TypedAST.Type] = {
+    val buf = mutable.ArrayBuffer[TypedAST.Type]()
+    returnTypeCollector = buf
+    returnTypeCollectionDepth = 0
+    buf
+  }
+
+  def stopReturnTypeCollection(): Unit = {
+    returnTypeCollector = null
+    returnTypeCollectionDepth = 0
+  }
+
+  def hasReturnTypeCollector: Boolean = returnTypeCollector != null
+
+  def collectingReturnTypes: Boolean =
+    returnTypeCollector != null && returnTypeCollectionDepth == 0
+
+  def pushReturnTypeCollectionDepth(): Unit = {
+    if (returnTypeCollector != null) returnTypeCollectionDepth += 1
+  }
+
+  def popReturnTypeCollectionDepth(): Unit = {
+    if (returnTypeCollector != null && returnTypeCollectionDepth > 0) returnTypeCollectionDepth -= 1
+  }
+
+  def collectReturnType(tp: TypedAST.Type): Unit = {
+    if (collectingReturnTypes && tp != null) returnTypeCollector += tp
+  }
+
+  def collectedReturnTypes: Seq[TypedAST.Type] =
+    if (returnTypeCollector == null) Seq.empty else returnTypeCollector.toSeq
 
 }

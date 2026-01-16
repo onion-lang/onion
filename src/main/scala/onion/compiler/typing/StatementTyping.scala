@@ -199,7 +199,20 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       }
     case node: AST.ReturnExpression =>
       val returnType = context.returnType
-      if (node.result == null) {
+      if (context.collectingReturnTypes) {
+        if (node.result == null) {
+          context.collectReturnType(BasicType.VOID)
+          new Return(node.location, null)
+        } else {
+          typed(node.result, context) match {
+            case None =>
+              new Return(node.location, null)
+            case Some(returned) =>
+              context.collectReturnType(returned.`type`)
+              new Return(node.location, returned)
+          }
+        }
+      } else if (node.result == null) {
         val expected = BasicType.VOID
         if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
         new Return(node.location, null)

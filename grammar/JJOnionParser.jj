@@ -37,6 +37,11 @@ public class JJOnionParser implements Parser {
     return t != null && t.image.equals(s);
   }
 
+  private boolean la2(String s) {
+    Token t = getToken(2);
+    return t != null && t.image.equals(s);
+  }
+
   private <T> Option<T> option(T value) {
     return Option$.MODULE$.apply(value);
   }
@@ -748,8 +753,11 @@ AST.EnumDeclaration enum_decl(int mset) : {
 }{
   start = "enum" name = id() "{"
     constant = enum_constant() {append(constants, constant);}
-    ("," constant = enum_constant() {append(constants, constant);})*
-    [","] // trailing comma allowed
+    (
+      LOOKAHEAD({la(",") && !la2("}")})
+      "," constant = enum_constant() {append(constants, constant);}
+    )*
+    [LOOKAHEAD({la(",") && la2("}")}) "," ] // trailing comma allowed when followed by }
   "}" {
     return new AST.EnumDeclaration(
       p(start), mset, c(name), toList(constants)
@@ -1116,13 +1124,20 @@ AST.SelectExpression select_statement() :{
   ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>> branches = new ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>>();
   AST.BlockExpression elseBlock = null ;
 }{
-  t1="select" e1=term() eols() "{" (<EOL>)*
-    ((<EOL>)* t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" (<EOL>)* ss=statements() {
-      append(branches, new Tuple2<List<AST.Pattern>, AST.BlockExpression>(toList(patterns), new AST.BlockExpression(p(t2), ss)));
-      patterns = new ArrayBuffer<AST.Pattern>();
-    })*
-    (<EOL>)* [t2="else" ":" (<EOL>)* [ss=statements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }]
-  (<EOL>)* "}" {
+  t1="select" e1=term() eols() "{" eols()
+    (
+      LOOKAHEAD({la("case")})
+      t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" eols() ss=statements() {
+        append(branches, new Tuple2<List<AST.Pattern>, AST.BlockExpression>(toList(patterns), new AST.BlockExpression(p(t2), ss)));
+        patterns = new ArrayBuffer<AST.Pattern>();
+      }
+      eols()
+    )*
+    eols()
+    [LOOKAHEAD({la("else")})
+      t2="else" ":" eols() [ss=statements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
+    ]
+  eols() "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);
   }
 }

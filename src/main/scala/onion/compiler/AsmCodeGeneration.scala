@@ -317,10 +317,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def emitStatements(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String): Unit =
     emitStatementsWithContext(gen, stmts, className, new LocalVarContext(gen))
 
-  private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit = {
+  private def withVisitor(gen: GeneratorAdapter, className: String, localVars: LocalVarContext)(action: AsmCodeGenerationVisitor => Unit): Unit =
     val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
-    stmts.foreach(visitor.visitStatement)
-  }
+    action(visitor)
+
+  private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit =
+    withVisitor(gen, className, localVars)(visitor => stmts.foreach(visitor.visitStatement))
 
   private def emitStatement(gen: GeneratorAdapter, stmt: ActionStatement, className: String): Unit =
     emitStatementsWithContext(gen, Array(stmt), className, new LocalVarContext(gen))
@@ -332,8 +334,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     emitExpressionWithContext(gen, expr, className, new LocalVarContext(gen))
     
   private def emitExpressionWithContext(gen: GeneratorAdapter, expr: Term, className: String, localVars: LocalVarContext): Unit =
-    val visitor = new AsmCodeGenerationVisitor(gen, className, localVars, this)
-    visitor.visitTerm(expr)
+    withVisitor(gen, className, localVars)(_.visitTerm(expr))
 
 
   // Helper methods for visitor pattern

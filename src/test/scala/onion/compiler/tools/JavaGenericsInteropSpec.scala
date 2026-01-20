@@ -197,6 +197,23 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       assert(Shell.Success("b") == result)
     }
 
+    it("infers generic return type for Collections.emptyList") {
+      val result = shell.run(
+        """
+          |class JavaCollectionsEmptyListInferred {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val list: List[String] = Collections::emptyList()
+          |    return "" + list.isEmpty()
+          |  }
+          |}
+          |""".stripMargin,
+        "JavaCollectionsEmptyListInferred.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
+
     it("supports Collections.unmodifiableList") {
       val result = shell.run(
         """

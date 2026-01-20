@@ -78,6 +78,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         if (functionType == null) return null
         TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
       case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
+      case AST.WildcardType(upperBound, lowerBound) =>
+        val mappedUpper = upperBound.map(map).getOrElse(rootClass)
+        val mappedLower = lowerBound.map(map)
+        new TypedAST.WildcardType(mappedUpper, mappedLower)
       case _ => null
     }
     private def forName(name: String, qualified: Boolean): ClassType = {
@@ -282,11 +286,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
                 report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
                 true
               } else {
-                val checkedArg = boxedTypeArgument(arg)
-                if (!TypeRules.isAssignable(upper, checkedArg)) {
-                  report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
-                  true
-                } else false
+                arg match {
+                  case w: TypedAST.WildcardType =>
+                    // For wildcards, check that the wildcard's upper bound is assignable to the type param's upper bound
+                    val wildcardUpper = w.upperBound
+                    if (!TypeRules.isAssignable(upper, wildcardUpper)) {
+                      report(INCOMPATIBLE_TYPE, typeNode, upper, wildcardUpper)
+                      true
+                    } else false
+                  case _ =>
+                    val checkedArg = boxedTypeArgument(arg)
+                    if (!TypeRules.isAssignable(upper, checkedArg)) {
+                      report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
+                      true
+                    } else false
+                }
               }
             }
             if (hasError) return

@@ -34,6 +34,15 @@ object AST {
   case class ArrayType(component: TypeDescriptor) extends TypeDescriptor {
     override def toString: String = s"${component.toString}[]"
   }
+  /** Wildcard type: ?, ? extends T, or ? super T */
+  case class WildcardType(upperBound: Option[TypeDescriptor], lowerBound: Option[TypeDescriptor]) extends TypeDescriptor {
+    override def toString: String = (upperBound, lowerBound) match {
+      case (None, None) => "?"
+      case (Some(ub), None) => s"? extends $ub"
+      case (None, Some(lb)) => s"? super $lb"
+      case (Some(ub), Some(lb)) => s"? extends $ub super $lb" // unusual but representable
+    }
+  }
   abstract sealed class PrimitiveTypeKind(val name: String) {
     override def toString: String = name
   }

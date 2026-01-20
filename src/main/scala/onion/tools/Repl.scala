@@ -16,7 +16,7 @@ import org.jline.terminal.{Terminal, TerminalBuilder}
 import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
 
-import java.io.{BufferedReader, File, FileInputStream, FileOutputStream, InputStreamReader, StringReader}
+import java.io.{BufferedReader, ByteArrayOutputStream, File, FileInputStream, FileOutputStream, InputStreamReader, PrintStream, StringReader}
 import java.nio.file.Paths
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
@@ -203,7 +203,7 @@ class Repl(classpath: Seq[String]) {
           val trimmed = line.trim
           if (trimmed.nonEmpty) {
             history += trimmed
-            running = processInput(trimmed, terminal)
+            running = processInput(trimmed, terminal, Some(reader))
           }
         }
       } catch {
@@ -230,7 +230,7 @@ class Repl(classpath: Seq[String]) {
         val trimmed = line.trim
         if (trimmed.nonEmpty) {
           history += trimmed
-          running = processInput(trimmed, terminal)
+          running = processInput(trimmed, terminal, None)
         }
       }
     }
@@ -279,11 +279,11 @@ class Repl(classpath: Seq[String]) {
     |""".stripMargin)
   }
 
-  private def processInput(input: String, terminal: Terminal): Boolean = {
+  private def processInput(input: String, terminal: Terminal, readerOpt: Option[LineReader]): Boolean = {
     if (input.startsWith(":")) {
       processCommand(input, terminal)
     } else {
-      executeCode(input)
+      executeCode(input, terminal, readerOpt)
       true
     }
   }
@@ -362,7 +362,7 @@ class Repl(classpath: Seq[String]) {
         }
         if (lines.nonEmpty) {
           println(Colors.YELLOW + "Executing pasted code..." + Colors.RESET)
-          executeCode(lines.mkString("\n"))
+          executeCode(lines.mkString("\n"), terminal, None)
         }
         true
 
@@ -401,7 +401,7 @@ class Repl(classpath: Seq[String]) {
   private case class DeclarationInput(code: String) extends InputKind
   private case class ExpressionInput(code: String) extends InputKind
 
-  private def executeCode(code: String): Unit = {
+  private def executeCode(code: String, terminal: Terminal, readerOpt: Option[LineReader]): Unit = {
     val inputId = inputCounter + 1
     val fileName = s"repl_input_$inputId.on"
     val unit = parseSnippet(code, fileName)
@@ -454,10 +454,7 @@ class Repl(classpath: Seq[String]) {
             val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = true)
             compileSession(source, fileName) match {
               case Right(classes) =>
-                shell.run(classes, Array()) match {
-                  case Shell.Success(_) => ()
-                  case Shell.Failure(_) => ()
-                }
+                runClasses(classes, terminal, readerOpt)
                 sessionSnippets += exprSnippet
                 resultCounter += 1
                 inputCounter += 1
@@ -467,10 +464,7 @@ class Repl(classpath: Seq[String]) {
                 val fallbackSource = buildSessionSource(sessionModule, sessionImports.toSeq, fallbackSnippets, printLastResult = false)
                 compileSession(fallbackSource, fileName) match {
                   case Right(classes) =>
-                    shell.run(classes, Array()) match {
-                      case Shell.Success(_) => ()
-                      case Shell.Failure(_) => ()
-                    }
+                    runClasses(classes, terminal, readerOpt)
                     sessionSnippets += rawSnippet
                     inputCounter += 1
                   case Left(fallbackErrors) =>
@@ -628,8 +622,11 @@ class Repl(classpath: Seq[String]) {
 
   private def isVoidAssignmentErrors(errors: Seq[CompileError]): Boolean = {
     errors.exists { error =>
-      val msg = error.message
-      msg.contains("java.lang.Object") && msg.contains("void")
+      val msg = error.message.toLowerCase
+      val objectMentioned = msg.contains("java.lang.object") || msg.contains("object")
+      val voidMismatch = msg.contains("void") && objectMentioned
+      val codeMatches = error.errorCode.contains("E0000") && msg.contains("void")
+      voidMismatch || codeMatches
     }
   }
 
@@ -696,6 +693,43 @@ class Repl(classpath: Seq[String]) {
     }
   }
 
+  private def runClasses(classes: Seq[CompiledClass], terminal: Terminal, readerOpt: Option[LineReader]): Unit = {
+    val encoding = config.encoding
+    val (result, output) = captureStdOut(encoding) {
+      shell.run(classes, Array())
+    }
+    result match {
+      case Shell.Success(_) => ()
+      case Shell.Failure(_) => ()
+    }
+    val normalizedOutput = if (output.endsWith(System.lineSeparator())) output else output + System.lineSeparator()
+    if (normalizedOutput.trim.nonEmpty) {
+      readerOpt match {
+        case Some(reader) => reader.printAbove(normalizedOutput.stripSuffix(System.lineSeparator()))
+        case None =>
+          terminal.writer().print(normalizedOutput)
+          terminal.writer().flush()
+      }
+    }
+  }
+
+  private def captureStdOut[T](encoding: String)(block: => T): (T, String) = {
+    val original = System.out
+    val buffer = new java.io.ByteArrayOutputStream()
+    val stream = new java.io.PrintStream(buffer, true, encoding)
+    System.setOut(stream)
+    try {
+      val result = block
+      stream.flush()
+      (result, buffer.toString(encoding))
+    } finally {
+      stream.flush()
+      System.setOut(original)
+    }
+  }
+
+  private def terminalWriter(): java.io.PrintStream = Console.out
+
   /**
    * Custom completer for Onion language
    */
@@ -737,80 +771,84 @@ class Repl(classpath: Seq[String]) {
   private class OnionHighlighter extends Highlighter {
     private val keywordSet = KEYWORDS.toSet
     private val typeSet = TYPES.toSet
+    private val keywordStyle = AttributedStyle.BOLD.foreground(AttributedStyle.BLUE)
+    private val typeStyle = AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN)
+    private val stringStyle = AttributedStyle.DEFAULT.foreground(AttributedStyle.GREEN)
+    private val numberStyle = AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA)
+    private val commentStyle = AttributedStyle.DEFAULT.foreground(AttributedStyle.BRIGHT)
 
     override def highlight(reader: LineReader, buffer: String): org.jline.utils.AttributedString = {
       val builder = new AttributedStringBuilder()
-      val tokens = tokenize(buffer)
-
-      tokens.foreach { token =>
-        if (token.startsWith(":")) {
-          // REPL command - yellow
-          builder.styled(AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW), token)
-        } else if (keywordSet.contains(token)) {
-          // Keyword - blue bold
-          builder.styled(AttributedStyle.BOLD.foreground(AttributedStyle.BLUE), token)
-        } else if (typeSet.contains(token)) {
-          // Type - cyan
-          builder.styled(AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN), token)
-        } else if (token.matches("\".*\"")) {
-          // String - green
-          builder.styled(AttributedStyle.DEFAULT.foreground(AttributedStyle.GREEN), token)
-        } else if (token.matches("\\d+")) {
-          // Number - magenta
-          builder.styled(AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA), token)
-        } else if (token == "//" || token.startsWith("//")) {
-          // Comment - gray
-          builder.styled(AttributedStyle.DEFAULT.foreground(AttributedStyle.BRIGHT), token)
+      var i = 0
+      while (i < buffer.length) {
+        val ch = buffer.charAt(i)
+        if (ch == '/' && i + 1 < buffer.length && buffer.charAt(i + 1) == '/') {
+          val comment = buffer.substring(i)
+          builder.styled(commentStyle, comment)
+          i = buffer.length
+        } else if (ch == '"') {
+          val (text, next) = readStringLiteral(buffer, i)
+          builder.styled(stringStyle, text)
+          i = next
+        } else if (ch.isDigit) {
+          val (text, next) = readNumber(buffer, i)
+          builder.styled(numberStyle, text)
+          i = next
+        } else if (isIdentifierStart(ch)) {
+          val (text, next) = readWord(buffer, i)
+          if (keywordSet.contains(text)) {
+            builder.styled(keywordStyle, text)
+          } else if (typeSet.contains(text)) {
+            builder.styled(typeStyle, text)
+          } else {
+            builder.append(text)
+          }
+          i = next
         } else {
-          builder.append(token)
+          builder.append(ch.toString)
+          i += 1
         }
       }
-
       builder.toAttributedString
     }
 
     override def setErrorPattern(errorPattern: java.util.regex.Pattern): Unit = {}
     override def setErrorIndex(errorIndex: Int): Unit = {}
 
-    private def tokenize(input: String): Seq[String] = {
-      val tokens = ArrayBuffer[String]()
-      val current = new StringBuilder()
-      var inString = false
-      var i = 0
+    private def isIdentifierStart(ch: Char): Boolean =
+      ch.isLetter || ch == '_'
 
-      while (i < input.length) {
-        val c = input(i)
-        if (inString) {
-          current.append(c)
-          if (c == '"' && (i == 0 || input(i - 1) != '\\')) {
-            tokens += current.toString
-            current.clear()
-            inString = false
-          }
-        } else if (c == '"') {
-          if (current.nonEmpty) {
-            tokens += current.toString
-            current.clear()
-          }
-          current.append(c)
-          inString = true
-        } else if (c.isWhitespace || "(){}[];,".contains(c)) {
-          if (current.nonEmpty) {
-            tokens += current.toString
-            current.clear()
-          }
-          tokens += c.toString
-        } else {
-          current.append(c)
-        }
+    private def readWord(buffer: String, start: Int): (String, Int) = {
+      var i = start
+      while (i < buffer.length && (buffer.charAt(i).isLetterOrDigit || buffer.charAt(i) == '_')) {
         i += 1
       }
+      (buffer.substring(start, i), i)
+    }
 
-      if (current.nonEmpty) {
-        tokens += current.toString
+    private def readNumber(buffer: String, start: Int): (String, Int) = {
+      var i = start
+      while (i < buffer.length && buffer.charAt(i).isDigit) {
+        i += 1
       }
+      (buffer.substring(start, i), i)
+    }
 
-      tokens.toSeq
+    private def readStringLiteral(buffer: String, start: Int): (String, Int) = {
+      val sb = new StringBuilder
+      var i = start
+      var escaped = false
+      while (i < buffer.length) {
+        val c = buffer.charAt(i)
+        sb.append(c)
+        if (c == '"' && !escaped && i != start) {
+          i += 1
+          return (sb.toString(), i)
+        }
+        escaped = c == '\\' && !escaped
+        i += 1
+      }
+      (sb.toString(), i)
     }
   }
 

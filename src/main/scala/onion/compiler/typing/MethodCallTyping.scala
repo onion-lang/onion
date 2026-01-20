@@ -357,6 +357,17 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
         }
         target = Boxing.boxing(table_, target)
         return typeMethodCallOnObject(node, target, target.`type`.asInstanceOf[ObjectType], params, context, expected)
+      case wildcardType: TypedAST.WildcardType =>
+        // ワイルドカード型は上限境界型として扱い、メソッド呼び出しを許可
+        wildcardType.upperBound match {
+          case objType: ObjectType =>
+            // Cast target to upper bound type for method resolution
+            val castedTarget = new TypedAST.AsInstanceOf(target, objType)
+            return typeMethodCallOnObject(node, castedTarget, objType, params, context, expected)
+          case _ =>
+            report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+            return None
+        }
       case _ =>
         report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
         return None

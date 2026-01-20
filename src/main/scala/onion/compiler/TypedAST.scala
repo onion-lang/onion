@@ -777,6 +777,9 @@ object TypedAST {
   final class AppliedClassType private(val raw: TypedAST.ClassType, val typeArguments: Array[TypedAST.Type])
     extends AbstractClassType {
     def name: String = raw.name
+    override def displayName: String =
+      if (typeArguments.isEmpty) raw.name
+      else s"${raw.name}[${typeArguments.map(_.displayName).mkString(", ")}]"
     def isInterface: Boolean = raw.isInterface
     def modifier: Int = raw.modifier
 
@@ -1274,6 +1277,9 @@ object TypedAST {
   abstract sealed class Type {
     def name: String
 
+    /** Display name for error messages (may include type arguments) */
+    def displayName: String = name
+
     def isBasicType: Boolean
 
     def isClassType: Boolean
@@ -1293,10 +1299,12 @@ object TypedAST {
       if (left.isBottomType) return right.isBottomType
       val l = left match {
         case tv: TypedAST.TypeVariableType => tv.upperBound
+        case w: TypedAST.WildcardType => w.upperBound
         case _ => left
       }
       val r = right match {
         case tv: TypedAST.TypeVariableType => tv.upperBound
+        case w: TypedAST.WildcardType => w.upperBound
         case _ => right
       }
       if (l.isBasicType) {
@@ -1348,13 +1356,38 @@ object TypedAST {
           while (i < expectedArgs.length) {
             val expectedArg = expectedArgs(i)
             val actualArg = actualArgs(i)
-            val matches = expectedArg match
-              case w: TypedAST.WildcardType =>
-                w.lowerBound match
-                  case Some(lb) => isSuperType(actualArg, lb)
-                  case None => isSuperType(w.upperBound, actualArg)
-              case tv: TypedAST.TypeVariableType =>
+            val matches = (expectedArg, actualArg) match
+              // Expected: ? extends E
+              case (w: TypedAST.WildcardType, _) if w.lowerBound.isEmpty =>
+                actualArg match
+                  case aw: TypedAST.WildcardType if aw.lowerBound.isEmpty =>
+                    // ? extends E ← ? extends A: A must be subtype of E
+                    isSuperType(w.upperBound, aw.upperBound)
+                  case aw: TypedAST.WildcardType if aw.lowerBound.isDefined =>
+                    // ? extends E ← ? super A: incompatible (covariant vs contravariant)
+                    false
+                  case _ =>
+                    // ? extends E ← A: A must be subtype of E
+                    isSuperType(w.upperBound, actualArg)
+              // Expected: ? super E
+              case (w: TypedAST.WildcardType, _) if w.lowerBound.isDefined =>
+                actualArg match
+                  case aw: TypedAST.WildcardType if aw.lowerBound.isDefined =>
+                    // ? super E ← ? super A: E must be subtype of A (contravariant)
+                    isSuperType(aw.lowerBound.get, w.lowerBound.get)
+                  case aw: TypedAST.WildcardType if aw.lowerBound.isEmpty =>
+                    // ? super E ← ? extends A: incompatible
+                    false
+                  case _ =>
+                    // ? super E ← A: A must be supertype of E
+                    isSuperType(actualArg, w.lowerBound.get)
+              // Expected: type variable T
+              case (tv: TypedAST.TypeVariableType, _) =>
                 isSuperType(tv.upperBound, actualArg)
+              // Expected: concrete type, Actual: wildcard - not directly assignable
+              case (_, _: TypedAST.WildcardType) =>
+                false
+              // Both concrete types: must be identical
               case _ =>
                 expectedArg eq actualArg
             if (!matches) return false

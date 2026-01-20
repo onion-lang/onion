@@ -30,13 +30,13 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Type extractors ==========
 
-  private def typeName(item: AnyRef): String = item.asInstanceOf[TypedAST.Type].name
-  private def classTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ClassType].name
-  private def objectTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ObjectType].name
+  private def typeName(item: AnyRef): String = item.asInstanceOf[TypedAST.Type].displayName
+  private def classTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ClassType].displayName
+  private def objectTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ObjectType].displayName
   private def asString(item: AnyRef): String = item.asInstanceOf[String]
   private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
   private def typeNames(types: Array[TypedAST.Type]): String = {
-    if (types.isEmpty) "" else types.map(_.name).mkString(", ")
+    if (types.isEmpty) "" else types.map(_.displayName).mkString(", ")
   }
   private def asTypeArray(item: AnyRef): Array[TypedAST.Type] = item.asInstanceOf[Array[TypedAST.Type]]
 

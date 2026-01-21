@@ -23,10 +23,132 @@ import scala.Option;
 import scala.Option$;
 import static onion.compiler.AST.append;
 import java.util.Stack;
+import java.util.ArrayList;
 
 @SuppressWarnings("unchecked")
 public class JJOnionParser implements Parser {
   private int mset; // used for semantic lookahead
+
+  // ========== Error Recovery Support ==========
+  private boolean errorRecoveryMode = false;
+  private ArrayList<ParseError> collectedErrors = new ArrayList<ParseError>();
+  private int maxErrors = 10; // Maximum number of errors to collect before giving up
+
+  /**
+   * Represents a parse error with location and message.
+   */
+  public static class ParseError {
+    public final int line;
+    public final int column;
+    public final String found;
+    public final String expected;
+
+    public ParseError(int line, int column, String found, String expected) {
+      this.line = line;
+      this.column = column;
+      this.found = found;
+      this.expected = expected;
+    }
+
+    @Override
+    public String toString() {
+      return "ParseError at " + line + ":" + column + " - found '" + found + "', expected " + expected;
+    }
+  }
+
+  /**
+   * Enable error recovery mode to collect multiple errors.
+   * @param maxErrors Maximum number of errors to collect before stopping
+   */
+  public void enableErrorRecovery(int maxErrors) {
+    this.errorRecoveryMode = true;
+    this.maxErrors = maxErrors;
+    this.collectedErrors.clear();
+  }
+
+  /**
+   * Disable error recovery mode.
+   */
+  public void disableErrorRecovery() {
+    this.errorRecoveryMode = false;
+  }
+
+  /**
+   * Get all collected errors.
+   */
+  public ArrayList<ParseError> getCollectedErrors() {
+    return new ArrayList<ParseError>(collectedErrors);
+  }
+
+  /**
+   * Check if there are any collected errors.
+   */
+  public boolean hasErrors() {
+    return !collectedErrors.isEmpty();
+  }
+
+  /**
+   * Collect an error and optionally continue parsing.
+   * @return true if parsing should continue, false if should stop
+   */
+  private boolean collectError(Token errorToken, String expected) {
+    if (!errorRecoveryMode) {
+      return false; // Don't collect, let normal exception handling occur
+    }
+
+    collectedErrors.add(new ParseError(
+      errorToken.beginLine,
+      errorToken.beginColumn,
+      errorToken.image,
+      expected
+    ));
+
+    return collectedErrors.size() < maxErrors;
+  }
+
+  /**
+   * Skip tokens until we find a synchronization point (semicolon, newline, or closing brace).
+   * Used for panic mode error recovery.
+   * @return true if a sync point was found, false if EOF was reached
+   */
+  private boolean skipToSyncPoint() {
+    Token t;
+    while (true) {
+      t = getNextToken();
+      String img = t.image;
+      // Check for EOF
+      if (img == null || t.kind == 0) { // 0 is typically EOF
+        return false;
+      }
+      // Sync points: semicolon, closing brace
+      if (";".equals(img) || "}".equals(img)) {
+        return true;
+      }
+      // Check for newline (typically represented as "\n" or "\r\n")
+      if (img.contains("\n") && states.isEmpty()) {
+        return true;
+      }
+    }
+  }
+
+  /**
+   * Skip tokens until we find a token with the specified image.
+   * @return true if the token was found, false if EOF was reached
+   */
+  private boolean skipToTokenImage(String... images) {
+    Token t;
+    while (true) {
+      t = getNextToken();
+      if (t.image == null || t.kind == 0) {
+        return false;
+      }
+      for (String img : images) {
+        if (img.equals(t.image)) {
+          return true;
+        }
+      }
+    }
+  }
 
   private boolean no(int m, int mset) {
     return (m & mset) == 0;

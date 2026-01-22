@@ -19,12 +19,66 @@ import java.util.concurrent.{CompletableFuture, ConcurrentHashMap}
 import scala.jdk.CollectionConverters._
 
 /**
+ * Represents a symbol definition with its location.
+ */
+case class SymbolDefinition(
+  name: String,
+  kind: SymbolKind,
+  uri: String,
+  line: Int,
+  startChar: Int,
+  endChar: Int
+) {
+  def toLocation: org.eclipse.lsp4j.Location = {
+    val range = new Range(
+      new Position(line, startChar),
+      new Position(line, endChar)
+    )
+    new org.eclipse.lsp4j.Location(uri, range)
+  }
+}
+
+/**
+ * Symbol table that stores all symbol definitions for quick lookup.
+ */
+class SymbolTable {
+  private val symbols = new ConcurrentHashMap[String, java.util.List[SymbolDefinition]]()
+
+  def add(symbol: SymbolDefinition): Unit = {
+    symbols.computeIfAbsent(symbol.name, _ => new java.util.ArrayList[SymbolDefinition]())
+    symbols.get(symbol.name).add(symbol)
+  }
+
+  def lookup(name: String): Seq[SymbolDefinition] = {
+    val defs = symbols.get(name)
+    if (defs != null) defs.asScala.toSeq else Seq.empty
+  }
+
+  def lookupInUri(name: String, uri: String): Seq[SymbolDefinition] = {
+    lookup(name).filter(_.uri == uri)
+  }
+
+  def clear(uri: String): Unit = {
+    symbols.forEach { (_, defs) =>
+      defs.removeIf(_.uri == uri)
+    }
+    // Remove empty entries
+    symbols.entrySet().removeIf(_.getValue.isEmpty)
+  }
+
+  def allSymbols: Seq[SymbolDefinition] = {
+    symbols.values().asScala.flatMap(_.asScala).toSeq
+  }
+}
+
+/**
  * Handles text document operations for the Onion Language Server.
  * Provides diagnostics, hover, completion, and go-to-definition.
  */
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {
   private var client: org.eclipse.lsp4j.services.LanguageClient = _
   private val documents = new ConcurrentHashMap[String, DocumentState]()
+  private val symbolTable = new SymbolTable()
 
   // Onion keywords for completion
   private val keywords = Array(
@@ -54,6 +108,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val uri = params.getTextDocument.getUri
     val content = params.getTextDocument.getText
     documents.put(uri, DocumentState(content, params.getTextDocument.getVersion))
+    updateSymbolTable(uri, content)
     validateDocument(uri, content)
   }
 
@@ -63,6 +118,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     if (changes.nonEmpty) {
       val content = changes.last.getText
       documents.put(uri, DocumentState(content, params.getTextDocument.getVersion))
+      updateSymbolTable(uri, content)
       validateDocument(uri, content)
     }
   }
@@ -70,6 +126,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
   override def didClose(params: DidCloseTextDocumentParams): Unit = {
     val uri = params.getTextDocument.getUri
     documents.remove(uri)
+    symbolTable.clear(uri)
     // Clear diagnostics
     client.publishDiagnostics(new PublishDiagnosticsParams(uri, java.util.Collections.emptyList()))
   }
@@ -166,9 +223,30 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   override def definition(params: DefinitionParams): CompletableFuture[LspEither[java.util.List[_ <: org.eclipse.lsp4j.Location], java.util.List[_ <: LocationLink]]] = {
     CompletableFuture.supplyAsync { () =>
-      // Basic implementation - returns empty for now
-      // Full implementation would require symbol table analysis
-      LspEither.forLeft(java.util.Collections.emptyList[org.eclipse.lsp4j.Location]())
+      val uri = params.getTextDocument.getUri
+      val position = params.getPosition
+      val state = documents.get(uri)
+
+      val locations = new java.util.ArrayList[org.eclipse.lsp4j.Location]()
+
+      if (state != null) {
+        val line = getLineAt(state.content, position.getLine)
+        val word = getWordAtPosition(line, position.getCharacter)
+
+        if (word.nonEmpty) {
+          // First, look for definitions in the current document
+          val localDefs = symbolTable.lookupInUri(word, uri)
+          if (localDefs.nonEmpty) {
+            localDefs.foreach(d => locations.add(d.toLocation))
+          } else {
+            // Then look in all documents
+            val allDefs = symbolTable.lookup(word)
+            allDefs.foreach(d => locations.add(d.toLocation))
+          }
+        }
+      }
+
+      LspEither.forLeft(locations)
     }
   }
 
@@ -214,6 +292,83 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val range = new Range(new Position(line, startChar), new Position(line, endChar))
     val symbol = new DocumentSymbol(name, kind, range, range)
     symbol
+  }
+
+  /**
+   * Updates the symbol table with all definitions from the document.
+   * Extracts classes, interfaces, methods, fields, and local variables.
+   */
+  private def updateSymbolTable(uri: String, content: String): Unit = {
+    // Clear existing symbols for this document
+    symbolTable.clear(uri)
+
+    val lines = content.split("\n")
+
+    // Patterns for symbol extraction
+    val classPattern = """(?:abstract\s+)?(?:sealed\s+)?(?:final\s+)?class\s+(\w+)""".r
+    val interfacePattern = """interface\s+(\w+)""".r
+    val enumPattern = """enum\s+(\w+)""".r
+    val recordPattern = """record\s+(\w+)""".r
+    val methodPattern = """def\s+(\w+)\s*[\[(]""".r
+    val fieldPattern = """(?:static\s+)?(?:val|var)\s+(\w+)\s*:""".r
+    val argumentPattern = """def\s+\w+\s*\(\s*([^)]+)\)""".r
+    val localVarPattern = """^\s*(?:val|var)\s+(\w+)\s*:""".r
+
+    lines.zipWithIndex.foreach { case (line, lineNum) =>
+      // Class definitions
+      classPattern.findAllMatchIn(line).foreach { m =>
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Class, uri, lineNum, m.start(1), m.end(1)))
+      }
+
+      // Interface definitions
+      interfacePattern.findAllMatchIn(line).foreach { m =>
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Interface, uri, lineNum, m.start(1), m.end(1)))
+      }
+
+      // Enum definitions
+      enumPattern.findAllMatchIn(line).foreach { m =>
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Enum, uri, lineNum, m.start(1), m.end(1)))
+      }
+
+      // Record definitions
+      recordPattern.findAllMatchIn(line).foreach { m =>
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Struct, uri, lineNum, m.start(1), m.end(1)))
+      }
+
+      // Method definitions
+      methodPattern.findAllMatchIn(line).foreach { m =>
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Method, uri, lineNum, m.start(1), m.end(1)))
+      }
+
+      // Field definitions (class level val/var)
+      // Only match if not inside a method (heuristic: line starts with whitespace but not too much)
+      if (line.matches("""^\s{2,6}(?:static\s+)?(?:val|var)\s+.*""")) {
+        fieldPattern.findAllMatchIn(line).foreach { m =>
+          symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Field, uri, lineNum, m.start(1), m.end(1)))
+        }
+      }
+
+      // Local variable definitions (inside methods - more indentation)
+      if (line.matches("""^\s{4,}(?:val|var)\s+.*""")) {
+        localVarPattern.findAllMatchIn(line).foreach { m =>
+          symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Variable, uri, lineNum, m.start(1), m.end(1)))
+        }
+      }
+
+      // Method arguments
+      argumentPattern.findAllMatchIn(line).foreach { m =>
+        val args = m.group(1)
+        // Parse individual arguments: name: Type
+        val argPattern = """(\w+)\s*:""".r
+        argPattern.findAllMatchIn(args).foreach { argMatch =>
+          val argName = argMatch.group(1)
+          // Calculate position relative to the line
+          val argStart = m.start(1) + argMatch.start(1)
+          val argEnd = m.start(1) + argMatch.end(1)
+          symbolTable.add(SymbolDefinition(argName, SymbolKind.Variable, uri, lineNum, argStart, argEnd))
+        }
+      }
+    }
   }
 
   private def validateDocument(uri: String, content: String): Unit = {

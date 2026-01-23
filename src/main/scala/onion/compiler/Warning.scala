@@ -19,14 +19,17 @@ enum WarningLevel:
  * Warning categories that can be individually suppressed.
  */
 enum WarningCategory(val code: String, val description: String):
-  case UnusedVariable    extends WarningCategory("W0001", "Unused variable")
-  case UnusedImport      extends WarningCategory("W0002", "Unused import")
-  case UnreachableCode   extends WarningCategory("W0003", "Unreachable code")
-  case DeprecatedFeature extends WarningCategory("W0004", "Deprecated feature")
-  case ShadowedVariable  extends WarningCategory("W0005", "Shadowed variable")
-  case UnusedParameter   extends WarningCategory("W0006", "Unused parameter")
-  case EmptyBlock        extends WarningCategory("W0007", "Empty block")
-  case RedundantCast     extends WarningCategory("W0008", "Redundant cast")
+  case UnusedVariable      extends WarningCategory("W0001", "Unused variable")
+  case UnusedImport        extends WarningCategory("W0002", "Unused import")
+  case UnreachableCode     extends WarningCategory("W0003", "Unreachable code")
+  case DeprecatedFeature   extends WarningCategory("W0004", "Deprecated feature")
+  case ShadowedVariable    extends WarningCategory("W0005", "Shadowed variable")
+  case UnusedParameter     extends WarningCategory("W0006", "Unused parameter")
+  case EmptyBlock          extends WarningCategory("W0007", "Empty block")
+  case RedundantCast       extends WarningCategory("W0008", "Redundant cast")
+  case PossibleNullDeref   extends WarningCategory("W0009", "Possible null dereference")
+  case UnnecessaryConversion extends WarningCategory("W0010", "Unnecessary type conversion")
+  case UncheckedCast       extends WarningCategory("W0011", "Unchecked cast")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -38,7 +41,11 @@ object WarningCategory:
     "shadowed-variable" -> WarningCategory.ShadowedVariable,
     "unused-parameter" -> WarningCategory.UnusedParameter,
     "empty-block" -> WarningCategory.EmptyBlock,
-    "redundant-cast" -> WarningCategory.RedundantCast
+    "redundant-cast" -> WarningCategory.RedundantCast,
+    "possible-null-deref" -> WarningCategory.PossibleNullDeref,
+    "null-deref" -> WarningCategory.PossibleNullDeref,
+    "unnecessary-conversion" -> WarningCategory.UnnecessaryConversion,
+    "unchecked-cast" -> WarningCategory.UncheckedCast
   )
 
   def fromString(value: String): Option[WarningCategory] =

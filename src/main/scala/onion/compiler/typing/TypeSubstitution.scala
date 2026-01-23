@@ -1,3 +1,10 @@
+/* ************************************************************** *
+ *                                                                *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
+ *                                                                *
+ *                                                                *
+ * This software is distributed under the modified BSD License.   *
+ * ************************************************************** */
 package onion.compiler.typing
 
 import onion.compiler.TypedAST
@@ -5,7 +12,53 @@ import onion.compiler.TypedAST.{ArrayType, Type}
 
 import scala.collection.mutable.HashMap
 
+/**
+ * Type Substitution Utilities for Generic Type Handling
+ *
+ * This object provides utilities for substituting type variables with
+ * concrete types in the context of generic classes and methods.
+ *
+ * == Type Substitution Overview ==
+ *
+ * When a generic type is applied with type arguments, type variables in the
+ * generic definition need to be replaced with the actual type arguments.
+ *
+ * Example:
+ * {{{
+ * // Generic class definition
+ * class List[T] {
+ *   def add(elem: T): Unit = ...
+ * }
+ *
+ * // Usage with type argument
+ * val strings: List[String] = new List[String]()
+ * strings.add("hello")  // T is substituted with String
+ * }}}
+ *
+ * == Two Levels of Substitution ==
+ *
+ * '''Class-level substitution''': Type parameters from the enclosing class.
+ * Built from `AppliedClassType` nodes (e.g., `List[String]`).
+ *
+ * '''Method-level substitution''': Type parameters from a generic method.
+ * Built from method type argument inference or explicit specification.
+ *
+ * Method substitution takes precedence over class substitution when the
+ * same type variable name is used in both scopes.
+ *
+ * @see [[onion.compiler.TypedAST.TypeVariableType]] for type variable representation
+ * @see [[onion.compiler.TypedAST.AppliedClassType]] for applied generic types
+ */
 private[compiler] object TypeSubstitution {
+
+  /**
+   * Builds a type substitution map from an applied class type.
+   *
+   * Given `List[String]`, this returns `Map("T" -> String)`.
+   *
+   * @param tp The type to extract substitution from
+   * @return A map from type parameter names to their actual type arguments
+   */
   def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
     case applied: TypedAST.AppliedClassType =>
       val rawParams = applied.raw.typeParameters
@@ -14,6 +67,23 @@ private[compiler] object TypeSubstitution {
       scala.collection.immutable.Map.empty
   }
 
+  /**
+   * Applies type substitution to a type, replacing type variables with their mapped types.
+   *
+   * This method recursively traverses the type structure, substituting type variables
+   * where substitutions are available. It handles:
+   *   - Type variable substitution
+   *   - Applied class types (recursive substitution in type arguments)
+   *   - Array types (substitution in component type)
+   *   - Wildcard types (substitution in bounds)
+   *
+   * @param tp The type to perform substitution on
+   * @param classSubst Substitution map from enclosing class type parameters
+   * @param methodSubst Substitution map from method type parameters (takes precedence)
+   * @param defaultToBound If true, unsubstituted type variables are replaced with their upper bounds;
+   *                       if false, type variables remain as-is
+   * @return The type with all applicable substitutions applied
+   */
   def substituteType(
     tp: Type,
     classSubst: scala.collection.immutable.Map[String, Type],

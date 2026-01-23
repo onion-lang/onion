@@ -11,8 +11,30 @@ import toolbox.SymbolGenerator
 import scala.collection.mutable
 
 /**
- * @author Kota Mizushima
+ * Local Variable Context for Type Checking
  *
+ * This class manages local variable scopes during type checking, providing:
+ *   - Variable lookup and binding
+ *   - Scope nesting (frames and scopes)
+ *   - Closure variable tracking
+ *   - Usage tracking for unused variable warnings
+ *   - Return type inference for closures
+ *
+ * == Scope Management ==
+ *
+ * LocalContext manages two levels of scoping:
+ *   - '''Frames''': Major scope boundaries (methods, closures)
+ *   - '''Scopes''': Minor scope boundaries (blocks, loops)
+ *
+ * == Null-Safe Variants ==
+ *
+ * Methods that may return null have Option-returning variants:
+ *   - `lookup` → `lookupOpt`
+ *   - `lookupOnlyCurrentScope` → `lookupOnlyCurrentScopeOpt`
+ *
+ * New code should prefer the *Opt variants for safer null handling.
+ *
+ * @author Kota Mizushima
  */
 class LocalContext {
   private var contextFrame = new LocalFrame(null)
@@ -63,6 +85,15 @@ class LocalContext {
     this.isMethod = false
   }
 
+  /** Save current method context for later restoration */
+  def saveMethodContext(): (TypedAST.Method, Boolean) = (method, isMethod)
+
+  /** Restore method context from saved state */
+  def restoreMethodContext(saved: (TypedAST.Method, Boolean)): Unit = {
+    this.method = saved._1
+    this.isMethod = saved._2
+  }
+
   def openFrame[A](block: => A): A = try {
     contextFrame = new LocalFrame(contextFrame)
     block
@@ -100,6 +131,11 @@ class LocalContext {
     contextFrame.lookup(name)
   }
 
+  /** Option-returning version of lookup for safer null handling */
+  def lookupOpt(name: String): Option[ClosureLocalBinding] = {
+    Option(contextFrame.lookup(name))
+  }
+
   /**
    * Gets all variable names visible from the current scope.
    */
@@ -110,6 +146,11 @@ class LocalContext {
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     contextFrame.lookupOnlyCurrentScope(name)
+  }
+
+  /** Option-returning version of lookupOnlyCurrentScope for safer null handling */
+  def lookupOnlyCurrentScopeOpt(name: String): Option[ClosureLocalBinding] = {
+    Option(contextFrame.lookupOnlyCurrentScope(name))
   }
 
   /**

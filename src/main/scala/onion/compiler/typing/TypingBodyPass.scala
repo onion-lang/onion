@@ -106,8 +106,60 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       }
     }
 
-    // 3. 既存のチェック
-    if (!TypeRules.isAssignable(expected, actual.`type`)) {
+    // 3. 型変数を含む場合の特別チェック
+    // expectedがTypeVariableを含むAppliedClassTypeの場合、構造的にマッチすればOK
+    def containsTypeVariable(tp: Type): Boolean = tp match {
+      case _: TypedAST.TypeVariableType => true
+      case applied: TypedAST.AppliedClassType => applied.typeArguments.exists(containsTypeVariable)
+      case at: TypedAST.ArrayType => containsTypeVariable(at.base)
+      case _ => false
+    }
+
+    def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
+      case (tv: TypedAST.TypeVariableType, _) =>
+        // 型変数は任意の型を受け入れる（上限境界を満たせば）
+        TypeRules.isSuperType(tv.upperBound, actual)
+      case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
+        // 同じrawクラスで型引数が構造的にマッチ
+        (ae.raw.name == aa.raw.name) &&
+          ae.typeArguments.length == aa.typeArguments.length &&
+          ae.typeArguments.zip(aa.typeArguments).forall { case (e, a) => structurallyAssignable(e, a) }
+      case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
+        // expected側に型変数があるが、actualがAppliedClassTypeでない場合
+        // rawクラスが一致すればOK
+        actual match {
+          case ct: TypedAST.ClassType => ae.raw.name == ct.name
+          case _ => false
+        }
+      case _ =>
+        TypeRules.isAssignable(expected, actual)
+    }
+
+    // 4. AppliedClassType同士のボクシングを考慮したチェック
+    def isAssignableWithBoxing(expectedType: Type, actualType: Type): Boolean =
+      if (TypeRules.isAssignable(expectedType, actualType)) true
+      else if (!expectedType.isBasicType && actualType.isBasicType) {
+        val boxedActual = Boxing.boxedType(table_, actualType.asInstanceOf[BasicType])
+        TypeRules.isAssignable(expectedType, boxedActual)
+      } else if (expectedType.isBasicType && !actualType.isBasicType) {
+        val boxedExpected = Boxing.boxedType(table_, expectedType.asInstanceOf[BasicType])
+        TypeRules.isAssignable(boxedExpected, actualType)
+      } else (expectedType, actualType) match {
+        case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
+          (ae.raw.name == aa.raw.name) &&
+            ae.typeArguments.length == aa.typeArguments.length &&
+            ae.typeArguments.zip(aa.typeArguments).forall { case (e, a) => isAssignableWithBoxing(e, a) }
+        case _ => false
+      }
+
+    // 5. 通常のチェック（型変数を考慮）
+    val isCompatible = if (containsTypeVariable(expected)) {
+      structurallyAssignable(expected, actual.`type`)
+    } else {
+      isAssignableWithBoxing(expected, actual.`type`)
+    }
+
+    if (!isCompatible) {
       report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
       return null
     }
@@ -115,6 +167,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   }
   def openClosure[A](context: LocalContext)(block: => A): A = {
     val tmp = context.isClosure
+    val savedMethodContext = context.saveMethodContext()
     val collecting = context.hasReturnTypeCollector
     if (collecting) context.pushReturnTypeCollectionDepth()
     try {
@@ -123,6 +176,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }finally{
       if (collecting) context.popReturnTypeCollectionDepth()
       context.setClosure(tmp)
+      context.restoreMethodContext(savedMethodContext)
     }
   }
   def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
@@ -207,7 +261,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val superClass = currentClass.superClass
     val matched = superClass.findConstructor(params)
     if (matched.length == 0) {
-      report(CONSTRUCTOR_NOT_FOUND, node, superClass, types(params))
+      report(CONSTRUCTOR_NOT_FOUND, node, superClass, types(params), superClass.constructors)
     }else if (matched.length > 1) {
       report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, types(params)), Array[AnyRef](superClass, types(params)))
     }else {

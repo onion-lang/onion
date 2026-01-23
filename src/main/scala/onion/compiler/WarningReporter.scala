@@ -72,6 +72,18 @@ class WarningReporter(
     report(WarningCategory.RedundantCast, location, s"redundant cast from '$fromType' to '$toType'")
   }
 
+  def possibleNullDereference(location: Location, expression: String): Unit = {
+    report(WarningCategory.PossibleNullDeref, location, s"possible null dereference: $expression")
+  }
+
+  def unnecessaryConversion(location: Location, fromType: String, toType: String): Unit = {
+    report(WarningCategory.UnnecessaryConversion, location, s"unnecessary conversion from '$fromType' to '$toType'")
+  }
+
+  def uncheckedCast(location: Location, fromType: String, toType: String): Unit = {
+    report(WarningCategory.UncheckedCast, location, s"unchecked cast from '$fromType' to '$toType'")
+  }
+
   def getWarnings: Seq[CompileWarning] = warnings.toSeq
 
   def hasWarnings: Boolean = warnings.nonEmpty

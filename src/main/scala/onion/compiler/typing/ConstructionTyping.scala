@@ -77,7 +77,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
 
     val constructors = typeRef.findConstructor(parameters)
     if (constructors.length == 0) {
-      report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters))
+      report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {
       report(

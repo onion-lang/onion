@@ -1,3 +1,10 @@
+/* ************************************************************** *
+ *                                                                *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
+ *                                                                *
+ *                                                                *
+ * This software is distributed under the modified BSD License.   *
+ * ************************************************************** */
 package onion.compiler
 
 import _root_.scala.jdk.CollectionConverters._
@@ -9,6 +16,69 @@ import collection.mutable.{Buffer, HashMap, Map, Set => MutableSet}
 
 import scala.compiletime.uninitialized
 
+/**
+ * Type Checking Phase - Static Type Analysis and Type Inference
+ *
+ * This is the central phase of the Onion compiler, responsible for:
+ *   - Type checking all expressions and statements
+ *   - Type inference for local variables and closures
+ *   - Method and constructor resolution with overloading
+ *   - Access control verification
+ *   - Symbol table construction
+ *
+ * == Four Sub-Phases ==
+ *
+ * The type checking is organized into four sequential sub-phases:
+ *
+ * '''1. Header Pass''' ([[onion.compiler.typing.TypingHeaderPass]])
+ *   - Collects class/interface/record declarations
+ *   - Builds the initial class table
+ *   - Processes imports and module declarations
+ *
+ * '''2. Outline Pass''' ([[onion.compiler.typing.TypingOutlinePass]])
+ *   - Processes class member declarations (fields, methods)
+ *   - Resolves inheritance relationships
+ *   - Builds method and field symbol tables
+ *
+ * '''3. Body Pass''' ([[onion.compiler.typing.TypingBodyPass]])
+ *   - Type checks method and constructor bodies
+ *   - Performs type inference
+ *   - Resolves method calls and field accesses
+ *   - Generates typed AST nodes
+ *
+ * '''4. Duplication Pass''' ([[onion.compiler.typing.TypingDuplicationPass]])
+ *   - Detects duplicate declarations
+ *   - Validates method signatures (erasure collision detection)
+ *
+ * == Type System Features ==
+ *
+ *   - '''Subtyping''': Class inheritance, interface implementation
+ *   - '''Generics''': Parameterized types with type bounds
+ *   - '''Wildcards''': `? extends T` and `? super T`
+ *   - '''Boxing''': Automatic primitive-to-object conversion
+ *   - '''Closures''': First-class functions with type inference
+ *
+ * == Key Components ==
+ *
+ *   - [[ClassTable]]: Symbol table for class definitions
+ *   - [[NameMapper]]: Resolves type names to types
+ *   - [[LocalContext]]: Tracks local variable scopes
+ *   - [[SemanticErrorReporter]]: Collects type errors
+ *
+ * == Phase Position in Pipeline ==
+ *
+ * {{{
+ * Parsing → Rewriting → '''Typing''' → Code Generation
+ * }}}
+ *
+ * @param config Compiler configuration options
+ *
+ * @see [[onion.compiler.Rewriting]] for the previous phase
+ * @see [[onion.compiler.AsmCodeGeneration]] for the next phase
+ * @see [[onion.compiler.TypedAST]] for the output AST types
+ *
+ * @author Kota Mizushima
+ */
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
   private[compiler] case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
@@ -47,6 +117,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   private[compiler] class NameMapper(imports: Seq[ImportItem]) {
     def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
+
+    /** Get candidate class names for suggestions (non-on-demand imports only) */
+    def getCandidateClassNames: Array[String] = {
+      val localClasses = table_.classes.values.map(_.name).toSeq
+      val importedClasses = imports.filterNot(_.isOnDemand).map(_.simpleName)
+      (localClasses ++ importedClasses).distinct.toArray
+    }
     def map(descriptor : AST.TypeDescriptor): Type = descriptor match {
       case AST.PrimitiveType(AST.KChar)       => BasicType.CHAR
       case AST.PrimitiveType(AST.KByte)       => BasicType.BYTE
@@ -249,7 +326,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def mapFromOpt(typeNode: AST.TypeNode): Option[Type] = mapFromOpt(typeNode, mapper_)
   private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
     val mappedType = mapper.resolveNode(typeNode)
-    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
+    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
     else validateTypeApplication(typeNode, mappedType)
     mappedType
   }
@@ -257,7 +334,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameMapper): Option[Type] = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) {
-      report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString)
+      report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
       None
     } else {
       validateTypeApplication(typeNode, mappedType)

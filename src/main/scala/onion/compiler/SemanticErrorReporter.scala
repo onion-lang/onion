@@ -14,11 +14,68 @@ import onion.compiler.toolbox.{Message, Systems}
 import onion.compiler.exceptions.CompilationException
 
 /**
- * Data-driven semantic error reporter.
+ * Semantic Error Reporter - Central Error Collection and Formatting
  *
- * Each error type is associated with an ErrorDef that specifies:
- * - The message key for i18n lookup
- * - Extractors that convert the items array to format arguments
+ * This class collects and formats semantic errors during type checking.
+ * It provides:
+ *   - Data-driven error message formatting with i18n support
+ *   - Compilation context tracking (class/method being compiled)
+ *   - "Did you mean?" suggestions for common typos
+ *   - Threshold-based early termination when too many errors occur
+ *
+ * == Error Reporting Architecture ==
+ *
+ * The reporter uses a data-driven approach for error formatting:
+ *
+ * '''1. ErrorDef''': Maps error types to message keys and argument extractors
+ *
+ * '''2. Special Handlers''': Some errors (METHOD_NOT_FOUND, CLASS_NOT_FOUND, etc.)
+ * have custom handlers that provide additional suggestions
+ *
+ * '''3. Message Formatting''': Uses `java.text.MessageFormat` with i18n properties
+ *
+ * == Suggestion System ==
+ *
+ * For resolution errors, the reporter can suggest similar names:
+ * {{{
+ * error: variable 'naem' is not found
+ *   did you mean: name
+ * }}}
+ *
+ * Currently supports suggestions for:
+ *   - VARIABLE_NOT_FOUND
+ *   - METHOD_NOT_FOUND
+ *   - FIELD_NOT_FOUND
+ *   - CLASS_NOT_FOUND
+ *
+ * == Compilation Context ==
+ *
+ * The reporter tracks the current compilation context (class, method, phase)
+ * to provide more helpful error messages:
+ * {{{
+ * error: type mismatch (in class Foo, method bar)
+ * }}}
+ *
+ * == Usage ==
+ *
+ * {{{
+ * val reporter = new SemanticErrorReporter(maxErrors = 100)
+ * reporter.setSourceFile("MyClass.on")
+ * reporter.enterClass("MyClass")
+ * reporter.enterMethod("myMethod")
+ *
+ * // Report an error
+ * reporter.report(INCOMPATIBLE_TYPE, location, expectedType, actualType)
+ *
+ * // Get all collected errors
+ * val errors = reporter.getProblems
+ * }}}
+ *
+ * @param threshold Maximum number of errors before throwing CompilationException
+ *
+ * @see [[SemanticError]] for error type definitions
+ * @see [[CompileError]] for error representation
+ * @see [[CompilationContext]] for context tracking
  *
  * @author Kota Mizushima
  */
@@ -27,6 +84,7 @@ class SemanticErrorReporter(threshold: Int) {
   private var sourceFile: String = null
   private var errorCount: Int = 0
   private var currentError: SemanticError = null
+  private var context: CompilationContext = CompilationContext.empty
 
   // ========== Type extractors ==========
 
@@ -57,7 +115,8 @@ class SemanticErrorReporter(threshold: Int) {
 
   private def problem(position: Location, message: String): Unit = {
     val errorCode = Option(currentError).map(_.errorCode)
-    problems.append(new CompileError(sourceFile, position, message, errorCode))
+    val ctx = if (context == CompilationContext.empty) None else Some(context)
+    problems.append(CompileError(sourceFile, position, message, errorCode, ctx))
   }
 
   // ========== Error definitions ==========
@@ -106,11 +165,7 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(items => typeName(items(0)))
     ),
 
-    // Resolution errors
-    SemanticError.CLASS_NOT_FOUND -> ErrorDef(
-      "error.semantic.classNotFound",
-      Seq(items => asString(items(0)))
-    ),
+    // Resolution errors - CLASS_NOT_FOUND handled specially with suggestions
     SemanticError.FIELD_NOT_FOUND -> ErrorDef(
       "error.semantic.fieldNotFound",
       Seq(items => typeName(items(0)), items => asString(items(1)))
@@ -119,10 +174,7 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.methodNotFound",
       Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
     ),
-    SemanticError.CONSTRUCTOR_NOT_FOUND -> ErrorDef(
-      "error.semantic.constructorNotFound",
-      Seq(items => typeName(items(0)), items => typeNames(asTypeArray(items(1))))
-    ),
+    // CONSTRUCTOR_NOT_FOUND handled specially with available constructors
     SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE -> ErrorDef(
       "error.semantic.cannotCallMethodOnPrimitive",
       Seq(items => typeName(items(0)), items => asString(items(1)))
@@ -336,6 +388,42 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /**
+   * Handles CLASS_NOT_FOUND with optional suggestions for similar class names.
+   */
+  private def reportClassNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val name = asString(items(0))
+    val baseMessage = format(message("error.semantic.classNotFound"), Seq(name))
+
+    val suggestion = if (items.length > 1) {
+      val candidates = items(1).asInstanceOf[Array[String]]
+      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
+   * Handles CONSTRUCTOR_NOT_FOUND with available constructors display.
+   */
+  private def reportConstructorNotFound(position: Location, items: Array[AnyRef]): Unit = {
+    val typeRef = items(0).asInstanceOf[TypedAST.Type]
+    val argTypes = asTypeArray(items(1))
+    val baseMessage = format(message("error.semantic.constructorNotFound"), Seq(typeName(typeRef), typeNames(argTypes)))
+
+    val suggestion = if (items.length > 2) {
+      val constructors = items(2).asInstanceOf[Array[TypedAST.ConstructorRef]]
+      if (constructors.nonEmpty) {
+        val ctorSignatures = constructors.map { ctor =>
+          s"  ${typeRef.name}(${ctor.getArgs.map(_.displayName).mkString(", ")})"
+        }
+        Some(s"Available constructors:${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
+      } else None
+    } else None
+
+    problem(position, appendSuggestion(baseMessage, suggestion))
+  }
+
+  /**
    * Handles AMBIGUOUS_METHOD with complex item structure.
    */
   private def reportAmbiguousMethod(position: Location, items: Array[AnyRef]): Unit = {
@@ -390,6 +478,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportMethodNotFound(position, items)
       case SemanticError.FIELD_NOT_FOUND =>
         reportFieldNotFound(position, items)
+      case SemanticError.CLASS_NOT_FOUND =>
+        reportClassNotFound(position, items)
+      case SemanticError.CONSTRUCTOR_NOT_FOUND =>
+        reportConstructorNotFound(position, items)
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>
@@ -418,5 +510,45 @@ class SemanticErrorReporter(threshold: Int) {
 
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile
+  }
+
+  // ========== Context management ==========
+
+  /** Sets the current compilation context */
+  def setContext(ctx: CompilationContext): Unit = {
+    this.context = ctx
+  }
+
+  /** Gets the current compilation context */
+  def getContext: CompilationContext = context
+
+  /** Enters a class context */
+  def enterClass(className: String): Unit = {
+    context = context.withClass(className)
+  }
+
+  /** Enters a method context */
+  def enterMethod(methodName: String): Unit = {
+    context = context.withMethod(methodName)
+  }
+
+  /** Leaves the current method context */
+  def leaveMethod(): Unit = {
+    context = context.clearMethod
+  }
+
+  /** Leaves the current class context */
+  def leaveClass(): Unit = {
+    context = context.clearClass
+  }
+
+  /** Sets the compilation phase */
+  def setPhase(phase: String): Unit = {
+    context = context.withPhase(phase)
+  }
+
+  /** Resets the context to empty */
+  def resetContext(): Unit = {
+    context = CompilationContext.empty
   }
 }

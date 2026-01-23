@@ -1,3 +1,10 @@
+/* ************************************************************** *
+ *                                                                *
+ * Copyright (c) 2016-, Kota Mizushima, All rights reserved.  *
+ *                                                                *
+ *                                                                *
+ * This software is distributed under the modified BSD License.   *
+ * ************************************************************** */
 package onion.compiler
 
 import java.util._
@@ -5,14 +12,72 @@ import java.util
 import scala.jdk.CollectionConverters._
 
 /**
-
-
+ * Typed Abstract Syntax Tree (Typed AST)
+ *
+ * This object contains all the typed AST node definitions used by the Onion compiler
+ * after the type checking phase. Unlike the untyped AST ([[AST]]), every node in the
+ * typed AST carries complete type information.
+ *
+ * == Node Hierarchy ==
+ *
+ * {{{
+ * Node (sealed trait)
+ * ├── Type              - Type representations (BasicType, ClassType, ArrayType, etc.)
+ * ├── Term              - Typed expressions with type() method
+ * │   ├── Values        - Literals (IntValue, StringValue, etc.)
+ * │   ├── References    - Variable/field references (RefLocal, RefField, etc.)
+ * │   ├── Operations    - Operators (BinaryTerm, UnaryTerm)
+ * │   └── Calls         - Method/constructor calls (Call, NewObject, etc.)
+ * ├── Statement         - Control flow (Return, Throw, etc.)
+ * └── Declaration       - Class/method definitions (ClassDefinition, MethodDefinition)
+ * }}}
+ *
+ * == Type System ==
+ *
+ * The type hierarchy includes:
+ *   - '''BasicType''': Primitive types (int, long, double, boolean, etc.)
+ *   - '''ClassType''': Reference types (classes, interfaces)
+ *   - '''ArrayType''': Array types with component type and dimension
+ *   - '''AppliedClassType''': Parameterized types (e.g., `List[String]`)
+ *   - '''WildcardType''': Bounded wildcards (e.g., `? extends Number`)
+ *   - '''TypeVariableType''': Type parameters
+ *   - '''NullType''': Type of null literal
+ *   - '''BottomType''': Bottom type (subtype of all types)
+ *
+ * == Term Categories ==
+ *
+ * Terms are typed expressions that can appear in expression positions:
+ *   - '''Value terms''': IntValue, LongValue, StringValue, BoolValue, etc.
+ *   - '''Reference terms''': RefLocal (local variable), RefField (field access)
+ *   - '''Binary terms''': Arithmetic, comparison, logical operators
+ *   - '''Unary terms''': Negation, not, increment/decrement
+ *   - '''Call terms''': Method invocation, constructor call, super call
+ *   - '''Array terms''': RefArray (index), NewArray, NewArrayWithValues
+ *
+ * == Usage in Compiler Pipeline ==
+ *
+ * {{{
+ * Parsing → Rewriting → Typing → '''Code Generation'''
+ *                         ↓
+ *                   TypedAST nodes
+ * }}}
+ *
+ * The typed AST is produced by the Typing phase and consumed by the
+ * code generation phase (AsmCodeGeneration) to produce JVM bytecode.
+ *
+ * @see [[onion.compiler.AST]] for the untyped AST
+ * @see [[onion.compiler.Typing]] for the phase that creates typed AST
+ * @see [[onion.compiler.AsmCodeGeneration]] for bytecode generation
+ *
+ * @author Kota Mizushima
  */
 object TypedAST {
 
   /**
-   * This interface represents an internal representation node of onion program.
-   * @author Kota Mizushima
+   * Base trait for all typed AST nodes.
+   *
+   * This is a sealed trait, meaning all implementations are defined
+   * within this file.
    */
   sealed trait Node
 

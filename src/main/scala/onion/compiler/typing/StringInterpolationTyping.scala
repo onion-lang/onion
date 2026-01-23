@@ -16,7 +16,7 @@ final class StringInterpolationTyping(private val typing: Typing, private val bo
 
     val constructors = sbType.findConstructor(Array[Term]())
     if (constructors.isEmpty) {
-      report(CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type]())
+      report(CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type](), sbType.constructors)
       return None
     }
     val noArgConstructor = constructors(0)

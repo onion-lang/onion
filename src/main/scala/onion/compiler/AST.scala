@@ -18,6 +18,11 @@ object AST {
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A): Unit = {
     buffer += element
   }
+
+  /** Append an element to an immutable list (returns new list) - used for trailing lambda */
+  def appendToList[A](list: List[A], element: A): List[A] = {
+    if (element == null) list else list :+ element
+  }
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString
@@ -162,6 +167,15 @@ object AST {
   }
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
   case class XorAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^=")
+
+  // Do notation for monadic operations: do[M] { x <- e1; y <- e2; ret e3 }
+  /** Binding statement in do notation: x <- expr */
+  case class DoBinding(location: Location, name: String, expr: Expression) extends Node
+  /** Return statement in do notation: ret expr */
+  case class RetStatement(location: Location, expr: Expression) extends Expression
+  /** Do expression: do[M] { statements }
+   *  statements is a List of DoBinding or Expression (including RetStatement) */
+  case class DoExpression(location: Location, monadType: TypeNode, statements: List[Any]) extends Expression
 
   // Patterns for select/case
   abstract sealed class Pattern extends Node

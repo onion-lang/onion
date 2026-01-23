@@ -66,6 +66,133 @@ private[typing] object GenericMethodTypeArguments {
   ): scala.collection.immutable.Map[String, Type] =
     infer(typing, callNode, method, args, classSubst, null)
 
+  /**
+   * Infer type arguments, but only return those that were actually constrained.
+   * Type parameters that would default to their bound are NOT included in the result.
+   * This is useful for preliminary inference before closure typing, where we want
+   * to preserve type variables for closure return type inference.
+   */
+  def inferWithoutDefaults(
+    typing: Typing,
+    callNode: AST.Node,
+    method: Method,
+    args: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    expectedReturn: Type = null
+  ): scala.collection.immutable.Map[String, Type] = {
+    import typing.*
+    val typeParams = method.typeParameters
+    if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
+
+    def isSuperTypeForBounds(left: Type, right: Type): Boolean =
+      if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArgument(right))
+      else TypeRules.isSuperType(left, right)
+
+    val inferred = HashMap[String, Type]()
+    val upperConstraints = HashMap[String, Type]()
+    val lowerConstraints = HashMap[String, Type]()
+    val paramNames = typeParams.map(_.name).toSet
+
+    def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
+      if (bound == null || bound.isNullType) return
+      upperConstraints.get(name) match
+        case None =>
+          upperConstraints += name -> bound
+        case Some(prev) =>
+          if (isSuperTypeForBounds(prev, bound)) upperConstraints += name -> bound
+          else if (isSuperTypeForBounds(bound, prev)) ()
+          else report(INCOMPATIBLE_TYPE, position, prev, bound)
+    }
+
+    def addLower(name: String, bound: Type): Unit = {
+      if (bound == null || bound.isNullType) return
+      lowerConstraints.get(name) match
+        case None =>
+          lowerConstraints += name -> bound
+        case Some(prev) =>
+          if (isSuperTypeForBounds(prev, bound)) ()
+          else if (isSuperTypeForBounds(bound, prev)) lowerConstraints += name -> bound
+          else lowerConstraints += name -> rootClass
+    }
+
+    def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
+      if (actual.isNullType) return
+      formal match
+        case w: TypedAST.WildcardType =>
+          w.lowerBound match
+            case Some(lb) =>
+              lb match
+                case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+                  addUpper(tv.name, actual, position)
+                case _ =>
+                  unify(lb, actual, position)
+            case None =>
+              w.upperBound match
+                case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+                  addLower(tv.name, actual)
+                case _ =>
+                  unify(w.upperBound, actual, position)
+        case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+          inferred.get(tv.name) match {
+            case Some(prev) =>
+              if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
+            case None =>
+              inferred += tv.name -> actual
+          }
+        case apf: TypedAST.AppliedClassType =>
+          def sameRawClass(c1: TypedAST.ClassType, c2: TypedAST.ClassType): Boolean =
+            (c1 eq c2) || (c1.name == c2.name)
+
+          def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
+            if sameRawClass(apf.raw, apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
+              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position) }
+
+          actual match
+            case apa: TypedAST.AppliedClassType =>
+              if sameRawClass(apf.raw, apa.raw) then unifyWithApplied(apa)
+              else
+                val views = AppliedTypeViews.collectAppliedViewsFrom(apa)
+                views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
+                  case Some(view) => unifyWithApplied(view)
+                  case None =>
+            case ct: ClassType =>
+              val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
+              views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
+                case Some(view) => unifyWithApplied(view)
+                case None =>
+            case _ =>
+        case aft: ArrayType =>
+          actual match {
+            case aat: ArrayType if aft.dimension == aat.dimension =>
+              unify(aft.component, aat.component, position)
+            case _ =>
+          }
+        case _ =>
+    }
+
+    val formalArgs =
+      method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+    formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+
+    if (expectedReturn != null) {
+      val formalReturn =
+        TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+      unify(formalReturn, expectedReturn, callNode)
+    }
+
+    // Only include type parameters that were actually constrained
+    // (either directly inferred or have lower constraints)
+    val result = HashMap[String, Type]()
+    for (tp <- typeParams) {
+      val name = tp.name
+      inferred.get(name).orElse(lowerConstraints.get(name)).foreach { t =>
+        result += name -> t
+      }
+    }
+
+    result.toMap
+  }
+
   def explicit(
     typing: Typing,
     callNode: AST.Node,
@@ -167,21 +294,25 @@ private[typing] object GenericMethodTypeArguments {
               inferred += tv.name -> actual
           }
         case apf: TypedAST.AppliedClassType =>
+          // 同じクラス名で型引数の数が一致するかチェック（参照比較ではなく名前比較）
+          def sameRawClass(c1: TypedAST.ClassType, c2: TypedAST.ClassType): Boolean =
+            (c1 eq c2) || (c1.name == c2.name)
+
           def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
-            if (apf.raw eq apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
+            if sameRawClass(apf.raw, apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
               apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position) }
 
           actual match
             case apa: TypedAST.AppliedClassType =>
-              if (apf.raw eq apa.raw) then unifyWithApplied(apa)
+              if sameRawClass(apf.raw, apa.raw) then unifyWithApplied(apa)
               else
                 val views = AppliedTypeViews.collectAppliedViewsFrom(apa)
-                views.get(apf.raw) match
+                views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
                   case Some(view) => unifyWithApplied(view)
                   case None =>
             case ct: ClassType =>
               val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
-              views.get(apf.raw) match
+              views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
                 case Some(view) => unifyWithApplied(view)
                 case None =>
             case _ =>

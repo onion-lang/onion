@@ -31,23 +31,45 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
       val hasReturn = containsReturn(node.body)
       val useExpressionBody = !hasReturn
 
+      // Check if inferredTarget has a return type that needs inference
+      // This happens when the expected type is like Function1<String, Object> where U was bound to Object
+      // or Function1<String, Future<U>> where U is a type variable inside a complex type
+      val needsReturnTypeInference = inferredTarget match {
+        case applied: AppliedClassType =>
+          // Check if the last type argument (return type for FunctionN) contains type variables
+          applied.typeArguments.lastOption.exists { lastArg =>
+            lastArg == rootClass || containsTypeVariable(lastArg)
+          }
+        case _ => false
+      }
+
       val inferredReturnType =
-        if (inferredTarget == null && node.typeRef.isRelaxed) {
+        if ((inferredTarget == null || needsReturnTypeInference) && node.typeRef.isRelaxed) {
           if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes)
           else inferReturnTypeFromReturns(node, context, argTypes)
         } else None
 
       val typeRef =
-        if (inferredTarget != null) rawTypeRef
-        else if (node.typeRef.isRelaxed) inferFunctionType(rawTypeRef, argTypes, inferredReturnType)
-        else rawTypeRef
+        if (inferredTarget != null && inferredReturnType.isDefined) {
+          // Use inferred return type to create a more precise type
+          inferFunctionType(rawTypeRef, argTypes, inferredReturnType)
+        } else if (inferredTarget != null) {
+          rawTypeRef
+        } else if (node.typeRef.isRelaxed) {
+          inferFunctionType(rawTypeRef, argTypes, inferredReturnType)
+        } else {
+          rawTypeRef
+        }
       val classSubst = TypeSubstitution.classSubstitution(typeRef)
 
       def substitutedArgs(method: Method): Array[Type] =
         method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true))
 
+      // ラムダの期待戻り値型を計算する際、残った型変数（外側メソッドの型パラメータ等）は
+      // rootClassに置換する。これにより Function1<String, Future<U>> の U が Object になっても
+      // ラムダ本体が Future<String> を返すとき、戻り値型チェックが通るようになる。
       def substitutedReturn(method: Method): Type =
-        TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+        TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
 
       val candidates = typeRef.methods.filter(m => m.name == name && m.arguments.length == argTypes.length)
       candidates.find(m => sameTypes(substitutedArgs(m), argTypes)) match {
@@ -201,10 +223,17 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
     inferredReturnType: Option[Type]
   ): ClassType = {
     if (inferredReturnType.isEmpty && !rawType.isInterface) return rawType
-    val paramCount = rawType.typeParameters.length
+
+    // Get the underlying interface type (unwrap AppliedClassType if necessary)
+    val baseType = rawType match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
+
+    val paramCount = baseType.typeParameters.length
     if (paramCount == argTypes.length + 1) {
       val ret = inferredReturnType.getOrElse(rootClass)
-      AppliedClassType(rawType, (argTypes.toIndexedSeq :+ ret).toList)
+      AppliedClassType(baseType, (argTypes.toIndexedSeq :+ ret).toList)
     } else {
       rawType
     }
@@ -338,6 +367,16 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
 
   private def defaultValue(tp: Type): Term =
     body.defaultValue(tp)
+
+  /** Recursively check if a type contains any type variables */
+  private def containsTypeVariable(typ: Type): Boolean = typ match {
+    case _: TypeVariableType => true
+    case applied: AppliedClassType =>
+      applied.typeArguments.exists(containsTypeVariable)
+    case array: ArrayType =>
+      containsTypeVariable(array.component)
+    case _ => false
+  }
 
   private def containsReturn(node: AST.Node): Boolean = {
     var found = false

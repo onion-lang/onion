@@ -341,24 +341,28 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   def emitRefLocal(gen: GeneratorAdapter, ref: RefLocal, localVars: LocalVarContext): Unit =
     localVars match
       case closureCtx: ClosureLocalVarContext =>
-        closureCtx.capturedBinding(ref.index) match
+        // Use frameIndex to handle nested closures correctly
+        closureCtx.capturedBinding(ref.frame, ref.index) match
           case Some(binding) =>
             gen.loadThis()
             val fieldType = if binding.isBoxed then boxAsmType(binding.tp) else asmType(binding.tp)
             gen.getField(
               AsmUtil.objectType(closureCtx.closureClassName),
-              closureCtx.capturedFieldName(binding.index),
+              closureCtx.capturedFieldName(binding),
               fieldType
             )
             // If boxed, also get the value from the box
             if binding.isBoxed then
               gen.getField(boxAsmType(binding.tp), "value", boxedValueType(binding.tp))
           case None =>
-            if closureCtx.isParameter(ref.index) then
+            // For frame=0 (current closure's own variables/parameters)
+            if ref.frame == 0 && closureCtx.isParameter(ref.index) then
               gen.loadArg(ref.index)
-            else
+            else if ref.frame == 0 then
               val slot = closureCtx.slotOf(ref.index).getOrElse(closureCtx.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
               gen.loadLocal(slot)
+            else
+              throw new IllegalStateException(s"Non-captured variable with frame=${ref.frame}, index=${ref.index} in closure context")
       case _ =>
         if localVars.isParameter(ref.index) then
           gen.loadArg(ref.index)
@@ -375,14 +379,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   def emitSetLocal(gen: GeneratorAdapter, set: SetLocal, className: String, localVars: LocalVarContext): Unit =
     localVars match
       case closureCtx: ClosureLocalVarContext =>
-        closureCtx.capturedBinding(set.index) match
+        // Use frameIndex to handle nested closures correctly
+        closureCtx.capturedBinding(set.frame, set.index) match
           case Some(binding) if binding.isBoxed =>
             // Boxed captured variable: load box, compute value, put value into box
             gen.loadThis()
             val boxType = boxAsmType(binding.tp)
             gen.getField(
               AsmUtil.objectType(closureCtx.closureClassName),
-              closureCtx.capturedFieldName(binding.index),
+              closureCtx.capturedFieldName(binding),
               boxType
             )
             emitExpressionWithContext(gen, set.value, className, localVars)
@@ -402,10 +407,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
               gen.dupX1()
             gen.putField(
               AsmUtil.objectType(closureCtx.closureClassName),
-              closureCtx.capturedFieldName(binding.index),
+              closureCtx.capturedFieldName(binding),
               asmType(binding.tp)
             )
           case None =>
+            // For frame=0 (current closure's own variables/parameters)
+            if set.frame != 0 then
+              throw new IllegalStateException(s"Non-captured variable with frame=${set.frame}, index=${set.index} in closure context")
             emitExpressionWithContext(gen, set.value, className, localVars)
             val valueType = asmType(set.`type`)
             if valueType.getSize() == 2 then gen.dup2() else gen.dup()

@@ -464,9 +464,11 @@ TOKEN:
 | <K_CHAR:         "Char"  >
 | <K_CLASS:        "class"        >
 | <K_RECORD:       "record"       >
+| <K_RET:          "ret"          >
 | <K_CONST:        "const"        >
 | <K_CONTINUE:     "continue"    >
 | <K_DEF:          "def"          >
+| <K_DO:           "do"           >
 | <K_DOUBLE:       "Double"      >
 | <K_ELSE:         "else"         >
 | <K_ENUM:         "enum"         >
@@ -531,6 +533,7 @@ TOKEN : {
 | <GT:             ">"            >
 | <ARROW:          "->"           >
 | <ARROW2:         "=>"           >
+| <LARROW:         "<-"           >
 | <SUBTYPE:        "<:"           >
 | <NOT:            "!"            >
 | <AMP:            "&"            >
@@ -1426,6 +1429,7 @@ AST.Expression primary_suffix() : {
   Token t, n; AST.Expression e, a = null; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
   List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
   AST.TypeNode type;
+  AST.ClosureExpression tl = null;
 }{
   e=primary()
 ( LOOKAHEAD(2)
@@ -1433,9 +1437,11 @@ AST.Expression primary_suffix() : {
   | t="." eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
-          {e = new AST.MethodCall(p(t), e, c(n), args, tas);}
+        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+          { args = AST.appendToList(args, tl); e = new AST.MethodCall(p(t), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
-          {e = new AST.MethodCall(p(t), e, c(n), args);}
+        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+          { args = AST.appendToList(args, tl); e = new AST.MethodCall(p(t), e, c(n), args); }
     | {e = new AST.MemberSelection(p(t), e, c(n));}
     )
   | t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
@@ -1451,18 +1457,32 @@ AST.Expression primary() : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL();
   AST.BlockExpression body;
+  AST.ClosureExpression tl = null;
 }{
   LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
-    t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"           {return new AST.SuperMethodCall(p(t), c(n), es, tas);}
-| t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]                                {return new AST.SuperMethodCall(p(t), c(n), es);}
-| LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es, tas);}
-| LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"    {return new AST.StaticMethodCall(p(t), ty, c(n), es);}
+    t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
+| t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es); }
+| LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+| LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
 | LOOKAHEAD(2) ty=class_type() t="::" n=id()                        {return new AST.StaticMemberSelection(p(t), ty, c(n));}
-| LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas);}
-| LOOKAHEAD(2) t=id() "(" es=terms() ")"                            {return new AST.UnqualifiedMethodCall(p(t), c(t), es);}
+| LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es, tas); }
+| LOOKAHEAD(2) t=id() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es); }
 | t=id()                                                            {return new AST.Id(p(t), c(t));}
 | {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
 | LOOKAHEAD( lambda_head() ) e=arrow_anonymous_function()                 {return e;}
+| LOOKAHEAD("do" "[") e=do_expression()                                   {return e;}
 | LOOKAHEAD("new" raw_type() "[" "]" "{") t="new" ty=raw_type() "[" "]" "{" eols() es=terms() "}"
     { return new AST.NewArrayWithValues(p(t), ty, es); }
 | t="new" ty=type() {
@@ -1510,6 +1530,65 @@ AST.ClosureExpression arrow_anonymous_function() :{
     leaveDefault();
     return new AST.ClosureExpression(p(t), ty, "call", args, null, body);
   }
+}
+
+// Do notation: do[M] { x <- e1; y <- e2; ret e3 }
+AST.DoExpression do_expression() :{
+  Token t;
+  AST.TypeNode monadType;
+  List<Object> stmts;
+}{
+  {enterDefault();}
+  t="do" "[" monadType=type() "]" "{" eols() stmts=do_statements() eols() "}" {
+    leaveDefault();
+    return new AST.DoExpression(p(t), monadType, stmts);
+  }
+}
+
+List<Object> do_statements() :{
+  Object stmt;
+  ArrayBuffer<Object> stmts = new ArrayBuffer<Object>();
+}{
+  stmt=do_statement() { append(stmts, stmt); }
+  ( eols() ";" eols() stmt=do_statement() { append(stmts, stmt); } )*
+  { return toList(stmts); }
+}
+
+Object do_statement() :{
+  Token t;
+  String name;
+  AST.Expression e;
+}{
+  // ret expr (return statement in do notation)
+  LOOKAHEAD("ret")
+    t="ret" eols() e=term() { return new AST.RetStatement(p(t), e); }
+  // x <- expr (binding)
+| LOOKAHEAD(id() eols() <LARROW>)
+    t=id() eols() <LARROW> eols() e=term() { return new AST.DoBinding(p(t), c(t), e); }
+  // expr (side-effect or final expression)
+| e=term() { return e; }
+}
+
+// Trailing lambda: { x, y => body } or { => body } for zero args
+AST.ClosureExpression trailing_lambda() :{
+  Token t;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  List<AST.CompoundExpression> stmts = (List<AST.CompoundExpression>)AST.NIL();
+  AST.BlockExpression body;
+  AST.TypeNode ty = null;
+}{
+  {enterDefault();}
+  t="{" eols() args=lambda_args() eols() <ARROW2> eols() [stmts=statements()] eols() "}" {
+    body = new AST.BlockExpression(p(t), stmts);
+    ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
+    leaveDefault();
+    return new AST.ClosureExpression(p(t), ty, "call", args, null, body);
+  }
+}
+
+// Look-ahead for trailing lambda: { [args] => ... }
+void trailing_lambda_head() :{}{
+  "{" eols() [lambda_arg_head() ("," eols() lambda_arg_head())*] eols() <ARROW2>
 }
 
 AST.Expression null_literal() :{Token t;}{

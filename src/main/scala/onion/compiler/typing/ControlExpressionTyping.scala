@@ -344,6 +344,65 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       }
     }
 
+    // Recursive helper to process nested field patterns at any depth
+    def processNestedFieldPattern(
+      fieldPattern: AST.Pattern,
+      fieldType: Type,
+      currentPath: List[AccessStep],
+      bindingEntries: scala.collection.mutable.ArrayBuffer[BindingEntry],
+      nestedConditions: scala.collection.mutable.ArrayBuffer[Term],
+      parentNode: AST.Node
+    ): Unit = fieldPattern match {
+      case AST.WildcardPattern(_) =>
+        // Skip wildcard - no binding created
+
+      case AST.BindingPattern(_, bindingName) =>
+        // Simple binding
+        bindingEntries += BindingEntry(bindingName, fieldType, currentPath)
+
+      case nested @ AST.DestructuringPattern(_, ctorName, fieldPats) =>
+        // Nested destructuring pattern - recurse to any depth
+        val nestedClassDef = resolveRecordClass(nested, ctorName)
+        val nestedType = nestedClassDef
+
+        val nestedFields = nestedClassDef.fields
+        if (fieldPats.length != nestedFields.length) {
+          report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(fieldPats.length), ctorName)
+          break(None)
+        }
+
+        // Build accessor for nested type check by following the access path
+        def buildAccessorForCondition(base: Term, path: List[AccessStep]): Term = path match {
+          case Nil => base
+          case AccessStep(castType, getter) :: rest =>
+            val cast = new AsInstanceOf(base, castType)
+            if (getter == null) buildAccessorForCondition(cast, rest)
+            else {
+              val call = new Call(cast, getter, Array.empty)
+              buildAccessorForCondition(call, rest)
+            }
+        }
+
+        val fieldAccess = buildAccessorForCondition(new RefLocal(bind), currentPath)
+        val nestedInstanceOf = new InstanceOf(fieldAccess, nestedType.asInstanceOf[ObjectType])
+        nestedConditions += nestedInstanceOf
+
+        // Process nested field patterns recursively
+        for ((nestedFieldPat, nestedField) <- fieldPats.zip(nestedFields)) {
+          val nestedGetter = findFieldGetter(nestedClassDef, nestedField.name).getOrElse {
+            report(NOT_A_RECORD_TYPE, nested, ctorName)
+            break(None)
+          }
+          val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
+          processNestedFieldPattern(nestedFieldPat, nestedField.`type`, nestedPath, bindingEntries, nestedConditions, nested)
+        }
+
+      case other =>
+        // Other patterns not supported in destructuring position
+        report(NOT_A_RECORD_TYPE, parentNode, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
+        break(None)
+    }
+
     // Look up the record type by constructor name
     val classDef = resolveRecordClass(dp, constructor)
     val recordType = classDef
@@ -371,59 +430,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         break(None)
       }
       val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))
-
-      fieldPattern match {
-        case AST.WildcardPattern(_) =>
-          // Skip wildcard - no binding created
-
-        case AST.BindingPattern(_, name) =>
-          // Simple binding
-          bindingEntries += BindingEntry(name, field.`type`, currentPath)
-
-        case nested @ AST.DestructuringPattern(_, nestedCtor, nestedFieldPatterns) =>
-          // Nested destructuring pattern - recurse
-          val nestedClassDef = resolveRecordClass(nested, nestedCtor)
-          val nestedType = nestedClassDef
-
-          val nestedFields = nestedClassDef.fields
-          if (nestedFieldPatterns.length != nestedFields.length) {
-            report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(nestedFieldPatterns.length), nestedCtor)
-            break(None)
-          }
-
-          // Build accessor for nested type check: ((RootType)bind).getter() instanceof NestedType
-          val rootCast = new AsInstanceOf(new RefLocal(bind), recordType.asInstanceOf[ObjectType])
-          val fieldAccess = new Call(rootCast, getter, Array.empty)
-          val nestedInstanceOf = new InstanceOf(fieldAccess, nestedType.asInstanceOf[ObjectType])
-          nestedConditions += nestedInstanceOf
-
-          // Process nested field patterns
-          for ((nestedFieldPattern, nestedField) <- nestedFieldPatterns.zip(nestedFields)) {
-            val nestedGetter = findFieldGetter(nestedClassDef, nestedField.name).getOrElse {
-              report(NOT_A_RECORD_TYPE, nested, nestedCtor)
-              break(None)
-            }
-            val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
-
-            nestedFieldPattern match {
-              case AST.WildcardPattern(_) =>
-                // Skip
-
-              case AST.BindingPattern(_, name) =>
-                bindingEntries += BindingEntry(name, nestedField.`type`, nestedPath)
-
-              case _ =>
-                // Deeper nesting - for now, report error (could support more levels)
-                report(NOT_A_RECORD_TYPE, nested, "deeply nested patterns not yet supported")
-                break(None)
-            }
-          }
-
-        case other =>
-          // Other patterns not supported in destructuring position
-          report(NOT_A_RECORD_TYPE, dp, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
-          break(None)
-      }
+      processNestedFieldPattern(fieldPattern, field.`type`, currentPath, bindingEntries, nestedConditions, dp)
     }
 
     val bindingInfo = MultiBindings(recordType.asInstanceOf[ClassType], bindingEntries.toList, nestedConditions.toList)

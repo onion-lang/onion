@@ -8,7 +8,8 @@ import scala.collection.mutable
 
 private[compiler] object CapturedVariableCollector {
   def collect(stmt: ActionStatement, frame: onion.compiler.LocalFrame = null): Seq[ClosureLocalBinding] = {
-    val captured = mutable.LinkedHashMap[Int, ClosureLocalBinding]()
+    // Use (frameIndex, index) as key to handle nested closures correctly
+    val captured = mutable.LinkedHashMap[(Int, Int), ClosureLocalBinding]()
 
     // Build index -> ClosureLocalBinding map from frame
     val bindingsByIndex: Map[Int, ClosureLocalBinding] =
@@ -20,10 +21,17 @@ private[compiler] object CapturedVariableCollector {
       } else Map.empty
 
     def record(frameIndex: Int, index: Int, tp: TypedAST.Type): Unit =
-      captured.getOrElseUpdate(index, {
-        // Try to get the original binding with correct frame, isMutable, and isBoxed flags
-        bindingsByIndex.getOrElse(index,
-          new ClosureLocalBinding(frameIndex, index, tp, isMutable = true, isBoxed = false))
+      captured.getOrElseUpdate((frameIndex, index), {
+        // Create a new binding with the correct frameIndex
+        // Use bindingsByIndex only for isMutable and isBoxed flags (if frame=1 means direct parent)
+        val baseBinding = bindingsByIndex.get(index)
+        new ClosureLocalBinding(
+          frameIndex,  // Always use the passed frameIndex
+          index,
+          tp,
+          baseBinding.map(_.isMutable).getOrElse(true),
+          baseBinding.map(_.isBoxed).getOrElse(false)
+        )
       })
 
     def visitTerm(term: Term): Unit = term match {
@@ -98,8 +106,17 @@ private[compiler] object CapturedVariableCollector {
       case newArrWithValues: NewArrayWithValues =>
         newArrWithValues.values.foreach(visitTerm)
 
-      case _: NewClosure =>
-        () // Do not traverse nested closures.
+      case closure: NewClosure =>
+        // For nested closures, we need to capture variables that the nested closure will need
+        // These are the variables that the nested closure itself captures (with adjusted frame indices)
+        // Frame index adjustment: if nested closure captures at frame N, we need to capture at frame N-1
+        // (because we're one level closer to the definition site)
+        val nestedCaptured = CapturedVariableCollector.collect(closure.block, closure.frame)
+        for capturedVar <- nestedCaptured do
+          val adjustedFrame = capturedVar.frameIndex - 1
+          if adjustedFrame > 0 then
+            // This variable comes from an outer scope beyond the current closure
+            record(adjustedFrame, capturedVar.index, capturedVar.tp)
 
       case _: BoolValue | _: ByteValue | _: CharacterValue | _: DoubleValue | _: FloatValue | _: IntValue |
           _: LongValue | _: ShortValue | _: StringValue | _: NullValue |

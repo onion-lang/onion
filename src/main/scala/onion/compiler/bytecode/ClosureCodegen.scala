@@ -38,18 +38,23 @@ final class ClosureCodegen(
     gen.newInstance(closureType)
     gen.dup()
 
+    // When emitting code to capture a variable:
+    // - capturedVar.frameIndex is relative to the NEW closure being created
+    // - In the CURRENT context (where we're generating code), we need to adjust
+    // - frame=1 in new closure means frame=0 in current closure (one level closer)
     for capturedVar <- capturedVars do
+      val adjustedFrame = capturedVar.frameIndex - 1
       if capturedVar.isBoxed then
         // For boxed variables, load the box object itself (not the value inside)
         val boxType = boxAsmType(capturedVar.tp)
         localVars match
           case closureCtx: ClosureLocalVarContext =>
-            closureCtx.capturedBinding(capturedVar.index) match
+            closureCtx.capturedBinding(adjustedFrame, capturedVar.index) match
               case Some(binding) =>
                 gen.loadThis()
                 gen.getField(
                   AsmUtil.objectType(closureCtx.closureClassName),
-                  closureCtx.capturedFieldName(binding.index),
+                  closureCtx.capturedFieldName(binding),
                   boxType
                 )
               case None =>
@@ -63,8 +68,7 @@ final class ClosureCodegen(
             )
             gen.loadLocal(slot)
       else
-        // Use the correct frame from ClosureLocalBinding
-        val ref = new RefLocal(capturedVar.frameIndex, capturedVar.index, capturedVar.tp)
+        val ref = new RefLocal(adjustedFrame, capturedVar.index, capturedVar.tp)
         asmCodeGen.emitRefLocal(gen, ref, localVars)
 
     val ctorDesc = AsmType.getMethodDescriptor(
@@ -103,7 +107,7 @@ final class ClosureCodegen(
       val fieldType = capturedFieldType(capturedVar)
       cw.visitField(
         Opcodes.ACC_PRIVATE,
-        s"captured_${capturedVar.index}",
+        s"captured_${capturedVar.frameIndex}_${capturedVar.index}",
         fieldType.getDescriptor,
         null,
         null
@@ -187,7 +191,7 @@ final class ClosureCodegen(
       gen.loadArg(paramIndex)
       gen.putField(
         AsmUtil.objectType(className),
-        s"captured_${capturedVar.index}",
+        s"captured_${capturedVar.frameIndex}_${capturedVar.index}",
         capturedFieldType(capturedVar)
       )
 

@@ -50,6 +50,17 @@ private object TypeSubst {
 final class MethodCallTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
+  /** Check if a closure expression has any untyped parameters */
+  private def hasUntypedParams(closure: AST.ClosureExpression): Boolean =
+    closure.args.exists(_.typeRef == null)
+
+  /** Check if an expression is a closure with untyped parameters */
+  private def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
+    expr match {
+      case c: AST.ClosureExpression => hasUntypedParams(c)
+      case _ => false
+    }
+
   private sealed trait StaticImportLookup
   private case class StaticImportFound(term: Term) extends StaticImportLookup
   private case object StaticImportNotFound extends StaticImportLookup
@@ -344,8 +355,23 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     var target = typed(node.target, context).getOrElse(null)
     if (target == null) return None
-    val params = typedTerms(node.args.toArray, context)
-    if (params == null) return None
+
+    // Check for closures with untyped parameters - they need bidirectional type inference
+    val untypedClosureIndices = node.args.zipWithIndex.collect {
+      case (expr, i) if isClosureWithUntypedParams(expr) => i
+    }.toSet
+
+    // Only type non-closure arguments here if there are untyped closures
+    val params = if (untypedClosureIndices.isEmpty) {
+      typedTerms(node.args.toArray, context)
+    } else {
+      // For bidirectional inference, we'll type parameters inside typeMethodCallOnObject
+      null
+    }
+
+    // If params is null due to typing error (not due to bidirectional inference), return None
+    if (params == null && untypedClosureIndices.isEmpty) return None
+
     target.`type` match {
       case targetType: ObjectType =>
         return typeMethodCallOnObject(node, target, targetType, params, context, expected)
@@ -382,6 +408,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       return typeMethodCallWithNamedArgs(node, target, targetType, context, expected)
     }
 
+    // Bidirectional type inference for closures with untyped parameters
+    // If params is null, it means we need bidirectional inference
+    if (params == null) {
+      val untypedClosureIndices = node.args.zipWithIndex.collect {
+        case (expr, i) if isClosureWithUntypedParams(expr) => i
+      }.toSet
+      return typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
+    }
+
     val methods = MethodResolution.findMethods(targetType, name, params, table_)
     selectSingleMethod(node, targetType, name, methods, types(params)) match {
       case None => None
@@ -399,6 +434,154 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           val castType = TypeSubst(method.returnType, classSubst, methodSubst)
           TypeSubst.withCast(call, castType)
         }
+    }
+  }
+
+  /**
+   * Bidirectional type inference for method calls with closures that have untyped parameters.
+   *
+   * The flow is:
+   * 1. Type all non-closure arguments normally
+   * 2. Use placeholder types for closure arguments (suppress errors)
+   * 3. Resolve the method using the non-closure argument types
+   * 4. Get the expected types for all arguments from the resolved method
+   * 5. Re-type the closures with the expected types
+   */
+  private def typeMethodCallWithBidirectionalInference(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Term] = {
+    val name = node.name
+    val args = node.args.toArray
+
+    // Phase 1: Type non-closure arguments, use placeholder for closures
+    val preliminaryParams = new Array[Term](args.length)
+    var hasNonClosureError = false
+
+    for (i <- args.indices) {
+      if (untypedClosureIndices.contains(i)) {
+        // Create a placeholder for the closure - we'll type it later
+        // For method resolution, we need a rough type hint
+        preliminaryParams(i) = null
+      } else {
+        typed(args(i), context) match {
+          case Some(term) => preliminaryParams(i) = term
+          case None =>
+            hasNonClosureError = true
+            preliminaryParams(i) = null
+        }
+      }
+    }
+
+    if (hasNonClosureError) return None
+
+    // Phase 2: Find candidate methods using non-closure arguments
+    // We need to find methods that could potentially match
+    val candidates = new JTreeSet[Method](new MethodComparator)
+    collectMethodsMatching(targetType, name, candidates, isInstanceMethod)
+
+    if (candidates.isEmpty) {
+      report(METHOD_NOT_FOUND, node, targetType, name, Array[Type]())
+      return None
+    }
+
+    // Filter candidates by argument count and non-closure argument types
+    val nonClosureTypes = preliminaryParams.zipWithIndex.collect {
+      case (term, i) if term != null => (i, term.`type`)
+    }.toMap
+
+    val applicableMethods = candidates.asScala.filter { method =>
+      val methodArgCount = method.arguments.length
+      val argsCount = args.length
+
+      // Check argument count (considering default args and varargs)
+      val countOk = if (method.isVararg) {
+        argsCount >= method.minArguments
+      } else {
+        argsCount >= method.minArguments && argsCount <= methodArgCount
+      }
+
+      if (!countOk) false
+      else {
+        // Check non-closure arguments are compatible
+        val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+        val methodSubst = GenericMethodTypeArguments.infer(
+          typing, node, method, preliminaryParams.filter(_ != null), classSubst, expected
+        )
+        val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+
+        nonClosureTypes.forall { case (i, argType) =>
+          i < expectedArgs.length && isAssignableWithBoxing(expectedArgs(i), argType)
+        }
+      }
+    }.toArray
+
+    if (applicableMethods.isEmpty) {
+      val nonClosureTypesArr = nonClosureTypes.values.toArray
+      report(METHOD_NOT_FOUND, node, targetType, name, nonClosureTypesArr)
+      return None
+    }
+
+    // For now, just pick the first applicable method
+    // TODO: Better overload resolution considering closure types
+    val method = applicableMethods.head
+    val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+
+    // Phase 3: Get preliminary expected argument types from the resolved method
+    // First infer method type args using only the non-closure arguments
+    // Use inferWithoutDefaults so that type parameters only appearing in closure return types
+    // are NOT included in the substitution, allowing closure typing to infer them
+    val nonClosureParams = preliminaryParams.filter(_ != null)
+    val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(typing, node, method, nonClosureParams, classSubst, expected)
+    // For closure arguments, preserve type variables so closure typing can infer return types
+    // Use defaultToBound = false to keep type variables like U in Function1<String, Future<U>>
+    val preliminaryExpectedArgs = method.arguments.map { tp =>
+      TypeSubstitution.substituteType(tp, classSubst, preliminaryMethodSubst, defaultToBound = false)
+    }
+
+    // Phase 4: Type the closures with preliminary expected types
+    // The closure will infer its return type from its body
+    val finalParams = new Array[Term](args.length)
+    var hasError = false
+
+    for (i <- args.indices) {
+      if (untypedClosureIndices.contains(i)) {
+        val expectedType = if (i < preliminaryExpectedArgs.length) preliminaryExpectedArgs(i) else null
+        typed(args(i), context, expectedType) match {
+          case Some(term) => finalParams(i) = term
+          case None =>
+            hasError = true
+            finalParams(i) = null
+        }
+      } else {
+        finalParams(i) = preliminaryParams(i)
+      }
+    }
+
+    if (hasError) return None
+
+    // Check if the method is static (not allowed for instance method call)
+    if ((method.modifier & AST.M_STATIC) != 0) {
+      report(ILLEGAL_METHOD_CALL, node, method.affiliation, name, method.arguments)
+      return None
+    }
+
+    // Phase 5: Re-infer method type arguments with actual closure types
+    // This allows the method's return type parameter (e.g., U in map<U>) to be inferred from closure's actual return type
+    val finalMethodSubst = GenericMethodTypeArguments.infer(typing, node, method, finalParams, classSubst, expected)
+    val finalExpectedArgs = TypeSubst.args(method, classSubst, finalMethodSubst)
+
+    // Phase 6: Build the final call
+    for {
+      finalProcessedParams <- prepareCallParams(node, node.args, method, finalParams, finalExpectedArgs)
+    } yield {
+      val call = new Call(target, method, finalProcessedParams)
+      val castType = TypeSubst(method.returnType, classSubst, finalMethodSubst)
+      TypeSubst.withCast(call, castType)
     }
   }
 

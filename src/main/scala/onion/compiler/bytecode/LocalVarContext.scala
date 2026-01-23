@@ -61,12 +61,25 @@ class ClosureLocalVarContext(
   val closureClassName: String,
   val capturedVars: Seq[onion.compiler.ClosureLocalBinding]
 ) extends LocalVarContext(gen) {
-  private val capturedByIndex: Map[Int, onion.compiler.ClosureLocalBinding] =
-    capturedVars.map(b => b.index -> b).toMap
+  // Use (frameIndex, index) as key to handle nested closures correctly
+  private val capturedByKey: Map[(Int, Int), onion.compiler.ClosureLocalBinding] =
+    capturedVars.map(b => (b.frameIndex, b.index) -> b).toMap
 
-  def capturedFieldName(typedIndex: Int): String = s"captured_$typedIndex"
+  // Also maintain index-only lookup for backward compatibility with non-nested cases
+  private val capturedByIndex: Map[Int, onion.compiler.ClosureLocalBinding] =
+    capturedVars.filter(_.frameIndex == 0).map(b => b.index -> b).toMap
+
+  def capturedFieldName(frameIndex: Int, typedIndex: Int): String = s"captured_${frameIndex}_$typedIndex"
+
+  def capturedFieldName(binding: onion.compiler.ClosureLocalBinding): String =
+    capturedFieldName(binding.frameIndex, binding.index)
+
+  def capturedBinding(frameIndex: Int, typedIndex: Int): Option[onion.compiler.ClosureLocalBinding] =
+    capturedByKey.get((frameIndex, typedIndex))
 
   def capturedBinding(typedIndex: Int): Option[onion.compiler.ClosureLocalBinding] = capturedByIndex.get(typedIndex)
+
+  def isCapturedVariable(frameIndex: Int, typedIndex: Int): Boolean = capturedByKey.contains((frameIndex, typedIndex))
 
   def isCapturedVariable(typedIndex: Int): Boolean = capturedByIndex.contains(typedIndex)
 

@@ -675,6 +675,55 @@ object TypedAST {
   }
 
   /**
+   * An extension method definition.
+   *
+   * Extension methods are methods added to existing types without modifying them.
+   * They are compiled as static methods with the receiver as the first parameter.
+   *
+   * {{{
+   * extension String {
+   *   def reversed(): String { ... }
+   * }
+   * // Compiled as: ExtensionString.reversed(String receiver): String
+   * }}}
+   *
+   * @param location Source location
+   * @param modifier Access modifiers
+   * @param receiverType The type being extended
+   * @param name Method name
+   * @param arguments Method parameters (excluding implicit receiver)
+   * @param returnType Return type
+   * @param block Method body
+   */
+  class ExtensionMethodDefinition(
+    val location: Location,
+    val modifier: Int,
+    val receiverType: TypedAST.Type,
+    val containerClass: TypedAST.ClassType,
+    val name: String,
+    val arguments: Array[TypedAST.Type],
+    val returnType: TypedAST.Type,
+    var block: TypedAST.StatementBlock,
+    override val typeParameters: Array[TypedAST.TypeParameter] = Array()
+  ) extends Node with Method {
+    private var frame: LocalFrame = _
+
+    /** The extension method is registered under a generated container class */
+    def affiliation: TypedAST.ClassType = containerClass
+
+    def getBlock: TypedAST.StatementBlock = block
+
+    def setBlock(block: TypedAST.StatementBlock): Unit = this.block = block
+
+    def setFrame(frame: LocalFrame): Unit = this.frame = frame
+
+    def getFrame: LocalFrame = frame
+
+    /** Extension methods are always static at the bytecode level */
+    def isStatic: Boolean = true
+  }
+
+  /**
    * @author Kota Mizushima
    */
   class NewObject(location: Location, val constructor: TypedAST.ConstructorRef, val parameters: Array[TypedAST.Term]) extends Term(location) {

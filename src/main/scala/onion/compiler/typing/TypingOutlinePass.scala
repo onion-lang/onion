@@ -19,6 +19,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
       case node: AST.RecordDeclaration => processRecordDeclaration(node)
       case node: AST.EnumDeclaration => processEnumDeclaration(node)
+      case node: AST.ExtensionDeclaration => processExtensionDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
       case _ =>
@@ -165,6 +166,93 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       val superInit = new TypedAST.Super(definition_.superClass, superArgs, superTerms)
       val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, ctorArgs, null, superInit)
       definition_.add(ctor)
+    }
+  }
+
+  private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = {
+    // Get the container class registered in HeaderPass
+    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+    mapper_ = find(definition_.name)
+
+    // Resolve the receiver type (the type being extended)
+    val receiverType = mapFrom(node.receiverType)
+    if (receiverType == null) {
+      report(SemanticError.CLASS_NOT_FOUND, node.receiverType, node.receiverType.desc.toString)
+      return
+    }
+
+    // Get the FQCN for the receiver type (for extension method lookup)
+    val receiverFqcn = receiverType match {
+      case ct: ClassType => ct.name
+      case at: ArrayType => s"[${at.component}"  // array representation
+      case _ => receiverType.toString
+    }
+
+    // Process each method in the extension
+    for (method <- node.methods) {
+      processExtensionMethodDeclaration(method, receiverType, receiverFqcn)
+    }
+
+    // Add default constructor to container class
+    definition_.addDefaultConstructor
+  }
+
+  private def processExtensionMethodDeclaration(
+    node: AST.MethodDeclaration,
+    receiverType: Type,
+    receiverFqcn: String
+  ): Unit = {
+    val methodTypeParams = createTypeParams(node.typeParameters)
+    declaredTypeParams_(node) = methodTypeParams
+
+    openTypeParams(typeParams_ ++ methodTypeParams) {
+      val argsOption = typesOf(node.args)
+      val returnTypeOption =
+        if (node.returnType == null) {
+          report(SemanticError.RETURN_TYPE_REQUIRED, node, s"extension ${receiverFqcn}.${node.name}")
+          None
+        } else Option(mapFrom(node.returnType))
+
+      for (args <- argsOption; returnType <- returnTypeOption) {
+        // Extension methods are always public and static in the container class
+        val modifier = Modifier.PUBLIC | Modifier.STATIC
+        val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+        val hasVararg = node.args.lastOption.exists(_.isVararg)
+
+        // Create ExtensionMethodDefinition
+        val extensionMethod = new ExtensionMethodDefinition(
+          node.location,
+          modifier,
+          receiverType,
+          definition_,  // container class
+          node.name,
+          args.toArray,
+          returnType,
+          null,  // block will be set in BodyPass
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
+        )
+        put(node, extensionMethod)
+
+        // Register the extension method for lookup during method resolution
+        registerExtensionMethod(receiverFqcn, extensionMethod)
+
+        // Also create a static method in the container class
+        // The static method has an extra first parameter for the receiver
+        val staticArgs = Array(receiverType) ++ args.toArray
+        val staticMethod = new MethodDefinition(
+          node.location,
+          modifier,
+          definition_,
+          node.name,
+          staticArgs,
+          returnType,
+          null,
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
+          throwsTypes,
+          hasVararg
+        )
+        definition_.add(staticMethod)
+      }
     }
   }
 

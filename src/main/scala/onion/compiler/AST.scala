@@ -207,6 +207,21 @@ object AST {
   case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode] = Nil) extends Toplevel
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 
+  /**
+   * Extension declaration for adding methods to existing types.
+   *
+   * {{{
+   * extension String {
+   *   def reversed(): String { ... }
+   * }
+   * }}}
+   *
+   * @param location Source location
+   * @param receiverType The type being extended
+   * @param methods Methods to add to the type
+   */
+  case class ExtensionDeclaration(location: Location, receiverType: TypeNode, methods: List[MethodDeclaration]) extends Toplevel
+
   abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
   case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None) extends Node
 

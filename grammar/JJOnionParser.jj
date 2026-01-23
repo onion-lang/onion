@@ -472,6 +472,7 @@ TOKEN:
 | <K_DOUBLE:       "Double"      >
 | <K_ELSE:         "else"         >
 | <K_ENUM:         "enum"         >
+| <K_EXTENSION:    "extension"    >
 | <K_FALSE:        "false"        >
 | <K_FINALLY:      "finally"      >
 | <K_FINAL:        "final"        >
@@ -692,12 +693,28 @@ AST.ImportClause import_decl() :{
 AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
 ( LOOKAHEAD(2)
   top=statement()
+| LOOKAHEAD("extension")
+  top=extension_decl()
 | [mset=modifiers()]
   ( top=type_decl(mset)
   | top=fun_decl(mset)
   | top=var_decl(mset)
   )
 ) {return top;}
+}
+
+AST.ExtensionDeclaration extension_decl() : {
+  Token t;
+  AST.TypeNode receiverType;
+  AST.MethodDeclaration method;
+  ArrayBuffer<AST.MethodDeclaration> methods = new ArrayBuffer<AST.MethodDeclaration>();
+  int mset = 0;
+}{
+  t="extension" receiverType=type() "{"
+    ([mset=modifiers()] method=method_decl(mset) {append(methods, method); mset = 0;})*
+  "}" {
+    return new AST.ExtensionDeclaration(p(t), receiverType, toList(methods));
+  }
 }
 
 AST.GlobalVariableDeclaration var_decl(int modifiers) : {

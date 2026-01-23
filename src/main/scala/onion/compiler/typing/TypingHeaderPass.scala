@@ -25,6 +25,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
         registerRecord(declaration, moduleName, imports)
       case declaration: AST.EnumDeclaration =>
         registerEnum(declaration, moduleName, imports)
+      case declaration: AST.ExtensionDeclaration =>
+        registerExtension(declaration, moduleName, imports)
       case _ =>
         nonTypeCount += 1
     }
@@ -117,6 +119,48 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
       table_.classes.add(node)
       put(declaration, node)
       add(node.name, new NameMapper(imports))
+    }
+  }
+
+  private def registerExtension(declaration: AST.ExtensionDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
+    // Generate container class name from receiver type
+    val receiverTypeName = extractTypeName(declaration.receiverType)
+    val containerClassName = createFQCN(moduleName, "Extension$" + receiverTypeName.replace(".", "_"))
+
+    // Extension container is a public final class with static methods
+    val modifiers = Modifier.PUBLIC | Modifier.FINAL
+    val node = ClassDefinition.newClass(declaration.location, modifiers, containerClassName, table_.rootClass, new Array[ClassType](0))
+    node.setSourceFile(Paths.nameOf(unit.sourceFile))
+    node.setResolutionComplete(true) // No inheritance to resolve
+
+    if (table_.lookup(node.name) != null) {
+      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    } else {
+      table_.classes.add(node)
+      put(declaration, node)
+      add(node.name, new NameMapper(imports))
+      // Register this as an extension declaration for later processing
+      registerExtensionDeclaration(declaration, node)
+    }
+  }
+
+  private def extractTypeName(typeNode: AST.TypeNode): String = {
+    typeNode.desc match {
+      case AST.ReferenceType(name, _) => name.replace(".", "_")
+      case AST.ParameterizedType(component, _) => extractTypeDescName(component)
+      case AST.ArrayType(component) => extractTypeDescName(component) + "_Array"
+      case AST.PrimitiveType(kind) => kind.toString
+      case _ => "Unknown"
+    }
+  }
+
+  private def extractTypeDescName(desc: AST.TypeDescriptor): String = {
+    desc match {
+      case AST.ReferenceType(name, _) => name.replace(".", "_")
+      case AST.ParameterizedType(component, _) => extractTypeDescName(component)
+      case AST.ArrayType(component) => extractTypeDescName(component) + "_Array"
+      case AST.PrimitiveType(kind) => kind.toString
+      case _ => "Unknown"
     }
   }
 

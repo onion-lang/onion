@@ -193,6 +193,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] var unit_ : AST.CompilationUnit = uninitialized
   private[compiler] var typeParams_ : TypeParamScope = emptyTypeParams
   private[compiler] val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
+  // Extension method support: maps extension declarations to their container classes
+  private[compiler] val extensionDeclarations_ : Buffer[(AST.ExtensionDeclaration, ClassDefinition)] = Buffer()
+  // Maps receiver type FQCN to extension methods - populated during OutlinePass
+  private[compiler] val extensionMethods_ : HashMap[String, Buffer[ExtensionMethodDefinition]] = HashMap()
   private[compiler] val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   private[compiler] val warningReporter_ : WarningReporter = new WarningReporter(config.warningLevel, config.suppressedWarnings)
   private var suppressReporting: Int = 0
@@ -305,6 +309,16 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def lookupKernelNodeOpt(astNode: AST.Node): Option[Node] = ast2ixt_.get(astNode)
   private[compiler] def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
   private[compiler] def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
+  // Extension method registration
+  private[compiler] def registerExtensionDeclaration(decl: AST.ExtensionDeclaration, container: ClassDefinition): Unit = {
+    extensionDeclarations_ += ((decl, container))
+  }
+  private[compiler] def registerExtensionMethod(receiverFqcn: String, method: ExtensionMethodDefinition): Unit = {
+    extensionMethods_.getOrElseUpdate(receiverFqcn, Buffer()) += method
+  }
+  private[compiler] def lookupExtensionMethods(receiverFqcn: String): Seq[ExtensionMethodDefinition] = {
+    extensionMethods_.getOrElse(receiverFqcn, Seq()).toSeq
+  }
   /** Option-returning version of find */
   private[compiler] def findOpt(className: String): Option[NameMapper] = mappers_.get(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName

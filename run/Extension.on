@@ -1,0 +1,44 @@
+// Extension Methods Sample
+// Add methods to existing types without modifying them
+
+extension String {
+  def twice(): String {
+    return this + this
+  }
+
+  def shout(): String {
+    return this.toUpperCase() + "!"
+  }
+
+  def repeat(n: Int): String {
+    var result: String = ""
+    var i: Int = 0
+    while i < n {
+      result = result + this
+      i = i + 1
+    }
+    return result
+  }
+}
+
+extension JInteger {
+  def doubled(): Int {
+    return this.intValue() * 2
+  }
+
+  def isEven(): Boolean {
+    return this.intValue() % 2 == 0
+  }
+}
+
+// Usage
+IO::println("hello".twice())      // hellohello
+IO::println("wow".shout())        // WOW!
+IO::println("ab".repeat(3))       // ababab
+
+val n: JInteger = JInteger::valueOf(21)
+IO::println("" + n.doubled())     // 42
+IO::println("" + n.isEven())      // false
+
+val m: JInteger = JInteger::valueOf(10)
+IO::println("" + m.isEven())      // true

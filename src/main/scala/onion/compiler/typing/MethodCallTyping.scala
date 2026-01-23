@@ -418,6 +418,11 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     }
 
     val methods = MethodResolution.findMethods(targetType, name, params, table_)
+    if (methods.length == 0) {
+      // Try extension methods when normal method not found
+      return tryExtensionMethodCall(node, target, targetType, params, context, expected)
+    }
+
     selectSingleMethod(node, targetType, name, methods, types(params)) match {
       case None => None
       case Some(method) if (method.modifier & AST.M_STATIC) != 0 =>
@@ -435,6 +440,111 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
           TypeSubst.withCast(call, castType)
         }
     }
+  }
+
+  /**
+   * Try to resolve a method call using extension methods.
+   * Extension methods are called as static methods on the container class with the receiver as the first argument.
+   */
+  private def tryExtensionMethodCall(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    context: LocalContext,
+    expected: Type
+  ): Option[Term] = {
+    val name = node.name
+
+    // Get the FQCN for extension method lookup
+    val receiverFqcn = targetType match {
+      case ct: ClassType => ct.name
+      case _ => return reportMethodNotFound(node, targetType, name, params)
+    }
+
+    // Look up extension methods for this receiver type
+    val extensionMethods = lookupExtensionMethods(receiverFqcn)
+
+    // Also check superclasses and interfaces for extension methods
+    val allExtensionMethods = collectExtensionMethods(targetType, name)
+
+    if (allExtensionMethods.isEmpty) {
+      return reportMethodNotFound(node, targetType, name, params)
+    }
+
+    // Find applicable extension methods (matching name and argument types)
+    val applicable = allExtensionMethods.filter { extMethod =>
+      extMethod.name == name && isExtensionMethodApplicable(extMethod, params)
+    }
+
+    if (applicable.isEmpty) {
+      return reportMethodNotFound(node, targetType, name, params)
+    }
+
+    if (applicable.length > 1) {
+      report(AMBIGUOUS_METHOD, node,
+        Array[AnyRef](applicable(0).containerClass, name, applicable(0).arguments),
+        Array[AnyRef](applicable(1).containerClass, name, applicable(1).arguments)
+      )
+      return None
+    }
+
+    val extMethod = applicable.head
+
+    // Build the static call: Container.method(receiver, args...)
+    val containerClass = extMethod.containerClass
+    val staticArgs = Array(target) ++ params
+
+    // Find the actual static method in the container class
+    val staticMethods = containerClass.findMethod(name, staticArgs)
+    if (staticMethods.isEmpty) {
+      return reportMethodNotFound(node, targetType, name, params)
+    }
+
+    val staticMethod = staticMethods(0)
+    val classSubst = TypeSubstitution.classSubstitution(containerClass)
+
+    for {
+      methodSubst <- resolveMethodTypeArgs(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)
+      expectedArgs = TypeSubst.args(staticMethod, classSubst, methodSubst)
+      processedParams <- processParamsWithExpected(node, staticArgs, expectedArgs)
+    } yield {
+      val call = new CallStatic(containerClass, staticMethod, processedParams)
+      val castType = TypeSubst(staticMethod.returnType, classSubst, methodSubst)
+      TypeSubst.withCast(call, castType)
+    }
+  }
+
+  private def collectExtensionMethods(targetType: ObjectType, name: String): Seq[ExtensionMethodDefinition] = {
+    val result = scala.collection.mutable.Buffer[ExtensionMethodDefinition]()
+
+    def collect(tp: ObjectType): Unit = {
+      if (tp == null) return
+      tp match {
+        case ct: ClassType =>
+          result ++= lookupExtensionMethods(ct.name).filter(_.name == name)
+        case _ =>
+      }
+      collect(tp.superClass)
+      tp.interfaces.foreach(collect)
+    }
+
+    collect(targetType)
+    result.toSeq
+  }
+
+  private def isExtensionMethodApplicable(extMethod: ExtensionMethodDefinition, params: Array[Term]): Boolean = {
+    val expectedArgs = extMethod.arguments
+    if (params.length != expectedArgs.length) return false
+
+    params.indices.forall { i =>
+      isAssignableWithBoxing(expectedArgs(i), params(i).`type`)
+    }
+  }
+
+  private def reportMethodNotFound(node: AST.Node, targetType: ObjectType, name: String, params: Array[Term]): Option[Term] = {
+    report(METHOD_NOT_FOUND, node, targetType, name, types(params))
+    None
   }
 
   /**

@@ -302,6 +302,74 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   }
   def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit = { () }
   def processEnumDeclaration(node: AST.EnumDeclaration, context: LocalContext): Unit = { () }
+
+  def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = {
+    // Get the container class for this extension
+    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+    if (definition_ == null) return
+    mapper_ = find(definition_.name)
+
+    // Resolve the receiver type
+    val receiverType = mapFrom(node.receiverType)
+    if (receiverType == null) return
+
+    // Process each method in the extension
+    for (methodNode <- node.methods) {
+      processExtensionMethodDeclaration(methodNode, receiverType)
+    }
+  }
+
+  private def processExtensionMethodDeclaration(node: AST.MethodDeclaration, receiverType: Type): Unit = {
+    val extMethod = lookupKernelNode(node).asInstanceOf[ExtensionMethodDefinition]
+    if (extMethod == null) return
+    if (node.block == null) return
+
+    val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
+    openTypeParams(typeParams_ ++ methodTypeParams) {
+      // Find the corresponding static method in the container class
+      // Extension methods are stored as static methods with receiver as first parameter
+      val staticMethods = definition_.methods(node.name)
+      val staticMethod = staticMethods.find { m =>
+        (m.modifier & AST.M_STATIC) != 0 &&
+        m.arguments.length == extMethod.arguments.length + 1 &&
+        m.arguments(0) == receiverType
+      }.map(_.asInstanceOf[MethodDefinition]).orNull
+
+      if (staticMethod == null) return
+
+      val context = new LocalContext
+      context.setStatic(true)  // Extension methods are compiled as static methods
+      context.setMethod(staticMethod)
+
+      // Scan for captured variables before processing the method body
+      val extArgs = AST.Argument(node.location, "this", AST.TypeNode(node.location, AST.ReferenceType(receiverType.name, true), false)) :: node.args
+      markCapturedVariables(context, extArgs, node.block)
+
+      // Add 'this' as the first parameter (the receiver)
+      context.add("this", receiverType)
+
+      // Add method parameters
+      val arguments = staticMethod.arguments
+      for ((arg, i) <- node.args.zipWithIndex) {
+        // Skip first argument (receiver) when binding
+        context.add(arg.name, arguments(i + 1))
+      }
+
+      // Process default argument values
+      val argsWithDefaults = buildArgumentsWithDefaults(extArgs, arguments, context)
+      staticMethod.setArgumentsWithDefaults(argsWithDefaults)
+
+      // Type check the method body
+      val translatedBlock = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], staticMethod.returnType)
+      staticMethod.setBlock(translatedBlock)
+      staticMethod.setFrame(context.getContextFrame)
+      extMethod.setBlock(translatedBlock)
+      extMethod.setFrame(context.getContextFrame)
+
+      // Report unused variable warnings
+      reportUnused(context)
+    }
+  }
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
     val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (function == null) return
@@ -673,7 +741,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node: AST.ClosureExpression =>
       closureTyping.typeClosure(node, context, expected)
     case node@AST.CurrentInstance(loc) =>
-      if (context.isStatic) {
+      // In extension methods, 'this' is a local variable (the receiver)
+      val thisBinding = context.lookup("this")
+      if (thisBinding != null) {
+        context.recordUsage("this")
+        Some(new RefLocal(thisBinding))
+      } else if (context.isStatic) {
         report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
         None
       } else {
@@ -856,6 +929,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
             case node: AST.ClassDeclaration => processClassDeclaration(node, context)
             case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
             case node: AST.EnumDeclaration => processEnumDeclaration(node, context)
+            case node: AST.ExtensionDeclaration => processExtensionDeclaration(node)
             case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
             case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
             case _ =>

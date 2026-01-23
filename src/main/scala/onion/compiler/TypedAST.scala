@@ -338,6 +338,23 @@ object TypedAST {
     private var typeParameters_ = typeParameters0
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
+    /**
+     * Record components: (name, type) pairs for each record field.
+     * Present only for record types. Used by codegen to generate
+     * equals(), hashCode(), toString(), and copy() methods.
+     */
+    private var recordComponents_ : Option[Array[(String, TypedAST.Type)]] = None
+
+    /** Get record components if this is a record type */
+    def recordComponents: Option[Array[(String, TypedAST.Type)]] = recordComponents_
+
+    /** Set record components (marks this as a record type) */
+    def setRecordComponents(components: Array[(String, TypedAST.Type)]): Unit =
+      recordComponents_ = Some(components)
+
+    /** Check if this is a record type */
+    def isRecord: Boolean = recordComponents_.isDefined
+
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =

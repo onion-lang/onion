@@ -278,16 +278,32 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     // Synthetic getter for records: non-abstract, no block, no args, has return type, and NOT static
     val isSyntheticGetter = node.block == null && !Modifier.isAbstract(node.modifier) &&
-                            node.arguments.isEmpty && node.returnType != BasicType.VOID && !isStatic
+                            node.arguments.isEmpty && node.returnType != BasicType.VOID && !isStatic &&
+                            !Modifier.isSyntheticRecord(node.modifier)
+
+    // Check for synthetic record methods (equals, hashCode, toString, copy)
+    val isSyntheticRecord = Modifier.isSyntheticRecord(node.modifier)
 
     if node.block != null then
       emitStatementsWithContext(gen, node.block.statements, className, localVars)
+    else if isSyntheticRecord then
+      // Generate synthetic record method bytecode
+      node.classType match
+        case classDef: ClassDefinition if classDef.isRecord =>
+          val components = classDef.recordComponents.getOrElse(Array.empty[(String, Type)])
+          node.name match
+            case "equals"   => emitRecordEquals(gen, className, components)
+            case "hashCode" => emitRecordHashCode(gen, className, components)
+            case "toString" => emitRecordToString(gen, className, classDef.name, components)
+            case "copy"     => emitRecordCopy(gen, className, components)
+            case _ => // Unknown synthetic record method, no-op
+        case _ => // Not a record, no-op
     else if isSyntheticGetter then
       // Synthetic getter for records: return this.fieldName
       gen.loadThis()
       gen.getField(AsmUtil.objectType(className), node.name, returnType)
 
-    if !isSyntheticGetter then
+    if !isSyntheticGetter && !isSyntheticRecord then
       val needsDefault = node.block == null || !hasReturn(node.block.statements)
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else
@@ -301,18 +317,266 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private[compiler] def hasReturn(stmts: Array[ActionStatement]): Boolean =
     stmts.exists {
       case _: Return => true
-      case ifStmt: IfStatement => 
-        ifStmt.elseStatement != null && 
+      case ifStmt: IfStatement =>
+        ifStmt.elseStatement != null &&
         (ifStmt.thenStatement match {
           case block: StatementBlock => hasReturn(block.statements)
           case _ => false
-        }) && 
+        }) &&
         (ifStmt.elseStatement match {
           case block: StatementBlock => hasReturn(block.statements)
           case _ => false
         })
       case _ => false
     }
+
+  // =====================================================
+  // Synthetic Record Methods: equals, hashCode, toString, copy
+  // =====================================================
+
+  private val ObjectsType: AsmType = AsmType.getType(classOf[java.util.Objects])
+  private val ObjectsEquals: AsmMethod = AsmMethod.getMethod("boolean equals(Object, Object)")
+  private val ObjectsHashCode: AsmMethod = AsmMethod.getMethod("int hashCode(Object)")
+  private val StringBuilderType: AsmType = AsmType.getType(classOf[java.lang.StringBuilder])
+  private val StringBuilderAppendString: AsmMethod = AsmMethod.getMethod("StringBuilder append(String)")
+  private val StringBuilderAppendObject: AsmMethod = AsmMethod.getMethod("StringBuilder append(Object)")
+  private val StringBuilderAppendInt: AsmMethod = AsmMethod.getMethod("StringBuilder append(int)")
+  private val StringBuilderAppendLong: AsmMethod = AsmMethod.getMethod("StringBuilder append(long)")
+  private val StringBuilderAppendDouble: AsmMethod = AsmMethod.getMethod("StringBuilder append(double)")
+  private val StringBuilderAppendFloat: AsmMethod = AsmMethod.getMethod("StringBuilder append(float)")
+  private val StringBuilderAppendBoolean: AsmMethod = AsmMethod.getMethod("StringBuilder append(boolean)")
+  private val StringBuilderAppendChar: AsmMethod = AsmMethod.getMethod("StringBuilder append(char)")
+  private val StringBuilderToString: AsmMethod = AsmMethod.getMethod("String toString()")
+  private val StringBuilderInit: AsmMethod = AsmMethod.getMethod("void <init>(String)")
+
+  /**
+   * Generate equals method for record:
+   * {{{
+   * public boolean equals(Object other) {
+   *   if (this == other) return true;
+   *   if (other == null) return false;
+   *   if (!(other instanceof ThisClass)) return false;
+   *   ThisClass that = (ThisClass) other;
+   *   return Objects.equals(this.field1, that.field1) && ...;
+   * }
+   * }}}
+   */
+  private def emitRecordEquals(gen: GeneratorAdapter, className: String, components: Array[(String, Type)]): Unit =
+    val classType = AsmUtil.objectType(className)
+
+    // if (this == other) return true
+    gen.loadThis()
+    gen.loadArg(0)
+    val notSameRef = gen.newLabel()
+    gen.ifCmp(AsmUtil.objectType(AsmUtil.JavaLangObject), GeneratorAdapter.NE, notSameRef)
+    gen.push(true)
+    gen.returnValue()
+    gen.mark(notSameRef)
+
+    // if (other == null) return false
+    gen.loadArg(0)
+    val notNull = gen.newLabel()
+    gen.ifNonNull(notNull)
+    gen.push(false)
+    gen.returnValue()
+    gen.mark(notNull)
+
+    // if (!(other instanceof ThisClass)) return false
+    gen.loadArg(0)
+    gen.instanceOf(classType)
+    val isInstance = gen.newLabel()
+    gen.ifZCmp(GeneratorAdapter.NE, isInstance)
+    gen.push(false)
+    gen.returnValue()
+    gen.mark(isInstance)
+
+    // ThisClass that = (ThisClass) other
+    gen.loadArg(0)
+    gen.checkCast(classType)
+    val thatLocal = gen.newLocal(classType)
+    gen.storeLocal(thatLocal)
+
+    // Compare each field
+    for (name, fieldType) <- components do
+      val fieldAsmType = asmType(fieldType)
+      val fieldMatches = gen.newLabel()
+
+      gen.loadThis()
+      gen.getField(classType, name, fieldAsmType)
+      gen.loadLocal(thatLocal)
+      gen.getField(classType, name, fieldAsmType)
+
+      if fieldType.isBasicType then
+        // Primitive comparison
+        gen.ifCmp(fieldAsmType, GeneratorAdapter.EQ, fieldMatches)
+        gen.push(false)
+        gen.returnValue()
+        gen.mark(fieldMatches)
+      else
+        // Objects.equals(a, b)
+        gen.invokeStatic(ObjectsType, ObjectsEquals)
+        gen.ifZCmp(GeneratorAdapter.NE, fieldMatches)
+        gen.push(false)
+        gen.returnValue()
+        gen.mark(fieldMatches)
+
+    // All fields match
+    gen.push(true)
+
+  /**
+   * Generate hashCode method for record:
+   * {{{
+   * public int hashCode() {
+   *   int result = 1;
+   *   result = 31 * result + Objects.hashCode(field1);
+   *   result = 31 * result + field2; // for primitives
+   *   ...
+   *   return result;
+   * }
+   * }}}
+   */
+  private def emitRecordHashCode(gen: GeneratorAdapter, className: String, components: Array[(String, Type)]): Unit =
+    val classType = AsmUtil.objectType(className)
+
+    // int result = 1
+    gen.push(1)
+    val resultLocal = gen.newLocal(AsmType.INT_TYPE)
+    gen.storeLocal(resultLocal)
+
+    for (name, fieldType) <- components do
+      val fieldAsmType = asmType(fieldType)
+
+      // result = 31 * result + hashCode(field)
+      gen.push(31)
+      gen.loadLocal(resultLocal)
+      gen.math(GeneratorAdapter.MUL, AsmType.INT_TYPE)
+
+      gen.loadThis()
+      gen.getField(classType, name, fieldAsmType)
+
+      fieldType match
+        case BasicType.INT =>
+          // int hash is the value itself
+        case BasicType.LONG =>
+          // Long.hashCode(value) = (int)(value ^ (value >>> 32))
+          gen.dup2()
+          gen.push(32)
+          gen.visitInsn(Opcodes.LUSHR)
+          gen.visitInsn(Opcodes.LXOR)
+          gen.cast(AsmType.LONG_TYPE, AsmType.INT_TYPE)
+        case BasicType.DOUBLE =>
+          // Double.doubleToLongBits then same as long
+          gen.invokeStatic(AsmType.getType(classOf[java.lang.Double]), AsmMethod.getMethod("long doubleToLongBits(double)"))
+          gen.dup2()
+          gen.push(32)
+          gen.visitInsn(Opcodes.LUSHR)
+          gen.visitInsn(Opcodes.LXOR)
+          gen.cast(AsmType.LONG_TYPE, AsmType.INT_TYPE)
+        case BasicType.FLOAT =>
+          // Float.floatToIntBits
+          gen.invokeStatic(AsmType.getType(classOf[java.lang.Float]), AsmMethod.getMethod("int floatToIntBits(float)"))
+        case BasicType.BOOLEAN =>
+          // Boolean.hashCode(value) = value ? 1231 : 1237
+          val trueLabel = gen.newLabel()
+          val endLabel = gen.newLabel()
+          gen.ifZCmp(GeneratorAdapter.NE, trueLabel)
+          gen.push(1237)
+          gen.goTo(endLabel)
+          gen.mark(trueLabel)
+          gen.push(1231)
+          gen.mark(endLabel)
+        case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
+          // Cast to int
+          gen.cast(fieldAsmType, AsmType.INT_TYPE)
+        case _ =>
+          // Objects.hashCode(obj)
+          gen.invokeStatic(ObjectsType, ObjectsHashCode)
+
+      gen.math(GeneratorAdapter.ADD, AsmType.INT_TYPE)
+      gen.storeLocal(resultLocal)
+
+    gen.loadLocal(resultLocal)
+
+  /**
+   * Generate toString method for record:
+   * {{{
+   * public String toString() {
+   *   return "ClassName(field1=" + field1 + ", field2=" + field2 + ")";
+   * }
+   * }}}
+   */
+  private def emitRecordToString(gen: GeneratorAdapter, className: String, simpleName: String, components: Array[(String, Type)]): Unit =
+    val classType = AsmUtil.objectType(className)
+    val shortName = simpleName.split('.').last
+
+    // new StringBuilder("ClassName(")
+    gen.newInstance(StringBuilderType)
+    gen.dup()
+    gen.push(s"$shortName(")
+    gen.invokeConstructor(StringBuilderType, StringBuilderInit)
+
+    for i <- components.indices do
+      val (name, fieldType) = components(i)
+      val fieldAsmType = asmType(fieldType)
+
+      // "fieldName="
+      gen.push(s"$name=")
+      gen.invokeVirtual(StringBuilderType, StringBuilderAppendString)
+
+      // this.field
+      gen.loadThis()
+      gen.getField(classType, name, fieldAsmType)
+
+      // append field value
+      fieldType match
+        case BasicType.INT | BasicType.BYTE | BasicType.SHORT =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendInt)
+        case BasicType.LONG =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendLong)
+        case BasicType.DOUBLE =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendDouble)
+        case BasicType.FLOAT =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendFloat)
+        case BasicType.BOOLEAN =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendBoolean)
+        case BasicType.CHAR =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendChar)
+        case _ =>
+          gen.invokeVirtual(StringBuilderType, StringBuilderAppendObject)
+
+      // ", " except for last
+      if i < components.length - 1 then
+        gen.push(", ")
+        gen.invokeVirtual(StringBuilderType, StringBuilderAppendString)
+
+    // ")"
+    gen.push(")")
+    gen.invokeVirtual(StringBuilderType, StringBuilderAppendString)
+
+    // toString()
+    gen.invokeVirtual(StringBuilderType, StringBuilderToString)
+
+  /**
+   * Generate copy method for record:
+   * {{{
+   * public ThisClass copy(T1 arg1, T2 arg2, ...) {
+   *   return new ThisClass(arg1, arg2, ...);
+   * }
+   * }}}
+   */
+  private def emitRecordCopy(gen: GeneratorAdapter, className: String, components: Array[(String, Type)]): Unit =
+    val classType = AsmUtil.objectType(className)
+    val argTypes = components.map { case (_, tp) => asmType(tp) }
+
+    // new ThisClass(arg0, arg1, ...)
+    gen.newInstance(classType)
+    gen.dup()
+
+    for i <- components.indices do
+      gen.loadArg(i)
+
+    val ctorDesc = AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)
+    gen.invokeConstructor(classType, AsmMethod("<init>", ctorDesc))
 
   private def emitStatements(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String): Unit =
     emitStatementsWithContext(gen, stmts, className, new LocalVarContext(gen))

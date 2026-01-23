@@ -14,6 +14,7 @@ object AST {
   val M_PRIVATE = 512
   val M_FORWARDED = 1024
   val M_SEALED = 2048
+  val M_SYNTHETIC_RECORD = 8192  // Auto-generated record methods (equals, hashCode, toString, copy)
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A): Unit = {
     buffer += element

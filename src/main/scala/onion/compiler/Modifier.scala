@@ -26,6 +26,7 @@ object Modifier {
   final val FORWARDED = 1024
   final val SEALED = 2048
   final val ENUM = 4096
+  final val SYNTHETIC_RECORD = 8192  // Auto-generated record methods
 
   def check(modifier: Int, bitFlag: Int): Boolean = {
      (modifier & bitFlag) != 0
@@ -81,6 +82,10 @@ object Modifier {
 
   def isEnum(modifier: Int): Boolean = {
      check(modifier, ENUM)
+  }
+
+  def isSyntheticRecord(modifier: Int): Boolean = {
+     check(modifier, SYNTHETIC_RECORD)
   }
 
 }

@@ -89,6 +89,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     for (args <- argsOption) {
       val argTypes = args.toArray
 
+      // Store record components for codegen
+      val components = node.args.zip(argTypes).map { case (arg, argType) =>
+        (arg.name, argType)
+      }.toArray
+      definition_.setRecordComponents(components)
+
       // Create private final fields for each component
       node.args.zip(argTypes).foreach { case (arg, argType) =>
         val fieldModifier = Modifier.PRIVATE | Modifier.FINAL
@@ -107,6 +113,41 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       val ctorModifier = Modifier.PUBLIC
       val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, argTypes, null, null)
       definition_.add(ctor)
+
+      // Generate equals(Object): Boolean method
+      val equalsModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+      val equalsMethod = new MethodDefinition(
+        node.location, equalsModifier, definition_, "equals",
+        Array(rootClass), BasicType.BOOLEAN, null
+      )
+      definition_.add(equalsMethod)
+
+      // Generate hashCode(): Int method
+      val hashCodeModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+      val hashCodeMethod = new MethodDefinition(
+        node.location, hashCodeModifier, definition_, "hashCode",
+        Array.empty, BasicType.INT, null
+      )
+      definition_.add(hashCodeMethod)
+
+      // Generate toString(): String method
+      val toStringModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+      val stringType = load("java.lang.String")
+      if (stringType != null) {
+        val toStringMethod = new MethodDefinition(
+          node.location, toStringModifier, definition_, "toString",
+          Array.empty, stringType, null
+        )
+        definition_.add(toStringMethod)
+      }
+
+      // Generate copy(components...): ThisType method
+      val copyModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+      val copyMethod = new MethodDefinition(
+        node.location, copyModifier, definition_, "copy",
+        argTypes, definition_, null
+      )
+      definition_.add(copyMethod)
     }
   }
 

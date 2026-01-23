@@ -1,0 +1,73 @@
+// Data Class Sample
+// Demonstrates auto-generated equals(), hashCode(), toString(), and copy() methods for records
+
+// Simple record with primitive fields
+record Point(x: Int, y: Int);
+
+// Record with mixed types
+record Person(name: String, age: Int);
+
+// Record with object fields
+record Line(start: Point, end: Point);
+
+class Main {
+public:
+  static def main(args: String[]): Unit {
+    IO::println("=== Data Class Demo ===")
+    IO::println("")
+
+    // Create records
+    val p1 = new Point(1, 2)
+    val p2 = new Point(1, 2)
+    val p3 = new Point(3, 4)
+
+    // toString() - readable representation
+    IO::println("--- toString() ---")
+    IO::println("p1 = " + p1.toString())
+    IO::println("p2 = " + p2.toString())
+    IO::println("p3 = " + p3.toString())
+    IO::println("")
+
+    // equals() - structural equality
+    IO::println("--- equals() ---")
+    IO::println("p1.equals(p1) = " + p1.equals(p1))  // true (same instance)
+    IO::println("p1.equals(p2) = " + p1.equals(p2))  // true (same values)
+    IO::println("p1.equals(p3) = " + p1.equals(p3))  // false (different values)
+    IO::println("p1.equals(null) = " + p1.equals(null))  // false
+    IO::println("")
+
+    // hashCode() - consistent with equals
+    IO::println("--- hashCode() ---")
+    IO::println("p1.hashCode() = " + p1.hashCode())
+    IO::println("p2.hashCode() = " + p2.hashCode())
+    IO::println("p1.hashCode() == p2.hashCode(): " + (p1.hashCode() == p2.hashCode()))
+    IO::println("")
+
+    // copy() - create new instance with modified fields
+    IO::println("--- copy() ---")
+    val p4 = p1.copy(10, 20)
+    IO::println("p1 = " + p1.toString())
+    IO::println("p4 = p1.copy(10, 20) = " + p4.toString())
+    IO::println("p1 === p4: " + (p1 === p4))  // false (different instances)
+    IO::println("")
+
+    // Person example
+    IO::println("--- Person Record ---")
+    val alice = new Person("Alice", 30)
+    val bob = new Person("Bob", 25)
+    val aliceCopy = alice.copy("Alice", 31)
+    IO::println("alice = " + alice.toString())
+    IO::println("bob = " + bob.toString())
+    IO::println("alice.equals(bob) = " + alice.equals(bob))
+    IO::println("aliceCopy = alice.copy(\"Alice\", 31) = " + aliceCopy.toString())
+    IO::println("")
+
+    // Nested records
+    IO::println("--- Nested Records ---")
+    val line = new Line(new Point(0, 0), new Point(100, 100))
+    IO::println("line = " + line.toString())
+    IO::println("")
+
+    IO::println("=== Demo Complete ===")
+  }
+}

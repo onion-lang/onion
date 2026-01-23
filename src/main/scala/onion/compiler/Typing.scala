@@ -159,6 +159,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         val mappedUpper = upperBound.map(map).getOrElse(rootClass)
         val mappedLower = lowerBound.map(map)
         new TypedAST.WildcardType(mappedUpper, mappedLower)
+      case AST.NullableType(inner) =>
+        val mappedInner = map(inner)
+        if (mappedInner == null) null
+        else new TypedAST.NullableType(mappedInner)
       case _ => null
     }
     private def forName(name: String, qualified: Boolean): ClassType = {

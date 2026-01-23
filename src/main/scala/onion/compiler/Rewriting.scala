@@ -291,6 +291,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.MemberSelection(loc, Option(target).map(rewriteExpression).orNull, name)
     case AST.MethodCall(loc, target, name, args, typeArgs) =>
       AST.MethodCall(loc, Option(target).map(rewriteExpression).orNull, name, args.map(rewriteExpression), typeArgs)
+    // Safe call (null-safe)
+    case AST.SafeMemberSelection(loc, target, name) =>
+      AST.SafeMemberSelection(loc, rewriteExpression(target), name)
+    case AST.SafeMethodCall(loc, target, name, args, typeArgs) =>
+      AST.SafeMethodCall(loc, rewriteExpression(target), name, args.map(rewriteExpression), typeArgs)
     case AST.NewArray(loc, typeRef, args) => AST.NewArray(loc, typeRef, args.map(rewriteExpression))
     case AST.NewArrayWithValues(loc, typeRef, values) => AST.NewArrayWithValues(loc, typeRef, values.map(rewriteExpression))
     case AST.NewObject(loc, typeRef, args) => AST.NewObject(loc, typeRef, args.map(rewriteExpression))

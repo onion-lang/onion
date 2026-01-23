@@ -580,6 +580,7 @@ TOKEN : {
 | <RBRACKET:       "]"            >
 | <QUESTION:       "?"            >
 | <ELVIS:          "?:"           >
+| <SAFE_ACCESS:    "?."           >
 }
 
 /*
@@ -1061,7 +1062,10 @@ AST.TypeNode type() : {
       append(p, left);
       left = new AST.FunctionType(toList(p), r.desc());
     }
-  ] {
+  ]
+  // Nullable type marker: T?
+  [ LOOKAHEAD(1) <QUESTION> { left = new AST.NullableType(left); } ]
+  {
     return new AST.TypeNode(loc, left, isRelaxed);
   }
 }
@@ -1460,6 +1464,17 @@ AST.Expression primary_suffix() : {
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
           { args = AST.appendToList(args, tl); e = new AST.MethodCall(p(t), e, c(n), args); }
     | {e = new AST.MemberSelection(p(t), e, c(n));}
+    )
+  // Safe call operator: expr?.name or expr?.method()
+  | t=<SAFE_ACCESS> eols() n=id() (
+      LOOKAHEAD( type_arguments() eols() "(" )
+        tas=type_arguments() eols() "(" eols() args=terms() ")"
+        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+          { args = AST.appendToList(args, tl); e = new AST.SafeMethodCall(p(t), e, c(n), args, tas); }
+    | LOOKAHEAD(1) "(" eols() args=terms() ")"
+        [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+          { args = AST.appendToList(args, tl); e = new AST.SafeMethodCall(p(t), e, c(n), args); }
+    | {e = new AST.SafeMemberSelection(p(t), e, c(n));}
     )
   | t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
   | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}

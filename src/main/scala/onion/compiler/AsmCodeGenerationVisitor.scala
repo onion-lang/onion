@@ -137,7 +137,95 @@ class AsmCodeGenerationVisitor(
       methodDesc,
       false
     )
-  
+
+  /**
+   * Safe method call: target?.method(args)
+   * Returns null if target is null, otherwise calls the method.
+   *
+   * Bytecode pattern:
+   *   visitTerm(target)       // stack: [target]
+   *   dup                     // stack: [target, target]
+   *   ifnull nullLabel        // if null, jump to nullLabel
+   *   // non-null path
+   *   visitCall               // stack: [result]
+   *   goto endLabel
+   *   nullLabel:
+   *   pop                     // pop the target
+   *   aconst_null             // push null
+   *   endLabel:
+   */
+  override def visitSafeCall(node: SafeCall): Unit =
+    val nullLabel = gen.newLabel()
+    val endLabel = gen.newLabel()
+
+    // Evaluate target
+    visitTerm(node.target)
+    gen.dup()
+    gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+
+    // Non-null path: call the method
+    val argTypes = node.method.arguments.map(asmType)
+    emitArgumentsWithAdaptation(node.parameters, argTypes)
+    val ownerType = AsmUtil.objectType(node.method.affiliation.name)
+    val methodDesc = AsmType.getMethodDescriptor(
+      asmType(node.method.returnType),
+      argTypes*
+    )
+    val isInterface = node.method.affiliation.isInterface
+    if isInterface then
+      gen.invokeInterface(ownerType, AsmMethod(node.method.name, methodDesc))
+    else
+      gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
+
+    // Box primitive return type if needed (safe call always returns nullable)
+    node.method.returnType match
+      case bt: BasicType if bt != BasicType.VOID =>
+        gen.box(asmType(bt))
+      case _ => // Already an object type
+
+    gen.goTo(endLabel)
+
+    // Null path: pop target and push null
+    gen.visitLabel(nullLabel)
+    gen.pop()
+    gen.visitInsn(Opcodes.ACONST_NULL)
+
+    gen.visitLabel(endLabel)
+
+  /**
+   * Safe field access: target?.field
+   * Returns null if target is null, otherwise accesses the field.
+   *
+   * Bytecode pattern similar to SafeCall.
+   */
+  override def visitSafeFieldAccess(node: SafeFieldAccess): Unit =
+    val nullLabel = gen.newLabel()
+    val endLabel = gen.newLabel()
+
+    // Evaluate target
+    visitTerm(node.target)
+    gen.dup()
+    gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+
+    // Non-null path: access the field
+    val ownerType = AsmUtil.objectType(node.field.affiliation.name)
+    gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
+
+    // Box primitive field type if needed (safe access always returns nullable)
+    node.field.`type` match
+      case bt: BasicType if bt != BasicType.VOID =>
+        gen.box(asmType(bt))
+      case _ => // Already an object type
+
+    gen.goTo(endLabel)
+
+    // Null path: pop target and push null
+    gen.visitLabel(nullLabel)
+    gen.pop()
+    gen.visitInsn(Opcodes.ACONST_NULL)
+
+    gen.visitLabel(endLabel)
+
   override def visitAsInstanceOf(node: AsInstanceOf): Unit =
     visitTerm(node.target)
     (node.target.`type`, node.destination) match

@@ -490,6 +490,19 @@ object AsmCodeGeneration:
     case tv: TypeVariableType => asmType(tv.upperBound)
     case ap: AppliedClassType => asmType(ap.raw)
     case w: WildcardType      => asmType(w.upperBound)
+    case nt: NullableType     =>
+      // NullableType at runtime uses the boxed form for primitives, same type for objects
+      nt.innerType match
+        case BasicType.VOID    => AsmUtil.objectType(AsmUtil.JavaLangObject)
+        case BasicType.BOOLEAN => AsmUtil.objectType("java.lang.Boolean")
+        case BasicType.BYTE    => AsmUtil.objectType("java.lang.Byte")
+        case BasicType.SHORT   => AsmUtil.objectType("java.lang.Short")
+        case BasicType.CHAR    => AsmUtil.objectType("java.lang.Character")
+        case BasicType.INT     => AsmUtil.objectType("java.lang.Integer")
+        case BasicType.LONG    => AsmUtil.objectType("java.lang.Long")
+        case BasicType.FLOAT   => AsmUtil.objectType("java.lang.Float")
+        case BasicType.DOUBLE  => AsmUtil.objectType("java.lang.Double")
+        case other => asmType(other)
     case ct: ClassType     => AsmUtil.objectType(ct.name)
     case at: ArrayType     =>
       // Build descriptor with correct number of dimensions

@@ -48,6 +48,10 @@ object AST {
       case (Some(ub), Some(lb)) => s"? extends $ub super $lb" // unusual but representable
     }
   }
+  /** Nullable type: T? */
+  case class NullableType(inner: TypeDescriptor) extends TypeDescriptor {
+    override def toString: String = s"${inner.toString}?"
+  }
   abstract sealed class PrimitiveTypeKind(val name: String) {
     override def toString: String = name
   }
@@ -127,6 +131,13 @@ object AST {
   case class MathRightShiftAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>=")
   case class MemberSelection(location: Location, target: Expression/*nullable*/, name: String) extends Expression
   case class MethodCall(location: Location, target: Expression/*nullable*/, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
+    def this(location: Location, target: Expression, name: String, args: List[Expression]) =
+      this(location, target, name, args, Nil)
+  }
+  /** Safe member selection: expr?.name (returns null if expr is null) */
+  case class SafeMemberSelection(location: Location, target: Expression, name: String) extends Expression
+  /** Safe method call: expr?.name(args) (returns null if expr is null) */
+  case class SafeMethodCall(location: Location, target: Expression, name: String, args: List[Expression], typeArgs: List[TypeNode] = Nil) extends Expression {
     def this(location: Location, target: Expression, name: String, args: List[Expression]) =
       this(location, target, name, args, Nil)
   }

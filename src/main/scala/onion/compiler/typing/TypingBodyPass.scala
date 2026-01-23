@@ -472,6 +472,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] =
     methodCallTyping.typeMethodCall(node, context, expected)
 
+  def typeSafeMemberSelection(node: AST.SafeMemberSelection, context: LocalContext): Option[Term] =
+    methodCallTyping.typeSafeMemberSelection(node, context)
+
+  def typeSafeMethodCall(node: AST.SafeMethodCall, context: LocalContext, expected: Type = null): Option[Term] =
+    methodCallTyping.typeSafeMethodCall(node, context, expected)
+
   def typeUnqualifiedMethodCall(node: AST.UnqualifiedMethodCall, context: LocalContext, expected: Type = null): Option[Term] =
     methodCallTyping.typeUnqualifiedMethodCall(node, context, expected)
 
@@ -578,7 +584,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
     val leftString = toStringCall(node.lhs, leftBoxed.get)
     val rightString = toStringCall(node.rhs, rightBoxed.get)
-    val concat = findMethod(node, leftString.`type`.asInstanceOf[ObjectType], "concat", Array[Term](rightString))
+    // Unwrap NullableType to get the inner type for method lookup
+    val leftStringType = leftString.`type` match {
+      case nt: TypedAST.NullableType => nt.innerType.asInstanceOf[ObjectType]
+      case other => other.asInstanceOf[ObjectType]
+    }
+    val concat = findMethod(node, leftStringType, "concat", Array[Term](rightString))
     Some(new Call(leftString, concat, Array[Term](rightString)))
   }
 
@@ -592,7 +603,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     }
 
   private def toStringCall(node: AST.Expression, term: Term): Term = {
-    val toStringMethod = findMethod(node, term.`type`.asInstanceOf[ObjectType], "toString")
+    // Unwrap NullableType to get the inner type for method lookup
+    val targetType = term.`type` match {
+      case nt: TypedAST.NullableType => nt.innerType.asInstanceOf[ObjectType]
+      case other => other.asInstanceOf[ObjectType]
+    }
+    val toStringMethod = findMethod(node, targetType, "toString")
     new Call(term, toStringMethod, Array.empty)
   }
 
@@ -775,6 +791,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       typeMemberSelection(node, context)
     case node: AST.MethodCall =>
       typeMethodCall(node, context, expected)
+    case node: AST.SafeMemberSelection =>
+      typeSafeMemberSelection(node, context)
+    case node: AST.SafeMethodCall =>
+      typeSafeMethodCall(node, context, expected)
     case node@AST.Negate(loc, target) =>
       typeUnaryNumeric(node, "-", MINUS, context)
     case node: AST.NewArray =>

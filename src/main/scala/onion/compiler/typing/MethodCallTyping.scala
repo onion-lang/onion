@@ -1352,6 +1352,153 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     args.exists(_.isInstanceOf[AST.NamedArgument])
 
   /**
+   * Type a safe member selection: expr?.name
+   * Returns null if target is null, otherwise accesses the field.
+   */
+  def typeSafeMemberSelection(node: AST.SafeMemberSelection, context: LocalContext): Option[Term] = {
+    var target = typed(node.target, context).getOrElse(null)
+    if (target == null) return None
+
+    // Get the inner type if nullable
+    val targetType = target.`type` match {
+      case nt: TypedAST.NullableType => nt.innerType
+      case other => other
+    }
+
+    if (targetType.isNullType) {
+      report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
+      return None
+    }
+
+    // Handle basic types by boxing
+    val (finalTarget, finalTargetType) = targetType match {
+      case bt: BasicType =>
+        if (bt == BasicType.VOID) {
+          report(INCOMPATIBLE_TYPE, node.target, rootClass, bt)
+          return None
+        }
+        val boxed = Boxing.boxing(table_, target)
+        (boxed, boxed.`type`.asInstanceOf[ObjectType])
+      case ot: ObjectType =>
+        (target, ot)
+      case _ =>
+        report(INCOMPATIBLE_TYPE, node.target, rootClass, targetType)
+        return None
+    }
+
+    if (!MemberAccess.ensureTypeAccessible(typing, node, finalTargetType, definition_)) return None
+    val name = node.name
+
+    // Array.length
+    if (finalTargetType.isArrayType) {
+      if (name.equals(MethodNames.LENGTH) || name.equals(MethodNames.SIZE)) {
+        val innerResult = new ArrayLength(finalTarget)
+        // Safe call wraps result in nullable
+        return Some(new TypedAST.SafeFieldAccess(node.location, finalTarget, new TypedAST.FieldDefinition(node.location, 0, null, "length", BasicType.INT)))
+      } else {
+        return None
+      }
+    }
+
+    val field = MemberAccess.findField(finalTargetType, name)
+    if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
+      return Some(new TypedAST.SafeFieldAccess(node.location, finalTarget, field))
+    }
+
+    // Try method name, then getter pattern, then boolean getter pattern
+    val methodNames = Array(name, getter(name), getterBoolean(name))
+    var methodIndex = 0
+    while (methodIndex < methodNames.length) {
+      val methodName = methodNames(methodIndex)
+      tryFindMethod(node, finalTargetType, methodName, Array.empty) match {
+        case Right(method) =>
+          return Some(new TypedAST.SafeCall(node.location, finalTarget, method, Array.empty))
+        case Left(false) => return None
+        case Left(true) =>
+      }
+      methodIndex += 1
+    }
+
+    // None of the method patterns matched
+    if (field == null) report(FIELD_NOT_FOUND, node, finalTargetType, node.name)
+    else report(FIELD_NOT_ACCESSIBLE, node, finalTargetType, node.name, definition_)
+    None
+  }
+
+  /**
+   * Type a safe method call: expr?.method(args)
+   * Returns null if target is null, otherwise calls the method.
+   */
+  def typeSafeMethodCall(node: AST.SafeMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
+    var target = typed(node.target, context).getOrElse(null)
+    if (target == null) return None
+
+    // Get the inner type if nullable
+    val targetType = target.`type` match {
+      case nt: TypedAST.NullableType => nt.innerType
+      case other => other
+    }
+
+    val params = typedTerms(node.args.toArray, context)
+    if (params == null) return None
+
+    targetType match {
+      case objType: ObjectType =>
+        return typeSafeMethodCallOnObject(node, target, objType, params, context, expected)
+      case basicType: BasicType =>
+        if (basicType == BasicType.VOID) {
+          report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
+          return None
+        }
+        val boxedTarget = Boxing.boxing(table_, target)
+        return typeSafeMethodCallOnObject(node, boxedTarget, boxedTarget.`type`.asInstanceOf[ObjectType], params, context, expected)
+      case wildcardType: TypedAST.WildcardType =>
+        wildcardType.upperBound match {
+          case objType: ObjectType =>
+            val castedTarget = new TypedAST.AsInstanceOf(target, objType)
+            return typeSafeMethodCallOnObject(node, castedTarget, objType, params, context, expected)
+          case _ =>
+            report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+            return None
+        }
+      case _ =>
+        report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+        return None
+    }
+  }
+
+  private def typeSafeMethodCallOnObject(node: AST.SafeMethodCall, target: Term, targetType: ObjectType, params: Array[Term], context: LocalContext, expected: Type = null): Option[Term] = {
+    val name = node.name
+
+    val methods = MethodResolution.findMethods(targetType, name, params, table_)
+    if (methods.length == 0) {
+      report(METHOD_NOT_FOUND, node, targetType, name, types(params))
+      return None
+    }
+
+    selectSingleMethod(node, targetType, name, methods, types(params)) match {
+      case None => None
+      case Some(method) if (method.modifier & AST.M_STATIC) != 0 =>
+        report(ILLEGAL_METHOD_CALL, node, method.affiliation, name, method.arguments)
+        None
+      case Some(method) =>
+        // Unwrap NullableType for class substitution
+        val actualTargetType = target.`type` match {
+          case nt: TypedAST.NullableType => nt.innerType
+          case other => other
+        }
+        val classSubst = TypeSubstitution.classSubstitution(actualTargetType)
+        for {
+          methodSubst <- resolveMethodTypeArgs(node, method, params, node.typeArgs, classSubst, expected)
+          expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+          finalParams <- prepareCallParams(node, node.args, method, params, expectedArgs)
+        } yield {
+          new TypedAST.SafeCall(node.location, target, method, finalParams)
+        }
+    }
+  }
+
+  /**
    * デフォルト引数で足りない分を補完する
    */
   private def fillDefaultArguments(params: Array[Term], method: Method): Option[Array[Term]] = {

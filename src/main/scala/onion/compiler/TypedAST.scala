@@ -224,6 +224,27 @@ object TypedAST {
   }
 
   /**
+   * Safe method call: target?.method(params)
+   * Returns null if target is null, otherwise calls the method
+   */
+  class SafeCall(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+    def this(target: TypedAST.Term, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
+      this(null, target, method, parameters)
+    }
+
+    /** Result type is nullable because it can be null when target is null */
+    def `type`: TypedAST.Type = {
+      val returnType = method.returnType
+      // If return type is already nullable or null type, return as-is
+      if (returnType.isNullable || returnType.isNullType) returnType
+      // If return type is a primitive, it cannot be null - wrap in nullable
+      else if (returnType.isBasicType) new NullableType(returnType)
+      // For object types, wrap in nullable
+      else new NullableType(returnType)
+    }
+  }
+
+  /**
    * @author Kota Mizushima
    */
   class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
@@ -503,6 +524,25 @@ object TypedAST {
     }
 
     def `type`: TypedAST.Type = field.`type`
+  }
+
+  /**
+   * Safe field access: target?.field
+   * Returns null if target is null, otherwise accesses the field
+   */
+  class SafeFieldAccess(location: Location, val target: TypedAST.Term, val field: TypedAST.FieldRef) extends Term(location) {
+    def this(target: TypedAST.Term, field: TypedAST.FieldRef) = {
+      this(null, target, field)
+    }
+
+    /** Result type is nullable because it can be null when target is null */
+    def `type`: TypedAST.Type = {
+      val fieldType = field.`type`
+      // If field type is already nullable or null type, return as-is
+      if (fieldType.isNullable || fieldType.isNullType) fieldType
+      // Wrap in nullable
+      else new NullableType(fieldType)
+    }
   }
 
   class SetField(location: Location, val target: TypedAST.Term, val field: TypedAST.FieldRef, val value: TypedAST.Term) extends Term(location) {
@@ -1296,6 +1336,31 @@ object TypedAST {
   }
 
   /**
+   * Nullable type: T? - allows null values
+   */
+  class NullableType(val innerType: TypedAST.Type) extends Type {
+    def name: String = s"${innerType.name}?"
+
+    override def displayName: String = s"${innerType.displayName}?"
+
+    def isArrayType: Boolean = false
+
+    def isBasicType: Boolean = false
+
+    def isClassType: Boolean = false
+
+    def isNullType: Boolean = false
+
+    def isObjectType: Boolean = true
+
+    /** NullableType is always nullable */
+    override def isNullable: Boolean = true
+
+    /** Unwrap to get the inner type */
+    def unwrap: TypedAST.Type = innerType
+  }
+
+  /**
    * @author Kota Mizushima
    */
   sealed trait ObjectType extends Type {
@@ -1405,12 +1470,30 @@ object TypedAST {
     def isBottomType: Boolean = false
 
     def isObjectType: Boolean
+
+    /** Whether this type is nullable (T?) */
+    def isNullable: Boolean = false
   }
 
   object TypeRules {
     def isSuperType(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
       if (right.isBottomType) return true
       if (left.isBottomType) return right.isBottomType
+
+      // Handle NullableType
+      (left, right) match {
+        // T? ← T? : check inner types
+        case (l: TypedAST.NullableType, r: TypedAST.NullableType) =>
+          return isSuperType(l.innerType, r.innerType)
+        // T? ← T : allowed (widening)
+        case (l: TypedAST.NullableType, _) =>
+          return isSuperType(l.innerType, right) || right.isNullType
+        // T ← T? : NOT allowed (requires explicit unwrap)
+        case (_, r: TypedAST.NullableType) =>
+          return false
+        case _ => // continue with normal logic
+      }
+
       val l = left match {
         case tv: TypedAST.TypeVariableType => tv.upperBound
         case w: TypedAST.WildcardType => w.upperBound

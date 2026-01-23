@@ -78,14 +78,22 @@ strings[2] = "c"
 val objects: Object[] = new Object[5]
 ```
 
-### Null Type
+### Null Type and Nullable Types
 
-The `null` literal has a special null type:
+The `null` literal can be assigned to reference types. For better null safety, use nullable types (`T?`):
 
 ```onion
+// Traditional (allows null implicitly)
 val maybeString: String = null
 val maybeObject: Object = null
+
+// Recommended: Explicit nullable types
+val safeName: String? = null        // Clearly nullable
+val definite: String = "hello"      // Cannot be null
+val upper: Object? = safeName?.toUpperCase()  // Safe call
 ```
+
+See [Null Safety](null-safety.md) for detailed information about nullable types and the safe call operator (`?.`).
 
 ### Bottom Type (Nothing)
 
@@ -265,6 +273,7 @@ When the target function type is known, lambda parameters can omit types. If no 
 
 ## Next Steps
 
+- [Null Safety](null-safety.md) - Nullable types and safe call operator
 - [Control Flow](control-flow.md) - if, while, for, select
 - [Functions](functions.md) - Function definitions and lambdas
 - [Classes and Objects](classes-and-objects.md) - Object-oriented programming

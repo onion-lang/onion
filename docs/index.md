@@ -7,6 +7,7 @@
 ## Key Features
 
 - **Statically Typed** - Catch errors at compile time with local type inference
+- **Null Safety** - Nullable types (`T?`) and safe call operator (`?.`) prevent null pointer exceptions
 - **Object-Oriented** - Classes, inheritance, interfaces, and method overloading
 - **Functional Elements** - Lambda expressions, closures, and first-class functions
 - **Monadic Composition** - Do notation for Option, Result, and Future types
@@ -63,6 +64,11 @@ val result: Option[Int] = do[Option] {
 val future: Future[String] = Future::async(() -> { return fetchData(); })
 future.map { data => processData(data) }
       .onSuccess { result => IO::println(result) }
+
+// Null safety with safe call operator
+val name: String? = getUserName()  // Nullable type
+val upper: Object? = name?.toUpperCase()  // Safe call - returns null if name is null
+val display: String = name ?: "unknown"  // Elvis operator for default value
 ```
 
 ## Getting Started
@@ -75,6 +81,8 @@ future.map { data => processData(data) }
 
 - [Overview](guide/overview.md) - Language philosophy and design
 - [Basic Syntax](guide/basic-syntax.md) - Variables, operators, and expressions
+- [Variables and Types](guide/variables-and-types.md) - Type system and type annotations
+- [Null Safety](guide/null-safety.md) - Nullable types (`T?`) and safe call operator (`?.`)
 - [Control Flow](guide/control-flow.md) - if, while, for, foreach, select, and do notation
 - [Functions](guide/functions.md) - Function definitions and lambda expressions
 - [Lambda Expressions](guide/lambda-expressions.md) - Closures and trailing lambda syntax

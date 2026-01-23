@@ -215,6 +215,97 @@ select score {
 IO::println("Grade: " + grade)
 ```
 
+## Do Notation (Monadic Composition)
+
+Do notation provides a clean syntax for chaining operations on monadic types like `Option`, `Result`, and `Future`. It desugars to `flatMap`/`map` calls.
+
+### Basic Syntax
+
+```onion
+do[MonadType] {
+  x <- expr1   // Bind: extract value from monad
+  y <- expr2   // Chain multiple bindings
+  ret result   // Return: wrap result in monad
+}
+```
+
+### With Option
+
+Chain operations that might fail:
+
+```onion
+def findUser(id: Int): Option[User] { /* ... */ }
+def getEmail(user: User): Option[String] { /* ... */ }
+
+val email: Option[String] = do[Option] {
+  user <- findUser(42)
+  email <- getEmail(user)
+  ret email
+}
+
+// Equivalent to:
+// findUser(42).flatMap(user => getEmail(user).map(email => email))
+```
+
+### With Result
+
+Handle errors elegantly:
+
+```onion
+def parseNumber(s: String): Result[Int, String] { /* ... */ }
+def divide(a: Int, b: Int): Result[Int, String] { /* ... */ }
+
+val result: Result[Int, String] = do[Result] {
+  x <- parseNumber("10")
+  y <- parseNumber("2")
+  z <- divide(x, y)
+  ret z
+}
+```
+
+### With Future
+
+Compose async operations:
+
+```onion
+def fetchUser(id: Int): Future[User] { /* ... */ }
+def fetchPosts(user: User): Future[List] { /* ... */ }
+
+val posts: Future[List] = do[Future] {
+  user <- fetchUser(42)
+  posts <- fetchPosts(user)
+  ret posts
+}
+```
+
+### Mixing with Regular Expressions
+
+You can mix bindings with regular statements:
+
+```onion
+val result: Option[Int] = do[Option] {
+  x <- parseNumber(input)
+  val doubled = x * 2        // Regular statement
+  y <- validateRange(doubled)
+  IO::println("Valid: " + y) // Side effect
+  ret y
+}
+```
+
+### Error Short-Circuiting
+
+If any step fails, the entire do block short-circuits:
+
+```onion
+val result: Option[Int] = do[Option] {
+  x <- Option::some(10)    // Success
+  y <- Option::none()      // Fails here - short circuits
+  z <- Option::some(30)    // Never executed
+  ret x + y + z
+}
+// result is Option::none()
+```
+
 ## Break and Continue
 
 ### Break Statement

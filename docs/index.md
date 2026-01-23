@@ -9,9 +9,11 @@
 - **Statically Typed** - Catch errors at compile time with local type inference
 - **Object-Oriented** - Classes, inheritance, interfaces, and method overloading
 - **Functional Elements** - Lambda expressions, closures, and first-class functions
+- **Monadic Composition** - Do notation for Option, Result, and Future types
+- **Asynchronous Programming** - Built-in Future type with functional combinators
 - **Java Interoperability** - Direct access to Java libraries and frameworks
 - **JVM Target** - Compiles to efficient JVM bytecode
-- **Concise Syntax** - Clean, readable code with minimal boilerplate
+- **Concise Syntax** - Clean, readable code with trailing lambda support
 
 ## Quick Example
 
@@ -49,6 +51,18 @@ select value {
   else:
     IO::println("High")
 }
+
+// Do notation for monadic composition
+val result: Option[Int] = do[Option] {
+  x <- parseNumber("42")
+  y <- parseNumber("10")
+  ret x + y
+}
+
+// Async programming with Future
+val future: Future[String] = Future::async(() -> { return fetchData(); })
+future.map { data => processData(data) }
+      .onSuccess { result => IO::println(result) }
 ```
 
 ## Getting Started
@@ -61,10 +75,16 @@ select value {
 
 - [Overview](guide/overview.md) - Language philosophy and design
 - [Basic Syntax](guide/basic-syntax.md) - Variables, operators, and expressions
-- [Control Flow](guide/control-flow.md) - if, while, for, foreach, and select
+- [Control Flow](guide/control-flow.md) - if, while, for, foreach, select, and do notation
 - [Functions](guide/functions.md) - Function definitions and lambda expressions
+- [Lambda Expressions](guide/lambda-expressions.md) - Closures and trailing lambda syntax
 - [Classes and Objects](guide/classes-and-objects.md) - Object-oriented programming
 - [Java Interoperability](guide/java-interop.md) - Using Java libraries
+
+## Reference
+
+- [Standard Library](reference/stdlib.md) - IO, Option, Result, Future, and more
+- [Compiler Architecture](reference/compiler-architecture.md) - How the compiler works
 
 ## Tools
 

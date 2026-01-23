@@ -390,6 +390,136 @@ Provided via `onion.Result`.
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
 
+## Future Module
+
+Provided via `onion.Future`. Represents asynchronous computations.
+
+### Creating Futures
+
+```onion
+// Already completed with a value
+val done: Future[Int] = Future::successful(42)
+
+// Already failed
+val fail: Future[Int] = Future::failed(new RuntimeException("error"))
+
+// Run async on background thread
+val async: Future[String] = Future::async(() -> { return compute(); })
+
+// Async with exception handling
+val safe: Future[Int] = Future::asyncThrowing(() -> {
+  return riskyOperation();
+})
+
+// Delay
+val delayed: Future[Void] = Future::delay(1000L)  // 1 second
+```
+
+### Transformation Methods
+
+```onion
+val f: Future[Int] = Future::successful(10)
+
+// Transform the value
+f.map((x: Int) -> { return x * 2; })  // Future[Int] = 20
+
+// Chain async operations
+f.flatMap((x: Int) -> { return Future::successful(x + 1); })
+
+// Filter (fails if predicate false)
+f.filter((x: Int) -> { return x > 0; })
+
+// Alias for flatMap (used by do notation)
+f.bind((x: Int) -> { return Future::successful(x); })
+```
+
+### Error Handling
+
+```onion
+val f: Future[Int] = Future::failed(new RuntimeException("oops"))
+
+// Recover with value
+f.recover((e: Throwable) -> { return 0; })
+
+// Recover with another Future
+f.recoverWith((e: Throwable) -> { return Future::successful(42); })
+
+// Transform error
+f.mapError((e: Throwable) -> { return new CustomException(e); })
+```
+
+### Callbacks
+
+```onion
+val f: Future[String] = Future::async(() -> { return "result"; })
+
+f.onSuccess((value: String) -> { IO::println(value); })
+f.onFailure((error: Throwable) -> { IO::println(error); })
+f.onComplete(
+  (value: String) -> { IO::println("ok: " + value); },
+  (error: Throwable) -> { IO::println("err: " + error); }
+)
+```
+
+### Blocking Operations
+
+```onion
+val f: Future[Int] = Future::successful(42)
+
+f.await()              // Block and get result (throws on failure)
+f.awaitTimeout(5000L)  // Block with timeout in ms
+f.getOrElse(0)         // Get result or default on failure
+```
+
+### Status Queries
+
+```onion
+f.isCompleted()  // true if done (success or failure)
+f.isSuccess()    // true if completed successfully
+f.isFailure()    // true if completed with error
+```
+
+### Combining Futures
+
+```onion
+val f1: Future[Int] = Future::successful(1)
+val f2: Future[Int] = Future::successful(2)
+
+// Zip into tuple-like array
+f1.zip(f2)  // Future[Object[]] = [1, 2]
+
+// Race: first to complete wins
+f1.race(f2)
+
+// Wait for all
+Future::all(f1, f2, f3)  // Future[Object[]] = [1, 2, 3]
+
+// First to complete
+Future::first(f1, f2, f3)
+```
+
+### Conversions
+
+```onion
+val f: Future[Int] = Future::successful(42)
+
+f.toOption()  // Option[Int] - Some(42) or None (blocks)
+f.toResult()  // Result[Int, Throwable] (blocks)
+f.underlying() // Java CompletableFuture for interop
+```
+
+### Do Notation Support
+
+Future works with do notation for sequential async composition:
+
+```onion
+val result: Future[Int] = do[Future] {
+  x <- Future::async(() -> { return fetchA(); })
+  y <- Future::async(() -> { return fetchB(x); })
+  ret x + y
+}
+```
+
 ## Next Steps
 
 - [Language Specification](specification.md) - Formal language spec

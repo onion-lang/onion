@@ -21,6 +21,57 @@ val inc = (x: Int) -> { return x + 1; }
 IO::println(double(21))
 ```
 
+### Do Notation for Monadic Composition
+
+Onion supports Haskell-style do notation for composing monadic operations (Option, Result, Future, etc.):
+
+```onion
+// Async computation with do notation
+val result: Future[Int] = do[Future] {
+  x <- Future::async(() -> { return fetchUser(); })
+  y <- Future::async(() -> { return fetchData(x); })
+  ret x + y
+}
+
+// Option chaining
+val user: Option[String] = do[Option] {
+  id <- lookupId("alice")
+  profile <- loadProfile(id)
+  ret profile.name
+}
+```
+
+### Trailing Lambda Syntax
+
+Methods accepting a function as the last parameter can use trailing lambda syntax:
+
+```onion
+// Traditional call
+list.map((x: Int) -> { return x * 2; })
+
+// With trailing lambda
+list.map { x => x * 2 }
+
+// Multiple arguments + trailing lambda
+future.onComplete(onSuccess, onFailure) { result =>
+  IO::println("Done: " + result)
+}
+```
+
+### Asynchronous Programming with Future
+
+Built-in `Future[T]` type for async operations:
+
+```onion
+val future: Future[String] = Future::async(() -> {
+  return Http::get("https://api.example.com/data");
+})
+
+future.map((data: String) -> { return parseJson(data); })
+      .onSuccess((result: Object) -> { IO::println(result); })
+      .onFailure((error: Throwable) -> { IO::println("Error: " + error); })
+```
+
 ## Architecture
 
 The compiler parses source code into an untyped AST and then performs type

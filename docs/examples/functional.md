@@ -365,8 +365,261 @@ def analyzeLog(filename :String) {
 analyzeLog("app.log")
 ```
 
+## Do Notation
+
+Chain monadic operations with clean syntax.
+
+### Option Chaining
+
+```onion
+def parseNumber(s: String): Option[Int] {
+  try {
+    return Option::some(JInteger::parseInt(s));
+  } catch e: NumberFormatException {
+    return Option::none();
+  }
+}
+
+// Without do notation
+val result1: Option[Int] = parseNumber("10").flatMap((x: Int) -> {
+  return parseNumber("20").map((y: Int) -> {
+    return x + y;
+  });
+})
+
+// With do notation - much cleaner!
+val result2: Option[Int] = do[Option] {
+  x <- parseNumber("10")
+  y <- parseNumber("20")
+  ret x + y
+}
+
+IO::println(result2.getOrElse(0))  // 30
+```
+
+### Result Error Handling
+
+```onion
+def divide(a: Int, b: Int): Result[Int, String] {
+  if b == 0 {
+    return Result::err("Division by zero");
+  }
+  return Result::ok(a / b);
+}
+
+val calculation: Result[Int, String] = do[Result] {
+  x <- Result::ok(100)
+  y <- divide(x, 5)      // 20
+  z <- divide(y, 4)      // 5
+  ret z * 2              // 10
+}
+
+select calculation {
+  case Result::ok(value):
+    IO::println("Result: " + value)
+  case Result::err(msg):
+    IO::println("Error: " + msg)
+}
+```
+
+### Nested Do Blocks
+
+```onion
+val nested: Option[Int] = do[Option] {
+  x <- Option::some(10)
+  inner <- do[Option] {
+    y <- Option::some(20)
+    ret y * 2
+  }
+  ret x + inner  // 10 + 40 = 50
+}
+```
+
+## Asynchronous Programming with Future
+
+### Creating Futures
+
+```onion
+// Already completed Future
+val immediate: Future[Int] = Future::successful(42)
+
+// Async computation
+val async: Future[String] = Future::async(() -> {
+  Thread::sleep(1000L);
+  return "Hello after 1 second";
+})
+
+// From throwing operation
+val risky: Future[Int] = Future::asyncThrowing(() -> {
+  if Math::random() < 0.5 {
+    throw new RuntimeException("Bad luck!");
+  }
+  return 100;
+})
+```
+
+### Transforming Futures
+
+```onion
+val numbers: Future[Int] = Future::successful(10)
+
+// Map: transform the value
+val doubled: Future[Int] = numbers.map((x: Int) -> { return x * 2; })
+
+// FlatMap: chain async operations
+val chained: Future[String] = numbers.flatMap((x: Int) -> {
+  return Future::async(() -> {
+    return "Number is: " + x;
+  });
+})
+
+// Filter: fail if predicate not met
+val positive: Future[Int] = numbers.filter((x: Int) -> { return x > 0; })
+```
+
+### Error Handling
+
+```onion
+val failing: Future[Int] = Future::failed(new RuntimeException("Oops!"))
+
+// Recover with a default value
+val recovered: Future[Int] = failing.recover((error: Throwable) -> {
+  IO::println("Error: " + error.getMessage());
+  return 0;
+})
+
+// Recover with another Future
+val retried: Future[Int] = failing.recoverWith((error: Throwable) -> {
+  return Future::successful(42);
+})
+```
+
+### Combining Futures
+
+```onion
+val f1: Future[Int] = Future::async(() -> { Thread::sleep(100L); return 1; })
+val f2: Future[Int] = Future::async(() -> { Thread::sleep(200L); return 2; })
+
+// Wait for all
+val all: Future[Object[]] = Future::all(f1, f2)
+all.onSuccess((results: Object[]) -> {
+  IO::println("Results: " + results[0] + ", " + results[1]);
+})
+
+// Race: first to complete wins
+val race: Future[Int] = f1.race(f2)
+race.onSuccess((winner: Int) -> {
+  IO::println("Winner: " + winner);  // Usually f1
+})
+
+// Zip two futures
+val zipped: Future[Object[]] = f1.zip(f2)
+```
+
+### Callbacks
+
+```onion
+val future: Future[String] = Future::async(() -> {
+  return "Async result";
+})
+
+future
+  .onSuccess((value: String) -> { IO::println("Success: " + value); })
+  .onFailure((error: Throwable) -> { IO::println("Failed: " + error); })
+```
+
+### Blocking (Use Sparingly)
+
+```onion
+val future: Future[Int] = Future::async(() -> { return 42; })
+
+// Block until complete
+val result: Int = future.await()
+
+// Block with timeout (in milliseconds)
+val timed: Int = future.awaitTimeout(5000L)
+
+// Get with default on failure
+val safe: Int = future.getOrElse(0)
+```
+
+### Future with Do Notation
+
+```onion
+def fetchUser(id: Int): Future[String] {
+  return Future::async(() -> { return "User" + id; });
+}
+
+def fetchProfile(name: String): Future[String] {
+  return Future::async(() -> { return name + "'s profile"; });
+}
+
+val profile: Future[String] = do[Future] {
+  user <- fetchUser(42)
+  profile <- fetchProfile(user)
+  ret profile.toUpperCase()
+}
+
+profile.onSuccess((p: String) -> { IO::println(p); })
+// Prints: USER42'S PROFILE
+```
+
+### Practical: Parallel API Calls
+
+```onion
+def fetchFromApi(url: String): Future[String] {
+  return Future::async(() -> {
+    // Simulate network request
+    Thread::sleep((Math::random() * 1000L)$Long);
+    return "Data from " + url;
+  });
+}
+
+// Fire off multiple requests in parallel
+val api1: Future[String] = fetchFromApi("/users")
+val api2: Future[String] = fetchFromApi("/posts")
+val api3: Future[String] = fetchFromApi("/comments")
+
+// Wait for all to complete
+Future::all(api1, api2, api3).onSuccess((results: Object[]) -> {
+  IO::println("Users: " + results[0])
+  IO::println("Posts: " + results[1])
+  IO::println("Comments: " + results[2])
+})
+
+// Or use do notation with zip
+val combined: Future[String] = do[Future] {
+  pair1 <- api1.zip(api2)
+  data3 <- api3
+  ret pair1[0]$String + " | " + pair1[1]$String + " | " + data3
+}
+```
+
+## Trailing Lambda Syntax
+
+Kotlin-style trailing lambda for cleaner method calls:
+
+```onion
+// Traditional syntax
+list.map((x: Int) -> { return x * 2; })
+
+// Trailing lambda - more concise
+list.map { x => x * 2 }
+
+// Works with any method taking a function last
+future.onSuccess { result =>
+  IO::println("Got: " + result)
+}
+
+// With other arguments before the trailing lambda
+api.request("GET", "/users") { response =>
+  IO::println(response.body())
+}
+```
+
 ## Next Steps
 
 - [Lambda Expressions Guide](../guide/lambda-expressions.md) - Detailed lambda documentation
 - [Functions Guide](../guide/functions.md) - Function definitions
+- [Standard Library](../reference/stdlib.md) - Option, Result, Future reference
 - [Basic Examples](basic.md) - Simpler programs

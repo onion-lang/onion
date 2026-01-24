@@ -12,29 +12,27 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.github.io/onion/">
+        <link rel="canonical" href="https://onion-lang.github.io/onion/guide/null-safety/">
       
       
-      
-        <link rel="next" href="getting-started/installation/">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
-        <title>Onion Programming Language</title>
+        <title>Null Safety - Onion Programming Language</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,7 +51,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#onion-programming-language" class="md-skip">
+        <a href="#null-safety" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +90,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Null Safety
             
           </span>
         </div>
@@ -223,11 +221,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="." class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -248,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -268,7 +264,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="guide/overview/" class="md-tabs__link">
+        <a href="../overview/" class="md-tabs__link">
           
   
   
@@ -288,7 +284,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="examples/overview/" class="md-tabs__link">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -308,7 +304,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="tools/compiler/" class="md-tabs__link">
+        <a href="../../tools/compiler/" class="md-tabs__link">
           
   
   
@@ -328,7 +324,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="reference/specification/" class="md-tabs__link">
+        <a href="../../reference/specification/" class="md-tabs__link">
           
   
   
@@ -348,7 +344,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="contributing/development/" class="md-tabs__link">
+        <a href="../../contributing/development/" class="md-tabs__link">
           
   
   
@@ -382,7 +378,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -409,37 +405,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -455,125 +424,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#key-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#language-guide" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Language Guide
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tools
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#project-history" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Project History
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#community" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Community
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -639,7 +489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -667,7 +517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/hello-world/" class="md-nav__link">
+      <a href="../../getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -695,7 +545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/quick-start/" class="md-nav__link">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -784,7 +634,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/overview/" class="md-nav__link">
+      <a href="../overview/" class="md-nav__link">
         
   
   
@@ -812,7 +662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/basic-syntax/" class="md-nav__link">
+      <a href="../basic-syntax/" class="md-nav__link">
         
   
   
@@ -840,7 +690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/variables-and-types/" class="md-nav__link">
+      <a href="../variables-and-types/" class="md-nav__link">
         
   
   
@@ -868,7 +718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/control-flow/" class="md-nav__link">
+      <a href="../control-flow/" class="md-nav__link">
         
   
   
@@ -896,7 +746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/functions/" class="md-nav__link">
+      <a href="../functions/" class="md-nav__link">
         
   
   
@@ -924,7 +774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/classes-and-objects/" class="md-nav__link">
+      <a href="../classes-and-objects/" class="md-nav__link">
         
   
   
@@ -952,7 +802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/inheritance/" class="md-nav__link">
+      <a href="../inheritance/" class="md-nav__link">
         
   
   
@@ -980,7 +830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/lambda-expressions/" class="md-nav__link">
+      <a href="../lambda-expressions/" class="md-nav__link">
         
   
   
@@ -1008,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guide/java-interop/" class="md-nav__link">
+      <a href="../java-interop/" class="md-nav__link">
         
   
   
@@ -1097,7 +947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -1125,7 +975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -1153,7 +1003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -1181,7 +1031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -1270,7 +1120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tools/compiler/" class="md-nav__link">
+      <a href="../../tools/compiler/" class="md-nav__link">
         
   
   
@@ -1298,7 +1148,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tools/script-runner/" class="md-nav__link">
+      <a href="../../tools/script-runner/" class="md-nav__link">
         
   
   
@@ -1326,7 +1176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tools/repl/" class="md-nav__link">
+      <a href="../../tools/repl/" class="md-nav__link">
         
   
   
@@ -1415,7 +1265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/specification/" class="md-nav__link">
+      <a href="../../reference/specification/" class="md-nav__link">
         
   
   
@@ -1443,7 +1293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/stdlib/" class="md-nav__link">
+      <a href="../../reference/stdlib/" class="md-nav__link">
         
   
   
@@ -1471,7 +1321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -1560,7 +1410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="contributing/development/" class="md-nav__link">
+      <a href="../../contributing/development/" class="md-nav__link">
         
   
   
@@ -1588,7 +1438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="contributing/building/" class="md-nav__link">
+      <a href="../../contributing/building/" class="md-nav__link">
         
   
   
@@ -1643,10 +1493,88 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#key-features" class="md-nav__link">
+  <a href="#nullable-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Features
+        Nullable Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nullable Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#type-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safe-call-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe Call Operator (?.)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Safe Call Operator (?.)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-calls-with-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method Calls with Arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe-call-on-non-nullable-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe Call on Non-Nullable Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combining-with-elvis-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining with Elvis Operator (?:)
       
     </span>
   </a>
@@ -1654,10 +1582,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#null-checking-with-if" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        Null Checking with if
       
     </span>
   </a>
@@ -1665,10 +1593,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
+  <a href="#return-type-of-safe-calls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Getting Started
+        Return Type of Safe Calls
       
     </span>
   </a>
@@ -1676,10 +1604,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#language-guide" class="md-nav__link">
+  <a href="#complete-example" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Language Guide
+        Complete Example
       
     </span>
   </a>
@@ -1687,10 +1615,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
+  <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reference
+        Best Practices
       
     </span>
   </a>
@@ -1698,10 +1626,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tools" class="md-nav__link">
+  <a href="#comparison-with-other-languages" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tools
+        Comparison with Other Languages
       
     </span>
   </a>
@@ -1709,32 +1637,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#project-history" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Project History
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#community" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Community
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
+        Next Steps
       
     </span>
   </a>
@@ -1761,119 +1667,174 @@
   
 
 
-<h1 id="onion-programming-language">Onion Programming Language<a class="headerlink" href="#onion-programming-language" title="Permanent link">&para;</a></h1>
-<p><img alt="Build Status" src="https://github.com/onion-lang/onion/actions/workflows/scala.yml/badge.svg?branch=main" /></p>
-<p><strong>Onion</strong> is a statically-typed, object-oriented programming language that compiles to JVM bytecode. It combines the power of static typing with a concise, expressive syntax and seamless Java interoperability.</p>
-<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Statically Typed</strong> - Catch errors at compile time with local type inference</li>
-<li><strong>Null Safety</strong> - Nullable types (<code>T?</code>) and safe call operator (<code>?.</code>) prevent null pointer exceptions</li>
-<li><strong>Object-Oriented</strong> - Classes, inheritance, interfaces, and method overloading</li>
-<li><strong>Functional Elements</strong> - Lambda expressions, closures, and first-class functions</li>
-<li><strong>Monadic Composition</strong> - Do notation for Option, Result, and Future types</li>
-<li><strong>Asynchronous Programming</strong> - Built-in Future type with functional combinators</li>
-<li><strong>Java Interoperability</strong> - Direct access to Java libraries and frameworks</li>
-<li><strong>JVM Target</strong> - Compiles to efficient JVM bytecode</li>
-<li><strong>Concise Syntax</strong> - Clean, readable code with trailing lambda support</li>
-</ul>
-<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>// Hello World
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>IO::println(&quot;Hello, World!&quot;)
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>// Class definition with inheritance
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>class Calculator : JFrame &lt;: ActionListener {
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  var result: Long
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  public:
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    def this {
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      // Constructor logic
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      this.result = 0L;
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    }
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    def calculate(x: Long, y: Long): Long {
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>      return x + y;
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    }
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>}
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>// Lambda expressions
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>val filter: String -&gt; Boolean = (line: String) -&gt; {
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  return line.startsWith(&quot;ERROR&quot;);
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>}
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>// Pattern matching with select
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>val value = 3
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>select value {
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  case 0, 1, 2:
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    IO::println(&quot;Low&quot;)
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>  case 3, 4, 5:
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    IO::println(&quot;Medium&quot;)
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>  else:
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    IO::println(&quot;High&quot;)
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>}
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>// Do notation for monadic composition
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>val result: Option[Int] = do[Option] {
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>  x &lt;- parseNumber(&quot;42&quot;)
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>  y &lt;- parseNumber(&quot;10&quot;)
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>  ret x + y
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>}
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>// Async programming with Future
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>val future: Future[String] = Future::async(() -&gt; { return fetchData(); })
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>future.map { data =&gt; processData(data) }
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>      .onSuccess { result =&gt; IO::println(result) }
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>// Null safety with safe call operator
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>val name: String? = getUserName()  // Nullable type
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>val upper: Object? = name?.toUpperCase()  // Safe call - returns null if name is null
-</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>val display: String = name ?: &quot;unknown&quot;  // Elvis operator for default value
+<h1 id="null-safety">Null Safety<a class="headerlink" href="#null-safety" title="Permanent link">&para;</a></h1>
+<p>Onion provides null safety features inspired by Kotlin, helping you avoid <code>NullPointerException</code> at compile time.</p>
+<h2 id="nullable-types">Nullable Types<a class="headerlink" href="#nullable-types" title="Permanent link">&para;</a></h2>
+<p>By default, types in Onion cannot hold <code>null</code>. To allow <code>null</code>, use the <code>?</code> suffix:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>// Non-nullable: cannot be null
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val name: String = &quot;Alice&quot;
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>// val name: String = null  // Compile error!
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>// Nullable: can be null
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>val maybeName: String? = null  // OK
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>val anotherName: String? = &quot;Bob&quot;  // Also OK
 </span></code></pre></div>
-<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
+<h3 id="type-compatibility">Type Compatibility<a class="headerlink" href="#type-compatibility" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="getting-started/installation/">Installation Guide</a> - Set up Onion on your system</li>
-<li><a href="getting-started/hello-world/">Hello World Tutorial</a> - Your first Onion program</li>
-<li><a href="getting-started/quick-start/">Quick Start</a> - Essential language features</li>
+<li><code>T</code> to <code>T?</code> is allowed (widening)</li>
+<li><code>T?</code> to <code>T</code> is <strong>not</strong> allowed (requires explicit handling)</li>
 </ul>
-<h2 id="language-guide">Language Guide<a class="headerlink" href="#language-guide" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="guide/overview/">Overview</a> - Language philosophy and design</li>
-<li><a href="guide/basic-syntax/">Basic Syntax</a> - Variables, operators, and expressions</li>
-<li><a href="guide/variables-and-types/">Variables and Types</a> - Type system and type annotations</li>
-<li><a href="guide/null-safety/">Null Safety</a> - Nullable types (<code>T?</code>) and safe call operator (<code>?.</code>)</li>
-<li><a href="guide/control-flow/">Control Flow</a> - if, while, for, foreach, select, and do notation</li>
-<li><a href="guide/functions/">Functions</a> - Function definitions and lambda expressions</li>
-<li><a href="guide/lambda-expressions/">Lambda Expressions</a> - Closures and trailing lambda syntax</li>
-<li><a href="guide/classes-and-objects/">Classes and Objects</a> - Object-oriented programming</li>
-<li><a href="guide/java-interop/">Java Interoperability</a> - Using Java libraries</li>
-</ul>
-<h2 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="reference/stdlib/">Standard Library</a> - IO, Option, Result, Future, and more</li>
-<li><a href="reference/compiler-architecture/">Compiler Architecture</a> - How the compiler works</li>
-</ul>
-<h2 id="tools">Tools<a class="headerlink" href="#tools" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>onionc</strong> - Compile Onion source files to .class files</li>
-<li><strong>onion</strong> - Run Onion scripts directly (compile and execute)</li>
-<li><strong>Shell</strong> - Interactive REPL for experimentation</li>
-</ul>
-<h2 id="project-history">Project History<a class="headerlink" href="#project-history" title="Permanent link">&para;</a></h2>
-<p>Originally written in Java in 2005, Onion has been completely rewritten in Scala 3.6.2, with only the parser using JavaCC. The compiler follows a classic multi-phase architecture:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>val s: String = &quot;hello&quot;
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val nullable: String? = s  // OK: String → String?
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>val maybeS: String? = &quot;world&quot;
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>// val nonNull: String = maybeS  // Compile error: String? → String
+</span></code></pre></div>
+<h2 id="safe-call-operator">Safe Call Operator (<code>?.</code>)<a class="headerlink" href="#safe-call-operator" title="Permanent link">&para;</a></h2>
+<p>The safe call operator allows you to safely access methods or properties on a nullable value. If the target is <code>null</code>, the entire expression returns <code>null</code> instead of throwing an exception.</p>
+<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val s: String? = null
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>val upper: Object? = s?.toUpperCase()  // Returns null, no exception!
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>val s2: String? = &quot;hello&quot;
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>val upper2: Object? = s2?.toUpperCase()  // Returns &quot;HELLO&quot;
+</span></code></pre></div>
+<h3 id="method-calls-with-arguments">Method Calls with Arguments<a class="headerlink" href="#method-calls-with-arguments" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val s: String? = &quot;hello world&quot;
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>val sub: Object? = s?.substring(0, 5)  // Returns &quot;hello&quot;
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>val nullS: String? = null
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>val nullSub: Object? = nullS?.substring(0, 5)  // Returns null
+</span></code></pre></div>
+<h3 id="safe-call-on-non-nullable-types">Safe Call on Non-Nullable Types<a class="headerlink" href="#safe-call-on-non-nullable-types" title="Permanent link">&para;</a></h3>
+<p>You can also use <code>?.</code> on non-nullable types (though it's less useful since they can't be <code>null</code>):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>val s: String = &quot;hello&quot;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>val upper: Object? = s?.toUpperCase()  // Works, returns &quot;HELLO&quot;
+</span></code></pre></div>
+<h2 id="combining-with-elvis-operator">Combining with Elvis Operator (<code>?:</code>)<a class="headerlink" href="#combining-with-elvis-operator" title="Permanent link">&para;</a></h2>
+<p>The safe call operator works great with the Elvis operator for providing default values:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val name: String? = null
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>// If name is null, use &quot;unknown&quot;
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>val displayName: String = name ?: &quot;unknown&quot;
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>// Chain safe call with Elvis
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>val s: String? = null
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>val upper: String = s?.toUpperCase() ?: &quot;DEFAULT&quot;  // Returns &quot;DEFAULT&quot;
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>val s2: String? = &quot;hello&quot;
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>val upper2: String = s2?.toUpperCase() ?: &quot;DEFAULT&quot;  // Returns &quot;HELLO&quot;
+</span></code></pre></div>
+<h2 id="null-checking-with-if">Null Checking with <code>if</code><a class="headerlink" href="#null-checking-with-if" title="Permanent link">&para;</a></h2>
+<p>You can check for <code>null</code> using standard <code>if</code> statements:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val name: String? = getUserName()
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>if name != null {
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  // Inside this block, we know name is not null
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  IO::println(&quot;Hello, &quot; + name)
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>} else {
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  IO::println(&quot;Hello, guest&quot;)
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>}
+</span></code></pre></div>
+<h2 id="return-type-of-safe-calls">Return Type of Safe Calls<a class="headerlink" href="#return-type-of-safe-calls" title="Permanent link">&para;</a></h2>
+<p>The return type of a safe call expression is always nullable (<code>T?</code>), since it can return <code>null</code> when the target is <code>null</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>val s: String? = &quot;hello&quot;
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>// toUpperCase() returns String, but s?.toUpperCase() returns String?
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>val upper: Object? = s?.toUpperCase()
+</span></code></pre></div>
+<p>For primitive return types, they are boxed (e.g., <code>Int</code> becomes <code>Integer?</code>):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>val s: String? = &quot;hello&quot;
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>val len: Object? = s?.length()  // Returns boxed Integer (5), not primitive int
+</span></code></pre></div>
+<h2 id="complete-example">Complete Example<a class="headerlink" href="#complete-example" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>class Main {
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>public:
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  static def main(args: String[]): Unit {
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    // Nullable type declaration
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    val maybeString: String? = null
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    IO::println(&quot;maybeString is null: &quot; + (maybeString == null))
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    val definiteString: String? = &quot;hello&quot;
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    IO::println(&quot;definiteString is null: &quot; + (definiteString == null))
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    // Safe call returns nullable result
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    val upper: Object? = definiteString?.toUpperCase()
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    if upper != null {
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>      IO::println(&quot;Upper: &quot; + upper)
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    }
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    // Safe call on null returns null
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    val nullResult: Object? = maybeString?.toUpperCase()
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    if nullResult == null {
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>      IO::println(&quot;nullResult is null as expected&quot;)
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>    }
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>    // Safe call with arguments
+</span><span id="__span-9-24"><a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>    val sub: Object? = definiteString?.substring(0, 3)
+</span><span id="__span-9-25"><a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>    if sub != null {
+</span><span id="__span-9-26"><a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>      IO::println(&quot;Substring: &quot; + sub)
+</span><span id="__span-9-27"><a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>    }
+</span><span id="__span-9-28"><a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>  }
+</span><span id="__span-9-29"><a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a>}
+</span></code></pre></div>
+<p>Output:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>maybeString is null: true
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>definiteString is null: false
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Upper: HELLO
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>nullResult is null as expected
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Substring: hel
+</span></code></pre></div></p>
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Parsing</strong> - JavaCC-generated parser produces untyped AST</li>
-<li><strong>Rewriting</strong> - AST normalization and transformation</li>
-<li><strong>Type Checking</strong> - Type inference and validation</li>
-<li><strong>Code Generation</strong> - ASM-based bytecode generation</li>
+<li><strong>Prefer non-nullable types</strong> - Use <code>T?</code> only when <code>null</code> is a meaningful value</li>
+<li><strong>Use <code>?.</code> for chains</strong> - Avoid nested null checks with safe call chains</li>
+<li><strong>Provide defaults with <code>?:</code></strong> - Use Elvis operator to provide sensible defaults</li>
+<li><strong>Check early</strong> - Validate nullable inputs at function boundaries</li>
 </ol>
-<h2 id="community">Community<a class="headerlink" href="#community" title="Permanent link">&para;</a></h2>
+<h2 id="comparison-with-other-languages">Comparison with Other Languages<a class="headerlink" href="#comparison-with-other-languages" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Onion</th>
+<th>Kotlin</th>
+<th>Java</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nullable type</td>
+<td><code>T?</code></td>
+<td><code>T?</code></td>
+<td><code>@Nullable T</code></td>
+</tr>
+<tr>
+<td>Safe call</td>
+<td><code>?.</code></td>
+<td><code>?.</code></td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Elvis operator</td>
+<td><code>?:</code></td>
+<td><code>?:</code></td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Non-null assertion</td>
+<td>N/A</td>
+<td><code>!!</code></td>
+<td>N/A</td>
+</tr>
+</tbody>
+</table>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="https://github.com/onion-lang/onion">GitHub Repository</a></li>
-<li><a href="https://github.com/onion-lang/onion/issues">Issue Tracker</a></li>
-<li><a href="contributing/development/">Contributing Guide</a></li>
+<li><a href="../control-flow/">Control Flow</a> - if, while, for, select</li>
+<li><a href="../functions/">Functions</a> - Function definitions and lambdas</li>
+<li><a href="../variables-and-types/">Variables and Types</a> - Type system overview</li>
 </ul>
-<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
-<p>Onion is open source software. See <a href="https://github.com/onion-lang/onion/blob/main/LICENSE">LICENSE</a> for details.</p>
-<p>This software includes software developed by <a href="http://www.apache.org/">Apache Software Foundation</a>.</p>
 
 
 
@@ -1904,28 +1865,6 @@
       
         <footer class="md-footer">
   
-    
-      
-      <nav class="md-footer__inner md-grid" aria-label="Footer" >
-        
-        
-          
-          <a href="getting-started/installation/" class="md-footer__link md-footer__link--next" aria-label="Next: Installation">
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              <div class="md-ellipsis">
-                Installation
-              </div>
-            </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
-            </div>
-          </a>
-        
-      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1969,10 +1908,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

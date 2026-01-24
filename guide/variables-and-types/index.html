@@ -854,10 +854,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#null-type" class="md-nav__link">
+  <a href="#null-type-and-nullable-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Null Type
+        Null Type and Nullable Types
       
     </span>
   </a>
@@ -1955,10 +1955,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#null-type" class="md-nav__link">
+  <a href="#null-type-and-nullable-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Null Type
+        Null Type and Nullable Types
       
     </span>
   </a>
@@ -2244,11 +2244,18 @@
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>strings[2] = &quot;c&quot;
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>val objects: Object[] = new Object[5]
 </span></code></pre></div>
-<h3 id="null-type">Null Type<a class="headerlink" href="#null-type" title="Permanent link">&para;</a></h3>
-<p>The <code>null</code> literal has a special null type:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val maybeString: String = null
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>val maybeObject: Object = null
+<h3 id="null-type-and-nullable-types">Null Type and Nullable Types<a class="headerlink" href="#null-type-and-nullable-types" title="Permanent link">&para;</a></h3>
+<p>The <code>null</code> literal can be assigned to reference types. For better null safety, use nullable types (<code>T?</code>):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>// Traditional (allows null implicitly)
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>val maybeString: String = null
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>val maybeObject: Object = null
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>// Recommended: Explicit nullable types
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>val safeName: String? = null        // Clearly nullable
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>val definite: String = &quot;hello&quot;      // Cannot be null
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>val upper: Object? = safeName?.toUpperCase()  // Safe call
 </span></code></pre></div>
+<p>See <a href="../null-safety/">Null Safety</a> for detailed information about nullable types and the safe call operator (<code>?.</code>).</p>
 <h3 id="bottom-type-nothing">Bottom Type (Nothing)<a class="headerlink" href="#bottom-type-nothing" title="Permanent link">&para;</a></h3>
 <p><code>Nothing</code> is the subtype of all types and is used for expressions that never return, such as <code>return</code>, <code>throw</code>, <code>break</code>, and <code>continue</code>.</p>
 <h2 id="type-casting">Type Casting<a class="headerlink" href="#type-casting" title="Permanent link">&para;</a></h2>
@@ -2379,6 +2386,7 @@
 </ul>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../null-safety/">Null Safety</a> - Nullable types and safe call operator</li>
 <li><a href="../control-flow/">Control Flow</a> - if, while, for, select</li>
 <li><a href="../functions/">Functions</a> - Function definitions and lambdas</li>
 <li><a href="../classes-and-objects/">Classes and Objects</a> - Object-oriented programming</li>

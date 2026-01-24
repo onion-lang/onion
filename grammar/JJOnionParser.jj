@@ -510,6 +510,7 @@ TOKEN:
 | <K_THROWS:       "throws"       >
 | <K_TRUE:         "true"         >
 | <K_TRY:          "try"          >
+| <K_TYPE:         "type"         >
 | <K_VAL:          "val"          >
 | <K_VAR:          "var"          >
 | <K_VOID:         "void" | "Unit" >
@@ -697,7 +698,9 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
 | LOOKAHEAD("extension")
   top=extension_decl()
 | [mset=modifiers()]
-  ( top=type_decl(mset)
+  ( LOOKAHEAD("type")
+    top=type_alias_decl(mset)
+  | top=type_decl(mset)
   | top=fun_decl(mset)
   | top=var_decl(mset)
   )
@@ -730,6 +733,17 @@ AST.GlobalVariableDeclaration var_decl(int modifiers) : {
     return new AST.GlobalVariableDeclaration(
       p(keyword), declMods, c(name), ty, e
     );
+  }
+}
+
+AST.TypeAliasDeclaration type_alias_decl(int modifiers) : {
+  Token t, name;
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
+  AST.TypeNode targetType;
+}{
+  {enterSection();}
+  t="type" name=id() [tparams=type_params()] "=" targetType=type() eos() {
+    return new AST.TypeAliasDeclaration(p(t), modifiers, c(name), tparams, targetType);
   }
 }
 

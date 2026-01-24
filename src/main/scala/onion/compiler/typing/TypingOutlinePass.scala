@@ -22,6 +22,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       case node: AST.ExtensionDeclaration => processExtensionDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
+      case node: AST.TypeAliasDeclaration => processTypeAliasDeclaration(node)
       case _ =>
     }
   }
@@ -508,6 +509,28 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       case _ =>
         constructTypeHierarchy(node.superClass, visit)
         node.interfaces.foreach(constructTypeHierarchy(_, visit))
+    }
+  }
+
+  private def processTypeAliasDeclaration(node: AST.TypeAliasDeclaration): Unit = {
+    val moduleName = if (unit_.module != null) unit_.module.name else null
+    val fqcn = createFQCN(moduleName, node.name)
+
+    typeAliases_.get(fqcn).foreach { entry =>
+      // Create type parameters for generic aliases
+      val aliasTypeParams = createTypeParams(node.typeParameters)
+
+      // Update entry with resolved type parameters
+      typeAliases_(fqcn) = entry.copy(typeParameters = aliasTypeParams)
+
+      // Validate target type can be resolved
+      openTypeParams(emptyTypeParams ++ aliasTypeParams) {
+        val mapper = new NameMapper(entry.imports)
+        val targetType = mapper.map(node.targetType.desc)
+        if (targetType == null) {
+          report(SemanticError.CLASS_NOT_FOUND, node.targetType, node.targetType.desc.toString)
+        }
+      }
     }
   }
 }

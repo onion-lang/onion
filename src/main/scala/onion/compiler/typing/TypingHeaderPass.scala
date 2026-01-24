@@ -27,6 +27,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
         registerEnum(declaration, moduleName, imports)
       case declaration: AST.ExtensionDeclaration =>
         registerExtension(declaration, moduleName, imports)
+      case declaration: AST.TypeAliasDeclaration =>
+        registerTypeAlias(declaration, moduleName, imports)
       case _ =>
         nonTypeCount += 1
     }
@@ -142,6 +144,36 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
       // Register this as an extension declaration for later processing
       registerExtensionDeclaration(declaration, node)
     }
+  }
+
+  private def registerTypeAlias(
+    declaration: AST.TypeAliasDeclaration,
+    moduleName: String,
+    imports: Seq[ImportItem]
+  ): Unit = {
+    val fqcn = createFQCN(moduleName, declaration.name)
+
+    // Check duplicate type alias
+    if (typeAliases_.contains(fqcn)) {
+      report(SemanticError.DUPLICATE_TYPE_ALIAS, declaration, fqcn)
+      return
+    }
+
+    // Check conflict with class names
+    if (table_.lookup(fqcn) != null) {
+      report(SemanticError.DUPLICATE_CLASS, declaration, fqcn)
+      return
+    }
+
+    // Store with empty type params (will be populated in OutlinePass)
+    val entry = TypeAliasEntry(
+      fqcn = fqcn,
+      typeParameters = Seq.empty,
+      targetDescriptor = declaration.targetType.desc,
+      node = declaration,
+      imports = imports
+    )
+    typeAliases_(fqcn) = entry
   }
 
   private def extractTypeName(typeNode: AST.TypeNode): String = {

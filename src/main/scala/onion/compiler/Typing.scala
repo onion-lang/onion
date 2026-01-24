@@ -115,6 +115,17 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
     loop(descriptor, 0)
   }
+  /**
+   * Represents a type alias entry.
+   */
+  private[compiler] case class TypeAliasEntry(
+    fqcn: String,
+    typeParameters: Seq[TypeParam],
+    targetDescriptor: AST.TypeDescriptor,
+    node: AST.TypeAliasDeclaration,
+    imports: Seq[ImportItem]
+  )
+
   private[compiler] class NameMapper(imports: Seq[ImportItem]) {
     def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
 
@@ -134,14 +145,55 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       case AST.PrimitiveType(AST.KDouble)     => BasicType.DOUBLE
       case AST.PrimitiveType(AST.KBoolean)    => BasicType.BOOLEAN
       case AST.PrimitiveType(AST.KVoid)       => BasicType.VOID
-      case AST.ReferenceType(name, qualified) => forName(name, qualified)
+      case AST.ReferenceType(name, qualified) =>
+        // Check if this is a type alias first
+        val aliasFqcn = if (qualified) name else {
+          val module = unit_.module
+          val moduleName = if (module != null) module.name else null
+          createFQCN(moduleName, name)
+        }
+        val aliasOpt = typeAliases_.get(aliasFqcn).orElse {
+          if (!qualified) {
+            imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => typeAliases_.get(fqcn)).nextOption()
+          } else None
+        }
+        aliasOpt match {
+          case Some(entry) if entry.typeParameters.isEmpty =>
+            resolveTypeAlias(entry, Nil)  // Returns any Type (including NullableType)
+          case _ =>
+            forName(name, qualified)  // Normal class lookup
+        }
       case AST.ParameterizedType(base, params) =>
+        val mappedArgs = params.map(map)
+        if (mappedArgs.exists(_ == null)) return null
+
+        // Check if base is a type alias
+        base match {
+          case AST.ReferenceType(name, qualified) =>
+            val aliasFqcn = if (qualified) name else {
+              val module = unit_.module
+              val moduleName = if (module != null) module.name else null
+              createFQCN(moduleName, name)
+            }
+            // Try local alias, then imported alias
+            val aliasOpt = typeAliases_.get(aliasFqcn).orElse {
+              if (!qualified) {
+                imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => typeAliases_.get(fqcn)).nextOption()
+              } else None
+            }
+            aliasOpt match {
+              case Some(aliasEntry) =>
+                return resolveTypeAlias(aliasEntry, mappedArgs)
+              case None =>
+            }
+          case _ =>
+        }
+
+        // Not a type alias, proceed with normal class resolution
         val raw = map(base)
         if (raw == null) return null
         raw match {
           case clazz: ClassType =>
-            val mappedArgs = params.map(map)
-            if (mappedArgs.exists(_ == null)) return null
             TypedAST.AppliedClassType(clazz, mappedArgs)
           case _ =>
             raw
@@ -172,7 +224,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         typeParams_.get(name).map(_.variableType).getOrElse {
           val module = unit_.module
           val moduleName = if (module != null) module.name else null
-          val local = table_.lookup(createFQCN(moduleName, name))
+          val aliasFqcn = createFQCN(moduleName, name)
+
+          // Existing class lookup logic (type alias is handled in map())
+          val local = table_.lookup(aliasFqcn)
           if (local != null) {
             local
           } else {
@@ -183,6 +238,54 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
               .orNull
           }
         }
+      }
+    }
+
+    private def resolveTypeAlias(entry: TypeAliasEntry, typeArgs: List[Type]): Type = {
+      // Cyclic detection
+      if (typeAliasResolutionStack_.contains(entry.fqcn)) {
+        report(CYCLIC_TYPE_ALIAS, entry.node, entry.fqcn)
+        return null
+      }
+
+      val params = entry.typeParameters
+
+      // Arity check for generic aliases
+      if (params.nonEmpty && typeArgs.length != params.length) {
+        report(TYPE_ARGUMENT_ARITY_MISMATCH, entry.node,
+               entry.fqcn, Integer.valueOf(params.length), Integer.valueOf(typeArgs.length))
+        return null
+      }
+
+      typeAliasResolutionStack_ += entry.fqcn
+      try {
+        // Create fresh NameMapper with alias's imports
+        val aliasMapper = new NameMapper(entry.imports)
+
+        // Set up type parameter scope for generic aliases
+        if (params.nonEmpty && typeArgs.nonEmpty) {
+          // Create substitution type params: map param names to actual types
+          val substitutions = params.zip(typeArgs).map { case (p, arg) =>
+            val varType = arg match {
+              case tv: TypeVariableType => tv
+              case ct: ClassType => TypeVariableType(p.name, ct)
+              case _ => TypeVariableType(p.name, rootClass)
+            }
+            TypeParam(p.name, varType, p.upperBound)
+          }
+          // Temporarily set up type params with the actual types for substitution
+          val savedTypeParams = typeParams_
+          typeParams_ = emptyTypeParams ++ substitutions
+          try {
+            aliasMapper.map(entry.targetDescriptor)
+          } finally {
+            typeParams_ = savedTypeParams
+          }
+        } else {
+          aliasMapper.map(entry.targetDescriptor)
+        }
+      } finally {
+        typeAliasResolutionStack_ -= entry.fqcn
       }
     }
   }
@@ -201,6 +304,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] val extensionDeclarations_ : Buffer[(AST.ExtensionDeclaration, ClassDefinition)] = Buffer()
   // Maps receiver type FQCN to extension methods - populated during OutlinePass
   private[compiler] val extensionMethods_ : HashMap[String, Buffer[ExtensionMethodDefinition]] = HashMap()
+  // Type alias storage
+  private[compiler] val typeAliases_ : HashMap[String, TypeAliasEntry] = HashMap()
+  // Cyclic detection stack for type alias resolution
+  private[compiler] val typeAliasResolutionStack_ : MutableSet[String] = MutableSet()
   private[compiler] val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
   private[compiler] val warningReporter_ : WarningReporter = new WarningReporter(config.warningLevel, config.suppressedWarnings)
   private var suppressReporting: Int = 0

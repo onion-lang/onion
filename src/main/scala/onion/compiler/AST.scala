@@ -220,6 +220,11 @@ object AST {
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 
   /**
+   * Type alias declaration: type Name[A, B] = TargetType
+   */
+  case class TypeAliasDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], targetType: TypeNode) extends Toplevel
+
+  /**
    * Extension declaration for adding methods to existing types.
    *
    * {{{

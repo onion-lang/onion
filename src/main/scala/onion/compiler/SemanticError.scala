@@ -118,6 +118,8 @@ object SemanticError {
   case object CURRENT_INSTANCE_NOT_AVAILABLE extends SemanticError(50)
   case object RETURN_TYPE_REQUIRED extends SemanticError(51)
   case object LAMBDA_PARAM_TYPE_REQUIRED extends SemanticError(52)
+  case object CYCLIC_TYPE_ALIAS extends SemanticError(53)
+  case object DUPLICATE_TYPE_ALIAS extends SemanticError(54)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

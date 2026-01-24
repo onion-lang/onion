@@ -256,6 +256,11 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     context.setConstructor(constructor)
     val args = constructor.getArgs
     bindParameters(context, node.args, args)
+
+    // Build argument names and default values for named argument support
+    val argsWithDefaults = buildArgumentsWithDefaults(node.args, args, context)
+    constructor.setArgumentsWithDefaults(argsWithDefaults)
+
     val params = typedTerms(node.superInits.toArray, context)
     val currentClass = definition_
     val superClass = currentClass.superClass

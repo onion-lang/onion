@@ -112,6 +112,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       // Create constructor
       val ctorModifier = Modifier.PUBLIC
       val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, argTypes, null, null)
+      // Set argument names for named argument support (records don't have default values)
+      val methodArgs = node.args.zip(argTypes).map { case (arg, argType) =>
+        MethodArgument(arg.name, argType, None)
+      }.toArray
+      ctor.setArgumentsWithDefaults(methodArgs)
       definition_.add(ctor)
 
       // Generate equals(Object): Boolean method

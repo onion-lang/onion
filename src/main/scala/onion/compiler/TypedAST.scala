@@ -450,6 +450,22 @@ object TypedAST {
     def affiliation: TypedAST.ClassType = classType
 
     var frame: LocalFrame = _
+
+    // Named arguments and default values support
+    private var argsWithDefaults_ : Array[MethodArgument] = null
+
+    def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit =
+      argsWithDefaults_ = args
+
+    def argumentsWithDefaults: Array[MethodArgument] =
+      if (argsWithDefaults_ != null) argsWithDefaults_
+      else arguments.zipWithIndex.map { case (tp, i) => MethodArgument(s"arg$i", tp, None) }
+
+    /** Minimum required arguments (those without default values) */
+    def minArguments: Int = {
+      val args = argumentsWithDefaults
+      args.count(_.defaultValue.isEmpty)
+    }
   }
 
   /**

@@ -25,6 +25,75 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   // The typed term is created in the same scope where the pattern bindings are set up
   case class GuardInfo(guardAst: AST.Expression, guardTerm: Term = null)
 
+  // Smart cast: type narrowing information for if-expressions
+  case class NarrowingInfo(
+    positive: Map[String, Type],  // Narrowings for then-branch
+    negative: Map[String, Type]   // Narrowings for else-branch
+  )
+  object NarrowingInfo {
+    val empty: NarrowingInfo = NarrowingInfo(Map.empty, Map.empty)
+  }
+
+  /**
+   * Extracts type narrowing information from a condition expression.
+   * Used for smart casts in if-expressions.
+   * Package-private for use by StatementTyping.
+   */
+  private[typing] def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo = {
+    condition match {
+      // x is SomeType -> narrow x to SomeType in then-branch
+      case AST.IsInstance(_, AST.Id(_, name), typeRef) =>
+        val binding = context.lookup(name)
+        if (binding != null && !binding.isMutable) {
+          val targetType = mapFrom(typeRef)
+          if (targetType != null) {
+            return NarrowingInfo(Map(name -> targetType), Map.empty)
+          }
+        }
+        NarrowingInfo.empty
+
+      // x != null -> narrow x from T? to T in then-branch
+      case AST.NotEqual(_, AST.Id(_, name), AST.NullLiteral(_)) =>
+        extractNullCheckNarrowing(name, context, positive = true)
+      case AST.NotEqual(_, AST.NullLiteral(_), AST.Id(_, name)) =>
+        extractNullCheckNarrowing(name, context, positive = true)
+
+      // x == null -> narrow x from T? to T in else-branch
+      case AST.Equal(_, AST.Id(_, name), AST.NullLiteral(_)) =>
+        extractNullCheckNarrowing(name, context, positive = false)
+      case AST.Equal(_, AST.NullLiteral(_), AST.Id(_, name)) =>
+        extractNullCheckNarrowing(name, context, positive = false)
+
+      // cond1 && cond2 -> both narrowings apply in then-branch
+      case AST.LogicalAnd(_, left, right) =>
+        val l = extractNarrowing(left, context)
+        val r = extractNarrowing(right, context)
+        NarrowingInfo(l.positive ++ r.positive, Map.empty)
+
+      case _ => NarrowingInfo.empty
+    }
+  }
+
+  /**
+   * Helper for null-check narrowing extraction.
+   */
+  private def extractNullCheckNarrowing(name: String, context: LocalContext, positive: Boolean): NarrowingInfo = {
+    val binding = context.lookup(name)
+    if (binding != null && !binding.isMutable) {
+      binding.tp match {
+        case nt: NullableType =>
+          if (positive) {
+            NarrowingInfo(Map(name -> nt.innerType), Map.empty)
+          } else {
+            NarrowingInfo(Map.empty, Map(name -> nt.innerType))
+          }
+        case _ => NarrowingInfo.empty
+      }
+    } else {
+      NarrowingInfo.empty
+    }
+  }
+
   def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
     context.openScope {
       if (node.elements.isEmpty) {
@@ -55,34 +124,59 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       }
     }
 
-  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] =
+  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] = {
     context.openScope {
-      for {
-        conditionRaw <- typed(node.condition, context)
-        condition <- Option(ensureBoolean(node.condition, conditionRaw))
-        thenTerm <- typeBlockExpression(node.thenBlock, context)
-        result <- if (node.elseBlock == null) {
-          val thenStmt = termToStatement(node.thenBlock, thenTerm)
-          Some(statementTerm(new IfStatement(condition, thenStmt, null), BasicType.VOID, node.location))
-        } else {
-          for {
-            elseTerm <- typeBlockExpression(node.elseBlock, context)
-            resultType <- Option(leastUpperBound(node, thenTerm.`type`, elseTerm.`type`))
-          } yield {
-            if (resultType.isBottomType || resultType == BasicType.VOID) {
-              val thenStmt = termToStatement(node.thenBlock, thenTerm)
-              val elseStmt = termToStatement(node.elseBlock, elseTerm)
-              statementTerm(new IfStatement(condition, thenStmt, elseStmt), resultType, node.location)
-            } else {
-              val resultVar = new ClosureLocalBinding(0, context.add(context.newName, resultType, isMutable = true), resultType, isMutable = true)
-              val thenStmt = assignBranch(node.thenBlock, thenTerm, resultVar, resultType)
-              val elseStmt = assignBranch(node.elseBlock, elseTerm, resultVar, resultType)
-              new Begin(node.location, Array[Term](statementTerm(new IfStatement(condition, thenStmt, elseStmt), BasicType.VOID, node.location), new RefLocal(resultVar)))
-            }
-          }
+      // Type the condition
+      val conditionRawOpt = typed(node.condition, context)
+      if (conditionRawOpt.isEmpty) return None
+      val conditionRaw = conditionRawOpt.get
+      val condition = ensureBoolean(node.condition, conditionRaw)
+      if (condition == null) return None
+
+      // Extract smart cast narrowing info
+      val narrowing = extractNarrowing(node.condition, context)
+      val savedNarrowings = context.saveNarrowings()
+
+      // Type the then-block with positive narrowings applied
+      narrowing.positive.foreach { case (name, tp) =>
+        context.addNarrowing(name, tp)
+      }
+      val thenTermOpt = typeBlockExpression(node.thenBlock, context)
+      context.restoreNarrowings(savedNarrowings)
+
+      if (thenTermOpt.isEmpty) return None
+      val thenTerm = thenTermOpt.get
+
+      if (node.elseBlock == null) {
+        val thenStmt = termToStatement(node.thenBlock, thenTerm)
+        Some(statementTerm(new IfStatement(condition, thenStmt, null), BasicType.VOID, node.location))
+      } else {
+        // Type the else-block with negative narrowings applied
+        narrowing.negative.foreach { case (name, tp) =>
+          context.addNarrowing(name, tp)
         }
-      } yield result
+        val elseTermOpt = typeBlockExpression(node.elseBlock, context)
+        context.restoreNarrowings(savedNarrowings)
+
+        if (elseTermOpt.isEmpty) return None
+        val elseTerm = elseTermOpt.get
+
+        val resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
+        if (resultType == null) return None
+
+        if (resultType.isBottomType || resultType == BasicType.VOID) {
+          val thenStmt = termToStatement(node.thenBlock, thenTerm)
+          val elseStmt = termToStatement(node.elseBlock, elseTerm)
+          Some(statementTerm(new IfStatement(condition, thenStmt, elseStmt), resultType, node.location))
+        } else {
+          val resultVar = new ClosureLocalBinding(0, context.add(context.newName, resultType, isMutable = true), resultType, isMutable = true)
+          val thenStmt = assignBranch(node.thenBlock, thenTerm, resultVar, resultType)
+          val elseStmt = assignBranch(node.elseBlock, elseTerm, resultVar, resultType)
+          Some(new Begin(node.location, Array[Term](statementTerm(new IfStatement(condition, thenStmt, elseStmt), BasicType.VOID, node.location), new RefLocal(resultVar))))
+        }
+      }
     }
+  }
 
   def typeSelectExpression(node: AST.SelectExpression, context: LocalContext): Option[Term] = boundary {
     val condition = typed(node.condition, context).getOrElse(break(None))

@@ -42,6 +42,10 @@ class LocalContext {
   private val boxedVariables = scala.collection.mutable.Set[String]()
   private val usageTracker = new VariableUsageTracker()
   private var returnTypeCollector: mutable.Buffer[TypedAST.Type] = null
+
+  // Smart cast: type narrowing information
+  // Maps variable names to their narrowed types (only for immutable variables)
+  private var narrowings: Map[String, TypedAST.Type] = Map.empty
   private var returnTypeCollectionDepth: Int = 0
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
@@ -266,4 +270,47 @@ class LocalContext {
   def collectedReturnTypes: Seq[TypedAST.Type] =
     if (returnTypeCollector == null) Seq.empty else returnTypeCollector.toSeq
 
+  // ========== Smart Cast (Type Narrowing) ==========
+
+  /**
+   * Gets the effective type for a variable, considering smart casts.
+   * Returns the narrowed type if available, otherwise the declared type.
+   * Smart casts only apply to immutable (val) variables.
+   */
+  def getEffectiveType(name: String): TypedAST.Type = {
+    val binding = lookup(name)
+    if (binding == null) return null
+    // Mutable variables are not subject to smart cast (could be reassigned)
+    if (binding.isMutable) return binding.tp
+    narrowings.getOrElse(name, binding.tp)
+  }
+
+  /**
+   * Adds a type narrowing for a variable.
+   * Used when an is-check or null-check narrows the type.
+   */
+  def addNarrowing(name: String, tp: TypedAST.Type): Unit =
+    narrowings = narrowings + (name -> tp)
+
+  /**
+   * Clears the type narrowing for a variable.
+   * Used when a variable is reassigned.
+   */
+  def clearNarrowing(name: String): Unit =
+    narrowings = narrowings - name
+
+  /**
+   * Saves the current narrowing state.
+   * Used before entering a branch to allow restoration after.
+   */
+  def saveNarrowings(): Map[String, TypedAST.Type] = narrowings
+
+  /**
+   * Restores a previously saved narrowing state.
+   * Used after exiting a branch to restore the pre-branch state.
+   */
+  def restoreNarrowings(saved: Map[String, TypedAST.Type]): Unit =
+    narrowings = saved
+
 }
+

@@ -20,11 +20,15 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private val expressionFormTyping = new ExpressionFormTyping(typing, this)
   private val closureTyping = new ClosureTyping(typing, this)
   private val statementTyping = new StatementTyping(typing, this)
-  private val controlExpressionTyping = new ControlExpressionTyping(typing, this)
+  private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, this)
   def run(): Unit = runUnit()
 
   def createEqualsForRef(lhs: Term, rhs: Term): Term =
     operatorTyping.createEquals(EQUAL, lhs, rhs)
+
+  /** Extract smart cast narrowing info from a condition expression. */
+  def extractNarrowing(condition: AST.Expression, context: LocalContext): controlExpressionTyping.NarrowingInfo =
+    controlExpressionTyping.extractNarrowing(condition, context)
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
     val expressions = new Array[Term](nodes.length)
@@ -778,9 +782,16 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       if (bind == null) {
         report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
         None
-      }else {
+      } else {
         context.recordUsage(name)
-        Some(new RefLocal(bind))
+        // Smart cast: use effective type which may be narrowed
+        val effectiveType = context.getEffectiveType(name)
+        if (effectiveType != bind.tp) {
+          // Type has been narrowed, insert a cast
+          Some(new AsInstanceOf(new RefLocal(bind), effectiveType))
+        } else {
+          Some(new RefLocal(bind))
+        }
       }
     case node: AST.UnqualifiedFieldReference =>
       if (context.isStatic) {

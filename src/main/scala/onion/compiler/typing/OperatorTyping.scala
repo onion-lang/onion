@@ -130,8 +130,22 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
 
   def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
     val left = typed(node.lhs, context).getOrElse(null)
+    if (left == null) return null
+
+    // For &&, apply smart cast narrowing from left side when typing right side
+    val savedNarrowings = context.saveNarrowings()
+    val isAnd = node.isInstanceOf[AST.LogicalAnd]
+    if (isAnd) {
+      val narrowing = body.extractNarrowing(node.lhs, context)
+      narrowing.positive.foreach { case (name, tp) =>
+        context.addNarrowing(name, tp)
+      }
+    }
+
     val right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return null
+    context.restoreNarrowings(savedNarrowings)
+
+    if (right == null) return null
     val leftType: Type = left.`type`
     val rightType: Type = right.`type`
     if ((leftType != BasicType.BOOLEAN) || (rightType != BasicType.BOOLEAN)) {

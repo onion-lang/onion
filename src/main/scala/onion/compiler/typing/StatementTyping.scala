@@ -154,8 +154,28 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     case node: AST.IfExpression =>
       context.openScope {
         val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
+
+        // Smart cast: extract narrowing info and apply it to branches
+        val narrowing = body.extractNarrowing(node.condition, context)
+        val savedNarrowings = context.saveNarrowings()
+
+        // Apply positive narrowings for then-block
+        narrowing.positive.foreach { case (name, tp) =>
+          context.addNarrowing(name, tp)
+        }
         val thenBlock = translate(node.thenBlock, context)
-        val elseBlock = if (node.elseBlock == null) null else translate(node.elseBlock, context)
+        context.restoreNarrowings(savedNarrowings)
+
+        // Apply negative narrowings for else-block
+        val elseBlock = if (node.elseBlock == null) null else {
+          narrowing.negative.foreach { case (name, tp) =>
+            context.addNarrowing(name, tp)
+          }
+          val result = translate(node.elseBlock, context)
+          context.restoreNarrowings(savedNarrowings)
+          result
+        }
+
         if (condition != null) new IfStatement(condition, thenBlock, elseBlock) else new NOP(node.location)
       }
     case node: AST.LocalVariableDeclaration =>

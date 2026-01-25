@@ -224,7 +224,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     // Resolve the receiver type (the type being extended)
     val receiverType = mapFrom(node.receiverType)
     if (receiverType == null) {
-      report(SemanticError.CLASS_NOT_FOUND, node.receiverType, node.receiverType.desc.toString)
+      report(SemanticError.CLASS_NOT_FOUND, node.receiverType, node.receiverType.desc.toString, mapper_.getCandidateClassNames)
       return
     }
 
@@ -528,7 +528,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
         val mapper = new NameMapper(entry.imports)
         val targetType = mapper.map(node.targetType.desc)
         if (targetType == null) {
-          report(SemanticError.CLASS_NOT_FOUND, node.targetType, node.targetType.desc.toString)
+          report(SemanticError.CLASS_NOT_FOUND, node.targetType, node.targetType.desc.toString, mapper.getCandidateClassNames)
         }
       }
     }

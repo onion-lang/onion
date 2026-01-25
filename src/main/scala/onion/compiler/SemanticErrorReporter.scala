@@ -455,13 +455,14 @@ class SemanticErrorReporter(threshold: Int) {
 
   /**
    * Handles NON_EXHAUSTIVE_PATTERN_MATCH with type array formatting.
+   * Uses displayName to show generic type arguments in error messages.
    */
   private def reportNonExhaustivePatternMatch(position: Location, items: Array[AnyRef]): Unit = {
     val sealedType = items(0).asInstanceOf[TypedAST.Type]
     val missingTypes = items(1).asInstanceOf[Array[TypedAST.Type]]
-    val missingNames = missingTypes.map(_.name).mkString(", ")
+    val missingNames = missingTypes.map(_.displayName).mkString(", ")
     problem(position, format(message("error.semantic.nonExhaustivePatternMatch"),
-      Seq(sealedType.name, missingNames)))
+      Seq(sealedType.displayName, missingNames)))
   }
 
   // ========== Main report method ==========

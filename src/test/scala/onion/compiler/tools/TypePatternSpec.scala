@@ -126,5 +126,77 @@ class TypePatternSpec extends AbstractShellSpec {
       )
       assert(result.isInstanceOf[Shell.Failure])
     }
+
+    it("reports error when all patterns have guards (not exhaustive)") {
+      val result = shell.run(
+        """
+          |sealed interface Status {}
+          |record Active() <: Status;
+          |record Inactive() <: Status;
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s: Status = new Active();
+          |    return select s {
+          |      case a is Active when true: "active"
+          |      case i is Inactive when true: "inactive"
+          |    };
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      // Guarded patterns don't count toward exhaustiveness
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("accepts exhaustive match with mixed guarded and unguarded patterns") {
+      val result = shell.run(
+        """
+          |sealed interface Option {}
+          |record Some(value: Int) <: Option;
+          |record None() <: Option;
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o: Option = new Some(42);
+          |    return select o {
+          |      case s is Some when s.value() > 0: "positive"
+          |      case s is Some: "non-positive"
+          |      case n is None: "none"
+          |    };
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("positive") == result)
+    }
+
+    it("excludes guarded destructuring patterns from exhaustiveness") {
+      val result = shell.run(
+        """
+          |sealed interface Tree {}
+          |record Leaf(value: Int) <: Tree;
+          |record Node(left: Tree, right: Tree) <: Tree;
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val t: Tree = new Leaf(1);
+          |    return select t {
+          |      case Leaf(v) when v > 0: "positive leaf"
+          |      case Node(_, _): "node"
+          |    };
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      // Leaf without guard is missing, Node is covered
+      assert(result.isInstanceOf[Shell.Failure])
+    }
   }
 }

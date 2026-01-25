@@ -190,7 +190,6 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     val caseNodes = Buffer[AST.BlockExpression]()
     // Store binding info along with created ClosureLocalBindings for code generation
     val caseBindingData = Buffer[(PatternBindingInfo, List[ClosureLocalBinding], Option[GuardInfo])]()
-    val matchedTypes = Buffer[Type]() // Track matched types for exhaustiveness check
     var hasWildcardPattern = false // Track if any pattern has a wildcard
 
     for ((patterns, thenBlock) <- node.cases) {
@@ -211,7 +210,6 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       // Handle different binding types
       bindingInfo match {
         case SingleBinding(varName, varType) =>
-          matchedTypes += varType // Track for exhaustiveness
           context.openScope {
             val varIndex = context.add(varName, varType, isMutable = false)
             val varBind = new ClosureLocalBinding(0, varIndex, varType, isMutable = false, isBoxed = false)
@@ -235,7 +233,6 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
           }
 
         case MultiBindings(recordType, bindings, _) =>
-          matchedTypes += recordType // Track for exhaustiveness
           context.openScope {
             val varBinds = bindings.map { case BindingEntry(varName, varType, _) =>
               val varIndex = context.add(varName, varType, isMutable = false)
@@ -280,22 +277,29 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
     // Exhaustiveness check for sealed types
     var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
-    if (node.elseBlock == null && !hasWildcardPattern && matchedTypes.nonEmpty) {
+    if (node.elseBlock == null && !hasWildcardPattern) {
       condition.`type` match {
         case classDef: ClassDefinition if classDef.isSealed =>
-          val sealedSubtypes = classDef.sealedSubtypes
-          val missingTypes = sealedSubtypes.filterNot { subtype =>
-            matchedTypes.exists { matchedType =>
-              matchedType match {
-                case mt: ClassType => mt.name == subtype.name
-                case _ => false
+          // Extract matched types from caseBindingData, excluding guarded patterns
+          // (guarded patterns can fail at runtime, so they don't guarantee exhaustiveness)
+          val unguardedMatchedTypes = caseBindingData.flatMap {
+            case (SingleBinding(_, tp), _, None) => Some(tp)      // Type pattern without guard
+            case (MultiBindings(tp, _, _), _, None) => Some(tp)   // Destructuring without guard
+            case _ => None                                         // Guarded or NoBindings
+          }
+
+          if (unguardedMatchedTypes.nonEmpty) {
+            val sealedSubtypes = classDef.sealedSubtypes
+            val missingTypes = sealedSubtypes.filterNot { subtype =>
+              unguardedMatchedTypes.exists { matchedType =>
+                isSubtypeMatch(matchedType, subtype)
               }
             }
-          }
-          if (missingTypes.nonEmpty) {
-            report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missingTypes.map(_.asInstanceOf[Type]))
-          } else {
-            isExhaustive = true
+            if (missingTypes.nonEmpty) {
+              report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missingTypes.map(_.asInstanceOf[Type]))
+            } else {
+              isExhaustive = true
+            }
           }
         case _ =>
       }
@@ -880,6 +884,19 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       val result = leastUpperBound(node, acc, t)
       if (result == null) break(None)
       result
+    }
+  }
+
+  /**
+   * Check if a matched type covers a sealed subtype.
+   * Used for exhaustiveness checking of sealed types.
+   */
+  private def isSubtypeMatch(matched: Type, sealedSubtype: ClassType): Boolean = {
+    matched match {
+      case mt: ClassType =>
+        // Match by name (most common case) or check subtype relationship
+        mt.name == sealedSubtype.name || TypeRules.isSuperType(mt, sealedSubtype)
+      case _ => false
     }
   }
 }

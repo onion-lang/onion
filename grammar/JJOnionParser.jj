@@ -531,6 +531,8 @@ TOKEN : {
 | <SLASH:          "/"            >
 | <PERC:           "%"            >
 | <DOLLAR:         "$"            >
+| <LTEQ:           "<="           >
+| <GTEQ:           ">="           >
 | <LT:             "<"            >
 | <GT:             ">"            >
 | <ARROW:          "->"           >
@@ -1418,8 +1420,8 @@ AST.Expression equal() :{ Token t; AST.Expression a, b; }{
 
 AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
   a=bit_shift()
-  ( ( t="<=" eols() b=bit_shift() {a = new AST.LessOrEqual(p(t), a, b);}
-    | t=">=" eols() b=bit_shift() {a = new AST.GreaterOrEqual(p(t), a, b);}
+  ( ( t=<LTEQ> eols() b=bit_shift() {a = new AST.LessOrEqual(p(t), a, b);}
+    | t=<GTEQ> eols() b=bit_shift() {a = new AST.GreaterOrEqual(p(t), a, b);}
     | t="<"  eols() b=bit_shift() {a = new AST.LessThan(p(t), a, b);}
     | t=">"  eols() b=bit_shift() {a = new AST.GreaterThan(p(t), a, b);}
     | t="is" eols() type = type() {a = new AST.IsInstance(p(t), a, type);}

@@ -1,0 +1,72 @@
+// シンプルなTodoリスト - CLI対話型アプリ
+
+import {
+  java.io.BufferedReader;
+  java.io.InputStreamReader;
+  java.util.ArrayList;
+  java.lang.Integer as JInt;
+}
+
+class TodoApp {
+public:
+  static def main(args: String[]): void {
+    val reader: BufferedReader = new BufferedReader(new InputStreamReader(System::in));
+    val todos: ArrayList = new ArrayList();
+
+    IO::println("=== Todo リスト ===");
+    IO::println("コマンド: add <内容>, list, done <番号>, quit");
+    IO::println("");
+
+    var running: Boolean = true;
+    while running {
+      IO::print("> ");
+      val line: String = reader.readLine();
+
+      if line == null {
+        running = false;
+      } else {
+        val input: String = line.trim();
+
+        if input.startsWith("add ") {
+          val task: String = input.substring(4);
+          todos.add(task);
+          IO::println("追加: " + task);
+        } else {
+          if input == "list" {
+            if todos.size() == 0 {
+              IO::println("(タスクなし)");
+            } else {
+              for var i: Int = 0; i < todos.size(); i = i + 1 {
+                IO::println("  " + (i + 1) + ". " + todos.get(i));
+              }
+            }
+          } else {
+            if input.startsWith("done ") {
+              try {
+                val num: Int = JInt::parseInt(input.substring(5)) - 1;
+                if num >= 0 && num < todos.size() {
+                  val task: String = todos.get(num)$String;
+                  todos.remove(task);
+                  IO::println("完了: " + task);
+                } else {
+                  IO::println("無効な番号");
+                }
+              } catch e: Exception {
+                IO::println("数字を入力してね");
+              }
+            } else {
+              if input == "quit" || input == "exit" {
+                IO::println("さようなら！");
+                running = false;
+              } else {
+                if input != "" {
+                  IO::println("不明なコマンド: " + input);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

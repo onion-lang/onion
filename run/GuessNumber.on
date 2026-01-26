@@ -1,0 +1,60 @@
+// 数当てゲーム - Number Guessing Game
+// 1から100までの数を当てよう！
+
+import {
+  java.io.BufferedReader;
+  java.io.InputStreamReader;
+  java.lang.Integer as JInt;
+}
+
+class GuessNumber {
+public:
+  static def main(args: String[]): void {
+    val reader: BufferedReader = new BufferedReader(new InputStreamReader(System::in));
+    val answer: Int = Rand::nextInt(1, 101);
+    var guess: Int = 0;
+    var tries: Int = 0;
+
+    IO::println("=== 数当てゲーム ===");
+    IO::println("1から100までの数を当ててね！");
+    IO::println("");
+
+    while guess != answer {
+      IO::print("予想を入力 > ");
+      val line: String = reader.readLine();
+
+      if line == null {
+        IO::println("終了します");
+        return;
+      }
+
+      try {
+        guess = JInt::parseInt(line.trim());
+        tries = tries + 1;
+
+        if guess < answer {
+          IO::println("もっと大きい！");
+        } else {
+          if guess > answer {
+            IO::println("もっと小さい！");
+          } else {
+            IO::println("");
+            IO::println("正解！ " + tries + "回で当たったよ！");
+
+            if tries <= 5 {
+              IO::println("すごい！天才！");
+            } else {
+              if tries <= 7 {
+                IO::println("なかなかやるね！");
+              } else {
+                IO::println("次はもっと早く当てよう！");
+              }
+            }
+          }
+        }
+      } catch e: Exception {
+        IO::println("数字を入力してね");
+      }
+    }
+  }
+}

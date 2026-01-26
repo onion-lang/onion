@@ -1,0 +1,52 @@
+// フィボナッチ数列 - 再帰 vs 反復 の速度比較
+
+class Fibonacci {
+public:
+  // 再帰版（遅い）
+  static def fibRecursive(n: Int): Long {
+    if n <= 1 {
+      return n$Long;
+    }
+    return fibRecursive(n - 1) + fibRecursive(n - 2);
+  }
+
+  // 反復版（速い）
+  static def fibIterative(n: Int): Long {
+    if n <= 1 {
+      return n$Long;
+    }
+    var a: Long = 0L;
+    var b: Long = 1L;
+    for var i: Int = 2; i <= n; i = i + 1 {
+      val tmp: Long = a + b;
+      a = b;
+      b = tmp;
+    }
+    return b;
+  }
+
+  static def main(args: String[]): void {
+    IO::println("=== フィボナッチ数列 速度比較 ===");
+    IO::println("");
+
+    // 反復版のテスト
+    IO::println("反復版 fib(40):");
+    val startIter: Long = Timing::nanos();
+    val resultIter: Long = fibIterative(40);
+    val elapsedIter: Long = Timing::elapsedNanos(startIter);
+    IO::println("  結果: " + resultIter);
+    IO::println("  時間: " + Timing::formatNanos(elapsedIter));
+    IO::println("");
+
+    // 再帰版のテスト（小さい値で）
+    IO::println("再帰版 fib(35):");
+    val startRec: Long = Timing::nanos();
+    val resultRec: Long = fibRecursive(35);
+    val elapsedRec: Long = Timing::elapsedNanos(startRec);
+    IO::println("  結果: " + resultRec);
+    IO::println("  時間: " + Timing::formatNanos(elapsedRec));
+    IO::println("");
+
+    IO::println("反復版は圧倒的に速い！");
+  }
+}

@@ -1,0 +1,26 @@
+// FizzBuzz - プログラミングの定番問題
+// 3の倍数でFizz、5の倍数でBuzz、両方の倍数でFizzBuzz
+
+class FizzBuzz {
+public:
+  static def main(args: String[]): void {
+    IO::println("=== FizzBuzz (1-30) ===");
+    IO::println("");
+
+    for var i: Int = 1; i <= 30; i = i + 1 {
+      if i % 15 == 0 {
+        IO::println("FizzBuzz");
+      } else {
+        if i % 3 == 0 {
+          IO::println("Fizz");
+        } else {
+          if i % 5 == 0 {
+            IO::println("Buzz");
+          } else {
+            IO::println("" + i);
+          }
+        }
+      }
+    }
+  }
+}

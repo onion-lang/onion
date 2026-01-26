@@ -5,7 +5,7 @@ public:
   // 再帰版（遅い）
   static def fibRecursive(n: Int): Long {
     if n <= 1 {
-      return n$Long;
+      return n as Long;
     }
     return fibRecursive(n - 1) + fibRecursive(n - 2);
   }
@@ -13,7 +13,7 @@ public:
   // 反復版（速い）
   static def fibIterative(n: Int): Long {
     if n <= 1 {
-      return n$Long;
+      return n as Long;
     }
     var a: Long = 0L;
     var b: Long = 1L;

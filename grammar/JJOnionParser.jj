@@ -531,7 +531,6 @@ TOKEN : {
 | <STAR:           "*"            >
 | <SLASH:          "/"            >
 | <PERC:           "%"            >
-| <DOLLAR:         "$"            >
 | <LTEQ:           "<="           >
 | <GTEQ:           ">="           >
 | <LT:             "<"            >
@@ -1531,7 +1530,7 @@ AST.Expression primary_suffix() : {
           { args = AST.appendToList(args, tl); e = new AST.SafeMethodCall(p(t), e, c(n), args); }
     | {e = new AST.SafeMemberSelection(p(t), e, c(n));}
     )
-  | t="$" eols() type=type()                                                                      {e = new AST.Cast(p(t), e, type);}
+  | t=<K_AS> eols() type=type()                                                                    {e = new AST.Cast(p(t), e, type);}
   | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
   | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
   )

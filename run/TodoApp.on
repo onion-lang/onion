@@ -45,7 +45,7 @@ public:
               try {
                 val num: Int = JInt::parseInt(input.substring(5)) - 1;
                 if num >= 0 && num < todos.size() {
-                  val task: String = todos.get(num)$String;
+                  val task: String = todos.get(num) as String;
                   todos.remove(task);
                   IO::println("完了: " + task);
                 } else {

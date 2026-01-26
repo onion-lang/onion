@@ -15,12 +15,12 @@ public:
 	def setValue(value : Long) : void { this.text.setText(JLong::toString(value)); }
 	def setValue(value : String) : void { this.text.setText(value); }
 	def actionPerformed(event : ActionEvent) : void {
-		val label: String = event.source$JButton.label
+		val label: String = (event.source as JButton).getText()
 		if label == "C" {
 			this.left = 0
 			this.right = 0
 			this.operator = null
-			this.text.setText(JLong::toString(0))
+			this.text.setText(JLong::toString(0L))
 			this.isError = false
 		}else{
 			this.text.setText(label)
@@ -46,7 +46,7 @@ public:
 			"0", "=", "/", "+"
 		]
 		foreach label:String in labels {
-			val button: JButton = new JButton(label$String)
+			val button: JButton = new JButton(label as String)
 			button.addActionListener(this)
 			button.setPreferredSize(new Dimension(42, 28))
 			center.add(button)

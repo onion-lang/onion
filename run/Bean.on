@@ -44,5 +44,5 @@ encoder.writeObject(new ExampleBean("HogeBean", 100));
 encoder.close;
 
 val decoder: XMLDecoder = new XMLDecoder(new ByteArrayInputStream(out.toByteArray()));
-val bean: ExampleBean = decoder.readObject$ExampleBean;
+val bean: ExampleBean = decoder.readObject as ExampleBean;
 IO::println(bean);

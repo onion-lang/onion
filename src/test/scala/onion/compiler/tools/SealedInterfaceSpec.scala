@@ -82,7 +82,7 @@ class SealedInterfaceSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val r: Result = new Success("Hello");
-          |    val s = r $ Success;
+          |    val s = r as Success;
           |    return s.value();
           |  }
           |}

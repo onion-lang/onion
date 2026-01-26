@@ -15,7 +15,7 @@ class ImportSpec extends AbstractShellSpec {
           |   static def main(args: String[]): Int {
           |     val xs: ArrayList = new ArrayList()
           |     xs.add(new Integer(2))
-          |     return xs.get(0)$Integer.intValue()
+          |     return (xs.get(0) as Integer).intValue()
           |   }
           | }
         """.stripMargin,

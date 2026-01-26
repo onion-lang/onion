@@ -120,7 +120,7 @@ class SmartCastSpec extends AbstractShellSpec {
             |  static def main(args: String[]): String {
             |    var obj: Object = "hello";
             |    if (obj is String) {
-            |      return obj$String.toUpperCase();
+            |      return (obj as String).toUpperCase();
             |    }
             |    return "not string";
             |  }

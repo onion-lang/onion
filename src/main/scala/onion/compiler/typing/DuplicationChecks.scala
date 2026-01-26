@@ -92,12 +92,22 @@ private[compiler] object DuplicationChecks {
     val views = allViews - clazz
     if views.isEmpty then return
 
-    // Collect all implemented methods by erased signature
-    val implByErasedParams: scala.collection.immutable.Map[(String, String), Method] =
-      clazz.methods
-        .filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier))
-        .map(m => ((m.name, erasedParamDescriptor(m.arguments)), m))
-        .toMap
+    // Collect all implemented methods from this class AND all ancestor classes
+    // Parent classes may already provide concrete implementations for abstract methods
+    val implByErasedParams = mutable.HashMap[(String, String), Method]()
+
+    // Add this class's own methods
+    for m <- clazz.methods do
+      if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
+        implByErasedParams((m.name, erasedParamDescriptor(m.arguments))) = m
+
+    // Also add concrete methods from parent classes (not just interfaces)
+    for view <- views.values do
+      for m <- view.raw.methods do
+        if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
+          val key = (m.name, erasedParamDescriptor(m.arguments))
+          if !implByErasedParams.contains(key) then
+            implByErasedParams(key) = m
 
     // Check all abstract methods from superclasses and interfaces
     for (view <- views.values) {

@@ -1,0 +1,12 @@
+// Test 1: Simple countdown - should print 5, 4, 3, 2, 1, 0
+def countdown(n: Int): Int {
+  IO::println(n)
+  if (n <= 0) {
+    return 0
+  }
+  return countdown(n - 1)
+}
+
+IO::println("=== Countdown Test ===")
+val result = countdown(5)
+IO::println("Final result: " + result)

@@ -715,7 +715,8 @@ object TypedAST {
     var block: TypedAST.StatementBlock,
     override val typeParameters: Array[TypedAST.TypeParameter] = Array(),
     val throwsTypes: Array[TypedAST.ClassType] = Array(),
-    private val vararg: Boolean = false
+    private val vararg: Boolean = false,
+    val annotations: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
   ) extends Node with Method {
     private var closure: Boolean = false
     private var frame: LocalFrame = _

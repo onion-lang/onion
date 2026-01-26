@@ -21,8 +21,20 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - **Package JAR with dependencies**: `sbt assembly` (creates `onion.jar`)
 - **Create distribution package**: `sbt dist` (creates ZIP with lib/, bin/, run/, onion.jar in target/)
 - **Run Onion script**: `sbt 'runScript path/to/script.on [args]'`
+- **Start REPL**: `sbt repl`
 - **Clean build**: `sbt clean`
-- **Interactive console**: `sbt console`
+- **Scala console**: `sbt console`
+
+### Compiler Options (for onionc/onion)
+
+- `-classpath <path>` - Set classpath for compilation
+- `-encoding <encoding>` - Set source file encoding
+- `-d <dir>` - Set output directory for class files
+- `-maxErrorReports <n>` - Limit number of errors reported
+- `--dump-ast` - Print parsed AST to stderr
+- `--dump-typed-ast` - Print typed AST summary to stderr
+- `--warn <off|on|error>` - Set warning level
+- `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
 
 ## High-Level Architecture
 
@@ -39,7 +51,9 @@ Source Files (.on)
     ↓
 [3] Type Checking → Typed AST
     ↓
-[4] Code Generation (ASM) → JVM Bytecode
+[4] Tail Call Optimization → Optimized Typed AST
+    ↓
+[5] Code Generation (ASM) → JVM Bytecode
     ↓
 Class Loading & Execution
 ```
@@ -71,7 +85,18 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
      - `SemanticErrorReporter.scala` - Error collection
    - Output: Typed AST (`TypedAST.scala`, 37KB)
 
-4. **Code Generation** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
+4. **Tail Call Optimization** (`src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`)
+   - Detects tail-recursive methods (self-calls in return position)
+   - Transforms tail recursion into loops to prevent stack overflow
+   - Strategy:
+     1. Copy parameters to loop variables at method entry
+     2. Rewrite all parameter references to use loop variables
+     3. Wrap method body in `while(true)` loop
+     4. Replace tail calls with variable updates + continue
+   - Prevents StackOverflowError for deep recursion (e.g., 10000+ calls)
+   - Output: Optimized Typed AST
+
+5. **Code Generation** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
    - **ASM-based bytecode generation** (current implementation)
    - Visitor pattern: `AsmCodeGenerationVisitor.scala`
    - Bytecode utilities:
@@ -150,10 +175,13 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 ## Important Code Locations
 
 - **Main compiler logic**: `src/main/scala/onion/compiler/`
+- **Optimizations**: `src/main/scala/onion/compiler/optimization/`
+  - `TailCallOptimization.scala` - Tail recursion → loop transformation
 - **Parser grammar**: `grammar/JJOnionParser.jj`
 - **Runtime library**: `src/main/java/onion/` (Java interfaces)
 - **Tools (CLI)**: `src/main/scala/onion/tools/`
 - **Tests**: `src/test/scala/onion/compiler/tools/`
+- **Test programs**: `src/test/run/` (example Onion programs)
 - **Build config**: `build.sbt`
 
 ## Language Features
@@ -167,6 +195,31 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 - Arrays and collections
 - Static and instance methods
 
-## Known Limitations (per README.md)
+### Recent Language Features
 
-- Compiler may crash on certain code patterns (examples in `run/` are verified to work)
+**Do Notation for Monadic Composition:**
+- Haskell-style do notation for composing monadic operations (Option, Result, Future)
+- Example: `do[Future] { x <- asyncOp(); ret x + 1 }`
+
+**Trailing Lambda Syntax:**
+- Methods accepting a function as the last parameter can use trailing lambda syntax
+- Example: `list.map { x => x * 2 }`
+
+**Asynchronous Programming:**
+- Built-in `Future[T]` type for async operations
+- `Future::async(() -> { ... })` for creating async computations
+- `.map()`, `.onSuccess()`, `.onFailure()` for handling results
+
+## Known Limitations
+
+- Compiler may crash on certain edge cases (examples in `run/` are verified to work)
+- Generics are erasure-based (no variance, wildcards, or reified type info)
+- Diagnostics are still improving; some errors may be reported later in the pipeline
+- Tail call optimization only handles direct self-recursion (not mutual recursion or continuation-passing style)
+
+## Entry Points for Execution
+
+When using `onion` command (or `sbt runScript`), the entry point is determined by:
+1. A main method if there is an explicit class definition and it has the main method
+2. The main method of the class on the top
+3. Otherwise, the first statement on the top

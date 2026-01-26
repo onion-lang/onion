@@ -1,0 +1,25 @@
+// Simple tail recursion test
+def sum(n: Int): Int {
+  if (n == 0) {
+    return 0
+  }
+  if (n == 1) {
+    return 1
+  }
+  return n + sum(n - 1)
+}
+
+IO::println("=== Sum Test (NOT tail recursive) ===")
+IO::println("sum(5) = " + sum(5))
+
+def sumTail(n: Int, acc: Int): Int {
+  if (n == 0) {
+    return acc
+  }
+  return sumTail(n - 1, acc + n)
+}
+
+IO::println("=== Sum Test (tail recursive) ===")
+IO::println("sumTail(5, 0) = " + sumTail(5, 0))
+IO::println("sumTail(100, 0) = " + sumTail(100, 0))
+IO::println("sumTail(1000, 0) = " + sumTail(1000, 0))

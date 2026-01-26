@@ -191,22 +191,39 @@ IO::println(factorial(5))  // 120
 
 ### Tail Recursion
 
-While Onion doesn't optimize tail calls, you can write tail-recursive functions:
+**Tail Call Optimization:** Onion automatically optimizes tail-recursive functions by converting them to loops. This prevents stack overflow for deep recursion.
+
+When compiling with `--verbose`, the compiler will log which methods are being optimized for tail recursion.
+
+Tail-recursive functions can handle large recursion depths without stack overflow:
 
 ```onion
-def factorialTail(n :Int, acc :Int) :Int {
-  if n <= 1 {
+// Tail-recursive factorial with accumulator
+def factorialTail(n: Int, acc: Int): Int {
+  if (n <= 1) {
     return acc
   }
-  return factorialTail(n - 1, n * acc)
+  return factorialTail(n - 1, n * acc)  // Tail call - optimized to loop
 }
 
-def factorial(n :Int) :Int {
+def factorial(n: Int): Int {
   return factorialTail(n, 1)
 }
 
-IO::println(factorial(5))  // 120
+IO::println(factorial(5))     // 120
+IO::println(factorial(1000))  // Works without stack overflow!
 ```
+
+**What is tail recursion?** A recursive call is in "tail position" when it's the last operation before returning. The compiler automatically detects this pattern and converts the recursion to an efficient loop.
+
+**Benefits:**
+- Prevents `StackOverflowError` for deep recursion
+- Constant stack space usage
+- Performance equivalent to loops
+
+**Limitations:**
+- Only direct self-recursion is optimized (not mutual recursion)
+- The recursive call must be in return position (no operations after the call)
 
 ## Method Overloading
 

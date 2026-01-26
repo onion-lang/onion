@@ -1,0 +1,12 @@
+// Tail-recursive factorial with accumulator
+def factorial(n: Int, acc: Int): Int {
+  if (n <= 1) {
+    return acc
+  }
+  return factorial(n - 1, n * acc)
+}
+
+IO::println("=== Factorial Test ===")
+IO::println("factorial(5) = " + factorial(5, 1))
+IO::println("factorial(10) = " + factorial(10, 1))
+IO::println("factorial(20) = " + factorial(20, 1))

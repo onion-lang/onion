@@ -1017,8 +1017,14 @@ AST.TypeNode class_type() : {Token n;}{
 | n=id()   {return new AST.TypeNode(p(n), new AST.ReferenceType(c(n), false), false);}
 }
 
-AST.TypeNode raw_type() :{AST.TypeNode c;}{
-  (c = basic_type() | c = class_type()) {return c;}
+AST.TypeNode raw_type() :{AST.TypeNode ty; Token n; StringBuilder sb = new StringBuilder();}{
+  ty = basic_type() {return ty;}
+| n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true), false);}
+| n=id() {sb.append(c(n));} (LOOKAHEAD("." <ID> ("." | "[" | "=" | ")" | "," | ";" | ">" | "{" | <EOL> | <EOF>)) "." n=id() {sb.append(".").append(c(n));})* {
+    String name = sb.toString();
+    boolean isFqcn = name.contains(".");
+    return new AST.TypeNode(p(n), new AST.ReferenceType(name, isFqcn), false);
+  }
 }
 
 // Parses a type parameter list: [T], [T extends Bound]

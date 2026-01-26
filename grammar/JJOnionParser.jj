@@ -1066,8 +1066,10 @@ AST.TypeNode type() : {
         scala.Option<AST.TypeDescriptor> upperBound = scala.Option.apply(null);
         scala.Option<AST.TypeDescriptor> lowerBound = scala.Option.apply(null);
       }
-      [ <K_EXTENDS> arg=type() { upperBound = scala.Option.apply(arg.desc()); }
-      | <K_SUPER> arg=type() { lowerBound = scala.Option.apply(arg.desc()); }
+      [ LOOKAHEAD(<K_EXTENDS> | <K_SUPER>)
+        ( <K_EXTENDS> arg=type() { upperBound = scala.Option.apply(arg.desc()); }
+        | <K_SUPER> arg=type() { lowerBound = scala.Option.apply(arg.desc()); }
+        )
       ] {
         core = new AST.WildcardType(upperBound, lowerBound);
       }
@@ -1616,7 +1618,7 @@ List<Object> do_statements() :{
   ArrayBuffer<Object> stmts = new ArrayBuffer<Object>();
 }{
   stmt=do_statement() { append(stmts, stmt); }
-  ( eols() ";" eols() stmt=do_statement() { append(stmts, stmt); } )*
+  ( LOOKAHEAD(eols() ";") eols() ";" eols() stmt=do_statement() { append(stmts, stmt); } )*
   { return toList(stmts); }
 }
 

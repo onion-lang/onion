@@ -2,13 +2,13 @@
 // Demonstrates auto-generated equals(), hashCode(), toString(), and copy() methods for records
 
 // Simple record with primitive fields
-record Point(x: Int, y: Int);
+record Point(x: Int, y: Int)
 
 // Record with mixed types
-record Person(name: String, age: Int);
+record Person(name: String, age: Int)
 
 // Record with object fields
-record Line(start: Point, end: Point);
+record Line(start: Point, end: Point)
 
 class Main {
 public:

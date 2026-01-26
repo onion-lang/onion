@@ -639,7 +639,7 @@ TOKEN:
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
 | <QUOTED_ID: "`" (~["`"])+ "`" >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
-// | <FID:      "@" <ID>                                                    >  // Removed: @ syntax deprecated
+| <ANNOTATION: "@" ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >  // Annotation syntax
 }
 
 /*
@@ -756,16 +756,17 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   AST.BlockExpression b = null;
   AST.Expression e = null;
   List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
+  List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
-  t1="def" t2=id() ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
+  anns=annotations() t1="def" t2=id() ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  (b=block() | {enterSection();} eos()) {
-       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, throwsTypes);
+       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, throwsTypes, anns);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t1), args, ty,
          new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e))),
-         throwsTypes
+         throwsTypes, anns
        );
      }
   )
@@ -944,6 +945,22 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
   }
 }
 
+List<AST.Annotation> annotations() : {
+  ArrayBuffer<AST.Annotation> anns = new ArrayBuffer<AST.Annotation>();
+  Token t;
+  String name;
+}{
+  (
+    t=<ANNOTATION> {
+      // Extract annotation name (remove @ prefix)
+      name = t.image.substring(1);
+      append(anns, new AST.Annotation(p(t), name));
+    }
+    eols()
+  )*
+  {return toList(anns);}
+}
+
 AST.MethodDeclaration method_decl(int mset) : {
   Token t;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
@@ -952,16 +969,17 @@ AST.MethodDeclaration method_decl(int mset) : {
   AST.Expression e = null;
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
+  List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
-  "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
+  anns=annotations() "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  (b=block() | {enterSection();} eos() ) {
-       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes);
+       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
-         tparams, throwsTypes
+         tparams, throwsTypes, anns
        );
      }
   )

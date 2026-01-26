@@ -41,6 +41,8 @@ class OnionCompiler(val config: CompilerConfig) {
       val parsing = new Parsing(config)
       val rewriting = new Rewriting(config)
       val typing = new Typing(config)
+      val tailCallOpt = new optimization.TailCallOptimization(config)
+      val mutualRecOpt = new optimization.MutualRecursionOptimization(config)
       val generating = new TypedGenerating(config)
 
       val parsed = parsing.process(srcs)
@@ -48,7 +50,9 @@ class OnionCompiler(val config: CompilerConfig) {
       val rewritten = rewriting.process(parsed)
       val typed = typing.process(rewritten)
       if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
-      val generated = generating.process(typed)
+      val optimized1 = tailCallOpt.process(typed)
+      val optimized2 = mutualRecOpt.process(optimized1)
+      val generated = generating.process(optimized2)
 
       Success(generated)
     } catch {
@@ -76,6 +80,8 @@ class OnionCompiler(val config: CompilerConfig) {
       val parsing = new Parsing(config)
       val rewriting = new Rewriting(config)
       val typing = new Typing(config)
+      val tailCallOpt = new optimization.TailCallOptimization(config)
+      val mutualRecOpt = new optimization.MutualRecursionOptimization(config)
       val generating = new TypedGenerating(config)
 
       val parsed = timed("Parsing")(parsing.process(srcs))
@@ -83,7 +89,9 @@ class OnionCompiler(val config: CompilerConfig) {
       val rewritten = timed("Rewriting")(rewriting.process(parsed))
       val typed = timed("Typing")(typing.process(rewritten))
       if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
-      val generated = timed("CodeGen")(generating.process(typed))
+      val optimized1 = timed("TailCallOpt")(tailCallOpt.process(typed))
+      val optimized2 = timed("MutualRecOpt")(mutualRecOpt.process(optimized1))
+      val generated = timed("CodeGen")(generating.process(optimized2))
 
       val totalElapsed = now() - totalStart
       System.err.println(f"[verbose] Total: ${totalElapsed}ms (${srcs.size} source files)")

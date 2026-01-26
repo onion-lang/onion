@@ -216,7 +216,10 @@ object AST {
   case class TryExpression(location: Location, resources: List[LocalVariableDeclaration], tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends CompoundExpression
   case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
 
-  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode] = Nil) extends Toplevel
+  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends Toplevel {
+    def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode]) =
+      this(location, modifiers, name, args, returnType, block, throwsTypes, Nil)
+  }
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 
   /**
@@ -241,12 +244,15 @@ object AST {
 
   abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
   case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None) extends Node
+  case class Annotation(location: Location, name: String) extends Node
 
-  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil) extends MemberDeclaration {
+  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends MemberDeclaration {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) =
-      this(location, modifiers, name, args, returnType, block, Nil, Nil)
+      this(location, modifiers, name, args, returnType, block, Nil, Nil, Nil)
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter]) =
-      this(location, modifiers, name, args, returnType, block, typeParameters, Nil)
+      this(location, modifiers, name, args, returnType, block, typeParameters, Nil, Nil)
+    def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter], throwsTypes: List[TypeNode]) =
+      this(location, modifiers, name, args, returnType, block, typeParameters, throwsTypes, Nil)
   }
   case class FieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends MemberDeclaration
   case class DelegatedFieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression) extends MemberDeclaration

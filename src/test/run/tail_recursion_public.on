@@ -1,0 +1,17 @@
+// Public methods should NOT be optimized (will cause StackOverflowError with large n)
+class PublicTailRecTest {
+  public:
+    def countdownPublic(n: Int): Int {
+      if (n <= 0) {
+        return 0
+      }
+      return countdownPublic(n - 1)
+    }
+}
+
+val test = new PublicTailRecTest
+IO::println("=== Public Method (No TCO) Test ===")
+IO::println("Small recursion depth (100) should work:")
+IO::println("countdownPublic(100) = " + test.countdownPublic(100))
+IO::println("Large recursion depth would cause StackOverflowError without TCO")
+// Don't test with 10000 - it will fail!

@@ -1,0 +1,12 @@
+// Test with very large recursion depth to verify no stack overflow
+def count(n: Int): Int {
+  if (n <= 0) {
+    return 0
+  }
+  return count(n - 1)
+}
+
+IO::println("=== Large Recursion Test ===")
+IO::println("Counting down from 10000...")
+val result = count(10000)
+IO::println("Success! Result: " + result)

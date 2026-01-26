@@ -1,0 +1,27 @@
+class PrivateTailRecTest {
+  private:
+    def countdown(n: Int): Int {
+      if (n <= 0) {
+        return 0
+      }
+      return countdown(n - 1)
+    }
+
+    def factorial(n: Int, acc: Int): Int {
+      if (n <= 1) {
+        return acc
+      }
+      return factorial(n - 1, n * acc)
+    }
+
+  public:
+    def runTests(): Void {
+      IO::println("=== Private Method TCO Test ===")
+      IO::println("countdown(10000) = " + countdown(10000))
+      IO::println("factorial(10, 1) = " + factorial(10, 1))
+      IO::println("factorial(20, 1) = " + factorial(20, 1))
+    }
+}
+
+val test = new PrivateTailRecTest
+test.runTests()

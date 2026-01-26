@@ -335,7 +335,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
       val modifier = node.modifiers | AST.M_PUBLIC
       val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
       val hasVararg = node.args.lastOption.exists(_.isVararg)
-      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes, hasVararg)
+      val annotations = node.annotations.map(_.name).toSet
+      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes, hasVararg, annotations)
       put(node, method)
       classType.add(method)
     }
@@ -365,6 +366,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
         if (node.block == null) modifier |= AST.M_ABSTRACT
         val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
+        val annotations = node.annotations.map(_.name).toSet
         val method = new MethodDefinition(
           node.location,
           modifier,
@@ -375,7 +377,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
           null,
           methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
           throwsTypes,
-          hasVararg
+          hasVararg,
+          annotations
         )
         put(node, method)
         definition_.add(method)

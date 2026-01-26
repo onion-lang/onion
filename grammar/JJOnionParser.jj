@@ -483,6 +483,7 @@ TOKEN:
 | <K_GOTO:         "goto"         >
 | <K_IF:           "if"           >
 | <K_IMPORT:       "import"       >
+| <K_AS:           "as"           >
 | <K_INT:          "Int"  >
 | <K_INTERFACE:    "interface"    >
 | <K_INTERNAL:     "internal"     >
@@ -668,6 +669,20 @@ Token id() :{Token t;}{
   | t=<QUOTED_ID> { return t; }
 }
 
+// Helper for import names - accepts identifiers AND type keywords (Long, Int, etc.)
+Token import_id() :{Token t;}{
+    t=<ID> { return t; }
+  | t=<QUOTED_ID> { return t; }
+  | t=<K_LONG> { return t; }
+  | t=<K_INT> { return t; }
+  | t=<K_SHORT> { return t; }
+  | t=<K_BYTE> { return t; }
+  | t=<K_CHAR> { return t; }
+  | t=<K_FLOAT> { return t; }
+  | t=<K_DOUBLE> { return t; }
+  | t=<K_BOOLEAN> { return t; }
+}
+
 AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new StringBuffer();}{
   {enterSection();}
   t1="module" t2=id() {sb.append(c(t2));} ("." t2=id() {sb.append("."); sb.append(c(t2));})* eos() {
@@ -676,20 +691,18 @@ AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new String
 }
 
 AST.ImportClause import_decl() :{
-  Token t = null, n, star;
+  Token t = null, n, star, alias = null;
   StringBuffer sb;
   String s = null;
   ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
 }{
   t="import" "{"
-    ( {sb = new StringBuffer();enterSection();}
-      ( LOOKAHEAD(2)
-        (n=id() {s=c(n);} "=" n=id() {sb.append(c(n));} ("." n=id() {sb.append("."); sb.append(c(n));})+ eos())
-      | ((LOOKAHEAD(2) n=id() "." {sb.append(c(n)); sb.append(".");})+ (n=id() | star="*" {n = star;}) eos() {
-           s = c(n); sb.append(s);
-         }
-        )
-      ){ append(imports, new Tuple2<String, String>(s, new String(sb))); }
+    ( {sb = new StringBuffer(); alias = null; enterSection();}
+      (LOOKAHEAD(2) n=import_id() "." {sb.append(c(n)); sb.append(".");})+
+      (n=import_id() | star="*" {n = star;}) {s = c(n); sb.append(s);}
+      [<K_AS> alias=id() {s = c(alias);}]
+      eos()
+      { append(imports, new Tuple2<String, String>(s, new String(sb))); }
     )*
   "}"{ return new AST.ImportClause(p(t), toList(imports)); }
 }

@@ -308,18 +308,64 @@ try {
 
 他の言語と混同しやすい構文です。**必ず確認してください：**
 
+### 型システムと演算子
+
+| 誤り（Java/Scala風） | 正しい（Onion） |
+|---------------------|----------------|
+| `expr$Type` | `expr as Type` - `as`キーワードを使用 |
+| `(expr as Type).method()` はメソッドチェインに括弧が必要 | ✓ 正しい |
+| `Box<T>` | `Box[T]` - ジェネリクスは角括弧 |
+| `new Box<String>()` | `new Box[String]()` - 角括弧 |
+| `String \| null` | `String?` - nullable型の構文 |
+| `==` で参照等価 | `===` が参照等価、`==` は値等価 |
+
+### 制御フロー
+
+| 誤り（Java/Scala風） | 正しい（Onion） |
+|---------------------|----------------|
+| `if (condition) { }` | `if condition { }` - 条件を括弧で囲まない |
+| `while (condition) { }` | `while condition { }` - 括弧なし |
+| `else if condition { }` | `else { if condition { } }` - `else if`キーワードなし |
+| `switch value { case 1: }` | `select value { case 1: }` - `switch`ではなく`select` |
+| `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
+| `i += 1` や `i++` | `i = i + 1` - 複合演算子は限定的（`++`はforループ内のみ） |
+
+### メソッドとクラス
+
 | 誤り（Java/Scala風） | 正しい（Onion） |
 |---------------------|----------------|
 | `catch (e: Exception) { }` | `catch e: Exception { }` - 括弧なし |
-| `expr$Type` | `expr as Type` - `as`キーワードを使用 |
-| `(expr as Type).method()` はメソッドチェインに括弧が必要 | ✓ 正しい |
-| `import java.util.*;` | `import { java.util.* }` - 波括弧、`*`の後にセミコロンなし |
-| `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - エイリアスに`as`を使用 |
-| `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
 | `public void method()` | `public: def method(): void` - セクションベースのアクセス |
+| `def method(): T { }` | `def method: T { }` - 引数なしなら括弧省略可 |
 | `this.field = value` コンストラクタ内 | ✓ 正しい - フィールドは`this.`が必要 |
-| `new int[10]` | `new Int[10]` - 型名は大文字開始 |
-| `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longリテラルは`L`サフィックス |
+| `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longは`L`サフィックス |
+| `System.out` | `System::out` - 静的フィールドも`::` |
+
+### インポートと型
+
+| 誤り（Java/Scala風） | 正しい（Onion） |
+|---------------------|----------------|
+| `import java.util.*;` | `import { java.util.* }` - 波括弧が必要 |
+| `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - エイリアスに`as` |
+| `new int[10]` | `new Int[10]` - プリミティブ型名は大文字 |
+| `int`, `long`, `boolean` | `Int`, `Long`, `Boolean` - 大文字 |
+
+### コレクション
+
+| 誤り（Java/Scala風） | 正しい（Onion） |
+|---------------------|----------------|
+| `new String[] {"a", "b"}` | `["a", "b"]`は`List`を作成、配列は`new String[n]` |
+| `arr.length()` | `arr.length` - 配列の長さはプロパティ、メソッドではない |
+| `list.size()` | `list.size` - これもプロパティ |
+| `foreach (x : list)` | `foreach x: Type in list { }` - 構文が異なる |
+
+### リテラル
+
+| 誤り | 正しい（Onion） |
+|-----|----------------|
+| `0` でlong | `0L` - Long型には明示的な`L`サフィックスが必要 |
+| `0.0` でfloat | `0.0f` - Float型には明示的な`f`サフィックス |
+| `"str" + 123` | ✓ 正しい - 自動文字列変換 |
 
 ## 既知の制限
 

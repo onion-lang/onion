@@ -304,18 +304,64 @@ try {
 
 These are frequently confused with other languages. **Always check these:**
 
+### Type System & Operators
+
+| Wrong (Java/Scala style) | Correct (Onion) |
+|--------------------------|-----------------|
+| `expr$Type` | `expr as Type` - use `as` keyword |
+| `(expr as Type).method()` requires parentheses | ✓ correct for method chaining |
+| `Box<T>` | `Box[T]` - square brackets for generics |
+| `new Box<String>()` | `new Box[String]()` - square brackets |
+| `String \| null` | `String?` - nullable type syntax |
+| `==` for reference equality | `===` for reference, `==` for value equality |
+
+### Control Flow
+
+| Wrong (Java/Scala style) | Correct (Onion) |
+|--------------------------|-----------------|
+| `if (condition) { }` | `if condition { }` - no parentheses around condition |
+| `while (condition) { }` | `while condition { }` - no parentheses |
+| `else if condition { }` | `else { if condition { } }` - no `else if` keyword |
+| `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
+| `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
+| `i += 1` or `i++` | `i = i + 1` - limited compound operators (only `++` in for loops) |
+
+### Methods & Classes
+
 | Wrong (Java/Scala style) | Correct (Onion) |
 |--------------------------|-----------------|
 | `catch (e: Exception) { }` | `catch e: Exception { }` - no parentheses |
-| `expr$Type` | `expr as Type` - use `as` keyword |
-| `(expr as Type).method()` requires parentheses | ✓ correct for method chaining |
-| `import java.util.*;` | `import { java.util.* }` - braces, no semicolon after `*` |
-| `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - `as` for alias |
-| `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
 | `public void method()` | `public: def method(): void` - section-based access |
+| `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `this.field = value` in constructor | ✓ correct - fields must use `this.` |
-| `new int[10]` | `new Int[10]` - capitalized type names |
-| `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long literal |
+| `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
+| `System.out` | `System::out` - `::` for static fields too |
+
+### Imports & Types
+
+| Wrong (Java/Scala style) | Correct (Onion) |
+|--------------------------|-----------------|
+| `import java.util.*;` | `import { java.util.* }` - braces required |
+| `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - `as` for alias |
+| `new int[10]` | `new Int[10]` - capitalized primitive names |
+| `int`, `long`, `boolean` | `Int`, `Long`, `Boolean` - capitalized |
+
+### Collections
+
+| Wrong (Java/Scala style) | Correct (Onion) |
+|--------------------------|-----------------|
+| `new String[] {"a", "b"}` | `["a", "b"]` creates `List`, use `new String[n]` for array |
+| `arr.length()` | `arr.length` - array length is property, not method |
+| `list.size()` | `list.size` - also a property |
+| `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
+
+### Literals
+
+| Wrong | Correct (Onion) |
+|-------|-----------------|
+| `0` for long | `0L` - explicit `L` suffix required for Long |
+| `0.0` for float | `0.0f` - explicit `f` suffix for Float |
+| `"str" + 123` | ✓ correct - auto string conversion |
 
 ## Known Limitations
 

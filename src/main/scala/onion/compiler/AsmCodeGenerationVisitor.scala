@@ -106,8 +106,20 @@ class AsmCodeGenerationVisitor(
       argTypes*
     )
     val isInterface = node.method.affiliation.isInterface
+    val isPrivate = Modifier.isPrivate(node.method.modifier)
+
+    // Select correct invoke instruction based on method type
     if isInterface then
       gen.invokeInterface(ownerType, AsmMethod(node.method.name, methodDesc))
+    else if isPrivate then
+      // JVM spec requires invokespecial for private instance methods
+      gen.visitMethodInsn(
+        Opcodes.INVOKESPECIAL,
+        ownerType.getInternalName,
+        node.method.name,
+        methodDesc,
+        false  // isInterface = false
+      )
     else
       gen.invokeVirtual(ownerType, AsmMethod(node.method.name, methodDesc))
   

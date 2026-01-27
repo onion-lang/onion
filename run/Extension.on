@@ -1,5 +1,10 @@
 // Extension Methods Sample
 // Add methods to existing types without modifying them
+extension List[String] {
+  def first(): String {
+    return this.get(0);
+  }
+}
 
 extension String {
   def twice(): String {
@@ -32,6 +37,7 @@ extension JInteger {
 }
 
 // Usage
+IO::println(["A", "B"].first())   // A
 IO::println("hello".twice())      // hellohello
 IO::println("wow".shout())        // WOW!
 IO::println("ab".repeat(3))       // ababab

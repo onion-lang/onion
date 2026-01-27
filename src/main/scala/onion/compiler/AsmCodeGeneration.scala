@@ -276,6 +276,18 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       .withParameters(isStatic, argTypes)
       .withBoxedVariables(node.getFrame)
 
+    // TCO: Pre-allocate JVM slots for loop variables before emitting method body
+    node.getTcoLoopVars match {
+      case Some(loopVars) =>
+        System.err.println(s"[CodeGen] Pre-allocating ${loopVars.length} TCO loop variable slots for ${node.name}")
+        loopVars.foreach { case (loopVarIndex, paramType) =>
+          val slot = localVars.allocateSlot(loopVarIndex, asmType(paramType))
+          System.err.println(s"[CodeGen]   TypedAST index $loopVarIndex -> JVM slot $slot (${paramType.name})")
+        }
+      case None =>
+        // Non-TCO method, no action needed
+    }
+
     // Synthetic getter for records: non-abstract, no block, no args, has return type, and NOT static
     val isSyntheticGetter = node.block == null && !Modifier.isAbstract(node.modifier) &&
                             node.arguments.isEmpty && node.returnType != BasicType.VOID && !isStatic &&

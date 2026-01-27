@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Onion is a statically-typed, object-oriented programming language that compiles to JVM bytecode. Originally written in Java, it has been rewritten in Scala (except the parser, which uses JavaCC).
 
 **Configuration:**
-- Scala version: 3.6.2
+- Scala version: 3.3.7
 - Java version: 17
 - SBT version: ~1.9+
 - Main dependencies: ASM 9.8 (bytecode), JavaCC 5.0 (parser), ScalaTest 3.2.19 (testing)
@@ -139,6 +139,19 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `onion/IO.java` - I/O utilities for Onion programs
 - `OnionClassLoader.scala` - Custom class loading for compiled classes
 
+**Standard Library** (`src/main/java/onion/`):
+- `IO` - Console I/O (println, readLine)
+- `Strings` - String utilities
+- `Rand` - Random number generation (int, long, double, boolean, nextInt, shuffle)
+- `Assert` - Testing assertions (assertTrue, assertEquals, assertNotNull, fail)
+- `Timing` - Time measurement (nanos, millis, measure, time, sleep)
+- `Files` - File operations
+- `DateTime` - Date/time utilities
+- `Json` - JSON parsing/serialization
+- `Http` - HTTP client
+- `Regex` - Regular expressions
+- `Option`, `Result`, `Future` - Functional types
+
 ## Testing
 
 **Framework:** ScalaTest 3.2.19
@@ -170,7 +183,7 @@ Located in `run/` directory:
 If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 1. Edit the JavaCC grammar file
 2. Run `sbt compile` - parser will auto-regenerate
-3. Generated parser appears in `target/scala-3.6.2/src_managed/main/java/onion/compiler/parser/`
+3. Generated parser appears in `target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/`
 
 ## Important Code Locations
 
@@ -184,31 +197,108 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 - **Test programs**: `src/test/run/` (example Onion programs)
 - **Build config**: `build.sbt`
 
-## Language Features
+## Language Syntax
 
-- Statically typed with type inference
-- Object-oriented with classes, inheritance, access modifiers
-- First-class functions (Function0-Function10 interfaces)
-- Module system with imports
-- Control flow: if/else, while, for, break, continue
-- String interpolation
-- Arrays and collections
-- Static and instance methods
+### Basic Syntax
 
-### Recent Language Features
+```onion
+// Class definition with inheritance and interface implementation
+class MyClass : ParentClass <: Interface1, Interface2 {
+  val immutableField: String      // immutable field
+  var mutableField: Int           // mutable field
+public:
+  def method(arg: Type): ReturnType { ... }
+  static def staticMethod(): void { ... }
+  def this { /* constructor */ }
+}
+
+// Import syntax with alias
+import {
+  java.util.*
+  java.lang.Long as JLong;
+}
+
+// Type cast (requires parentheses for method chaining)
+val btn: JButton = (event.source as JButton)
+val text: String = (obj as JButton).getText()
+
+// Static method call
+IO::println("Hello")
+Long::toString(42L)
+
+// Instance method call
+obj.method()
+obj?.safeMethod()  // safe call operator (returns null if obj is null)
+```
+
+### Control Flow
+
+```onion
+// if/else
+if condition { ... } else { ... }
+
+// while loop
+while condition { ... }
+
+// for loop
+for i = 0; i < 10; i++ { ... }
+
+// foreach
+foreach item: Type in collection { ... }
+
+// select (pattern matching on values)
+select value {
+case 1, 2, 3: ...
+case 4: ...
+else: ...
+}
+
+// break and continue
+while true {
+  if done { break }
+  if skip { continue }
+}
+```
+
+### Functions and Lambdas
+
+```onion
+// Lambda expressions
+val f: Function1[Int, Int] = (x: Int) -> x * 2
+val g = (x, y) -> x + y
+
+// Trailing lambda syntax
+list.map { x => x * 2 }
+list.filter { x => x > 0 }
+
+// Method reference (static)
+Type::methodName
+```
+
+### Advanced Features
 
 **Do Notation for Monadic Composition:**
-- Haskell-style do notation for composing monadic operations (Option, Result, Future)
-- Example: `do[Future] { x <- asyncOp(); ret x + 1 }`
-
-**Trailing Lambda Syntax:**
-- Methods accepting a function as the last parameter can use trailing lambda syntax
-- Example: `list.map { x => x * 2 }`
+```onion
+do[Future] { x <- asyncOp(); ret x + 1 }
+do[Option] { a <- getA(); b <- getB(); ret a + b }
+```
 
 **Asynchronous Programming:**
-- Built-in `Future[T]` type for async operations
-- `Future::async(() -> { ... })` for creating async computations
-- `.map()`, `.onSuccess()`, `.onFailure()` for handling results
+```onion
+val future: Future[String] = Future::async(() -> { longOperation() })
+future.map((s) -> s.toUpperCase())
+future.onSuccess((s) -> IO::println(s))
+future.onFailure((e) -> IO::println("Error: " + e.message()))
+```
+
+**Try-Catch:**
+```onion
+try {
+  riskyOperation()
+} catch e: Exception {
+  IO::println("Error: " + e.message())
+}
+```
 
 ## Known Limitations
 

@@ -1,0 +1,319 @@
+# CLAUDE.md (日本語版)
+
+このファイルは、Claude Code (claude.ai/code) がこのリポジトリで作業する際のガイダンスを提供します。
+
+## プロジェクト概要
+
+Onionは、JVMバイトコードにコンパイルされる静的型付けのオブジェクト指向プログラミング言語です。元々はJavaで書かれていましたが、パーサー（JavaCCを使用）を除き、Scalaで書き直されています。
+
+**構成:**
+- Scala バージョン: 3.3.7
+- Java バージョン: 17
+- SBT バージョン: ~1.9+
+- 主要な依存関係: ASM 9.8 (バイトコード), JavaCC 5.0 (パーサー), ScalaTest 3.2.19 (テスト)
+
+## ビルドコマンド
+
+- **プロジェクトのコンパイル**: `sbt compile`
+  - `grammar/JJOnionParser.jj` が変更されると、パーサーを自動再生成
+- **テストの実行**: `sbt test`
+- **単一テストスイートの実行**: `sbt 'testOnly *HelloWorldSpec'`
+- **依存関係を含むJARのパッケージ化**: `sbt assembly` (`onion.jar`を作成)
+- **配布パッケージの作成**: `sbt dist` (target/にlib/, bin/, run/, onion.jarを含むZIPを作成)
+- **Onionスクリプトの実行**: `sbt 'runScript path/to/script.on [args]'`
+- **REPLの起動**: `sbt repl`
+- **クリーンビルド**: `sbt clean`
+- **Scalaコンソール**: `sbt console`
+
+### コンパイラオプション (onionc/onion用)
+
+- `-classpath <path>` - コンパイル用のクラスパスを設定
+- `-encoding <encoding>` - ソースファイルのエンコーディングを設定
+- `-d <dir>` - クラスファイルの出力ディレクトリを設定
+- `-maxErrorReports <n>` - 報告するエラーの数を制限
+- `--dump-ast` - パースされたASTを標準エラー出力に表示
+- `--dump-typed-ast` - 型付けされたASTの概要を標準エラー出力に表示
+- `--warn <off|on|error>` - 警告レベルを設定
+- `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
+
+## 高レベルアーキテクチャ
+
+Onionコンパイラは、古典的なコンパイラアーキテクチャに従った**マルチフェーズパイプラインコンパイラ**です。
+
+### コンパイルパイプライン
+
+```
+ソースファイル (.on)
+    ↓
+[1] パース (JavaCC) → 型なしAST
+    ↓
+[2] 書き換え → 正規化された型なしAST
+    ↓
+[3] 型チェック → 型付きAST
+    ↓
+[4] 末尾呼び出し最適化 → 最適化された型付きAST
+    ↓
+[5] コード生成 (ASM) → JVMバイトコード
+    ↓
+クラスのロードと実行
+```
+
+### コアコンパイラフェーズ
+
+すべてのフェーズは `Processor[A, B]` トレイトを継承し、`andThen()` を使って合成できます：
+
+1. **パース** (`src/main/scala/onion/compiler/Parsing.scala`)
+   - `grammar/JJOnionParser.jj` (36KBの文法ファイル) からJavaCC生成パーサーを使用
+   - パーサークラス: `JJOnionParser` (`sourceManaged/`に自動生成)
+   - ソーステキスト → 型なしAST (`AST.scala`) に変換
+   - `ASTBuilder.scala` を使用してパーサートークンからASTを構築
+
+2. **書き換え** (`src/main/scala/onion/compiler/Rewriting.scala`)
+   - ASTの変換と正規化
+   - 複雑な構文の簡略化
+   - 出力: 正規化された型なしAST
+
+3. **型チェック** (`src/main/scala/onion/compiler/Typing.scala`, 86KB - 最大のコンポーネント)
+   - 型推論と検証
+   - シンボル解決と名前束縛
+   - オーバーロードを伴うメソッド解決
+   - アクセス制御チェック
+   - 主要なサポートファイル:
+     - `ClassTable.scala` - クラスシンボルテーブル
+     - `LocalContext.scala` - ローカル変数環境
+     - `Symbol.scala` - シンボル定義
+     - `SemanticErrorReporter.scala` - エラー収集
+   - 出力: 型付きAST (`TypedAST.scala`, 37KB)
+
+4. **末尾呼び出し最適化** (`src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`)
+   - 末尾再帰メソッド（return位置での自己呼び出し）を検出
+   - スタックオーバーフローを防ぐため、末尾再帰をループに変換
+   - 戦略:
+     1. メソッド開始時にパラメータをループ変数にコピー
+     2. すべてのパラメータ参照をループ変数を使用するように書き換え
+     3. メソッド本体を `while(true)` ループでラップ
+     4. 末尾呼び出しを変数更新 + continueに置き換え
+   - 深い再帰（例: 10000回以上の呼び出し）でのStackOverflowErrorを防止
+   - 出力: 最適化された型付きAST
+
+5. **コード生成** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
+   - **ASMベースのバイトコード生成**（現在の実装）
+   - ビジターパターン: `AsmCodeGenerationVisitor.scala`
+   - バイトコードユーティリティ:
+     - `bytecode/MethodEmitter.scala` - JVMメソッド生成
+     - `bytecode/LocalVarContext.scala` - ローカル変数追跡
+     - `bytecode/AsmUtil.scala` - ASMヘルパー関数
+   - 出力: `CompiledClass` オブジェクト（メモリ内またはファイル）
+
+### 主要なアーキテクチャコンポーネント
+
+**オーケストレーション:**
+- `OnionCompiler.scala` - メインコンパイラオーケストレーター、すべてのフェーズを合成
+- `CompilationOutcome` を返す（クラス付きのSuccessまたはエラー付きのFailure）
+
+**エントリーポイント:**
+- `onion.tools.CompilerFrontend` - `onionc` コマンドのCLI（.classファイルにコンパイル）
+- `onion.tools.ScriptRunner` - `onion` コマンドのCLI（メモリ内でコンパイルして実行）
+- `onion.tools.Shell` - 対話型REPLシェル
+
+**型システム:**
+- `BasicType` - プリミティブ (int, long, double, boolean, byte, short, char, float)
+- `ClassType` - 参照型
+- `ArrayType` - コンポーネント追跡付きの配列型
+- `NullType` - nullリテラル型
+- `OnionTypeConversion.scala` - 型変換ロジック
+
+**シンボルテーブルと環境:**
+- `AbstractTable.scala`, `OrderedTable.scala`, `MultiTable.scala` - シンボルストレージ
+- `LocalBinding.scala`, `ClosureLocalBinding.scala` - 変数束縛
+- `LocalFrame.scala`, `LocalScope.scala` - スコープ管理
+- `environment/ClassFileTable.scala` - ロードされたクラスメタデータのキャッシュ
+
+**エラー処理:**
+- `CompileError.scala`, `SemanticError.scala` - エラー型
+- `SemanticErrorReporter.scala` - エラー収集と報告
+- `CompilationReporter.scala` - ユーザー向けエラーフォーマット
+
+**ランタイムサポート:**
+- `onion/Function0.java` から `Function10.java` まで - クロージャ用の関数インターフェース
+- `onion/IO.java` - Onionプログラム用のI/Oユーティリティ
+- `OnionClassLoader.scala` - コンパイルされたクラス用のカスタムクラスローダー
+
+**標準ライブラリ** (`src/main/java/onion/`):
+- `IO` - コンソールI/O (println, readLine)
+- `Strings` - 文字列ユーティリティ
+- `Rand` - 乱数生成 (int, long, double, boolean, nextInt, shuffle)
+- `Assert` - テストアサーション (assertTrue, assertEquals, assertNotNull, fail)
+- `Timing` - 時間計測 (nanos, millis, measure, time, sleep)
+- `Files` - ファイル操作
+- `DateTime` - 日付/時刻ユーティリティ
+- `Json` - JSONパース/シリアライズ
+- `Http` - HTTPクライアント
+- `Regex` - 正規表現
+- `Option`, `Result`, `Future` - 関数型
+
+## テスト
+
+**フレームワーク:** ScalaTest 3.2.19
+
+**テストの場所:** `src/test/scala/onion/compiler/tools/`
+
+**基底クラス:** テストは統合テスト用に `AbstractShellSpec` を継承
+
+**テストスイート:**
+- `HelloWorldSpec.scala` - 基本出力
+- `FactorialSpec.scala` - 再帰
+- `StringInterpolationSpec.scala` - 文字列機能
+- `BreakContinueSpec.scala` - 制御フロー
+- `ImportSpec.scala` - モジュールシステム
+- `BeanSpec.scala` - OOP機能
+- `ForeachSpec.scala` - イテレーション
+- `CompilationFailureSpec.scala` - エラー処理
+
+**テストリソース:** `src/test/run/` にはテストで使用されるOnionプログラムの例が含まれています
+
+## サンプルプログラム
+
+`run/` ディレクトリにあります：
+- `Hello.on` - 最もシンプルなプログラム: `IO::println("Hello")`
+- `FizzBuzz.on` - 定番のFizzBuzz問題
+- `Fibonacci.on` - 再帰版vs反復版の速度比較
+- `GuessNumber.on` - 数当てゲーム（CLI対話型）
+- `TodoApp.on` - Todoリスト管理アプリ
+- `Calculator.on`, `Array.on`, `Bean.on`, `List.on` など
+
+## パーサー文法の変更
+
+パーサー文法 (`grammar/JJOnionParser.jj`) を変更する場合：
+1. JavaCC文法ファイルを編集
+2. `sbt compile` を実行 - パーサーが自動再生成される
+3. 生成されたパーサーは `target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/` に出力される
+
+## 重要なコードの場所
+
+- **メインコンパイラロジック**: `src/main/scala/onion/compiler/`
+- **最適化**: `src/main/scala/onion/compiler/optimization/`
+  - `TailCallOptimization.scala` - 末尾再帰 → ループ変換
+- **パーサー文法**: `grammar/JJOnionParser.jj`
+- **ランタイムライブラリ**: `src/main/java/onion/` (Javaインターフェース)
+- **ツール (CLI)**: `src/main/scala/onion/tools/`
+- **テスト**: `src/test/scala/onion/compiler/tools/`
+- **テストプログラム**: `src/test/run/` (Onionプログラムの例)
+- **ビルド設定**: `build.sbt`
+
+## 言語構文
+
+### 基本構文
+
+```onion
+// 継承とインターフェース実装を伴うクラス定義
+class MyClass : ParentClass <: Interface1, Interface2 {
+  val immutableField: String      // 不変フィールド
+  var mutableField: Int           // 可変フィールド
+public:
+  def method(arg: Type): ReturnType { ... }
+  static def staticMethod(): void { ... }
+  def this { /* コンストラクタ */ }
+}
+
+// エイリアス付きimport構文
+import {
+  java.util.*
+  java.lang.Long as JLong;
+}
+
+// 型キャスト（メソッドチェーンには括弧が必要）
+val btn: JButton = (event.source as JButton)
+val text: String = (obj as JButton).getText()
+
+// 静的メソッド呼び出し
+IO::println("Hello")
+Long::toString(42L)
+
+// インスタンスメソッド呼び出し
+obj.method()
+obj?.safeMethod()  // 安全呼び出し演算子（objがnullの場合nullを返す）
+```
+
+### 制御フロー
+
+```onion
+// if/else
+if condition { ... } else { ... }
+
+// whileループ
+while condition { ... }
+
+// forループ
+for i = 0; i < 10; i++ { ... }
+
+// foreach
+foreach item: Type in collection { ... }
+
+// select（値に対するパターンマッチング）
+select value {
+case 1, 2, 3: ...
+case 4: ...
+else: ...
+}
+
+// breakとcontinue
+while true {
+  if done { break }
+  if skip { continue }
+}
+```
+
+### 関数とラムダ
+
+```onion
+// ラムダ式
+val f: Function1[Int, Int] = (x: Int) -> x * 2
+val g = (x, y) -> x + y
+
+// 末尾ラムダ構文
+list.map { x => x * 2 }
+list.filter { x => x > 0 }
+
+// メソッド参照（静的）
+Type::methodName
+```
+
+### 高度な機能
+
+**モナド合成のためのdo記法:**
+```onion
+do[Future] { x <- asyncOp(); ret x + 1 }
+do[Option] { a <- getA(); b <- getB(); ret a + b }
+```
+
+**非同期プログラミング:**
+```onion
+val future: Future[String] = Future::async(() -> { longOperation() })
+future.map((s) -> s.toUpperCase())
+future.onSuccess((s) -> IO::println(s))
+future.onFailure((e) -> IO::println("Error: " + e.message()))
+```
+
+**Try-Catch:**
+```onion
+try {
+  riskyOperation()
+} catch e: Exception {
+  IO::println("Error: " + e.message())
+}
+```
+
+## 既知の制限
+
+- コンパイラは特定のエッジケースでクラッシュする可能性があります（`run/` の例は動作確認済み）
+- ジェネリクスは型消去ベース（変性、ワイルドカード、具象化された型情報なし）
+- 診断機能は改善中；一部のエラーはパイプラインの後半で報告される場合があります
+- 末尾呼び出し最適化は直接の自己再帰のみ処理（相互再帰や継続渡しスタイルは非対応）
+
+## 実行のエントリーポイント
+
+`onion` コマンド（または `sbt runScript`）を使用する場合、エントリーポイントは以下の順で決定されます：
+1. 明示的なクラス定義があり、そのクラスがmainメソッドを持つ場合はそのmainメソッド
+2. 最上位のクラスのmainメソッド
+3. それ以外の場合、最上位の最初の文

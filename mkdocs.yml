@@ -66,6 +66,16 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - 日本語:
+      - ホーム: ja/index.md
+      - はじめに:
+          - インストール: ja/getting-started/installation.md
+          - Hello World: ja/getting-started/hello-world.md
+          - クイックスタート: ja/getting-started/quick-start.md
+      - 言語ガイド:
+          - 基本構文: ja/guide/basic-syntax.md
+      - リファレンス:
+          - 標準ライブラリ: ja/reference/stdlib.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Hello World: getting-started/hello-world.md

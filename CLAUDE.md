@@ -386,7 +386,7 @@ These are frequently confused with other languages. **Always check these:**
 | `x -> x * 2` | `(x: Int) -> x * 2` - type annotation often needed |
 | `(x) -> expr` (single param) | `(x: Type) -> expr` - type usually required |
 | `func(arg)` for lambda | `func.call(arg)` or `func(arg)` - both work |
-| `Int -> Int` | `(Int) -> Int` - function type needs parens |
+| `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |
 
 ### Method Calls

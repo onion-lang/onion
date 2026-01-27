@@ -2130,10 +2130,82 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="よくある構文ミス（重要）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型システムと演算子
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        制御フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        メソッドとクラス
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        インポートと型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コレクション
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        リテラル
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_17" class="md-nav__link">
+  <a href="#_23" class="md-nav__link">
     <span class="md-ellipsis">
       
         既知の制限
@@ -2144,7 +2216,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_18" class="md-nav__link">
+  <a href="#_24" class="md-nav__link">
     <span class="md-ellipsis">
       
         実行のエントリーポイント
@@ -2454,6 +2526,77 @@
 </span></code></pre></div></p>
 <h2 id="_16">よくある構文ミス（重要）<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
 <p>他の言語と混同しやすい構文です。<strong>必ず確認してください：</strong></p>
+<h3 id="_17">型システムと演算子<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java/Scala風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>expr$Type</code></td>
+<td><code>expr as Type</code> - <code>as</code>キーワードを使用</td>
+</tr>
+<tr>
+<td><code>(expr as Type).method()</code> はメソッドチェインに括弧が必要</td>
+<td>✓ 正しい</td>
+</tr>
+<tr>
+<td><code>Box&lt;T&gt;</code></td>
+<td><code>Box[T]</code> - ジェネリクスは角括弧</td>
+</tr>
+<tr>
+<td><code>new Box&lt;String&gt;()</code></td>
+<td><code>new Box[String]()</code> - 角括弧</td>
+</tr>
+<tr>
+<td><code>String \| null</code></td>
+<td><code>String?</code> - nullable型の構文</td>
+</tr>
+<tr>
+<td><code>==</code> で参照等価</td>
+<td><code>===</code> が参照等価、<code>==</code> は値等価</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_18">制御フロー<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java/Scala風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>if (condition) { }</code></td>
+<td><code>if condition { }</code> - 条件を括弧で囲まない</td>
+</tr>
+<tr>
+<td><code>while (condition) { }</code></td>
+<td><code>while condition { }</code> - 括弧なし</td>
+</tr>
+<tr>
+<td><code>else if condition { }</code></td>
+<td><code>else { if condition { } }</code> - <code>else if</code>キーワードなし</td>
+</tr>
+<tr>
+<td><code>switch value { case 1: }</code></td>
+<td><code>select value { case 1: }</code> - <code>switch</code>ではなく<code>select</code></td>
+</tr>
+<tr>
+<td><code>for (int i = 0; ...)</code></td>
+<td><code>for var i: Int = 0; ...</code> - 括弧なし</td>
+</tr>
+<tr>
+<td><code>i += 1</code> や <code>i++</code></td>
+<td><code>i = i + 1</code> - 複合演算子は限定的（<code>++</code>はforループ内のみ）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_19">メソッドとクラス<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -2467,51 +2610,112 @@
 <td><code>catch e: Exception { }</code> - 括弧なし</td>
 </tr>
 <tr>
-<td><code>expr$Type</code></td>
-<td><code>expr as Type</code> - <code>as</code>キーワードを使用</td>
-</tr>
-<tr>
-<td><code>(expr as Type).method()</code> はメソッドチェインに括弧が必要</td>
-<td>✓ 正しい</td>
-</tr>
-<tr>
-<td><code>import java.util.*;</code></td>
-<td><code>import { java.util.* }</code> - 波括弧、<code>*</code>の後にセミコロンなし</td>
-</tr>
-<tr>
-<td><code>import { Foo = pkg.Class; }</code></td>
-<td><code>import { pkg.Class as Foo; }</code> - エイリアスに<code>as</code>を使用</td>
-</tr>
-<tr>
-<td><code>for (int i = 0; ...)</code></td>
-<td><code>for var i: Int = 0; ...</code> - 括弧なし</td>
-</tr>
-<tr>
 <td><code>public void method()</code></td>
 <td><code>public: def method(): void</code> - セクションベースのアクセス</td>
+</tr>
+<tr>
+<td><code>def method(): T { }</code></td>
+<td><code>def method: T { }</code> - 引数なしなら括弧省略可</td>
 </tr>
 <tr>
 <td><code>this.field = value</code> コンストラクタ内</td>
 <td>✓ 正しい - フィールドは<code>this.</code>が必要</td>
 </tr>
 <tr>
-<td><code>new int[10]</code></td>
-<td><code>new Int[10]</code> - 型名は大文字開始</td>
+<td><code>Long.toString(0)</code></td>
+<td><code>Long::toString(0L)</code> - 静的メソッドは<code>::</code>、longは<code>L</code>サフィックス</td>
 </tr>
 <tr>
-<td><code>Long.toString(0)</code></td>
-<td><code>Long::toString(0L)</code> - 静的メソッドは<code>::</code>、longリテラルは<code>L</code>サフィックス</td>
+<td><code>System.out</code></td>
+<td><code>System::out</code> - 静的フィールドも<code>::</code></td>
 </tr>
 </tbody>
 </table>
-<h2 id="_17">既知の制限<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
+<h3 id="_20">インポートと型<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java/Scala風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>import java.util.*;</code></td>
+<td><code>import { java.util.* }</code> - 波括弧が必要</td>
+</tr>
+<tr>
+<td><code>import { Foo = pkg.Class; }</code></td>
+<td><code>import { pkg.Class as Foo; }</code> - エイリアスに<code>as</code></td>
+</tr>
+<tr>
+<td><code>new int[10]</code></td>
+<td><code>new Int[10]</code> - プリミティブ型名は大文字</td>
+</tr>
+<tr>
+<td><code>int</code>, <code>long</code>, <code>boolean</code></td>
+<td><code>Int</code>, <code>Long</code>, <code>Boolean</code> - 大文字</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_21">コレクション<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java/Scala風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>new String[] {"a", "b"}</code></td>
+<td><code>["a", "b"]</code>は<code>List</code>を作成、配列は<code>new String[n]</code></td>
+</tr>
+<tr>
+<td><code>arr.length()</code></td>
+<td><code>arr.length</code> - 配列の長さはプロパティ、メソッドではない</td>
+</tr>
+<tr>
+<td><code>list.size()</code></td>
+<td><code>list.size</code> - これもプロパティ</td>
+</tr>
+<tr>
+<td><code>foreach (x : list)</code></td>
+<td><code>foreach x: Type in list { }</code> - 構文が異なる</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_22">リテラル<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code> でlong</td>
+<td><code>0L</code> - Long型には明示的な<code>L</code>サフィックスが必要</td>
+</tr>
+<tr>
+<td><code>0.0</code> でfloat</td>
+<td><code>0.0f</code> - Float型には明示的な<code>f</code>サフィックス</td>
+</tr>
+<tr>
+<td><code>"str" + 123</code></td>
+<td>✓ 正しい - 自動文字列変換</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_23">既知の制限<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h2>
 <ul>
 <li>コンパイラは特定のエッジケースでクラッシュする可能性があります（<code>run/</code> の例は動作確認済み）</li>
 <li>ジェネリクスは型消去ベース（変性、ワイルドカード、具象化された型情報なし）</li>
 <li>診断機能は改善中；一部のエラーはパイプラインの後半で報告される場合があります</li>
 <li>末尾呼び出し最適化は直接の自己再帰のみ処理（相互再帰や継続渡しスタイルは非対応）</li>
 </ul>
-<h2 id="_18">実行のエントリーポイント<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
+<h2 id="_24">実行のエントリーポイント<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h2>
 <p><code>onion</code> コマンド（または <code>sbt runScript</code>）を使用する場合、エントリーポイントは以下の順で決定されます：
 1. 明示的なクラス定義があり、そのクラスがmainメソッドを持つ場合はそのmainメソッド
 2. 最上位のクラスのmainメソッド

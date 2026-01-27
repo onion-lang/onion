@@ -102,7 +102,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 
 ## Project History
 
-Originally written in Java in 2005, Onion has been completely rewritten in Scala 3.6.2, with only the parser using JavaCC. The compiler follows a classic multi-phase architecture:
+Originally written in Java in 2005, Onion has been completely rewritten in Scala 3.3.7, with only the parser using JavaCC. The compiler follows a classic multi-phase architecture:
 
 1. **Parsing** - JavaCC-generated parser produces untyped AST
 2. **Rewriting** - AST normalization and transformation

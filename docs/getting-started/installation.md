@@ -49,7 +49,7 @@ Onion runs on the JVM and requires:
    sbt assembly
    ```
 
-   This creates `onion.jar` in the `target/scala-3.6.2/` directory
+   This creates `onion.jar` in the `target/scala-3.3.7/` directory
 
 ## Verify Installation
 

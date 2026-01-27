@@ -363,6 +363,58 @@ These are frequently confused with other languages. **Always check these:**
 | `0.0` for float | `0.0f` - explicit `f` suffix for Float |
 | `"str" + 123` | ✓ correct - auto string conversion |
 
+### Inheritance & Interfaces
+
+| Wrong (Java/Scala style) | Correct (Onion) |
+|--------------------------|-----------------|
+| `class A extends B` | `class A : B` - colon for inheritance |
+| `class A implements I` | `class A <: I` - `<:` for interface |
+| `class A extends B implements I` | `class A : B <: I` - combine both |
+| `class A implements I, J` | `class A <: I, J` - comma-separated |
+
+### Records
+
+| Wrong (Java style) | Correct (Onion) |
+|--------------------|-----------------|
+| `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
+| `point.x` for record field | `point.x()` - record fields are methods (need parens) |
+
+### Lambdas & Functions
+
+| Wrong | Correct (Onion) |
+|-------|-----------------|
+| `x -> x * 2` | `(x: Int) -> x * 2` - type annotation often needed |
+| `(x) -> expr` (single param) | `(x: Type) -> expr` - type usually required |
+| `func(arg)` for lambda | `func.call(arg)` or `func(arg)` - both work |
+| `Int -> Int` | `(Int) -> Int` - function type needs parens |
+| `(Int, Int) -> Int` | ✓ correct - multi-param function type |
+
+### Method Calls
+
+| Wrong | Correct (Onion) |
+|-------|-----------------|
+| `obj.method()` always | `obj.method` - parens optional for no-arg methods |
+| `str.equals(other)` | `str == other` - `==` works for strings (value equality) |
+| `str1 == str2` reference check | `str1 === str2` - use `===` for reference |
+
+### Exceptions
+
+| Wrong (Java style) | Correct (Onion) |
+|--------------------|-----------------|
+| `throw new Exception();` | `throw new Exception("msg")` - same syntax |
+| `try { } catch { } finally { }` | ✓ correct - finally is supported |
+| `catch (Type e)` | `catch e: Type` - no parens, type after colon |
+
+### Miscellaneous
+
+| Wrong | Correct (Onion) |
+|-------|-----------------|
+| `null` check with `== null` | ✓ correct - works as expected |
+| `&&`, `\|\|` operators | ✓ correct - same as Java |
+| `!condition` | ✓ correct - same as Java |
+| `a ? b : c` ternary | Not supported - use `if/else` expression |
+| String templates `$var` | Not supported - use `+` concatenation |
+
 ## Known Limitations
 
 - Compiler may crash on certain edge cases (examples in `run/` are verified to work)

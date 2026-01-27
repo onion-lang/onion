@@ -367,6 +367,58 @@ try {
 | `0.0` でfloat | `0.0f` - Float型には明示的な`f`サフィックス |
 | `"str" + 123` | ✓ 正しい - 自動文字列変換 |
 
+### 継承とインターフェース
+
+| 誤り（Java/Scala風） | 正しい（Onion） |
+|---------------------|----------------|
+| `class A extends B` | `class A : B` - 継承はコロン |
+| `class A implements I` | `class A <: I` - インターフェースは`<:` |
+| `class A extends B implements I` | `class A : B <: I` - 両方を組み合わせ |
+| `class A implements I, J` | `class A <: I, J` - カンマ区切り |
+
+### レコード
+
+| 誤り（Java風） | 正しい（Onion） |
+|---------------|----------------|
+| `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - コンストラクタ形式 |
+| `point.x` でレコードフィールド | `point.x()` - レコードフィールドはメソッド（括弧必要） |
+
+### ラムダと関数
+
+| 誤り | 正しい（Onion） |
+|-----|----------------|
+| `x -> x * 2` | `(x: Int) -> x * 2` - 型注釈が必要なことが多い |
+| `(x) -> expr`（単一引数） | `(x: Type) -> expr` - 型が通常必要 |
+| `func(arg)` でラムダ呼び出し | `func.call(arg)` または `func(arg)` - 両方OK |
+| `Int -> Int` | `(Int) -> Int` - 関数型には括弧が必要 |
+| `(Int, Int) -> Int` | ✓ 正しい - 複数引数の関数型 |
+
+### メソッド呼び出し
+
+| 誤り | 正しい（Onion） |
+|-----|----------------|
+| `obj.method()` を常に | `obj.method` - 引数なしメソッドは括弧省略可 |
+| `str.equals(other)` | `str == other` - 文字列に`==`が使える（値等価） |
+| `str1 == str2` で参照チェック | `str1 === str2` - 参照には`===` |
+
+### 例外
+
+| 誤り（Java風） | 正しい（Onion） |
+|---------------|----------------|
+| `throw new Exception();` | `throw new Exception("msg")` - 同じ構文 |
+| `try { } catch { } finally { }` | ✓ 正しい - finallyサポートあり |
+| `catch (Type e)` | `catch e: Type` - 括弧なし、コロンの後に型 |
+
+### その他
+
+| 誤り | 正しい（Onion） |
+|-----|----------------|
+| `null`チェックに`== null` | ✓ 正しい - 期待通りに動作 |
+| `&&`, `\|\|` 演算子 | ✓ 正しい - Javaと同じ |
+| `!condition` | ✓ 正しい - Javaと同じ |
+| `a ? b : c` 三項演算子 | 非サポート - `if/else`式を使用 |
+| 文字列テンプレート `$var` | 非サポート - `+`で連結 |
+
 ## 既知の制限
 
 - コンパイラは特定のエッジケースでクラッシュする可能性があります（`run/` の例は動作確認済み）

@@ -413,7 +413,7 @@ These are frequently confused with other languages. **Always check these:**
 | `&&`, `\|\|` operators | ✓ correct - same as Java |
 | `!condition` | ✓ correct - same as Java |
 | `a ? b : c` ternary | Not supported - use `if/else` expression |
-| String templates `$var` | Not supported - use `+` concatenation |
+| String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
 
 ## Known Limitations
 

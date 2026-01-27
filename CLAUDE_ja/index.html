@@ -2199,13 +2199,79 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        継承とインターフェース
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レコード
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ラムダと関数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        メソッド呼び出し
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        例外
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        その他
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#_23" class="md-nav__link">
+  <a href="#_29" class="md-nav__link">
     <span class="md-ellipsis">
       
         既知の制限
@@ -2216,7 +2282,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_24" class="md-nav__link">
+  <a href="#_30" class="md-nav__link">
     <span class="md-ellipsis">
       
         実行のエントリーポイント
@@ -2708,14 +2774,168 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_23">既知の制限<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h2>
+<h3 id="_23">継承とインターフェース<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java/Scala風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>class A extends B</code></td>
+<td><code>class A : B</code> - 継承はコロン</td>
+</tr>
+<tr>
+<td><code>class A implements I</code></td>
+<td><code>class A &lt;: I</code> - インターフェースは<code>&lt;:</code></td>
+</tr>
+<tr>
+<td><code>class A extends B implements I</code></td>
+<td><code>class A : B &lt;: I</code> - 両方を組み合わせ</td>
+</tr>
+<tr>
+<td><code>class A implements I, J</code></td>
+<td><code>class A &lt;: I, J</code> - カンマ区切り</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_24">レコード<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>record Point { int x; int y; }</code></td>
+<td><code>record Point(x: Int, y: Int)</code> - コンストラクタ形式</td>
+</tr>
+<tr>
+<td><code>point.x</code> でレコードフィールド</td>
+<td><code>point.x()</code> - レコードフィールドはメソッド（括弧必要）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_25">ラムダと関数<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x -&gt; x * 2</code></td>
+<td><code>(x: Int) -&gt; x * 2</code> - 型注釈が必要なことが多い</td>
+</tr>
+<tr>
+<td><code>(x) -&gt; expr</code>（単一引数）</td>
+<td><code>(x: Type) -&gt; expr</code> - 型が通常必要</td>
+</tr>
+<tr>
+<td><code>func(arg)</code> でラムダ呼び出し</td>
+<td><code>func.call(arg)</code> または <code>func(arg)</code> - 両方OK</td>
+</tr>
+<tr>
+<td><code>Int -&gt; Int</code></td>
+<td><code>(Int) -&gt; Int</code> - 関数型には括弧が必要</td>
+</tr>
+<tr>
+<td><code>(Int, Int) -&gt; Int</code></td>
+<td>✓ 正しい - 複数引数の関数型</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_26">メソッド呼び出し<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>obj.method()</code> を常に</td>
+<td><code>obj.method</code> - 引数なしメソッドは括弧省略可</td>
+</tr>
+<tr>
+<td><code>str.equals(other)</code></td>
+<td><code>str == other</code> - 文字列に<code>==</code>が使える（値等価）</td>
+</tr>
+<tr>
+<td><code>str1 == str2</code> で参照チェック</td>
+<td><code>str1 === str2</code> - 参照には<code>===</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_27">例外<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り（Java風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>throw new Exception();</code></td>
+<td><code>throw new Exception("msg")</code> - 同じ構文</td>
+</tr>
+<tr>
+<td><code>try { } catch { } finally { }</code></td>
+<td>✓ 正しい - finallyサポートあり</td>
+</tr>
+<tr>
+<td><code>catch (Type e)</code></td>
+<td><code>catch e: Type</code> - 括弧なし、コロンの後に型</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_28">その他<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>null</code>チェックに<code>== null</code></td>
+<td>✓ 正しい - 期待通りに動作</td>
+</tr>
+<tr>
+<td><code>&amp;&amp;</code>, <code>\|\|</code> 演算子</td>
+<td>✓ 正しい - Javaと同じ</td>
+</tr>
+<tr>
+<td><code>!condition</code></td>
+<td>✓ 正しい - Javaと同じ</td>
+</tr>
+<tr>
+<td><code>a ? b : c</code> 三項演算子</td>
+<td>非サポート - <code>if/else</code>式を使用</td>
+</tr>
+<tr>
+<td>文字列テンプレート <code>$var</code></td>
+<td>非サポート - <code>+</code>で連結</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_29">既知の制限<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h2>
 <ul>
 <li>コンパイラは特定のエッジケースでクラッシュする可能性があります（<code>run/</code> の例は動作確認済み）</li>
 <li>ジェネリクスは型消去ベース（変性、ワイルドカード、具象化された型情報なし）</li>
 <li>診断機能は改善中；一部のエラーはパイプラインの後半で報告される場合があります</li>
 <li>末尾呼び出し最適化は直接の自己再帰のみ処理（相互再帰や継続渡しスタイルは非対応）</li>
 </ul>
-<h2 id="_24">実行のエントリーポイント<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h2>
+<h2 id="_30">実行のエントリーポイント<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h2>
 <p><code>onion</code> コマンド（または <code>sbt runScript</code>）を使用する場合、エントリーポイントは以下の順で決定されます：
 1. 明示的なクラス定義があり、そのクラスがmainメソッドを持つ場合はそのmainメソッド
 2. 最上位のクラスのmainメソッド

@@ -304,6 +304,23 @@ try {
 }
 ```
 
+## よくある構文ミス（重要）
+
+他の言語と混同しやすい構文です。**必ず確認してください：**
+
+| 誤り（Java/Scala風） | 正しい（Onion） |
+|---------------------|----------------|
+| `catch (e: Exception) { }` | `catch e: Exception { }` - 括弧なし |
+| `expr$Type` | `expr as Type` - `as`キーワードを使用 |
+| `(expr as Type).method()` はメソッドチェインに括弧が必要 | ✓ 正しい |
+| `import java.util.*;` | `import { java.util.* }` - 波括弧、`*`の後にセミコロンなし |
+| `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - エイリアスに`as`を使用 |
+| `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
+| `public void method()` | `public: def method(): void` - セクションベースのアクセス |
+| `this.field = value` コンストラクタ内 | ✓ 正しい - フィールドは`this.`が必要 |
+| `new int[10]` | `new Int[10]` - 型名は大文字開始 |
+| `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longリテラルは`L`サフィックス |
+
 ## 既知の制限
 
 - コンパイラは特定のエッジケースでクラッシュする可能性があります（`run/` の例は動作確認済み）

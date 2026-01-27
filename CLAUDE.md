@@ -300,6 +300,23 @@ try {
 }
 ```
 
+## Common Syntax Mistakes (IMPORTANT)
+
+These are frequently confused with other languages. **Always check these:**
+
+| Wrong (Java/Scala style) | Correct (Onion) |
+|--------------------------|-----------------|
+| `catch (e: Exception) { }` | `catch e: Exception { }` - no parentheses |
+| `expr$Type` | `expr as Type` - use `as` keyword |
+| `(expr as Type).method()` requires parentheses | ✓ correct for method chaining |
+| `import java.util.*;` | `import { java.util.* }` - braces, no semicolon after `*` |
+| `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - `as` for alias |
+| `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
+| `public void method()` | `public: def method(): void` - section-based access |
+| `this.field = value` in constructor | ✓ correct - fields must use `this.` |
+| `new int[10]` | `new Int[10]` - capitalized type names |
+| `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long literal |
+
 ## Known Limitations
 
 - Compiler may crash on certain edge cases (examples in `run/` are verified to work)

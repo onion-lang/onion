@@ -722,6 +722,9 @@ object TypedAST {
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null
 
+    // TCO: Tail Call Optimization metadata
+    private var tcoLoopVars: Option[Seq[(Int, Type)]] = None  // (loopVarIndex, paramType)
+
     def affiliation: TypedAST.ClassType = classType
 
     override def isVararg: Boolean = vararg
@@ -745,6 +748,14 @@ object TypedAST {
     override def argumentsWithDefaults: Array[MethodArgument] =
       if (argsWithDefaults_ != null) argsWithDefaults_
       else super.argumentsWithDefaults
+
+    // TCO: Tail Call Optimization metadata accessors
+    def setTcoLoopVars(loopVars: Seq[(Int, Type)]): Unit =
+      tcoLoopVars = Some(loopVars)
+
+    def getTcoLoopVars: Option[Seq[(Int, Type)]] = tcoLoopVars
+
+    def hasTcoLoopVars: Boolean = tcoLoopVars.isDefined
 
   }
 

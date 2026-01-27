@@ -2125,7 +2125,7 @@
   <a href="#_16" class="md-nav__link">
     <span class="md-ellipsis">
       
-        既知の制限
+        よくある構文ミス（重要）
       
     </span>
   </a>
@@ -2134,6 +2134,17 @@
       
         <li class="md-nav__item">
   <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        既知の制限
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
     <span class="md-ellipsis">
       
         実行のエントリーポイント
@@ -2441,14 +2452,66 @@
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  IO::println(&quot;Error: &quot; + e.message())
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>}
 </span></code></pre></div></p>
-<h2 id="_16">既知の制限<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<h2 id="_16">よくある構文ミス（重要）<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<p>他の言語と混同しやすい構文です。<strong>必ず確認してください：</strong></p>
+<table>
+<thead>
+<tr>
+<th>誤り（Java/Scala風）</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catch (e: Exception) { }</code></td>
+<td><code>catch e: Exception { }</code> - 括弧なし</td>
+</tr>
+<tr>
+<td><code>expr$Type</code></td>
+<td><code>expr as Type</code> - <code>as</code>キーワードを使用</td>
+</tr>
+<tr>
+<td><code>(expr as Type).method()</code> はメソッドチェインに括弧が必要</td>
+<td>✓ 正しい</td>
+</tr>
+<tr>
+<td><code>import java.util.*;</code></td>
+<td><code>import { java.util.* }</code> - 波括弧、<code>*</code>の後にセミコロンなし</td>
+</tr>
+<tr>
+<td><code>import { Foo = pkg.Class; }</code></td>
+<td><code>import { pkg.Class as Foo; }</code> - エイリアスに<code>as</code>を使用</td>
+</tr>
+<tr>
+<td><code>for (int i = 0; ...)</code></td>
+<td><code>for var i: Int = 0; ...</code> - 括弧なし</td>
+</tr>
+<tr>
+<td><code>public void method()</code></td>
+<td><code>public: def method(): void</code> - セクションベースのアクセス</td>
+</tr>
+<tr>
+<td><code>this.field = value</code> コンストラクタ内</td>
+<td>✓ 正しい - フィールドは<code>this.</code>が必要</td>
+</tr>
+<tr>
+<td><code>new int[10]</code></td>
+<td><code>new Int[10]</code> - 型名は大文字開始</td>
+</tr>
+<tr>
+<td><code>Long.toString(0)</code></td>
+<td><code>Long::toString(0L)</code> - 静的メソッドは<code>::</code>、longリテラルは<code>L</code>サフィックス</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_17">既知の制限<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <ul>
 <li>コンパイラは特定のエッジケースでクラッシュする可能性があります（<code>run/</code> の例は動作確認済み）</li>
 <li>ジェネリクスは型消去ベース（変性、ワイルドカード、具象化された型情報なし）</li>
 <li>診断機能は改善中；一部のエラーはパイプラインの後半で報告される場合があります</li>
 <li>末尾呼び出し最適化は直接の自己再帰のみ処理（相互再帰や継続渡しスタイルは非対応）</li>
 </ul>
-<h2 id="_17">実行のエントリーポイント<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
+<h2 id="_18">実行のエントリーポイント<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
 <p><code>onion</code> コマンド（または <code>sbt runScript</code>）を使用する場合、エントリーポイントは以下の順で決定されます：
 1. 明示的なクラス定義があり、そのクラスがmainメソッドを持つ場合はそのmainメソッド
 2. 最上位のクラスのmainメソッド

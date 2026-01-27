@@ -157,14 +157,18 @@ count--
 
 ### Type Casting Operator
 
-The `$` operator performs type casting:
+The `as` keyword performs type casting. When chaining with method calls, use parentheses:
 
 ```onion
 val x: Double = 3.14
-val y: Int = x$Int  // Cast to Int (3)
+val y: Int = x as Int  // Cast to Int (3)
 
 val random: Double = Math::random()
-val randomInt: Int = (random * 100)$Int
+val randomInt: Int = (random * 100) as Int
+
+// When chaining method calls, parentheses are required
+val btn: Object = getButton()
+val text: String = (btn as JButton).getText()
 ```
 
 ### List Append Operator

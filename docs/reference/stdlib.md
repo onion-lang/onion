@@ -99,7 +99,7 @@ Generate random number between 0.0 and 1.0:
 
 ```onion
 val r: Double = Math::random()
-val randomInt: Int = (Math::random() * 100)$Int
+val randomInt: Int = (Math::random() * 100) as Int
 ```
 
 ### Math::sqrt
@@ -518,6 +518,117 @@ val result: Future[Int] = do[Future] {
   y <- Future::async(() -> { return fetchB(x); })
   ret x + y
 }
+```
+
+## Rand Module
+
+Random number generation utilities via `onion.Rand`.
+
+### Rand::int / Rand::long / Rand::double
+
+Generate random numbers:
+
+```onion
+val randomInt: Int = Rand::int()           // Random Int
+val randomLong: Long = Rand::long()        // Random Long
+val randomDouble: Double = Rand::double()  // 0.0 to 1.0
+val randomBool: Boolean = Rand::boolean()  // Random Boolean
+```
+
+### Rand::nextInt
+
+Generate random integer in range:
+
+```onion
+val dice: Int = Rand::nextInt(6) + 1      // 1 to 6
+val percent: Int = Rand::nextInt(100)     // 0 to 99
+```
+
+### Rand::shuffle
+
+Shuffle a list in place:
+
+```onion
+import { java.util.ArrayList; }
+
+val list: ArrayList = new ArrayList
+list.add("A")
+list.add("B")
+list.add("C")
+Rand::shuffle(list)  // Shuffles in place
+```
+
+## Assert Module
+
+Testing assertions via `onion.Assert`. Throws `AssertionError` on failure.
+
+### Basic Assertions
+
+```onion
+Assert::assertTrue(x > 0)
+Assert::assertFalse(list.isEmpty())
+Assert::assertEquals(expected, actual)
+Assert::assertNotEquals(a, b)
+```
+
+### Null Assertions
+
+```onion
+Assert::assertNotNull(result)
+Assert::assertNull(errorMessage)
+```
+
+### Explicit Failure
+
+```onion
+if invalidState {
+  Assert::fail("Should not reach here")
+}
+```
+
+## Timing Module
+
+Time measurement utilities via `onion.Timing`.
+
+### Getting Current Time
+
+```onion
+val startNanos: Long = Timing::nanos()     // High-precision (System.nanoTime)
+val startMillis: Long = Timing::millis()   // Wall clock (System.currentTimeMillis)
+```
+
+### Measuring Elapsed Time
+
+```onion
+val start: Long = Timing::nanos()
+// ... some operation ...
+val elapsedNs: Long = Timing::elapsedNanos(start)    // Elapsed in nanoseconds
+val elapsedMs: Double = Timing::elapsedMs(start)     // Elapsed in milliseconds
+```
+
+### Formatting Time
+
+```onion
+val nanos: Long = 1234567890L
+val formatted: String = Timing::formatNanos(nanos)   // "1.23s"
+// Output formats: "123ns", "45.67μs", "12.34ms", "1.23s"
+```
+
+### Sleep
+
+```onion
+Timing::sleep(1000L)  // Sleep for 1000 milliseconds
+```
+
+### Measuring Function Execution
+
+```onion
+// Measure and print execution time, return result
+val result: Int = Timing::measure(() -> { return expensiveOperation(); })
+// Prints: "Elapsed: 123.45ms"
+
+// Get execution time in nanoseconds without printing
+val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 ```
 
 ## Next Steps

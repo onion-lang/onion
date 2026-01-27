@@ -241,14 +241,18 @@ try {
 
 ## Type Casting
 
-Use the `$` operator for type casting:
+Use the `as` keyword for type casting. When chaining with method calls, use parentheses:
 
 ```onion
 val random: Double = Math::random()
-val randomInt: Int = (random * 100)$Int
+val randomInt: Int = (random * 100) as Int
 
 val obj: Object = "Hello"
-val str: String = obj$String
+val str: String = obj as String
+
+// When chaining method calls, parentheses are required
+val btn: Object = getButton()
+val text: String = (btn as JButton).getText()
 ```
 
 ## Module System

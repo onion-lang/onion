@@ -9,6 +9,8 @@ import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
 
+import ArgumentHelpers.{NamedArgInfo, extractNamedArgInfo, filterByNamedArgs, hasNamedArguments, fillDefaultArguments}
+
 /** Well-known method names used in method resolution */
 private object MethodNames {
   val LENGTH = "length"
@@ -137,21 +139,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   private def isStaticMethod(m: Method): Boolean = (m.modifier & AST.M_STATIC) != 0
 
   /** Information extracted from named arguments */
-  private case class NamedArgInfo(namedArgNames: Set[String], positionalCount: Int)
-
-  /** Extract named argument information from expression list */
-  private def extractNamedArgInfo(args: Seq[AST.Expression]): NamedArgInfo = {
-    val namedArgNames = args.collect { case na: AST.NamedArgument => na.name }.toSet
-    val positionalCount = args.takeWhile(!_.isInstanceOf[AST.NamedArgument]).size
-    NamedArgInfo(namedArgNames, positionalCount)
-  }
-
-  /** Filter methods by named argument compatibility */
-  private def filterByNamedArgs(candidates: JTreeSet[Method], info: NamedArgInfo): List[Method] =
-    candidates.asScala.filter { method =>
-      val paramNames = method.argumentsWithDefaults.map(_.name).toSet
-      info.namedArgNames.subsetOf(paramNames) && info.positionalCount <= method.arguments.length
-    }.toList
+  // Named argument helpers delegated to ArgumentHelpers object
 
   /** Process parameters with type checking, returns None on error */
   private def processParamsWithExpected(
@@ -1345,11 +1333,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     Some(result)
   }
 
-  /**
-   * 引数リストに名前付き引数が含まれているか確認
-   */
-  private def hasNamedArguments(args: List[AST.Expression]): Boolean =
-    args.exists(_.isInstanceOf[AST.NamedArgument])
+  // hasNamedArguments delegated to ArgumentHelpers object
 
   /**
    * Type a safe member selection: expr?.name
@@ -1498,25 +1482,5 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     }
   }
 
-  /**
-   * デフォルト引数で足りない分を補完する
-   */
-  private def fillDefaultArguments(params: Array[Term], method: Method): Option[Array[Term]] = {
-    val argsWithDefaults = method.argumentsWithDefaults
-    if (params.length >= argsWithDefaults.length) {
-      Some(params)
-    } else {
-      val result = new Array[Term](argsWithDefaults.length)
-      System.arraycopy(params, 0, result, 0, params.length)
-      var i = params.length
-      while (i < argsWithDefaults.length) {
-        argsWithDefaults(i).defaultValue match {
-          case Some(term) => result(i) = term
-          case None => return None
-        }
-        i += 1
-      }
-      Some(result)
-    }
-  }
+  // fillDefaultArguments delegated to ArgumentHelpers object
 }

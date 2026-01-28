@@ -136,7 +136,3 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 * The compiler still has edge cases and can crash; please report minimal repros.
 * Generics are erasure-based (no variance, wildcards, or reified type info).
 * Diagnostics are still improving; some errors may be reported later in the pipeline.
-
-## BuildHive (Jenkins)
-
-This software includes softwares developed by [Apache Software Foundation](http://www.apache.org/).

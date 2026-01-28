@@ -11,44 +11,6 @@ import scala.jdk.CollectionConverters.*
 
 import ArgumentHelpers.{NamedArgInfo, extractNamedArgInfo, filterByNamedArgs, hasNamedArguments, fillDefaultArguments}
 
-/** Well-known method names used in method resolution */
-private object MethodNames {
-  val LENGTH = "length"
-  val SIZE = "size"
-  val GET_PREFIX = "get"
-  val IS_PREFIX = "is"
-}
-
-/** Type substitution helpers to reduce boilerplate */
-private object TypeSubst {
-  import scala.collection.immutable.Map
-
-  /** Substitute type with only class-level type parameters from target type */
-  def withClassOnly(typ: TypedAST.Type, targetType: TypedAST.Type): TypedAST.Type =
-    TypeSubstitution.substituteType(
-      typ,
-      TypeSubstitution.classSubstitution(targetType),
-      Map.empty,
-      defaultToBound = true
-    )
-
-  /** Substitute type with both class and method type parameters */
-  def apply(typ: TypedAST.Type, classSubst: Map[String, TypedAST.Type], methodSubst: Map[String, TypedAST.Type]): TypedAST.Type =
-    TypeSubstitution.substituteType(typ, classSubst, methodSubst, defaultToBound = true)
-
-  /** Substitute all argument types of a method */
-  def args(method: TypedAST.Method, classSubst: Map[String, TypedAST.Type], methodSubst: Map[String, TypedAST.Type]): Array[TypedAST.Type] =
-    method.arguments.map(tp => apply(tp, classSubst, methodSubst))
-
-  /** Wrap term in AsInstanceOf if types differ, otherwise return as-is */
-  def withCast(term: Term, targetType: TypedAST.Type): Term =
-    if (targetType eq term.`type`) term else new AsInstanceOf(term, targetType)
-
-  /** Option-returning version of withCast */
-  def withCastOpt(term: Term, targetType: TypedAST.Type): Option[Term] =
-    Some(withCast(term, targetType))
-}
-
 final class MethodCallTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 

@@ -325,14 +325,19 @@ These are frequently confused with other languages. **Always check these:**
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
 | `i += 1` or `i++` | `i = i + 1` - limited compound operators (only `++` in for loops) |
+| `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
 
 ### Methods & Classes
 
 | Wrong (Java/Scala style) | Correct (Onion) |
 |--------------------------|-----------------|
+| `public ClassName() { }` | `def this { }` - constructor uses `def this` |
+| `public ClassName(x: Int) { }` | `def this(x: Int) { }` - with params |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - no parentheses |
 | `public void method()` | `public: def method(): void` - section-based access |
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
+| `@Override void method()` | `override def method(): void` - keyword not annotation |
+| `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
 | `this.field = value` in constructor | ✓ correct - fields must use `this.` |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
@@ -351,6 +356,8 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong (Java/Scala style) | Correct (Onion) |
 |--------------------------|-----------------|
 | `new String[] {"a", "b"}` | `["a", "b"]` creates `List`, use `new String[n]` for array |
+| `list.get(i)` | `list[i]` - both array and List use `[]` access |
+| `list.set(i, v)` | `list[i] = v` - assignment also uses `[]` |
 | `arr.length()` | `arr.length` - array length is property, not method |
 | `list.size()` | `list.size` - also a property |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
@@ -388,6 +395,7 @@ These are frequently confused with other languages. **Always check these:**
 | `func(arg)` for lambda | `func.call(arg)` or `func(arg)` - both work |
 | `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |
+| `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - trailing lambda with `=>` |
 
 ### Method Calls
 
@@ -414,6 +422,9 @@ These are frequently confused with other languages. **Always check these:**
 | `!condition` | ✓ correct - same as Java |
 | `a ? b : c` ternary | Not supported - use `if/else` expression |
 | String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
+| `this` only | `self` also works - both refer to current instance |
+| Reserved word as identifier | `` `class` `` - use backticks to escape keywords |
+| `println("Hi")` | ✓ correct - top-level function, or `IO::println` |
 
 ## Known Limitations
 

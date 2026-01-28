@@ -329,14 +329,19 @@ try {
 | `switch value { case 1: }` | `select value { case 1: }` - `switch`ではなく`select` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
 | `i += 1` や `i++` | `i = i + 1` - 複合演算子は限定的（`++`はforループ内のみ） |
+| `while (x = read()) != null` | ✓ 正しい - 括弧付きで代入を条件に使用可 |
 
 ### メソッドとクラス
 
 | 誤り（Java/Scala風） | 正しい（Onion） |
 |---------------------|----------------|
+| `public ClassName() { }` | `def this { }` - コンストラクタは`def this` |
+| `public ClassName(x: Int) { }` | `def this(x: Int) { }` - 引数付き |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - 括弧なし |
 | `public void method()` | `public: def method(): void` - セクションベースのアクセス |
 | `def method(): T { }` | `def method: T { }` - 引数なしなら括弧省略可 |
+| `@Override void method()` | `override def method(): void` - アノテーションではなくキーワード |
+| `fun String.twice()` (Kotlin風) | `extension String { def twice() { } }` - extensionブロック |
 | `this.field = value` コンストラクタ内 | ✓ 正しい - フィールドは`this.`が必要 |
 | `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longは`L`サフィックス |
 | `System.out` | `System::out` - 静的フィールドも`::` |
@@ -355,6 +360,8 @@ try {
 | 誤り（Java/Scala風） | 正しい（Onion） |
 |---------------------|----------------|
 | `new String[] {"a", "b"}` | `["a", "b"]`は`List`を作成、配列は`new String[n]` |
+| `list.get(i)` | `list[i]` - 配列もリストも`[]`でアクセス |
+| `list.set(i, v)` | `list[i] = v` - 代入も`[]`を使用 |
 | `arr.length()` | `arr.length` - 配列の長さはプロパティ、メソッドではない |
 | `list.size()` | `list.size` - これもプロパティ |
 | `foreach (x : list)` | `foreach x: Type in list { }` - 構文が異なる |
@@ -392,6 +399,7 @@ try {
 | `func(arg)` でラムダ呼び出し | `func.call(arg)` または `func(arg)` - 両方OK |
 | `Int -> Int` | ✓ 正しい - 単一引数の関数型 |
 | `(Int, Int) -> Int` | ✓ 正しい - 複数引数の関数型 |
+| `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - トレイリングラムダは`=>`を使用 |
 
 ### メソッド呼び出し
 
@@ -418,6 +426,9 @@ try {
 | `!condition` | ✓ 正しい - Javaと同じ |
 | `a ? b : c` 三項演算子 | 非サポート - `if/else`式を使用 |
 | 文字列テンプレート `$var` や `${expr}` | `"text #{expr}"` - `#{}` 構文を使用 |
+| `this`のみ | `self`も使用可 - 両方とも現在のインスタンスを参照 |
+| 予約語を識別子に | `` `class` `` - バッククォートでキーワードをエスケープ |
+| `println("Hi")` | ✓ 正しい - トップレベル関数、または`IO::println` |
 
 ## 既知の制限
 

@@ -2660,6 +2660,10 @@
 <td><code>i += 1</code> や <code>i++</code></td>
 <td><code>i = i + 1</code> - 複合演算子は限定的（<code>++</code>はforループ内のみ）</td>
 </tr>
+<tr>
+<td><code>while (x = read()) != null</code></td>
+<td>✓ 正しい - 括弧付きで代入を条件に使用可</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_19">メソッドとクラス<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
@@ -2672,6 +2676,14 @@
 </thead>
 <tbody>
 <tr>
+<td><code>public ClassName() { }</code></td>
+<td><code>def this { }</code> - コンストラクタは<code>def this</code></td>
+</tr>
+<tr>
+<td><code>public ClassName(x: Int) { }</code></td>
+<td><code>def this(x: Int) { }</code> - 引数付き</td>
+</tr>
+<tr>
 <td><code>catch (e: Exception) { }</code></td>
 <td><code>catch e: Exception { }</code> - 括弧なし</td>
 </tr>
@@ -2682,6 +2694,14 @@
 <tr>
 <td><code>def method(): T { }</code></td>
 <td><code>def method: T { }</code> - 引数なしなら括弧省略可</td>
+</tr>
+<tr>
+<td><code>@Override void method()</code></td>
+<td><code>override def method(): void</code> - アノテーションではなくキーワード</td>
+</tr>
+<tr>
+<td><code>fun String.twice()</code> (Kotlin風)</td>
+<td><code>extension String { def twice() { } }</code> - extensionブロック</td>
 </tr>
 <tr>
 <td><code>this.field = value</code> コンストラクタ内</td>
@@ -2736,6 +2756,14 @@
 <tr>
 <td><code>new String[] {"a", "b"}</code></td>
 <td><code>["a", "b"]</code>は<code>List</code>を作成、配列は<code>new String[n]</code></td>
+</tr>
+<tr>
+<td><code>list.get(i)</code></td>
+<td><code>list[i]</code> - 配列もリストも<code>[]</code>でアクセス</td>
+</tr>
+<tr>
+<td><code>list.set(i, v)</code></td>
+<td><code>list[i] = v</code> - 代入も<code>[]</code>を使用</td>
 </tr>
 <tr>
 <td><code>arr.length()</code></td>
@@ -2849,6 +2877,10 @@
 <td><code>(Int, Int) -&gt; Int</code></td>
 <td>✓ 正しい - 複数引数の関数型</td>
 </tr>
+<tr>
+<td><code>list.map(x -&gt; x * 2)</code></td>
+<td><code>list.map { x =&gt; x * 2 }</code> - トレイリングラムダは<code>=&gt;</code>を使用</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_26">メソッド呼び出し<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
@@ -2925,6 +2957,18 @@
 <tr>
 <td>文字列テンプレート <code>$var</code> や <code>${expr}</code></td>
 <td><code>"text #{expr}"</code> - <code>#{}</code> 構文を使用</td>
+</tr>
+<tr>
+<td><code>this</code>のみ</td>
+<td><code>self</code>も使用可 - 両方とも現在のインスタンスを参照</td>
+</tr>
+<tr>
+<td>予約語を識別子に</td>
+<td><code>`class`</code> - バッククォートでキーワードをエスケープ</td>
+</tr>
+<tr>
+<td><code>println("Hi")</code></td>
+<td>✓ 正しい - トップレベル関数、または<code>IO::println</code></td>
 </tr>
 </tbody>
 </table>

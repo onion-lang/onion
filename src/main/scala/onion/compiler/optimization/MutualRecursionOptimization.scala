@@ -124,120 +124,20 @@ class MutualRecursionOptimization(config: CompilerConfig)
   }
 
   /**
-   * Build call graph: method -> set of methods it calls
+   * Build call graph using the TailCallGraphAnalysis helper.
    */
-  private def buildCallGraph(methods: Seq[MethodDefinition]): Map[MethodDefinition, Set[MethodDefinition]] = {
-    val methodByName = methods.map(m => m.name -> m).toMap
-
-    methods.map { method =>
-      val calledMethods = findTailCalls(method).flatMap { callName =>
-        methodByName.get(callName)
-      }.toSet
-      method -> calledMethods
-    }.toMap
-  }
+  private def buildCallGraph(methods: Seq[MethodDefinition]): Map[MethodDefinition, Set[MethodDefinition]] =
+    TailCallGraphAnalysis.buildCallGraph(methods)
 
   /**
-   * Find method names called in tail position
-   */
-  private def findTailCalls(method: MethodDefinition): Set[String] = {
-    val calls = mutable.Set[String]()
-
-    def visitStatement(stmt: ActionStatement): Unit = {
-      stmt match {
-        case ret: Return if ret.term != null =>
-          ret.term match {
-            case call: Call =>
-              call.method match {
-                case targetMethod: MethodDefinition =>
-                  calls += targetMethod.name
-                case _ =>
-              }
-            case call: CallStatic =>
-              call.method match {
-                case targetMethod: MethodDefinition =>
-                  calls += targetMethod.name
-                case _ =>
-              }
-            case _ =>
-          }
-
-        case block: StatementBlock =>
-          block.statements.foreach(visitStatement)
-
-        case ifStmt: IfStatement =>
-          visitStatement(ifStmt.thenStatement)
-          if (ifStmt.elseStatement != null) {
-            visitStatement(ifStmt.elseStatement)
-          }
-
-        case _ =>
-      }
-    }
-
-    if (method.getBlock != null) {
-      method.getBlock.statements.foreach(visitStatement)
-    }
-
-    calls.toSet
-  }
-
-  /**
-   * Find strongly connected components using Tarjan's algorithm
+   * Find strongly connected components (mutual recursion groups).
+   * Delegates to the generic SCC algorithm.
    */
   private def findMutualRecursionGroups(
     methods: Seq[MethodDefinition],
     callGraph: Map[MethodDefinition, Set[MethodDefinition]]
   ): Seq[Seq[MethodDefinition]] = {
-    val index = mutable.Map[MethodDefinition, Int]()
-    val lowLink = mutable.Map[MethodDefinition, Int]()
-    val onStack = mutable.Set[MethodDefinition]()
-    val stack = mutable.Stack[MethodDefinition]()
-    val sccs = mutable.ArrayBuffer[Seq[MethodDefinition]]()
-    var currentIndex = 0
-
-    def strongConnect(method: MethodDefinition): Unit = {
-      index(method) = currentIndex
-      lowLink(method) = currentIndex
-      currentIndex += 1
-      stack.push(method)
-      onStack += method
-
-      // Visit successors
-      callGraph.getOrElse(method, Set.empty).foreach { successor =>
-        if (!index.contains(successor)) {
-          strongConnect(successor)
-          lowLink(method) = math.min(lowLink(method), lowLink(successor))
-        } else if (onStack.contains(successor)) {
-          lowLink(method) = math.min(lowLink(method), index(successor))
-        }
-      }
-
-      // If method is root of SCC, pop the stack
-      if (lowLink(method) == index(method)) {
-        val scc = mutable.ArrayBuffer[MethodDefinition]()
-        var w: MethodDefinition = null
-        var continue = true
-        while (continue) {
-          w = stack.pop()
-          onStack -= w
-          scc += w
-          if (w == method) continue = false
-        }
-
-        if (scc.size > 1) {
-          sccs += scc.toSeq
-        }
-      }
-    }
-
-    methods.foreach { method =>
-      if (!index.contains(method)) {
-        strongConnect(method)
-      }
-    }
-
-    sccs.toSeq
+    StronglyConnectedComponents.findSCCs(methods, m => callGraph.getOrElse(m, Set.empty))
   }
 
   /**
@@ -262,7 +162,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Check 4: All tail calls must be to methods in the group
     val groupNames = group.map(_.name).toSet
     group.foreach { method =>
-      val tailCalls = findTailCalls(method)
+      val tailCalls = TailCallGraphAnalysis.findTailCalls(method)
       val externalCalls = tailCalls.filterNot(groupNames.contains)
       if (externalCalls.nonEmpty) {
         return Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.mkString(", ")}")

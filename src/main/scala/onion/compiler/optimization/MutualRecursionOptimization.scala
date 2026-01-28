@@ -99,15 +99,21 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Transform each group
     mutualGroups.foreach { group =>
       if (group.size > 1) {
-        val methodNames = group.map(_.name).mkString(", ")
-        System.err.println(s"[Mutual TCO] Detected mutual recursion group: $methodNames")
+        if (config.verbose) {
+          val methodNames = group.map(_.name).mkString(", ")
+          System.err.println(s"[Mutual TCO] Detected mutual recursion group: $methodNames")
+        }
 
         // Validate group can be optimized
         validateGroup(group) match {
           case Some(error) =>
-            System.err.println(s"[Mutual TCO] Cannot optimize: $error")
+            if (config.verbose) {
+              System.err.println(s"[Mutual TCO] Cannot optimize: $error")
+            }
           case None =>
-            System.err.println(s"[Mutual TCO] Optimization will be applied")
+            if (config.verbose) {
+              System.err.println(s"[Mutual TCO] Optimization will be applied")
+            }
             transformGroup(classDef, group)
         }
       }
@@ -196,7 +202,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Step 1: Check parameter compatibility
     val paramCounts = group.map(_.arguments.length).toSet
     if (paramCounts.size > 1) {
-      System.err.println(s"[Mutual TCO] ERROR: Methods have different parameter counts: $paramCounts")
+      if (config.verbose) {
+        System.err.println(s"[Mutual TCO] ERROR: Methods have different parameter counts: $paramCounts")
+      }
       return
     }
 
@@ -204,9 +212,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     // Check parameter types are compatible across all methods
     for (paramIdx <- 0 until paramCount) {
-      val paramTypes = group.map(_.arguments(paramIdx).name).toSet
-      if (paramTypes.size > 1) {
-        System.err.println(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypes")
+      val paramTypesSet = group.map(_.arguments(paramIdx).name).toSet
+      if (paramTypesSet.size > 1) {
+        if (config.verbose) {
+          System.err.println(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypesSet")
+        }
         return
       }
     }
@@ -216,9 +226,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
     val returnType = group.head.returnType
     val paramTypes = group.head.arguments
 
-    System.err.println(s"[Mutual TCO] Creating state machine method: $stateMachineMethodName")
-    System.err.println(s"[Mutual TCO]   Parameters: ${paramTypes.map(_.name).mkString(", ")}")
-    System.err.println(s"[Mutual TCO]   Return type: ${returnType.name}")
+    if (config.verbose) {
+      System.err.println(s"[Mutual TCO] Creating state machine method: $stateMachineMethodName")
+      System.err.println(s"[Mutual TCO]   Parameters: ${paramTypes.map(_.name).mkString(", ")}")
+      System.err.println(s"[Mutual TCO]   Return type: ${returnType.name}")
+    }
 
     // Step 3: Generate state machine method
     val stateMachineMethod = createStateMachineMethod(
@@ -232,7 +244,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     // Step 4: Add state machine method to class
     classDef.methods_.add(stateMachineMethod)
-    System.err.println(s"[Mutual TCO] Added state machine method to class")
+    if (config.verbose) {
+      System.err.println(s"[Mutual TCO] Added state machine method to class")
+    }
 
     // Step 5: Replace original method bodies with forwarders
     group.foreach { method =>
@@ -244,10 +258,14 @@ class MutualRecursionOptimization(config: CompilerConfig)
         paramCount
       )
       method.setBlock(forwarderBody)
-      System.err.println(s"[Mutual TCO] Replaced ${method.name} with forwarder (state $stateId)")
+      if (config.verbose) {
+        System.err.println(s"[Mutual TCO] Replaced ${method.name} with forwarder (state $stateId)")
+      }
     }
 
-    System.err.println(s"[Mutual TCO] State machine optimization complete")
+    if (config.verbose) {
+      System.err.println(s"[Mutual TCO] State machine optimization complete")
+    }
   }
 
   /**
@@ -292,7 +310,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
       annotations = scala.collection.immutable.Set.empty
     )
 
-    System.err.println(s"[Mutual TCO] Generated state machine method: $methodName")
+    if (config.verbose) {
+      System.err.println(s"[Mutual TCO] Generated state machine method: $methodName")
+    }
     stateMachineMethod
   }
 
@@ -400,14 +420,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Build if-else chain: if (state == 0) {...} else if (state == 1) {...} else {...}
     var currentElse: ActionStatement = createDefaultReturn(returnType)
 
-    System.err.println(s"[Mutual TCO]   Building if-else chain for ${group.size} states")
+    if (config.verbose) {
+      System.err.println(s"[Mutual TCO]   Building if-else chain for ${group.size} states")
+    }
 
     // Process methods in reverse order to build the chain from bottom up
     group.toSeq.reverse.foreach { method =>
       val stateId = stateIds(method)
       val stateIdValue = new IntValue(loc, stateId)
 
-      System.err.println(s"[Mutual TCO]   Processing state $stateId (${method.name})")
+      if (config.verbose) {
+        System.err.println(s"[Mutual TCO]   Processing state $stateId (${method.name})")
+      }
 
       // Condition: state_loop == stateId
       // Create a fresh RefLocal for each condition
@@ -429,14 +453,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
         paramCount
       )
 
-      System.err.println(s"[Mutual TCO]     Transformed body has ${transformedBody.statements.length} statements")
+      if (config.verbose) {
+        System.err.println(s"[Mutual TCO]     Transformed body has ${transformedBody.statements.length} statements")
+      }
 
       // Create if statement
       val ifStmt = new IfStatement(loc, condition, transformedBody, currentElse)
       currentElse = ifStmt
     }
 
-    System.err.println(s"[Mutual TCO]   If-else chain complete")
+    if (config.verbose) {
+      System.err.println(s"[Mutual TCO]   If-else chain complete")
+    }
     new StatementBlock(loc, currentElse)
   }
 

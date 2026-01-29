@@ -9,6 +9,8 @@ import onion.compiler.toolbox.Boxing
 import scala.collection.mutable.Buffer
 import scala.util.boundary, boundary.break
 
+import TypeNarrowingAnalysis.NarrowingInfo
+
 final class ControlExpressionTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
@@ -25,74 +27,12 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   // The typed term is created in the same scope where the pattern bindings are set up
   case class GuardInfo(guardAst: AST.Expression, guardTerm: Term = null)
 
-  // Smart cast: type narrowing information for if-expressions
-  case class NarrowingInfo(
-    positive: Map[String, Type],  // Narrowings for then-branch
-    negative: Map[String, Type]   // Narrowings for else-branch
-  )
-  object NarrowingInfo {
-    val empty: NarrowingInfo = NarrowingInfo(Map.empty, Map.empty)
-  }
-
   /**
    * Extracts type narrowing information from a condition expression.
-   * Used for smart casts in if-expressions.
-   * Package-private for use by StatementTyping.
+   * Delegates to TypeNarrowingAnalysis with the type resolver.
    */
-  private[typing] def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo = {
-    condition match {
-      // x is SomeType -> narrow x to SomeType in then-branch
-      case AST.IsInstance(_, AST.Id(_, name), typeRef) =>
-        val binding = context.lookup(name)
-        if (binding != null && !binding.isMutable) {
-          val targetType = mapFrom(typeRef)
-          if (targetType != null) {
-            return NarrowingInfo(Map(name -> targetType), Map.empty)
-          }
-        }
-        NarrowingInfo.empty
-
-      // x != null -> narrow x from T? to T in then-branch
-      case AST.NotEqual(_, AST.Id(_, name), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = true)
-      case AST.NotEqual(_, AST.NullLiteral(_), AST.Id(_, name)) =>
-        extractNullCheckNarrowing(name, context, positive = true)
-
-      // x == null -> narrow x from T? to T in else-branch
-      case AST.Equal(_, AST.Id(_, name), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = false)
-      case AST.Equal(_, AST.NullLiteral(_), AST.Id(_, name)) =>
-        extractNullCheckNarrowing(name, context, positive = false)
-
-      // cond1 && cond2 -> both narrowings apply in then-branch
-      case AST.LogicalAnd(_, left, right) =>
-        val leftNarrowing = extractNarrowing(left, context)
-        val rightNarrowing = extractNarrowing(right, context)
-        NarrowingInfo(leftNarrowing.positive ++ rightNarrowing.positive, Map.empty)
-
-      case _ => NarrowingInfo.empty
-    }
-  }
-
-  /**
-   * Helper for null-check narrowing extraction.
-   */
-  private def extractNullCheckNarrowing(name: String, context: LocalContext, positive: Boolean): NarrowingInfo = {
-    val binding = context.lookup(name)
-    if (binding != null && !binding.isMutable) {
-      binding.tp match {
-        case nullableType: NullableType =>
-          if (positive) {
-            NarrowingInfo(Map(name -> nullableType.innerType), Map.empty)
-          } else {
-            NarrowingInfo(Map.empty, Map(name -> nullableType.innerType))
-          }
-        case _ => NarrowingInfo.empty
-      }
-    } else {
-      NarrowingInfo.empty
-    }
-  }
+  private[typing] def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo =
+    TypeNarrowingAnalysis.extractNarrowing(condition, context, mapFrom)
 
   def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
     context.openScope {

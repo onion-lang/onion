@@ -12,6 +12,8 @@ import onion.compiler.toolbox.Boxing
 import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, HashMap, Map, Set => MutableSet, Stack}
 
+import TypeNarrowingAnalysis.NarrowingInfo
+
 final class TypingBodyPass(private val typing: Typing, private val unit: AST.CompilationUnit) {
   import typing.*
   private val methodCallTyping = new MethodCallTyping(typing, this)
@@ -27,7 +29,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     operatorTyping.createEquals(EQUAL, lhs, rhs)
 
   /** Extract smart cast narrowing info from a condition expression. */
-  def extractNarrowing(condition: AST.Expression, context: LocalContext): controlExpressionTyping.NarrowingInfo =
+  def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo =
     controlExpressionTyping.extractNarrowing(condition, context)
 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {

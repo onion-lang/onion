@@ -112,10 +112,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
     // 3. 型変数を含む場合の特別チェック
     // expectedがTypeVariableを含むAppliedClassTypeの場合、構造的にマッチすればOK
-    def containsTypeVariable(tp: Type): Boolean = tp match {
+    def containsTypeVariable(typeToCheck: Type): Boolean = typeToCheck match {
       case _: TypedAST.TypeVariableType => true
       case applied: TypedAST.AppliedClassType => applied.typeArguments.exists(containsTypeVariable)
-      case at: TypedAST.ArrayType => containsTypeVariable(at.base)
+      case arrayType: TypedAST.ArrayType => containsTypeVariable(arrayType.base)
       case _ => false
     }
 
@@ -132,7 +132,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         // expected側に型変数があるが、actualがAppliedClassTypeでない場合
         // rawクラスが一致すればOK
         actual match {
-          case ct: TypedAST.ClassType => ae.raw.name == ct.name
+          case classType: TypedAST.ClassType => ae.raw.name == classType.name
           case _ => false
         }
       case _ =>
@@ -170,7 +170,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     new AsInstanceOf(node.location, actual, expected)
   }
   def openClosure[A](context: LocalContext)(block: => A): A = {
-    val tmp = context.isClosure
+    val wasInClosure = context.isClosure
     val savedMethodContext = context.saveMethodContext()
     val collecting = context.hasReturnTypeCollector
     if (collecting) context.pushReturnTypeCollectionDepth()
@@ -179,7 +179,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       block
     }finally{
       if (collecting) context.popReturnTypeCollectionDepth()
-      context.setClosure(tmp)
+      context.setClosure(wasInClosure)
       context.restoreMethodContext(savedMethodContext)
     }
   }
@@ -338,10 +338,10 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       // Find the corresponding static method in the container class
       // Extension methods are stored as static methods with receiver as first parameter
       val staticMethods = definition_.methods(node.name)
-      val staticMethod = staticMethods.find { m =>
-        (m.modifier & AST.M_STATIC) != 0 &&
-        m.arguments.length == extMethod.arguments.length + 1 &&
-        m.arguments(0) == receiverType
+      val staticMethod = staticMethods.find { method =>
+        (method.modifier & AST.M_STATIC) != 0 &&
+        method.arguments.length == extMethod.arguments.length + 1 &&
+        method.arguments(0) == receiverType
       }.map(_.asInstanceOf[MethodDefinition]).orNull
 
       if (staticMethod == null) return
@@ -595,7 +595,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     val rightString = toStringCall(node.rhs, rightBoxed.get)
     // Unwrap NullableType to get the inner type for method lookup
     val leftStringType = leftString.`type` match {
-      case nt: TypedAST.NullableType => nt.innerType.asInstanceOf[ObjectType]
+      case nullableType: TypedAST.NullableType => nullableType.innerType.asInstanceOf[ObjectType]
       case other => other.asInstanceOf[ObjectType]
     }
     val concat = findMethod(node, leftStringType, "concat", Array[Term](rightString))
@@ -614,7 +614,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private def toStringCall(node: AST.Expression, term: Term): Term = {
     // Unwrap NullableType to get the inner type for method lookup
     val targetType = term.`type` match {
-      case nt: TypedAST.NullableType => nt.innerType.asInstanceOf[ObjectType]
+      case nullableType: TypedAST.NullableType => nullableType.innerType.asInstanceOf[ObjectType]
       case other => other.asInstanceOf[ObjectType]
     }
     val toStringMethod = findMethod(node, targetType, "toString")
@@ -623,17 +623,17 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
   private def numericBasicType(term: Term): Option[BasicType] = {
     if (term.isBasicType) {
-      val bt = term.`type`.asInstanceOf[BasicType]
-      if (isNumeric(bt)) Some(bt) else None
+      val basicType = term.`type`.asInstanceOf[BasicType]
+      if (isNumeric(basicType)) Some(basicType) else None
     } else {
       Boxing.unboxedType(table_, term.`type`).filter(isNumeric)
     }
   }
 
-  private def isNumeric(t: BasicType): Boolean =
-    (t eq BasicType.BYTE) || (t eq BasicType.SHORT) || (t eq BasicType.CHAR) ||
-      (t eq BasicType.INT) || (t eq BasicType.LONG) || (t eq BasicType.FLOAT) ||
-      (t eq BasicType.DOUBLE)
+  private def isNumeric(basicType: BasicType): Boolean =
+    (basicType eq BasicType.BYTE) || (basicType eq BasicType.SHORT) || (basicType eq BasicType.CHAR) ||
+      (basicType eq BasicType.INT) || (basicType eq BasicType.LONG) || (basicType eq BasicType.FLOAT) ||
+      (basicType eq BasicType.DOUBLE)
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = node match {
     case node: AST.Addition =>
@@ -723,14 +723,14 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node@AST.BooleanLiteral(loc, v) =>
       Some(new BoolValue(loc, v))
     case node@AST.ListLiteral(loc, elements) =>
-      val typedElements = elements.map { e => typed(e, context).getOrElse(null) }
+      val typedElements = elements.map { element => typed(element, context).getOrElse(null) }
       if (typedElements.exists(_ == null)) {
         None
       } else {
         // Box basic types for list element type calculation
-        val elementTypes = typedElements.map { t =>
-          t.`type` match {
-            case bt: BasicType => Boxing.boxedType(table_, bt)
+        val elementTypes = typedElements.map { typedElement =>
+          typedElement.`type` match {
+            case basicType: BasicType => Boxing.boxedType(table_, basicType)
             case other => other
           }
         }

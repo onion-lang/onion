@@ -66,9 +66,9 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
       // cond1 && cond2 -> both narrowings apply in then-branch
       case AST.LogicalAnd(_, left, right) =>
-        val l = extractNarrowing(left, context)
-        val r = extractNarrowing(right, context)
-        NarrowingInfo(l.positive ++ r.positive, Map.empty)
+        val leftNarrowing = extractNarrowing(left, context)
+        val rightNarrowing = extractNarrowing(right, context)
+        NarrowingInfo(leftNarrowing.positive ++ rightNarrowing.positive, Map.empty)
 
       case _ => NarrowingInfo.empty
     }
@@ -81,11 +81,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     val binding = context.lookup(name)
     if (binding != null && !binding.isMutable) {
       binding.tp match {
-        case nt: NullableType =>
+        case nullableType: NullableType =>
           if (positive) {
-            NarrowingInfo(Map(name -> nt.innerType), Map.empty)
+            NarrowingInfo(Map(name -> nullableType.innerType), Map.empty)
           } else {
-            NarrowingInfo(Map.empty, Map(name -> nt.innerType))
+            NarrowingInfo(Map.empty, Map(name -> nullableType.innerType))
           }
         case _ => NarrowingInfo.empty
       }
@@ -138,8 +138,8 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       val savedNarrowings = context.saveNarrowings()
 
       // Type the then-block with positive narrowings applied
-      narrowing.positive.foreach { case (name, tp) =>
-        context.addNarrowing(name, tp)
+      narrowing.positive.foreach { case (name, narrowedType) =>
+        context.addNarrowing(name, narrowedType)
       }
       val thenTermOpt = typeBlockExpression(node.thenBlock, context)
       context.restoreNarrowings(savedNarrowings)
@@ -152,8 +152,8 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         Some(statementTerm(new IfStatement(condition, thenStmt, null), BasicType.VOID, node.location))
       } else {
         // Type the else-block with negative narrowings applied
-        narrowing.negative.foreach { case (name, tp) =>
-          context.addNarrowing(name, tp)
+        narrowing.negative.foreach { case (name, narrowedType) =>
+          context.addNarrowing(name, narrowedType)
         }
         val elseTermOpt = typeBlockExpression(node.elseBlock, context)
         context.restoreNarrowings(savedNarrowings)
@@ -434,8 +434,8 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         case null =>
           report(NOT_A_RECORD_TYPE, node, name)
           break(None)
-        case cd: ClassDefinition =>
-          cd
+        case classDef: ClassDefinition =>
+          classDef
         case _ =>
           report(NOT_A_RECORD_TYPE, node, name)
           break(None)
@@ -550,18 +550,18 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
       case AST.ExpressionPattern(expr) =>
         val exprOpt = typed(expr, context)
-        val e = exprOpt.getOrElse(null)
-        if (e == null) break((null, NoBindings, false, None))
+        val typedExpr = exprOpt.getOrElse(null)
+        if (typedExpr == null) break((null, NoBindings, false, None))
 
-        if (!TypeRules.isAssignable(conditionType, e.`type`)) {
-          report(INCOMPATIBLE_TYPE, expr, conditionType, e.`type`)
+        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`)) {
+          report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }
 
         val normalizedExpr =
-          if (e.isBasicType && e.`type` != conditionType) new AsInstanceOf(e, conditionType)
-          else if (e.isReferenceType && e.`type` != rootClass) new AsInstanceOf(e, rootClass)
-          else e
+          if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
+          else if (typedExpr.isReferenceType && typedExpr.`type` != rootClass) new AsInstanceOf(typedExpr, rootClass)
+          else typedExpr
 
         if (normalizedExpr.isReferenceType) {
           body.createEqualsForRef(new RefLocal(bind), normalizedExpr)
@@ -569,12 +569,12 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
           new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), normalizedExpr)
         }
 
-      case tp @ AST.TypePattern(_, name, typeRef) =>
+      case typePattern @ AST.TypePattern(_, name, typeRef) =>
         val mappedType = mapFrom(typeRef)
         if (mappedType == null) break((null, NoBindings, false, None))
 
         if (!mappedType.isObjectType) {
-          report(INCOMPATIBLE_TYPE, tp, table_.rootClass, mappedType)
+          report(INCOMPATIBLE_TYPE, typePattern, table_.rootClass, mappedType)
           break((null, NoBindings, false, None))
         }
 
@@ -592,8 +592,8 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         bindingInfo = SingleBinding(name, conditionType)
         new BoolValue(loc, true)
 
-      case dp: AST.DestructuringPattern =>
-        processDestructuringPattern(dp, bind, context) match {
+      case destructuringPattern: AST.DestructuringPattern =>
+        processDestructuringPattern(destructuringPattern, bind, context) match {
           case Some((check, info)) =>
             bindingInfo = info
             check
@@ -838,7 +838,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   }
 
   private def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
-    case st: StatementTerm => st.statement
+    case stmtTerm: StatementTerm => stmtTerm.statement
     case _ => new ExpressionActionStatement(node.location, term)
   }
 
@@ -893,9 +893,9 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
    */
   private def isSubtypeMatch(matched: Type, sealedSubtype: ClassType): Boolean = {
     matched match {
-      case mt: ClassType =>
+      case matchedClassType: ClassType =>
         // Match by name (most common case) or check subtype relationship
-        mt.name == sealedSubtype.name || TypeRules.isSuperType(mt, sealedSubtype)
+        matchedClassType.name == sealedSubtype.name || TypeRules.isSuperType(matchedClassType, sealedSubtype)
       case _ => false
     }
   }

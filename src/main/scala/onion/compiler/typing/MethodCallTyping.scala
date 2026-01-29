@@ -78,20 +78,20 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
   /** Collects methods matching the filter from a type hierarchy into candidates set */
   private def collectMethodsMatching(
-    tp: ObjectType,
+    sourceType: ObjectType,
     name: String,
     candidates: JTreeSet[Method],
     filter: Method => Boolean
   ): Unit = {
-    def collect(t: ObjectType): Unit = {
-      if (t == null) return
-      t.methods(name).foreach { m =>
-        if (filter(m)) candidates.add(m)
+    def collect(currentType: ObjectType): Unit = {
+      if (currentType == null) return
+      currentType.methods(name).foreach { method =>
+        if (filter(method)) candidates.add(method)
       }
-      collect(t.superClass)
-      t.interfaces.foreach(collect)
+      collect(currentType.superClass)
+      currentType.interfaces.foreach(collect)
     }
-    collect(tp)
+    collect(sourceType)
   }
 
   /** Filter for instance (non-static) methods */
@@ -408,7 +408,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     // Get the FQCN for extension method lookup
     val receiverFqcn = targetType match {
-      case ct: ClassType => ct.name
+      case classType: ClassType => classType.name
       case _ => return reportMethodNotFound(node, targetType, name, params)
     }
 
@@ -468,15 +468,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   private def collectExtensionMethods(targetType: ObjectType, name: String): Seq[ExtensionMethodDefinition] = {
     val result = scala.collection.mutable.Buffer[ExtensionMethodDefinition]()
 
-    def collect(tp: ObjectType): Unit = {
-      if (tp == null) return
-      tp match {
-        case ct: ClassType =>
-          result ++= lookupExtensionMethods(ct.name).filter(_.name == name)
+    def collect(currentType: ObjectType): Unit = {
+      if (currentType == null) return
+      currentType match {
+        case classType: ClassType =>
+          result ++= lookupExtensionMethods(classType.name).filter(_.name == name)
         case _ =>
       }
-      collect(tp.superClass)
-      tp.interfaces.foreach(collect)
+      collect(currentType.superClass)
+      currentType.interfaces.foreach(collect)
     }
 
     collect(targetType)
@@ -599,8 +599,8 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(typing, node, method, nonClosureParams, classSubst, expected)
     // For closure arguments, preserve type variables so closure typing can infer return types
     // Use defaultToBound = false to keep type variables like U in Function1<String, Future<U>>
-    val preliminaryExpectedArgs = method.arguments.map { tp =>
-      TypeSubstitution.substituteType(tp, classSubst, preliminaryMethodSubst, defaultToBound = false)
+    val preliminaryExpectedArgs = method.arguments.map { argType =>
+      TypeSubstitution.substituteType(argType, classSubst, preliminaryMethodSubst, defaultToBound = false)
     }
 
     // Phase 4: Type the closures with preliminary expected types
@@ -1307,7 +1307,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     // Get the inner type if nullable
     val targetType = target.`type` match {
-      case nt: TypedAST.NullableType => nt.innerType
+      case nullableType: TypedAST.NullableType => nullableType.innerType
       case other => other
     }
 
@@ -1318,15 +1318,15 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     // Handle basic types by boxing
     val (finalTarget, finalTargetType) = targetType match {
-      case bt: BasicType =>
-        if (bt == BasicType.VOID) {
-          report(INCOMPATIBLE_TYPE, node.target, rootClass, bt)
+      case basicType: BasicType =>
+        if (basicType == BasicType.VOID) {
+          report(INCOMPATIBLE_TYPE, node.target, rootClass, basicType)
           return None
         }
         val boxed = Boxing.boxing(table_, target)
         (boxed, boxed.`type`.asInstanceOf[ObjectType])
-      case ot: ObjectType =>
-        (target, ot)
+      case objectType: ObjectType =>
+        (target, objectType)
       case _ =>
         report(INCOMPATIBLE_TYPE, node.target, rootClass, targetType)
         return None
@@ -1381,7 +1381,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
 
     // Get the inner type if nullable
     val targetType = target.`type` match {
-      case nt: TypedAST.NullableType => nt.innerType
+      case nullableType: TypedAST.NullableType => nullableType.innerType
       case other => other
     }
 
@@ -1430,7 +1430,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
       case Some(method) =>
         // Unwrap NullableType for class substitution
         val actualTargetType = target.`type` match {
-          case nt: TypedAST.NullableType => nt.innerType
+          case nullableType: TypedAST.NullableType => nullableType.innerType
           case other => other
         }
         val classSubst = TypeSubstitution.classSubstitution(actualTargetType)

@@ -18,11 +18,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   import typing.*
   private val methodCallTyping = new MethodCallTyping(typing, this)
   private val assignmentTyping = new AssignmentTyping(typing, this)
-  private val operatorTyping = new OperatorTyping(typing, this)
+  private[typing] val operatorTyping = new OperatorTyping(typing, this)
   private val expressionFormTyping = new ExpressionFormTyping(typing, this)
   private val closureTyping = new ClosureTyping(typing, this)
   private val statementTyping = new StatementTyping(typing, this)
   private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, this)
+  private val additionTyping = new AdditionTyping(typing, this)
   def run(): Unit = runUnit()
 
   def createEqualsForRef(lhs: Term, rhs: Term): Term =
@@ -571,71 +572,9 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     expressionFormTyping.typeIsInstance(node, context)
 
-  private def typeAddition(node: AST.Addition, context: LocalContext): Option[Term] = {
-    val left = typed(node.lhs, context).getOrElse(null)
-    val right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return None
-
-    tryNumericAddition(node, left, right).orElse(typeStringConcatenation(node, left, right))
-  }
-
-  private def tryNumericAddition(node: AST.Addition, left: Term, right: Term): Option[Term] =
-    (numericBasicType(left), numericBasicType(right)) match {
-      case (Some(lbt), Some(rbt)) =>
-        val leftTerm = if (left.isBasicType) left else Boxing.unboxing(table_, left, lbt)
-        val rightTerm = if (right.isBasicType) right else Boxing.unboxing(table_, right, rbt)
-        Some(processNumericExpression(ADD, node, leftTerm, rightTerm))
-      case _ => None
-    }
-
-  private def typeStringConcatenation(node: AST.Addition, left: Term, right: Term): Option[Term] = {
-    val leftBoxed = boxForConcat(node.lhs, left)
-    val rightBoxed = boxForConcat(node.rhs, right)
-    if (leftBoxed.isEmpty || rightBoxed.isEmpty) return None
-
-    val leftString = toStringCall(node.lhs, leftBoxed.get)
-    val rightString = toStringCall(node.rhs, rightBoxed.get)
-    // Unwrap NullableType to get the inner type for method lookup
-    val leftStringType = leftString.`type` match {
-      case nullableType: TypedAST.NullableType => nullableType.innerType.asInstanceOf[ObjectType]
-      case other => other.asInstanceOf[ObjectType]
-    }
-    val concat = findMethod(node, leftStringType, "concat", Array[Term](rightString))
-    Some(new Call(leftString, concat, Array[Term](rightString)))
-  }
-
-  private def boxForConcat(node: AST.Expression, term: Term): Option[Term] =
-    if (!term.isBasicType) Some(term)
-    else if (term.`type` == BasicType.VOID) {
-      report(IS_NOT_BOXABLE_TYPE, node, term.`type`)
-      None
-    } else {
-      Some(Boxing.boxing(table_, term))
-    }
-
-  private def toStringCall(node: AST.Expression, term: Term): Term = {
-    // Unwrap NullableType to get the inner type for method lookup
-    val targetType = term.`type` match {
-      case nullableType: TypedAST.NullableType => nullableType.innerType.asInstanceOf[ObjectType]
-      case other => other.asInstanceOf[ObjectType]
-    }
-    val toStringMethod = findMethod(node, targetType, "toString")
-    new Call(term, toStringMethod, Array.empty)
-  }
-
-  private def numericBasicType(term: Term): Option[BasicType] = {
-    if (term.isBasicType) {
-      val basicType = term.`type`.asInstanceOf[BasicType]
-      if (isNumeric(basicType)) Some(basicType) else None
-    } else {
-      Boxing.unboxedType(table_, term.`type`).filter(isNumeric)
-    }
-  }
-
-  private def isNumeric(basicType: BasicType): Boolean =
-    (basicType eq BasicType.BYTE) || (basicType eq BasicType.SHORT) || (basicType eq BasicType.CHAR) ||
-      (basicType eq BasicType.INT) || (basicType eq BasicType.LONG) || (basicType eq BasicType.FLOAT) ||
-      (basicType eq BasicType.DOUBLE)
+  /** Delegate addition type-checking to AdditionTyping */
+  private def typeAddition(node: AST.Addition, context: LocalContext): Option[Term] =
+    additionTyping.typeAddition(node, context)
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = node match {
     case node: AST.Addition =>

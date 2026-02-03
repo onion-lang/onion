@@ -14,19 +14,6 @@ import TypeNarrowingAnalysis.NarrowingInfo
 final class ControlExpressionTyping(private val typing: Typing, private val body: TypingBodyPass) {
   import typing.*
 
-  // Pattern binding info for different pattern types
-  sealed trait PatternBindingInfo
-  case object NoBindings extends PatternBindingInfo
-  case class SingleBinding(name: String, tp: Type) extends PatternBindingInfo
-  // For nested patterns, we store the access path from root to each binding
-  case class AccessStep(castType: ClassType, getter: Method)
-  case class BindingEntry(name: String, tp: Type, accessPath: List[AccessStep])
-  case class MultiBindings(rootType: ClassType, bindings: List[BindingEntry], nestedConditions: List[Term] = Nil) extends PatternBindingInfo
-
-  // Guard info - stores both AST (for validation) and typed term (for code generation)
-  // The typed term is created in the same scope where the pattern bindings are set up
-  case class GuardInfo(guardAst: AST.Expression, guardTerm: Term = null)
-
   /**
    * Extracts type narrowing information from a condition expression.
    * Delegates to TypeNarrowingAnalysis with the type resolver.

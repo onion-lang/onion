@@ -115,12 +115,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
     // 3. 型変数を含む場合の特別チェック
     // expectedがTypeVariableを含むAppliedClassTypeの場合、構造的にマッチすればOK
-    def containsTypeVariable(typeToCheck: Type): Boolean = typeToCheck match {
-      case _: TypedAST.TypeVariableType => true
-      case applied: TypedAST.AppliedClassType => applied.typeArguments.exists(containsTypeVariable)
-      case arrayType: TypedAST.ArrayType => containsTypeVariable(arrayType.base)
-      case _ => false
-    }
+    def containsTypeVariable(typeToCheck: Type): Boolean =
+      TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
     def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
       case (tv: TypedAST.TypeVariableType, _) =>

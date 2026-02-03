@@ -212,10 +212,8 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
     true
   }
 
-  private def sameTypes(left: Array[Type], right: Array[Type]): Boolean = {
-    if (left.length != right.length) return false
-    (for (i <- 0 until left.length) yield (left(i), right(i))).forall { case (l, r) => l eq r }
-  }
+  private def sameTypes(left: Array[Type], right: Array[Type]): Boolean =
+    TypeCheckingHelpers.sameTypes(left, right)
 
   private def inferFunctionType(
     rawType: ClassType,
@@ -300,23 +298,9 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
     }
   }
 
-  private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type = {
-    if (left == null || right == null) return null
-    if (left.isBottomType) return right
-    if (right.isBottomType) return left
-    if (left eq right) return left
-    if (left.isNullType && right.isNullType) return left
-    if ((left eq BasicType.VOID) || (right eq BasicType.VOID)) {
-      if ((left eq BasicType.VOID) && (right eq BasicType.VOID)) return BasicType.VOID
-      report(INCOMPATIBLE_TYPE, node, left, right)
-      return null
-    }
-    if (TypeRules.isSuperType(left, right)) return left
-    if (TypeRules.isSuperType(right, left)) return right
-    if (!left.isBasicType && !right.isBasicType) return rootClass
-    report(INCOMPATIBLE_TYPE, node, left, right)
-    null
-  }
+  private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type =
+    TypeCheckingHelpers.leastUpperBound(node, left, right, rootClass,
+      (n, l, r) => report(INCOMPATIBLE_TYPE, n, l, r))
 
   private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
     val terms = bodyTerm match {
@@ -369,14 +353,8 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
     body.defaultValue(tp)
 
   /** Recursively check if a type contains any type variables */
-  private def containsTypeVariable(typ: Type): Boolean = typ match {
-    case _: TypeVariableType => true
-    case applied: AppliedClassType =>
-      applied.typeArguments.exists(containsTypeVariable)
-    case array: ArrayType =>
-      containsTypeVariable(array.component)
-    case _ => false
-  }
+  private def containsTypeVariable(typ: Type): Boolean =
+    TypeCheckingHelpers.containsTypeVariable(typ)
 
   private def containsReturn(node: AST.Node): Boolean = {
     var found = false

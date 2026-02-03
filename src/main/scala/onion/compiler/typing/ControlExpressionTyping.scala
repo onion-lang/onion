@@ -681,23 +681,9 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   private def statementTerm(statement: ActionStatement, termType: Type, location: Location): Term =
     new StatementTerm(location, statement, termType)
 
-  private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type = {
-    if (left == null || right == null) return null
-    if (left.isBottomType) return right
-    if (right.isBottomType) return left
-    if (left eq right) return left
-    if (left.isNullType && right.isNullType) return left
-    if ((left eq BasicType.VOID) || (right eq BasicType.VOID)) {
-      if ((left eq BasicType.VOID) && (right eq BasicType.VOID)) return BasicType.VOID
-      report(INCOMPATIBLE_TYPE, node, left, right)
-      return null
-    }
-    if (TypeRules.isSuperType(left, right)) return left
-    if (TypeRules.isSuperType(right, left)) return right
-    if (!left.isBasicType && !right.isBasicType) return rootClass
-    report(INCOMPATIBLE_TYPE, node, left, right)
-    null
-  }
+  private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type =
+    TypeCheckingHelpers.leastUpperBound(node, left, right, rootClass,
+      (n, l, r) => report(INCOMPATIBLE_TYPE, n, l, r))
 
   private def foldLub(node: AST.Node, types: Seq[Type]): Option[Type] = boundary {
     types.reduceOption { (acc, t) =>

@@ -44,7 +44,7 @@ object OnionTypeConversion {
 class OnionTypeConversion(table: ClassTable) {
   import OnionTypeConversion._
 
-  def toOnionType(klass: Class[_]): TypedAST.Type = {
+  def toOnionType(klass: Class[?]): TypedAST.Type = {
     val returnType: TypedAST.Type = c2t.get(klass).asInstanceOf[TypedAST.Type]
     if (returnType != null) return returnType
     if (!klass.isArray) {
@@ -58,7 +58,7 @@ class OnionTypeConversion(table: ClassTable) {
     }
     if (klass.isArray) {
       @tailrec
-      def extractArrayInfo(cls: Class[_], dim: Int): (Class[_], Int) =
+      def extractArrayInfo(cls: Class[?], dim: Int): (Class[?], Int) =
         if (cls.isArray) extractArrayInfo(cls.getComponentType, dim + 1)
         else (cls, dim)
 

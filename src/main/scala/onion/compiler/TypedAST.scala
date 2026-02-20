@@ -124,7 +124,7 @@ object TypedAST {
       this(null, terms)
     }
 
-    def this(expressions: List[_]) = {
+    def this(expressions: List[?]) = {
       this(expressions.toArray(new Array[TypedAST.Term](0)).asInstanceOf[Array[TypedAST.Term]])
     }
 

@@ -78,7 +78,7 @@ object ReflectionRefs {
         val args = p.getActualTypeArguments.map(a => toOnionType(a, env))
         if (raw == null || args.contains(null)) null
         else TypedAST.AppliedClassType(raw, args.toList)
-      case v: TypeVariable[_] =>
+      case v: TypeVariable[?] =>
         env.getOrElse(
           v.getName,
           new TypedAST.TypeVariableType(v.getName, erasedUpperBound(v.getBounds, env))

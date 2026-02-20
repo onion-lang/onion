@@ -24,5 +24,5 @@ class OnionClassLoader @throws(classOf[MalformedURLException]) (parent: ClassLoa
   }
 
   @throws(classOf[ClassNotFoundException])
-  protected override def findClass(name: String): Class[_] = super.findClass(name)
+  protected override def findClass(name: String): Class[?] = super.findClass(name)
 }

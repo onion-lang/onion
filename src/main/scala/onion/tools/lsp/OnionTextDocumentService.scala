@@ -221,7 +221,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     }
   }
 
-  override def definition(params: DefinitionParams): CompletableFuture[LspEither[java.util.List[_ <: org.eclipse.lsp4j.Location], java.util.List[_ <: LocationLink]]] = {
+  override def definition(params: DefinitionParams): CompletableFuture[LspEither[java.util.List[? <: org.eclipse.lsp4j.Location], java.util.List[? <: LocationLink]]] = {
     CompletableFuture.supplyAsync { () =>
       val uri = params.getTextDocument.getUri
       val position = params.getPosition

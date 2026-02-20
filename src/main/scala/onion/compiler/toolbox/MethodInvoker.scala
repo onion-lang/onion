@@ -30,7 +30,7 @@ object MethodInvoker {
     }
   }
 
-  def callStatic(target: Class[_], name: String, args: Array[AnyRef]): AnyRef = {
+  def callStatic(target: Class[?], name: String, args: Array[AnyRef]): AnyRef = {
     try {
       getMethod(target, name, args).invoke(null, args)
     }
@@ -46,7 +46,7 @@ object MethodInvoker {
     }
   }
 
-  private def getMethod(target: Class[_], name: String, args: Array[AnyRef]): Method = {
+  private def getMethod(target: Class[?], name: String, args: Array[AnyRef]): Method = {
     val argsClasses = args.map {_.getClass()}
     target.getMethod(name, argsClasses:_*)
   }

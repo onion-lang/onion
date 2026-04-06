@@ -9,6 +9,7 @@ package onion.compiler
 
 import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.exceptions.CompilationException
+import onion.compiler.pipeline.{CompileProfileReporter, CompilerPipeline}
 import scala.util.control.NonFatal
 
 /**
@@ -29,74 +30,17 @@ class OnionCompiler(val config: CompilerConfig) {
   }
 
   def compile(srcs: Seq[InputSource]): CompilationOutcome = {
-    if (config.verbose) {
-      compileVerbose(srcs)
-    } else {
-      compileNormal(srcs)
-    }
-  }
-
-  private def compileNormal(srcs: Seq[InputSource]): CompilationOutcome = {
     try {
-      val parsing = new Parsing(config)
-      val rewriting = new Rewriting(config)
-      val typing = new Typing(config)
-      val tailCallOpt = new optimization.TailCallOptimization(config)
-      val mutualRecOpt = new optimization.MutualRecursionOptimization(config)
-      val generating = new TypedGenerating(config)
-
-      val parsed = parsing.process(srcs)
-      if (config.dumpAst) DiagnosticsPrinter.dumpAst(parsed)
-      val rewritten = rewriting.process(parsed)
-      val typed = typing.process(rewritten)
-      if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
-      val optimized1 = tailCallOpt.process(typed)
-      val optimized2 = mutualRecOpt.process(optimized1)
-      val generated = generating.process(optimized2)
-
-      Success(generated)
-    } catch {
-      case e: CompilationException =>
-        Failure(e.problems.toIndexedSeq)
-      case NonFatal(e) =>
-        Failure(Seq(internalError(e)))
-    }
-  }
-
-  private def compileVerbose(srcs: Seq[InputSource]): CompilationOutcome = {
-    import java.lang.System.{currentTimeMillis => now}
-
-    def timed[A](phaseName: String)(block: => A): A = {
-      val start = now()
-      val result = block
-      val elapsed = now() - start
-      System.err.println(f"[verbose] $phaseName: ${elapsed}ms")
-      result
-    }
-
-    try {
-      val totalStart = now()
-
-      val parsing = new Parsing(config)
-      val rewriting = new Rewriting(config)
-      val typing = new Typing(config)
-      val tailCallOpt = new optimization.TailCallOptimization(config)
-      val mutualRecOpt = new optimization.MutualRecursionOptimization(config)
-      val generating = new TypedGenerating(config)
-
-      val parsed = timed("Parsing")(parsing.process(srcs))
-      if (config.dumpAst) DiagnosticsPrinter.dumpAst(parsed)
-      val rewritten = timed("Rewriting")(rewriting.process(parsed))
-      val typed = timed("Typing")(typing.process(rewritten))
-      if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
-      val optimized1 = timed("TailCallOpt")(tailCallOpt.process(typed))
-      val optimized2 = timed("MutualRecOpt")(mutualRecOpt.process(optimized1))
-      val generated = timed("CodeGen")(generating.process(optimized2))
-
-      val totalElapsed = now() - totalStart
-      System.err.println(f"[verbose] Total: ${totalElapsed}ms (${srcs.size} source files)")
-
-      Success(generated)
+      val result = new CompilerPipeline(config).run(srcs)
+      result.profile.foreach { profile =>
+        if (config.verbose) {
+          System.err.println(CompileProfileReporter.renderVerbose(profile))
+        }
+        if (config.compileProfile.enabled) {
+          CompileProfileReporter.report(profile, config.compileProfile)
+        }
+      }
+      Success(result.classes)
     } catch {
       case e: CompilationException =>
         Failure(e.problems.toIndexedSeq)

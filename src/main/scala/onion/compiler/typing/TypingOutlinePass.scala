@@ -528,7 +528,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
 
       // Validate target type can be resolved
       openTypeParams(emptyTypeParams ++ aliasTypeParams) {
-        val mapper = new NameMapper(entry.imports)
+        val mapper = new NameMapper(typing, entry.imports)
         val targetType = mapper.map(node.targetType.desc)
         if (targetType == null) {
           report(SemanticError.CLASS_NOT_FOUND, node.targetType, node.targetType.desc.toString, mapper.getCandidateClassNames)

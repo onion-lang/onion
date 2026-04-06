@@ -29,11 +29,14 @@ echo "Building onion.jar..."
 cd "$SCRIPT_DIR"
 sbt assembly
 
-JAR_PATH="$SCRIPT_DIR/target/scala-3.3.7/onion.jar"
-if [ ! -f "$JAR_PATH" ]; then
-    # Try alternative scala version paths
-    JAR_PATH=$(find "$SCRIPT_DIR/target" -name "onion.jar" 2>/dev/null | head -1)
-fi
+JAR_PATH=$(
+  find "$SCRIPT_DIR/target" \
+    \( -path "*/scala-*/onion.jar" -o -path "*/scala_*/onion.jar" \) \
+    -not -path "*/dist/*" \
+    2>/dev/null \
+    | sort \
+    | head -1
+)
 
 if [ ! -f "$JAR_PATH" ]; then
     echo "Error: onion.jar not found after build"
@@ -53,32 +56,50 @@ cp "$JAR_PATH" "$LIB_DIR/onion.jar"
 echo "  $LIB_DIR/onion.jar"
 
 # Create onion script (script runner)
-cat > "$BIN_DIR/onion" << 'SCRIPT'
+cat > "$BIN_DIR/onion" << SCRIPT
 #!/bin/sh
-ONION_JAR="$HOME/.local/lib/onion/onion.jar"
+ONION_JAR="$LIB_DIR/onion.jar"
 if [ -z "$JAVA_HOME" ]; then
     JAVA_CMD="java"
 else
     JAVA_CMD="$JAVA_HOME/bin/java"
 fi
-exec "$JAVA_CMD" -cp "$ONION_JAR" onion.tools.ScriptRunner "$@"
+if [ "\$1" = "repl" ]; then
+    shift
+    exec "\$JAVA_CMD" -cp "\$ONION_JAR" onion.tools.Repl "\$@"
+fi
+exec "\$JAVA_CMD" -cp "\$ONION_JAR" onion.tools.ScriptRunner "\$@"
 SCRIPT
 chmod +x "$BIN_DIR/onion"
 echo "  $BIN_DIR/onion"
 
 # Create onionc script (compiler)
-cat > "$BIN_DIR/onionc" << 'SCRIPT'
+cat > "$BIN_DIR/onionc" << SCRIPT
 #!/bin/sh
-ONION_JAR="$HOME/.local/lib/onion/onion.jar"
+ONION_JAR="$LIB_DIR/onion.jar"
 if [ -z "$JAVA_HOME" ]; then
     JAVA_CMD="java"
 else
     JAVA_CMD="$JAVA_HOME/bin/java"
 fi
-exec "$JAVA_CMD" -cp "$ONION_JAR" onion.tools.CompilerFrontend "$@"
+exec "\$JAVA_CMD" -cp "\$ONION_JAR" onion.tools.CompilerFrontend "\$@"
 SCRIPT
 chmod +x "$BIN_DIR/onionc"
 echo "  $BIN_DIR/onionc"
+
+# Create onion-repl script
+cat > "$BIN_DIR/onion-repl" << SCRIPT
+#!/bin/sh
+ONION_JAR="$LIB_DIR/onion.jar"
+if [ -z "\$JAVA_HOME" ]; then
+    JAVA_CMD="java"
+else
+    JAVA_CMD="\$JAVA_HOME/bin/java"
+fi
+exec "\$JAVA_CMD" -cp "\$ONION_JAR" onion.tools.Repl "\$@"
+SCRIPT
+chmod +x "$BIN_DIR/onion-repl"
+echo "  $BIN_DIR/onion-repl"
 
 echo ""
 echo "=== Installation Complete ==="
@@ -94,5 +115,7 @@ fi
 
 echo "Usage:"
 echo "  onion script.on      # Run a script"
+echo "  onion repl           # Start the REPL"
+echo "  onion-repl           # Start the REPL"
 echo "  onionc -d out src/   # Compile to .class files"
 echo ""

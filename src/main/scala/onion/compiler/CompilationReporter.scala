@@ -20,9 +20,12 @@ object CompilationReporter {
 
   def printErrors(errors: Seq[CompileError], out: PrintStream = Console.err): Unit = {
     if (errors.isEmpty) return
-    errors.map(formatError).foreach(out.println)
+    formatErrors(errors).foreach(out.println)
     out.println(Message("error.count", errors.size))
   }
+
+  def formatErrors(errors: Seq[CompileError]): Seq[String] =
+    errors.map(formatError)
 
   private def formatError(error: CompileError): String = {
     val locationOpt = Option(error.location)

@@ -60,7 +60,7 @@ Output:
 ### Compiler Pipeline
 
 ```
-Parsing → Rewriting → Typing → [TailCallOptimization] → CodeGeneration
+Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → TypedAstCodeGeneration
 ```
 
 ## Future Work

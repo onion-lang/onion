@@ -11,14 +11,18 @@ Source Code (.on files)
     ↓
 [2] Rewriting → Normalized Untyped AST
     ↓
-[3] Type Checking → Typed AST
+[3] Typing → Typed AST
     ↓
-[4] Code Generation (ASM) → JVM Bytecode (.class files)
+[4] TailCallOptimization → Typed AST
+    ↓
+[5] MutualRecursionOptimization → Typed AST
+    ↓
+[6] TypedAstCodeGeneration (ASM) → JVM Bytecode (.class files)
 ```
 
 ## Implementation
 
-- **Language**: Scala 3.6.2
+- **Language**: Scala 3.3.7
 - **Parser Generator**: JavaCC 5.0
 - **Bytecode Library**: ASM 9.8
 - **Build Tool**: SBT
@@ -66,9 +70,9 @@ Transform and normalize the untyped AST:
 - Expand syntactic sugar
 - Normalize operator precedence
 
-## Phase 3: Type Checking
+## Phase 3: Typing
 
-**File**: `src/main/scala/onion/compiler/Typing.scala` (86KB - largest component)
+**Facade**: `src/main/scala/onion/compiler/Typing.scala`
 
 ### Responsibilities
 
@@ -76,6 +80,22 @@ Transform and normalize the untyped AST:
 2. **Type Validation**: Ensure type compatibility
 3. **Name Resolution**: Resolve variable and method names
 4. **Symbol Tables**: Build and maintain symbol information
+
+### Internal Structure
+
+`Typing.scala` is the orchestration layer for four passes:
+
+1. `TypingHeaderPass` - register classes, imports, and top-level containers
+2. `TypingOutlinePass` - resolve members, super types, and alias outlines
+3. `TypingBodyPass` - type-check executable bodies and expressions
+4. `TypingDuplicationPass` - validate duplicate members and erased signatures
+
+Supporting helpers live in `src/main/scala/onion/compiler/typing/`, including:
+
+- `NameResolution.scala` - type parameters, type aliases, and imported name resolution
+- `MethodResolution.scala` - overload and generic method selection
+- `TypeSubstitution.scala` and `GenericMethodTypeArguments.scala` - generic specialization
+- `ControlExpressionTyping.scala`, `StatementTyping.scala`, `MethodCallTyping.scala` - body-level typing helpers
 
 ### Supporting Components
 
@@ -111,9 +131,22 @@ Typed AST defined in `src/main/scala/onion/compiler/TypedAST.scala`:
 - Names are resolved to symbols
 - Ready for code generation
 
-## Phase 4: Code Generation
+## Phase 4: Tail Call Optimization
 
-**File**: `src/main/scala/onion/compiler/AsmCodeGeneration.scala` (42KB)
+**File**: `src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`
+
+This phase rewrites self-tail-recursive private methods into explicit loops in the typed AST.
+
+## Phase 5: Mutual Recursion Optimization
+
+**File**: `src/main/scala/onion/compiler/optimization/MutualRecursionOptimization.scala`
+
+This phase lowers `@TailRecursive` mutually recursive groups into state-machine style methods.
+
+## Phase 6: Code Generation
+
+**Primary boundary**: `src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`  
+**ASM backend**: `src/main/scala/onion/compiler/AsmCodeGeneration.scala`
 
 ### ASM Library
 
@@ -132,17 +165,7 @@ Uses the ASM library for bytecode generation:
 **Visitor Pattern**:
 - `AsmCodeGenerationVisitor.scala` - AST traversal for code generation
 
-### Process
-
-1. Create `ClassWriter` for each class
-2. Generate class metadata (name, superclass, interfaces)
-3. Generate fields from member variables
-4. Generate methods:
-   - Create `MethodVisitor`
-   - Emit bytecode instructions
-   - Manage local variables and stack
-5. Generate constructors
-6. Finalize class bytecode
+The main pipeline now targets `TypedAstCodeGeneration` directly. `TypedGenerating.scala` remains only as a thin legacy compatibility adapter and is no longer the primary codegen entry point.
 
 ### Output
 
@@ -153,31 +176,27 @@ Uses the ASM library for bytecode generation:
 
 ## Compiler Orchestration
 
-**File**: `src/main/scala/onion/compiler/OnionCompiler.scala`
+**Facade**: `src/main/scala/onion/compiler/OnionCompiler.scala`  
+**Pipeline**: `src/main/scala/onion/compiler/pipeline/CompilerPipeline.scala`
 
-### Processor Pipeline
+`OnionCompiler` is intentionally thin: it delegates phase execution to `CompilerPipeline`, handles exception mapping, and emits profiling output when enabled.
 
-All phases implement `Processor[A, B]` trait:
+### Profiling
 
-```scala
-trait Processor[A, B] {
-  def process(input: A): B
+Compile profiling is controlled by:
 
-  def andThen[C](next: Processor[B, C]): Processor[A, C]
-}
-```
+- `--verbose` for human-readable phase timing
+- `--profile-compile` to emit a structured profile
+- `--profile-format text|json`
+- `--profile-output stderr|stdout|<path>`
 
-### Composition
+The profile includes:
 
-Phases are composed using `andThen`:
-
-```scala
-val compiler =
-  Parsing
-    .andThen(Rewriting)
-    .andThen(Typing)
-    .andThen(AsmCodeGeneration)
-```
+- total wall-clock time
+- per-phase wall-clock time
+- source count
+- classpath entry count
+- generated class count
 
 ### Compilation Result
 
@@ -205,14 +224,11 @@ Command-line interface for `onion`:
 - Loads classes with custom classloader
 - Executes main method or top-level code
 
-### Shell
+### REPL
 
-**File**: `src/main/scala/onion/tools/Shell.scala`
+**File**: `src/main/scala/onion/tools/Repl.scala`
 
-Interactive REPL:
-- Reads expressions
-- Compiles incrementally
-- Evaluates and prints results
+The promoted REPL entry points are `sbt repl`, `onion repl`, and `onion-repl`.
 
 ## Class Loading
 
@@ -277,8 +293,10 @@ Type resolution:
 **File**: `build.sbt`
 
 - Version: 0.2.0-SNAPSHOT
-- Scala version: 3.6.2
+- Scala version: 3.3.7
 - Main class: `onion.tools.CompilerFrontend`
+- REPL task: `sbt repl`
+- Benchmark task: `sbt bench`
 
 ### Parser Generation
 

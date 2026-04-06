@@ -7,7 +7,6 @@ import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.TypedAST.UnaryTerm.Kind as UnaryKind
 import onion.compiler.TypedAST.UnaryTerm.Kind.*
-import onion.compiler.toolbox.Boxing
 
 import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, HashMap, Map, Set => MutableSet, Stack}
@@ -24,6 +23,37 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private val statementTyping = new StatementTyping(typing, this)
   private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, this)
   private val additionTyping = new AdditionTyping(typing, this)
+  private val methodLookupSupport = new MethodLookupSupport(typing)
+  private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable)
+  private val methodBodySupport = new MethodBodySupport(typing, typed(_, _, _), typedTerms, translate, addReturnNode)
+  private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
+  private val assignabilitySupport = new AssignabilitySupport(typing)
+  private val expressionDispatchSupport = new ExpressionDispatchSupport(this)
+  private val patternMatchSupport = new PatternMatchSupport(typing, (node, context) => typed(node, context), createEqualsForRef)
+  private val simpleExpressionTypingSupport = new SimpleExpressionTypingSupport(
+    typing,
+    typed(_, _, _),
+    typeMemberSelection(_, _),
+    typeAssignment(_, _)
+  )
+  private val declarationBodySupport = new DeclarationBodySupport(
+    typing,
+    classInitializerSupport,
+    methodBodySupport,
+    processMethodDeclaration,
+    processConstructorDeclaration
+  )
+  private val topLevelTypingSupport = new TopLevelTypingSupport(
+    typing,
+    entryPointSupport,
+    translate,
+    processClassDeclaration,
+    processInterfaceDeclaration,
+    processEnumDeclaration,
+    processExtensionDeclaration,
+    processFunctionDeclaration,
+    processGlobalVariableDeclaration
+  )
   def run(): Unit = runUnit()
 
   def createEqualsForRef(lhs: Term, rhs: Term): Term =
@@ -33,141 +63,11 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo =
     controlExpressionTyping.extractNarrowing(condition, context)
 
-  def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
-    val expressions = new Array[Term](nodes.length)
-    var error = false
-    var i = 0
-    while (i < nodes.length) {
-      val expression = typed(nodes(i), context).getOrElse(null)
-      expressions(i) = expression
-      if (expression == null) {
-        error = true
-      } else if (!TypeRules.isAssignable(typeRef, expression.`type`)) {
-        report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expression.`type`)
-        error = true
-      } else {
-        expressions(i) = normalizePatternTerm(expression, typeRef)
-      }
-      i += 1
-    }
-    if (error) null else buildEqualsChain(expressions, bind)
-  }
+  def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term =
+    patternMatchSupport.processNodes(nodes, typeRef, bind, context)
 
-  private def normalizePatternTerm(term: Term, expected: Type): Term = {
-    var normalized = term
-    if (normalized.isBasicType && normalized.`type` != expected) {
-      normalized = new AsInstanceOf(normalized, expected)
-    }
-    if (normalized.isReferenceType && normalized.`type` != rootClass) {
-      normalized = new AsInstanceOf(normalized, rootClass)
-    }
-    normalized
-  }
-
-  private def buildEqualsChain(expressions: Array[Term], bind: ClosureLocalBinding): Term = {
-    val ref = new RefLocal(bind)
-    var node: Term =
-      if (expressions(0).isReferenceType) operatorTyping.createEquals(EQUAL, ref, expressions(0))
-      else new BinaryTerm(EQUAL, BasicType.BOOLEAN, ref, expressions(0))
-    var i = 1
-    while (i < expressions.length) {
-      node = new BinaryTerm(
-        LOGICAL_OR,
-        BasicType.BOOLEAN,
-        node,
-        new BinaryTerm(EQUAL, BasicType.BOOLEAN, ref, expressions(i))
-      )
-      i += 1
-    }
-    node
-  }
-
-  def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
-    if (actual == null) return null
-    if (actual.`type`.isBottomType) return actual
-    if (expected == actual.`type`) return actual
-
-    // 1. プリミティブ型 → 参照型: オートボクシング
-    if (!expected.isBasicType && actual.`type`.isBasicType) {
-      val basicType = actual.`type`.asInstanceOf[BasicType]
-      if (basicType == BasicType.VOID) {
-        report(IS_NOT_BOXABLE_TYPE, node, basicType)
-        return null
-      }
-      val boxed = Boxing.boxing(table_, actual)
-      if (TypeRules.isAssignable(expected, boxed.`type`)) {
-        return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
-      }
-    }
-
-    // 2. 参照型 → プリミティブ型: オートアンボクシング
-    if (expected.isBasicType && !actual.`type`.isBasicType) {
-      val targetBasicType = expected.asInstanceOf[BasicType]
-      if (targetBasicType == BasicType.VOID) {
-        report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
-        return null
-      }
-      val boxedType = Boxing.boxedType(table_, targetBasicType)
-      if (TypeRules.isAssignable(boxedType, actual.`type`)) {
-        return Boxing.unboxing(table_, actual, targetBasicType)
-      }
-    }
-
-    // 3. 型変数を含む場合の特別チェック
-    // expectedがTypeVariableを含むAppliedClassTypeの場合、構造的にマッチすればOK
-    def containsTypeVariable(typeToCheck: Type): Boolean =
-      TypeCheckingHelpers.containsTypeVariable(typeToCheck)
-
-    def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
-      case (tv: TypedAST.TypeVariableType, _) =>
-        // 型変数は任意の型を受け入れる（上限境界を満たせば）
-        TypeRules.isSuperType(tv.upperBound, actual)
-      case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
-        // 同じrawクラスで型引数が構造的にマッチ
-        (ae.raw.name == aa.raw.name) &&
-          ae.typeArguments.length == aa.typeArguments.length &&
-          ae.typeArguments.zip(aa.typeArguments).forall { case (e, a) => structurallyAssignable(e, a) }
-      case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
-        // expected側に型変数があるが、actualがAppliedClassTypeでない場合
-        // rawクラスが一致すればOK
-        actual match {
-          case classType: TypedAST.ClassType => ae.raw.name == classType.name
-          case _ => false
-        }
-      case _ =>
-        TypeRules.isAssignable(expected, actual)
-    }
-
-    // 4. AppliedClassType同士のボクシングを考慮したチェック
-    def isAssignableWithBoxing(expectedType: Type, actualType: Type): Boolean =
-      if (TypeRules.isAssignable(expectedType, actualType)) true
-      else if (!expectedType.isBasicType && actualType.isBasicType) {
-        val boxedActual = Boxing.boxedType(table_, actualType.asInstanceOf[BasicType])
-        TypeRules.isAssignable(expectedType, boxedActual)
-      } else if (expectedType.isBasicType && !actualType.isBasicType) {
-        val boxedExpected = Boxing.boxedType(table_, expectedType.asInstanceOf[BasicType])
-        TypeRules.isAssignable(boxedExpected, actualType)
-      } else (expectedType, actualType) match {
-        case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
-          (ae.raw.name == aa.raw.name) &&
-            ae.typeArguments.length == aa.typeArguments.length &&
-            ae.typeArguments.zip(aa.typeArguments).forall { case (e, a) => isAssignableWithBoxing(e, a) }
-        case _ => false
-      }
-
-    // 5. 通常のチェック（型変数を考慮）
-    val isCompatible = if (containsTypeVariable(expected)) {
-      structurallyAssignable(expected, actual.`type`)
-    } else {
-      isAssignableWithBoxing(expected, actual.`type`)
-    }
-
-    if (!isCompatible) {
-      report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
-      return null
-    }
-    new AsInstanceOf(node.location, actual, expected)
-  }
+  def processAssignable(node: AST.Node, expected: Type, actual: Term): Term =
+    assignabilitySupport.processAssignable(node, expected, actual)
   def openClosure[A](context: LocalContext)(block: => A): A = {
     val wasInClosure = context.isClosure
     val savedMethodContext = context.saveMethodContext()
@@ -184,264 +84,29 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   }
   def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
 
-  private def bindParameters(context: LocalContext, args: List[AST.Argument], types: Array[Type]): Unit = {
-    var i = 0
-    args.foreach { arg =>
-      context.add(arg.name, types(i))
-      context.recordDeclaration(arg.name, arg.location, isParameter = true)
-      i += 1
-    }
-  }
-
-  private def markCapturedVariables(context: LocalContext, args: List[AST.Argument], block: AST.BlockExpression): Unit = {
-    val paramNames = args.map(_.name).toSet
-    val capturedVars = CapturedVariableScanner.scan(block, paramNames)
-    context.markAsBoxed(capturedVars)
-  }
-
-  private def buildArgumentsWithDefaults(
-    args: List[AST.Argument],
-    types: Array[Type],
-    context: LocalContext
-  ): Array[TypedAST.MethodArgument] =
-    args.zipWithIndex.map { case (arg, i) =>
-      val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, types(i))
-      }
-      TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
-    }.toArray
-
-  private def reportUnused(context: LocalContext): Unit =
-    typing.reportUnusedVariables(context)
-
-  /** Common logic for setting up context and processing method/function bodies */
-  private def processMethodLikeBody(
-    method: MethodDefinition,
-    args: List[AST.Argument],
-    block: AST.BlockExpression
-  ): Unit = {
-    val context = new LocalContext
-    if ((method.modifier & AST.M_STATIC) != 0) {
-      context.setStatic(true)
-    }
-    context.setMethod(method)
-    val arguments = method.arguments
-
-    // Scan for captured variables before processing the method body
-    markCapturedVariables(context, args, block)
-    bindParameters(context, args, arguments)
-
-    // Process default argument values
-    val argsWithDefaults = buildArgumentsWithDefaults(args, arguments, context)
-    method.setArgumentsWithDefaults(argsWithDefaults)
-
-    val translatedBlock = addReturnNode(translate(block, context).asInstanceOf[StatementBlock], method.returnType)
-    method.setBlock(translatedBlock)
-    method.setFrame(context.getContextFrame)
-
-    // Report unused variable warnings
-    reportUnused(context)
-  }
-
   def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
     val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (method == null) return
     if (node.block == null) return
     val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
     openTypeParams(typeParams_ ++ methodTypeParams) {
-      processMethodLikeBody(method, node.args, node.block)
+      methodBodySupport.processMethodLikeBody(method, node.args, node.block)
     }
   }
-  def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
-    val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
-    if (constructor == null) return
-    val context = new LocalContext
-    context.setConstructor(constructor)
-    val args = constructor.getArgs
-    bindParameters(context, node.args, args)
-
-    // Build argument names and default values for named argument support
-    val argsWithDefaults = buildArgumentsWithDefaults(node.args, args, context)
-    constructor.setArgumentsWithDefaults(argsWithDefaults)
-
-    val params = typedTerms(node.superInits.toArray, context)
-    val currentClass = definition_
-    val superClass = currentClass.superClass
-    val matched = superClass.findConstructor(params)
-    if (matched.length == 0) {
-      report(CONSTRUCTOR_NOT_FOUND, node, superClass, types(params), superClass.constructors)
-    }else if (matched.length > 1) {
-      report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, types(params)), Array[AnyRef](superClass, types(params)))
-    }else {
-      val init = new Super(superClass, matched(0).getArgs, params)
-      val block = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], BasicType.VOID)
-      constructor.superInitializer = init
-      constructor.block = block
-      constructor.frame = context.getContextFrame
-    }
-
-    // Report unused variable warnings
-    reportUnused(context)
-  }
+  def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
+    methodBodySupport.processConstructorDeclaration(node)
   def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    mapper_ = find(definition_.name)
-    val classTypeParams = declaredTypeParams_.getOrElse(node, Seq())
-    openTypeParams(emptyTypeParams ++ classTypeParams) {
-      val instanceInitializers = Buffer[ActionStatement]()
-      val staticInitializers = Buffer[ActionStatement]()
-      for (section <- node.defaultSection ++ node.sections; member <- section.members) {
-        member match {
-          case field: AST.FieldDeclaration =>
-            collectFieldInitializer(field, instanceInitializers, staticInitializers)
-          case member: AST.MethodDeclaration =>
-            processMethodDeclaration(member)
-          case member: AST.ConstructorDeclaration =>
-            processConstructorDeclaration(member)
-          case field: AST.DelegatedFieldDeclaration =>
-            collectDelegatedFieldInitializer(field, instanceInitializers, staticInitializers)
-        }
-      }
-      injectInstanceInitializers(definition_, instanceInitializers.toSeq)
-      if (staticInitializers.nonEmpty) {
-        definition_.setStaticInitializers(staticInitializers.toArray)
-      }
-    }
+    declarationBodySupport.processClassDeclaration(node)
   }
   def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit = { () }
   def processEnumDeclaration(node: AST.EnumDeclaration, context: LocalContext): Unit = { () }
 
-  def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = {
-    // Get the container class for this extension
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    if (definition_ == null) return
-    mapper_ = find(definition_.name)
-
-    // Resolve the receiver type
-    val receiverType = mapFrom(node.receiverType)
-    if (receiverType == null) return
-
-    // Process each method in the extension
-    for (methodNode <- node.methods) {
-      processExtensionMethodDeclaration(methodNode, receiverType)
-    }
-  }
-
-  private def processExtensionMethodDeclaration(node: AST.MethodDeclaration, receiverType: Type): Unit = {
-    val extMethod = lookupKernelNode(node).asInstanceOf[ExtensionMethodDefinition]
-    if (extMethod == null) return
-    if (node.block == null) return
-
-    val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
-    openTypeParams(typeParams_ ++ methodTypeParams) {
-      // Find the corresponding static method in the container class
-      // Extension methods are stored as static methods with receiver as first parameter
-      val staticMethods = definition_.methods(node.name)
-      val staticMethod = staticMethods.find { method =>
-        (method.modifier & AST.M_STATIC) != 0 &&
-        method.arguments.length == extMethod.arguments.length + 1 &&
-        method.arguments(0) == receiverType
-      }.map(_.asInstanceOf[MethodDefinition]).orNull
-
-      if (staticMethod == null) return
-
-      val context = new LocalContext
-      context.setStatic(true)  // Extension methods are compiled as static methods
-      context.setMethod(staticMethod)
-
-      // Scan for captured variables before processing the method body
-      val extArgs = AST.Argument(node.location, "this", AST.TypeNode(node.location, AST.ReferenceType(receiverType.name, true), false)) :: node.args
-      markCapturedVariables(context, extArgs, node.block)
-
-      // Add 'this' as the first parameter (the receiver)
-      context.add("this", receiverType)
-
-      // Add method parameters
-      val arguments = staticMethod.arguments
-      for ((arg, i) <- node.args.zipWithIndex) {
-        // Skip first argument (receiver) when binding
-        context.add(arg.name, arguments(i + 1))
-      }
-
-      // Process default argument values
-      val argsWithDefaults = buildArgumentsWithDefaults(extArgs, arguments, context)
-      staticMethod.setArgumentsWithDefaults(argsWithDefaults)
-
-      // Type check the method body
-      val translatedBlock = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], staticMethod.returnType)
-      staticMethod.setBlock(translatedBlock)
-      staticMethod.setFrame(context.getContextFrame)
-      extMethod.setBlock(translatedBlock)
-      extMethod.setFrame(context.getContextFrame)
-
-      // Report unused variable warnings
-      reportUnused(context)
-    }
-  }
+  def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =
+    declarationBodySupport.processExtensionDeclaration(node)
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
     val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (function == null) return
-    processMethodLikeBody(function, node.args, node.block)
-  }
-  private def collectFieldInitializer(
-    node: AST.FieldDeclaration,
-    instanceInitializers: Buffer[ActionStatement],
-    staticInitializers: Buffer[ActionStatement]
-  ): Unit = {
-    if (node.init == null) return
-    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
-    if (field == null) return
-    val context = new LocalContext
-    val isStatic = Modifier.isStatic(node.modifiers)
-    context.setStatic(isStatic)
-    val fieldType = field.`type`
-    typed(node.init, context, fieldType) match {
-      case Some(term) =>
-        val value = processAssignable(node.init, fieldType, term)
-        if (value != null) {
-          val statement =
-            if (isStatic) new ExpressionActionStatement(new SetStaticField(definition_, field, value))
-            else new ExpressionActionStatement(new SetField(new This(definition_), field, value))
-          if (isStatic) staticInitializers += statement else instanceInitializers += statement
-        }
-      case None => ()
-    }
-  }
-
-  private def collectDelegatedFieldInitializer(
-    node: AST.DelegatedFieldDeclaration,
-    instanceInitializers: Buffer[ActionStatement],
-    staticInitializers: Buffer[ActionStatement]
-  ): Unit = {
-    if (node.init == null) return
-    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
-    if (field == null) return
-    val context = new LocalContext
-    val isStatic = Modifier.isStatic(node.modifiers)
-    context.setStatic(isStatic)
-    val fieldType = field.`type`
-    typed(node.init, context, fieldType) match {
-      case Some(term) =>
-        val value = processAssignable(node.init, fieldType, term)
-        if (value != null) {
-          val statement =
-            if (isStatic) new ExpressionActionStatement(new SetStaticField(definition_, field, value))
-            else new ExpressionActionStatement(new SetField(new This(definition_), field, value))
-          if (isStatic) staticInitializers += statement else instanceInitializers += statement
-        }
-      case None => ()
-    }
-  }
-
-  private def injectInstanceInitializers(classDef: ClassDefinition, initializers: Seq[ActionStatement]): Unit = {
-    if (initializers.isEmpty) return
-    classDef.constructors.foreach {
-      case ctor: ConstructorDefinition =>
-        val existing = Option(ctor.block).map(_.statements.toIndexedSeq).getOrElse(Seq.empty)
-        val combined = (initializers ++ existing).toArray
-        ctor.block = new StatementBlock(combined: _*)
-      case _ => ()
-    }
+    methodBodySupport.processMethodLikeBody(function, node.args, node.block)
   }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =
@@ -513,31 +178,6 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     expressionFormTyping.typeStringInterpolation(node, context)
 
-  def typeBinaryAssignment(node: AST.Expression, lhs: AST.Expression, rhs: AST.Expression, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
-    // Desugar: a += b becomes a = a + b
-    // First, create the binary operation
-    val binaryOp = binaryKind match {
-      case ADD => new AST.Addition(node.location, lhs, rhs)
-      case SUBTRACT => new AST.Subtraction(node.location, lhs, rhs)
-      case MULTIPLY => new AST.Multiplication(node.location, lhs, rhs)
-      case DIVIDE => new AST.Division(node.location, lhs, rhs)
-      case MOD => new AST.Modulo(node.location, lhs, rhs)
-      case BIT_AND => new AST.BitAnd(node.location, lhs, rhs)
-      case BIT_OR => new AST.BitOr(node.location, lhs, rhs)
-      case XOR => new AST.XOR(node.location, lhs, rhs)
-      case BIT_SHIFT_L2 => new AST.MathLeftShift(node.location, lhs, rhs)
-      case BIT_SHIFT_R2 => new AST.MathRightShift(node.location, lhs, rhs)
-      case BIT_SHIFT_R3 => new AST.LogicalRightShift(node.location, lhs, rhs)
-      case _ => throw new IllegalArgumentException(s"Invalid compound assignment operator: $binaryKind")
-    }
-
-    // Then create the assignment: a = (a + b)
-    val assignment = new AST.Assignment(node.location, lhs, binaryOp)
-
-    // Type-check the assignment
-    typeAssignment(assignment, context)
-  }
-
   def typeNumericBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeNumericBinary(node, kind, context)
 
@@ -568,250 +208,13 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     expressionFormTyping.typeIsInstance(node, context)
 
-  /** Delegate addition type-checking to AdditionTyping */
-  private def typeAddition(node: AST.Addition, context: LocalContext): Option[Term] =
+  private[typing] def typeAdditionNode(node: AST.Addition, context: LocalContext): Option[Term] =
     additionTyping.typeAddition(node, context)
 
-  def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = node match {
-    case node: AST.Addition =>
-      typeAddition(node, context)
-    case node@AST.Subtraction(loc, left, right) =>
-      typeNumericBinary(node, SUBTRACT, context)
-    case node@AST.Multiplication(loc, left, right) =>
-      typeNumericBinary(node, MULTIPLY, context)
-    case node@AST.Division(loc, left, right) =>
-      typeNumericBinary(node, DIVIDE, context)
-    case node@AST.Modulo(loc, left, right) =>
-      typeNumericBinary(node, MOD, context)
-    case node: AST.Assignment =>
-      typeAssignment(node, context)
-    case node@AST.LogicalAnd(loc, left, right) =>
-      typeLogicalBinary(node, LOGICAL_AND, context)
-    case node@AST.LogicalOr(loc, left, right) =>
-      typeLogicalBinary(node, LOGICAL_OR, context)
-    case node@AST.BitAnd(loc, l, r) =>
-      Option(processBitExpression(BIT_AND, node, context))
-    case node@AST.BitOr(loc, l, r) =>
-      Option(processBitExpression(BIT_OR, node, context))
-    case node@AST.XOR(loc, left, right) =>
-      Option(processBitExpression(XOR, node, context))
-    case node@AST.LogicalRightShift(loc, left, right) =>
-      Option(processShiftExpression(BIT_SHIFT_R3, node, context))
-    case node@AST.MathLeftShift(loc, left, right) =>
-      Option(processShiftExpression(BIT_SHIFT_L2, node, context))
-    case node@AST.MathRightShift(loc, left, right) =>
-      Option(processShiftExpression(BIT_SHIFT_R2, node, context))
-    case node@AST.GreaterOrEqual(loc, left, right) =>
-      typeComparableBinary(node, GREATER_OR_EQUAL, context)
-    case node@AST.GreaterThan(loc, left, right) =>
-      typeComparableBinary(node, GREATER_THAN, context)
-    case node@AST.LessOrEqual(loc, left, right) =>
-      typeComparableBinary(node, LESS_OR_EQUAL, context)
-    case node@AST.LessThan(loc, left, right) =>
-      typeComparableBinary(node, LESS_THAN, context)
-    case node@AST.Equal(loc, left, right) =>
-      Option(processEquals(EQUAL, node, context))
-    case node@AST.NotEqual(loc, left, right) =>
-      Option(processEquals(NOT_EQUAL, node, context))
-    case node@AST.ReferenceEqual(loc, left, right) =>
-      Option(processRefEquals(EQUAL, node, context))
-    case node@AST.ReferenceNotEqual(loc, left, right) =>
-      Option(processRefEquals(NOT_EQUAL, node, context))
-    case node: AST.Elvis =>
-      typeElvis(node, context)
-    case node: AST.Indexing =>
-      typeIndexing(node, context)
-    case node@AST.AdditionAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, ADD, context)
-    case node@AST.SubtractionAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, SUBTRACT, context)
-    case node@AST.MultiplicationAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, MULTIPLY, context)
-    case node@AST.DivisionAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, DIVIDE, context)
-    case node@AST.ModuloAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, MOD, context)
-    case node@AST.BitAndAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, BIT_AND, context)
-    case node@AST.BitOrAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, BIT_OR, context)
-    case node@AST.XorAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, XOR, context)
-    case node@AST.LeftShiftAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, BIT_SHIFT_L2, context)
-    case node@AST.MathRightShiftAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, BIT_SHIFT_R2, context)
-    case node@AST.LogicalRightShiftAssignment(_, left, right) =>
-      typeBinaryAssignment(node, left, right, BIT_SHIFT_R3, context)
-    case node@AST.CharacterLiteral(loc, v) =>
-      Some(new CharacterValue(loc, v))
-    case node@AST.ByteLiteral(loc, v) =>
-      Some(new ByteValue(loc, v))
-    case node@AST.ShortLiteral(loc, v) =>
-      Some(new ShortValue(loc, v))
-    case node@AST.IntegerLiteral(loc, v) =>
-      Some(new IntValue(loc, v))
-    case node@AST.LongLiteral(loc, v) =>
-      Some(new LongValue(loc, v))
-    case node@AST.FloatLiteral(loc, v) =>
-      Some(new FloatValue(loc, v))
-    case node@AST.DoubleLiteral(loc, v) =>
-      Some(new DoubleValue(loc, v))
-    case node@AST.BooleanLiteral(loc, v) =>
-      Some(new BoolValue(loc, v))
-    case node@AST.ListLiteral(loc, elements) =>
-      val typedElements = elements.map { element => typed(element, context).getOrElse(null) }
-      if (typedElements.exists(_ == null)) {
-        None
-      } else {
-        // Box basic types for list element type calculation
-        val elementTypes = typedElements.map { typedElement =>
-          typedElement.`type` match {
-            case basicType: BasicType => Boxing.boxedType(table_, basicType)
-            case other => other
-          }
-        }
-        val elementType: Type = if (elementTypes.isEmpty) {
-          rootClass // Empty list -> List<Object>
-        } else {
-          // Find least upper bound of all element types
-          elementTypes.reduce { (left, right) =>
-            if (left == null || right == null) null
-            else if (left.isBottomType) right
-            else if (right.isBottomType) left
-            else if (left eq right) left
-            else if (left.isNullType) right
-            else if (right.isNullType) left
-            else if (TypeRules.isSuperType(left, right)) left
-            else if (TypeRules.isSuperType(right, left)) right
-            else if (!left.isBasicType && !right.isBasicType) rootClass
-            else null
-          }
-        }
-        if (elementType == null) {
-          report(INCOMPATIBLE_TYPE, node, elementTypes.head, elementTypes.last)
-          None
-        } else {
-          val listType = AppliedClassType(load("java.util.List"), scala.collection.immutable.List(elementType))
-          Some(new ListLiteral(typedElements.toArray, listType))
-        }
-      }
-    case node@AST.NullLiteral(loc) =>
-      Some(new NullValue(loc))
-    case node: AST.Cast =>
-      typeCast(node, context)
-    case node: AST.ClosureExpression =>
-      closureTyping.typeClosure(node, context, expected)
-    case node@AST.CurrentInstance(loc) =>
-      // In extension methods, 'this' is a local variable (the receiver)
-      val thisBinding = context.lookup("this")
-      if (thisBinding != null) {
-        context.recordUsage("this")
-        Some(new RefLocal(thisBinding))
-      } else if (context.isStatic) {
-        report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
-        None
-      } else {
-        Some(new This(loc, definition_))
-      }
-    case node@AST.Id(loc, name) =>
-      val bind = context.lookup(name)
-      if (bind == null) {
-        report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
-        None
-      } else {
-        context.recordUsage(name)
-        // Smart cast: use effective type which may be narrowed
-        val effectiveType = context.getEffectiveType(name)
-        if (effectiveType != bind.tp) {
-          // Type has been narrowed, insert a cast
-          Some(new AsInstanceOf(new RefLocal(bind), effectiveType))
-        } else {
-          Some(new RefLocal(bind))
-        }
-      }
-    case node: AST.UnqualifiedFieldReference =>
-      if (context.isStatic) {
-        report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
-        None
-      } else {
-        val selection = AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name)
-        typeMemberSelection(selection, context)
-      }
-    case node: AST.IsInstance =>
-      typeIsInstance(node, context)
-    case node: AST.MemberSelection =>
-      typeMemberSelection(node, context)
-    case node: AST.MethodCall =>
-      typeMethodCall(node, context, expected)
-    case node: AST.SafeMemberSelection =>
-      typeSafeMemberSelection(node, context)
-    case node: AST.SafeMethodCall =>
-      typeSafeMethodCall(node, context, expected)
-    case node@AST.Negate(loc, target) =>
-      typeUnaryNumeric(node, "-", MINUS, context)
-    case node: AST.NewArray =>
-      typeNewArray(node, context)
-    case node: AST.NewArrayWithValues =>
-      typeNewArrayWithValues(node, context)
-    case node: AST.NewObject =>
-      typeNewObject(node, context)
-    case node@AST.Not(loc, target) =>
-      typeUnaryBoolean(node, "!", NOT, context)
-    case node@AST.Posit(loc, target) =>
-      typeUnaryNumeric(node, "+", PLUS, context)
-    case node@AST.PostDecrement(loc, target) =>
-      typePostUpdate(node, node.term, "--", SUBTRACT, context)
-    case node@AST.PostIncrement(loc, target) =>
-      typePostUpdate(node, node.term, "++", ADD, context)
-    // Prefer this.field or self.field for field access; unqualified form is handled above for compatibility.
-    case node: AST.UnqualifiedMethodCall =>
-      typeUnqualifiedMethodCall(node, context, expected)
-    case node: AST.StaticMemberSelection =>
-      typeStaticMemberSelection(node)
-    case node: AST.StaticMethodCall =>
-      typeStaticMethodCall(node, context, expected)
-    case node@AST.StringLiteral(loc, value) =>
-      Some(new StringValue(loc, value, load("java.lang.String")))
-    case node: AST.StringInterpolation =>
-      typeStringInterpolation(node, context)
-    case node: AST.SuperMethodCall =>
-      typeSuperMethodCall(node, context, expected)
-    case node: AST.NamedArgument =>
-      // NamedArgumentはメソッド呼び出しのコンテキストで処理される
-      // ここでは内部の値を型付けして返す
-      typed(node.value, context, expected)
-    case node: AST.BlockExpression =>
-      controlExpressionTyping.typeBlockExpression(node, context)
-    case node: AST.BreakExpression =>
-      controlExpressionTyping.typeBreakExpression(node, context)
-    case node: AST.ContinueExpression =>
-      controlExpressionTyping.typeContinueExpression(node, context)
-    case node: AST.EmptyExpression =>
-      controlExpressionTyping.typeEmptyExpression(node, context)
-    case node: AST.ExpressionBox =>
-      controlExpressionTyping.typeExpressionBox(node, context)
-    case node: AST.ForeachExpression =>
-      controlExpressionTyping.typeForeachExpression(node, context)
-    case node: AST.ForExpression =>
-      controlExpressionTyping.typeForExpression(node, context)
-    case node: AST.IfExpression =>
-      controlExpressionTyping.typeIfExpression(node, context)
-    case node: AST.LocalVariableDeclaration =>
-      val statement = statementTyping.translate(node, context)
-      Some(new StatementTerm(node.location, statement, BasicType.VOID))
-    case node: AST.ReturnExpression =>
-      controlExpressionTyping.typeReturnExpression(node, context)
-    case node: AST.SelectExpression =>
-      controlExpressionTyping.typeSelectExpression(node, context)
-    case node: AST.SynchronizedExpression =>
-      controlExpressionTyping.typeSynchronizedExpression(node, context)
-    case node: AST.ThrowExpression =>
-      controlExpressionTyping.typeThrowExpression(node, context)
-    case node: AST.TryExpression =>
-      controlExpressionTyping.typeTryExpression(node, context)
-    case node: AST.WhileExpression =>
-      controlExpressionTyping.typeWhileExpression(node, context)
+  def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = {
+    val result = expressionDispatchSupport.typed(node, context, expected)
+    result.foreach(term => put(node, term))
+    result
   }
   def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
     statementTyping.translate(node, context)
@@ -820,101 +223,35 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def addReturnNode(node: ActionStatement, returnType: Type): StatementBlock = {
     new StatementBlock(node, new Return(defaultValue(returnType)))
   }
-  def createMain(top: ClassType, ref: Method, name: String, args: Array[Type], ret: Type): MethodDefinition = {
-    val method = new MethodDefinition(null, AST.M_STATIC | AST.M_PUBLIC, top, name, args, ret, null)
-    val frame = new LocalFrame(null)
-    val params = new Array[Term](args.length)
-    for(i <- 0 until args.length) {
-      val arg = args(i)
-      val index = frame.add("args" + i, arg)
-      params(i) = new RefLocal(0, index, arg)
-    }
-    method.setFrame(frame)
-    val constructor = top.findConstructor(new Array[Term](0))(0)
-    var block = new StatementBlock(new ExpressionActionStatement(new Call(new NewObject(constructor, new Array[Term](0)), ref, params)))
-    block = addReturnNode(block, BasicType.VOID)
-    method.setBlock(block)
-    method
-  }
 
   private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
-    findMethod(node, target, name, new Array[Term](0))
-  private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method = {
-    val methods = MethodResolution.findMethods(target, name, params, table_)
-    if (methods.length == 0) {
-      report(METHOD_NOT_FOUND, node, target, name, params.map{param => param.`type`})
-      return null
-    }
-    methods(0)
-  }
-  private[typing] def types(terms: Array[Term]): Array[Type] = terms.map(term => term.`type`)
-  private[typing] def typeNames(types: Array[Type]): Array[String] = types.map(_.name)
-  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Continuable, Method] = {
-    val methods = MethodResolution.findMethods(target, name, params, table_)
-    if (methods.length > 0) {
-      if (methods.length > 1) {
-        report(AMBIGUOUS_METHOD, node, Array[AnyRef](methods(0).affiliation, name, methods(0).arguments), Array[AnyRef](methods(1).affiliation, name, methods(1).arguments))
-        Left(false)
-      } else if (!MemberAccess.isMemberAccessible(methods(0), definition_)) {
-        report(METHOD_NOT_ACCESSIBLE, node, methods(0).affiliation, name, methods(0).arguments, definition_)
-        Left(false)
-      } else {
-        Right(methods(0))
-      }
-    }else {
-      Left(true)
-    }
-  }
+    methodLookupSupport.findMethod(node, target, name)
+  private[typing] def findMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Method =
+    methodLookupSupport.findMethod(node, target, name, params)
+  private[typing] def types(terms: Array[Term]): Array[Type] =
+    methodLookupSupport.types(terms)
+  private[typing] def typeNames(types: Array[Type]): Array[String] =
+    methodLookupSupport.typeNames(types)
+  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Continuable, Method] =
+    methodLookupSupport.tryFindMethod(node, target, name, params)
 
   private def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term =
     operatorTyping.processNumericExpression(kind, node, lt, rt)
-  private[typing] def addArgument(arg: AST.Argument, context: LocalContext): Type = {
-    val name = arg.name
-    val binding = context.lookupOnlyCurrentScope(name)
-    if (binding != null) {
-      report(DUPLICATE_LOCAL_VARIABLE, arg, name)
-      return null
-    }
-    val argType = mapFrom(arg.typeRef, mapper_)
-    if(argType == null) return null
-    context.add(name, argType)
-    argType
+  private[typing] def addArgument(arg: AST.Argument, context: LocalContext): Type =
+    methodLookupSupport.addArgument(arg, context)
+  private[typing] def typeClosureNode(node: AST.ClosureExpression, context: LocalContext, expected: Type): Option[Term] =
+    closureTyping.typeClosure(node, context, expected)
+  private[typing] def typeLocalVariableDeclarationNode(node: AST.LocalVariableDeclaration, context: LocalContext): Option[Term] = {
+    val statement = statementTyping.translate(node, context)
+    Some(new StatementTerm(node.location, statement, BasicType.VOID))
   }
+  private[typing] def typeSimpleExpression(node: AST.Expression, context: LocalContext, expected: Type): Option[Term] =
+    simpleExpressionTypingSupport.typeSimple(node, context, expected)
 
   private def runUnit(): Unit = {
     unit_ = unit
-    val toplevels = unit.toplevels
-    val context = new LocalContext
-    val statements = Buffer[ActionStatement]()
-    mapper_ = find(topClass)
-    val klass = loadTopClass.asInstanceOf[ClassDefinition]
-    val argsType = loadArray(load("java.lang.String"), 1)
-    val method = new MethodDefinition(unit.location, AST.M_PUBLIC, klass, "start", Array[Type](argsType), BasicType.VOID, null)
-    context.add("args", argsType)
-    for (element <- toplevels) {
-      if (!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass
-      element match {
-        case node: AST.CompoundExpression =>
-          context.setMethod(method)
-          statements += translate(node, context)
-        case _ =>
-          element match {
-            case node: AST.ClassDeclaration => processClassDeclaration(node, context)
-            case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node, context)
-            case node: AST.EnumDeclaration => processEnumDeclaration(node, context)
-            case node: AST.ExtensionDeclaration => processExtensionDeclaration(node)
-            case node: AST.FunctionDeclaration => processFunctionDeclaration(node, context)
-            case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node, context)
-            case _ =>
-          }
-      }
-    }
-    if (klass != null) {
-      statements += new Return(null)
-      method.setBlock(new StatementBlock(statements.asJava))
-      method.setFrame(context.getContextFrame)
-      klass.add(method)
-      klass.add(createMain(klass, method, "main", Array[Type](argsType), BasicType.VOID))
-    }
+    val prepared = topLevelTypingSupport.prepareUnit(unit)
+    topLevelTypingSupport.processToplevels(unit.toplevels, prepared)
+    topLevelTypingSupport.finishUnit(prepared)
   }
 }

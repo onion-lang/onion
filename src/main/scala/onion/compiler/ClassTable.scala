@@ -20,6 +20,7 @@ class ClassTable(classPath: String) {
   val classes = new OrderedTable[TypedAST.ClassDefinition]
   private val classFiles = new JHashMap[String, TypedAST.ClassType]
   private val arrayClasses = new JHashMap[String, TypedAST.ArrayType]
+  private val missingClasses = new java.util.HashSet[String]
   private val table = new ClassFileTable(classPath)
 
   def loadArray(component: TypedAST.Type, dimension: Int): TypedAST.ArrayType = {
@@ -33,6 +34,7 @@ class ClassTable(classPath: String) {
 
   def load(className: String): TypedAST.ClassType = {
     var clazz: TypedAST.ClassType = lookup(className)
+    if (clazz == null && missingClasses.contains(className)) return null
     if (clazz == null) {
       val bytes = table.loadBytes(className)
       if (bytes != null) {
@@ -40,11 +42,12 @@ class ClassTable(classPath: String) {
         classFiles.put(clazz.name, clazz)
       } else {
         try {
-          clazz = new ReflectClassType(Class.forName(className, true, Thread.currentThread.getContextClassLoader), this)
+          clazz = new ReflectClassType(Class.forName(className, false, Thread.currentThread.getContextClassLoader), this)
           classFiles.put(clazz.name, clazz)
         }
         catch {
-          case e: ClassNotFoundException => {}
+          case _: ClassNotFoundException =>
+            missingClasses.add(className)
         }
       }
     }

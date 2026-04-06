@@ -50,6 +50,32 @@ Print a typed AST summary (classes, fields, methods) to stderr before running th
 onion --dump-typed-ast MyScript.on
 ```
 
+### `--profile-compile`
+
+Emit a compile profile before the script is executed.
+
+```bash
+onion --profile-compile MyScript.on
+```
+
+### `--profile-format <text|json>`
+
+Choose text or JSON profile output.
+
+```bash
+onion --profile-compile --profile-format json MyScript.on
+```
+
+### `--profile-output <target>`
+
+Write the compile profile to `stderr`, `stdout`, or a file path.
+
+```bash
+onion --profile-compile --profile-format json \
+      --profile-output target/script-profile.json \
+      MyScript.on
+```
+
 ### `--warn <off|on|error>`
 
 Control warning reporting. `error` treats warnings as compilation errors.

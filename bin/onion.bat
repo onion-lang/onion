@@ -1,6 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
+if not defined ONION_HOME (
+    set "ONION_HOME=%~dp0.."
+)
+
 rem Remove trailing backslash from ONION_HOME if present
 if "%ONION_HOME:~-1%"=="\" set "ONION_HOME=%ONION_HOME:~0,-1%"
 

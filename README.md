@@ -74,10 +74,16 @@ future.map((data: String) -> { return parseJson(data); })
 
 ## Architecture
 
-The compiler parses source code into an untyped AST and then performs type
-checking to produce a **typed AST**.  The old intermediate representation (IRT)
-has been folded into this typed tree.  Code generation now runs on the typed
-AST via a thin compatibility layer using ASM.
+The post-parse compiler is now an explicit pipeline:
+
+```text
+Parsing -> Rewriting -> Typing -> TailCallOptimization
+        -> MutualRecursionOptimization -> TypedAstCodeGeneration
+```
+
+- `Typing.scala` is the orchestration layer for header/outline/body/duplication passes, with name resolution and method resolution split into `onion.compiler.typing`.
+- `TypedGenerating.scala` now exists only as a thin legacy compatibility adapter; the main pipeline targets `onion.compiler.codegen.TypedAstCodeGeneration` directly.
+- `OnionCompiler` delegates execution and timing to `onion.compiler.pipeline.CompilerPipeline`, which can emit phase-by-phase compile profiles.
 
 ## Tools
 
@@ -97,6 +103,9 @@ onionc [options] source files...
 * -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
 * --dump-ast Print parsed AST to stderr.
 * --dump-typed-ast Print typed AST summary to stderr.
+* --profile-compile Emit a phase-by-phase compile profile.
+* --profile-format <text|json> Set compile profile format.
+* --profile-output <target> Write the profile to stderr, stdout, or a file.
 * --warn <off|on|error> Set warning level.
 * --Wno <codes> Suppress warnings (e.g., W0001,unused-parameter).
 
@@ -122,8 +131,15 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 * -maxErrorReports <error count> the maximum number of comiplation errors reported.
 * --dump-ast Print parsed AST to stderr.
 * --dump-typed-ast Print typed AST summary to stderr.
+* --profile-compile Emit a phase-by-phase compile profile.
+* --profile-format <text|json> Set compile profile format.
+* --profile-output <target> Write the profile to stderr, stdout, or a file.
 * --warn <off|on|error> Set warning level.
 * --Wno <codes> Suppress warnings (e.g., W0001,unused-parameter).
+
+### REPL
+
+Use `onion repl`, `onion-repl`, or `sbt repl` to start the interactive REPL. The promoted REPL supports multi-line input, persistent `resN` bindings, `:load`, `:time`, `:classpath`, `:type`, `:typed`, `:ast`, and `:bytecode`.
 
 `onion` compiles source files into in-memory class files and execute them.  The entry point is:
 

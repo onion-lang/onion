@@ -63,6 +63,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
   class OptimizationEnvironment
   type Environment = OptimizationEnvironment
 
+  private inline def trace(message: => String): Unit =
+    if (config.verbose) System.err.println(message)
+
   def newEnvironment(source: Seq[ClassDefinition]): Environment =
     new OptimizationEnvironment
 
@@ -101,18 +104,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
       if (group.size > 1) {
         if (config.verbose) {
           val methodNames = group.map(_.name).mkString(", ")
-          System.err.println(s"[Mutual TCO] Detected mutual recursion group: $methodNames")
+          trace(s"[Mutual TCO] Detected mutual recursion group: $methodNames")
         }
 
         // Validate group can be optimized
         validateGroup(group) match {
           case Some(error) =>
             if (config.verbose) {
-              System.err.println(s"[Mutual TCO] Cannot optimize: $error")
+              trace(s"[Mutual TCO] Cannot optimize: $error")
             }
           case None =>
             if (config.verbose) {
-              System.err.println(s"[Mutual TCO] Optimization will be applied")
+              trace(s"[Mutual TCO] Optimization will be applied")
             }
             transformGroup(classDef, group)
         }
@@ -195,7 +198,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     if (config.verbose) {
       group.zipWithIndex.foreach { case (method, stateId) =>
-        System.err.println(s"[Mutual TCO]   State $stateId: ${method.name}")
+        trace(s"[Mutual TCO]   State $stateId: ${method.name}")
       }
     }
 
@@ -203,7 +206,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     val paramCounts = group.map(_.arguments.length).toSet
     if (paramCounts.size > 1) {
       if (config.verbose) {
-        System.err.println(s"[Mutual TCO] ERROR: Methods have different parameter counts: $paramCounts")
+        trace(s"[Mutual TCO] ERROR: Methods have different parameter counts: $paramCounts")
       }
       return
     }
@@ -215,7 +218,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
       val paramTypesSet = group.map(_.arguments(paramIdx).name).toSet
       if (paramTypesSet.size > 1) {
         if (config.verbose) {
-          System.err.println(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypesSet")
+          trace(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypesSet")
         }
         return
       }
@@ -227,9 +230,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
     val paramTypes = group.head.arguments
 
     if (config.verbose) {
-      System.err.println(s"[Mutual TCO] Creating state machine method: $stateMachineMethodName")
-      System.err.println(s"[Mutual TCO]   Parameters: ${paramTypes.map(_.name).mkString(", ")}")
-      System.err.println(s"[Mutual TCO]   Return type: ${returnType.name}")
+      trace(s"[Mutual TCO] Creating state machine method: $stateMachineMethodName")
+      trace(s"[Mutual TCO]   Parameters: ${paramTypes.map(_.name).mkString(", ")}")
+      trace(s"[Mutual TCO]   Return type: ${returnType.name}")
     }
 
     // Step 3: Generate state machine method
@@ -245,7 +248,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Step 4: Add state machine method to class
     classDef.methods_.add(stateMachineMethod)
     if (config.verbose) {
-      System.err.println(s"[Mutual TCO] Added state machine method to class")
+      trace(s"[Mutual TCO] Added state machine method to class")
     }
 
     // Step 5: Replace original method bodies with forwarders
@@ -259,12 +262,12 @@ class MutualRecursionOptimization(config: CompilerConfig)
       )
       method.setBlock(forwarderBody)
       if (config.verbose) {
-        System.err.println(s"[Mutual TCO] Replaced ${method.name} with forwarder (state $stateId)")
+        trace(s"[Mutual TCO] Replaced ${method.name} with forwarder (state $stateId)")
       }
     }
 
     if (config.verbose) {
-      System.err.println(s"[Mutual TCO] State machine optimization complete")
+      trace(s"[Mutual TCO] State machine optimization complete")
     }
   }
 
@@ -311,7 +314,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     )
 
     if (config.verbose) {
-      System.err.println(s"[Mutual TCO] Generated state machine method: $methodName")
+      trace(s"[Mutual TCO] Generated state machine method: $methodName")
     }
     stateMachineMethod
   }
@@ -421,7 +424,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     var currentElse: ActionStatement = createDefaultReturn(returnType)
 
     if (config.verbose) {
-      System.err.println(s"[Mutual TCO]   Building if-else chain for ${group.size} states")
+      trace(s"[Mutual TCO]   Building if-else chain for ${group.size} states")
     }
 
     // Process methods in reverse order to build the chain from bottom up
@@ -430,7 +433,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
       val stateIdValue = new IntValue(loc, stateId)
 
       if (config.verbose) {
-        System.err.println(s"[Mutual TCO]   Processing state $stateId (${method.name})")
+        trace(s"[Mutual TCO]   Processing state $stateId (${method.name})")
       }
 
       // Condition: state_loop == stateId
@@ -454,7 +457,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
       )
 
       if (config.verbose) {
-        System.err.println(s"[Mutual TCO]     Transformed body has ${transformedBody.statements.length} statements")
+        trace(s"[Mutual TCO]     Transformed body has ${transformedBody.statements.length} statements")
       }
 
       // Create if statement
@@ -463,7 +466,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     if (config.verbose) {
-      System.err.println(s"[Mutual TCO]   If-else chain complete")
+      trace(s"[Mutual TCO]   If-else chain complete")
     }
     new StatementBlock(loc, currentElse)
   }
@@ -491,7 +494,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
                 case targetMethod: MethodDefinition if stateIdByName.contains(targetMethod.name) =>
                   // Transform to: update params, set state, continue
                   if (config.verbose) {
-                    System.err.println(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdByName(targetMethod.name)}")
+                    trace(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdByName(targetMethod.name)}")
                   }
                   transformTailCallToStateTransition(
                     call.parameters,
@@ -507,7 +510,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
               call.method match {
                 case targetMethod: MethodDefinition if stateIdByName.contains(targetMethod.name) =>
                   if (config.verbose) {
-                    System.err.println(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdByName(targetMethod.name)}")
+                    trace(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdByName(targetMethod.name)}")
                   }
                   transformTailCallToStateTransition(
                     call.parameters,
@@ -543,7 +546,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Transform statements in a block, merging tail calls into preceding if statements
     def transformStatementsInBlock(stmts: Seq[ActionStatement]): Seq[ActionStatement] = {
       if (config.verbose) {
-        System.err.println(s"[Mutual TCO]         transformStatementsInBlock: ${stmts.length} statements")
+        trace(s"[Mutual TCO]         transformStatementsInBlock: ${stmts.length} statements")
       }
 
       if (stmts.length < 2) {
@@ -556,14 +559,14 @@ class MutualRecursionOptimization(config: CompilerConfig)
         last match {
           case ret: Return if ret.term != null && isTailCallInGroup(ret.term) =>
             if (config.verbose) {
-              System.err.println(s"[Mutual TCO]         Last statement is tail call return!")
+              trace(s"[Mutual TCO]         Last statement is tail call return!")
             }
             // Check if second-to-last is an if statement with return in then branch
             if (lastIdx > 0) {
               stmts(lastIdx - 1) match {
                 case ifStmt: IfStatement if ifStmt.elseStatement == null =>
                   if (config.verbose) {
-                    System.err.println(s"[Mutual TCO]         Merging tail call into else branch of if statement")
+                    trace(s"[Mutual TCO]         Merging tail call into else branch of if statement")
                   }
                   // Merge tail call into else branch
                   val tailCallTransform = transformStatement(ret)
@@ -576,7 +579,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
                   stmts.take(lastIdx - 1).map(transformStatement) :+ newIfStmt
                 case other =>
                   if (config.verbose) {
-                    System.err.println(s"[Mutual TCO]         Second-to-last is not suitable if statement: ${other.getClass.getSimpleName}")
+                    trace(s"[Mutual TCO]         Second-to-last is not suitable if statement: ${other.getClass.getSimpleName}")
                   }
                   stmts.map(transformStatement)
               }
@@ -585,7 +588,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
             }
           case _ =>
             if (config.verbose) {
-              System.err.println(s"[Mutual TCO]         Last statement is not tail call: ${last.getClass.getSimpleName}")
+              trace(s"[Mutual TCO]         Last statement is not tail call: ${last.getClass.getSimpleName}")
             }
             stmts.map(transformStatement)
         }
@@ -599,7 +602,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
             case targetMethod: MethodDefinition =>
               val inGroup = stateIdByName.contains(targetMethod.name)
               if (config.verbose) {
-                System.err.println(s"[Mutual TCO]         Checking Call: ${targetMethod.name}, in group: $inGroup")
+                trace(s"[Mutual TCO]         Checking Call: ${targetMethod.name}, in group: $inGroup")
               }
               inGroup
             case _ => false
@@ -609,7 +612,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
             case targetMethod: MethodDefinition =>
               val inGroup = stateIdByName.contains(targetMethod.name)
               if (config.verbose) {
-                System.err.println(s"[Mutual TCO]         Checking CallStatic: ${targetMethod.name}, in group: $inGroup")
+                trace(s"[Mutual TCO]         Checking CallStatic: ${targetMethod.name}, in group: $inGroup")
               }
               inGroup
             case _ => false

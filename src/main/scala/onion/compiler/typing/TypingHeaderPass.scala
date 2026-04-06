@@ -80,7 +80,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     } else {
       table_.classes.add(node)
       put(declaration, node)
-      add(node.name, new NameMapper(imports))
+      add(node.name, new NameMapper(typing, imports))
     }
   }
 
@@ -92,7 +92,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     } else {
       table_.classes.add(node)
       put(declaration, node)
-      add(node.name, new NameMapper(imports))
+      add(node.name, new NameMapper(typing, imports))
     }
   }
 
@@ -106,7 +106,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     } else {
       table_.classes.add(node)
       put(declaration, node)
-      add(node.name, new NameMapper(imports))
+      add(node.name, new NameMapper(typing, imports))
     }
   }
 
@@ -120,7 +120,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     } else {
       table_.classes.add(node)
       put(declaration, node)
-      add(node.name, new NameMapper(imports))
+      add(node.name, new NameMapper(typing, imports))
     }
   }
 
@@ -140,7 +140,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     } else {
       table_.classes.add(node)
       put(declaration, node)
-      add(node.name, new NameMapper(imports))
+      add(node.name, new NameMapper(typing, imports))
       // Register this as an extension declaration for later processing
       registerExtensionDeclaration(declaration, node)
     }
@@ -203,6 +203,6 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     table_.classes.add(node)
     node.addDefaultConstructor
     put(unit, node)
-    add(node.name, new NameMapper(imports))
+    add(node.name, new NameMapper(typing, imports))
   }
 }

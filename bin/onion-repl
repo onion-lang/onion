@@ -7,6 +7,11 @@ else
     JAVA_CMD="$JAVA_HOME/bin/java"
 fi
 
+if [ -z "$ONION_HOME" ]; then
+    SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+    ONION_HOME=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+fi
+
 # Check if java is available
 if ! command -v "$JAVA_CMD" > /dev/null 2>&1; then
     echo "Error: Java not found. Please install Java or set JAVA_HOME environment variable."

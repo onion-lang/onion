@@ -61,7 +61,7 @@ This will:
 
 Expected output:
 ```
-[info] compiling 70 Scala sources and 15 Java sources to target/scala-3.6.2/classes ...
+[info] compiling ... Scala sources and ... Java sources to target/scala-3.3.7/classes ...
 [success] Total time: 45 s
 ```
 
@@ -116,11 +116,11 @@ Create a fat JAR with all dependencies:
 sbt assembly
 ```
 
-Output: `target/scala-3.6.2/onion.jar`
+Output: `target/scala-3.3.7/onion.jar`
 
 Run it:
 ```bash
-java -jar target/scala-3.6.2/onion.jar Hello.on
+java -jar target/scala-3.3.7/onion.jar Hello.on
 ```
 
 ### Distribution Package
@@ -139,11 +139,12 @@ onion-dist/
 ├── onion.jar          # Main compiler JAR
 ├── lib/               # Dependencies
 │   ├── asm-9.8.jar
-│   ├── scala-library-3.6.2.jar
+│   ├── scala-library-3.3.7.jar
 │   └── ...
 ├── bin/               # Executables
 │   ├── onionc
-│   └── onion
+│   ├── onion
+│   └── onion-repl
 ├── run/               # Example programs
 │   ├── Hello.on
 │   ├── Array.on
@@ -181,6 +182,24 @@ Run script runner:
 
 ```bash
 sbt 'runScript run/Hello.on'
+```
+
+Run the promoted REPL:
+
+```bash
+sbt repl
+```
+
+Run the benchmark suite:
+
+```bash
+sbt bench
+```
+
+Emit compile profiles:
+
+```bash
+sbt 'runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on'
 ```
 
 ### Interactive SBT
@@ -222,7 +241,7 @@ The parser is automatically regenerated when:
 
 Generated parser:
 ```
-target/scala-3.6.2/src_managed/main/java/onion/compiler/parser/
+target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/
 ├── JJOnionParser.java
 ├── Token.java
 ├── TokenManager.java
@@ -293,7 +312,7 @@ java -version
 ```
 
 Ensure they match requirements:
-- Scala 3.6.2
+- Scala 3.3.7
 - Java 17+
 
 ## Build Configuration
@@ -304,7 +323,7 @@ Key settings:
 
 ```scala
 version := "0.2.0-SNAPSHOT"
-scalaVersion := "3.6.2"
+scalaVersion := "3.3.7"
 name := "onion"
 organization := "org.onion_lang"
 
@@ -380,7 +399,7 @@ free -h
 Use PowerShell or Git Bash. Paths use backslashes:
 ```powershell
 sbt compile
-java -jar target\scala-3.6.2\onion.jar Hello.on
+java -jar target\scala-3.3.7\onion.jar Hello.on
 ```
 
 ## Next Steps

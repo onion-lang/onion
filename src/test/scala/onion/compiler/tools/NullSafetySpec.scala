@@ -109,6 +109,27 @@ class NullSafetySpec extends AbstractShellSpec {
         )
         assert(Shell.Success("success") == result)
       }
+
+      it("boxes primitive receivers before safe calls") {
+        val result = shell.run(
+          """
+            |class Main {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val n: Int = 42
+            |    val text: Object? = n?.toString()
+            |    if text == null {
+            |      return "null"
+            |    }
+            |    return text as String
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("42") == result)
+      }
     }
 
     describe("Safe call with Elvis operator") {

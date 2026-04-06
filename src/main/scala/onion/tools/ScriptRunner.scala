@@ -14,6 +14,7 @@ import onion.compiler.CompilationOutcome
 import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.CompilationReporter
 import onion.compiler.exceptions.ScriptException
+import onion.compiler.pipeline.{CompileProfileFormat, CompileProfileSettings}
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
@@ -58,6 +59,9 @@ object ScriptRunner {
   private final val MAX_ERROR: String = "-maxErrorReport"
   private final val DUMP_AST: String = "--dump-ast"
   private final val DUMP_TYPED_AST: String = "--dump-typed-ast"
+  private final val PROFILE_COMPILE: String = "--profile-compile"
+  private final val PROFILE_FORMAT: String = "--profile-format"
+  private final val PROFILE_OUTPUT: String = "--profile-output"
   private final val WARN_LEVEL: String = "--warn"
   private final val SUPPRESS_WARNINGS: String = "--Wno"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
@@ -74,6 +78,9 @@ class ScriptRunner {
     conf(MAX_ERROR, true),
     conf(DUMP_AST, false),
     conf(DUMP_TYPED_AST, false),
+    conf(PROFILE_COMPILE, false),
+    conf(PROFILE_FORMAT, true),
+    conf(PROFILE_OUTPUT, true),
     conf(WARN_LEVEL, true),
     conf(SUPPRESS_WARNINGS, true)
   )
@@ -125,6 +132,10 @@ class ScriptRunner {
          |  --verbose                   Show compilation phase timing
          |  --dump-ast                  Print parsed AST to stderr
          |  --dump-typed-ast            Print typed AST summary to stderr
+         |  --profile-compile           Emit compile profile for all phases
+         |  --profile-format <text|json>
+         |                              Set profile output format (default: text)
+         |  --profile-output <target>   Send profile to stderr, stdout, or a file path
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
          |  -h, --help                  Show this help message
@@ -146,11 +157,13 @@ class ScriptRunner {
     val classpath: Array[String] = checkClasspath(option.get(CLASSPATH))
     val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
     val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
+    val compileProfile = parseCompileProfile(option)
     val warningLevel = parseWarningLevel(option.get(WARN_LEVEL))
     val suppressedWarnings = parseSuppressedWarnings(option.get(SUPPRESS_WARNINGS))
     for(
       encoding <- checkEncoding(option.get(ENCODING));
       maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR));
+      profile <- compileProfile;
       level <- warningLevel;
       suppressed <- suppressedWarnings
     ) yield (new CompilerConfig(
@@ -163,8 +176,33 @@ class ScriptRunner {
       warningLevel = level,
       suppressedWarnings = suppressed,
       dumpAst = dumpAst,
-      dumpTypedAst = dumpTypedAst
+      dumpTypedAst = dumpTypedAst,
+      compileProfile = profile
     ))
+  }
+
+  private def parseCompileProfile(option: Map[String, CommandLineParam]): Option[CompileProfileSettings] = {
+    val enabled = option.get(PROFILE_COMPILE).contains(NoValuedParam)
+    val format = option.get(PROFILE_FORMAT) match {
+      case None => Some(CompileProfileFormat.Text)
+      case Some(ValuedParam(value)) =>
+        value.toLowerCase match {
+          case "text" => Some(CompileProfileFormat.Text)
+          case "json" => Some(CompileProfileFormat.Json)
+          case _ =>
+            err.println(s"Invalid profile format: $value")
+            None
+        }
+      case Some(NoValuedParam) =>
+        Some(CompileProfileFormat.Text)
+    }
+    format.map { selected =>
+      CompileProfileSettings(
+        enabled = enabled,
+        format = selected,
+        output = option.get(PROFILE_OUTPUT).collect { case ValuedParam(value) => value }
+      )
+    }
   }
 
   private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationOutcome = {

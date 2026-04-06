@@ -9,15 +9,18 @@ package onion.tools
 
 import onion.compiler._
 import onion.compiler.CompilationOutcome.{Failure, Success}
+import org.objectweb.asm.ClassReader
 import org.jline.reader._
 import org.jline.reader.impl.DefaultParser
 import org.jline.reader.impl.completer.StringsCompleter
 import org.jline.terminal.{Terminal, TerminalBuilder}
 import org.jline.utils.AttributedStringBuilder
 import org.jline.utils.AttributedStyle
+import org.objectweb.asm.util.TraceClassVisitor
 
-import java.io.{BufferedReader, ByteArrayOutputStream, File, FileInputStream, FileOutputStream, InputStreamReader, PrintStream, StringReader}
+import java.io.{BufferedReader, ByteArrayOutputStream, File, FileInputStream, FileOutputStream, InputStreamReader, PrintStream, PrintWriter, StringReader, StringWriter}
 import java.nio.file.Paths
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
@@ -59,7 +62,8 @@ object Repl {
 
   // REPL commands
   val COMMANDS: Array[String] = Array(
-    ":help", ":quit", ":exit", ":clear", ":history", ":imports", ":type", ":ast", ":typed", ":reset", ":paste"
+    ":help", ":quit", ":exit", ":clear", ":history", ":imports", ":type", ":ast", ":typed",
+    ":bytecode", ":reset", ":paste", ":load", ":time", ":classpath"
   )
 
   def main(args: Array[String]): Unit = {
@@ -75,6 +79,11 @@ class Repl(classpath: Seq[String]) {
   }
   private case class RawSnippet(code: String) extends Snippet
   private case class ExprSnippet(code: String, name: String) extends Snippet
+  private case class TypedSessionAnalysis(
+    rewritten: Seq[AST.CompilationUnit],
+    typed: Seq[TypedAST.ClassDefinition],
+    typing: Typing
+  )
 
   private case class TerminalContext(terminal: Terminal, useJLine: Boolean)
 
@@ -85,10 +94,13 @@ class Repl(classpath: Seq[String]) {
   private val history = ArrayBuffer[String]()
   private val sessionSnippets = ArrayBuffer[Snippet]()
   private val sessionImports = ArrayBuffer[(String, String)]()
+  private val compiledCache = mutable.HashMap[(String, String), Either[Seq[CompileError], Seq[CompiledClass]]]()
+  private val typedCache = mutable.HashMap[(String, String), Either[Seq[CompileError], TypedSessionAnalysis]]()
   private var sessionModule: Option[String] = None
   private var resultCounter = 0
   private var inputCounter = 0
   private var dummyCounter = 0
+  private var timingEnabled = false
 
   def run(): Unit = {
     val context = buildTerminal()
@@ -108,6 +120,14 @@ class Repl(classpath: Seq[String]) {
   }
 
   private def buildTerminal(): TerminalContext = {
+    if (System.console() == null) {
+      val dumb = TerminalBuilder.builder()
+        .name("Onion REPL")
+        .system(true)
+        .dumb(true)
+        .build()
+      return TerminalContext(dumb, useJLine = false)
+    }
     val preferred = firstNonDumb(Seq(
       () => openTtyTerminal(Some("exec")),
       () => openSystemTerminal(Some("exec")),
@@ -281,14 +301,14 @@ class Repl(classpath: Seq[String]) {
 
   private def processInput(input: String, terminal: Terminal, readerOpt: Option[LineReader]): Boolean = {
     if (input.startsWith(":")) {
-      processCommand(input, terminal)
+      processCommand(input, terminal, readerOpt)
     } else {
       executeCode(input, terminal, readerOpt)
       true
     }
   }
 
-  private def processCommand(input: String, terminal: Terminal): Boolean = {
+  private def processCommand(input: String, terminal: Terminal, readerOpt: Option[LineReader]): Boolean = {
     val parts = input.split("\\s+", 2)
     val cmd = parts(0).toLowerCase
     val arg = if (parts.length > 1) Some(parts(1)) else None
@@ -338,12 +358,21 @@ class Repl(classpath: Seq[String]) {
         }
         true
 
+      case ":bytecode" | ":javap" =>
+        arg match {
+          case Some(expr) => showBytecode(expr)
+          case None => println(Colors.RED + "Usage: :bytecode <expression>" + Colors.RESET)
+        }
+        true
+
       case ":reset" =>
         sessionSnippets.clear()
         sessionImports.clear()
         sessionModule = None
         resultCounter = 0
         inputCounter = 0
+        compiledCache.clear()
+        typedCache.clear()
         println(Colors.GREEN + "Session reset." + Colors.RESET)
         true
 
@@ -366,6 +395,40 @@ class Repl(classpath: Seq[String]) {
         }
         true
 
+      case ":load" =>
+        arg match {
+          case Some(path) =>
+            loadFile(path, terminal, readerOpt)
+          case None =>
+            println(Colors.RED + "Usage: :load <file>" + Colors.RESET)
+        }
+        true
+
+      case ":time" =>
+        arg.map(_.trim.toLowerCase) match {
+          case Some("on") =>
+            timingEnabled = true
+            println(Colors.GREEN + "Timing enabled." + Colors.RESET)
+          case Some("off") =>
+            timingEnabled = false
+            println(Colors.GREEN + "Timing disabled." + Colors.RESET)
+          case Some(other) =>
+            println(Colors.RED + s"Unknown :time mode: $other" + Colors.RESET)
+          case None =>
+            timingEnabled = !timingEnabled
+            val state = if (timingEnabled) "enabled" else "disabled"
+            println(Colors.GREEN + s"Timing $state." + Colors.RESET)
+        }
+        true
+
+      case ":classpath" =>
+        if (classpath.isEmpty) {
+          println("Classpath is empty.")
+        } else {
+          classpath.foreach(entry => println(s"${Colors.CYAN}-${Colors.RESET} $entry"))
+        }
+        true
+
       case _ =>
         println(Colors.RED + s"Unknown command: $cmd" + Colors.RESET)
         println("Type :help for available commands.")
@@ -383,8 +446,12 @@ class Repl(classpath: Seq[String]) {
     |  ${Colors.YELLOW}:type${Colors.RESET} <expr>      Show the type of an expression
     |  ${Colors.YELLOW}:ast${Colors.RESET} <expr>       Show the parsed AST
     |  ${Colors.YELLOW}:typed${Colors.RESET} <expr>     Show the typed AST summary
+    |  ${Colors.YELLOW}:bytecode${Colors.RESET} <expr>  Show generated JVM bytecode for an expression
     |  ${Colors.YELLOW}:reset${Colors.RESET}            Reset the session
     |  ${Colors.YELLOW}:paste${Colors.RESET}, :p        Enter paste mode
+    |  ${Colors.YELLOW}:load${Colors.RESET} <file>      Load and execute a file in the session
+    |  ${Colors.YELLOW}:time${Colors.RESET} [on|off]    Toggle compile/eval timing
+    |  ${Colors.YELLOW}:classpath${Colors.RESET}        Show the current classpath
     |
     |${Colors.BOLD}Keyboard Shortcuts:${Colors.RESET}
     |  ${Colors.CYAN}Tab${Colors.RESET}                 Auto-complete
@@ -419,40 +486,48 @@ class Repl(classpath: Seq[String]) {
             }
             val nextModule = Some(name)
             val source = buildSessionSource(nextModule, sessionImports.toSeq, sessionSnippets.toSeq, printLastResult = false)
-            compileSession(source, fileName) match {
+            withTiming("module") {
+              compileSession(source, fileName)
+            } match {
               case Right(_) =>
                 sessionModule = nextModule
                 inputCounter += 1
               case Left(errors) =>
-                CompilationReporter.printErrors(errors)
+                printErrors(errors)
             }
           case ImportInput(entries) =>
             val nextImports = mergeImports(sessionImports.toSeq, entries)
             val source = buildSessionSource(sessionModule, nextImports, sessionSnippets.toSeq, printLastResult = false)
-            compileSession(source, fileName) match {
+            withTiming("import") {
+              compileSession(source, fileName)
+            } match {
               case Right(_) =>
                 sessionImports.clear()
                 sessionImports ++= nextImports
                 inputCounter += 1
               case Left(errors) =>
-                CompilationReporter.printErrors(errors)
+                printErrors(errors)
             }
           case DeclarationInput(snippet) =>
             val nextSnippets = sessionSnippets.toSeq :+ RawSnippet(snippet)
             val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = false)
-            compileSession(source, fileName) match {
+            withTiming("declaration") {
+              compileSession(source, fileName)
+            } match {
               case Right(_) =>
                 sessionSnippets += RawSnippet(snippet)
                 inputCounter += 1
               case Left(errors) =>
-                CompilationReporter.printErrors(errors)
+                printErrors(errors)
             }
           case ExpressionInput(snippet) =>
             val resName = s"res$resultCounter"
             val exprSnippet = ExprSnippet(snippet, resName)
             val nextSnippets = sessionSnippets.toSeq :+ exprSnippet
             val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = true)
-            compileSession(source, fileName) match {
+            withTiming("expression") {
+              compileSession(source, fileName)
+            } match {
               case Right(classes) =>
                 runClasses(classes, terminal, readerOpt)
                 sessionSnippets += exprSnippet
@@ -462,16 +537,18 @@ class Repl(classpath: Seq[String]) {
                 val rawSnippet = RawSnippet(snippet)
                 val fallbackSnippets = sessionSnippets.toSeq :+ rawSnippet
                 val fallbackSource = buildSessionSource(sessionModule, sessionImports.toSeq, fallbackSnippets, printLastResult = false)
-                compileSession(fallbackSource, fileName) match {
+                withTiming("expression-fallback") {
+                  compileSession(fallbackSource, fileName)
+                } match {
                   case Right(classes) =>
                     runClasses(classes, terminal, readerOpt)
                     sessionSnippets += rawSnippet
                     inputCounter += 1
                   case Left(fallbackErrors) =>
-                    CompilationReporter.printErrors(fallbackErrors)
+                    printErrors(fallbackErrors)
                 }
               case Left(errors) =>
-                CompilationReporter.printErrors(errors)
+                printErrors(errors)
             }
         }
     }
@@ -485,12 +562,14 @@ class Repl(classpath: Seq[String]) {
       sessionSnippets.toSeq :+ ExprSnippet(expr, resName),
       printLastResult = false
     )
-    compileSession(source, "typecheck.on") match {
-      case Right(_) =>
-        println(s"${Colors.CYAN}Expression compiles successfully${Colors.RESET}")
-        println("(Full type inference requires direct type checker access)")
+    analyzeTypedSession(source, "typecheck.on") match {
+      case Right(analysis) =>
+        findSnippetType(analysis, resName) match {
+          case Some(tp) => println(s"${Colors.CYAN}$expr${Colors.RESET}: ${tp.name}")
+          case None => println(s"${Colors.YELLOW}Type information is unavailable for that expression.${Colors.RESET}")
+        }
       case Left(errors) =>
-        CompilationReporter.printErrors(errors)
+        printErrors(errors)
     }
   }
 
@@ -509,7 +588,7 @@ class Repl(classpath: Seq[String]) {
       DiagnosticsPrinter.dumpAst(parsed)
     } catch {
       case e: onion.compiler.exceptions.CompilationException =>
-        CompilationReporter.printErrors(e.problems.toIndexedSeq)
+        printErrors(e.problems.toIndexedSeq)
     }
   }
 
@@ -521,18 +600,29 @@ class Repl(classpath: Seq[String]) {
       sessionSnippets.toSeq :+ ExprSnippet(expr, resName),
       printLastResult = false
     )
-    val fileName = s"repl_typed_${inputCounter + 1}.on"
-    try {
-      val parsing = new Parsing(config)
-      val rewriting = new Rewriting(config)
-      val typing = new Typing(config)
-      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(source), fileName)))
-      val rewritten = rewriting.process(parsed)
-      val typed = typing.process(rewritten)
-      DiagnosticsPrinter.dumpTyped(typed)
-    } catch {
-      case e: onion.compiler.exceptions.CompilationException =>
-        CompilationReporter.printErrors(e.problems.toIndexedSeq)
+    analyzeTypedSession(source, s"repl_typed_${inputCounter + 1}.on") match {
+      case Right(analysis) =>
+        println(capturePrintStream { out =>
+          DiagnosticsPrinter.dumpTyped(analysis.typed, out)
+        })
+      case Left(errors) =>
+        printErrors(errors)
+    }
+  }
+
+  private def showBytecode(expr: String): Unit = {
+    val resName = "__repl_bytecode__"
+    val source = buildSessionSource(
+      sessionModule,
+      sessionImports.toSeq,
+      sessionSnippets.toSeq :+ ExprSnippet(expr, resName),
+      printLastResult = false
+    )
+    compileSession(source, s"repl_bytecode_${inputCounter + 1}.on") match {
+      case Right(classes) =>
+        println(renderBytecode(classes))
+      case Left(errors) =>
+        printErrors(errors)
     }
   }
 
@@ -564,11 +654,11 @@ class Repl(classpath: Seq[String]) {
             }
             Some(unit.copy(toplevels = filtered))
           case Left(nextErrors) =>
-            CompilationReporter.printErrors(nextErrors)
+            printErrors(nextErrors)
             None
         }
       case Left(errors) =>
-        CompilationReporter.printErrors(errors)
+        printErrors(errors)
         None
     }
   }
@@ -686,11 +776,36 @@ class Repl(classpath: Seq[String]) {
   }
 
   private def compileSession(source: String, fileName: String): Either[Seq[CompileError], Seq[CompiledClass]] = {
-    val compiler = new OnionCompiler(config)
-    compiler.compile(Seq(new StreamInputSource(new StringReader(source), fileName))) match {
-      case Success(classes) => Right(classes)
-      case Failure(errors) => Left(errors)
-    }
+    compiledCache.getOrElseUpdate(
+      (source, fileName),
+      {
+        val compiler = new OnionCompiler(config)
+        compiler.compile(Seq(new StreamInputSource(new StringReader(source), fileName))) match {
+          case Success(classes) => Right(classes)
+          case Failure(errors) => Left(errors)
+        }
+      }
+    )
+  }
+
+  private def analyzeTypedSession(source: String, fileName: String): Either[Seq[CompileError], TypedSessionAnalysis] = {
+    typedCache.getOrElseUpdate(
+      (source, fileName),
+      {
+        try {
+          val parsing = new Parsing(config)
+          val rewriting = new Rewriting(config)
+          val typing = new Typing(config)
+          val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(source), fileName)))
+          val rewritten = rewriting.process(parsed)
+          val typed = typing.process(rewritten)
+          Right(TypedSessionAnalysis(rewritten, typed, typing))
+        } catch {
+          case e: onion.compiler.exceptions.CompilationException =>
+            Left(e.problems.toIndexedSeq)
+        }
+      }
+    )
   }
 
   private def runClasses(classes: Seq[CompiledClass], terminal: Terminal, readerOpt: Option[LineReader]): Unit = {
@@ -729,6 +844,72 @@ class Repl(classpath: Seq[String]) {
   }
 
   private def terminalWriter(): java.io.PrintStream = Console.out
+
+  private def loadFile(path: String, terminal: Terminal, readerOpt: Option[LineReader]): Unit = {
+    val file = new File(path)
+    if (!file.exists()) {
+      println(Colors.RED + s"File not found: $path" + Colors.RESET)
+      return
+    }
+    val source = scala.io.Source.fromFile(file, encoding)
+    try {
+      executeCode(source.mkString, terminal, readerOpt)
+    } finally {
+      source.close()
+    }
+  }
+
+  private def withTiming[A](label: String)(block: => A): A = {
+    val start = System.nanoTime()
+    val result = block
+    if (timingEnabled) {
+      val elapsedMs = (System.nanoTime() - start).toDouble / 1000000.0
+      println(f"${Colors.YELLOW}[$label]${Colors.RESET} ${elapsedMs}%.2fms")
+    }
+    result
+  }
+
+  private def findSnippetType(analysis: TypedSessionAnalysis, name: String): Option[TypedAST.Type] =
+    findSnippetInit(analysis.rewritten, name)
+      .flatMap(analysis.typing.typedNodeOf)
+      .collect {
+        case term: TypedAST.Term => term.`type`
+      }
+
+  private def findSnippetInit(units: Seq[AST.CompilationUnit], name: String): Option[AST.Expression] =
+    units.iterator
+      .flatMap(_.toplevels.iterator)
+      .collect { case local: AST.LocalVariableDeclaration if local.name == name => local.init }
+      .filter(_ != null)
+      .toSeq
+      .lastOption
+
+  private def printErrors(errors: Seq[CompileError]): Unit = {
+    CompilationReporter.formatErrors(errors).foreach { error =>
+      Console.err.println(Colors.RED + error + Colors.RESET)
+    }
+    Console.err.println(Colors.RED + onion.compiler.toolbox.Message("error.count", errors.size) + Colors.RESET)
+  }
+
+  private def capturePrintStream(render: PrintStream => Unit): String = {
+    val buffer = new ByteArrayOutputStream()
+    val out = new PrintStream(buffer, true, encoding)
+    try {
+      render(out)
+      out.flush()
+      buffer.toString(encoding).trim
+    } finally {
+      out.close()
+    }
+  }
+
+  private def renderBytecode(classes: Seq[CompiledClass]): String =
+    classes.map { compiled =>
+      val writer = new StringWriter()
+      val trace = new TraceClassVisitor(new PrintWriter(writer))
+      new ClassReader(compiled.content).accept(trace, 0)
+      s"== ${compiled.className} ==\n${writer.toString.trim}"
+    }.mkString("\n\n")
 
   /**
    * Custom completer for Onion language

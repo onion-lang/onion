@@ -7,16 +7,23 @@ import java.util.jar.{Attributes, Manifest}
 
 lazy val onion = (project in file(".")).settings(onionSettings:_*)
 
-lazy val dist = TaskKey[Unit]("onion-dist")
+lazy val dist = taskKey[Unit]("Builds a runnable distribution under target/dist")
 
-lazy val distPath = SettingKey[File]("onion-dist-path")
+lazy val distPath = settingKey[File]("Output directory used by the dist task")
 
 lazy val runScript = inputKey[Unit]("Runs the ScriptRunner with arguments")
+lazy val bench = inputKey[Unit]("Runs the benchmark suite")
 
 fullRunInputTask(
   runScript,
   Compile,
   "onion.tools.ScriptRunner"
+)
+
+fullRunInputTask(
+  bench,
+  Compile,
+  "onion.tools.BenchmarkRunner"
 )
 
 lazy val repl = inputKey[Unit]("Starts the interactive REPL")
@@ -49,6 +56,9 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
   IO.copy(map)
   IO.copyDirectory(file("bin"), out / "bin")
   IO.copyDirectory(file("run"), out / "run")
+  (out / "bin" * "*").get
+    .filterNot(_.getName.toLowerCase.endsWith(".bat"))
+    .foreach(_.setExecutable(true, false))
   IO.copyFile(artifact, out / "onion.jar")
   IO.copyFile(file("README.md"), out / "README.md")
   val files = (out ** AllPassFilter).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))

@@ -10,9 +10,10 @@ package onion.compiler
 import _root_.scala.jdk.CollectionConverters._
 import _root_.onion.compiler.toolbox.{Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
+import _root_.onion.compiler.typing.{NameMapper, TypeAliasEntry, TypeParam, TypeParamScope, TypingDiagnostics, TypingTypeSupport}
 import _root_.onion.compiler.TypedAST._
 import _root_.onion.compiler.SemanticError._
-import collection.mutable.{Buffer, HashMap, Map, Set => MutableSet}
+import collection.mutable.{Buffer, HashMap, Map}
 
 import scala.compiletime.uninitialized
 
@@ -81,11 +82,6 @@ import scala.compiletime.uninitialized
  */
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
-  private[compiler] case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
-  private[compiler] case class TypeParamScope(params: Map[String, TypeParam]) {
-    def get(name: String): Option[TypeParam] = params.get(name)
-    def ++(ps: Seq[TypeParam]): TypeParamScope = copy(params ++ ps.map(p => p.name -> p))
-  }
   private[compiler] val emptyTypeParams = TypeParamScope(Map.empty)
 
   private[compiler] def boxedClass(`type`: BasicType): ClassType =
@@ -108,186 +104,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   type Continuable = Boolean
   type Environment = TypingEnvironment
   type Dimension = Int
-  private def split(descriptor: AST.TypeDescriptor): (AST.TypeDescriptor, Dimension) = {
+  private[compiler] def split(descriptor: AST.TypeDescriptor): (AST.TypeDescriptor, Dimension) = {
     def loop(target: AST.TypeDescriptor, dimension: Int): (AST.TypeDescriptor, Int) = target match {
       case AST.ArrayType(component) => loop(component, dimension + 1)
       case otherwise => (otherwise, dimension)
     }
     loop(descriptor, 0)
-  }
-  /**
-   * Represents a type alias entry.
-   */
-  private[compiler] case class TypeAliasEntry(
-    fqcn: String,
-    typeParameters: Seq[TypeParam],
-    targetDescriptor: AST.TypeDescriptor,
-    node: AST.TypeAliasDeclaration,
-    imports: Seq[ImportItem]
-  )
-
-  private[compiler] class NameMapper(imports: Seq[ImportItem]) {
-    def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
-
-    /** Get candidate class names for suggestions (non-on-demand imports only) */
-    def getCandidateClassNames: Array[String] = {
-      val localClasses = table_.classes.values.map(_.name).toSeq
-      val importedClasses = imports.filterNot(_.isOnDemand).map(_.simpleName)
-      (localClasses ++ importedClasses).distinct.toArray
-    }
-    def map(descriptor : AST.TypeDescriptor): Type = descriptor match {
-      case AST.PrimitiveType(AST.KChar)       => BasicType.CHAR
-      case AST.PrimitiveType(AST.KByte)       => BasicType.BYTE
-      case AST.PrimitiveType(AST.KShort)      => BasicType.SHORT
-      case AST.PrimitiveType(AST.KInt)        => BasicType.INT
-      case AST.PrimitiveType(AST.KLong)       => BasicType.LONG
-      case AST.PrimitiveType(AST.KFloat)      => BasicType.FLOAT
-      case AST.PrimitiveType(AST.KDouble)     => BasicType.DOUBLE
-      case AST.PrimitiveType(AST.KBoolean)    => BasicType.BOOLEAN
-      case AST.PrimitiveType(AST.KVoid)       => BasicType.VOID
-      case AST.ReferenceType(name, qualified) =>
-        // Check if this is a type alias first
-        val aliasFqcn = if (qualified) name else {
-          val module = unit_.module
-          val moduleName = if (module != null) module.name else null
-          createFQCN(moduleName, name)
-        }
-        val aliasOpt = typeAliases_.get(aliasFqcn).orElse {
-          if (!qualified) {
-            imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => typeAliases_.get(fqcn)).nextOption()
-          } else None
-        }
-        aliasOpt match {
-          case Some(entry) if entry.typeParameters.isEmpty =>
-            resolveTypeAlias(entry, Nil)  // Returns any Type (including NullableType)
-          case _ =>
-            forName(name, qualified)  // Normal class lookup
-        }
-      case AST.ParameterizedType(base, params) =>
-        val mappedArgs = params.map(map)
-        if (mappedArgs.exists(_ == null)) return null
-
-        // Check if base is a type alias
-        base match {
-          case AST.ReferenceType(name, qualified) =>
-            val aliasFqcn = if (qualified) name else {
-              val module = unit_.module
-              val moduleName = if (module != null) module.name else null
-              createFQCN(moduleName, name)
-            }
-            // Try local alias, then imported alias
-            val aliasOpt = typeAliases_.get(aliasFqcn).orElse {
-              if (!qualified) {
-                imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => typeAliases_.get(fqcn)).nextOption()
-              } else None
-            }
-            aliasOpt match {
-              case Some(aliasEntry) =>
-                return resolveTypeAlias(aliasEntry, mappedArgs)
-              case None =>
-            }
-          case _ =>
-        }
-
-        // Not a type alias, proceed with normal class resolution
-        val raw = map(base)
-        if (raw == null) return null
-        raw match {
-          case clazz: ClassType =>
-            TypedAST.AppliedClassType(clazz, mappedArgs)
-          case _ =>
-            raw
-        }
-      case AST.FunctionType(params, result) =>
-        val mappedParams = params.map(map)
-        val mappedResult = map(result)
-        if (mappedParams.exists(_ == null) || mappedResult == null) return null
-        val arity = mappedParams.length
-        val functionType = table_.load(s"onion.Function$arity")
-        if (functionType == null) return null
-        TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
-      case AST.ArrayType(component)           =>  val (base, dimension) = split(descriptor); table_.loadArray(map(base), dimension)
-      case AST.WildcardType(upperBound, lowerBound) =>
-        val mappedUpper = upperBound.map(map).getOrElse(rootClass)
-        val mappedLower = lowerBound.map(map)
-        new TypedAST.WildcardType(mappedUpper, mappedLower)
-      case AST.NullableType(inner) =>
-        val mappedInner = map(inner)
-        if (mappedInner == null) null
-        else new TypedAST.NullableType(mappedInner)
-      case _ => null
-    }
-    private def forName(name: String, qualified: Boolean): ClassType = {
-      if (qualified) {
-        table_.load(name)
-      } else {
-        typeParams_.get(name).map(_.variableType).getOrElse {
-          val module = unit_.module
-          val moduleName = if (module != null) module.name else null
-          val aliasFqcn = createFQCN(moduleName, name)
-
-          // Existing class lookup logic (type alias is handled in map())
-          val local = table_.lookup(aliasFqcn)
-          if (local != null) {
-            local
-          } else {
-            imports.iterator
-              .flatMap(_.matches(name))
-              .map(fqcn => forName(fqcn, qualified = true))
-              .find(_ != null)
-              .orNull
-          }
-        }
-      }
-    }
-
-    private def resolveTypeAlias(entry: TypeAliasEntry, typeArgs: List[Type]): Type = {
-      // Cyclic detection
-      if (typeAliasResolutionStack_.contains(entry.fqcn)) {
-        report(CYCLIC_TYPE_ALIAS, entry.node, entry.fqcn)
-        return null
-      }
-
-      val params = entry.typeParameters
-
-      // Arity check for generic aliases
-      if (params.nonEmpty && typeArgs.length != params.length) {
-        report(TYPE_ARGUMENT_ARITY_MISMATCH, entry.node,
-               entry.fqcn, Integer.valueOf(params.length), Integer.valueOf(typeArgs.length))
-        return null
-      }
-
-      typeAliasResolutionStack_ += entry.fqcn
-      try {
-        // Create fresh NameMapper with alias's imports
-        val aliasMapper = new NameMapper(entry.imports)
-
-        // Set up type parameter scope for generic aliases
-        if (params.nonEmpty && typeArgs.nonEmpty) {
-          // Create substitution type params: map param names to actual types
-          val substitutions = params.zip(typeArgs).map { case (p, arg) =>
-            val varType = arg match {
-              case tv: TypeVariableType => tv
-              case ct: ClassType => TypeVariableType(p.name, ct)
-              case _ => TypeVariableType(p.name, rootClass)
-            }
-            TypeParam(p.name, varType, p.upperBound)
-          }
-          // Temporarily set up type params with the actual types for substitution
-          val savedTypeParams = typeParams_
-          typeParams_ = emptyTypeParams ++ substitutions
-          try {
-            aliasMapper.map(entry.targetDescriptor)
-          } finally {
-            typeParams_ = savedTypeParams
-          }
-        } else {
-          aliasMapper.map(entry.targetDescriptor)
-        }
-      } finally {
-        typeAliasResolutionStack_ -= entry.fqcn
-      }
-    }
   }
   private[compiler] val table_  = new ClassTable(classpath(config.classPath))
   private[compiler] val ast2ixt_ = Map[AST.Node, TypedAST.Node]()
@@ -307,9 +129,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   // Type alias storage
   private[compiler] val typeAliases_ : HashMap[String, TypeAliasEntry] = HashMap()
   // Cyclic detection stack for type alias resolution
-  private[compiler] val typeAliasResolutionStack_ : MutableSet[String] = MutableSet()
-  private[compiler] val reporter_ : SemanticErrorReporter = new SemanticErrorReporter(config.maxErrorReports)
-  private[compiler] val warningReporter_ : WarningReporter = new WarningReporter(config.warningLevel, config.suppressedWarnings)
+  private[compiler] val typeAliasResolutionStack_ : collection.mutable.Set[String] = collection.mutable.Set()
+  private val diagnostics = new TypingDiagnostics(this, config)
+  private val typeSupport = new TypingTypeSupport(this)
+  private[compiler] val reporter_ : SemanticErrorReporter = diagnostics.reporter
+  private[compiler] val warningReporter_ : WarningReporter = diagnostics.warningReporter
   private var suppressReporting: Int = 0
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
@@ -317,19 +141,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     for(unit <- source) processOutline(unit)
     for(unit <- source) processTyping(unit)
     for(unit <- source) processDuplication(unit)
-    val problems = reporter_.getProblems
-    if (problems.length > 0) throw new CompilationException(problems.toSeq)
-
-    // Print warnings
-    warningReporter_.printWarnings()
-
-    // If warnings are treated as errors and there are warnings, fail compilation
-    if (warningReporter_.treatAsErrors && warningReporter_.hasWarnings) {
-      throw new CompilationException(Seq(
-        CompileError("", null, s"${warningReporter_.warningCount} warning(s) treated as errors")
-      ))
-    }
-
+    diagnostics.finishOrThrow()
     table_.classes.values.toSeq
   }
 
@@ -353,46 +165,22 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     finally suppressReporting -= 1
   }
 
-  private def reportingEnabled: Boolean = suppressReporting == 0
+  private[compiler] def reportingEnabled: Boolean = suppressReporting == 0
 
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit = {
     report(error, node.location, items*)
   }
-  def report(error: SemanticError, location: Location, items: AnyRef*): Unit = {
-    if (!reportingEnabled) return
-    def report_(items: Array[AnyRef]): Unit = {
-      reporter_.setSourceFile(unit_.sourceFile)
-      reporter_.report(error, location, items)
-    }
-    report_(items.toArray)
-  }
+  def report(error: SemanticError, location: Location, items: AnyRef*): Unit =
+    diagnostics.report(error, location, items)
 
-  def reportUnusedVariables(context: LocalContext): Unit = {
-    if (!reportingEnabled) return
-    warningReporter_.setSourceFile(unit_.sourceFile)
-    for (v <- context.unusedLocalVariables) {
-      warningReporter_.unusedVariable(v.location, v.name)
-    }
-    for (p <- context.unusedParameters) {
-      warningReporter_.unusedParameter(p.location, p.name)
-    }
-  }
+  def reportUnusedVariables(context: LocalContext): Unit =
+    diagnostics.reportUnusedVariables(context)
 
   /**
    * Reports a variable shadowing warning if the given name shadows an outer variable.
    */
-  def checkAndReportShadowing(name: String, location: Location, context: LocalContext): Unit = {
-    if (!reportingEnabled) return
-    // Skip synthetic/generated names
-    if (name.startsWith("symbol#") || name.startsWith("$")) return
-
-    warningReporter_.setSourceFile(unit_.sourceFile)
-    context.checkShadowing(name) match {
-      case Some(originalLocation) =>
-        warningReporter_.shadowedVariable(location, name, originalLocation)
-      case None => // No shadowing
-    }
-  }
+  def checkAndReportShadowing(name: String, location: Location, context: LocalContext): Unit =
+    diagnostics.checkAndReportShadowing(name, location, context)
 
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
   def load(name: String): ClassType = table_.load(name)
@@ -401,7 +189,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def loadTopClass: ClassType = table_.load(topClass)
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
-  def problems: Array[CompileError] = reporter_.getProblems
+  def problems: Array[CompileError] = diagnostics.problems
   def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray
   def topClass: String = {
     val module = unit_.module
@@ -418,6 +206,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def lookupKernelNode(astNode: AST.Node): Node = ast2ixt_.get(astNode).getOrElse(null)
   /** Option-returning version of lookupKernelNode */
   private[compiler] def lookupKernelNodeOpt(astNode: AST.Node): Option[Node] = ast2ixt_.get(astNode)
+  def typedNodeOf(astNode: AST.Node): Option[TypedAST.Node] = lookupKernelNodeOpt(astNode)
   private[compiler] def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
   private[compiler] def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
   // Extension method registration
@@ -434,117 +223,28 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def findOpt(className: String): Option[NameMapper] = mappers_.get(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
-  private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
-    val result = arguments.map { arg =>
-      val baseType = mapFrom(arg.typeRef)
-      if (baseType != null && arg.isVararg) {
-        // Convert vararg type to array type
-        table_.loadArray(baseType, 1)
-      } else {
-        baseType
-      }
-    }
-    if(result.forall(_ != null)) Some(result) else None
-  }
-  private[compiler] def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)
+  private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
+    typeSupport.typesOf(arguments)
+
+  private[compiler] def mapFrom(typeNode: AST.TypeNode): Type =
+    typeSupport.mapFrom(typeNode)
+
   /** Option-returning version of mapFrom for safer null handling */
-  private[compiler] def mapFromOpt(typeNode: AST.TypeNode): Option[Type] = mapFromOpt(typeNode, mapper_)
-  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
-    val mappedType = mapper.resolveNode(typeNode)
-    if (mappedType == null) report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
-    else validateTypeApplication(typeNode, mappedType)
-    mappedType
-  }
+  private[compiler] def mapFromOpt(typeNode: AST.TypeNode): Option[Type] =
+    typeSupport.mapFromOpt(typeNode)
+
+  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type =
+    typeSupport.mapFrom(typeNode, mapper)
+
   /** Option-returning version of mapFrom for safer null handling */
-  private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameMapper): Option[Type] = {
-    val mappedType = mapper.resolveNode(typeNode)
-    if (mappedType == null) {
-      report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
-      None
-    } else {
-      validateTypeApplication(typeNode, mappedType)
-      Some(mappedType)
-    }
-  }
+  private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameMapper): Option[Type] =
+    typeSupport.mapFromOpt(typeNode, mapper)
 
-  private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {
-    typeNode.desc match {
-      case AST.ParameterizedType(_, _) | AST.FunctionType(_, _) =>
-        mappedType match {
-          case applied: TypedAST.AppliedClassType =>
-            val rawParams = applied.raw.typeParameters
-            if (rawParams.isEmpty) {
-              report(TYPE_NOT_GENERIC, typeNode, applied.raw.name)
-              return
-            }
-            if (rawParams.length != applied.typeArguments.length) {
-              report(TYPE_ARGUMENT_ARITY_MISMATCH, typeNode, applied.raw.name, Integer.valueOf(rawParams.length), Integer.valueOf(applied.typeArguments.length))
-              return
-            }
-            val hasError = rawParams.indices.exists { i =>
-              val upper = rawParams(i).upperBound.getOrElse(rootClass)
-              val arg = applied.typeArguments(i)
-              if (arg eq BasicType.VOID) {
-                report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
-                true
-              } else {
-                arg match {
-                  case w: TypedAST.WildcardType =>
-                    // For wildcards, check that the wildcard's upper bound is assignable to the type param's upper bound
-                    val wildcardUpper = w.upperBound
-                    if (!TypeRules.isAssignable(upper, wildcardUpper)) {
-                      report(INCOMPATIBLE_TYPE, typeNode, upper, wildcardUpper)
-                      true
-                    } else false
-                  case _ =>
-                    val checkedArg = boxedTypeArgument(arg)
-                    if (!TypeRules.isAssignable(upper, checkedArg)) {
-                      report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
-                      true
-                    } else false
-                }
-              }
-            }
-            if (hasError) return
-          case _ =>
-        }
-      case _ =>
-    }
-  }
+  private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A =
+    typeSupport.openTypeParams(scope)(block)
 
-  private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
-    val prev = typeParams_
-    typeParams_ = scope
-    try block
-    finally typeParams_ = prev
-  }
-
-  private[compiler] def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {
-    val seen = MutableSet[String]()
-    val result = Buffer[TypeParam]()
-    for (tp <- nodes) {
-      if (seen.contains(tp.name)) {
-        report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
-      } else {
-        seen += tp.name
-        val upper = tp.upperBound match {
-          case Some(boundNode) =>
-            val mapped = mapFrom(boundNode)
-            mapped match {
-              case ct: ClassType => ct
-              case _ =>
-                report(INCOMPATIBLE_TYPE, boundNode, rootClass, mapped)
-                rootClass
-            }
-          case None =>
-            rootClass
-        }
-        val variableType = new TypedAST.TypeVariableType(tp.name, upper)
-        result += TypeParam(tp.name, variableType, upper)
-      }
-    }
-    result.toSeq
-  }
+  private[compiler] def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] =
+    typeSupport.createTypeParams(nodes)
 
 
 }

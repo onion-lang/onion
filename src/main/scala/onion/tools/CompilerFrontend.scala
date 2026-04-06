@@ -17,6 +17,7 @@ import onion.compiler.CompilationOutcome
 import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.CompilationReporter
 import onion.compiler.exceptions.ScriptException
+import onion.compiler.pipeline.{CompileProfileFormat, CompileProfileSettings}
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
@@ -64,6 +65,9 @@ object CompilerFrontend {
   private final val VERBOSE: String = "--verbose"
   private final val DUMP_AST: String = "--dump-ast"
   private final val DUMP_TYPED_AST: String = "--dump-typed-ast"
+  private final val PROFILE_COMPILE: String = "--profile-compile"
+  private final val PROFILE_FORMAT: String = "--profile-format"
+  private final val PROFILE_OUTPUT: String = "--profile-output"
   private final val WARN_LEVEL: String = "--warn"
   private final val SUPPRESS_WARNINGS: String = "--Wno"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
@@ -84,6 +88,9 @@ class CompilerFrontend {
     config(MAX_ERROR, true),
     config(DUMP_AST, false),
     config(DUMP_TYPED_AST, false),
+    config(PROFILE_COMPILE, false),
+    config(PROFILE_FORMAT, true),
+    config(PROFILE_OUTPUT, true),
     config(WARN_LEVEL, true),
     config(SUPPRESS_WARNINGS, true)
   )
@@ -161,6 +168,10 @@ class CompilerFrontend {
          |  --verbose                   Show compilation phase timing
          |  --dump-ast                  Print parsed AST to stderr
          |  --dump-typed-ast            Print typed AST summary to stderr
+         |  --profile-compile           Emit compile profile for all phases
+         |  --profile-format <text|json>
+         |                              Set profile output format (default: text)
+         |  --profile-output <target>   Send profile to stderr, stdout, or a file path
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
          |  -h, --help                  Show this help message
@@ -200,11 +211,13 @@ class CompilerFrontend {
     )
     val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
     val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
+    val compileProfile = parseCompileProfile(option)
     val warningLevel = parseWarningLevel(option.get(WARN_LEVEL))
     val suppressedWarnings = parseSuppressedWarnings(option.get(SUPPRESS_WARNINGS))
     for {
       e <- encoding
       m <- maxErrorReport
+      profile <- compileProfile
       level <- warningLevel
       suppressed <- suppressedWarnings
     } yield {
@@ -218,7 +231,32 @@ class CompilerFrontend {
         warningLevel = level,
         suppressedWarnings = suppressed,
         dumpAst = dumpAst,
-        dumpTypedAst = dumpTypedAst
+        dumpTypedAst = dumpTypedAst,
+        compileProfile = profile
+      )
+    }
+  }
+
+  private def parseCompileProfile(option: Map[String, CommandLineParam]): Option[CompileProfileSettings] = {
+    val enabled = option.get(PROFILE_COMPILE).contains(NoValuedParam)
+    val format = option.get(PROFILE_FORMAT) match {
+      case None => Some(CompileProfileFormat.Text)
+      case Some(ValuedParam(value)) =>
+        value.toLowerCase match {
+          case "text" => Some(CompileProfileFormat.Text)
+          case "json" => Some(CompileProfileFormat.Json)
+          case _ =>
+            printError(s"Invalid profile format: $value")
+            None
+        }
+      case Some(NoValuedParam) =>
+        Some(CompileProfileFormat.Text)
+    }
+    format.map { selected =>
+      CompileProfileSettings(
+        enabled = enabled,
+        format = selected,
+        output = option.get(PROFILE_OUTPUT).collect { case ValuedParam(value) => value }
       )
     }
   }

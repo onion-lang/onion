@@ -53,22 +53,20 @@ private[typing] object MemberAccess {
     }
 
   def ensureTypeAccessible(typing: Typing, node: AST.Node, target: ObjectType, context: ClassType): Boolean = {
-    import typing.*
     if (target.isArrayType) {
       val component = target.asInstanceOf[ArrayType].component
       if (!component.isBasicType) {
         if (!isTypeAccessible(component.asInstanceOf[ClassType], context)) {
-          report(CLASS_NOT_ACCESSIBLE, node, target, context)
+          typing.report(CLASS_NOT_ACCESSIBLE, node, target, context)
           return false
         }
       }
     } else {
       if (!isTypeAccessible(target.asInstanceOf[ClassType], context)) {
-        report(CLASS_NOT_ACCESSIBLE, node, target, context)
+        typing.report(CLASS_NOT_ACCESSIBLE, node, target, context)
         return false
       }
     }
     true
   }
 }
-

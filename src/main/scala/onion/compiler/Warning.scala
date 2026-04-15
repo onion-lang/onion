@@ -7,6 +7,8 @@
  * ************************************************************** */
 package onion.compiler
 
+import onion.compiler.diagnostics.Diagnostic
+
 /**
  * Warning levels for compiler diagnostics.
  */
@@ -64,9 +66,9 @@ case class CompileWarning(
   location: Location,
   category: WarningCategory,
   message: String
-):
-  def code: String = category.code
+) extends Diagnostic:
+  override def code: Option[String] = Some(category.code)
 
   def formatted: String =
     val loc = if location != null then s"${location.line}:${location.column}" else "?"
-    s"[$code] $sourceFile:$loc: warning: $message"
+    s"[${category.code}] $sourceFile:$loc: warning: $message"

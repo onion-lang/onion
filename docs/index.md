@@ -98,7 +98,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 
 - **onionc** - Compile Onion source files to .class files
 - **onion** - Run Onion scripts directly (compile and execute)
-- **Shell** - Interactive REPL for experimentation
+- **onion-repl / onion repl** - Interactive REPL for experimentation
 
 ## Project History
 
@@ -106,8 +106,10 @@ Originally written in Java in 2005, Onion has been completely rewritten in Scala
 
 1. **Parsing** - JavaCC-generated parser produces untyped AST
 2. **Rewriting** - AST normalization and transformation
-3. **Type Checking** - Type inference and validation
-4. **Code Generation** - ASM-based bytecode generation
+3. **Type Checking** - Type inference, name resolution, overload resolution, and typed AST construction
+4. **Tail-Call Optimization** - Self-recursive loop lowering
+5. **Mutual Recursion Optimization** - State-machine lowering for `@TailRecursive` groups
+6. **Code Generation** - Direct typed-AST bytecode generation via ASM
 
 ## Community
 

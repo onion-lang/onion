@@ -49,6 +49,9 @@ class TailCallOptimization(config: CompilerConfig)
   class OptimizationEnvironment
   type Environment = OptimizationEnvironment
 
+  private inline def trace(message: => String): Unit =
+    if (config.verbose) System.err.println(message)
+
   def newEnvironment(source: Seq[ClassDefinition]): Environment =
     new OptimizationEnvironment
 
@@ -61,7 +64,7 @@ class TailCallOptimization(config: CompilerConfig)
         case methodDef: MethodDefinition =>
           if (isTailRecursive(methodDef)) {
             if (config.verbose) {
-              System.err.println(s"[TCO] Optimizing tail-recursive method: ${classDef.name}.${methodDef.name}")
+              trace(s"[TCO] Optimizing tail-recursive method: ${classDef.name}.${methodDef.name}")
             }
             optimizeMethod(methodDef)
           }
@@ -78,7 +81,7 @@ class TailCallOptimization(config: CompilerConfig)
     // Only optimize private methods to avoid breaking public API
     if (!isPrivate(method)) {
       if (config.verbose) {
-        System.err.println(s"[TCO] Skipping non-private method: ${method.classType.name}.${method.name}")
+        trace(s"[TCO] Skipping non-private method: ${method.classType.name}.${method.name}")
       }
       return false
     }
@@ -86,14 +89,14 @@ class TailCallOptimization(config: CompilerConfig)
     // Skip methods with @TailRecursive annotation (they may be part of mutual recursion)
     if (method.annotations.contains("TailRecursive")) {
       if (config.verbose) {
-        System.err.println(s"[TCO] Skipping @TailRecursive annotated method: ${method.classType.name}.${method.name}")
+        trace(s"[TCO] Skipping @TailRecursive annotated method: ${method.classType.name}.${method.name}")
       }
       return false
     }
 
     val hasTailCall = containsTailCall(block.statements.toSeq, method)
     if (config.verbose) {
-      System.err.println(s"[TCO] Method ${method.classType.name}.${method.name}: hasTailCall=$hasTailCall")
+      trace(s"[TCO] Method ${method.classType.name}.${method.name}: hasTailCall=$hasTailCall")
     }
     hasTailCall
   }
@@ -124,40 +127,40 @@ class TailCallOptimization(config: CompilerConfig)
 
   private def checkStatementForTailCall(stmt: ActionStatement, method: MethodDefinition): Boolean = {
     if (config.verbose) {
-      System.err.println(s"[TCO]   checkStatementForTailCall: ${stmt.getClass.getSimpleName}")
+      trace(s"[TCO]   checkStatementForTailCall: ${stmt.getClass.getSimpleName}")
     }
     stmt match {
       case ret: Return =>
         val result = ret.term != null && isSelfCall(ret.term, method)
         if (config.verbose) {
-          System.err.println(s"[TCO]     Return statement: hasSelfCall=$result")
+          trace(s"[TCO]     Return statement: hasSelfCall=$result")
         }
         result
       case block: StatementBlock =>
         containsTailCall(block.statements.toSeq, method)
       case ifStmt: IfStatement =>
         if (config.verbose) {
-          System.err.println(s"[TCO]     IfStatement: checking then and else branches")
+          trace(s"[TCO]     IfStatement: checking then and else branches")
         }
         val thenResult = checkStatementForTailCall(ifStmt.thenStatement, method)
         val elseResult = if (ifStmt.elseStatement != null) checkStatementForTailCall(ifStmt.elseStatement, method) else false
         if (config.verbose) {
-          System.err.println(s"[TCO]     IfStatement: then=$thenResult, else=$elseResult")
+          trace(s"[TCO]     IfStatement: then=$thenResult, else=$elseResult")
         }
         thenResult || elseResult
       case exprStmt: ExpressionActionStatement =>
         // Check expression in tail position
         if (config.verbose) {
-          System.err.println(s"[TCO]     ExpressionActionStatement: checking term")
+          trace(s"[TCO]     ExpressionActionStatement: checking term")
         }
         val result = isSelfCall(exprStmt.term, method)
         if (config.verbose) {
-          System.err.println(s"[TCO]     ExpressionActionStatement: hasSelfCall=$result")
+          trace(s"[TCO]     ExpressionActionStatement: hasSelfCall=$result")
         }
         result
       case _ =>
         if (config.verbose) {
-          System.err.println(s"[TCO]     Unknown statement type")
+          trace(s"[TCO]     Unknown statement type")
         }
         false
     }
@@ -165,7 +168,7 @@ class TailCallOptimization(config: CompilerConfig)
 
   private def isSelfCall(term: Term, method: MethodDefinition): Boolean = {
     if (config.verbose) {
-      System.err.println(s"[TCO]   Checking term type: ${term.getClass.getSimpleName}")
+      trace(s"[TCO]   Checking term type: ${term.getClass.getSimpleName}")
     }
     term match {
       case call: Call =>
@@ -175,7 +178,7 @@ class TailCallOptimization(config: CompilerConfig)
             targetMethod.classType.name == method.classType.name &&
             argumentTypesMatch(targetMethod.arguments, method.arguments)
             if (config.verbose) {
-              System.err.println(s"[TCO]   Call to ${targetMethod.name}: isSelf=$isSelf")
+              trace(s"[TCO]   Call to ${targetMethod.name}: isSelf=$isSelf")
             }
             isSelf
           case _ => false
@@ -187,7 +190,7 @@ class TailCallOptimization(config: CompilerConfig)
             call.target.name == method.classType.name &&
             argumentTypesMatch(targetMethod.arguments, method.arguments)
             if (config.verbose) {
-              System.err.println(s"[TCO]   CallStatic to ${targetMethod.name}: isSelf=$isSelf")
+              trace(s"[TCO]   CallStatic to ${targetMethod.name}: isSelf=$isSelf")
             }
             isSelf
           case _ => false
@@ -195,16 +198,16 @@ class TailCallOptimization(config: CompilerConfig)
       case stmtTerm: StatementTerm =>
         // Check if-else expression (wrapped in StatementTerm)
         if (config.verbose) {
-          System.err.println(s"[TCO]   StatementTerm wrapping: ${stmtTerm.statement.getClass.getSimpleName}")
+          trace(s"[TCO]   StatementTerm wrapping: ${stmtTerm.statement.getClass.getSimpleName}")
         }
         checkStatementForTailCall(stmtTerm.statement, method)
       case begin: Begin =>
         // Check all terms in begin block for if-else expressions
         if (begin.terms.nonEmpty) {
           if (config.verbose) {
-            System.err.println(s"[TCO]   Begin with ${begin.terms.length} terms:")
+            trace(s"[TCO]   Begin with ${begin.terms.length} terms:")
             begin.terms.zipWithIndex.foreach { case (t, i) =>
-              System.err.println(s"[TCO]     Term $i: ${t.getClass.getSimpleName}")
+              trace(s"[TCO]     Term $i: ${t.getClass.getSimpleName}")
             }
           }
           // Check all terms (if-else expressions may be in any position)
@@ -215,16 +218,16 @@ class TailCallOptimization(config: CompilerConfig)
       case setLocal: SetLocal =>
         // Check value being assigned (may contain tail call)
         if (config.verbose) {
-          System.err.println(s"[TCO]   SetLocal: checking value")
+          trace(s"[TCO]   SetLocal: checking value")
         }
         val result = isSelfCall(setLocal.value, method)
         if (config.verbose) {
-          System.err.println(s"[TCO]   SetLocal: value has self call=$result")
+          trace(s"[TCO]   SetLocal: value has self call=$result")
         }
         result
       case _ =>
         if (config.verbose) {
-          System.err.println(s"[TCO]   Unknown term type, not a self call")
+          trace(s"[TCO]   Unknown term type, not a self call")
         }
         false
     }
@@ -281,9 +284,9 @@ class TailCallOptimization(config: CompilerConfig)
 
     method.setTcoLoopVars(allVarsForSlotAllocation)
 
-    System.err.println(s"[TCO] Registered ${loopVarMapping.length} loop variables for method ${method.name}")
+    trace(s"[TCO] Registered ${loopVarMapping.length} loop variables for method ${method.name}")
     if (tempVarMapping.isDefined) {
-      System.err.println(s"[TCO] Registered ${tempVarMapping.get.length} temp variables for method ${method.name}")
+      trace(s"[TCO] Registered ${tempVarMapping.get.length} temp variables for method ${method.name}")
     }
 
     // Step 1: Create initialization statements (copy parameters to loop variables)
@@ -294,53 +297,53 @@ class TailCallOptimization(config: CompilerConfig)
     }
 
     // Step 2: Rewrite all parameter references in the method body to use loop variables
-    System.err.println(s"[TCO optimizeMethod] Step 2: Rewriting parameter references, original body has ${block.statements.length} statements")
+    trace(s"[TCO optimizeMethod] Step 2: Rewriting parameter references, original body has ${block.statements.length} statements")
     val rewrittenBody = rewriteParameterReferences(
       block.statements.toSeq,
       loopVarMapping
     )
-    System.err.println(s"[TCO optimizeMethod] Step 2 complete: rewrittenBody has ${rewrittenBody.length} statements")
+    trace(s"[TCO optimizeMethod] Step 2 complete: rewrittenBody has ${rewrittenBody.length} statements")
     rewrittenBody.zipWithIndex.foreach { case (stmt, i) =>
-      System.err.println(s"[TCO optimizeMethod]   rewrittenBody[$i]: ${stmt.getClass.getSimpleName}")
+      trace(s"[TCO optimizeMethod]   rewrittenBody[$i]: ${stmt.getClass.getSimpleName}")
       stmt match {
         case block: StatementBlock =>
-          System.err.println(s"[TCO optimizeMethod]     StatementBlock with ${block.statements.length} statements:")
+          trace(s"[TCO optimizeMethod]     StatementBlock with ${block.statements.length} statements:")
           block.statements.zipWithIndex.foreach { case (s, j) =>
-            System.err.println(s"[TCO optimizeMethod]       stmt[$j]: ${s.getClass.getSimpleName}")
+            trace(s"[TCO optimizeMethod]       stmt[$j]: ${s.getClass.getSimpleName}")
           }
         case ret: Return =>
           val hasTailCall = if (ret.term != null) isSelfCall(ret.term, method) else false
-          System.err.println(s"[TCO optimizeMethod]     Return: term=${if (ret.term != null) ret.term.getClass.getSimpleName else "null"}, hasTailCall=$hasTailCall")
+          trace(s"[TCO optimizeMethod]     Return: term=${if (ret.term != null) ret.term.getClass.getSimpleName else "null"}, hasTailCall=$hasTailCall")
         case _ =>
       }
     }
 
     // Step 3: Transform tail calls to loop variable updates
-    System.err.println(s"[TCO optimizeMethod] Step 3: Transforming tail calls")
+    trace(s"[TCO optimizeMethod] Step 3: Transforming tail calls")
     val transformedBody = transformStatements(
       rewrittenBody,
       method,
       loopVarMapping
     )
-    System.err.println(s"[TCO optimizeMethod] Step 3 complete: transformedBody has ${transformedBody.length} statements")
+    trace(s"[TCO optimizeMethod] Step 3 complete: transformedBody has ${transformedBody.length} statements")
     transformedBody.zipWithIndex.foreach { case (stmt, i) =>
-      System.err.println(s"[TCO optimizeMethod]   transformedBody[$i]: ${stmt.getClass.getSimpleName}")
+      trace(s"[TCO optimizeMethod]   transformedBody[$i]: ${stmt.getClass.getSimpleName}")
       stmt match {
         case block: StatementBlock =>
-          System.err.println(s"[TCO optimizeMethod]     StatementBlock with ${block.statements.length} statements:")
+          trace(s"[TCO optimizeMethod]     StatementBlock with ${block.statements.length} statements:")
           block.statements.zipWithIndex.foreach { case (s, j) =>
-            System.err.println(s"[TCO optimizeMethod]       stmt[$j]: ${s.getClass.getSimpleName}")
+            trace(s"[TCO optimizeMethod]       stmt[$j]: ${s.getClass.getSimpleName}")
           }
         case _ =>
       }
     }
 
     // Remove unreachable return statements at the end
-    System.err.println(s"[TCO optimizeMethod] Step 4: Removing trailing unreachable returns")
+    trace(s"[TCO optimizeMethod] Step 4: Removing trailing unreachable returns")
     val cleanedBody = removeTrailingUnreachableReturns(transformedBody)
-    System.err.println(s"[TCO optimizeMethod] Step 4 complete: cleanedBody has ${cleanedBody.length} statements")
+    trace(s"[TCO optimizeMethod] Step 4 complete: cleanedBody has ${cleanedBody.length} statements")
     cleanedBody.zipWithIndex.foreach { case (stmt, i) =>
-      System.err.println(s"[TCO optimizeMethod]   cleanedBody[$i]: ${stmt.getClass.getSimpleName}")
+      trace(s"[TCO optimizeMethod]   cleanedBody[$i]: ${stmt.getClass.getSimpleName}")
     }
 
     // Wrap in infinite loop: while (true) { ... }
@@ -380,9 +383,9 @@ class TailCallOptimization(config: CompilerConfig)
         new StatementBlock(block.location, rewritten: _*)
 
       case ifStmt: IfStatement =>
-        System.err.println(s"[TCO rewriteStatementRefs] Rewriting IfStatement condition")
+        trace(s"[TCO rewriteStatementRefs] Rewriting IfStatement condition")
         val rewrittenCond = rewriteTermRefs(ifStmt.condition, loopVarMapping)
-        System.err.println(s"[TCO rewriteStatementRefs] IfStatement condition rewritten")
+        trace(s"[TCO rewriteStatementRefs] IfStatement condition rewritten")
         val rewrittenThen = rewriteStatementRefs(ifStmt.thenStatement, loopVarMapping)
         val rewrittenElse = if (ifStmt.elseStatement != null) {
           rewriteStatementRefs(ifStmt.elseStatement, loopVarMapping)
@@ -412,11 +415,11 @@ class TailCallOptimization(config: CompilerConfig)
         // Check if this references a parameter
         loopVarMapping.find(_._1 == ref.index) match {
           case Some((_, loopVarIndex, paramType)) =>
-            System.err.println(s"[TCO rewriteTermRefs] RefLocal: index=${ref.index} → loopVarIndex=$loopVarIndex")
+            trace(s"[TCO rewriteTermRefs] RefLocal: index=${ref.index} → loopVarIndex=$loopVarIndex")
             // Replace with loop variable reference
             new RefLocal(ref.location, ref.frame, loopVarIndex, paramType)
           case None =>
-            System.err.println(s"[TCO rewriteTermRefs] RefLocal: index=${ref.index}, not a parameter")
+            trace(s"[TCO rewriteTermRefs] RefLocal: index=${ref.index}, not a parameter")
             // Not a parameter, keep as-is
             ref
         }
@@ -451,16 +454,16 @@ class TailCallOptimization(config: CompilerConfig)
 
       case begin: Begin =>
         // Recursively rewrite all terms in the Begin block
-        System.err.println(s"[TCO rewriteTermRefs] Begin with ${begin.terms.length} terms")
+        trace(s"[TCO rewriteTermRefs] Begin with ${begin.terms.length} terms")
         begin.terms.zipWithIndex.foreach { case (t, i) =>
-          System.err.println(s"[TCO rewriteTermRefs]   Begin term[$i]: ${t.getClass.getSimpleName}")
+          trace(s"[TCO rewriteTermRefs]   Begin term[$i]: ${t.getClass.getSimpleName}")
         }
         val rewrittenTerms = begin.terms.map(t => rewriteTermRefs(t, loopVarMapping))
         new Begin(begin.location, rewrittenTerms)
 
       case stmtTerm: StatementTerm =>
         // Rewrite the statement within StatementTerm
-        System.err.println(s"[TCO rewriteTermRefs] StatementTerm with statement: ${stmtTerm.statement.getClass.getSimpleName}")
+        trace(s"[TCO rewriteTermRefs] StatementTerm with statement: ${stmtTerm.statement.getClass.getSimpleName}")
         val rewrittenStmt = rewriteStatementRefs(stmtTerm.statement, loopVarMapping)
         new StatementTerm(stmtTerm.location, rewrittenStmt, stmtTerm.termType)
 
@@ -516,12 +519,12 @@ class TailCallOptimization(config: CompilerConfig)
   ): ActionStatement = {
     stmt match {
       case ret: Return if ret.term != null && isSelfCall(ret.term, method) =>
-        System.err.println(s"[TCO transformStatement] Return with tail call, term type=${ret.term.getClass.getSimpleName}")
+        trace(s"[TCO transformStatement] Return with tail call, term type=${ret.term.getClass.getSimpleName}")
         // Tail call found
         // Check if it's wrapped in Begin with IfStatement
         ret.term match {
           case begin: Begin if begin.terms.nonEmpty =>
-            System.err.println(s"[TCO transformStatement] Return: Begin with ${begin.terms.length} terms")
+            trace(s"[TCO transformStatement] Return: Begin with ${begin.terms.length} terms")
             // Look for IfStatement in Begin
             val ifStmtOpt = begin.terms.collectFirst {
               case stmtTerm: StatementTerm =>
@@ -531,16 +534,16 @@ class TailCallOptimization(config: CompilerConfig)
                 }
             }.flatten
 
-            System.err.println(s"[TCO transformStatement] Return: ifStmtOpt = ${ifStmtOpt.isDefined}")
+            trace(s"[TCO transformStatement] Return: ifStmtOpt = ${ifStmtOpt.isDefined}")
             ifStmtOpt match {
               case Some(ifStmt) =>
-                System.err.println(s"[TCO transformStatement] Return: Transforming IfStatement branches")
+                trace(s"[TCO transformStatement] Return: Transforming IfStatement branches")
 
                 // Get the result variable from the last term of Begin (RefLocal)
                 val resultTerm = begin.terms.last match {
                   case refLocal: RefLocal => refLocal
                   case other =>
-                    System.err.println(s"[TCO transformStatement] Warning: Begin's last term is not RefLocal but ${other.getClass.getSimpleName}")
+                    trace(s"[TCO transformStatement] Warning: Begin's last term is not RefLocal but ${other.getClass.getSimpleName}")
                     other
                 }
 
@@ -550,32 +553,32 @@ class TailCallOptimization(config: CompilerConfig)
 
                 // Helper to add Return if branch doesn't end with Continue
                 def ensureProperBranchEnd(transformedBranch: ActionStatement, branchName: String): ActionStatement = {
-                  System.err.println(s"[TCO ensureProperBranchEnd] $branchName: input type=${transformedBranch.getClass.getSimpleName}")
+                  trace(s"[TCO ensureProperBranchEnd] $branchName: input type=${transformedBranch.getClass.getSimpleName}")
                   val result = transformedBranch match {
                     case block: StatementBlock if block.statements.nonEmpty =>
-                      System.err.println(s"[TCO ensureProperBranchEnd] $branchName: StatementBlock with ${block.statements.length} statements")
+                      trace(s"[TCO ensureProperBranchEnd] $branchName: StatementBlock with ${block.statements.length} statements")
                       block.statements.zipWithIndex.foreach { case (stmt, i) =>
-                        System.err.println(s"[TCO ensureProperBranchEnd]   stmt[$i]: ${stmt.getClass.getSimpleName}")
+                        trace(s"[TCO ensureProperBranchEnd]   stmt[$i]: ${stmt.getClass.getSimpleName}")
                       }
                       // Check if last statement is Continue
                       block.statements.last match {
                         case _: Continue =>
-                          System.err.println(s"[TCO ensureProperBranchEnd] $branchName: Already has Continue")
+                          trace(s"[TCO ensureProperBranchEnd] $branchName: Already has Continue")
                           // Already has Continue, keep as-is
                           block
                         case _ =>
-                          System.err.println(s"[TCO ensureProperBranchEnd] $branchName: Adding Return")
+                          trace(s"[TCO ensureProperBranchEnd] $branchName: Adding Return")
                           // No Continue, add Return
                           val stmtsWithReturn = block.statements.toSeq :+ new Return(null, resultTerm)
                           new StatementBlock(block.location, stmtsWithReturn: _*)
                       }
                     case other =>
-                      System.err.println(s"[TCO ensureProperBranchEnd] $branchName: Single statement, wrapping with Return")
+                      trace(s"[TCO ensureProperBranchEnd] $branchName: Single statement, wrapping with Return")
                       // Single statement (ExpressionActionStatement, etc.)
                       // Wrap in block with Return
                       new StatementBlock(null, Seq(other, new Return(null, resultTerm)): _*)
                   }
-                  System.err.println(s"[TCO ensureProperBranchEnd] $branchName: result type=${result.getClass.getSimpleName}")
+                  trace(s"[TCO ensureProperBranchEnd] $branchName: result type=${result.getClass.getSimpleName}")
                   result
                 }
 
@@ -587,16 +590,16 @@ class TailCallOptimization(config: CompilerConfig)
                 // Return the transformed IfStatement directly
                 new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
               case None =>
-                System.err.println(s"[TCO transformStatement] Return: No IfStatement found, calling transformTailCall")
+                trace(s"[TCO transformStatement] Return: No IfStatement found, calling transformTailCall")
                 // No IfStatement found, transform as direct call
                 transformTailCall(ret.term, paramTemps)
             }
           case stmtTerm: StatementTerm =>
             // Explicit return: Return(StatementTerm(IfStatement))
-            System.err.println(s"[TCO transformStatement] Return: StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
+            trace(s"[TCO transformStatement] Return: StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
             stmtTerm.statement match {
               case ifStmt: IfStatement =>
-                System.err.println(s"[TCO transformStatement] Return: Transforming explicit return IfStatement")
+                trace(s"[TCO transformStatement] Return: Transforming explicit return IfStatement")
                 // IfStatementの両ブランチをtransformStatementで処理
                 val transformedThen = transformStatement(ifStmt.thenStatement, method, paramTemps)
                 val transformedElse = if (ifStmt.elseStatement != null) {
@@ -609,7 +612,7 @@ class TailCallOptimization(config: CompilerConfig)
             }
 
           case _ =>
-            System.err.println(s"[TCO transformStatement] Return: Not Begin, calling transformTailCall")
+            trace(s"[TCO transformStatement] Return: Not Begin, calling transformTailCall")
             // Direct tail call (not in Begin)
             transformTailCall(ret.term, paramTemps)
         }
@@ -629,16 +632,16 @@ class TailCallOptimization(config: CompilerConfig)
         new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
 
       case exprStmt: ExpressionActionStatement =>
-        System.err.println(s"[TCO transformStatement] ExpressionActionStatement, term type=${exprStmt.term.getClass.getSimpleName}")
+        trace(s"[TCO transformStatement] ExpressionActionStatement, term type=${exprStmt.term.getClass.getSimpleName}")
         // Check if the expression contains a tail call
         exprStmt.term match {
           case setLocal: SetLocal if isSelfCall(setLocal.value, method) =>
-            System.err.println(s"[TCO transformStatement] SetLocal with tail call, value type=${setLocal.value.getClass.getSimpleName}")
+            trace(s"[TCO transformStatement] SetLocal with tail call, value type=${setLocal.value.getClass.getSimpleName}")
             // Tail call is being assigned to a variable
             // Check if it's wrapped in Begin with IfStatement
             setLocal.value match {
               case begin: Begin if begin.terms.nonEmpty =>
-                System.err.println(s"[TCO transformStatement] Begin with ${begin.terms.length} terms")
+                trace(s"[TCO transformStatement] Begin with ${begin.terms.length} terms")
                 // Look for IfStatement in Begin
                 val ifStmtOpt = begin.terms.collectFirst {
                   case stmtTerm: StatementTerm =>
@@ -648,10 +651,10 @@ class TailCallOptimization(config: CompilerConfig)
                     }
                 }.flatten
 
-                System.err.println(s"[TCO transformStatement] ifStmtOpt = ${ifStmtOpt.isDefined}")
+                trace(s"[TCO transformStatement] ifStmtOpt = ${ifStmtOpt.isDefined}")
                 ifStmtOpt match {
                   case Some(ifStmt) =>
-                    System.err.println(s"[TCO transformStatement] Transforming IfStatement branches")
+                    trace(s"[TCO transformStatement] Transforming IfStatement branches")
                     // Transform the IfStatement's branches
                     val transformedThen = transformStatement(ifStmt.thenStatement, method, paramTemps)
                     val transformedElse = if (ifStmt.elseStatement != null) {
@@ -659,17 +662,17 @@ class TailCallOptimization(config: CompilerConfig)
                     } else null
                     new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
                   case None =>
-                    System.err.println(s"[TCO transformStatement] No IfStatement found, calling transformTailCall")
+                    trace(s"[TCO transformStatement] No IfStatement found, calling transformTailCall")
                     // No IfStatement found, try to transform as direct call
                     transformTailCall(setLocal.value, paramTemps)
                 }
               case _ =>
-                System.err.println(s"[TCO transformStatement] Not Begin, calling transformTailCall")
+                trace(s"[TCO transformStatement] Not Begin, calling transformTailCall")
                 // Direct tail call (not in Begin)
                 transformTailCall(setLocal.value, paramTemps)
             }
           case _ =>
-            System.err.println(s"[TCO transformStatement] No tail call in ExpressionActionStatement")
+            trace(s"[TCO transformStatement] No tail call in ExpressionActionStatement")
             // No tail call, keep as-is
             exprStmt
         }
@@ -698,39 +701,39 @@ class TailCallOptimization(config: CompilerConfig)
     // Extract the actual Call from wrapped structures (Begin, StatementTerm, etc.)
     def extractCall(t: Term, depth: Int = 0): Option[Term] = {
       val indent = "  " * depth
-      System.err.println(s"$indent[TCO extractCall] depth=$depth, term type=${t.getClass.getSimpleName}")
+      trace(s"$indent[TCO extractCall] depth=$depth, term type=${t.getClass.getSimpleName}")
 
       t match {
         case c: Call =>
-          System.err.println(s"$indent[TCO extractCall] Found Call!")
+          trace(s"$indent[TCO extractCall] Found Call!")
           Some(c)
         case c: CallStatic =>
-          System.err.println(s"$indent[TCO extractCall] Found CallStatic!")
+          trace(s"$indent[TCO extractCall] Found CallStatic!")
           Some(c)
         case begin: Begin =>
-          System.err.println(s"$indent[TCO extractCall] Begin with ${begin.terms.length} terms:")
+          trace(s"$indent[TCO extractCall] Begin with ${begin.terms.length} terms:")
           begin.terms.zipWithIndex.foreach { case (term, i) =>
-            System.err.println(s"$indent  Term $i: ${term.getClass.getSimpleName}")
+            trace(s"$indent  Term $i: ${term.getClass.getSimpleName}")
           }
           // If-else expression: recursively check all terms
           begin.terms.flatMap(t => extractCall(t, depth + 1)).headOption
         case stmtTerm: StatementTerm =>
-          System.err.println(s"$indent[TCO extractCall] StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
+          trace(s"$indent[TCO extractCall] StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
           // Unwrap StatementTerm
           stmtTerm.statement match {
             case exprStmt: ExpressionActionStatement =>
               extractCall(exprStmt.term, depth + 1)
             case ifStmt: IfStatement =>
-              System.err.println(s"$indent[TCO extractCall] IfStatement - should have been handled in transformStatement")
+              trace(s"$indent[TCO extractCall] IfStatement - should have been handled in transformStatement")
               None
             case _ => None
           }
         case setLocal: SetLocal =>
-          System.err.println(s"$indent[TCO extractCall] SetLocal, checking value")
+          trace(s"$indent[TCO extractCall] SetLocal, checking value")
           // Check value being assigned
           extractCall(setLocal.value, depth + 1)
         case other =>
-          System.err.println(s"$indent[TCO extractCall] Unhandled type: ${other.getClass.getSimpleName}")
+          trace(s"$indent[TCO extractCall] Unhandled type: ${other.getClass.getSimpleName}")
           None
       }
     }
@@ -748,7 +751,7 @@ class TailCallOptimization(config: CompilerConfig)
     }
 
     if (config.verbose) {
-      System.err.println(s"[TCO]   transformTailCall: term type=${term.getClass.getSimpleName}, actualCall type=${actualCall.getClass.getSimpleName}, newArgs.length=${newArgs.length}")
+      trace(s"[TCO]   transformTailCall: term type=${term.getClass.getSimpleName}, actualCall type=${actualCall.getClass.getSimpleName}, newArgs.length=${newArgs.length}")
     }
 
     val assignments = mutable.ArrayBuffer[ActionStatement]()
@@ -763,7 +766,7 @@ class TailCallOptimization(config: CompilerConfig)
       assignments += new ExpressionActionStatement(null, loopVarAssignment)
     } else if (newArgs.length > 1) {
       // Multiple arguments: use temporary variables to preserve evaluation order
-      System.err.println(s"[TCO transformTailCall] Multiple arguments: ${newArgs.length}")
+      trace(s"[TCO transformTailCall] Multiple arguments: ${newArgs.length}")
 
       // Temp variable indices come after loop variables
       // For factorial(n: Int, acc: Int):
@@ -778,7 +781,7 @@ class TailCallOptimization(config: CompilerConfig)
       newArgs.zipWithIndex.foreach { case (arg, i) =>
         val (_, _, paramType) = loopVarMapping(i)
         val tempVarIndex = tempVarOffset + i
-        System.err.println(s"[TCO transformTailCall]   Step 1: Assign temp[$i]: tempVarIndex=$tempVarIndex")
+        trace(s"[TCO transformTailCall]   Step 1: Assign temp[$i]: tempVarIndex=$tempVarIndex")
         val tempAssignment = new SetLocal(null, 0, tempVarIndex, paramType, arg)
         assignments += new ExpressionActionStatement(null, tempAssignment)
       }
@@ -788,7 +791,7 @@ class TailCallOptimization(config: CompilerConfig)
       loopVarMapping.zipWithIndex.foreach { case ((_, loopVarIndex, paramType), i) =>
         val tempVarIndex = tempVarOffset + i
         val tempRef = new RefLocal(null, 0, tempVarIndex, paramType)
-        System.err.println(s"[TCO transformTailCall]   Step 2: Copy temp[$i] -> loopVar[$i]: loopVarIndex=$loopVarIndex")
+        trace(s"[TCO transformTailCall]   Step 2: Copy temp[$i] -> loopVar[$i]: loopVarIndex=$loopVarIndex")
         val loopVarAssignment = new SetLocal(null, 0, loopVarIndex, paramType, tempRef)
         assignments += new ExpressionActionStatement(null, loopVarAssignment)
       }

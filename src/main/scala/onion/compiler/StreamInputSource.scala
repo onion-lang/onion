@@ -7,8 +7,10 @@
  * ************************************************************** */
 package onion.compiler
 
+import onion.compiler.source.ReaderSource
+
 import java.io.Reader
 
-class StreamInputSource(val reader: Reader, val name: String) extends InputSource {
-  def openReader: Reader = reader
-}
+class StreamInputSource(readerFactory: () => Reader, name: String)
+  extends ReaderSource(readerFactory, name)
+  with InputSource

@@ -112,7 +112,7 @@ final class BenchmarkRunner(private val iterations: Int) {
         |}
         |IO::println("res0 = " + res0)
         |""".stripMargin
-    new OnionCompiler(compilerConfig).compile(Seq(new StreamInputSource(new StringReader(source), "benchmark_repl.on"))) match {
+    new OnionCompiler(compilerConfig).compile(Seq(new StreamInputSource(() => new StringReader(source), "benchmark_repl.on"))) match {
       case Success(classes) =>
         captureStdOut {
           new Shell(classOf[OnionClassLoader].getClassLoader, compilerConfig.classPath).run(classes, Array())

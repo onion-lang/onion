@@ -1,8 +1,6 @@
 package onion.compiler
-import java.io.{Reader, StringReader}
+import onion.compiler.source.StringSource
 
-case class StringInputSource(input: String) extends InputSource {
-  override def openReader: Reader = new StringReader(input)
-
-  override def name: String = "<none>"
-}
+case class StringInputSource(input: String, override val name: String = "<none>")
+  extends StringSource(input, name)
+  with InputSource

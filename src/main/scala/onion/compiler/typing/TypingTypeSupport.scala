@@ -7,35 +7,33 @@ import onion.compiler.TypedAST.*
 import collection.mutable.{Buffer, Set => MutableSet}
 
 final class TypingTypeSupport(private val typing: Typing) {
-  import typing.*
-
   def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
     val result = arguments.map { arg =>
       val baseType = mapFrom(arg.typeRef)
-      if (baseType != null && arg.isVararg) table_.loadArray(baseType, 1)
+      if (baseType != null && arg.isVararg) typing.table_.loadArray(baseType, 1)
       else baseType
     }
     if (result.forall(_ != null)) Some(result) else None
   }
 
-  def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, mapper_)
+  def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, typing.mapper_)
 
-  def mapFromOpt(typeNode: AST.TypeNode): Option[Type] = mapFromOpt(typeNode, mapper_)
+  def mapFromOpt(typeNode: AST.TypeNode): Option[Type] = mapFromOpt(typeNode, typing.mapper_)
 
-  def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type = {
+  def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Type = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) {
-      report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
+      typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
     } else {
       validateTypeApplication(typeNode, mappedType)
     }
     mappedType
   }
 
-  def mapFromOpt(typeNode: AST.TypeNode, mapper: NameMapper): Option[Type] = {
+  def mapFromOpt(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) {
-      report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
+      typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
       None
     } else {
       validateTypeApplication(typeNode, mappedType)
@@ -44,10 +42,10 @@ final class TypingTypeSupport(private val typing: Typing) {
   }
 
   def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
-    val prev = typeParams_
-    typeParams_ = scope
+    val prev = typing.typeParams_
+    typing.setTypeParams(scope)
     try block
-    finally typeParams_ = prev
+    finally typing.setTypeParams(prev)
   }
 
   def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {
@@ -55,7 +53,7 @@ final class TypingTypeSupport(private val typing: Typing) {
     val result = Buffer[TypeParam]()
     for (tp <- nodes) {
       if (seen.contains(tp.name)) {
-        report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
+        typing.report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
       } else {
         seen += tp.name
         val upper = tp.upperBound match {
@@ -64,11 +62,11 @@ final class TypingTypeSupport(private val typing: Typing) {
             mapped match {
               case ct: ClassType => ct
               case _ =>
-                report(INCOMPATIBLE_TYPE, boundNode, rootClass, mapped)
-                rootClass
+                typing.report(INCOMPATIBLE_TYPE, boundNode, typing.rootClass, mapped)
+                typing.rootClass
             }
           case None =>
-            rootClass
+            typing.rootClass
         }
         val variableType = new TypedAST.TypeVariableType(tp.name, upper)
         result += TypeParam(tp.name, variableType, upper)
@@ -84,11 +82,11 @@ final class TypingTypeSupport(private val typing: Typing) {
           case applied: TypedAST.AppliedClassType =>
             val rawParams = applied.raw.typeParameters
             if (rawParams.isEmpty) {
-              report(TYPE_NOT_GENERIC, typeNode, applied.raw.name)
+              typing.report(TYPE_NOT_GENERIC, typeNode, applied.raw.name)
               return
             }
             if (rawParams.length != applied.typeArguments.length) {
-              report(
+              typing.report(
                 TYPE_ARGUMENT_ARITY_MISMATCH,
                 typeNode,
                 applied.raw.name,
@@ -98,23 +96,23 @@ final class TypingTypeSupport(private val typing: Typing) {
               return
             }
             val hasError = rawParams.indices.exists { i =>
-              val upper = rawParams(i).upperBound.getOrElse(rootClass)
+              val upper = rawParams(i).upperBound.getOrElse(typing.rootClass)
               val arg = applied.typeArguments(i)
               if (arg eq BasicType.VOID) {
-                report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
+                typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
                 true
               } else {
                 arg match {
                   case wildcard: TypedAST.WildcardType =>
                     val wildcardUpper = wildcard.upperBound
                     if (!TypeRules.isAssignable(upper, wildcardUpper)) {
-                      report(INCOMPATIBLE_TYPE, typeNode, upper, wildcardUpper)
+                      typing.report(INCOMPATIBLE_TYPE, typeNode, upper, wildcardUpper)
                       true
                     } else false
                   case _ =>
-                    val checkedArg = boxedTypeArgument(arg)
+                    val checkedArg = typing.boxedTypeArgument(arg)
                     if (!TypeRules.isAssignable(upper, checkedArg)) {
-                      report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
+                      typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
                       true
                     } else false
                 }

@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import org.objectweb.asm.Label
 
@@ -24,4 +24,3 @@ final class LoopContext {
     ends.pop()
   }
 }
-

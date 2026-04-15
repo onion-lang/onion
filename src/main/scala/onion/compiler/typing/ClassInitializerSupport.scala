@@ -10,15 +10,13 @@ private[compiler] final class ClassInitializerSupport(
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   processAssignable: (AST.Node, Type, Term) => Term
 ) {
-  import typing.*
-
   def collectFieldInitializer(
     node: AST.FieldDeclaration,
     definition: ClassDefinition,
     instanceInitializers: Buffer[ActionStatement],
     staticInitializers: Buffer[ActionStatement]
   ): Unit = {
-    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
+    val field = typing.lookupKernelNode(node).asInstanceOf[FieldDefinition]
     collectInitializer(node.modifiers, node.init, field, definition, instanceInitializers, staticInitializers)
   }
 
@@ -28,7 +26,7 @@ private[compiler] final class ClassInitializerSupport(
     instanceInitializers: Buffer[ActionStatement],
     staticInitializers: Buffer[ActionStatement]
   ): Unit = {
-    val field = lookupKernelNode(node).asInstanceOf[FieldDefinition]
+    val field = typing.lookupKernelNode(node).asInstanceOf[FieldDefinition]
     collectInitializer(node.modifiers, node.init, field, definition, instanceInitializers, staticInitializers)
   }
 

@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 import onion.compiler.toolbox.Boxing
 
 private[typing] final case class ResolvedMethodTarget(
@@ -10,8 +11,7 @@ private[typing] final case class ResolvedMethodTarget(
   targetType: ObjectType
 )
 
-private[compiler] final class MethodTargetTypingSupport(private val typing: Typing) {
-  import typing.*
+private[compiler] final class MethodTargetTypingSupport(private val bodyContext: TypingBodyContext) {
 
   def normalizeMethodCallTarget(
     node: AST.MethodCall,
@@ -22,10 +22,10 @@ private[compiler] final class MethodTargetTypingSupport(private val typing: Typi
         Some(ResolvedMethodTarget(target, targetType))
       case basicType: BasicType =>
         if (basicType == BasicType.VOID) {
-          report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
+          bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
           None
         } else {
-          val boxed = Boxing.boxing(table_, target)
+          val boxed = Boxing.boxing(bodyContext.table, target)
           Some(ResolvedMethodTarget(boxed, boxed.`type`.asInstanceOf[ObjectType]))
         }
       case wildcardType: WildcardType =>
@@ -33,11 +33,11 @@ private[compiler] final class MethodTargetTypingSupport(private val typing: Typi
           case objType: ObjectType =>
             Some(ResolvedMethodTarget(new AsInstanceOf(target, objType), objType))
           case _ =>
-            report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+            bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
             None
         }
       case _ =>
-        report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+        bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
         None
     }
 
@@ -55,10 +55,10 @@ private[compiler] final class MethodTargetTypingSupport(private val typing: Typi
         Some(ResolvedMethodTarget(target, objType))
       case basicType: BasicType =>
         if (basicType == BasicType.VOID) {
-          report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
+          bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
           None
         } else {
-          val boxed = Boxing.boxing(table_, target)
+          val boxed = Boxing.boxing(bodyContext.table, target)
           Some(ResolvedMethodTarget(boxed, boxed.`type`.asInstanceOf[ObjectType]))
         }
       case wildcardType: WildcardType =>
@@ -66,11 +66,11 @@ private[compiler] final class MethodTargetTypingSupport(private val typing: Typi
           case objType: ObjectType =>
             Some(ResolvedMethodTarget(new AsInstanceOf(target, objType), objType))
           case _ =>
-            report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+            bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
             None
         }
       case _ =>
-        report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
+        bodyContext.report(INVALID_METHOD_CALL_TARGET, node, target.`type`)
         None
     }
   }

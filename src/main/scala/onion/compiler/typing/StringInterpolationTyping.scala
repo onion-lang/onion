@@ -3,20 +3,24 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
-final class StringInterpolationTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class StringInterpolationTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] = {
     val typedExprs = node.expressions.map(e => typed(e, context).getOrElse(null))
     if (typedExprs.contains(null)) return None
 
-    val stringType = load("java.lang.String")
-    val sbType = load("java.lang.StringBuilder")
+    val stringType = bodyContext.load("java.lang.String")
+    val sbType = bodyContext.load("java.lang.StringBuilder")
 
     val constructors = sbType.findConstructor(Array[Term]())
     if (constructors.isEmpty) {
-      report(CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type](), sbType.constructors)
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type](), sbType.constructors)
       return None
     }
     val noArgConstructor = constructors(0)
@@ -54,7 +58,7 @@ final class StringInterpolationTyping(private val typing: Typing, private val bo
 
     val toStringMethods = sbType.findMethod("toString", Array[Term]())
     if (toStringMethods.isEmpty) {
-      report(METHOD_NOT_FOUND, node, sbType, "toString", Array[Type]())
+      bodyContext.report(METHOD_NOT_FOUND, node, sbType, "toString", Array[Type]())
       return None
     }
     Some(new Call(result, toStringMethods(0), Array[Term]()))

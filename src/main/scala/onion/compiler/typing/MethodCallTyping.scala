@@ -3,23 +3,28 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 import ArgumentHelpers.hasNamedArguments
 import java.util.{TreeSet => JTreeSet}
 
-final class MethodCallTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
-  private val callArgumentTypingSupport = new CallArgumentTypingSupport(typing, typed(_, _, _), processAssignable)
+final class MethodCallTyping(
+  private[typing] val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
+  private val callArgumentTypingSupport = new CallArgumentTypingSupport(bodyContext, typed(_, _, _), processAssignable)
   private val methodInvocationBuilderSupport = new MethodInvocationBuilderSupport(typing, this)
-  private val methodCallReportingSupport = new MethodCallReportingSupport(typing, this)
-  private val methodTargetTypingSupport = new MethodTargetTypingSupport(typing)
-  private val memberSelectionTypingSupport = new MemberSelectionTypingSupport(typing, this)
+  private val methodCallReportingSupport = new MethodCallReportingSupport(bodyContext, this)
+  private val methodTargetTypingSupport = new MethodTargetTypingSupport(bodyContext)
+  private val memberSelectionResolutionSupport = new MemberSelectionResolutionSupport(typing, bodyContext, this)
+  private val memberSelectionTypingSupport = new MemberSelectionTypingSupport(bodyContext, this)
   private val methodCallFallbackSupport = new MethodCallFallbackSupport(typing, this)
-  private val instanceMethodCallSupport = new InstanceMethodCallSupport(typing, this, methodCallFallbackSupport)
-  private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(typing, this)
+  private val instanceMethodCallSupport = new InstanceMethodCallSupport(bodyContext, this, methodCallFallbackSupport)
+  private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this)
   private val staticMethodCallSupport = new StaticMethodCallSupport(typing, this)
-  private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(typing, this)
-  private val superMethodCallSupport = new SuperMethodCallSupport(typing, this)
+  private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(bodyContext, this)
+  private val superMethodCallSupport = new SuperMethodCallSupport(bodyContext, this)
 
   /** Select a single method, reporting errors if none found or ambiguous */
   private[typing] def selectSingleMethod(
@@ -127,7 +132,7 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     callArgumentTypingSupport.prepareCallParams(node, args, method, params, expectedArgs)
 
   private[typing] def isAssignableWithBoxing(target: Type, source: Type): Boolean = {
-    TypeRelations.isAssignableWithBoxing(target, source, table_)
+    TypeRelations.isAssignableWithBoxing(target, source, typing.table_)
   }
 
   private[typing] def buildResolvedCall(
@@ -162,6 +167,25 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
     target: Term
   ): Option[ResolvedMethodTarget] =
     methodTargetTypingSupport.normalizeSafeMethodCallTarget(node, target)
+
+  private[typing] def normalizeMemberSelectionTarget(
+    node: AST.MemberSelection,
+    target: Term
+  ): Option[ResolvedMemberSelectionTarget] =
+    memberSelectionResolutionSupport.normalizeMemberSelectionTarget(node, target)
+
+  private[typing] def normalizeSafeMemberSelectionTarget(
+    node: AST.SafeMemberSelection,
+    target: Term
+  ): Option[ResolvedMemberSelectionTarget] =
+    memberSelectionResolutionSupport.normalizeSafeMemberSelectionTarget(node, target)
+
+  private[typing] def resolveMemberSelection(
+    node: AST.Node,
+    targetType: ObjectType,
+    name: String
+  ): Option[ResolvedMemberSelection] =
+    memberSelectionResolutionSupport.resolveMemberSelection(node, targetType, name)
 
   private[typing] def reportMethodNotFound(
     node: AST.Node,
@@ -227,9 +251,9 @@ final class MethodCallTyping(private val typing: Typing, private val body: Typin
   private[typing] def mapTypeArgs(typeArgs: List[AST.TypeNode]): Option[Array[Type]] =
     typeArgs.foldLeft(Option(List.empty[Type])) { (accOpt, typeArg) =>
       accOpt.flatMap { acc =>
-        val mapped = mapFrom(typeArg)
+        val mapped = typing.mapFrom(typeArg)
         if (mapped == null) None
-        else if (mapped eq BasicType.VOID) { report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name); None }
+        else if (mapped eq BasicType.VOID) { typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name); None }
         else Some(acc :+ mapped)
       }
     }.map(_.toArray)

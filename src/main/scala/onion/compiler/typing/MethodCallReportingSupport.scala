@@ -3,20 +3,19 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class MethodCallReportingSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
-  import typing.*
-
   def reportMethodNotFound(
     node: AST.Node,
     targetType: AnyRef,
     name: String,
     argTypes: Array[Type]
   ): Unit =
-    report(METHOD_NOT_FOUND, node, targetType, name, argTypes)
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes)
 
   def reportAmbiguousMethods(
     node: AST.Node,
@@ -44,7 +43,7 @@ private[compiler] final class MethodCallReportingSupport(
     secondName: String,
     secondArguments: Array[Type]
   ): Unit = {
-    report(
+    bodyContext.report(
       AMBIGUOUS_METHOD,
       node,
       Array[AnyRef](firstAffiliation, firstName, firstArguments),
@@ -57,5 +56,5 @@ private[compiler] final class MethodCallReportingSupport(
     method: Method,
     name: String
   ): Unit =
-    report(ILLEGAL_METHOD_CALL, node, method.affiliation, name, method.arguments)
+    bodyContext.report(ILLEGAL_METHOD_CALL, node, method.affiliation, name, method.arguments)
 }

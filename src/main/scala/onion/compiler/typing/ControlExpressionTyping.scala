@@ -5,14 +5,18 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
 import scala.collection.mutable.Buffer
 import scala.util.boundary, boundary.break
 
 import TypeNarrowingAnalysis.NarrowingInfo
 
-final class ControlExpressionTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class ControlExpressionTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   private val destructuringProcessor = new DestructuringPatternProcessor(typing)
 
@@ -21,7 +25,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
    * Delegates to TypeNarrowingAnalysis with the type resolver.
    */
   private[typing] def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo =
-    TypeNarrowingAnalysis.extractNarrowing(condition, context, mapFrom)
+    TypeNarrowingAnalysis.extractNarrowing(condition, context, typing.mapFrom)
 
   def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
     context.openScope {
@@ -53,45 +57,39 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       }
     }
 
-  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] = {
+  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] = boundary {
     context.openScope {
-      // Type the condition
-      val conditionRawOpt = typed(node.condition, context)
-      if (conditionRawOpt.isEmpty) return None
-      val conditionRaw = conditionRawOpt.get
+      val conditionRaw = typed(node.condition, context).getOrElse(break(None))
       val condition = ensureBoolean(node.condition, conditionRaw)
-      if (condition == null) return None
+      if (condition == null) break(None)
 
-      // Extract smart cast narrowing info
       val narrowing = extractNarrowing(node.condition, context)
       val savedNarrowings = context.saveNarrowings()
 
-      // Type the then-block with positive narrowings applied
       narrowing.positive.foreach { case (name, narrowedType) =>
         context.addNarrowing(name, narrowedType)
       }
-      val thenTermOpt = typeBlockExpression(node.thenBlock, context)
+      val thenTerm = typeBlockExpression(node.thenBlock, context).getOrElse {
+        context.restoreNarrowings(savedNarrowings)
+        break(None)
+      }
       context.restoreNarrowings(savedNarrowings)
-
-      if (thenTermOpt.isEmpty) return None
-      val thenTerm = thenTermOpt.get
 
       if (node.elseBlock == null) {
         val thenStmt = termToStatement(node.thenBlock, thenTerm)
         Some(statementTerm(new IfStatement(condition, thenStmt, null), BasicType.VOID, node.location))
       } else {
-        // Type the else-block with negative narrowings applied
         narrowing.negative.foreach { case (name, narrowedType) =>
           context.addNarrowing(name, narrowedType)
         }
-        val elseTermOpt = typeBlockExpression(node.elseBlock, context)
+        val elseTerm = typeBlockExpression(node.elseBlock, context).getOrElse {
+          context.restoreNarrowings(savedNarrowings)
+          break(None)
+        }
         context.restoreNarrowings(savedNarrowings)
 
-        if (elseTermOpt.isEmpty) return None
-        val elseTerm = elseTermOpt.get
-
         val resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
-        if (resultType == null) return None
+        if (resultType == null) break(None)
 
         if (resultType.isBottomType || resultType == BasicType.VOID) {
           val thenStmt = termToStatement(node.thenBlock, thenTerm)
@@ -225,7 +223,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
               }
             }
             if (missingTypes.nonEmpty) {
-              report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missingTypes.map(_.asInstanceOf[Type]))
+              bodyContext.report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missingTypes.map(_.asInstanceOf[Type]))
             } else {
               isExhaustive = true
             }
@@ -374,13 +372,13 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         if (typedExpr == null) break((null, NoBindings, false, None))
 
         if (!TypeRules.isAssignable(conditionType, typedExpr.`type`)) {
-          report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }
 
         val normalizedExpr =
           if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
-          else if (typedExpr.isReferenceType && typedExpr.`type` != rootClass) new AsInstanceOf(typedExpr, rootClass)
+          else if (typedExpr.isReferenceType && typedExpr.`type` != bodyContext.rootClass) new AsInstanceOf(typedExpr, bodyContext.rootClass)
           else typedExpr
 
         if (normalizedExpr.isReferenceType) {
@@ -390,11 +388,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         }
 
       case typePattern @ AST.TypePattern(_, name, typeRef) =>
-        val mappedType = mapFrom(typeRef)
+        val mappedType = typing.mapFrom(typeRef)
         if (mappedType == null) break((null, NoBindings, false, None))
 
         if (!mappedType.isObjectType) {
-          report(INCOMPATIBLE_TYPE, typePattern, table_.rootClass, mappedType)
+          bodyContext.report(INCOMPATIBLE_TYPE, typePattern, bodyContext.table.rootClass, mappedType)
           break((null, NoBindings, false, None))
         }
 
@@ -475,7 +473,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] = boundary {
     // リソースを処理（try-with-resources）
     val resourceBindings = scala.collection.mutable.ArrayBuffer[(ClosureLocalBinding, Term)]()
-    val autoCloseable = load("java.lang.AutoCloseable")
+    val autoCloseable = bodyContext.load("java.lang.AutoCloseable")
     var resourceFailed = false
 
     context.openScope {
@@ -486,7 +484,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         } else {
           val init = initOpt.get
           val resourceType =
-            if (resource.typeRef != null) mapFrom(resource.typeRef)
+            if (resource.typeRef != null) typing.mapFrom(resource.typeRef)
             else init.`type`
 
           if (resourceType != null) {
@@ -496,7 +494,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
             // AutoCloseableを実装しているか確認
             if (!TypeRules.isSuperType(autoCloseable, resourceType)) {
-              report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+              bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
               resourceFailed = true
             } else {
               resourceBindings += ((binding, init))
@@ -520,9 +518,9 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         val (argument, body) = node.recClauses(i)
         context.openScope {
           val argType = addArgument(argument, context)
-          val expected = load("java.lang.Throwable")
+          val expected = bodyContext.load("java.lang.Throwable")
           if (!TypeRules.isSuperType(expected, argType)) {
-            report(INCOMPATIBLE_TYPE, argument, expected, argType)
+            bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
           }
           binds(i) = context.lookupOnlyCurrentScope(argument.name)
           typeBlockExpression(body, context) match {
@@ -596,7 +594,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
 
       // Lock must be object type, not primitive
       if (lock.isBasicType) {
-        report(INCOMPATIBLE_TYPE, node.condition, load("java.lang.Object"), lock.`type`)
+        bodyContext.report(INCOMPATIBLE_TYPE, node.condition, bodyContext.load("java.lang.Object"), lock.`type`)
         break(None)
       }
 
@@ -646,13 +644,13 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     if (term == null) return null
     // Try to unbox Boolean wrapper type
     val result = if (!term.isBasicType) {
-      Boxing.unboxedType(table_, term.`type`) match {
-        case Some(BasicType.BOOLEAN) => Boxing.unboxing(table_, term, BasicType.BOOLEAN)
+      Boxing.unboxedType(bodyContext.table, term.`type`) match {
+        case Some(BasicType.BOOLEAN) => Boxing.unboxing(bodyContext.table, term, BasicType.BOOLEAN)
         case _ => term
       }
     } else term
     if (result.`type` != BasicType.BOOLEAN) {
-      report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
+      bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
     }
     result
   }
@@ -682,8 +680,8 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
     new StatementTerm(location, statement, termType)
 
   private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type =
-    TypeCheckingHelpers.leastUpperBound(node, left, right, rootClass,
-      (n, l, r) => report(INCOMPATIBLE_TYPE, n, l, r))
+    TypeCheckingHelpers.leastUpperBound(node, left, right, bodyContext.rootClass,
+      (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
   private def foldLub(node: AST.Node, types: Seq[Type]): Option[Type] = boundary {
     types.reduceOption { (acc, t) =>

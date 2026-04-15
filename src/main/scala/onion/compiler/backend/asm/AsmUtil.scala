@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import org.objectweb.asm.{Opcodes, Type as AsmType}
 import org.objectweb.asm.commons.GeneratorAdapter

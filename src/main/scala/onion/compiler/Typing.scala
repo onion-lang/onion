@@ -10,12 +10,11 @@ package onion.compiler
 import _root_.scala.jdk.CollectionConverters._
 import _root_.onion.compiler.toolbox.{Paths, Systems}
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.typing.{NameMapper, TypeAliasEntry, TypeParam, TypeParamScope, TypingDiagnostics, TypingTypeSupport}
+import _root_.onion.compiler.typing.{NameResolver, TypeAliasEntry, TypeParam, TypeParamScope, TypingDiagnostics, TypingTypeSupport}
+import _root_.onion.compiler.typing.session.{AstBindingIndex, ExtensionRegistry, TypeAliasRegistry, TypingGlobalState, TypingSession, TypingUnitContext}
 import _root_.onion.compiler.TypedAST._
 import _root_.onion.compiler.SemanticError._
-import collection.mutable.{Buffer, HashMap, Map}
-
-import scala.compiletime.uninitialized
+import collection.mutable.{HashMap, Map}
 
 /**
  * Type Checking Phase - Static Type Analysis and Type Inference
@@ -62,7 +61,7 @@ import scala.compiletime.uninitialized
  * == Key Components ==
  *
  *   - [[ClassTable]]: Symbol table for class definitions
- *   - [[NameMapper]]: Resolves type names to types
+ *   - [[onion.compiler.typing.NameResolver]]: Resolves type names to types
  *   - [[LocalContext]]: Tracks local variable scopes
  *   - [[SemanticErrorReporter]]: Collects type errors
  *
@@ -111,30 +110,19 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
     loop(descriptor, 0)
   }
-  private[compiler] val table_  = new ClassTable(classpath(config.classPath))
-  private[compiler] val ast2ixt_ = Map[AST.Node, TypedAST.Node]()
-  private[compiler] val ixt2ast_ = Map[TypedAST.Node, AST.Node]()
-  private[compiler] val mappers_  = Map[String, NameMapper]()
-  private[compiler] var access_ : Int = uninitialized
-  private[compiler] var mapper_ : NameMapper = uninitialized
-  private[compiler] var staticImportedList_ : StaticImportList = uninitialized
-  private[compiler] var definition_ : ClassDefinition = uninitialized
-  private[compiler] var unit_ : AST.CompilationUnit = uninitialized
-  private[compiler] var typeParams_ : TypeParamScope = emptyTypeParams
-  private[compiler] val declaredTypeParams_ : HashMap[AST.Node, Seq[TypeParam]] = HashMap()
-  // Extension method support: maps extension declarations to their container classes
-  private[compiler] val extensionDeclarations_ : Buffer[(AST.ExtensionDeclaration, ClassDefinition)] = Buffer()
-  // Maps receiver type FQCN to extension methods - populated during OutlinePass
-  private[compiler] val extensionMethods_ : HashMap[String, Buffer[ExtensionMethodDefinition]] = HashMap()
-  // Type alias storage
-  private[compiler] val typeAliases_ : HashMap[String, TypeAliasEntry] = HashMap()
-  // Cyclic detection stack for type alias resolution
-  private[compiler] val typeAliasResolutionStack_ : collection.mutable.Set[String] = collection.mutable.Set()
-  private val diagnostics = new TypingDiagnostics(this, config)
+  private val globalState = TypingGlobalState(
+    table = new ClassTable(classpath(config.classPath)),
+    bindings = new AstBindingIndex,
+    mappers = Map[String, NameResolver](),
+    declaredTypeParams = HashMap[AST.Node, Seq[TypeParam]](),
+    typeAliases = new TypeAliasRegistry,
+    extensions = new ExtensionRegistry,
+    diagnostics = new SemanticErrorReporter(config.maxErrorReports),
+    warnings = new WarningReporter(config.warningLevel, config.suppressedWarnings)
+  )
+  private[compiler] val session = new TypingSession(config, globalState, emptyTypeParams)
+  private val diagnostics = new TypingDiagnostics(this, session)
   private val typeSupport = new TypingTypeSupport(this)
-  private[compiler] val reporter_ : SemanticErrorReporter = diagnostics.reporter
-  private[compiler] val warningReporter_ : WarningReporter = diagnostics.warningReporter
-  private var suppressReporting: Int = 0
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
@@ -146,26 +134,28 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   def processHeader(unit: AST.CompilationUnit): Unit = {
-    new onion.compiler.typing.TypingHeaderPass(this, unit).run()
+    val unitContext = session.activate(unit)
+    new onion.compiler.typing.TypingHeaderPass(this, unitContext).run()
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
-    new onion.compiler.typing.TypingOutlinePass(this, unit).run()
+    new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
   def processTyping(unit: AST.CompilationUnit): Unit =
-    new onion.compiler.typing.TypingBodyPass(this, unit).run()
+    new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)).run()
 
   // Typing body pass moved to onion.compiler.typing.TypingBodyPass
 
 
   def processDuplication(node: AST.CompilationUnit): Unit =
-    new onion.compiler.typing.TypingDuplicationPass(this, node).run()
+    new onion.compiler.typing.TypingDuplicationPass(this, session.activate(node)).run()
 
   def withSuppressedReporting[A](block: => A): A = {
-    suppressReporting += 1
+    val unitContext = currentUnitContext
+    unitContext.reportingSuppressed += 1
     try block
-    finally suppressReporting -= 1
+    finally unitContext.reportingSuppressed -= 1
   }
 
-  private[compiler] def reportingEnabled: Boolean = suppressReporting == 0
+  private[compiler] def reportingEnabled: Boolean = currentUnitContext.reportingSuppressed == 0
 
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit = {
     report(error, node.location, items*)
@@ -190,6 +180,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = diagnostics.problems
+  def warnings: Seq[CompileWarning] = diagnostics.warnings
+  def typedBindings: scala.collection.immutable.Map[AST.Node, TypedAST.Node] = session.global.bindings.allTypedBindings
   def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray
   def topClass: String = {
     val module = unit_.module
@@ -197,30 +189,29 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     createName(moduleName, Paths.cutExtension(unit_.sourceFile) + "Main")
   }
   private[compiler] def put(astNode: AST.Node, kernelNode: Node): Unit = {
-    ast2ixt_(astNode) = kernelNode
-    ixt2ast_(kernelNode) = astNode
+    session.global.bindings.bind(astNode, kernelNode)
   }
-  private[compiler] def lookupAST(kernelNode: Node): AST.Node =  ixt2ast_.get(kernelNode).getOrElse(null)
+  private[compiler] def lookupAST(kernelNode: Node): AST.Node = session.global.bindings.astOf(kernelNode).getOrElse(null)
   /** Option-returning version of lookupAST */
-  private[compiler] def lookupASTOpt(kernelNode: Node): Option[AST.Node] = ixt2ast_.get(kernelNode)
-  private[compiler] def lookupKernelNode(astNode: AST.Node): Node = ast2ixt_.get(astNode).getOrElse(null)
+  private[compiler] def lookupASTOpt(kernelNode: Node): Option[AST.Node] = session.global.bindings.astOf(kernelNode)
+  private[compiler] def lookupKernelNode(astNode: AST.Node): Node = session.global.bindings.typedOf(astNode).getOrElse(null)
   /** Option-returning version of lookupKernelNode */
-  private[compiler] def lookupKernelNodeOpt(astNode: AST.Node): Option[Node] = ast2ixt_.get(astNode)
+  private[compiler] def lookupKernelNodeOpt(astNode: AST.Node): Option[Node] = session.global.bindings.typedOf(astNode)
   def typedNodeOf(astNode: AST.Node): Option[TypedAST.Node] = lookupKernelNodeOpt(astNode)
-  private[compiler] def add(className: String, mapper: NameMapper): Unit = mappers_(className) = mapper
-  private[compiler] def find(className: String): NameMapper = mappers_.get(className).getOrElse(null)
+  private[compiler] def add(className: String, mapper: NameResolver): Unit = session.global.mappers(className) = mapper
+  private[compiler] def find(className: String): NameResolver = session.global.mappers.get(className).getOrElse(null)
   // Extension method registration
   private[compiler] def registerExtensionDeclaration(decl: AST.ExtensionDeclaration, container: ClassDefinition): Unit = {
-    extensionDeclarations_ += ((decl, container))
+    session.global.extensions.registerDeclaration(decl, container)
   }
   private[compiler] def registerExtensionMethod(receiverFqcn: String, method: ExtensionMethodDefinition): Unit = {
-    extensionMethods_.getOrElseUpdate(receiverFqcn, Buffer()) += method
+    session.global.extensions.registerMethod(receiverFqcn, method)
   }
   private[compiler] def lookupExtensionMethods(receiverFqcn: String): Seq[ExtensionMethodDefinition] = {
-    extensionMethods_.getOrElse(receiverFqcn, Seq()).toSeq
+    session.global.extensions.methodsFor(receiverFqcn)
   }
   /** Option-returning version of find */
-  private[compiler] def findOpt(className: String): Option[NameMapper] = mappers_.get(className)
+  private[compiler] def findOpt(className: String): Option[NameResolver] = session.global.mappers.get(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
@@ -233,11 +224,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def mapFromOpt(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFromOpt(typeNode)
 
-  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameMapper): Type =
+  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Type =
     typeSupport.mapFrom(typeNode, mapper)
 
   /** Option-returning version of mapFrom for safer null handling */
-  private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameMapper): Option[Type] =
+  private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     typeSupport.mapFromOpt(typeNode, mapper)
 
   private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A =
@@ -245,6 +236,26 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   private[compiler] def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] =
     typeSupport.createTypeParams(nodes)
+
+  private[compiler] def table_ : ClassTable = session.global.table
+  private[compiler] def mapper_ : NameResolver = currentUnitContext.currentMapper
+  private[compiler] def setMapper(value: NameResolver): Unit = currentUnitContext.currentMapper = value
+  private[compiler] def staticImportedList_ : StaticImportList = currentUnitContext.staticImports
+  private[compiler] def setStaticImportedList(value: StaticImportList): Unit = currentUnitContext.staticImports = value
+  private[compiler] def definition_ : ClassDefinition = currentUnitContext.currentDefinition
+  private[compiler] def setDefinition(value: ClassDefinition): Unit = currentUnitContext.currentDefinition = value
+  private[compiler] def unit_ : AST.CompilationUnit = currentUnitContext.unit
+  private[compiler] def access_ : Int = currentUnitContext.currentAccess
+  private[compiler] def setAccess(value: Int): Unit = currentUnitContext.currentAccess = value
+  private[compiler] def typeParams_ : TypeParamScope = currentUnitContext.currentTypeParams
+  private[compiler] def setTypeParams(value: TypeParamScope): Unit = currentUnitContext.currentTypeParams = value
+  private[compiler] def declaredTypeParams_ : collection.mutable.Map[AST.Node, Seq[TypeParam]] = session.global.declaredTypeParams
+  private[compiler] def typeAliases_ : collection.mutable.Map[String, TypeAliasEntry] = session.global.typeAliases.entries
+  private[compiler] def typeAliasResolutionStack_ : collection.mutable.Set[String] = session.global.typeAliases.resolutionStack
+  private[compiler] def reporter_ : SemanticErrorReporter = diagnostics.reporter
+  private[compiler] def warningReporter_ : WarningReporter = diagnostics.warningReporter
+
+  private def currentUnitContext: TypingUnitContext = session.currentContext
 
 
 }

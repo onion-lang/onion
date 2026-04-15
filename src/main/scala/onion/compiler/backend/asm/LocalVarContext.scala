@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import onion.compiler.LocalBinding
 import org.objectweb.asm.{Type as AsmType}
@@ -89,4 +89,3 @@ class ClosureLocalVarContext(
       case None    => super.getOrAllocateSlot(typedIndex, tp)
     }
 }
-

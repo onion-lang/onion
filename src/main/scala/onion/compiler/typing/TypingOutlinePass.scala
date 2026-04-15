@@ -2,18 +2,59 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.NameResolutionContext
+import onion.compiler.typing.session.TypingUnitContext
 
 import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, Set => MutableSet}
 
-final class TypingOutlinePass(private val typing: Typing, private val unit: AST.CompilationUnit) {
-  import typing.*
+final class TypingOutlinePass(private val typing: Typing, private val unitContext: TypingUnitContext) {
+  private val unit = unitContext.unit
+  private def table_ = typing.table_
+  private def definition_ = typing.definition_
+  private def mapper_ = typing.mapper_
+  private def access_ = typing.access_
+  private def topClass = typing.topClass
+  private def rootClass = typing.rootClass
+  private def typeAliases_ = typing.typeAliases_
+  private def declaredTypeParams_ = typing.declaredTypeParams_
+  private def typeParams_ = typing.typeParams_
+  private def emptyTypeParams = typing.emptyTypeParams
+  private def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
+    typing.report(error, node, items*)
+  private def report(error: SemanticError, location: Location, items: AnyRef*): Unit =
+    typing.report(error, location, items*)
+  private def put(ast: AST.Node, kernel: TypedAST.Node): Unit =
+    typing.put(ast, kernel)
+  private def find(name: String): NameResolver =
+    typing.find(name)
+  private def lookupKernelNode(ast: AST.Node): TypedAST.Node =
+    typing.lookupKernelNode(ast)
+  private def lookupAST(kernel: TypedAST.Node): AST.Node =
+    typing.lookupAST(kernel)
+  private def load(name: String): ClassType =
+    typing.load(name)
+  private def loadTopClass: ClassType =
+    typing.loadTopClass
+  private def mapFrom(typeNode: AST.TypeNode): Type =
+    typing.mapFrom(typeNode)
+  private def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Type =
+    typing.mapFrom(typeNode, mapper)
+  private def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
+    typing.typesOf(arguments)
+  private def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] =
+    typing.createTypeParams(nodes)
+  private def openTypeParams[A](scope: TypeParamScope)(block: => A): A =
+    typing.openTypeParams(scope)(block)
+  private def registerExtensionMethod(receiverFqcn: String, method: ExtensionMethodDefinition): Unit =
+    typing.registerExtensionMethod(receiverFqcn, method)
+  private def createFQCN(moduleName: String, className: String): String =
+    typing.createFQCN(moduleName, className)
 
   private var constructorCount = 0
 
   def run(): Unit = {
-    unit_ = unit
-    mapper_ = find(topClass)
+    typing.setMapper(find(topClass))
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -29,8 +70,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
 
   private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
     constructorCount = 0
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    mapper_ = find(definition_.name)
+    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
+    typing.setMapper(find(definition_.name))
 
     val classTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = classTypeParams
@@ -47,8 +88,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
   }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    mapper_ = find(definition_.name)
+    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
+    typing.setMapper(find(definition_.name))
 
     val interfaceTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = interfaceTypeParams
@@ -62,8 +103,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
   }
 
   private def processRecordDeclaration(node: AST.RecordDeclaration): Unit = {
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    mapper_ = find(definition_.name)
+    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
+    typing.setMapper(find(definition_.name))
 
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)
@@ -158,8 +199,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
   }
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = {
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    mapper_ = find(definition_.name)
+    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
+    typing.setMapper(find(definition_.name))
 
     // Enum extends java.lang.Enum<E>
     val enumClass = load("java.lang.Enum")
@@ -218,8 +259,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
 
   private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = {
     // Get the container class registered in HeaderPass
-    definition_ = lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    mapper_ = find(definition_.name)
+    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
+    typing.setMapper(find(definition_.name))
 
     // Resolve the receiver type (the type being extended)
     val receiverType = mapFrom(node.receiverType)
@@ -304,7 +345,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
   }
 
   private def processAccessSection(section: AST.AccessSection): Unit = {
-    access_ = section.modifiers
+    typing.setAccess(section.modifiers)
     section.members.foreach {
       case node: AST.FieldDeclaration => processFieldDeclaration(node)
       case node: AST.MethodDeclaration => processMethodDeclaration(node)
@@ -455,7 +496,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
     loop(start, Set.empty)
   }
 
-  private def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameMapper): ClassType = {
+  private def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameResolver): ClassType = {
     if (node == null) {
       return if (mustBeInterface) null else table_.rootClass
     }
@@ -516,7 +557,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
   }
 
   private def processTypeAliasDeclaration(node: AST.TypeAliasDeclaration): Unit = {
-    val moduleName = if (unit_.module != null) unit_.module.name else null
+    val moduleName = if (unit.module != null) unit.module.name else null
     val fqcn = createFQCN(moduleName, node.name)
 
     typeAliases_.get(fqcn).foreach { entry =>
@@ -528,7 +569,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unit: AST.
 
       // Validate target type can be resolved
       openTypeParams(emptyTypeParams ++ aliasTypeParams) {
-        val mapper = new NameMapper(typing, entry.imports)
+        val mapper = new NameResolver(NameResolutionContext.fromTyping(typing, entry.imports))
         val targetType = mapper.map(node.targetType.desc)
         if (targetType == null) {
           report(SemanticError.CLASS_NOT_FOUND, node.targetType, node.targetType.desc.toString, mapper.getCandidateClassNames)

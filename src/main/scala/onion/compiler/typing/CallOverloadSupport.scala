@@ -25,8 +25,6 @@ private[compiler] final class CallOverloadSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
-  import typing.*
-
   def selectNamedArgumentMethod(
     candidates: JTreeSet[Method],
     args: List[AST.Expression]

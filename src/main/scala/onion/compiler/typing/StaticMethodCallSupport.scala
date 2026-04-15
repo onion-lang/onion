@@ -12,15 +12,14 @@ private[compiler] final class StaticMethodCallSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
-  import typing.*
   private val overloadSupport = new CallOverloadSupport(typing, calls)
 
   def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] = {
-    val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
+    val typeRef = typing.mapFrom(node.typeRef).asInstanceOf[ClassType]
     if (typeRef == null) return None
     val field = MemberAccess.findField(typeRef, node.name)
     if (field == null) {
-      report(FIELD_NOT_FOUND, node, typeRef, node.name)
+      typing.report(FIELD_NOT_FOUND, node, typeRef, node.name)
       None
     } else {
       Some(new RefStaticField(typeRef, field))
@@ -28,7 +27,7 @@ private[compiler] final class StaticMethodCallSupport(
   }
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
-    val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
+    val typeRef = typing.mapFrom(node.typeRef).asInstanceOf[ClassType]
     if (typeRef == null) return None
 
     if (ArgumentHelpers.hasNamedArguments(node.args)) {

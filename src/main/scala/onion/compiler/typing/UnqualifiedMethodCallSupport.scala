@@ -2,17 +2,17 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 import java.util.{TreeSet => JTreeSet}
 
 private[compiler] final class UnqualifiedMethodCallSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
-  import typing.*
-  private val overloadSupport = new CallOverloadSupport(typing, calls)
-  private val callableValueCallSupport = new CallableValueCallSupport(typing, calls)
-  private val staticImportMethodCallSupport = new StaticImportMethodCallSupport(typing, calls)
+  private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
+  private val callableValueCallSupport = new CallableValueCallSupport(bodyContext, calls)
+  private val staticImportMethodCallSupport = new StaticImportMethodCallSupport(bodyContext, calls)
 
   def typeUnqualifiedMethodCall(
     node: AST.UnqualifiedMethodCall,
@@ -25,8 +25,8 @@ private[compiler] final class UnqualifiedMethodCallSupport(
 
     val params = calls.typedTerms(node.args.toArray, context)
     if (params == null) return None
-    val targetType = definition_
-    val methods = MethodResolution.findMethods(targetType, node.name, params, table_)
+    val targetType = bodyContext.definition
+    val methods = MethodResolution.findMethods(targetType, node.name, params, bodyContext.table)
     if (methods.length == 0) {
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
         case MethodFallbackLookup.Found(term) =>
@@ -75,7 +75,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     context: LocalContext,
     expected: Type
   ): Option[Term] = {
-    val targetType = definition_
+    val targetType = bodyContext.definition
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(targetType, node.name, candidates, _ => true)
     if (candidates.isEmpty) {

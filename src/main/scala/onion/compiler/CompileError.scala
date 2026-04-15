@@ -7,6 +7,8 @@
  * ************************************************************** */
 package onion.compiler
 
+import onion.compiler.diagnostics.Diagnostic
+
 /**
  * Compilation context information for error reporting.
  * Provides context about where in the code the error occurred.
@@ -74,7 +76,9 @@ case class CompileError(
   message: String,
   errorCode: Option[String] = None,
   context: Option[CompilationContext] = None
-) {
+) extends Diagnostic {
+  override def code: Option[String] = errorCode
+
   /**
    * Returns the full error message with context information.
    */

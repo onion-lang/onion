@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import org.objectweb.asm.{ClassWriter, Type as AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method as AsmMethod}
@@ -24,4 +24,3 @@ object MethodEmitter {
     if (!hasReturn) AsmUtil.emitDefaultReturn(gen, returnType)
   }
 }
-

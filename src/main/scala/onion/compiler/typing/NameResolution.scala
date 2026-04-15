@@ -3,8 +3,9 @@ package onion.compiler.typing
 import onion.compiler.TypedAST._
 import onion.compiler._
 import onion.compiler.SemanticError._
+import onion.compiler.typing.session.NameResolutionContext
 
-import scala.collection.mutable.{Map, Set => MutableSet}
+import scala.collection.mutable.Map
 
 final case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
 
@@ -21,11 +22,13 @@ final case class TypeAliasEntry(
   imports: Seq[ImportItem]
 )
 
-final class NameMapper(private val typing: Typing, imports: Seq[ImportItem]) {
+class NameResolver(private val context: NameResolutionContext) {
+  private def imports: Seq[ImportItem] = context.imports
+
   def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
 
   def getCandidateClassNames: Array[String] = {
-    val localClasses = typing.table_.classes.values.map(_.name).toSeq
+    val localClasses = context.table.classes.values.map(_.name).toSeq
     val importedClasses = imports.filterNot(_.isOnDemand).map(_.simpleName)
     (localClasses ++ importedClasses).distinct.toArray
   }
@@ -44,13 +47,13 @@ final class NameMapper(private val typing: Typing, imports: Seq[ImportItem]) {
       val aliasFqcn =
         if (qualified) name
         else {
-          val module = typing.unit_.module
+          val module = context.currentUnit.module
           val moduleName = if (module != null) module.name else null
-          typing.createFQCN(moduleName, name)
+          context.createFQCN(moduleName, name)
         }
-      val aliasOpt = typing.typeAliases_.get(aliasFqcn).orElse {
+      val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
         if (!qualified) {
-          imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => typing.typeAliases_.get(fqcn)).nextOption()
+          imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
         } else None
       }
       aliasOpt match {
@@ -68,13 +71,13 @@ final class NameMapper(private val typing: Typing, imports: Seq[ImportItem]) {
           val aliasFqcn =
             if (qualified) name
             else {
-              val module = typing.unit_.module
+              val module = context.currentUnit.module
               val moduleName = if (module != null) module.name else null
-              typing.createFQCN(moduleName, name)
+              context.createFQCN(moduleName, name)
             }
-          val aliasOpt = typing.typeAliases_.get(aliasFqcn).orElse {
+          val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
             if (!qualified) {
-              imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => typing.typeAliases_.get(fqcn)).nextOption()
+              imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
             } else None
           }
           aliasOpt match {
@@ -98,14 +101,14 @@ final class NameMapper(private val typing: Typing, imports: Seq[ImportItem]) {
       val mappedResult = map(result)
       if (mappedParams.exists(_ == null) || mappedResult == null) return null
       val arity = mappedParams.length
-      val functionType = typing.table_.load(s"onion.Function$arity")
+      val functionType = context.table.load(s"onion.Function$arity")
       if (functionType == null) return null
       TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
     case AST.ArrayType(component) =>
-      val (base, dimension) = typing.split(descriptor)
-      typing.table_.loadArray(map(base), dimension)
+      val (base, dimension) = context.splitDescriptor(descriptor)
+      context.table.loadArray(map(base), dimension)
     case AST.WildcardType(upperBound, lowerBound) =>
-      val mappedUpper = upperBound.map(map).getOrElse(typing.rootClass)
+      val mappedUpper = upperBound.map(map).getOrElse(context.rootClass)
       val mappedLower = lowerBound.map(map)
       new TypedAST.WildcardType(mappedUpper, mappedLower)
     case AST.NullableType(inner) =>
@@ -117,13 +120,13 @@ final class NameMapper(private val typing: Typing, imports: Seq[ImportItem]) {
 
   private def forName(name: String, qualified: Boolean): ClassType = {
     if (qualified) {
-      typing.table_.load(name)
+      context.table.load(name)
     } else {
-      typing.typeParams_.get(name).map(_.variableType).getOrElse {
-        val module = typing.unit_.module
+      context.currentTypeParams.get(name).map(_.variableType).getOrElse {
+        val module = context.currentUnit.module
         val moduleName = if (module != null) module.name else null
-        val aliasFqcn = typing.createFQCN(moduleName, name)
-        val local = typing.table_.lookup(aliasFqcn)
+        val aliasFqcn = context.createFQCN(moduleName, name)
+        val local = context.table.lookup(aliasFqcn)
         if (local != null) {
           local
         } else {
@@ -138,47 +141,52 @@ final class NameMapper(private val typing: Typing, imports: Seq[ImportItem]) {
   }
 
   private def resolveTypeAlias(entry: TypeAliasEntry, typeArgs: List[Type]): Type = {
-    if (typing.typeAliasResolutionStack_.contains(entry.fqcn)) {
-      typing.report(CYCLIC_TYPE_ALIAS, entry.node, entry.fqcn)
+    if (context.typeAliasResolutionStack.contains(entry.fqcn)) {
+      context.report(CYCLIC_TYPE_ALIAS, entry.node, Seq(entry.fqcn))
       return null
     }
 
     val params = entry.typeParameters
     if (params.nonEmpty && typeArgs.length != params.length) {
-      typing.report(
+      context.report(
         TYPE_ARGUMENT_ARITY_MISMATCH,
         entry.node,
-        entry.fqcn,
-        Integer.valueOf(params.length),
-        Integer.valueOf(typeArgs.length)
+        Seq(
+          entry.fqcn,
+          Integer.valueOf(params.length),
+          Integer.valueOf(typeArgs.length)
+        )
       )
       return null
     }
 
-    typing.typeAliasResolutionStack_ += entry.fqcn
+    context.typeAliasResolutionStack += entry.fqcn
     try {
-      val aliasMapper = new NameMapper(typing, entry.imports)
+      val aliasMapper = new NameResolver(context.copy(imports = entry.imports))
       if (params.nonEmpty && typeArgs.nonEmpty) {
         val substitutions = params.zip(typeArgs).map { case (p, arg) =>
           val varType = arg match {
             case tv: TypeVariableType => tv
             case ct: ClassType => TypeVariableType(p.name, ct)
-            case _ => TypeVariableType(p.name, typing.rootClass)
+            case _ => TypeVariableType(p.name, context.rootClass)
           }
           TypeParam(p.name, varType, p.upperBound)
         }
-        val savedTypeParams = typing.typeParams_
-        typing.typeParams_ = typing.emptyTypeParams ++ substitutions
+        val savedTypeParams = context.currentTypeParams
+        context.updateTypeParams(TypeParamScope(Map.empty) ++ substitutions)
         try {
           aliasMapper.map(entry.targetDescriptor)
         } finally {
-          typing.typeParams_ = savedTypeParams
+          context.updateTypeParams(savedTypeParams)
         }
       } else {
         aliasMapper.map(entry.targetDescriptor)
       }
     } finally {
-      typing.typeAliasResolutionStack_ -= entry.fqcn
+      context.typeAliasResolutionStack -= entry.fqcn
     }
   }
 }
+
+final class NameMapper(typing: Typing, imports: Seq[ImportItem])
+  extends NameResolver(NameResolutionContext.fromTyping(typing, imports))

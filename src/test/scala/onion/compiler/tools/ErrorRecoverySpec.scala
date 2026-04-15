@@ -15,7 +15,7 @@ class ErrorRecoverySpec extends AbstractShellSpec {
    */
   private def stringSource(code: String, fileName: String = "test.on"): InputSource = {
     new InputSource {
-      override def openReader: Reader = new StringReader(code)
+      override def openReader(): Reader = new StringReader(code)
       override def name: String = fileName
     }
   }

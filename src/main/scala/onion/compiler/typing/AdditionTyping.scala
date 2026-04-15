@@ -5,6 +5,7 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
 /**
  * Handles type checking for addition expressions.
@@ -18,10 +19,9 @@ import onion.compiler.toolbox.Boxing
  */
 private[typing] class AdditionTyping(
   private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {
-  import typing.*
-
   /**
    * Type-check an addition expression.
    * Tries numeric addition first, falls back to string concatenation.
@@ -41,8 +41,8 @@ private[typing] class AdditionTyping(
   private def tryNumericAddition(node: AST.Addition, left: Term, right: Term): Option[Term] =
     (numericBasicType(left), numericBasicType(right)) match {
       case (Some(leftBasicType), Some(rightBasicType)) =>
-        val leftTerm = if (left.isBasicType) left else Boxing.unboxing(table_, left, leftBasicType)
-        val rightTerm = if (right.isBasicType) right else Boxing.unboxing(table_, right, rightBasicType)
+        val leftTerm = if (left.isBasicType) left else Boxing.unboxing(bodyContext.table, left, leftBasicType)
+        val rightTerm = if (right.isBasicType) right else Boxing.unboxing(bodyContext.table, right, rightBasicType)
         Some(body.operatorTyping.processNumericExpression(ADD, node, leftTerm, rightTerm))
       case _ => None
     }
@@ -74,10 +74,10 @@ private[typing] class AdditionTyping(
   private def boxForConcat(node: AST.Expression, term: Term): Option[Term] =
     if (!term.isBasicType) Some(term)
     else if (term.`type` == BasicType.VOID) {
-      report(SemanticError.IS_NOT_BOXABLE_TYPE, node, term.`type`)
+      bodyContext.report(SemanticError.IS_NOT_BOXABLE_TYPE, node, term.`type`)
       None
     } else {
-      Some(Boxing.boxing(table_, term))
+      Some(Boxing.boxing(bodyContext.table, term))
     }
 
   /**
@@ -102,7 +102,7 @@ private[typing] class AdditionTyping(
       val basicType = term.`type`.asInstanceOf[BasicType]
       if (isNumeric(basicType)) Some(basicType) else None
     } else {
-      Boxing.unboxedType(table_, term.`type`).filter(isNumeric)
+      Boxing.unboxedType(bodyContext.table, term.`type`).filter(isNumeric)
     }
   }
 

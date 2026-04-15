@@ -1,6 +1,6 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
-import onion.compiler.{AsmCodeGeneration, Modifier, TypedAST}
+import onion.compiler.{Modifier, TypedAST}
 import onion.compiler.TypedAST.*
 import org.objectweb.asm.{ClassWriter, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{Method => AsmMethod}

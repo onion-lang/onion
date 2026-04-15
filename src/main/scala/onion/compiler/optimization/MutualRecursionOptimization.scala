@@ -170,15 +170,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     // Check 4: All tail calls must be to methods in the group
     val groupNames = group.map(_.name).toSet
-    group.foreach { method =>
+    var validationError: Option[String] = None
+    val iterator = group.iterator
+    while (iterator.hasNext && validationError.isEmpty) {
+      val method = iterator.next()
       val tailCalls = TailCallGraphAnalysis.findTailCalls(method)
       val externalCalls = tailCalls.filterNot(groupNames.contains)
       if (externalCalls.nonEmpty) {
-        return Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.mkString(", ")}")
+        validationError = Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.mkString(", ")}")
       }
     }
 
-    None // All validations passed
+    validationError
   }
 
   /**
@@ -214,14 +217,21 @@ class MutualRecursionOptimization(config: CompilerConfig)
     val paramCount = group.head.arguments.length
 
     // Check parameter types are compatible across all methods
-    for (paramIdx <- 0 until paramCount) {
+    var compatibleParameters = true
+    var paramIdx = 0
+    while (paramIdx < paramCount && compatibleParameters) {
       val paramTypesSet = group.map(_.arguments(paramIdx).name).toSet
       if (paramTypesSet.size > 1) {
         if (config.verbose) {
           trace(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypesSet")
         }
-        return
+        compatibleParameters = false
       }
+      paramIdx += 1
+    }
+
+    if (!compatibleParameters) {
+      return
     }
 
     // Step 2: Create state machine method name and structure

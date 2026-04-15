@@ -7,8 +7,6 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
-  import typing.*
-
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
@@ -91,7 +89,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       if (currentType == null) return
       currentType match {
         case classType: ClassType =>
-          lookupExtensionMethods(classType.name).foreach { extMethod =>
+          typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
             if (extMethod.name == name) result += extMethod
           }
         case _ =>

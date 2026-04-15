@@ -7,31 +7,33 @@ import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.TypedAST.UnaryTerm.Kind as UnaryKind
 import onion.compiler.TypedAST.UnaryTerm.Kind.*
+import onion.compiler.typing.session.{TypingBodyContext, TypingUnitContext}
 
 import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, HashMap, Map, Set => MutableSet, Stack}
 
 import TypeNarrowingAnalysis.NarrowingInfo
 
-final class TypingBodyPass(private val typing: Typing, private val unit: AST.CompilationUnit) {
-  import typing.*
-  private val methodCallTyping = new MethodCallTyping(typing, this)
-  private val assignmentTyping = new AssignmentTyping(typing, this)
-  private[typing] val operatorTyping = new OperatorTyping(typing, this)
-  private val expressionFormTyping = new ExpressionFormTyping(typing, this)
-  private val closureTyping = new ClosureTyping(typing, this)
-  private val statementTyping = new StatementTyping(typing, this)
-  private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, this)
-  private val additionTyping = new AdditionTyping(typing, this)
-  private val methodLookupSupport = new MethodLookupSupport(typing)
+final class TypingBodyPass(private val typing: Typing, private val unitContext: TypingUnitContext) {
+  private val unit = unitContext.unit
+  private val bodyContext = TypingBodyContext.fromTyping(typing)
+  private val methodCallTyping = new MethodCallTyping(typing, bodyContext, this)
+  private val assignmentTyping = new AssignmentTyping(typing, bodyContext, this)
+  private[typing] val operatorTyping = new OperatorTyping(typing, bodyContext, this)
+  private val expressionFormTyping = new ExpressionFormTyping(typing, bodyContext, this)
+  private val closureTyping = new ClosureTyping(typing, bodyContext, this)
+  private val statementTyping = new StatementTyping(typing, bodyContext, this)
+  private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, bodyContext, this)
+  private val additionTyping = new AdditionTyping(typing, bodyContext, this)
+  private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
   private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable)
-  private val methodBodySupport = new MethodBodySupport(typing, typed(_, _, _), typedTerms, translate, addReturnNode)
+  private val methodBodySupport = new MethodBodySupport(typing, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode)
   private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
-  private val assignabilitySupport = new AssignabilitySupport(typing)
+  private val assignabilitySupport = new AssignabilitySupport(typing, bodyContext)
   private val expressionDispatchSupport = new ExpressionDispatchSupport(this)
-  private val patternMatchSupport = new PatternMatchSupport(typing, (node, context) => typed(node, context), createEqualsForRef)
+  private val patternMatchSupport = new PatternMatchSupport(bodyContext, (node, context) => typed(node, context), createEqualsForRef)
   private val simpleExpressionTypingSupport = new SimpleExpressionTypingSupport(
-    typing,
+    bodyContext,
     typed(_, _, _),
     typeMemberSelection(_, _),
     typeAssignment(_, _)
@@ -85,11 +87,11 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
 
   def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-    val method = lookupKernelNode(node).asInstanceOf[MethodDefinition]
+    val method = typing.lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (method == null) return
     if (node.block == null) return
-    val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
-    openTypeParams(typeParams_ ++ methodTypeParams) {
+    val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+    typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
       methodBodySupport.processMethodLikeBody(method, node.args, node.block)
     }
   }
@@ -104,7 +106,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =
     declarationBodySupport.processExtensionDeclaration(node)
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
-    val function = lookupKernelNode(node).asInstanceOf[MethodDefinition]
+    val function = typing.lookupKernelNode(node).asInstanceOf[MethodDefinition]
     if (function == null) return
     methodBodySupport.processMethodLikeBody(function, node.args, node.block)
   }
@@ -213,7 +215,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = {
     val result = expressionDispatchSupport.typed(node, context, expected)
-    result.foreach(term => put(node, term))
+    result.foreach(term => typing.put(node, term))
     result
   }
   def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
@@ -232,7 +234,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     methodLookupSupport.types(terms)
   private[typing] def typeNames(types: Array[Type]): Array[String] =
     methodLookupSupport.typeNames(types)
-  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Continuable, Method] =
+  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[typing.Continuable, Method] =
     methodLookupSupport.tryFindMethod(node, target, name, params)
 
   private def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term =
@@ -249,7 +251,6 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     simpleExpressionTypingSupport.typeSimple(node, context, expected)
 
   private def runUnit(): Unit = {
-    unit_ = unit
     val prepared = topLevelTypingSupport.prepareUnit(unit)
     topLevelTypingSupport.processToplevels(unit.toplevels, prepared)
     topLevelTypingSupport.finishUnit(prepared)

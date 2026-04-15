@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
@@ -6,7 +6,7 @@ import org.objectweb.asm.{ClassWriter, Opcodes, Type as AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method as AsmMethod}
 
 final class ClosureCodegen(
-  asmCodeGen: AsmCodeGeneration,
+  asmCodeGen: onion.compiler.backend.asm.AsmCodeGeneration,
   outputDirectory: String,
   nextClosureId: () => Int,
   registerCompiledClass: CompiledClass => Unit

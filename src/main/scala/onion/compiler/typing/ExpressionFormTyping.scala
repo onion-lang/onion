@@ -4,11 +4,15 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.typing.session.TypingBodyContext
 
-final class ExpressionFormTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
-  private val constructionTyping = new ConstructionTyping(typing, body)
-  private val stringInterpolationTyping = new StringInterpolationTyping(typing, body)
+final class ExpressionFormTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
+  private val constructionTyping = new ConstructionTyping(typing, bodyContext, body)
+  private val stringInterpolationTyping = new StringInterpolationTyping(typing, bodyContext, body)
 
   def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] =
     constructionTyping.typeIndexing(node, context)
@@ -30,16 +34,16 @@ final class ExpressionFormTyping(private val typing: Typing, private val body: T
       left <- typed(node.lhs, context)
       right <- typed(node.rhs, context)
       result <- if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
-        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
         None
       } else Some(new BinaryTerm(ELVIS, left.`type`, left, right))
     } yield result
 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     typed(node.src, context).flatMap { term =>
-      Option(mapFrom(node.to, mapper_)).flatMap { destination =>
+      Option(typing.mapFrom(node.to, bodyContext.mapper)).flatMap { destination =>
         if (term.`type`.isBasicType && !destination.isBasicType) {
-          report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
           None
         } else {
           Some(new AsInstanceOf(term, destination))
@@ -50,7 +54,7 @@ final class ExpressionFormTyping(private val typing: Typing, private val body: T
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     for {
       target <- typed(node.target, context)
-      destinationType <- Option(mapFrom(node.typeRef, mapper_))
+      destinationType <- Option(typing.mapFrom(node.typeRef, bodyContext.mapper))
     } yield new InstanceOf(target, destinationType)
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =

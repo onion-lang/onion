@@ -2,13 +2,12 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class CallableValueCallSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
-  import typing.*
-
   def resolveCallableValue(
     node: AST.UnqualifiedMethodCall,
     params: Array[Term],
@@ -32,11 +31,12 @@ private[compiler] final class CallableValueCallSupport(
     }
 
     if (!context.isStatic) {
-      val field = MemberAccess.findField(definition_, node.name)
-      if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
+      val owner = bodyContext.definition
+      val field = MemberAccess.findField(owner, node.name)
+      if (field != null && MemberAccess.isMemberAccessible(field, owner)) {
         field.`type` match
           case targetType: ObjectType =>
-            return callOnTarget(new RefField(new This(definition_), field), targetType)
+            return callOnTarget(new RefField(new This(owner), field), targetType)
           case _ =>
       }
     }

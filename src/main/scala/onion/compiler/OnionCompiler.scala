@@ -7,57 +7,37 @@
  * ************************************************************** */
 package onion.compiler
 
-import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.exceptions.CompilationException
-import onion.compiler.pipeline.{CompileProfileReporter, CompilerPipeline}
-import scala.util.control.NonFatal
+import onion.compiler.pipeline.{CompilationRequest, CompilationResult, PipelineRunner}
+import onion.compiler.source.InputSourceAdapter
 
 /**
  * @author Kota Mizushima
  *
  */
 class OnionCompiler(val config: CompilerConfig) {
-  private val InternalErrorCode = "I0000"
+  def compile(fileNames: Array[String]): CompilationOutcome =
+    compileDetailed(fileNames).toOutcome
 
-  private def internalError(e: Throwable): CompileError = {
-    val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
-    CompileError(null, null, s"Internal compiler error: $message", Some(InternalErrorCode))
-  }
+  def compile(srcs: Seq[InputSource]): CompilationOutcome =
+    compileDetailed(srcs).toOutcome
 
-  def compile(fileNames: Array[String]): CompilationOutcome = {
-    val sources = fileNames.iterator.map(new FileInputSource(_)).toSeq
-    compile(sources)
-  }
+  def compileDetailed(fileNames: Array[String]): CompilationResult =
+    compileDetailed(fileNames.iterator.map(new FileInputSource(_)).toSeq)
 
-  def compile(srcs: Seq[InputSource]): CompilationOutcome = {
-    try {
-      val result = new CompilerPipeline(config).run(srcs)
-      result.profile.foreach { profile =>
-        if (config.verbose) {
-          System.err.println(CompileProfileReporter.renderVerbose(profile))
-        }
-        if (config.compileProfile.enabled) {
-          CompileProfileReporter.report(profile, config.compileProfile)
-        }
-      }
-      Success(result.classes)
-    } catch {
-      case e: CompilationException =>
-        Failure(e.problems.toIndexedSeq)
-      case NonFatal(e) =>
-        Failure(Seq(internalError(e)))
-    }
-  }
+  def compileDetailed(srcs: Seq[InputSource]): CompilationResult =
+    new PipelineRunner(PipelineRunner.defaultPhases(config))
+      .run(CompilationRequest(InputSourceAdapter.fromInputSources(srcs), config))
 
   def compileOrThrow(fileNames: Array[String]): Seq[CompiledClass] =
-    compile(fileNames) match {
-      case Success(classes) => classes
-      case Failure(errors) => throw new CompilationException(errors)
+    compileDetailed(fileNames) match {
+      case result if !result.hasErrors => result.classes
+      case result => throw new CompilationException(result.allErrors)
     }
 
   def compileOrThrow(srcs: Seq[InputSource]): Seq[CompiledClass] =
-    compile(srcs) match {
-      case Success(classes) => classes
-      case Failure(errors) => throw new CompilationException(errors)
+    compileDetailed(srcs) match {
+      case result if !result.hasErrors => result.classes
+      case result => throw new CompilationException(result.allErrors)
     }
 }

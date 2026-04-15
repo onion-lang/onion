@@ -146,7 +146,8 @@ This phase lowers `@TailRecursive` mutually recursive groups into state-machine 
 ## Phase 6: Code Generation
 
 **Primary boundary**: `src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`  
-**ASM backend**: `src/main/scala/onion/compiler/AsmCodeGeneration.scala`
+**ASM backend boundary**: `src/main/scala/onion/compiler/backend/asm/AsmBackend.scala`
+**Legacy implementation body**: `src/main/scala/onion/compiler/backend/asm/AsmCodeGeneration.scala`
 
 ### ASM Library
 
@@ -157,7 +158,7 @@ Uses the ASM library for bytecode generation:
 
 ### Supporting Components
 
-**Bytecode Utilities** (`src/main/scala/onion/compiler/bytecode/`):
+**Bytecode Utilities** (`src/main/scala/onion/compiler/backend/asm/`):
 - `MethodEmitter.scala` - JVM method generation
 - `LocalVarContext.scala` - Local variable management
 - `AsmUtil.scala` - ASM helper functions
@@ -165,7 +166,7 @@ Uses the ASM library for bytecode generation:
 **Visitor Pattern**:
 - `AsmCodeGenerationVisitor.scala` - AST traversal for code generation
 
-The main pipeline now targets `TypedAstCodeGeneration` directly. `TypedGenerating.scala` remains only as a thin legacy compatibility adapter and is no longer the primary codegen entry point.
+The main pipeline now targets `TypedAstCodeGeneration`, which delegates to `backend.asm.AsmBackend`. `TypedGenerating.scala` remains only as a public facade over `codegen.legacy.TypedGeneratingBridge` and is no longer the primary codegen entry point.
 
 ### Output
 
@@ -179,7 +180,7 @@ The main pipeline now targets `TypedAstCodeGeneration` directly. `TypedGeneratin
 **Facade**: `src/main/scala/onion/compiler/OnionCompiler.scala`  
 **Pipeline**: `src/main/scala/onion/compiler/pipeline/CompilerPipeline.scala`
 
-`OnionCompiler` is intentionally thin: it delegates phase execution to `CompilerPipeline`, handles exception mapping, and emits profiling output when enabled.
+`OnionCompiler` is intentionally thin: it delegates phase execution to `CompilerPipeline`, handles exception mapping, and exposes `compileDetailed` for tools that need timings, diagnostics, and debug artifacts.
 
 ### Profiling
 

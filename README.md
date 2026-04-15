@@ -78,11 +78,12 @@ The post-parse compiler is now an explicit pipeline:
 
 ```text
 Parsing -> Rewriting -> Typing -> TailCallOptimization
-        -> MutualRecursionOptimization -> TypedAstCodeGeneration
+        -> MutualRecursionOptimization -> TypedAstCodeGeneration -> backend.asm.AsmBackend
 ```
 
-- `Typing.scala` is the orchestration layer for header/outline/body/duplication passes, with name resolution and method resolution split into `onion.compiler.typing`.
-- `TypedGenerating.scala` now exists only as a thin legacy compatibility adapter; the main pipeline targets `onion.compiler.codegen.TypedAstCodeGeneration` directly.
+- `Typing.scala` is the orchestration layer for header/outline/body/duplication passes, with per-unit state held in `typing.session.TypingSession` / `TypingUnitContext`.
+- Type name resolution now lives in `onion.compiler.typing.NameResolver`, with `NameMapper` retained only as a compatibility facade.
+- `TypedGenerating.scala` is now just a public legacy facade over `onion.compiler.codegen.legacy.TypedGeneratingBridge`; the main pipeline targets `onion.compiler.codegen.TypedAstCodeGeneration` and `onion.compiler.backend.asm.AsmBackend`.
 - `OnionCompiler` delegates execution and timing to `onion.compiler.pipeline.CompilerPipeline`, which can emit phase-by-phase compile profiles.
 
 ## Tools

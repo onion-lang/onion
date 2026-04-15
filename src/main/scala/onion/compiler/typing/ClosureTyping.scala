@@ -3,11 +3,15 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 import scala.jdk.CollectionConverters.*
 
-final class ClosureTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class ClosureTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   def typeClosure(node: AST.ClosureExpression, context: LocalContext, expected: Type): Option[Term] = {
     val args = node.args
@@ -18,11 +22,11 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
         case _ => null
       }
 
-    val rawTypeRef = Option(inferredTarget).getOrElse(mapFrom(node.typeRef).asInstanceOf[ClassType])
+    val rawTypeRef = Option(inferredTarget).getOrElse(typing.mapFrom(node.typeRef).asInstanceOf[ClassType])
     if (rawTypeRef == null) {
       None
     } else if (!rawTypeRef.isInterface) {
-      report(INTERFACE_REQUIRED, node.typeRef, rawTypeRef)
+      bodyContext.report(INTERFACE_REQUIRED, node.typeRef, rawTypeRef)
       None
     } else {
       val argTypesOpt = resolveClosureArgTypes(node, inferredTarget)
@@ -38,7 +42,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
         case applied: AppliedClassType =>
           // Check if the last type argument (return type for FunctionN) contains type variables
           applied.typeArguments.lastOption.exists { lastArg =>
-            lastArg == rootClass || containsTypeVariable(lastArg)
+            lastArg == bodyContext.rootClass || containsTypeVariable(lastArg)
           }
         case _ => false
       }
@@ -74,7 +78,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
       val candidates = typeRef.methods.filter(m => m.name == name && m.arguments.length == argTypes.length)
       candidates.find(m => sameTypes(substitutedArgs(m), argTypes)) match {
         case None =>
-          report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
+          bodyContext.report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
           None
         case Some(method) =>
           val expectedArgs = substitutedArgs(method)
@@ -155,7 +159,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
         argTypes(i) = null
         hasMissing = true
       } else {
-        val mapped = mapFrom(arg.typeRef)
+        val mapped = typing.mapFrom(arg.typeRef)
         if (mapped == null) return None
         argTypes(i) = mapped
       }
@@ -166,7 +170,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
       Some(argTypes)
     } else if (inferredTarget == null) {
       args.zipWithIndex.foreach { case (arg, idx) =>
-        if (arg.typeRef == null) report(LAMBDA_PARAM_TYPE_REQUIRED, arg, arg.name)
+        if (arg.typeRef == null) bodyContext.report(LAMBDA_PARAM_TYPE_REQUIRED, arg, arg.name)
       }
       None
     } else {
@@ -201,7 +205,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
     while (i < args.length) {
       val arg = args(i)
       if (context.lookupOnlyCurrentScope(arg.name) != null) {
-        report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
+        bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
         return false
       }
       val argType = argTypes(i)
@@ -230,7 +234,7 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
 
     val paramCount = baseType.typeParameters.length
     if (paramCount == argTypes.length + 1) {
-      val ret = inferredReturnType.getOrElse(rootClass)
+      val ret = inferredReturnType.getOrElse(bodyContext.rootClass)
       AppliedClassType(baseType, (argTypes.toIndexedSeq :+ ret).toList)
     } else {
       rawType
@@ -299,8 +303,8 @@ final class ClosureTyping(private val typing: Typing, private val body: TypingBo
   }
 
   private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type =
-    TypeCheckingHelpers.leastUpperBound(node, left, right, rootClass,
-      (n, l, r) => report(INCOMPATIBLE_TYPE, n, l, r))
+    TypeCheckingHelpers.leastUpperBound(node, left, right, bodyContext.rootClass,
+      (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
   private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
     val terms = bodyTerm match {

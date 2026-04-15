@@ -16,19 +16,22 @@ private[typing] object GenericMethodTypeArguments {
     reportErrors: Boolean = true,
     typeArgNodes: Array[AST.TypeNode] = null
   ): Option[scala.collection.immutable.Map[String, Type]] = {
-    import typing.*
+    val rootClass = typing.rootClass
+    def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
+      typing.report(error, node, items*)
+    def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
     if (typeParams.isEmpty) {
       if (reportErrors) {
-        report(METHOD_NOT_GENERIC, callNode, method.affiliation.name, method.name)
+        reportError(callNode, METHOD_NOT_GENERIC, method.affiliation.name, method.name)
       }
       return None
     }
     if (typeParams.length != mappedArgs.length) {
       if (reportErrors) {
-        report(
-          METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
+        reportError(
           callNode,
+          METHOD_TYPE_ARGUMENT_ARITY_MISMATCH,
           method.affiliation.name,
           method.name,
           Integer.valueOf(typeParams.length),
@@ -44,10 +47,10 @@ private[typing] object GenericMethodTypeArguments {
       val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
       val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
       val arg = mappedArgs(i)
-      if (!TypeRules.isAssignable(upper, boxedTypeArgument(arg))) {
+      if (!TypeRules.isAssignable(upper, boxedTypeArg(arg))) {
         if (reportErrors) {
           val position = if (typeArgNodes == null || i >= typeArgNodes.length) callNode else typeArgNodes(i)
-          report(INCOMPATIBLE_TYPE, position, upper, arg)
+          reportError(position, INCOMPATIBLE_TYPE, upper, arg)
         }
         false
       } else true
@@ -80,12 +83,15 @@ private[typing] object GenericMethodTypeArguments {
     classSubst: scala.collection.immutable.Map[String, Type],
     expectedReturn: Type = null
   ): scala.collection.immutable.Map[String, Type] = {
-    import typing.*
+    val rootClass = typing.rootClass
+    def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
+      typing.report(error, node, items*)
+    def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
     if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
 
     def isSuperTypeForBounds(left: Type, right: Type): Boolean =
-      if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArgument(right))
+      if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
       else TypeRules.isSuperType(left, right)
 
     val inferred = HashMap[String, Type]()
@@ -101,7 +107,7 @@ private[typing] object GenericMethodTypeArguments {
         case Some(prev) =>
           if (isSuperTypeForBounds(prev, bound)) upperConstraints += name -> bound
           else if (isSuperTypeForBounds(bound, prev)) ()
-          else report(INCOMPATIBLE_TYPE, position, prev, bound)
+          else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
     }
 
     def addLower(name: String, bound: Type): Unit = {
@@ -135,7 +141,7 @@ private[typing] object GenericMethodTypeArguments {
         case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
           inferred.get(tv.name) match {
             case Some(prev) =>
-              if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
+              if (!(prev eq actual)) reportError(position, INCOMPATIBLE_TYPE, prev, actual)
             case None =>
               inferred += tv.name -> actual
           }
@@ -200,13 +206,12 @@ private[typing] object GenericMethodTypeArguments {
     typeArgs: List[AST.TypeNode],
     classSubst: scala.collection.immutable.Map[String, Type]
   ): Option[scala.collection.immutable.Map[String, Type]] = {
-    import typing.*
     val mappedArgsOpt = typeArgs.foldLeft(Option(Array.empty[Type])) { (accOpt, typeArg) =>
       accOpt.flatMap { acc =>
-        val mapped = mapFrom(typeArg)
+        val mapped = typing.mapFrom(typeArg)
         if (mapped == null) None
         else if (mapped eq BasicType.VOID) {
-          report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name)
+          typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name)
           None
         } else Some(acc :+ mapped)
       }
@@ -224,16 +229,19 @@ private[typing] object GenericMethodTypeArguments {
     classSubst: scala.collection.immutable.Map[String, Type],
     expectedReturn: Type
   ): scala.collection.immutable.Map[String, Type] = {
-    import typing.*
+    val rootClass = typing.rootClass
+    def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
+      typing.report(error, node, items*)
+    def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
     if (typeParams.isEmpty) return scala.collection.immutable.Map.empty
 
     def isSuperTypeForBounds(left: Type, right: Type): Boolean =
-      if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArgument(right))
+      if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
       else TypeRules.isSuperType(left, right)
 
     def isAssignableForBounds(left: Type, right: Type): Boolean =
-      if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArgument(right))
+      if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArg(right))
       else TypeRules.isAssignable(left, right)
 
     val bounds = HashMap[String, Type]()
@@ -255,7 +263,7 @@ private[typing] object GenericMethodTypeArguments {
         case Some(prev) =>
           if (isSuperTypeForBounds(prev, bound)) upperConstraints += name -> bound
           else if (isSuperTypeForBounds(bound, prev)) ()
-          else report(INCOMPATIBLE_TYPE, position, prev, bound)
+          else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
     }
 
     def addLower(name: String, bound: Type): Unit = {
@@ -289,7 +297,7 @@ private[typing] object GenericMethodTypeArguments {
         case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
           inferred.get(tv.name) match {
             case Some(prev) =>
-              if (!(prev eq actual)) report(INCOMPATIBLE_TYPE, position, prev, actual)
+              if (!(prev eq actual)) reportError(position, INCOMPATIBLE_TYPE, prev, actual)
             case None =>
               inferred += tv.name -> actual
           }
@@ -345,7 +353,7 @@ private[typing] object GenericMethodTypeArguments {
             if (isSuperTypeForBounds(bound0, upper)) upper
             else if (isSuperTypeForBounds(upper, bound0)) bound0
             else {
-              report(INCOMPATIBLE_TYPE, callNode, bound0, upper)
+              reportError(callNode, INCOMPATIBLE_TYPE, bound0, upper)
               bound0
             }
 
@@ -356,7 +364,7 @@ private[typing] object GenericMethodTypeArguments {
 
       val inferredType =
         if (!isAssignableForBounds(bound, inferredType0)) {
-          report(INCOMPATIBLE_TYPE, callNode, bound, inferredType0)
+          reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
           bound
         } else {
           inferredType0

@@ -4,9 +4,12 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
-private[compiler] final class AssignabilitySupport(typing: Typing) {
-  import typing.*
+private[compiler] final class AssignabilitySupport(
+  typing: Typing,
+  bodyContext: TypingBodyContext
+) {
 
   def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
     if (actual == null) return null
@@ -16,10 +19,10 @@ private[compiler] final class AssignabilitySupport(typing: Typing) {
     if (!expected.isBasicType && actual.`type`.isBasicType) {
       val basicType = actual.`type`.asInstanceOf[BasicType]
       if (basicType == BasicType.VOID) {
-        report(IS_NOT_BOXABLE_TYPE, node, basicType)
+        bodyContext.report(IS_NOT_BOXABLE_TYPE, node, basicType)
         return null
       }
-      val boxed = Boxing.boxing(table_, actual)
+      val boxed = Boxing.boxing(bodyContext.table, actual)
       if (TypeRules.isAssignable(expected, boxed.`type`)) {
         return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
       }
@@ -28,12 +31,12 @@ private[compiler] final class AssignabilitySupport(typing: Typing) {
     if (expected.isBasicType && !actual.`type`.isBasicType) {
       val targetBasicType = expected.asInstanceOf[BasicType]
       if (targetBasicType == BasicType.VOID) {
-        report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
+        bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
         return null
       }
-      val boxedType = Boxing.boxedType(table_, targetBasicType)
+      val boxedType = Boxing.boxedType(bodyContext.table, targetBasicType)
       if (TypeRules.isAssignable(boxedType, actual.`type`)) {
-        return Boxing.unboxing(table_, actual, targetBasicType)
+        return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }
     }
 
@@ -58,10 +61,10 @@ private[compiler] final class AssignabilitySupport(typing: Typing) {
 
     val isCompatible =
       if (containsTypeVariable(expected)) structurallyAssignable(expected, actual.`type`)
-      else TypeRelations.isAssignableWithBoxing(expected, actual.`type`, table_)
+      else TypeRelations.isAssignableWithBoxing(expected, actual.`type`, bodyContext.table)
 
     if (!isCompatible) {
-      report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
+      bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
       return null
     }
     new AsInstanceOf(node.location, actual, expected)

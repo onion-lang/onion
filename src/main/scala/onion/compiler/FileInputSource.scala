@@ -7,11 +7,6 @@
  * ************************************************************** */
 package onion.compiler
 
-import java.io.Reader
-import onion.compiler.toolbox.Inputs
+import onion.compiler.source.FileSource
 
-class FileInputSource(val name: String) extends InputSource {
-  private lazy val reader: Reader = Inputs.newReader(name)
-
-  def openReader: Reader = reader
-}
+class FileInputSource(name: String) extends FileSource(name) with InputSource

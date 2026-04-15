@@ -8,7 +8,6 @@
 package onion.tools.lsp
 
 import onion.compiler._
-import onion.compiler.CompilationOutcome.{Failure, Success}
 import org.eclipse.lsp4j._
 import org.eclipse.lsp4j.jsonrpc.messages.{Either => LspEither}
 import org.eclipse.lsp4j.services.TextDocumentService
@@ -376,14 +375,9 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 100)
     val compiler = new OnionCompiler(config)
 
-    val outcome = compiler.compile(Seq(new StreamInputSource(new StringReader(content), fileName)))
-
-    val diagnostics = outcome match {
-      case Success(_) =>
-        java.util.Collections.emptyList[Diagnostic]()
-      case Failure(errors) =>
-        errors.map(errorToDiagnostic).asJava
-    }
+    val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
+    val diagnostics =
+      (result.diagnostics.errors.map(errorToDiagnostic) ++ result.diagnostics.warnings.map(warningToDiagnostic)).asJava
 
     client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics))
   }
@@ -403,6 +397,25 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     diagnostic.setSeverity(DiagnosticSeverity.Error)
     diagnostic.setSource("onion")
     diagnostic.setMessage(error.message)
+    diagnostic
+  }
+
+  private def warningToDiagnostic(warning: CompileWarning): Diagnostic = {
+    val location = warning.location
+    val line = if (location != null) Math.max(0, location.line - 1) else 0
+    val column = if (location != null) Math.max(0, location.column - 1) else 0
+
+    val range = new Range(
+      new Position(line, column),
+      new Position(line, column + 10)
+    )
+
+    val diagnostic = new Diagnostic()
+    diagnostic.setRange(range)
+    diagnostic.setSeverity(DiagnosticSeverity.Warning)
+    diagnostic.setSource("onion")
+    diagnostic.setCode(warning.category.code)
+    diagnostic.setMessage(warning.message)
     diagnostic
   }
 

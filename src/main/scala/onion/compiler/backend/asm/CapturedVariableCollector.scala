@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import onion.compiler.{LocalBinding, ClosureLocalBinding}
 import onion.compiler.TypedAST
@@ -167,4 +167,3 @@ private[compiler] object CapturedVariableCollector {
     captured.values.toSeq
   }
 }
-

@@ -3,17 +3,18 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Paths
+import onion.compiler.typing.session.NameResolutionContext
+import onion.compiler.typing.session.TypingUnitContext
 
 import scala.collection.mutable.Buffer
 
-final class TypingHeaderPass(private val typing: Typing, private val unit: AST.CompilationUnit) {
-  import typing.*
+final class TypingHeaderPass(private val typing: Typing, private val unitContext: TypingUnitContext) {
+  private val unit = unitContext.unit
 
   def run(): Unit = {
-    unit_ = unit
     val moduleName = if (unit.module != null) unit.module.name else null
     val imports = buildImports(moduleName)
-    staticImportedList_ = defaultStaticImports()
+    unitContext.staticImports = defaultStaticImports()
 
     var nonTypeCount = 0
     unit.toplevels.foreach {
@@ -73,76 +74,76 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
   }
 
   private def registerClass(declaration: AST.ClassDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
-    val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null, null)
+    val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, typing.createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
-    if (table_.lookup(node.name) != null) {
-      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    if (typing.table_.lookup(node.name) != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
     } else {
-      table_.classes.add(node)
-      put(declaration, node)
-      add(node.name, new NameMapper(typing, imports))
+      typing.table_.classes.add(node)
+      typing.put(declaration, node)
+      typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
     }
   }
 
   private def registerInterface(declaration: AST.InterfaceDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
-    val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, createFQCN(moduleName, declaration.name), null)
+    val node = ClassDefinition.newInterface(declaration.location, declaration.modifiers, typing.createFQCN(moduleName, declaration.name), null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
-    if (table_.lookup(node.name) != null) {
-      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    if (typing.table_.lookup(node.name) != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
     } else {
-      table_.classes.add(node)
-      put(declaration, node)
-      add(node.name, new NameMapper(typing, imports))
+      typing.table_.classes.add(node)
+      typing.put(declaration, node)
+      typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
     }
   }
 
   private def registerRecord(declaration: AST.RecordDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     // Records are compiled as final classes
     val modifiers = declaration.modifiers | Modifier.FINAL
-    val node = ClassDefinition.newClass(declaration.location, modifiers, createFQCN(moduleName, declaration.name), null, null)
+    val node = ClassDefinition.newClass(declaration.location, modifiers, typing.createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
-    if (table_.lookup(node.name) != null) {
-      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    if (typing.table_.lookup(node.name) != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
     } else {
-      table_.classes.add(node)
-      put(declaration, node)
-      add(node.name, new NameMapper(typing, imports))
+      typing.table_.classes.add(node)
+      typing.put(declaration, node)
+      typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
     }
   }
 
   private def registerEnum(declaration: AST.EnumDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     // Enums are compiled as final classes extending java.lang.Enum
     val modifiers = declaration.modifiers | Modifier.FINAL | Modifier.ENUM
-    val node = ClassDefinition.newClass(declaration.location, modifiers, createFQCN(moduleName, declaration.name), null, null)
+    val node = ClassDefinition.newClass(declaration.location, modifiers, typing.createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
-    if (table_.lookup(node.name) != null) {
-      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    if (typing.table_.lookup(node.name) != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
     } else {
-      table_.classes.add(node)
-      put(declaration, node)
-      add(node.name, new NameMapper(typing, imports))
+      typing.table_.classes.add(node)
+      typing.put(declaration, node)
+      typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
     }
   }
 
   private def registerExtension(declaration: AST.ExtensionDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     // Generate container class name from receiver type
     val receiverTypeName = extractTypeName(declaration.receiverType)
-    val containerClassName = createFQCN(moduleName, "Extension$" + receiverTypeName.replace(".", "_"))
+    val containerClassName = typing.createFQCN(moduleName, "Extension$" + receiverTypeName.replace(".", "_"))
 
     // Extension container is a public final class with static methods
     val modifiers = Modifier.PUBLIC | Modifier.FINAL
-    val node = ClassDefinition.newClass(declaration.location, modifiers, containerClassName, table_.rootClass, new Array[ClassType](0))
+    val node = ClassDefinition.newClass(declaration.location, modifiers, containerClassName, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     node.setResolutionComplete(true) // No inheritance to resolve
 
-    if (table_.lookup(node.name) != null) {
-      report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    if (typing.table_.lookup(node.name) != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
     } else {
-      table_.classes.add(node)
-      put(declaration, node)
-      add(node.name, new NameMapper(typing, imports))
+      typing.table_.classes.add(node)
+      typing.put(declaration, node)
+      typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
       // Register this as an extension declaration for later processing
-      registerExtensionDeclaration(declaration, node)
+      typing.registerExtensionDeclaration(declaration, node)
     }
   }
 
@@ -151,17 +152,17 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
     moduleName: String,
     imports: Seq[ImportItem]
   ): Unit = {
-    val fqcn = createFQCN(moduleName, declaration.name)
+    val fqcn = typing.createFQCN(moduleName, declaration.name)
 
     // Check duplicate type alias
-    if (typeAliases_.contains(fqcn)) {
-      report(SemanticError.DUPLICATE_TYPE_ALIAS, declaration, fqcn)
+    if (typing.typeAliases_.contains(fqcn)) {
+      typing.report(SemanticError.DUPLICATE_TYPE_ALIAS, declaration, fqcn)
       return
     }
 
     // Check conflict with class names
-    if (table_.lookup(fqcn) != null) {
-      report(SemanticError.DUPLICATE_CLASS, declaration, fqcn)
+    if (typing.table_.lookup(fqcn) != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, declaration, fqcn)
       return
     }
 
@@ -173,7 +174,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
       node = declaration,
       imports = imports
     )
-    typeAliases_(fqcn) = entry
+    typing.typeAliases_(fqcn) = entry
   }
 
   private def extractTypeName(typeNode: AST.TypeNode): String = {
@@ -197,12 +198,12 @@ final class TypingHeaderPass(private val typing: Typing, private val unit: AST.C
   }
 
   private def registerTopLevelContainer(imports: Seq[ImportItem]): Unit = {
-    val node = ClassDefinition.newClass(unit.location, 0, topClass, table_.rootClass, new Array[ClassType](0))
-    node.setSourceFile(Paths.nameOf(unit_.sourceFile))
+    val node = ClassDefinition.newClass(unit.location, 0, typing.topClass, typing.table_.rootClass, new Array[ClassType](0))
+    node.setSourceFile(Paths.nameOf(unit.sourceFile))
     node.setResolutionComplete(true)
-    table_.classes.add(node)
+    typing.table_.classes.add(node)
     node.addDefaultConstructor
-    put(unit, node)
-    add(node.name, new NameMapper(typing, imports))
+    typing.put(unit, node)
+    typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
   }
 }

@@ -2,7 +2,7 @@ package onion.compiler.tools
 
 import onion.compiler.CompilationOutcome.Success
 import onion.compiler._
-import onion.compiler.pipeline.{CompileProfileFormat, CompileProfileSettings}
+import onion.compiler.pipeline.{CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -27,17 +27,18 @@ class CompilerProfileSpec extends AnyFunSpec with Matchers {
       )
 
       val compiler = new OnionCompiler(config)
-      val result = compiler.compile(
-        Seq(new StreamInputSource(new StringReader("""IO::println("profile")"""), "Profile.on"))
+      val result = compiler.compileDetailed(
+        Seq(new StreamInputSource(() => new StringReader("""IO::println("profile")"""), "Profile.on"))
       )
 
-      result shouldBe a [Success]
+      result.toOutcome shouldBe a [Success]
+      CompileProfileReporter.report(result.toCompileProfile, config.compileProfile)
       val profileJson = Files.readString(output)
       profileJson should include ("\"sourceCount\":1")
       profileJson should include ("\"generatedClasses\":")
       profileJson should include ("\"phases\":[")
       profileJson should include ("\"name\":\"Parsing\"")
-      profileJson should include ("\"name\":\"CodeGen\"")
+      profileJson should include ("\"name\":\"BytecodeGeneration\"")
     }
   }
 }

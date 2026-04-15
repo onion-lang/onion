@@ -66,6 +66,8 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
 }
 
 def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
+  val parserOutput = output / "onion" / "compiler" / "parser"
+  IO.createDirectory(parserOutput)
   Fork.java(
     ForkOptions().withOutputStrategy(
       OutputStrategy.LoggedOutput(log)
@@ -77,7 +79,7 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
       "-UNICODE_INPUT=true",
       "-JAVA_UNICODE_ESCAPE=true",
       "-BUILD_TOKEN_MANAGER=true",
-      "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
+      s"-OUTPUT_DIRECTORY=${parserOutput.toString}",
       "grammar/JJOnionParser.jj"
     )
   ) match {
@@ -121,7 +123,7 @@ lazy val onionSettings = Seq(
     }
   }.taskValue,
   Compile / packageBin / packageOptions := {
-    val main = mainClass.value
+    val main = (Compile / mainClass).value
     val opts = (Compile / packageBin / packageOptions).value
     opts ++ main.map{m => Package.MainClass(m)}
   },
@@ -141,7 +143,7 @@ lazy val onionSettings = Seq(
   dist / distPath := {
     target.value / "dist"
   },
-  mainClass := Some("onion.tools.CompilerFrontend"),
+  Compile / mainClass := Some("onion.tools.CompilerFrontend"),
   assembly / assemblyJarName := "onion.jar",
   assembly / assemblyMergeStrategy := {
     case "module-info.class" => MergeStrategy.discard

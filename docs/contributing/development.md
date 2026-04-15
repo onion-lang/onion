@@ -130,8 +130,9 @@ The parser will be regenerated automatically.
 1. Update grammar in `JJOnionParser.jj`
 2. Update AST in `AST.scala`
 3. Update type checking in `Typing.scala`
-4. Update code generation in `AsmCodeGeneration.scala`
-5. Add tests
+4. Update the bytecode boundary in `codegen/TypedAstCodeGeneration.scala` / `backend/asm/AsmBackend.scala`
+5. If needed, update the legacy implementation body in `backend/asm/AsmCodeGeneration.scala`
+6. Add tests
 
 ### Adding a Test
 
@@ -189,8 +190,10 @@ Or use IntelliJ IDEA's debugger:
 - Type inference and validation
 - Name resolution
 - Symbol table management
+- Session state is held in `typing/session/TypingSession.scala`
 
-**Code Generation** (`AsmCodeGeneration.scala`):
+**Code Generation** (`codegen/TypedAstCodeGeneration.scala`, `backend/asm/AsmBackend.scala`):
+- Typed-AST to bytecode boundary
 - ASM-based bytecode generation
 - JVM instruction emission
 

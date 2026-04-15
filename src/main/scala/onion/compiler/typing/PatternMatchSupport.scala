@@ -4,14 +4,13 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class PatternMatchSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext) => Option[Term],
   createEqualsForRef: (Term, Term) => Term
 ) {
-  import typing.*
-
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term = {
     val expressions = new Array[Term](nodes.length)
     var error = false
@@ -22,7 +21,7 @@ private[compiler] final class PatternMatchSupport(
       if (expression == null) {
         error = true
       } else if (!TypeRules.isAssignable(typeRef, expression.`type`)) {
-        report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expression.`type`)
+        bodyContext.report(INCOMPATIBLE_TYPE, nodes(i), typeRef, expression.`type`)
         error = true
       } else {
         expressions(i) = normalizePatternTerm(expression, typeRef)
@@ -37,8 +36,8 @@ private[compiler] final class PatternMatchSupport(
     if (normalized.isBasicType && normalized.`type` != expected) {
       normalized = new AsInstanceOf(normalized, expected)
     }
-    if (normalized.isReferenceType && normalized.`type` != rootClass) {
-      normalized = new AsInstanceOf(normalized, rootClass)
+    if (normalized.isReferenceType && normalized.`type` != bodyContext.rootClass) {
+      normalized = new AsInstanceOf(normalized, bodyContext.rootClass)
     }
     normalized
   }

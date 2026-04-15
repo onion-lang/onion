@@ -2,6 +2,7 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 import java.util.{TreeSet => JTreeSet}
 
@@ -14,11 +15,10 @@ private[typing] enum MethodFallbackLookup[+A] {
 }
 
 private[compiler] final class StaticImportMethodCallSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
-  import typing.*
-  private val overloadSupport = new CallOverloadSupport(typing, calls)
+  private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
 
   private sealed trait StaticImportResolution
   private case class StaticImportResolved(method: Method, term: Term) extends StaticImportResolution
@@ -42,8 +42,8 @@ private[compiler] final class StaticImportMethodCallSupport(
 
     val resolved = scala.collection.mutable.Buffer[StaticImportResolved]()
     var ambiguous: Option[StaticImportAmbiguous] = None
-    staticImportedList_.getItems.foreach { item =>
-      val typeRef = load(item.getName)
+    bodyContext.staticImportedList.getItems.foreach { item =>
+      val typeRef = bodyContext.load(item.getName)
       if (typeRef != null) {
         resolveStaticImportOnType(node, typeRef, params, expected, mappedTypeArgs) match {
           case found: StaticImportResolved =>

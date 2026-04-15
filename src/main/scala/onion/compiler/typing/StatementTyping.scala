@@ -4,12 +4,16 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.typing.session.TypingBodyContext
 import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
 
-final class StatementTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class StatementTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed) or null on error. */
   private def ensureBooleanCondition(node: AST.Node, termOpt: Option[Term]): Term = {
@@ -18,13 +22,13 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       case Some(term) =>
         // Try to unbox Boolean wrapper type
         val result = if (!term.isBasicType) {
-          Boxing.unboxedType(table_, term.`type`) match {
-            case Some(BasicType.BOOLEAN) => Boxing.unboxing(table_, term, BasicType.BOOLEAN)
+          Boxing.unboxedType(bodyContext.table, term.`type`) match {
+            case Some(BasicType.BOOLEAN) => Boxing.unboxing(bodyContext.table, term, BasicType.BOOLEAN)
             case _ => term
           }
         } else term
         if (result.`type` != BasicType.BOOLEAN) {
-          report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
         }
         result
     }
@@ -53,8 +57,8 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         for (elem <- elements) {
           if (foundTerminating) {
             // Report unreachable code
-            warningReporter_.setSourceFile(typing.unit_.sourceFile)
-            warningReporter_.unreachableCode(elem.location)
+            bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+            bodyContext.warningReporter.unreachableCode(elem.location)
           }
           val stmt = translate(elem, context)
           statements += stmt
@@ -66,14 +70,14 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       }
     case node: AST.BreakExpression =>
       if (!context.inLoop) {
-        report(BREAK_OUTSIDE_LOOP, node)
+        bodyContext.report(BREAK_OUTSIDE_LOOP, node)
         new NOP(node.location)
       } else {
         new Break(node.location)
       }
     case node: AST.ContinueExpression =>
       if (!context.inLoop) {
-        report(CONTINUE_OUTSIDE_LOOP, node)
+        bodyContext.report(CONTINUE_OUTSIDE_LOOP, node)
         new NOP(node.location)
       } else {
         new Continue(node.location)
@@ -93,7 +97,7 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         if (collection == null) {
           new NOP(node.location)
         } else if (collection.isBasicType) {
-          report(INCOMPATIBLE_TYPE, node.collection, load("java.util.Collection"), collection.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, node.collection, bodyContext.load("java.util.Collection"), collection.`type`)
           new NOP(node.location)
         } else {
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
@@ -118,7 +122,7 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
               )
             new StatementBlock(init, block)
           } else {
-            val iteratorType = load("java.util.Iterator")
+            val iteratorType = bodyContext.load("java.util.Iterator")
             val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
             val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
             val mNext = findMethod(node.collection, iteratorType, "next")
@@ -129,7 +133,7 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
                 assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0)))
               )
             var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-            if (elementVar.tp != rootClass) {
+            if (elementVar.tp != bodyContext.rootClass) {
               next = new AsInstanceOf(next, elementVar.tp)
             }
             block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
@@ -181,7 +185,7 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     case node: AST.LocalVariableDeclaration =>
       val binding = context.lookupOnlyCurrentScope(node.name)
       if (binding != null) {
-        report(DUPLICATE_LOCAL_VARIABLE, node, node.name)
+        bodyContext.report(DUPLICATE_LOCAL_VARIABLE, node, node.name)
         return new NOP(node.location)
       }
       if (node.typeRef == null) {
@@ -189,17 +193,17 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         if (inferred == null) return new NOP(node.location)
         val inferredType = inferred.`type`
         if (inferredType == BasicType.VOID) {
-          report(INCOMPATIBLE_TYPE, node.init, rootClass, inferredType)
+          bodyContext.report(INCOMPATIBLE_TYPE, node.init, bodyContext.rootClass, inferredType)
           return new NOP(node.location)
         }
-        checkAndReportShadowing(node.name, node.location, context)
+        typing.checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, inferredType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
         val lhsType = mapFrom(node.typeRef)
         if (lhsType == null) return new NOP(node.location)
-        checkAndReportShadowing(node.name, node.location, context)
+        typing.checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
         var local: SetLocal = null
@@ -234,14 +238,14 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
         }
       } else if (node.result == null) {
         val expected = BasicType.VOID
-        if (returnType != expected) report(CANNOT_RETURN_VALUE, node)
+        if (returnType != expected) bodyContext.report(CANNOT_RETURN_VALUE, node)
         new Return(node.location, null)
       } else {
         typed(node.result, context, returnType) match {
           case None =>
             new Return(node.location, null)
           case Some(returned) if returned.`type` == BasicType.VOID =>
-            report(CANNOT_RETURN_VALUE, node)
+            bodyContext.report(CANNOT_RETURN_VALUE, node)
             new Return(node.location, null)
           case Some(returned) =>
             val value = processAssignable(node.result, returnType, returned)
@@ -259,7 +263,7 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
       context.openScope {
         val lock = typed(node.condition, context).getOrElse(null)
         if (lock != null && lock.isBasicType) {
-          report(INCOMPATIBLE_TYPE, node.condition, load("java.lang.Object"), lock.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, node.condition, bodyContext.load("java.lang.Object"), lock.`type`)
           new NOP(node.location)
         } else if (lock == null) {
           new NOP(node.location)
@@ -271,17 +275,17 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
     case node: AST.ThrowExpression =>
       val expressionOpt = typed(node.target, context)
       for (expression <- expressionOpt) {
-        val expected = load("java.lang.Throwable")
+        val expected = bodyContext.load("java.lang.Throwable")
         val detected = expression.`type`
         if (!TypeRules.isSuperType(expected, detected)) {
-          report(INCOMPATIBLE_TYPE, node, expected, detected)
+          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, detected)
         }
       }
       new Throw(node.location, expressionOpt.getOrElse(null))
     case node: AST.TryExpression =>
       // リソースを処理（try-with-resources）
       val resourceBindings = scala.collection.mutable.ArrayBuffer[(ClosureLocalBinding, Term)]()
-      val autoCloseable = load("java.lang.AutoCloseable")
+      val autoCloseable = bodyContext.load("java.lang.AutoCloseable")
 
       context.openScope {
         for (resource <- node.resources) {
@@ -300,7 +304,7 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
                 resourceBindings += ((binding, init))
               } else {
                 // Report error but still allow the variable to be used
-                report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+                bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
               }
             }
           }
@@ -313,9 +317,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
           val (argument, body) = node.recClauses(i)
           context.openScope {
             val argType = addArgument(argument, context)
-            val expected = load("java.lang.Throwable")
+            val expected = bodyContext.load("java.lang.Throwable")
             if (!TypeRules.isSuperType(expected, argType)) {
-              report(INCOMPATIBLE_TYPE, argument, expected, argType)
+              bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
             }
             binds(i) = context.lookupOnlyCurrentScope(argument.name)
             catchBlocks(i) = translate(body, context)
@@ -346,6 +350,9 @@ final class StatementTyping(private val typing: Typing, private val body: Typing
 
   private def defaultValue(typeRef: Type): Term =
     body.defaultValue(typeRef)
+
+  private def mapFrom(typeNode: AST.TypeNode): Type =
+    typing.mapFrom(typeNode)
 
   private def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term =
     body.processNodes(nodes, typeRef, bind, context)

@@ -1,78 +1,28 @@
 package onion.compiler.typing
 
 import onion.compiler.*
-import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class SafeNavigationTypingSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
-  import typing.*
-
   def typeSafeMemberSelection(node: AST.SafeMemberSelection, context: LocalContext): Option[Term] = {
-    var target = calls.typed(node.target, context).getOrElse(null)
+    val target = calls.typed(node.target, context).getOrElse(null)
     if (target == null) return None
 
-    val targetType = target.`type` match {
-      case nullableType: NullableType => nullableType.innerType
-      case other => other
-    }
-
-    if (targetType.isNullType) {
-      report(INCOMPATIBLE_TYPE, node.target, rootClass, target.`type`)
-      return None
-    }
-
-    val (finalTarget, finalTargetType) = targetType match {
-      case basicType: BasicType =>
-        if (basicType == BasicType.VOID) {
-          report(INCOMPATIBLE_TYPE, node.target, rootClass, basicType)
-          return None
-        }
-        val boxed = Boxing.boxing(table_, target)
-        (boxed, boxed.`type`.asInstanceOf[ObjectType])
-      case objectType: ObjectType =>
-        (target, objectType)
-      case _ =>
-        report(INCOMPATIBLE_TYPE, node.target, rootClass, targetType)
-        return None
-    }
-
-    if (!MemberAccess.ensureTypeAccessible(typing, node, finalTargetType, definition_)) return None
-    val name = node.name
-
-    if (finalTargetType.isArrayType) {
-      if (name.equals(MethodNames.LENGTH) || name.equals(MethodNames.SIZE)) {
-        val lengthField = new FieldDefinition(node.location, 0, null, "length", BasicType.INT)
-        return Some(new SafeFieldAccess(node.location, finalTarget, lengthField))
-      } else {
-        return None
+    calls.normalizeSafeMemberSelectionTarget(node, target).flatMap { resolved =>
+      calls.resolveMemberSelection(node, resolved.targetType, node.name).map {
+        case ResolvedArrayLengthSelection =>
+          val lengthField = new FieldDefinition(node.location, 0, null, "length", BasicType.INT)
+          new SafeFieldAccess(node.location, resolved.term, lengthField)
+        case ResolvedFieldSelection(field) =>
+          new SafeFieldAccess(node.location, resolved.term, field)
+        case ResolvedGetterSelection(method) =>
+          new SafeCall(node.location, resolved.term, method, Array.empty)
       }
     }
-
-    val field = MemberAccess.findField(finalTargetType, name)
-    if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
-      return Some(new SafeFieldAccess(node.location, finalTarget, field))
-    }
-
-    val methodNames = Array(name, calls.getter(name), calls.getterBoolean(name))
-    var methodIndex = 0
-    while (methodIndex < methodNames.length) {
-      val methodName = methodNames(methodIndex)
-      calls.tryFindMethod(node, finalTargetType, methodName, Array.empty) match {
-        case Right(method) =>
-          return Some(new SafeCall(node.location, finalTarget, method, Array.empty))
-        case Left(false) => return None
-        case Left(true) =>
-      }
-      methodIndex += 1
-    }
-
-    if (field == null) report(FIELD_NOT_FOUND, node, finalTargetType, node.name)
-    else report(FIELD_NOT_ACCESSIBLE, node, finalTargetType, node.name, definition_)
-    None
   }
 
   def typeSafeMethodCall(node: AST.SafeMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
@@ -95,7 +45,7 @@ private[compiler] final class SafeNavigationTypingSupport(
     expected: Type
   ): Option[Term] = {
     val name = node.name
-    val methods = MethodResolution.findMethods(targetType, name, params, table_)
+    val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
       calls.reportMethodNotFound(node, targetType, name, calls.types(params))
       return None

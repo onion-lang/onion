@@ -3,16 +3,16 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class MethodBodySupport(
   typing: Typing,
+  bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
   translate: (AST.CompoundExpression, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock
 ) {
-  import typing.*
-
   def processMethodLikeBody(
     method: MethodDefinition,
     args: List[AST.Argument],
@@ -35,16 +35,16 @@ private[compiler] final class MethodBodySupport(
   }
 
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
-    val constructor = lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
+    val constructor = typing.lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
     if constructor == null then return
     val context = prepareConstructorContext(constructor, node.args)
     val params = typedTerms(node.superInits.toArray, context)
-    val superClass = definition_.superClass
+    val superClass = bodyContext.definition.superClass
     val matched = superClass.findConstructor(params)
     if matched.length == 0 then
-      report(CONSTRUCTOR_NOT_FOUND, node, superClass, termTypes(params), superClass.constructors)
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, superClass, termTypes(params), superClass.constructors)
     else if matched.length > 1 then
-      report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, termTypes(params)), Array[AnyRef](superClass, termTypes(params)))
+      bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, termTypes(params)), Array[AnyRef](superClass, termTypes(params)))
     else
       val init = new Super(superClass, matched(0).getArgs, params)
       finishConstructorBody(constructor, init, node.block, context)
@@ -85,11 +85,11 @@ private[compiler] final class MethodBodySupport(
     receiverType: Type,
     definition: ClassDefinition
   ): Unit = {
-    val extMethod = lookupKernelNode(node).asInstanceOf[ExtensionMethodDefinition]
+    val extMethod = typing.lookupKernelNode(node).asInstanceOf[ExtensionMethodDefinition]
     if extMethod == null || node.block == null then return
 
-    val methodTypeParams = declaredTypeParams_.getOrElse(node, Seq())
-    openTypeParams(typeParams_ ++ methodTypeParams) {
+    val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+    typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
       val staticMethod = findStaticExtensionMethod(definition, node, extMethod, receiverType)
       if staticMethod != null then
         processExtensionMethodBody(extMethod, staticMethod, node, receiverType)

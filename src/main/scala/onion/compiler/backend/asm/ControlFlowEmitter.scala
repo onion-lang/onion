@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import onion.compiler.TypedAST.*
 import org.objectweb.asm.{Opcodes, Type => AsmType}

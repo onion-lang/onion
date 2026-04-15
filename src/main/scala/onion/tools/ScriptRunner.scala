@@ -10,11 +10,9 @@ package onion.tools
 import java.io.UnsupportedEncodingException
 import java.lang.System.err
 import onion.compiler._
-import onion.compiler.CompilationOutcome
-import onion.compiler.CompilationOutcome.{Failure, Success}
-import onion.compiler.CompilationReporter
+import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.pipeline.{CompileProfileFormat, CompileProfileSettings}
+import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
@@ -104,15 +102,16 @@ class ScriptRunner {
           case None => -1
           case Some(config) =>
             val scriptArgs = params.drop(1).toArray
-            compile(config, Array(params.head)) match {
-              case Success(classes) =>
-                new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(classes, scriptArgs) match {
-                  case Shell.Success(_) => 0
-                  case Shell.Failure(code) => code
-                }
-              case Failure(errors) =>
-                CompilationReporter.printErrors(errors)
-                -1
+            val result = compile(config, Array(params.head))
+            emitDiagnostics(result)
+            emitProfile(config, result)
+            if (result.hasErrors) {
+              -1
+            } else {
+              new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(result.classes, scriptArgs) match {
+                case Shell.Success(_) => 0
+                case Shell.Failure(code) => code
+              }
             }
         }
     }
@@ -205,8 +204,19 @@ class ScriptRunner {
     }
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationOutcome = {
-    new OnionCompiler(config).compile(fileNames)
+  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationResult =
+    new OnionCompiler(config).compileDetailed(fileNames)
+
+  private def emitDiagnostics(result: CompilationResult): Unit =
+    DiagnosticRenderer.printDiagnostics(result.diagnostics)
+
+  private def emitProfile(config: CompilerConfig, result: CompilationResult): Unit = {
+    if (config.verbose) {
+      System.err.println(CompileProfileReporter.renderVerbose(result.toCompileProfile))
+    }
+    if (config.compileProfile.enabled) {
+      CompileProfileReporter.report(result.toCompileProfile, config.compileProfile)
+    }
   }
 
   private def checkClasspath(optClasspath: Option[CommandLineParam]): Array[String] = {

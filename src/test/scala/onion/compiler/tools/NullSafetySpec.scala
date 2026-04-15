@@ -130,6 +130,38 @@ class NullSafetySpec extends AbstractShellSpec {
         )
         assert(Shell.Success("42") == result)
       }
+
+      it("uses getter fallback through safe member selection") {
+        val result = shell.run(
+          """
+            |class Box {
+            |private:
+            |  var value: String
+            |public:
+            |  def this(value: String) {
+            |    this.value = value
+            |  }
+            |
+            |  def getValue :String = this.value
+            |}
+            |
+            |class Main {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val box: Box? = new Box("seven")
+            |    val value: String? = box?.value
+            |    if value == null {
+            |      return "null"
+            |    }
+            |    return value as String
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("seven") == result)
+      }
     }
 
     describe("Safe call with Elvis operator") {

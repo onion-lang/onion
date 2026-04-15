@@ -11,7 +11,6 @@ private[compiler] final class MethodCallFallbackSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
-  import typing.*
   private val overloadSupport = new CallOverloadSupport(typing, calls)
   private val extensionMethodFallbackSupport = new ExtensionMethodFallbackSupport(typing, calls)
 

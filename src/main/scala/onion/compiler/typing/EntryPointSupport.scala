@@ -10,10 +10,8 @@ private[compiler] final class EntryPointSupport(
   typing: Typing,
   addReturnNode: (ActionStatement, Type) => StatementBlock
 ) {
-  import typing.*
-
   def stringArgsType: ArrayType =
-    loadArray(load("java.lang.String"), 1)
+    typing.loadArray(typing.load("java.lang.String"), 1)
 
   def createStartMethod(
     unit: AST.CompilationUnit,

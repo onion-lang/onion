@@ -3,16 +3,15 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 import ArgumentHelpers.fillDefaultArguments
 
 private[compiler] final class CallArgumentTypingSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   processAssignable: (AST.Node, Type, Term) => Term
 ) {
-  import typing.*
-
   def processParamsWithExpected(
     node: AST.Node,
     params: Array[Term],
@@ -138,10 +137,10 @@ private[compiler] final class CallArgumentTypingSupport(
           sawNamed = true
           val paramIndex = paramNames.indexOf(named.name)
           if (paramIndex < 0) {
-            report(UNKNOWN_PARAMETER_NAME, named, named.name)
+            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
             hasError = true
           } else if (filled(paramIndex)) {
-            report(DUPLICATE_ARGUMENT, named, named.name)
+            bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)
             hasError = true
           } else {
             typed(named.value, context, null) match {
@@ -155,7 +154,7 @@ private[compiler] final class CallArgumentTypingSupport(
 
         case expr =>
           if (sawNamed) {
-            report(POSITIONAL_AFTER_NAMED, expr)
+            bodyContext.report(POSITIONAL_AFTER_NAMED, expr)
             hasError = true
           } else if (positionalIndex >= argsWithDefaults.length) {
             typed(expr, context, null)
@@ -178,7 +177,7 @@ private[compiler] final class CallArgumentTypingSupport(
 
     val missingRequired = argsWithDefaults.indices.find(i => !filled(i) && argsWithDefaults(i).defaultValue.isEmpty)
     if (missingRequired.isDefined) {
-      report(METHOD_NOT_FOUND, node, method.affiliation, method.name, argsWithDefaults.map(_.argType))
+      bodyContext.report(METHOD_NOT_FOUND, node, method.affiliation, method.name, argsWithDefaults.map(_.argType))
       return None
     }
 

@@ -1,23 +1,13 @@
 package onion.compiler
 
-import onion.compiler.codegen.TypedAstCodeGeneration
+import onion.compiler.codegen.legacy.TypedGeneratingBridge
 
 /**
- * Legacy compatibility adapter for callers that still instantiate
+ * Legacy public facade for callers that still instantiate
  * `onion.compiler.TypedGenerating` directly.
  *
- * The main compiler pipeline now targets `onion.compiler.codegen.TypedAstCodeGeneration`
- * instead of routing through this shim.
+ * The actual bridge implementation now lives under
+ * `onion.compiler.codegen.legacy.TypedGeneratingBridge`.
  */
 class TypedGenerating(config: CompilerConfig)
-  extends AnyRef
-    with Processor[Seq[TypedAST.ClassDefinition], Seq[CompiledClass]]:
-  private val generator = new TypedAstCodeGeneration(config)
-
-  type Environment = Unit
-
-  override def newEnvironment(source: Seq[TypedAST.ClassDefinition]): Environment =
-    ()
-
-  override def processBody(source: Seq[TypedAST.ClassDefinition], environment: Environment): Seq[CompiledClass] =
-    generator.process(source)
+  extends TypedGeneratingBridge(config)

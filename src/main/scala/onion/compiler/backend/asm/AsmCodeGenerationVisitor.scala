@@ -1,9 +1,9 @@
-package onion.compiler
+package onion.compiler.backend.asm
 
 import org.objectweb.asm.{Label, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.bytecode.{AsmUtil, ControlFlowEmitter, LocalVarContext, LoopContext, TermEmitter}
-import TypedAST._
+import onion.compiler.{Location, Modifier, TypedAST, TypedASTVisitor}
+import TypedAST.*
 
 /**
  * Visitor implementation for ASM bytecode generation from TypedAST nodes.

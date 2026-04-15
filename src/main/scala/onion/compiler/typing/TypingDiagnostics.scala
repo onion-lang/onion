@@ -1,26 +1,15 @@
 package onion.compiler.typing
 
 import onion.compiler.*
+import onion.compiler.typing.session.TypingSession
 
-final class TypingDiagnostics(private val typing: Typing, config: CompilerConfig) {
-  import typing.*
-
-  private[compiler] val reporter: SemanticErrorReporter =
-    new SemanticErrorReporter(config.maxErrorReports)
-  private[compiler] val warningReporter: WarningReporter =
-    new WarningReporter(config.warningLevel, config.suppressedWarnings)
+final class TypingDiagnostics(private val typing: Typing, private val session: TypingSession) {
+  private[compiler] val reporter: SemanticErrorReporter = session.global.diagnostics
+  private[compiler] val warningReporter: WarningReporter = session.global.warnings
 
   def finishOrThrow(): Unit = {
     val problems = reporter.getProblems
     if (problems.nonEmpty) throw new onion.compiler.exceptions.CompilationException(problems.toSeq)
-
-    warningReporter.printWarnings()
-
-    if (warningReporter.treatAsErrors && warningReporter.hasWarnings) {
-      throw new onion.compiler.exceptions.CompilationException(
-        Seq(CompileError("", null, s"${warningReporter.warningCount} warning(s) treated as errors"))
-      )
-    }
   }
 
   def report(error: SemanticError, location: Location, items: Seq[AnyRef]): Unit = {
@@ -51,4 +40,6 @@ final class TypingDiagnostics(private val typing: Typing, config: CompilerConfig
   }
 
   def problems: Array[CompileError] = reporter.getProblems
+
+  def warnings: Seq[CompileWarning] = warningReporter.getWarnings
 }

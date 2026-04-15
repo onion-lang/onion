@@ -2,18 +2,18 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 import java.util.{TreeSet => JTreeSet}
 
 import ArgumentHelpers.hasNamedArguments
 
 private[compiler] final class InstanceMethodCallSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping,
   fallback: MethodCallFallbackSupport
 ) {
-  import typing.*
-  private val overloadSupport = new CallOverloadSupport(typing, calls)
+  private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
 
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     val target = calls.typed(node.target, context).getOrElse(null)
@@ -55,7 +55,7 @@ private[compiler] final class InstanceMethodCallSupport(
       return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
     }
 
-    val methods = MethodResolution.findMethods(targetType, name, params, table_)
+    val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
       return fallback.tryExtensionMethodCall(node, target, targetType, params, expected)
     }

@@ -52,7 +52,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     problems: ArrayBuffer[CompileError]
   ): Unit = {
     try {
-      val reader = source.openReader
+      val reader = source.openReader()
       val parser = new JJOnionParser(reader)
 
       // Enable error recovery mode to collect multiple errors

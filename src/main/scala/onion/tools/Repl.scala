@@ -9,6 +9,7 @@ package onion.tools
 
 import onion.compiler._
 import onion.compiler.CompilationOutcome.{Failure, Success}
+import onion.compiler.diagnostics.DiagnosticRenderer
 import org.objectweb.asm.ClassReader
 import org.jline.reader._
 import org.jline.reader.impl.DefaultParser
@@ -82,7 +83,7 @@ class Repl(classpath: Seq[String]) {
   private case class TypedSessionAnalysis(
     rewritten: Seq[AST.CompilationUnit],
     typed: Seq[TypedAST.ClassDefinition],
-    typing: Typing
+    typedBindings: Map[AST.Node, TypedAST.Node]
   )
 
   private case class TerminalContext(terminal: Terminal, useJLine: Boolean)
@@ -582,13 +583,12 @@ class Repl(classpath: Seq[String]) {
       printLastResult = false
     )
     val fileName = s"repl_ast_${inputCounter + 1}.on"
-    try {
-      val parsing = new Parsing(config)
-      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(source), fileName)))
-      DiagnosticsPrinter.dumpAst(parsed)
-    } catch {
-      case e: onion.compiler.exceptions.CompilationException =>
-        printErrors(e.problems.toIndexedSeq)
+    val compiler = new OnionCompiler(config)
+    val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), fileName)))
+    if (result.hasErrors) {
+      printErrors(result.allErrors)
+    } else {
+      println(DiagnosticRenderer.renderAst(result.debugArtifacts.parsedUnits.getOrElse(Seq.empty)))
     }
   }
 
@@ -602,9 +602,7 @@ class Repl(classpath: Seq[String]) {
     )
     analyzeTypedSession(source, s"repl_typed_${inputCounter + 1}.on") match {
       case Right(analysis) =>
-        println(capturePrintStream { out =>
-          DiagnosticsPrinter.dumpTyped(analysis.typed, out)
-        })
+        println(DiagnosticRenderer.renderTyped(analysis.typed))
       case Left(errors) =>
         printErrors(errors)
     }
@@ -666,7 +664,7 @@ class Repl(classpath: Seq[String]) {
   private def tryParse(code: String, fileName: String): Either[IndexedSeq[CompileError], AST.CompilationUnit] = {
     try {
       val parsing = new Parsing(config)
-      val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(code), fileName)))
+      val parsed = parsing.process(Seq(new StreamInputSource(() => new StringReader(code), fileName)))
       Right(parsed.head)
     } catch {
       case e: onion.compiler.exceptions.CompilationException =>
@@ -780,7 +778,7 @@ class Repl(classpath: Seq[String]) {
       (source, fileName),
       {
         val compiler = new OnionCompiler(config)
-        compiler.compile(Seq(new StreamInputSource(new StringReader(source), fileName))) match {
+        compiler.compile(Seq(new StreamInputSource(() => new StringReader(source), fileName))) match {
           case Success(classes) => Right(classes)
           case Failure(errors) => Left(errors)
         }
@@ -792,17 +790,18 @@ class Repl(classpath: Seq[String]) {
     typedCache.getOrElseUpdate(
       (source, fileName),
       {
-        try {
-          val parsing = new Parsing(config)
-          val rewriting = new Rewriting(config)
-          val typing = new Typing(config)
-          val parsed = parsing.process(Seq(new StreamInputSource(new StringReader(source), fileName)))
-          val rewritten = rewriting.process(parsed)
-          val typed = typing.process(rewritten)
-          Right(TypedSessionAnalysis(rewritten, typed, typing))
-        } catch {
-          case e: onion.compiler.exceptions.CompilationException =>
-            Left(e.problems.toIndexedSeq)
+        val compiler = new OnionCompiler(config)
+        val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), fileName)))
+        if (result.hasErrors) {
+          Left(result.allErrors)
+        } else {
+          Right(
+            TypedSessionAnalysis(
+              rewritten = result.debugArtifacts.rewrittenUnits.getOrElse(Seq.empty),
+              typed = result.debugArtifacts.typedClasses.getOrElse(Seq.empty),
+              typedBindings = result.debugArtifacts.typedBindings.getOrElse(Map.empty)
+            )
+          )
         }
       }
     )
@@ -871,7 +870,7 @@ class Repl(classpath: Seq[String]) {
 
   private def findSnippetType(analysis: TypedSessionAnalysis, name: String): Option[TypedAST.Type] =
     findSnippetInit(analysis.rewritten, name)
-      .flatMap(analysis.typing.typedNodeOf)
+      .flatMap(analysis.typedBindings.get)
       .collect {
         case term: TypedAST.Term => term.`type`
       }

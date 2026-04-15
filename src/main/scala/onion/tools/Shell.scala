@@ -13,9 +13,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.net.MalformedURLException
 import onion.compiler._
-import onion.compiler.CompilationOutcome
-import onion.compiler.CompilationOutcome.{Failure, Success}
-import onion.compiler.CompilationReporter
+import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.compiler.exceptions.ScriptException
 
 class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
@@ -24,14 +22,14 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
   private val config = new CompilerConfig(classpath, null, encoding, "", 10)
   def run(script: String, fileName: String, args: Array[String]): Shell.Result = {
     val compiler: OnionCompiler = new OnionCompiler(config)
-    val outcome: CompilationOutcome = withContextClassLoader(classLoader) {
-      compiler.compile(Seq(new StreamInputSource(new StringReader(script), fileName)))
+    val result = withContextClassLoader(classLoader) {
+      compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(script), fileName)))
     }
-    outcome match {
-      case Success(classes) => run(classes, args)
-      case Failure(errors) =>
-        CompilationReporter.printErrors(errors)
-        Shell.Failure(-1)
+    if (result.hasErrors) {
+      DiagnosticRenderer.printDiagnostics(result.diagnostics)
+      Shell.Failure(-1)
+    } else {
+      run(result.classes, args)
     }
   }
 

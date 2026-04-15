@@ -1,4 +1,4 @@
-package onion.compiler.bytecode
+package onion.compiler.backend.asm
 
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.diagrams.Diagrams

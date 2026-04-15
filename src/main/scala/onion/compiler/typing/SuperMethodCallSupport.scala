@@ -2,17 +2,16 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class SuperMethodCallSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   calls: MethodCallTyping
 ) {
-  import typing.*
-
   def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) return None
-    val contextClass = definition_
+    val contextClass = bodyContext.definition
     calls.tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
       case Right(method) =>
         val classSubst = TypeSubstitution.classSubstitution(contextClass.superClass)

@@ -6,15 +6,14 @@ import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
 private[compiler] final class SimpleExpressionTypingSupport(
-  typing: Typing,
+  bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   typeMemberSelection: (AST.MemberSelection, LocalContext) => Option[Term],
   typeAssignment: (AST.Assignment, LocalContext) => Option[Term]
 ) {
-  import typing.*
-
   def typeSimple(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     node match {
       case node@AST.AdditionAssignment(_, left, right) =>
@@ -66,7 +65,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
       case node: AST.UnqualifiedFieldReference =>
         typeUnqualifiedFieldReference(node, context)
       case node@AST.StringLiteral(loc, value) =>
-        Some(new StringValue(loc, value, load("java.lang.String")))
+        Some(new StringValue(loc, value, bodyContext.load("java.lang.String")))
       case node: AST.NamedArgument =>
         typed(node.value, context, expected)
       case _ =>
@@ -132,12 +131,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
     if (failed) {
       if (incompatibleLeft != null && incompatibleRight != null) {
-        report(INCOMPATIBLE_TYPE, node, incompatibleLeft, incompatibleRight)
+        bodyContext.report(INCOMPATIBLE_TYPE, node, incompatibleLeft, incompatibleRight)
       }
       None
     } else {
-      val finalElementType = if (typedElements.isEmpty) rootClass else elementType
-      val listType = AppliedClassType(load("java.util.List"), scala.collection.immutable.List(finalElementType))
+      val finalElementType = if (typedElements.isEmpty) bodyContext.rootClass else elementType
+      val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
       Some(new ListLiteral(typedElements, listType))
     }
   }
@@ -148,17 +147,17 @@ private[compiler] final class SimpleExpressionTypingSupport(
       context.recordUsage("this")
       Some(new RefLocal(thisBinding))
     } else if (context.isStatic) {
-      report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      bodyContext.report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
       None
     } else {
-      Some(new This(node.location, definition_))
+      Some(new This(node.location, bodyContext.definition))
     }
   }
 
   private def typeIdentifier(node: AST.Id, context: LocalContext): Option[Term] = {
     val bind = context.lookup(node.name)
     if (bind == null) {
-      report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+      bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
       None
     } else {
       context.recordUsage(node.name)
@@ -170,7 +169,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
   private def typeUnqualifiedFieldReference(node: AST.UnqualifiedFieldReference, context: LocalContext): Option[Term] =
     if (context.isStatic) {
-      report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+      bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
       None
     } else {
       val selection = AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name)
@@ -179,7 +178,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
   private def normalizeListElementType(tp: Type): Type =
     tp match {
-      case basicType: BasicType => Boxing.boxedType(table_, basicType)
+      case basicType: BasicType => Boxing.boxedType(bodyContext.table, basicType)
       case other => other
     }
 
@@ -192,6 +191,6 @@ private[compiler] final class SimpleExpressionTypingSupport(
     else if (right.isNullType) left
     else if (TypeRules.isSuperType(left, right)) left
     else if (TypeRules.isSuperType(right, left)) right
-    else if (!left.isBasicType && !right.isBasicType) rootClass
+    else if (!left.isBasicType && !right.isBasicType) bodyContext.rootClass
     else null
 }

@@ -13,11 +13,9 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.UnsupportedEncodingException
 import onion.compiler.{CompiledClass, CompilerConfig, OnionCompiler, WarningCategory, WarningLevel}
-import onion.compiler.CompilationOutcome
-import onion.compiler.CompilationOutcome.{Failure, Success}
-import onion.compiler.CompilationReporter
+import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.compiler.exceptions.ScriptException
-import onion.compiler.pipeline.{CompileProfileFormat, CompileProfileSettings}
+import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
@@ -112,14 +110,12 @@ class CompilerFrontend {
         createConfig(success, verbose) match {
           case None => -1
           case Some(config) =>
-            compile(config, params) match {
-              case Success(classes) =>
-                val generated = generateFiles(classes)
-                if (generated) 0 else -1
-              case Failure(errors) =>
-                CompilationReporter.printErrors(errors)
-                -1
-            }
+            val result = compile(config, params)
+            emitDiagnostics(result)
+            emitProfile(config, result)
+            if (result.hasErrors) -1
+            else if (generateFiles(result.classes)) 0
+            else -1
         }
     }
   }
@@ -261,8 +257,19 @@ class CompilerFrontend {
     }
   }
 
-  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationOutcome = {
-    new OnionCompiler(config).compile(fileNames)
+  private def compile(config: CompilerConfig, fileNames: Array[String]): CompilationResult =
+    new OnionCompiler(config).compileDetailed(fileNames)
+
+  private def emitDiagnostics(result: CompilationResult): Unit =
+    DiagnosticRenderer.printDiagnostics(result.diagnostics)
+
+  private def emitProfile(config: CompilerConfig, result: CompilationResult): Unit = {
+    if (config.verbose) {
+      System.err.println(CompileProfileReporter.renderVerbose(result.toCompileProfile))
+    }
+    if (config.compileProfile.enabled) {
+      CompileProfileReporter.report(result.toCompileProfile, config.compileProfile)
+    }
   }
 
   private def checkClasspath(classpath: Option[String]): Array[String] = {

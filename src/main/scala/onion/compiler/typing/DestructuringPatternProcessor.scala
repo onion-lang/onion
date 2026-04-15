@@ -15,8 +15,6 @@ import scala.util.boundary, boundary.break
  * - Nested destructuring patterns are supported to arbitrary depth
  */
 private[typing] class DestructuringPatternProcessor(private val typing: Typing) {
-  import typing.*
-
   /**
    * Find the getter method for a field in a record type.
    * Records expose fields as zero-argument methods.
@@ -43,15 +41,15 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
     val AST.DestructuringPattern(_, constructor, fieldPatterns) = dp
 
     def resolveRecordClass(node: AST.Node, name: String): ClassDefinition = {
-      val recordType = load(name)
+      val recordType = typing.load(name)
       recordType match {
         case null =>
-          report(NOT_A_RECORD_TYPE, node, name)
+          typing.report(NOT_A_RECORD_TYPE, node, name)
           break(None)
         case classDef: ClassDefinition =>
           classDef
         case _ =>
-          report(NOT_A_RECORD_TYPE, node, name)
+          typing.report(NOT_A_RECORD_TYPE, node, name)
           break(None)
       }
     }
@@ -79,7 +77,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
 
         val nestedFields = nestedClassDef.fields
         if (fieldPats.length != nestedFields.length) {
-          report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(fieldPats.length), ctorName)
+          typing.report(WRONG_BINDING_COUNT, nested, Int.box(nestedFields.length), Int.box(fieldPats.length), ctorName)
           break(None)
         }
 
@@ -102,7 +100,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
         // Process nested field patterns recursively
         for ((nestedFieldPat, nestedField) <- fieldPats.zip(nestedFields)) {
           val nestedGetter = findFieldGetter(nestedClassDef, nestedField.name).getOrElse {
-            report(NOT_A_RECORD_TYPE, nested, ctorName)
+            typing.report(NOT_A_RECORD_TYPE, nested, ctorName)
             break(None)
           }
           val nestedPath = currentPath :+ AccessStep(nestedType.asInstanceOf[ClassType], nestedGetter)
@@ -111,7 +109,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
 
       case other =>
         // Other patterns not supported in destructuring position
-        report(NOT_A_RECORD_TYPE, parentNode, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
+        typing.report(NOT_A_RECORD_TYPE, parentNode, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")
         break(None)
     }
 
@@ -125,7 +123,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
 
     // Check binding count matches field count
     if (fieldPatterns.length != fieldCount) {
-      report(WRONG_BINDING_COUNT, dp, Int.box(fieldCount), Int.box(fieldPatterns.length), constructor)
+      typing.report(WRONG_BINDING_COUNT, dp, Int.box(fieldCount), Int.box(fieldPatterns.length), constructor)
       break(None)
     }
 
@@ -138,7 +136,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
 
     for ((fieldPattern, field) <- fieldPatterns.zip(fields)) {
       val getter = findFieldGetter(classDef, field.name).getOrElse {
-        report(NOT_A_RECORD_TYPE, dp, constructor)
+        typing.report(NOT_A_RECORD_TYPE, dp, constructor)
         break(None)
       }
       val currentPath = List(AccessStep(recordType.asInstanceOf[ClassType], getter))

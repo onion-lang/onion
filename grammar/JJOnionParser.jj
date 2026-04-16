@@ -708,7 +708,7 @@ AST.ImportClause import_decl() :{
 
 AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
 ( LOOKAHEAD(2)
-  top=statement()
+  top=block_element()
 | LOOKAHEAD("extension")
   top=extension_decl()
 | [mset=modifiers()]
@@ -797,12 +797,12 @@ AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
   (ty=interface_decl(modifiers) | ty=class_decl(modifiers) | ty=record_decl(modifiers) | ty=enum_decl(modifiers)) {return ty;}
 }
 
-AST.BlockExpression block():{Token t; List<AST.CompoundExpression> statements = (List<AST.CompoundExpression>)AST.NIL(); AST.BlockExpression s;}{
-  t="{" eols() [statements=statements()] eols() "}" {return new AST.BlockExpression(p(t), statements);}
+AST.BlockExpression block():{Token t; List<AST.BlockElement> elements = (List<AST.BlockElement>)AST.NIL(); AST.BlockExpression s;}{
+  t="{" eols() [elements=block_elements()] eols() "}" {return new AST.BlockExpression(p(t), elements);}
 }
 
-List<AST.CompoundExpression> statements():{ AST.CompoundExpression s; ArrayBuffer<AST.CompoundExpression> statements = new ArrayBuffer<AST.CompoundExpression>(); }{
-  (s=statement() { append(statements, s); })+ {return toList(statements);}
+List<AST.BlockElement> block_elements():{ AST.BlockElement element; ArrayBuffer<AST.BlockElement> elements = new ArrayBuffer<AST.BlockElement>(); }{
+  (element=block_element() { append(elements, element); })+ {return toList(elements);}
 }
 
 int modifiers():{ mset = 0; Token t = null, last = null; }{
@@ -874,7 +874,7 @@ AST.ClassDeclaration class_decl(int mset) : {
   ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*] "{"
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
-  "}" {
+  "}" [";"] {
     return new AST.ClassDeclaration(
       p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams
     );
@@ -890,7 +890,7 @@ AST.RecordDeclaration record_decl(int mset) : {
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
-  ] {
+  ] [";"] {
     return new AST.RecordDeclaration(
       p(t1), mset, c(t2), args, toList(superTypes)
     );
@@ -911,7 +911,7 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
     ("," superType = type() {append(superTypes, superType);})*
   ] "{"
     (signature = interface_method_decl() {append(signatures, signature); })*
-  "}" {
+  "}" [";"] {
     return new AST.InterfaceDeclaration(
       p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
     );
@@ -930,7 +930,7 @@ AST.EnumDeclaration enum_decl(int mset) : {
       "," constant = enum_constant() {append(constants, constant);}
     )*
     [LOOKAHEAD({la(",") && la2("}")}) "," ] // trailing comma allowed when followed by }
-  "}" {
+  "}" [";"] {
     return new AST.EnumDeclaration(
       p(start), mset, c(name), toList(constants)
     );
@@ -1181,22 +1181,21 @@ AST.FieldDeclaration field_decl(int modifiers):{
   }
 }
 
-AST.CompoundExpression statement():{AST.CompoundExpression s;}{
-  s=local_var_statement()    {return s;}
-| s=if_statement()           {return s;}
-| s=while_statement()        {return s;}
-| s=for_statement()          {return s;}
-| s=select_statement()       {return s;}
+AST.BlockElement block_element():{AST.BlockElement s;}{
+  s=local_var_declaration()  {return s;}
+| s=if_expression()          {return s;}
+| s=while_expression()       {return s;}
+| s=for_expression()         {return s;}
+| s=select_expression()      {return s;}
 | s=block()                  {return s;}
-| s=try_statement()          {return s;}
-| s=throw_statement()        {return s;}
-| s=break_statement()        {return s;}
-| s=continue_statement()     {return s;}
-| s=return_statement()       {return s;}
-| s=empty_statement()        {return s;}
-| s=synchronized_statement() {return s;}
-| s=foreach_statement()      {return s;}
-| s=exp_statement()          {return s;}
+| s=try_expression()         {return s;}
+| s=terminated_throw_expression()    {return s;}
+| s=terminated_break_expression()    {return s;}
+| s=terminated_continue_expression() {return s;}
+| s=terminated_return_expression()   {return s;}
+| s=synchronized_expression()        {return s;}
+| s=foreach_expression()             {return s;}
+| s=expression_element()     {return s;}
 }
 
 // End of section
@@ -1214,7 +1213,7 @@ void eos_or_block_end() :{} {
 | LOOKAHEAD("}") { leaveSection(); }
 }
 
-AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;}{
+AST.LocalVariableDeclaration local_var_declaration() :{Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;}{
   {enterSection();}
   (keyword="val" {declMods = AST.M_FINAL();} | keyword="var" {declMods = 0;})
   t=id()
@@ -1225,7 +1224,7 @@ AST.LocalVariableDeclaration local_var_statement() :{Token keyword, t; int declM
   eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, c(t), ty, e);}
 }
 
-AST.BreakExpression break_statement() :{Token t;}{
+AST.BreakExpression terminated_break_expression() :{Token t;}{
   {enterSection();}
   t="break" eos() {return new AST.BreakExpression(p(t));}
 }
@@ -1234,7 +1233,7 @@ AST.BreakExpression break_expression() :{Token t;}{
   t="break" {return new AST.BreakExpression(p(t));}
 }
 
-AST.ContinueExpression continue_statement() :{Token t; AST.ContinueExpression st;}{
+AST.ContinueExpression terminated_continue_expression() :{Token t; AST.ContinueExpression st;}{
   {enterSection();}
   t="continue" eos() {return new AST.ContinueExpression(p(t));}
 }
@@ -1243,7 +1242,7 @@ AST.ContinueExpression continue_expression() :{Token t; AST.ContinueExpression s
   t="continue" {return new AST.ContinueExpression(p(t));}
 }
 
-AST.ThrowExpression throw_statement() :{Token t; AST.Expression e;}{
+AST.ThrowExpression terminated_throw_expression() :{Token t; AST.Expression e;}{
   {enterSection();}
   t="throw" e=term() eos() {return new AST.ThrowExpression(p(t), e);}
 }
@@ -1267,7 +1266,7 @@ List<AST.LocalVariableDeclaration> resource_list() :{
   {return toList(rs);}
 }
 
-AST.TryExpression try_statement() :{
+AST.TryExpression try_expression() :{
   Token t; AST.Argument a; AST.BlockExpression b1, b2, b3 = null;
   List<AST.LocalVariableDeclaration> resources = (List<AST.LocalVariableDeclaration>)AST.NIL();
   ArrayBuffer<Tuple2<AST.Argument,AST.BlockExpression>> as = new ArrayBuffer<Tuple2<AST.Argument, AST.BlockExpression>>();
@@ -1277,16 +1276,12 @@ AST.TryExpression try_statement() :{
   ["finally" b3=block()] {return new AST.TryExpression(p(t), resources, b1, toList(as), b3);}
 }
 
-AST.ExpressionBox exp_statement() :{AST.Expression e;}{
+AST.Expression expression_element() :{AST.Expression e;}{
   {enterSection();}
-  e=assignable() eos_or_block_end() {return new AST.ExpressionBox(e.location(), e);}
+  e=assignable() eos_or_block_end() {return e;}
 }
 
-AST.EmptyExpression empty_statement() :{Token t;}{
-  t=";" {return new AST.EmptyExpression(p(t));}
-}
-
-AST.IfExpression if_statement() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null;}{
+AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null;}{
   t="if" e=term() b1=block() [LOOKAHEAD(2) "else" b2=block()] {return new AST.IfExpression(p(t), e, b1, b2);}
 }
 
@@ -1330,17 +1325,17 @@ List<AST.Pattern> destructuring_bindings() :{
   { return toList(bindings); }
 }
 
-AST.SelectExpression select_statement() :{
+AST.SelectExpression select_expression() :{
   Token t1, t2; AST.Expression e1; AST.Pattern p;
   ArrayBuffer<AST.Pattern> patterns = new ArrayBuffer<AST.Pattern>();
-  List<AST.CompoundExpression> ss = null;
+  List<AST.BlockElement> ss = null;
   ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>> branches = new ArrayBuffer<Tuple2<List<AST.Pattern>, AST.BlockExpression>>();
   AST.BlockExpression elseBlock = null ;
 }{
   t1="select" e1=term() eols() "{" eols()
     (
       LOOKAHEAD({la("case")})
-      t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" eols() ss=statements() {
+      t2="case" p=case_pattern() {append(patterns, p);} ("," p=case_pattern() {append(patterns, p);})* ":" eols() ss=block_elements() {
         append(branches, new Tuple2<List<AST.Pattern>, AST.BlockExpression>(toList(patterns), new AST.BlockExpression(p(t2), ss)));
         patterns = new ArrayBuffer<AST.Pattern>();
       }
@@ -1348,14 +1343,14 @@ AST.SelectExpression select_statement() :{
     )*
     eols()
     [LOOKAHEAD({la("else")})
-      t2="else" ":" eols() [ss=statements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
+      t2="else" ":" eols() [ss=block_elements()] { elseBlock = new AST.BlockExpression(p(t2), ss); }
     ]
   eols() "}" {
     return new AST.SelectExpression(p(t1), e1, toList(branches), elseBlock);
   }
 }
 
-AST.ReturnExpression return_statement() :{Token t; AST.Expression e = null;}{
+AST.ReturnExpression terminated_return_expression() :{Token t; AST.Expression e = null;}{
   {enterSection();}
   t="return" [e=term()] eos() {return new AST.ReturnExpression(p(t), e);}
 }
@@ -1364,40 +1359,46 @@ AST.ReturnExpression return_expression() :{Token t; AST.Expression e = null;}{
   t="return" [LOOKAHEAD(2) e=term()] {return new AST.ReturnExpression(p(t), e);}
 }
 
-AST.SynchronizedExpression synchronized_statement() :{Token t; AST.Expression e = null; AST.BlockExpression b;}{
+AST.SynchronizedExpression synchronized_expression() :{Token t; AST.Expression e = null; AST.BlockExpression b;}{
   t="synchronized" [LOOKAHEAD({!la("{")}) e=term()] b=block() {return new AST.SynchronizedExpression(p(t), e, b);}
 }
 
-AST.WhileExpression while_statement() :{Token t; AST.Expression e; AST.BlockExpression b;}{
+AST.WhileExpression while_expression() :{Token t; AST.Expression e; AST.BlockExpression b;}{
   t="while" e=term() b=block() {return new AST.WhileExpression(p(t), e, b);}
 }
 
-AST.ForeachExpression foreach_statement() :{Token t; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{
+AST.ForeachExpression foreach_expression() :{Token t; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{
   t="foreach" a=argument() (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
     return new AST.ForeachExpression(p(t), a, e, b);
   }
 }
 
-AST.ForExpression for_statement() :{Token t; AST.CompoundExpression s; AST.Expression e1 = null, e2 = null; AST.BlockExpression b;}{
-  t="for" (s=local_var_statement() | s=exp_statement() | s=empty_statement())
+AST.ForInitializer for_initializer() :{AST.LocalVariableDeclaration d; AST.Expression e; Token t;}{
+  d=local_var_declaration() { return new AST.ForInitDeclaration(d); }
+| e=expression_element() { return new AST.ForInitExpression(e); }
+| t=";" { return new AST.ForInitEmpty(p(t)); }
+}
+
+AST.ForExpression for_expression() :{Token t; AST.ForInitializer init; AST.Expression e1 = null, e2 = null; AST.BlockExpression b;}{
+  t="for" init=for_initializer()
   [e1=term()] ";" [LOOKAHEAD({!la("{")}) e2=term()] b=block() {
-  	return new AST.ForExpression(p(t), s, e1, e2, b);
+  	return new AST.ForExpression(p(t), init, e1, e2, b);
   }
 }
 
 AST.Expression expression() :{AST.Expression e;}{
-  e=if_statement()           {return e;}
-| e=while_statement()        {return e;}
-| e=for_statement()          {return e;}
-| e=select_statement()       {return e;}
+  e=if_expression()          {return e;}
+| e=while_expression()       {return e;}
+| e=for_expression()         {return e;}
+| e=select_expression()      {return e;}
 | e=block()                  {return e;}
-| e=try_statement()          {return e;}
+| e=try_expression()         {return e;}
 | e=throw_expression()       {return e;}
 | e=break_expression()       {return e;}
 | e=continue_expression()    {return e;}
 | e=return_expression()      {return e;}
-| e=synchronized_statement() {return e;}
-| e=foreach_statement()      {return e;}
+| e=synchronized_expression() {return e;}
+| e=foreach_expression()      {return e;}
 | e=assignable()             {return e;}
 }
 
@@ -1625,22 +1626,22 @@ AST.DoExpression do_expression() :{
   List<Object> stmts;
 }{
   {enterDefault();}
-  t="do" "[" monadType=type() "]" "{" eols() stmts=do_statements() eols() "}" {
+  t="do" "[" monadType=type() "]" "{" eols() stmts=do_clauses() eols() "}" {
     leaveDefault();
     return new AST.DoExpression(p(t), monadType, stmts);
   }
 }
 
-List<Object> do_statements() :{
+List<Object> do_clauses() :{
   Object stmt;
   ArrayBuffer<Object> stmts = new ArrayBuffer<Object>();
 }{
-  stmt=do_statement() { append(stmts, stmt); }
-  ( LOOKAHEAD(eols() ";") eols() ";" eols() stmt=do_statement() { append(stmts, stmt); } )*
+  stmt=do_clause() { append(stmts, stmt); }
+  ( LOOKAHEAD(eols() ";") eols() ";" eols() stmt=do_clause() { append(stmts, stmt); } )*
   { return toList(stmts); }
 }
 
-Object do_statement() :{
+Object do_clause() :{
   Token t;
   String name;
   AST.Expression e;
@@ -1659,12 +1660,12 @@ Object do_statement() :{
 AST.ClosureExpression trailing_lambda() :{
   Token t;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
-  List<AST.CompoundExpression> stmts = (List<AST.CompoundExpression>)AST.NIL();
+  List<AST.BlockElement> stmts = (List<AST.BlockElement>)AST.NIL();
   AST.BlockExpression body;
   AST.TypeNode ty = null;
 }{
   {enterDefault();}
-  t="{" eols() args=lambda_args() eols() <ARROW2> eols() [stmts=statements()] eols() "}" {
+  t="{" eols() args=lambda_args() eols() <ARROW2> eols() [stmts=block_elements()] eols() "}" {
     body = new AST.BlockExpression(p(t), stmts);
     ty = new AST.TypeNode(p(t), new AST.ReferenceType("onion.Function" + args.size(), true), true);
     leaveDefault();

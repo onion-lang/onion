@@ -10,7 +10,7 @@ private[compiler] final class MethodBodySupport(
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
-  translate: (AST.CompoundExpression, LocalContext) => ActionStatement,
+  translate: (AST.BlockElement, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock
 ) {
   def processMethodLikeBody(

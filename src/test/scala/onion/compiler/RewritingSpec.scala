@@ -89,7 +89,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
         case AST.MethodCall(_, _: AST.UnqualifiedMethodCall, "bind", List(closure: AST.ClosureExpression), _) =>
           assert(closure.args.head.name == "x")
           closure.body.elements.head match {
-            case AST.ExpressionBox(_, AST.StaticMethodCall(_, typeRef, "successful", _, _)) =>
+            case AST.StaticMethodCall(_, typeRef, "successful", _, _) =>
               assert(typeRef.desc.toString == "Future")
             case other =>
               fail(s"Expected closure body to be StaticMethodCall, got: $other")
@@ -116,7 +116,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
         case AST.MethodCall(_, _, "bind", List(outerClosure: AST.ClosureExpression), _) =>
           assert(outerClosure.args.head.name == "x")
           outerClosure.body.elements.head match {
-            case AST.ExpressionBox(_, AST.MethodCall(_, _, "bind", List(innerClosure: AST.ClosureExpression), _)) =>
+            case AST.MethodCall(_, _, "bind", List(innerClosure: AST.ClosureExpression), _) =>
               assert(innerClosure.args.head.name == "y")
             case other =>
               fail(s"Expected nested MethodCall to bind, got: $other")
@@ -377,7 +377,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val condition = AST.LessThan(defaultLoc, id("i"), intLit(10))
       val update = AST.PostIncrement(defaultLoc, id("i"))
       val body = block(exprBox(intLit(1)))
-      val expr = forExpr(init, condition, update, body)
+      val expr = forExpr(forInit(init), condition, update, body)
       val result = rewriteExpression(expr)
 
       result match {

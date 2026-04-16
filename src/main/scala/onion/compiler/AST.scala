@@ -84,7 +84,8 @@ object AST {
   case class ModuleDeclaration(location: Location, name: String) extends Node
   case class ImportClause(location: Location, mapping: List[(String, String)]) extends Node
   abstract sealed class Toplevel extends Node
-  abstract sealed class Expression extends Toplevel
+  abstract sealed class BlockElement extends Toplevel
+  abstract sealed class Expression extends BlockElement
   abstract sealed class BinaryExpression(val symbol: String) extends Expression {
     def lhs: Expression
     def rhs: Expression
@@ -199,22 +200,28 @@ object AST {
   case class BindingPattern(location: Location, name: String) extends Pattern
   case class GuardedPattern(location: Location, pattern: Pattern, guard: Expression) extends Pattern
 
-  abstract sealed class CompoundExpression extends Expression
-  case class BlockExpression(location: Location, elements: List[CompoundExpression]) extends CompoundExpression
-  case class BreakExpression(location: Location) extends CompoundExpression
-  case class ContinueExpression(location: Location) extends CompoundExpression
-  case class EmptyExpression(location: Location) extends CompoundExpression
-  case class ExpressionBox(location: Location, body: Expression) extends CompoundExpression
-  case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends CompoundExpression
-  case class ForExpression(location: Location, init: CompoundExpression, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends CompoundExpression
-  case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
-  case class LocalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode/*nullable*/, init: Expression/*nullable*/) extends CompoundExpression
-  case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends CompoundExpression
-  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Pattern], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends CompoundExpression
-  case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
-  case class ThrowExpression(location: Location, target: Expression) extends CompoundExpression
-  case class TryExpression(location: Location, resources: List[LocalVariableDeclaration], tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends CompoundExpression
-  case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends CompoundExpression
+  abstract sealed class ForInitializer extends Node
+  case class ForInitDeclaration(declaration: LocalVariableDeclaration) extends ForInitializer {
+    def location: Location = declaration.location
+  }
+  case class ForInitExpression(expression: Expression) extends ForInitializer {
+    def location: Location = expression.location
+  }
+  case class ForInitEmpty(location: Location) extends ForInitializer
+
+  case class BlockExpression(location: Location, elements: List[BlockElement]) extends Expression
+  case class BreakExpression(location: Location) extends Expression
+  case class ContinueExpression(location: Location) extends Expression
+  case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends Expression
+  case class ForExpression(location: Location, init: ForInitializer, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends Expression
+  case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends Expression
+  case class LocalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode/*nullable*/, init: Expression/*nullable*/) extends BlockElement
+  case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends Expression
+  case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Pattern], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends Expression
+  case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression
+  case class ThrowExpression(location: Location, target: Expression) extends Expression
+  case class TryExpression(location: Location, resources: List[LocalVariableDeclaration], tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends Expression
+  case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression
 
   case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends Toplevel {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode]) =

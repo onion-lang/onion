@@ -22,7 +22,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private[typing] val operatorTyping = new OperatorTyping(typing, bodyContext, this)
   private val expressionFormTyping = new ExpressionFormTyping(typing, bodyContext, this)
   private val closureTyping = new ClosureTyping(typing, bodyContext, this)
-  private val statementTyping = new StatementTyping(typing, bodyContext, this)
+  private val blockElementLowering = new BlockElementLowering(typing, bodyContext, this)
   private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, bodyContext, this)
   private val additionTyping = new AdditionTyping(typing, bodyContext, this)
   private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
@@ -218,8 +218,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     result.foreach(term => typing.put(node, term))
     result
   }
-  def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
-    statementTyping.translate(node, context)
+  def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =
+    blockElementLowering.translate(node, context)
 
   def defaultValue(typeRef: Type): Term = Term.defaultValue(typeRef)
   def addReturnNode(node: ActionStatement, returnType: Type): StatementBlock = {
@@ -244,7 +244,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private[typing] def typeClosureNode(node: AST.ClosureExpression, context: LocalContext, expected: Type): Option[Term] =
     closureTyping.typeClosure(node, context, expected)
   private[typing] def typeLocalVariableDeclarationNode(node: AST.LocalVariableDeclaration, context: LocalContext): Option[Term] = {
-    val statement = statementTyping.translate(node, context)
+    val statement = blockElementLowering.translate(node, context)
     Some(new StatementTerm(node.location, statement, BasicType.VOID))
   }
   private[typing] def typeSimpleExpression(node: AST.Expression, context: LocalContext, expected: Type): Option[Term] =

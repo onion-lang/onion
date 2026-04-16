@@ -181,20 +181,36 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   def rewriteBlockExpression(block: AST.BlockExpression): AST.BlockExpression = {
     if (block == null) return null
-    val newElements = block.elements.map(rewriteCompoundExpression)
+    val newElements = block.elements.map(rewriteBlockElement)
     block.copy(elements = newElements)
   }
 
-  def rewriteCompoundExpression(expr: AST.CompoundExpression): AST.CompoundExpression = expr match {
+  def rewriteBlockElement(element: AST.BlockElement): AST.BlockElement = element match {
+    case AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
+      AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, Option(init).map(rewriteExpression).orNull)
+    case expr: AST.Expression =>
+      rewriteExpression(expr)
+  }
+
+  def rewriteForInitializer(init: AST.ForInitializer): AST.ForInitializer = init match {
+    case AST.ForInitDeclaration(declaration) =>
+      AST.ForInitDeclaration(rewriteBlockElement(declaration).asInstanceOf[AST.LocalVariableDeclaration])
+    case AST.ForInitExpression(expression) =>
+      AST.ForInitExpression(rewriteExpression(expression))
+    case empty: AST.ForInitEmpty =>
+      empty
+  }
+
+  def rewriteExpression(expr: AST.Expression): AST.Expression = expr match {
+    // Do notation desugaring - the main transformation
+    case doExpr: AST.DoExpression => desugarDoExpression(doExpr)
+    case AST.RetStatement(loc, e) => AST.RetStatement(loc, rewriteExpression(e))
     case b: AST.BlockExpression => rewriteBlockExpression(b)
-    case AST.BreakExpression(loc) => expr
-    case AST.ContinueExpression(loc) => expr
-    case AST.EmptyExpression(loc) => expr
-    case AST.ExpressionBox(loc, body) => AST.ExpressionBox(loc, rewriteExpression(body))
+    case AST.BreakExpression(_) | AST.ContinueExpression(_) => expr
     case AST.ForeachExpression(loc, arg, collection, statement) =>
       AST.ForeachExpression(loc, arg, rewriteExpression(collection), rewriteBlockExpression(statement))
     case AST.ForExpression(loc, init, condition, update, block) =>
-      AST.ForExpression(loc, rewriteCompoundExpression(init),
+      AST.ForExpression(loc, rewriteForInitializer(init),
         Option(condition).map(rewriteExpression).orNull,
         Option(update).map(rewriteExpression).orNull,
         rewriteBlockExpression(block))
@@ -202,8 +218,6 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.IfExpression(loc, rewriteExpression(condition),
         rewriteBlockExpression(thenBlock),
         Option(elseBlock).map(rewriteBlockExpression).orNull)
-    case AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
-      AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, Option(init).map(rewriteExpression).orNull)
     case AST.ReturnExpression(loc, result) =>
       AST.ReturnExpression(loc, Option(result).map(rewriteExpression).orNull)
     case AST.SelectExpression(loc, condition, cases, elseBlock) =>
@@ -216,18 +230,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.ThrowExpression(loc, rewriteExpression(target))
     case AST.TryExpression(loc, resources, tryBlock, recClauses, finBlock) =>
       AST.TryExpression(loc,
-        resources.map(r => rewriteCompoundExpression(r).asInstanceOf[AST.LocalVariableDeclaration]),
+        resources.map(r => rewriteBlockElement(r).asInstanceOf[AST.LocalVariableDeclaration]),
         rewriteBlockExpression(tryBlock),
         recClauses.map { case (arg, block) => (arg, rewriteBlockExpression(block)) },
         Option(finBlock).map(rewriteBlockExpression).orNull)
     case AST.WhileExpression(loc, condition, block) =>
       AST.WhileExpression(loc, rewriteExpression(condition), rewriteBlockExpression(block))
-  }
-
-  def rewriteExpression(expr: AST.Expression): AST.Expression = expr match {
-    // Do notation desugaring - the main transformation
-    case doExpr: AST.DoExpression => desugarDoExpression(doExpr)
-    case AST.RetStatement(loc, e) => AST.RetStatement(loc, rewriteExpression(e))
 
     // Binary expressions
     case AST.Addition(loc, lhs, rhs) => AST.Addition(loc, rewriteExpression(lhs), rewriteExpression(rhs))
@@ -311,8 +319,6 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case AST.SuperMethodCall(loc, name, args, typeArgs) =>
       AST.SuperMethodCall(loc, name, args.map(rewriteExpression), typeArgs)
 
-    // Compound expressions that can appear in expression context
-    case compound: AST.CompoundExpression => rewriteCompoundExpression(compound)
   }
 
   /**
@@ -371,7 +377,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
         // Create closure: (x) -> { restExpr }
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
-        val closureBody = AST.BlockExpression(binding.location, List(AST.ExpressionBox(binding.location, restExpr)))
+        val closureBody = AST.BlockExpression(binding.location, List(restExpr))
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
 
@@ -385,7 +391,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
         // Create closure: (_) -> { restExpr }
         val arg = AST.Argument(loc, "_unused", null, null, false)
-        val closureBody = AST.BlockExpression(loc, List(AST.ExpressionBox(loc, restExpr)))
+        val closureBody = AST.BlockExpression(loc, List(restExpr))
         val closureType = AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(loc, closureType, "call", List(arg), null, closureBody)
 

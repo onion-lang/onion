@@ -168,7 +168,7 @@ public class ASTBuilderAdapter {
     
     public AST.BlockExpression createBlockExpression(
         Location location,
-        List<AST.CompoundExpression> statements
+        List<AST.BlockElement> statements
     ) {
         return builder.createBlockExpression(location, statements);
     }
@@ -316,7 +316,7 @@ public class ASTBuilderAdapter {
     
     public AST.ForExpression createFor(
         Location location,
-        AST.CompoundExpression init,
+        AST.ForInitializer init,
         AST.Expression cond,
         AST.Expression update,
         AST.BlockExpression body

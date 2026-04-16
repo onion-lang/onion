@@ -2,9 +2,9 @@ package onion.compiler.tools
 
 import onion.tools.Shell
 
-class SelectStatementPatternSpec extends AbstractShellSpec {
-  describe("Select statement with type pattern") {
-    it("matches type pattern in statement context") {
+class SelectPatternSpec extends AbstractShellSpec {
+  describe("Select expression with type pattern") {
+    it("matches type pattern in block context") {
       val result = shell.run(
         """
           |sealed interface Animal {}
@@ -30,7 +30,7 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
       assert(Shell.Success("dog: Rex") == result)
     }
 
-    it("handles multiple type patterns in statement") {
+    it("handles multiple type patterns in block context") {
       val result = shell.run(
         """
           |sealed interface Shape {}
@@ -59,8 +59,8 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
     }
   }
 
-  describe("Select statement with destructuring pattern") {
-    it("destructures record in statement context") {
+  describe("Select expression with destructuring pattern") {
+    it("destructures record in block context") {
       val result = shell.run(
         """
           |record Point(x: Int, y: Int)
@@ -83,7 +83,7 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
       assert(Shell.Success(7) == result)
     }
 
-    it("destructures sealed interface subtypes in statement") {
+    it("destructures sealed interface subtypes in block context") {
       val result = shell.run(
         """
           |sealed interface Result {}
@@ -110,8 +110,8 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
     }
   }
 
-  describe("Select statement with guarded pattern") {
-    it("applies guard condition in statement context with binding pattern") {
+  describe("Select expression with guarded pattern") {
+    it("applies guard condition in block context with binding pattern") {
       val result = shell.run(
         """
           |class Test {
@@ -135,7 +135,7 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
       assert(Shell.Success("medium") == result)
     }
 
-    it("combines type pattern with guard in statement") {
+    it("combines type pattern with guard in block context") {
       val result = shell.run(
         """
           |sealed interface Box {}
@@ -164,8 +164,8 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
     }
   }
 
-  describe("Select statement with wildcard pattern") {
-    it("matches wildcard in statement context") {
+  describe("Select expression with wildcard pattern") {
+    it("matches wildcard in block context") {
       val result = shell.run(
         """
           |class Test {
@@ -189,7 +189,7 @@ class SelectStatementPatternSpec extends AbstractShellSpec {
     }
   }
 
-  describe("Select statement with mixed patterns") {
+  describe("Select expression with mixed patterns") {
     it("combines expression, type, and wildcard patterns") {
       val result = shell.run(
         """

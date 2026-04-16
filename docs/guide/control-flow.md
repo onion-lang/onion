@@ -280,12 +280,12 @@ val posts: Future[List] = do[Future] {
 
 ### Mixing with Regular Expressions
 
-You can mix bindings with regular statements:
+You can mix bindings with regular expressions and declarations:
 
 ```onion
 val result: Option[Int] = do[Option] {
   x <- parseNumber(input)
-  val doubled = x * 2        // Regular statement
+  val doubled = x * 2        // Local declaration
   y <- validateRange(doubled)
   IO::println("Valid: " + y) // Side effect
   ret y

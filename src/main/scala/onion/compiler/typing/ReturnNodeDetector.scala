@@ -116,9 +116,6 @@ private[typing] object ReturnNodeDetector {
         }
         if (selectExpr.elseBlock != null) visit(selectExpr.elseBlock)
 
-      case exprBox: AST.ExpressionBox =>
-        visit(exprBox.body)
-
       case stringInterp: AST.StringInterpolation =>
         stringInterp.expressions.foreach(visit)
 

@@ -169,25 +169,25 @@ static def staticMethod(params) :ReturnType {
 }
 ```
 
-## Statements
+## Block Elements
 
-Control-flow forms are expressions. Blocks evaluate to the last expression, `if`/`select`/`try` can appear where an expression is expected, and loops evaluate to `void`. `return`/`throw`/`break`/`continue` are bottom-typed (they never produce a value).
+Control-flow forms are expressions. Blocks evaluate to the last expression, `if`/`select`/`try` can appear where an expression is expected, and loops evaluate to `void`. `return`/`throw`/`break`/`continue` are bottom-typed (they never produce a value). Inside a block, the only declaration-form block element is a local `val`/`var`; everything else is parsed as an expression.
 
-### Expression Statement
+### Expression Element
 
 ```onion
 expression;
 ```
 
-### Block Statement
+### Block Expression
 
 ```onion
 {
-  statements
+  block_elements
 }
 ```
 
-### If Statement
+### If Expression
 
 ```onion
 if condition {
@@ -223,7 +223,7 @@ foreach variable :Type in collection {
 }
 ```
 
-### Select Statement
+### Select Expression
 
 ```onion
 select expression {
@@ -236,7 +236,7 @@ select expression {
 }
 ```
 
-### Try-Catch Statement
+### Try-Catch Expression
 
 ```onion
 try {
@@ -246,7 +246,7 @@ try {
 }
 ```
 
-### Return Statement
+### Return Expression
 
 ```onion
 return

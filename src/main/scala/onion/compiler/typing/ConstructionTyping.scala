@@ -124,7 +124,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
     val (positionalCount, namedNames) = namedInfo
 
     // Filter constructors by named argument compatibility
-    val candidates = filterConstructorsByNamedArgs(typeRef.constructors, namedInfo)
+    val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
 
     if (candidates.isEmpty) {
       // Type the arguments anyway to provide better error messages

@@ -260,11 +260,11 @@ val list: ArrayList = new ArrayList
 val array: String[] = new String[10]
 ```
 
-## Statements
+## Block Elements
 
-### Expression Statements
+### Expressions In Blocks
 
-Any expression can be a statement:
+Any expression can appear directly inside a block:
 
 ```onion
 IO::println("Hello")
@@ -272,7 +272,7 @@ var x: Int = 10
 x = x + 1
 ```
 
-### Block Statements
+### Block Expressions
 
 Blocks are enclosed in curly braces:
 

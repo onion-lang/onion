@@ -76,7 +76,7 @@ trait ASTBuilder {
 
   def createBlockExpression(
     location: Location,
-    statements: List[AST.CompoundExpression]
+    statements: List[AST.BlockElement]
   ): AST.BlockExpression
 
   def createBinaryExpression(
@@ -238,7 +238,7 @@ class DefaultASTBuilder extends ASTBuilder {
 
   def createBlockExpression(
     location: Location,
-    statements: List[AST.CompoundExpression]
+    statements: List[AST.BlockElement]
   ): AST.BlockExpression = {
     AST.BlockExpression(location, statements)
   }

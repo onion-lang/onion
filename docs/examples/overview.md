@@ -50,7 +50,7 @@ java Hello
 | `ReadLine.on` | User input | I/O, strings |
 | `List.on` | Dynamic lists | ArrayList, `<<` operator |
 | `Foreach.on` | Foreach loop | Iteration, collections |
-| `Select.on` | Pattern matching | Select statement |
+| `Select.on` | Pattern matching | Select expression |
 | `LineFilter.on` | Lambda filtering | Lambdas, closures |
 | `LineCounter.on` | File processing | Recursion, I/O |
 | `Factorial.on` | Recursion | Recursive functions |

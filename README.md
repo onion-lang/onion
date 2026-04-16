@@ -129,7 +129,7 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 
 1. A main method if there is an explicit class definition and it have the main method.
 2. The main method of the class on the top.
-3. Otherwise, the first statement on the top.
+3. Otherwise, the first top-level declaration or expression.
 
 ## Limitations
 

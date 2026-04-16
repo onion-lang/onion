@@ -21,7 +21,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
   private[typing] val operatorTyping = new OperatorTyping(typing, this)
   private val expressionFormTyping = new ExpressionFormTyping(typing, this)
   private val closureTyping = new ClosureTyping(typing, this)
-  private val statementTyping = new StatementTyping(typing, this)
+  private val blockElementLowering = new BlockElementLowering(typing, this)
   private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, this)
   private val additionTyping = new AdditionTyping(typing, this)
   def run(): Unit = runUnit()
@@ -343,39 +343,39 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
         method.arguments(0) == receiverType
       }.map(_.asInstanceOf[MethodDefinition]).orNull
 
-      if (staticMethod == null) return
+      if (staticMethod != null) {
+        val context = new LocalContext
+        context.setStatic(true)  // Extension methods are compiled as static methods
+        context.setMethod(staticMethod)
 
-      val context = new LocalContext
-      context.setStatic(true)  // Extension methods are compiled as static methods
-      context.setMethod(staticMethod)
+        // Scan for captured variables before processing the method body
+        val extArgs = AST.Argument(node.location, "this", AST.TypeNode(node.location, AST.ReferenceType(receiverType.name, true), false)) :: node.args
+        markCapturedVariables(context, extArgs, node.block)
 
-      // Scan for captured variables before processing the method body
-      val extArgs = AST.Argument(node.location, "this", AST.TypeNode(node.location, AST.ReferenceType(receiverType.name, true), false)) :: node.args
-      markCapturedVariables(context, extArgs, node.block)
+        // Add 'this' as the first parameter (the receiver)
+        context.add("this", receiverType)
 
-      // Add 'this' as the first parameter (the receiver)
-      context.add("this", receiverType)
+        // Add method parameters
+        val arguments = staticMethod.arguments
+        for ((arg, i) <- node.args.zipWithIndex) {
+          // Skip first argument (receiver) when binding
+          context.add(arg.name, arguments(i + 1))
+        }
 
-      // Add method parameters
-      val arguments = staticMethod.arguments
-      for ((arg, i) <- node.args.zipWithIndex) {
-        // Skip first argument (receiver) when binding
-        context.add(arg.name, arguments(i + 1))
+        // Process default argument values
+        val argsWithDefaults = buildArgumentsWithDefaults(extArgs, arguments, context)
+        staticMethod.setArgumentsWithDefaults(argsWithDefaults)
+
+        // Type check the method body
+        val translatedBlock = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], staticMethod.returnType)
+        staticMethod.setBlock(translatedBlock)
+        staticMethod.setFrame(context.getContextFrame)
+        extMethod.setBlock(translatedBlock)
+        extMethod.setFrame(context.getContextFrame)
+
+        // Report unused variable warnings
+        reportUnused(context)
       }
-
-      // Process default argument values
-      val argsWithDefaults = buildArgumentsWithDefaults(extArgs, arguments, context)
-      staticMethod.setArgumentsWithDefaults(argsWithDefaults)
-
-      // Type check the method body
-      val translatedBlock = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], staticMethod.returnType)
-      staticMethod.setBlock(translatedBlock)
-      staticMethod.setFrame(context.getContextFrame)
-      extMethod.setBlock(translatedBlock)
-      extMethod.setFrame(context.getContextFrame)
-
-      // Report unused variable warnings
-      reportUnused(context)
     }
   }
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
@@ -573,6 +573,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     additionTyping.typeAddition(node, context)
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = node match {
+    case _: AST.DoExpression | _: AST.RetStatement =>
+      None
     case node: AST.Addition =>
       typeAddition(node, context)
     case node@AST.Subtraction(loc, left, right) =>
@@ -787,19 +789,12 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
       controlExpressionTyping.typeBreakExpression(node, context)
     case node: AST.ContinueExpression =>
       controlExpressionTyping.typeContinueExpression(node, context)
-    case node: AST.EmptyExpression =>
-      controlExpressionTyping.typeEmptyExpression(node, context)
-    case node: AST.ExpressionBox =>
-      controlExpressionTyping.typeExpressionBox(node, context)
     case node: AST.ForeachExpression =>
       controlExpressionTyping.typeForeachExpression(node, context)
     case node: AST.ForExpression =>
       controlExpressionTyping.typeForExpression(node, context)
     case node: AST.IfExpression =>
       controlExpressionTyping.typeIfExpression(node, context)
-    case node: AST.LocalVariableDeclaration =>
-      val statement = statementTyping.translate(node, context)
-      Some(new StatementTerm(node.location, statement, BasicType.VOID))
     case node: AST.ReturnExpression =>
       controlExpressionTyping.typeReturnExpression(node, context)
     case node: AST.SelectExpression =>
@@ -813,8 +808,8 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     case node: AST.WhileExpression =>
       controlExpressionTyping.typeWhileExpression(node, context)
   }
-  def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
-    statementTyping.translate(node, context)
+  def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =
+    blockElementLowering.translate(node, context)
 
   def defaultValue(typeRef: Type): Term = Term.defaultValue(typeRef)
   def addReturnNode(node: ActionStatement, returnType: Type): StatementBlock = {
@@ -894,7 +889,7 @@ final class TypingBodyPass(private val typing: Typing, private val unit: AST.Com
     for (element <- toplevels) {
       if (!element.isInstanceOf[AST.TypeDeclaration]) definition_ = klass
       element match {
-        case node: AST.CompoundExpression =>
+        case node: AST.BlockElement =>
           context.setMethod(method)
           statements += translate(node, context)
         case _ =>

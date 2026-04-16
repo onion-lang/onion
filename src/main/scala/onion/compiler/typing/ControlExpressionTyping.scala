@@ -38,11 +38,11 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
             terms += statementTerm(stmt, BasicType.VOID, element.location)
           } else {
             element match {
-              case _: AST.LocalVariableDeclaration | _: AST.EmptyExpression =>
+              case _: AST.LocalVariableDeclaration =>
                 val stmt = translate(element, context)
                 terms += statementTerm(stmt, BasicType.VOID, element.location)
-              case _ =>
-                typed(element, context) match {
+              case expr: AST.Expression =>
+                typed(expr, context) match {
                   case Some(term) => terms += term
                   case None => failed = true
                 }
@@ -53,14 +53,13 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       }
     }
 
-  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] = {
+  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] = boundary {
     context.openScope {
       // Type the condition
       val conditionRawOpt = typed(node.condition, context)
-      if (conditionRawOpt.isEmpty) return None
-      val conditionRaw = conditionRawOpt.get
+      val conditionRaw = conditionRawOpt.getOrElse(break(None))
       val condition = ensureBoolean(node.condition, conditionRaw)
-      if (condition == null) return None
+      if (condition == null) break(None)
 
       // Extract smart cast narrowing info
       val narrowing = extractNarrowing(node.condition, context)
@@ -73,8 +72,7 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
       val thenTermOpt = typeBlockExpression(node.thenBlock, context)
       context.restoreNarrowings(savedNarrowings)
 
-      if (thenTermOpt.isEmpty) return None
-      val thenTerm = thenTermOpt.get
+      val thenTerm = thenTermOpt.getOrElse(break(None))
 
       if (node.elseBlock == null) {
         val thenStmt = termToStatement(node.thenBlock, thenTerm)
@@ -87,11 +85,10 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
         val elseTermOpt = typeBlockExpression(node.elseBlock, context)
         context.restoreNarrowings(savedNarrowings)
 
-        if (elseTermOpt.isEmpty) return None
-        val elseTerm = elseTermOpt.get
+        val elseTerm = elseTermOpt.getOrElse(break(None))
 
         val resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
-        if (resultType == null) return None
+        if (resultType == null) break(None)
 
         if (resultType.isBottomType || resultType == BasicType.VOID) {
           val thenStmt = termToStatement(node.thenBlock, thenTerm)
@@ -620,16 +617,10 @@ final class ControlExpressionTyping(private val typing: Typing, private val body
   def typeContinueExpression(node: AST.ContinueExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BottomType.BOTTOM, node.location))
 
-  def typeExpressionBox(node: AST.ExpressionBox, context: LocalContext): Option[Term] =
-    typed(node.body, context)
-
-  def typeEmptyExpression(node: AST.EmptyExpression, context: LocalContext): Option[Term] =
-    Some(statementTerm(new NOP(node.location), BasicType.VOID, node.location))
-
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     body.typed(node, context, expected)
 
-  private def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
+  private def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =
     body.translate(node, context)
 
   private def processAssignable(node: AST.Node, expected: Type, term: Term): Term =

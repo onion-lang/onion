@@ -616,7 +616,7 @@ class Repl(classpath: Seq[String]) {
     case _: AST.ReturnExpression => false
     case _: AST.BreakExpression => false
     case _: AST.ContinueExpression => false
-    case _: AST.CompoundExpression => true
+    case _: AST.Expression => true
     case _ => false
   }
 

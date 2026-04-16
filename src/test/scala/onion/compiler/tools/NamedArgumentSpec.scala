@@ -109,6 +109,30 @@ class NamedArgumentSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("8,24") == result)
     }
+
+    it("should work with unqualified instance methods") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  def format(a: Int, b: Int, c: Int = 3): String {
+          |    return "" + a + "," + b + "," + c;
+          |  }
+          |
+          |  def run(): String {
+          |    return format(b = 2, a = 1);
+          |  }
+          |
+          |  static def main(args: String[]): String {
+          |    return (new Test()).run();
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("1,2,3") == result)
+    }
   }
 
   describe("constructor named arguments") {

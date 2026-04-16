@@ -8,12 +8,16 @@ import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.TypedAST.UnaryTerm.Kind as UnaryKind
 import onion.compiler.TypedAST.UnaryTerm.Kind.*
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
-final class OperatorTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class OperatorTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   def createEquals(kind: BinaryKind, lhs: Term, rhs: Term): Term = {
-    val params = Array[Term](new AsInstanceOf(rhs, rootClass))
+    val params = Array[Term](new AsInstanceOf(rhs, bodyContext.rootClass))
     val target = lhs.`type`.asInstanceOf[ObjectType]
     val methods = target.findMethod("equals", params)
     var node: Term = new Call(lhs, methods(0), params)
@@ -30,7 +34,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     val leftType: Type = left.`type`
     val rightType: Type = right.`type`
     if ((left.isBasicType && (!right.isBasicType)) || ((!left.isBasicType) && (right.isBasicType))) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       return null
     }
     if (left.isBasicType && right.isBasicType) {
@@ -39,7 +43,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
         if (resultType != left.`type`) left = new AsInstanceOf(left, resultType)
         if (resultType != right.`type`) right = new AsInstanceOf(right, resultType)
       } else if (leftType != BasicType.BOOLEAN || rightType != BasicType.BOOLEAN) {
-        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
         return null
       }
     } else if (left.isReferenceType && right.isReferenceType) {
@@ -53,23 +57,23 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     var right: Term = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
     if (!left.`type`.isBasicType) {
-      val params = Array[Term](right)
-      tryFindMethod(node, left.`type`.asInstanceOf[ObjectType], "add", params) match {
-        case Left(_) =>
-          report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
+        val params = Array[Term](right)
+        tryFindMethod(node, left.`type`.asInstanceOf[ObjectType], "add", params) match {
+          case Left(_) =>
+          bodyContext.report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
           return null
         case Right(method) =>
           return new Call(left, method, params)
       }
     }
     if (!right.`type`.isBasicType) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       return null
     }
     val leftType: BasicType = left.`type`.asInstanceOf[BasicType]
     val rightType: BasicType = right.`type`.asInstanceOf[BasicType]
     if ((!leftType.isInteger) || (!rightType.isInteger)) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       return null
     }
     val leftResultType = promoteInteger(leftType)
@@ -88,13 +92,13 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     if (leftRaw == null || rightRaw == null) return null
 
     // Try to unbox wrapper types to numeric primitives
-    val left = Boxing.tryUnboxToNumeric(table_, leftRaw, numericTypes.contains)
-    val right = Boxing.tryUnboxToNumeric(table_, rightRaw, numericTypes.contains)
+    val left = Boxing.tryUnboxToNumeric(bodyContext.table, leftRaw, numericTypes.contains)
+    val right = Boxing.tryUnboxToNumeric(bodyContext.table, rightRaw, numericTypes.contains)
 
     val leftType = left.`type`
     val rightType = right.`type`
     if ((!numeric(leftType)) || (!numeric(rightType))) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       null
     } else {
       val resultType = promote(leftType, rightType)
@@ -109,7 +113,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     val right = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
     if ((!left.isBasicType) || (!right.isBasicType)) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       return null
     }
     val leftType = left.`type`.asInstanceOf[BasicType]
@@ -120,7 +124,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     } else if (leftType.isBoolean && rightType.isBoolean) {
       resultType = BasicType.BOOLEAN
     } else {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       return null
     }
     val newLeft = if (left.`type` != resultType) new AsInstanceOf(left, resultType) else left
@@ -149,7 +153,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     val leftType: Type = left.`type`
     val rightType: Type = right.`type`
     if ((leftType != BasicType.BOOLEAN) || (rightType != BasicType.BOOLEAN)) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       null
     } else {
       Array[Term](left, right)
@@ -163,7 +167,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     val leftType = leftRaw.`type`
     val rightType = rightRaw.`type`
     if ((leftRaw.isBasicType && (!rightRaw.isBasicType)) || ((!leftRaw.isBasicType) && (rightRaw.isBasicType))) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
       return null
     }
     val (left, right) = if (leftRaw.isBasicType && rightRaw.isBasicType) {
@@ -173,7 +177,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
         val newRight = if (resultType != rightRaw.`type`) new AsInstanceOf(rightRaw, resultType) else rightRaw
         (newLeft, newRight)
       } else if (leftType != BasicType.BOOLEAN || rightType != BasicType.BOOLEAN) {
-        report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftType, rightType))
         return null
       } else {
         (leftRaw, rightRaw)
@@ -188,8 +192,8 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     for {
       leftRaw <- typed(node.lhs, context)
       rightRaw <- typed(node.rhs, context)
-      left = Boxing.tryUnboxToNumeric(table_, leftRaw, numericTypes.contains)
-      right = Boxing.tryUnboxToNumeric(table_, rightRaw, numericTypes.contains)
+      left = Boxing.tryUnboxToNumeric(bodyContext.table, leftRaw, numericTypes.contains)
+      right = Boxing.tryUnboxToNumeric(bodyContext.table, rightRaw, numericTypes.contains)
       result <- Option(processNumericExpression(kind, node, left, right))
     } yield result
 
@@ -205,18 +209,18 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
 
   def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = Boxing.tryUnboxToNumeric(table_, termRaw, numericTypes.contains)
+      val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
       if (!hasNumericType(term)) {
-        report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
       } else Some(new UnaryTerm(kind, term.`type`, term))
     }
 
   def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
-      val term = Boxing.tryUnboxToBoolean(table_, termRaw)
+      val term = Boxing.tryUnboxToBoolean(bodyContext.table, termRaw)
       if (term.`type` != BasicType.BOOLEAN) {
-        report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
+        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](term.`type`))
         None
       } else Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
     }
@@ -225,7 +229,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
     val operand = typed(termNode, context).getOrElse(null)
     if (operand == null) return None
     if ((!operand.isBasicType) || !hasNumericType(operand)) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](operand.`type`))
       return None
     }
     Option(operand match {
@@ -234,7 +238,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
           case id: AST.Id =>
             val bind = context.lookup(id.name)
             if (bind != null && !bind.isMutable) {
-              report(CANNOT_ASSIGN_TO_VAL, id, id.name)
+              bodyContext.report(CANNOT_ASSIGN_TO_VAL, id, id.name)
               return None
             }
           case _ =>
@@ -247,7 +251,7 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
         )
       case ref: RefField =>
         if (Modifier.isFinal(ref.field.modifier)) {
-          report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
+          bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
           return None
         }
         val varIndex = context.add(context.newName, ref.target.`type`)
@@ -260,14 +264,14 @@ final class OperatorTyping(private val typing: Typing, private val body: TypingB
           )
         )
       case _ =>
-        report(LVALUE_REQUIRED, termNode)
+        bodyContext.report(LVALUE_REQUIRED, termNode)
         null
     })
   }
 
   def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term = {
     if ((!hasNumericType(lt)) || (!hasNumericType(rt))) {
-      report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
+      bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](lt.`type`, rt.`type`))
       return null
     }
     val resultType = promote(lt.`type`, rt.`type`)

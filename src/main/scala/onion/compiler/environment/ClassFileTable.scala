@@ -9,6 +9,7 @@ package onion.compiler.environment
 
 import java.io.{File, IOException}
 import java.net.URLClassLoader
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * @author Kota Mizushima
@@ -16,6 +17,7 @@ import java.net.URLClassLoader
  */
 class ClassFileTable(classPathString: String) {
   private val classLoader: ClassLoader = createClassLoader(classPathString)
+  private val bytesCache = new ConcurrentHashMap[String, Option[Array[Byte]]]()
 
   private def createClassLoader(classPath: String): ClassLoader = {
     val urls = classPath.split(File.pathSeparator).map { path =>
@@ -31,16 +33,23 @@ class ClassFileTable(classPathString: String) {
    * @return byte array of the class file, or null if not found
    */
   def loadBytes(className: String): Array[Byte] = {
+    val cached = bytesCache.get(className)
+    if (cached != null) return cached.orNull
+
     val resourcePath = className.replace('.', '/') + ".class"
     val inputStream = classLoader.getResourceAsStream(resourcePath)
-    if (inputStream == null) return null
+    val loaded =
+      if (inputStream == null) None
+      else
+        try {
+          Option(inputStream.readAllBytes())
+        } catch {
+          case _: IOException => None
+        } finally {
+          inputStream.close()
+        }
 
-    try {
-      inputStream.readAllBytes()
-    } catch {
-      case _: IOException => null
-    } finally {
-      inputStream.close()
-    }
+    bytesCache.putIfAbsent(className, loaded)
+    loaded.orNull
   }
 }

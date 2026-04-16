@@ -62,6 +62,32 @@ Print a typed AST summary (classes, fields, methods) to stderr.
 onionc --dump-typed-ast MyProgram.on
 ```
 
+### `--profile-compile`
+
+Emit a compile profile with per-phase timing, source count, classpath size, and generated class count.
+
+```bash
+onionc --profile-compile MyProgram.on
+```
+
+### `--profile-format <text|json>`
+
+Choose how the compile profile is rendered.
+
+```bash
+onionc --profile-compile --profile-format json MyProgram.on
+```
+
+### `--profile-output <target>`
+
+Write the compile profile to `stderr`, `stdout`, or a file path.
+
+```bash
+onionc --profile-compile --profile-format json \
+       --profile-output target/profile.json \
+       MyProgram.on
+```
+
 ### `--warn <off|on|error>`
 
 Control warning reporting. `error` treats warnings as compilation errors.

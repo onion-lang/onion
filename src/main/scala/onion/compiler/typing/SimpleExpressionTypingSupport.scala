@@ -1,0 +1,196 @@
+package onion.compiler.typing
+
+import onion.compiler.*
+import onion.compiler.SemanticError.*
+import onion.compiler.TypedAST.*
+import onion.compiler.TypedAST.BinaryTerm.Kind as BinaryKind
+import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
+
+private[compiler] final class SimpleExpressionTypingSupport(
+  bodyContext: TypingBodyContext,
+  typed: (AST.Expression, LocalContext, Type) => Option[Term],
+  typeMemberSelection: (AST.MemberSelection, LocalContext) => Option[Term],
+  typeAssignment: (AST.Assignment, LocalContext) => Option[Term]
+) {
+  def typeSimple(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
+    node match {
+      case node@AST.AdditionAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, ADD, context)
+      case node@AST.SubtractionAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, SUBTRACT, context)
+      case node@AST.MultiplicationAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, MULTIPLY, context)
+      case node@AST.DivisionAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, DIVIDE, context)
+      case node@AST.ModuloAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, MOD, context)
+      case node@AST.BitAndAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, BIT_AND, context)
+      case node@AST.BitOrAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, BIT_OR, context)
+      case node@AST.XorAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, XOR, context)
+      case node@AST.LeftShiftAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, BIT_SHIFT_L2, context)
+      case node@AST.MathRightShiftAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, BIT_SHIFT_R2, context)
+      case node@AST.LogicalRightShiftAssignment(_, left, right) =>
+        typeBinaryAssignment(node, left, right, BIT_SHIFT_R3, context)
+      case node@AST.CharacterLiteral(loc, v) =>
+        Some(new CharacterValue(loc, v))
+      case node@AST.ByteLiteral(loc, v) =>
+        Some(new ByteValue(loc, v))
+      case node@AST.ShortLiteral(loc, v) =>
+        Some(new ShortValue(loc, v))
+      case node@AST.IntegerLiteral(loc, v) =>
+        Some(new IntValue(loc, v))
+      case node@AST.LongLiteral(loc, v) =>
+        Some(new LongValue(loc, v))
+      case node@AST.FloatLiteral(loc, v) =>
+        Some(new FloatValue(loc, v))
+      case node@AST.DoubleLiteral(loc, v) =>
+        Some(new DoubleValue(loc, v))
+      case node@AST.BooleanLiteral(loc, v) =>
+        Some(new BoolValue(loc, v))
+      case node: AST.ListLiteral =>
+        typeListLiteral(node, context)
+      case node@AST.NullLiteral(loc) =>
+        Some(new NullValue(loc))
+      case node@AST.CurrentInstance(loc) =>
+        typeCurrentInstance(node, context)
+      case node@AST.Id(loc, name) =>
+        typeIdentifier(node, context)
+      case node: AST.UnqualifiedFieldReference =>
+        typeUnqualifiedFieldReference(node, context)
+      case node@AST.StringLiteral(loc, value) =>
+        Some(new StringValue(loc, value, bodyContext.load("java.lang.String")))
+      case node: AST.NamedArgument =>
+        typed(node.value, context, expected)
+      case _ =>
+        None
+    }
+
+  private def typeBinaryAssignment(
+    node: AST.Expression,
+    lhs: AST.Expression,
+    rhs: AST.Expression,
+    binaryKind: BinaryKind,
+    context: LocalContext
+  ): Option[Term] = {
+    val binaryOp = binaryKind match {
+      case ADD => new AST.Addition(node.location, lhs, rhs)
+      case SUBTRACT => new AST.Subtraction(node.location, lhs, rhs)
+      case MULTIPLY => new AST.Multiplication(node.location, lhs, rhs)
+      case DIVIDE => new AST.Division(node.location, lhs, rhs)
+      case MOD => new AST.Modulo(node.location, lhs, rhs)
+      case BIT_AND => new AST.BitAnd(node.location, lhs, rhs)
+      case BIT_OR => new AST.BitOr(node.location, lhs, rhs)
+      case XOR => new AST.XOR(node.location, lhs, rhs)
+      case BIT_SHIFT_L2 => new AST.MathLeftShift(node.location, lhs, rhs)
+      case BIT_SHIFT_R2 => new AST.MathRightShift(node.location, lhs, rhs)
+      case BIT_SHIFT_R3 => new AST.LogicalRightShift(node.location, lhs, rhs)
+      case _ => throw new IllegalArgumentException(s"Invalid compound assignment operator: $binaryKind")
+    }
+    typeAssignment(new AST.Assignment(node.location, lhs, binaryOp), context)
+  }
+
+  private def typeListLiteral(node: AST.ListLiteral, context: LocalContext): Option[Term] = {
+    val typedElements = new Array[Term](node.elements.size)
+    var elementType: Type = null
+    var failed = false
+    var incompatibleLeft: Type = null
+    var incompatibleRight: Type = null
+    var index = 0
+
+    node.elements.foreach { element =>
+      if (!failed) {
+        val typedElement = typed(element, context, null).orNull
+        if (typedElement == null) {
+          failed = true
+        } else {
+          typedElements(index) = typedElement
+          val normalizedType = normalizeListElementType(typedElement.`type`)
+          if (index == 0) {
+            elementType = normalizedType
+          } else {
+            val merged = mergeListElementType(elementType, normalizedType)
+            if (merged == null) {
+              failed = true
+              incompatibleLeft = elementType
+              incompatibleRight = normalizedType
+            } else {
+              elementType = merged
+            }
+          }
+          index += 1
+        }
+      }
+    }
+
+    if (failed) {
+      if (incompatibleLeft != null && incompatibleRight != null) {
+        bodyContext.report(INCOMPATIBLE_TYPE, node, incompatibleLeft, incompatibleRight)
+      }
+      None
+    } else {
+      val finalElementType = if (typedElements.isEmpty) bodyContext.rootClass else elementType
+      val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
+      Some(new ListLiteral(typedElements, listType))
+    }
+  }
+
+  private def typeCurrentInstance(node: AST.CurrentInstance, context: LocalContext): Option[Term] = {
+    val thisBinding = context.lookup("this")
+    if (thisBinding != null) {
+      context.recordUsage("this")
+      Some(new RefLocal(thisBinding))
+    } else if (context.isStatic) {
+      bodyContext.report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      None
+    } else {
+      Some(new This(node.location, bodyContext.definition))
+    }
+  }
+
+  private def typeIdentifier(node: AST.Id, context: LocalContext): Option[Term] = {
+    val bind = context.lookup(node.name)
+    if (bind == null) {
+      bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+      None
+    } else {
+      context.recordUsage(node.name)
+      val effectiveType = context.getEffectiveType(node.name)
+      if (effectiveType != bind.tp) Some(new AsInstanceOf(new RefLocal(bind), effectiveType))
+      else Some(new RefLocal(bind))
+    }
+  }
+
+  private def typeUnqualifiedFieldReference(node: AST.UnqualifiedFieldReference, context: LocalContext): Option[Term] =
+    if (context.isStatic) {
+      bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+      None
+    } else {
+      val selection = AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name)
+      typeMemberSelection(selection, context)
+    }
+
+  private def normalizeListElementType(tp: Type): Type =
+    tp match {
+      case basicType: BasicType => Boxing.boxedType(bodyContext.table, basicType)
+      case other => other
+    }
+
+  private def mergeListElementType(left: Type, right: Type): Type =
+    if (left == null || right == null) null
+    else if (left.isBottomType) right
+    else if (right.isBottomType) left
+    else if (left eq right) left
+    else if (left.isNullType) right
+    else if (right.isNullType) left
+    else if (TypeRules.isSuperType(left, right)) left
+    else if (TypeRules.isSuperType(right, left)) right
+    else if (!left.isBasicType && !right.isBasicType) bodyContext.rootClass
+    else null
+}

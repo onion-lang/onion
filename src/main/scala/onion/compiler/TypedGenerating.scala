@@ -1,19 +1,13 @@
 package onion.compiler
 
+import onion.compiler.codegen.legacy.TypedGeneratingBridge
+
 /**
- * Bridge generator that accepts typed AST and delegates to the old
- * CodeGeneration using TypedAST nodes. This eases migration away from TypedAST
- * without rewriting the backend in one go.
+ * Legacy public facade for callers that still instantiate
+ * `onion.compiler.TypedGenerating` directly.
+ *
+ * The actual bridge implementation now lives under
+ * `onion.compiler.codegen.legacy.TypedGeneratingBridge`.
  */
 class TypedGenerating(config: CompilerConfig)
-  extends AnyRef
-    with Processor[Seq[TypedAST.ClassDefinition], Seq[CompiledClass]]:
-  class TypedGeneratingEnvironment
-  type Environment = TypedGeneratingEnvironment
-  def newEnvironment(source: Seq[TypedAST.ClassDefinition]): TypedGeneratingEnvironment =
-    new TypedGeneratingEnvironment
-
-  private val generator: BytecodeGenerator = new AsmCodeGeneration(config)
-
-  def processBody(source: Seq[TypedAST.ClassDefinition], environment: TypedGeneratingEnvironment): Seq[CompiledClass] =
-    generator.process(source)
+  extends TypedGeneratingBridge(config)

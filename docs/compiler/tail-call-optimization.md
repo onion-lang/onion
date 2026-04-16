@@ -60,7 +60,7 @@ Output:
 ### Compiler Pipeline
 
 ```
-Parsing → Rewriting → Typing → [TailCallOptimization] → CodeGeneration
+Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → TypedAstCodeGeneration
 ```
 
 ## Future Work
@@ -117,7 +117,7 @@ Test files are located in `src/test/run/`:
 If you'd like to contribute to implementing the transformation phase:
 
 1. Understand `TypedAST` node structure (especially `LocalFrame`, `RefLocal`, `SetLocal`)
-2. Study `LocalVarContext` in `src/main/scala/onion/compiler/bytecode/LocalVarContext.scala`
+2. Study `LocalVarContext` in `src/main/scala/onion/compiler/backend/asm/LocalVarContext.scala`
 3. Implement recursive statement rewriting to replace parameter references
 4. Add comprehensive tests for various tail-recursive patterns
 

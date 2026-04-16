@@ -99,5 +99,27 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("HELLO!") == result)
     }
+
+    it("finds extension methods defined on receiver supertypes") {
+      val result = shell.run(
+        """
+          |extension Object {
+          |  def describe(): String {
+          |    return "Object(" + this.toString() + ")"
+          |  }
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "hello".describe()
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("Object(hello)") == result)
+    }
   }
 }

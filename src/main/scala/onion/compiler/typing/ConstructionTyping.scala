@@ -4,9 +4,13 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.session.TypingBodyContext
 
-final class ConstructionTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class ConstructionTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] =
     for {
@@ -14,19 +18,19 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
       indexRaw <- typed(node.rhs, context)
       result <- {
         if (target.isArrayType) {
-          val index = Boxing.tryUnboxToInteger(table_, indexRaw)
+          val index = Boxing.tryUnboxToInteger(bodyContext.table, indexRaw)
           if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
-            report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
+            bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
             None
           } else Some(new RefArray(target, index))
         } else if (target.isBasicType) {
-          report(INCOMPATIBLE_TYPE, node.lhs, rootClass, target.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, node.lhs, bodyContext.rootClass, target.`type`)
           None
         } else {
           val params = Array(indexRaw)
           tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", params) match {
             case Left(_) =>
-              report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+              bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
               None
             case Right(method) =>
               Some(new Call(target, method, params))
@@ -36,22 +40,22 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
     } yield result
 
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
-    val typeRef = mapFrom(node.typeRef, mapper_)
+    val typeRef = typing.mapFrom(node.typeRef, bodyContext.mapper)
     val parameters = typedTerms(node.args.toArray, context)
     if (typeRef == null || parameters == null) return None
-    val resultType = loadArray(typeRef, parameters.length)
+    val resultType = typing.loadArray(typeRef, parameters.length)
     Some(new NewArray(resultType, parameters))
   }
 
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] = {
-    val elementType = mapFrom(node.typeRef, mapper_)
+    val elementType = typing.mapFrom(node.typeRef, bodyContext.mapper)
     if (elementType == null) return None
-    val arrayType = loadArray(elementType, 1)
+    val arrayType = typing.loadArray(elementType, 1)
     val typedValues = node.values.toArray.map { expr =>
       typed(expr, context, elementType).flatMap { t =>
         if (TypeRules.isAssignable(elementType, t.`type`)) Some(t)
         else {
-          report(INCOMPATIBLE_TYPE, expr, elementType, t.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, expr, elementType, t.`type`)
           None
         }
       }
@@ -61,7 +65,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
   }
 
   def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] = {
-    val typeRef = mapFrom(node.typeRef).asInstanceOf[ClassType]
+    val typeRef = typing.mapFrom(node.typeRef).asInstanceOf[ClassType]
     if (typeRef == null) return None
 
     // Check if trying to instantiate an abstract class
@@ -70,7 +74,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
       case _ => typeRef
     }
     if (Modifier.isAbstract(classToCheck.modifier)) {
-      report(ABSTRACT_CLASS_INSTANTIATION, node, typeRef)
+      bodyContext.report(ABSTRACT_CLASS_INSTANTIATION, node, typeRef)
       return None
     }
 
@@ -85,10 +89,10 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
 
     val constructors = typeRef.findConstructor(parameters)
     if (constructors.length == 0) {
-      report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {
-      report(
+      bodyContext.report(
         AMBIGUOUS_CONSTRUCTOR,
         node,
         Array[AnyRef](constructors(0).affiliation, constructors(0).getArgs),
@@ -129,14 +133,14 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
     if (candidates.isEmpty) {
       // Type the arguments anyway to provide better error messages
       val parameters = typedTerms(node.args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
-      report(CONSTRUCTOR_NOT_FOUND, node, typeRef,
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef,
         if (parameters != null) types(parameters) else Array.empty[Type],
         typeRef.constructors)
       return None
     }
 
     if (candidates.length > 1) {
-      report(
+      bodyContext.report(
         AMBIGUOUS_CONSTRUCTOR,
         node,
         Array[AnyRef](candidates(0).affiliation, candidates(0).getArgs),
@@ -233,10 +237,10 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
           // Find parameter by name
           val paramIndex = paramNames.indexOf(named.name)
           if (paramIndex < 0) {
-            report(UNKNOWN_PARAMETER_NAME, named, named.name)
+            bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
             hasError = true
           } else if (filled(paramIndex)) {
-            report(DUPLICATE_ARGUMENT, named, named.name)
+            bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)
             hasError = true
           } else {
             // Type the value
@@ -252,7 +256,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
         case expr =>
           // Positional argument
           if (sawNamed) {
-            report(POSITIONAL_AFTER_NAMED, expr)
+            bodyContext.report(POSITIONAL_AFTER_NAMED, expr)
             hasError = true
           } else if (positionalIndex >= argsWithDefaults.length) {
             // Too many arguments - type anyway for error reporting
@@ -277,8 +281,7 @@ final class ConstructionTyping(private val typing: Typing, private val body: Typ
     // Check all required arguments are filled
     val missingRequired = argsWithDefaults.indices.find(i => !filled(i) && argsWithDefaults(i).defaultValue.isEmpty)
     if (missingRequired.isDefined) {
-      val missingName = argsWithDefaults(missingRequired.get).name
-      report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
         argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
       return None
     }

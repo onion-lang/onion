@@ -98,7 +98,7 @@ nav:
   - Tools:
       - Compiler (onionc): tools/compiler.md
       - Script Runner (onion): tools/script-runner.md
-      - REPL Shell: tools/repl.md
+      - REPL: tools/repl.md
   - Reference:
       - Language Specification: reference/specification.md
       - Standard Library: reference/stdlib.md

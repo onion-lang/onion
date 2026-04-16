@@ -89,7 +89,7 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 
 - **onionc** - Onionソースファイルを.classファイルにコンパイル
 - **onion** - Onionスクリプトを直接実行（コンパイルして実行）
-- **Shell** - 対話型REPL
+- **onion-repl / onion repl** - 対話型REPL
 
 ## プロジェクト履歴
 
@@ -97,8 +97,10 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 
 1. **パース** - JavaCC生成パーサーが型なしASTを生成
 2. **書き換え** - ASTの正規化と変換
-3. **型チェック** - 型推論と検証
-4. **コード生成** - ASMベースのバイトコード生成
+3. **型チェック** - 型推論・名前解決・オーバーロード解決・typed AST 構築
+4. **末尾呼び出し最適化** - 自己末尾再帰のループ化
+5. **相互再帰最適化** - `@TailRecursive` グループの状態機械化
+6. **コード生成** - typed AST から ASM で直接バイトコード生成
 
 ## コミュニティ
 

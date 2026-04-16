@@ -49,7 +49,12 @@ Onion runs on the JVM and requires:
    sbt assembly
    ```
 
-   This creates `onion.jar` in the `target/scala-3.3.7/` directory
+   This creates `onion.jar` under the active Scala target directory (currently `target/scala-3.3.7/`)
+
+5. Run the local installer if you want shell commands in `~/.local/bin`:
+   ```bash
+   ./install.sh
+   ```
 
 ## Verify Installation
 
@@ -58,6 +63,8 @@ Check that Onion is installed correctly:
 ```bash
 # If using the distribution
 onionc --help
+onion repl
+onion-repl
 
 # If using the JAR directly
 java -jar onion.jar --help

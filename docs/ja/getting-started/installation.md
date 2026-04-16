@@ -49,7 +49,12 @@ OnionはJVM上で動作し、以下が必要です：
    sbt assembly
    ```
 
-   これにより`target/scala-3.3.7/`ディレクトリに`onion.jar`が作成されます
+   これにより現在の Scala 向け target ディレクトリ（現状は `target/scala-3.3.7/`）に `onion.jar` が作成されます
+
+5. `~/.local/bin` にコマンドを入れたい場合はローカル installer を実行：
+   ```bash
+   ./install.sh
+   ```
 
 ## インストールの確認
 
@@ -58,6 +63,8 @@ Onionが正しくインストールされたことを確認：
 ```bash
 # 配布版を使用する場合
 onionc --help
+onion repl
+onion-repl
 
 # JARを直接使用する場合
 java -jar onion.jar --help

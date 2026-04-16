@@ -3,10 +3,14 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingBodyContext
 import onion.compiler.toolbox.Boxing
 
-final class AssignmentTyping(private val typing: Typing, private val body: TypingBodyPass) {
-  import typing.*
+final class AssignmentTyping(
+  private val typing: Typing,
+  private val bodyContext: TypingBodyContext,
+  private val body: TypingBodyPass
+) {
 
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term = {
     var value: Term = typed(node.rhs, context).getOrElse(null)
@@ -14,11 +18,11 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
     val id = node.lhs.asInstanceOf[AST.Id]
     val bind = context.lookup(id.name)
     if (bind == null) {
-      report(VARIABLE_NOT_FOUND, id, id.name, context.allNames.toArray)
+      bodyContext.report(VARIABLE_NOT_FOUND, id, id.name, context.allNames.toArray)
       return null
     }
     if (!bind.isMutable) {
-      report(CANNOT_ASSIGN_TO_VAL, id, id.name)
+      bodyContext.report(CANNOT_ASSIGN_TO_VAL, id, id.name)
       return null
     }
 
@@ -38,20 +42,20 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
     var index = typed(indexing.rhs, context).getOrElse(null)
     if (value == null || target == null || index == null) return null
     if (target.isBasicType) {
-      report(INCOMPATIBLE_TYPE, indexing.lhs, rootClass, target.`type`)
+      bodyContext.report(INCOMPATIBLE_TYPE, indexing.lhs, bodyContext.rootClass, target.`type`)
       return null
     }
     if (target.isArrayType) {
       val targetType = target.`type`.asInstanceOf[ArrayType]
       // Try to unbox Integer to int for array index
       if (!index.isBasicType) {
-        Boxing.unboxedType(table_, index.`type`) match {
-          case Some(bt) if bt.isInteger => index = Boxing.unboxing(table_, index, bt)
+        Boxing.unboxedType(bodyContext.table, index.`type`) match {
+          case Some(bt) if bt.isInteger => index = Boxing.unboxing(bodyContext.table, index, bt)
           case _ => // will fail below
         }
       }
       if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
-        report(INCOMPATIBLE_TYPE, indexing.rhs, BasicType.INT, index.`type`)
+        bodyContext.report(INCOMPATIBLE_TYPE, indexing.rhs, BasicType.INT, index.`type`)
         return null
       }
       if (value.`type`.isBottomType) return value
@@ -62,7 +66,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
       val params = Array[Term](index, value)
       tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "set", Array[Term](index, value)) match {
         case Left(_) =>
-          report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
+          bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
           if (value.`type`.isBottomType) value else null
         case Right(method) =>
           if (value.`type`.isBottomType) value else new Call(target, method, params)
@@ -73,11 +77,11 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
   def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {
     node match {
       case AST.Assignment(_, selection@AST.MemberSelection(_, _, _), expression) =>
-        val contextClass = definition_
+        val contextClass = bodyContext.definition
         val target = typed(selection.target, context).getOrElse(null)
         if (target == null) return null
         if (target.`type`.isBasicType || target.`type`.isNullType) {
-          report(INCOMPATIBLE_TYPE, selection.target, rootClass, target.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target.`type`)
           return null
         }
         val targetType = target.`type`.asInstanceOf[ObjectType]
@@ -85,9 +89,9 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
         val name = selection.name
         val field: FieldRef = MemberAccess.findField(targetType, name)
         val value: Term = typed(expression, context).getOrElse(null)
-        if (field != null && MemberAccess.isMemberAccessible(field, definition_)) {
+        if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
           if (Modifier.isFinal(field.modifier) && (context.constructor == null || !target.isInstanceOf[This])) {
-            report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
+            bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
             return null
           }
           val classSubst = TypeSubstitution.classSubstitution(target.`type`)
@@ -104,7 +108,7 @@ final class AssignmentTyping(private val typing: Typing, private val body: Typin
             if (value.`type`.isBottomType) value else null
         }
       case _ =>
-        report(LVALUE_REQUIRED, node)
+        bodyContext.report(LVALUE_REQUIRED, node)
         null
     }
   }

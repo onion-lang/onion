@@ -3,12 +3,13 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Classes
+import onion.compiler.typing.session.TypingUnitContext
 
 import scala.jdk.CollectionConverters.*
 import java.util.{TreeSet => JTreeSet}
 
-final class TypingDuplicationPass(private val typing: Typing, private val unit: AST.CompilationUnit) {
-  import typing.*
+final class TypingDuplicationPass(private val typing: Typing, private val unitContext: TypingUnitContext) {
+  private val unit = unitContext.unit
 
   private val seenMethods = new JTreeSet[Method](new MethodComparator)
   private val seenFields = new JTreeSet[FieldRef](new FieldComparator)
@@ -17,13 +18,12 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
   private val seenFunctions = new JTreeSet[Method](new MethodComparator)
 
   private def withKernel[T <: Node](ast: AST.Node)(f: T => Unit): Unit = {
-    val kernel = lookupKernelNode(ast)
+    val kernel = typing.lookupKernelNode(ast)
     if (kernel != null) f(kernel.asInstanceOf[T])
   }
 
   def run(): Unit = {
-    unit_ = unit
-    mapper_ = find(topClass)
+    typing.setMapper(typing.find(typing.topClass))
     seenGlobalVariables.clear()
     seenFunctions.clear()
     unit.toplevels.foreach {
@@ -39,20 +39,20 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
     seenMethods.clear()
     seenFields.clear()
     seenConstructors.clear()
-    definition_ = clazz
-    mapper_ = find(clazz.name)
+    typing.setDefinition(clazz)
+    typing.setMapper(typing.find(clazz.name))
   }
 
   private def registerField(ast: AST.Node, field: FieldDefinition): Unit =
-    if (seenFields.contains(field)) report(SemanticError.DUPLICATE_FIELD, ast, field.affiliation, field.name)
+    if (seenFields.contains(field)) typing.report(SemanticError.DUPLICATE_FIELD, ast, field.affiliation, field.name)
     else seenFields.add(field)
 
   private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit =
-    if (seenMethods.contains(method)) report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
+    if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
     else seenMethods.add(method)
 
   private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
-    if (seenConstructors.contains(constructor)) report(SemanticError.DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
+    if (seenConstructors.contains(constructor)) typing.report(SemanticError.DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
     else seenConstructors.add(constructor)
 
   private def processFieldLikeDeclaration(ast: AST.Node): Unit =
@@ -76,13 +76,13 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
 
   private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit =
     withKernel[FieldDefinition](node) { field =>
-      if (seenGlobalVariables.contains(field)) report(SemanticError.DUPLICATE_GLOBAL_VARIABLE, node, field.name)
+      if (seenGlobalVariables.contains(field)) typing.report(SemanticError.DUPLICATE_GLOBAL_VARIABLE, node, field.name)
       else seenGlobalVariables.add(field)
     }
 
   private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>
-      if (seenFunctions.contains(method)) report(SemanticError.DUPLICATE_FUNCTION, node, method.name, method.arguments)
+      if (seenFunctions.contains(method)) typing.report(SemanticError.DUPLICATE_FUNCTION, node, method.name, method.arguments)
       else seenFunctions.add(method)
     }
 
@@ -94,11 +94,11 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
       val index = frame.add("arg" + i, args(i))
       params(i) = new RefLocal(new ClosureLocalBinding(0, index, args(i), isMutable = true))
     }
-    val target = new Call(new RefField(new This(definition_), delegated), delegator, params)
+    val target = new Call(new RefField(new This(typing.definition_), delegated), delegator, params)
     val statement =
       if (delegator.returnType != BasicType.VOID) new StatementBlock(new Return(target))
       else new StatementBlock(new ExpressionActionStatement(target), new Return(null))
-    val node = new MethodDefinition(null, AST.M_PUBLIC, definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
+    val node = new MethodDefinition(null, AST.M_PUBLIC, typing.definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
     node.setFrame(frame)
     node
   }
@@ -112,11 +112,11 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
       for (method <- src.asScala) {
         if (!seenMethods.contains(method)) {
           if (generated.contains(method)) {
-            report(SemanticError.DUPLICATE_GENERATED_METHOD, field.location, method.affiliation, method.name, method.arguments)
+            typing.report(SemanticError.DUPLICATE_GENERATED_METHOD, field.location, method.affiliation, method.name, method.arguments)
           } else {
             val generatedMethod = makeDelegationMethod(field, method)
             generated.add(generatedMethod)
-            definition_.add(generatedMethod)
+            typing.definition_.add(generatedMethod)
           }
         }
       }
@@ -128,7 +128,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
   }
 
   private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
-    val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+    val clazz = typing.lookupKernelNode(node).asInstanceOf[ClassDefinition]
     if (clazz == null) return
     resetForTypeDeclaration(clazz)
     for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
@@ -140,7 +140,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unit: 
   }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
-    val clazz = lookupKernelNode(node).asInstanceOf[ClassDefinition]
+    val clazz = typing.lookupKernelNode(node).asInstanceOf[ClassDefinition]
     if (clazz == null) return
     resetForTypeDeclaration(clazz)
     for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)

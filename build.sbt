@@ -7,16 +7,23 @@ import java.util.jar.{Attributes, Manifest}
 
 lazy val onion = (project in file(".")).settings(onionSettings:_*)
 
-lazy val dist = TaskKey[Unit]("onion-dist")
+lazy val dist = taskKey[Unit]("Builds a runnable distribution under target/dist")
 
-lazy val distPath = SettingKey[File]("onion-dist-path")
+lazy val distPath = settingKey[File]("Output directory used by the dist task")
 
 lazy val runScript = inputKey[Unit]("Runs the ScriptRunner with arguments")
+lazy val bench = inputKey[Unit]("Runs the benchmark suite")
 
 fullRunInputTask(
   runScript,
   Compile,
   "onion.tools.ScriptRunner"
+)
+
+fullRunInputTask(
+  bench,
+  Compile,
+  "onion.tools.BenchmarkRunner"
 )
 
 lazy val repl = inputKey[Unit]("Starts the interactive REPL")
@@ -49,6 +56,9 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
   IO.copy(map)
   IO.copyDirectory(file("bin"), out / "bin")
   IO.copyDirectory(file("run"), out / "run")
+  (out / "bin" * "*").get
+    .filterNot(_.getName.toLowerCase.endsWith(".bat"))
+    .foreach(_.setExecutable(true, false))
   IO.copyFile(artifact, out / "onion.jar")
   IO.copyFile(file("README.md"), out / "README.md")
   val files = (out ** AllPassFilter).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))
@@ -56,6 +66,8 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
 }
 
 def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
+  val parserOutput = output / "onion" / "compiler" / "parser"
+  IO.createDirectory(parserOutput)
   Fork.java(
     ForkOptions().withOutputStrategy(
       OutputStrategy.LoggedOutput(log)
@@ -67,7 +79,7 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
       "-UNICODE_INPUT=true",
       "-JAVA_UNICODE_ESCAPE=true",
       "-BUILD_TOKEN_MANAGER=true",
-      "-OUTPUT_DIRECTORY=%s/onion/compiler/parser".format(output.toString),
+      s"-OUTPUT_DIRECTORY=${parserOutput.toString}",
       "grammar/JJOnionParser.jj"
     )
   ) match {
@@ -111,7 +123,7 @@ lazy val onionSettings = Seq(
     }
   }.taskValue,
   Compile / packageBin / packageOptions := {
-    val main = mainClass.value
+    val main = (Compile / mainClass).value
     val opts = (Compile / packageBin / packageOptions).value
     opts ++ main.map{m => Package.MainClass(m)}
   },
@@ -131,7 +143,7 @@ lazy val onionSettings = Seq(
   dist / distPath := {
     target.value / "dist"
   },
-  mainClass := Some("onion.tools.CompilerFrontend"),
+  Compile / mainClass := Some("onion.tools.CompilerFrontend"),
   assembly / assemblyJarName := "onion.jar",
   assembly / assemblyMergeStrategy := {
     case "module-info.class" => MergeStrategy.discard

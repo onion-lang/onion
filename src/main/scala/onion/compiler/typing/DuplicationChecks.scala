@@ -17,8 +17,6 @@ private[compiler] object DuplicationChecks {
     args.map(Erasure.asmType).map(_.getDescriptor).mkString("(", "", ")")
 
   def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
-    import typing.*
-
     if clazz.isInterface then return
     val allViews = AppliedTypeViews.collectAppliedViewsFrom(clazz)
     // Exclude the target class itself to avoid checking methods against themselves
@@ -44,23 +42,23 @@ private[compiler] object DuplicationChecks {
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 
-            val implAst = lookupAST(impl.asInstanceOf[Node])
+            val implAst = typing.lookupAST(impl.asInstanceOf[Node])
             val location = if implAst != null then implAst.location else fallback
 
             // Check if trying to override a final method
             if Modifier.isFinal(contract.modifier) then
               val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
-              report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
+              typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
 
             specializedArgs.zip(impl.arguments).foreach { case (arg, implArg) =>
-              val checkedArg = if (!implArg.isBasicType && arg.isBasicType) boxedTypeArgument(arg) else arg
+              val checkedArg = if (!implArg.isBasicType && arg.isBasicType) typing.boxedTypeArgument(arg) else arg
               if (!TypeRules.isSuperType(implArg, checkedArg)) {
-                report(SemanticError.INCOMPATIBLE_TYPE, location, arg, implArg)
+                typing.report(SemanticError.INCOMPATIBLE_TYPE, location, arg, implArg)
               }
             }
 
             if (!TypeRules.isAssignable(specializedRet, impl.returnType)) {
-              report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
+              typing.report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
             }
           }
       }
@@ -68,22 +66,18 @@ private[compiler] object DuplicationChecks {
   }
 
   def checkErasureSignatureCollisions(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
-    import typing.*
-
     val seen = mutable.HashMap[(String, String), Method]()
     for m <- clazz.methods do
       val key = (m.name, erasedMethodDesc(m))
       if seen.contains(key) then
-        val ast = lookupAST(m.asInstanceOf[Node])
+        val ast = typing.lookupAST(m.asInstanceOf[Node])
         val location = if ast != null then ast.location else fallback
-        report(SemanticError.ERASURE_SIGNATURE_COLLISION, location, clazz, m.name, key._2)
+        typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, location, clazz, m.name, key._2)
       else
         seen(key) = m
   }
 
   def checkAbstractMethodImplementation(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
-    import typing.*
-
     // Skip if the class is abstract or an interface
     if Modifier.isAbstract(clazz.modifier) || clazz.isInterface then return
 
@@ -124,9 +118,8 @@ private[compiler] object DuplicationChecks {
 
           if !implByErasedParams.contains(key) then
             val paramDescriptor = specializedArgs.map(_.name).mkString(", ")
-            report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
+            typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
       }
     }
   }
 }
-

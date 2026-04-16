@@ -1,4 +1,9 @@
 @echo off
+setlocal enabledelayedexpansion
+
+if not defined ONION_HOME (
+    set "ONION_HOME=%~dp0.."
+)
 
 rem Remove trailing backslash from ONION_HOME if present
 if "%ONION_HOME:~-1%"=="\" set "ONION_HOME=%ONION_HOME:~0,-1%"
@@ -17,5 +22,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
+set "CP=%ONION_HOME%\onion.jar"
+if exist "%ONION_HOME%\lib" (
+    for %%F in ("%ONION_HOME%\lib\*.jar") do (
+        set "CP=!CP!;%%F"
+    )
+)
+
+if defined CLASSPATH (
+    set "CP=%CP%;%CLASSPATH%"
+)
+
 rem Run the Onion compiler
-"%JAVA_CMD%" -jar "%ONION_HOME%\onion.jar" %*
+"%JAVA_CMD%" -classpath "%CP%" onion.tools.CompilerFrontend %*

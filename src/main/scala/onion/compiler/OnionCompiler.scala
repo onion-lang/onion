@@ -7,113 +7,37 @@
  * ************************************************************** */
 package onion.compiler
 
-import onion.compiler.CompilationOutcome.{Failure, Success}
 import onion.compiler.exceptions.CompilationException
-import scala.util.control.NonFatal
+import onion.compiler.pipeline.{CompilationRequest, CompilationResult, PipelineRunner}
+import onion.compiler.source.InputSourceAdapter
 
 /**
  * @author Kota Mizushima
  *
  */
 class OnionCompiler(val config: CompilerConfig) {
-  private val InternalErrorCode = "I0000"
+  def compile(fileNames: Array[String]): CompilationOutcome =
+    compileDetailed(fileNames).toOutcome
 
-  private def internalError(e: Throwable): CompileError = {
-    val message = Option(e.getMessage).filter(_.nonEmpty).getOrElse(e.getClass.getSimpleName)
-    CompileError(null, null, s"Internal compiler error: $message", Some(InternalErrorCode))
-  }
+  def compile(srcs: Seq[InputSource]): CompilationOutcome =
+    compileDetailed(srcs).toOutcome
 
-  def compile(fileNames: Array[String]): CompilationOutcome = {
-    val sources = fileNames.iterator.map(new FileInputSource(_)).toSeq
-    compile(sources)
-  }
+  def compileDetailed(fileNames: Array[String]): CompilationResult =
+    compileDetailed(fileNames.iterator.map(new FileInputSource(_)).toSeq)
 
-  def compile(srcs: Seq[InputSource]): CompilationOutcome = {
-    if (config.verbose) {
-      compileVerbose(srcs)
-    } else {
-      compileNormal(srcs)
-    }
-  }
-
-  private def compileNormal(srcs: Seq[InputSource]): CompilationOutcome = {
-    try {
-      val parsing = new Parsing(config)
-      val rewriting = new Rewriting(config)
-      val typing = new Typing(config)
-      val tailCallOpt = new optimization.TailCallOptimization(config)
-      val mutualRecOpt = new optimization.MutualRecursionOptimization(config)
-      val generating = new TypedGenerating(config)
-
-      val parsed = parsing.process(srcs)
-      if (config.dumpAst) DiagnosticsPrinter.dumpAst(parsed)
-      val rewritten = rewriting.process(parsed)
-      val typed = typing.process(rewritten)
-      if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
-      val optimized1 = tailCallOpt.process(typed)
-      val optimized2 = mutualRecOpt.process(optimized1)
-      val generated = generating.process(optimized2)
-
-      Success(generated)
-    } catch {
-      case e: CompilationException =>
-        Failure(e.problems.toIndexedSeq)
-      case NonFatal(e) =>
-        Failure(Seq(internalError(e)))
-    }
-  }
-
-  private def compileVerbose(srcs: Seq[InputSource]): CompilationOutcome = {
-    import java.lang.System.{currentTimeMillis => now}
-
-    def timed[A](phaseName: String)(block: => A): A = {
-      val start = now()
-      val result = block
-      val elapsed = now() - start
-      System.err.println(f"[verbose] $phaseName: ${elapsed}ms")
-      result
-    }
-
-    try {
-      val totalStart = now()
-
-      val parsing = new Parsing(config)
-      val rewriting = new Rewriting(config)
-      val typing = new Typing(config)
-      val tailCallOpt = new optimization.TailCallOptimization(config)
-      val mutualRecOpt = new optimization.MutualRecursionOptimization(config)
-      val generating = new TypedGenerating(config)
-
-      val parsed = timed("Parsing")(parsing.process(srcs))
-      if (config.dumpAst) DiagnosticsPrinter.dumpAst(parsed)
-      val rewritten = timed("Rewriting")(rewriting.process(parsed))
-      val typed = timed("Typing")(typing.process(rewritten))
-      if (config.dumpTypedAst) DiagnosticsPrinter.dumpTyped(typed)
-      val optimized1 = timed("TailCallOpt")(tailCallOpt.process(typed))
-      val optimized2 = timed("MutualRecOpt")(mutualRecOpt.process(optimized1))
-      val generated = timed("CodeGen")(generating.process(optimized2))
-
-      val totalElapsed = now() - totalStart
-      System.err.println(f"[verbose] Total: ${totalElapsed}ms (${srcs.size} source files)")
-
-      Success(generated)
-    } catch {
-      case e: CompilationException =>
-        Failure(e.problems.toIndexedSeq)
-      case NonFatal(e) =>
-        Failure(Seq(internalError(e)))
-    }
-  }
+  def compileDetailed(srcs: Seq[InputSource]): CompilationResult =
+    new PipelineRunner(PipelineRunner.defaultPhases(config))
+      .run(CompilationRequest(InputSourceAdapter.fromInputSources(srcs), config))
 
   def compileOrThrow(fileNames: Array[String]): Seq[CompiledClass] =
-    compile(fileNames) match {
-      case Success(classes) => classes
-      case Failure(errors) => throw new CompilationException(errors)
+    compileDetailed(fileNames) match {
+      case result if !result.hasErrors => result.classes
+      case result => throw new CompilationException(result.allErrors)
     }
 
   def compileOrThrow(srcs: Seq[InputSource]): Seq[CompiledClass] =
-    compile(srcs) match {
-      case Success(classes) => classes
-      case Failure(errors) => throw new CompilationException(errors)
+    compileDetailed(srcs) match {
+      case result if !result.hasErrors => result.classes
+      case result => throw new CompilationException(result.allErrors)
     }
 }

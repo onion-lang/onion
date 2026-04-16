@@ -7,9 +7,11 @@
  * ************************************************************** */
 package onion.compiler
 
+import onion.compiler.source.SourceHandle
+
 import java.io.Reader
 
-trait InputSource {
-  def openReader: Reader
+trait InputSource extends SourceHandle {
+  def openReader(): Reader
   def name: String
 }

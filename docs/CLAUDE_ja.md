@@ -96,20 +96,22 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
    - 深い再帰（例: 10000回以上の呼び出し）でのStackOverflowErrorを防止
    - 出力: 最適化された型付きAST
 
-5. **コード生成** (`src/main/scala/onion/compiler/AsmCodeGeneration.scala`, 42KB)
-   - **ASMベースのバイトコード生成**（現在の実装）
-   - ビジターパターン: `AsmCodeGenerationVisitor.scala`
+5. **コード生成** (`src/main/scala/onion/compiler/codegen/TypedAstCodeGeneration.scala`)
+   - **パイプラインの主境界** は `TypedAstCodeGeneration` → `backend/asm/AsmBackend.scala`
+   - **既存の大きい実装本体** は `src/main/scala/onion/compiler/backend/asm/AsmCodeGeneration.scala`
+   - ビジターパターン: `src/main/scala/onion/compiler/backend/asm/AsmCodeGenerationVisitor.scala`
    - バイトコードユーティリティ:
-     - `bytecode/MethodEmitter.scala` - JVMメソッド生成
-     - `bytecode/LocalVarContext.scala` - ローカル変数追跡
-     - `bytecode/AsmUtil.scala` - ASMヘルパー関数
+     - `backend/asm/MethodEmitter.scala` - JVMメソッド生成
+     - `backend/asm/LocalVarContext.scala` - ローカル変数追跡
+     - `backend/asm/AsmUtil.scala` - ASMヘルパー関数
    - 出力: `CompiledClass` オブジェクト（メモリ内またはファイル）
 
 ### 主要なアーキテクチャコンポーネント
 
 **オーケストレーション:**
-- `OnionCompiler.scala` - メインコンパイラオーケストレーター、すべてのフェーズを合成
-- `CompilationOutcome` を返す（クラス付きのSuccessまたはエラー付きのFailure）
+- `OnionCompiler.scala` - メインコンパイラ facade
+- 実フェーズ実行は `compiler/pipeline/PipelineRunner.scala`
+- `compileDetailed` で diagnostics / timings / debug artifacts を返せる
 
 **エントリーポイント:**
 - `onion.tools.CompilerFrontend` - `onionc` コマンドのCLI（.classファイルにコンパイル）
@@ -118,6 +120,8 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 
 **型システム:**
 - `BasicType` - プリミティブ (int, long, double, boolean, byte, short, char, float)
+- `typing/session/TypingSession.scala` - unit-local / global typing state
+- `typing/NameResolver.scala` 相当 (`NameResolution.scala`) - 型名解決の本体
 - `ClassType` - 参照型
 - `ArrayType` - コンポーネント追跡付きの配列型
 - `NullType` - nullリテラル型

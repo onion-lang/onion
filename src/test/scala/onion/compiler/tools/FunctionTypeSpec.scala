@@ -145,5 +145,58 @@ class FunctionTypeSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(3) == result)
     }
+
+    it("prefers the more specific overload for instance method lambdas") {
+      val result = shell.run(
+        """
+          |import { java.lang.Object; }
+          |class Picker {
+          |public:
+          |  def choose(seed: String, f: (String) -> Int): Int {
+          |    return 100 + f(seed)
+          |  }
+          |
+          |  def choose(seed: Object, f: (Object) -> Int): Int {
+          |    return 200 + f(seed)
+          |  }
+          |}
+          |
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val picker = new Picker()
+          |    return picker.choose("a") { x => x.toString().length() }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(101) == result)
+    }
+
+    it("allows function call syntax sugar on implicit this fields") {
+      val result = shell.run(
+        """
+          |class FieldCallableSugar {
+          |public:
+          |  var f: Int -> Int
+          |
+          |  def applyTo(x: Int): Int {
+          |    return f(x)
+          |  }
+          |
+          |  static def main(args: String[]): Int {
+          |    val sample = new FieldCallableSugar()
+          |    sample.f = (x: Int) -> { return x + 1; }
+          |    return sample.applyTo(41)
+          |  }
+          |}
+          |""".stripMargin,
+        "FieldCallableSugar.on",
+        Array()
+      )
+      assert(Shell.Success(42) == result)
+    }
   }
 }

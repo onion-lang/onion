@@ -50,13 +50,14 @@ class StdlibErgonomicsSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    Files::writeText("/tmp/onion-glob-a.on", "x")
-          |    Files::writeText("/tmp/onion-glob-b.on", "y")
-          |    Files::writeText("/tmp/onion-glob-c.txt", "z")
-          |    val found = Files::glob("/tmp", "onion-glob-*.on")
-          |    Files::delete("/tmp/onion-glob-a.on")
-          |    Files::delete("/tmp/onion-glob-b.on")
-          |    Files::delete("/tmp/onion-glob-c.txt")
+          |    new java.io.File("/tmp/onion-glob-test").mkdirs()
+          |    Files::writeText("/tmp/onion-glob-test/a.on", "x")
+          |    Files::writeText("/tmp/onion-glob-test/b.on", "y")
+          |    Files::writeText("/tmp/onion-glob-test/c.txt", "z")
+          |    val found = Files::glob("/tmp/onion-glob-test", "*.on")
+          |    Files::delete("/tmp/onion-glob-test/a.on")
+          |    Files::delete("/tmp/onion-glob-test/b.on")
+          |    Files::delete("/tmp/onion-glob-test/c.txt")
           |    return found.toString()
           |  }
           |}
@@ -64,7 +65,7 @@ class StdlibErgonomicsSpec extends AbstractShellSpec {
         "GlobBasic.on",
         Array()
       )
-      assert(Shell.Success("[onion-glob-a.on, onion-glob-b.on]") == result)
+      assert(Shell.Success("[a.on, b.on]") == result)
     }
   }
 }

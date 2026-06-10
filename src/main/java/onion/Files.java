@@ -221,15 +221,30 @@ public final class Files {
             base.getFileSystem().getPathMatcher("glob:" + pattern);
         java.util.ArrayList<String> result = new java.util.ArrayList<>();
         if (!java.nio.file.Files.isDirectory(base)) return result;
-        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(base)) {
-            walk.forEach(p -> {
+        // walkFileTree with a tolerant visitor: unreadable entries (other
+        // users' files under /tmp etc.) are skipped instead of aborting
+        java.nio.file.Files.walkFileTree(base, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+            private void check(java.nio.file.Path p) {
                 java.nio.file.Path rel = base.relativize(p);
-                if (rel.toString().isEmpty()) return;
-                if (matcher.matches(rel)) {
+                if (!rel.toString().isEmpty() && matcher.matches(rel)) {
                     result.add(rel.toString().replace(File.separatorChar, '/'));
                 }
-            });
-        }
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFile(java.nio.file.Path p, java.nio.file.attribute.BasicFileAttributes attrs) {
+                check(p);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult preVisitDirectory(java.nio.file.Path p, java.nio.file.attribute.BasicFileAttributes attrs) {
+                check(p);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFileFailed(java.nio.file.Path p, IOException exc) {
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
         java.util.Collections.sort(result);
         return result;
     }

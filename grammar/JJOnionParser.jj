@@ -138,6 +138,14 @@ public class JJOnionParser implements Parser {
     }
   }
 
+  private AST.Expression rangeNew(Location loc, AST.Expression start, AST.Expression end, boolean inclusive) {
+    ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();
+    append(args, start);
+    append(args, end);
+    append(args, new AST.BooleanLiteral(loc, inclusive));
+    return new AST.NewObject(loc, new AST.TypeNode(loc, new AST.ReferenceType("onion.Range", true), false), toList(args));
+  }
+
   private boolean isDeclarationStart(String img) {
     return "class".equals(img) || "interface".equals(img) || "record".equals(img)
         || "enum".equals(img) || "extension".equals(img) || "type".equals(img);
@@ -548,6 +556,8 @@ TOKEN : {
 | <LT:             "<"            >
 | <GT:             ">"            >
 | <ARROW:          "->"           >
+| <DOTDOT_LT:      "..<"          >
+| <DOTDOT:         ".."           >
 | <ARROW2:         "=>"           >
 | <LARROW:         "<-"           >
 | <SUBTYPE:        "<:"           >
@@ -613,7 +623,7 @@ TOKEN:
 | <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
 | <#OCTAL_LITERAL: "0" (["0"-"7"])* >
 | <FLOAT:
-    (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["F", "D"])?
+    (["0"-"9"])+ "." (["0"-"9"])+ (<EXPONENT>)? (["F", "D"])?
   | "." (["0"-"9"])+ (<EXPONENT>)? (["F","D"])?
   | (["0"-"9"])+ <EXPONENT> (["F","D"])?
   | (["0"-"9"])+ (<EXPONENT>)? ["F","D"]
@@ -1500,15 +1510,28 @@ AST.Expression equal() :{ Token t; AST.Expression a, b; }{
 }
 
 AST.Expression comparative() : { Token t; AST.Expression a, b; AST.TypeNode type; }{
-  a=bit_shift()
+  a=range_expr()
   ( LOOKAHEAD(2)
-    ( t=<LTEQ> eols() b=bit_shift() {a = new AST.LessOrEqual(p(t), a, b);}
-    | t=<GTEQ> eols() b=bit_shift() {a = new AST.GreaterOrEqual(p(t), a, b);}
-    | t="<"  eols() b=bit_shift() {a = new AST.LessThan(p(t), a, b);}
-    | t=">"  eols() b=bit_shift() {a = new AST.GreaterThan(p(t), a, b);}
+    ( t=<LTEQ> eols() b=range_expr() {a = new AST.LessOrEqual(p(t), a, b);}
+    | t=<GTEQ> eols() b=range_expr() {a = new AST.GreaterOrEqual(p(t), a, b);}
+    | t="<"  eols() b=range_expr() {a = new AST.LessThan(p(t), a, b);}
+    | t=">"  eols() b=range_expr() {a = new AST.GreaterThan(p(t), a, b);}
     | t="is" eols() type = type() {a = new AST.IsInstance(p(t), a, type);}
     )
   )* {return a;}
+}
+
+// Range literals a..b (inclusive) and a..<b (exclusive), desugared to
+// new onion.Range(a, b, inclusive). The runtime Range is Iterable, so
+// foreach works without further compiler support.
+AST.Expression range_expr() :{Token t; AST.Expression a, b;}{
+  a=bit_shift()
+  [ LOOKAHEAD(2)
+    ( t="..<" eols() b=bit_shift() { a = rangeNew(p(t), a, b, false); }
+    | t=".." eols() b=bit_shift() { a = rangeNew(p(t), a, b, true); }
+    )
+  ]
+  {return a;}
 }
 
 AST.Expression bit_shift() :{Token t; AST.Expression e1, e2;}{

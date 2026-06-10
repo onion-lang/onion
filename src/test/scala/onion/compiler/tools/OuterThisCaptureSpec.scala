@@ -56,5 +56,26 @@ class OuterThisCaptureSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("hello world!") == result)
     }
+    it("resolves this.method() inside a closure to the enclosing instance") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  def greet(name: String): String { return "Hello, " + name }
+          |  def run(): String {
+          |    val f = (x: String) -> this.greet(x)
+          |    return f("self")
+          |  }
+          |  def this {}
+          |  static def main(args: String[]): String {
+          |    return new Test().run()
+          |  }
+          |}
+          |""".stripMargin,
+        "ThisInClosure.on",
+        Array()
+      )
+      assert(Shell.Success("Hello, self") == result)
+    }
   }
 }

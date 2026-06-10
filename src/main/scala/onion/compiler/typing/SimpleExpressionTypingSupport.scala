@@ -151,6 +151,10 @@ private[compiler] final class SimpleExpressionTypingSupport(
     } else if (context.isStatic) {
       bodyContext.report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
       None
+    } else if (context.isClosure) {
+      // Inside a closure 'this'/'self' denotes the enclosing instance,
+      // reached through the closure's this$0 field
+      Some(new OuterThis(bodyContext.definition))
     } else {
       Some(new This(node.location, bodyContext.definition))
     }

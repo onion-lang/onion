@@ -248,10 +248,13 @@ class AsmCodeGenerationVisitor(
     (node.target.`type`, node.destination) match
       case (from: BasicType, to: BasicType) =>
         gen.cast(asmType(from), asmType(to))
-      case (from: BasicType, _: ObjectType | _: ArrayType | _: NullType) =>
+      case (from: BasicType, _) =>
         gen.box(asmType(from))
         gen.checkCast(asmType(node.destination))
-      case (_: ObjectType | _: ArrayType | _: NullType, to: BasicType) =>
+      case (_, to: BasicType) =>
+        // Any reference-like source (ObjectType, TypeVariableType, wildcard...):
+        // unbox emits the checkcast to the wrapper plus the xxxValue() call.
+        // Falling through to a bare checkcast would emit 'checkcast I'.
         gen.unbox(asmType(to))
       case _ =>
         gen.checkCast(asmType(node.destination))

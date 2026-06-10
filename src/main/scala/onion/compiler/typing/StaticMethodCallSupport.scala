@@ -43,6 +43,16 @@ private[compiler] final class StaticMethodCallSupport(
       return typeStaticMethodCallWithNamedArgs(node, typeRef, context, expected)
     }
 
+    // Closures with untyped parameters cannot be typed before the target
+    // parameter type is known: resolve the method from the other arguments
+    // first, then type the closures against the selected parameter types.
+    val untypedClosureIndices = node.args.zipWithIndex.collect {
+      case (closure: AST.ClosureExpression, i) if closure.args.exists(_.typeRef == null) => i
+    }.toSet
+    if (untypedClosureIndices.nonEmpty && node.typeArgs.isEmpty) {
+      return typeStaticCallWithBidirectionalInference(node, typeRef, context, expected, untypedClosureIndices)
+    }
+
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) {
       None
@@ -101,6 +111,105 @@ private[compiler] final class StaticMethodCallSupport(
             None
         }
       }
+    }
+  }
+
+  private def typeStaticCallWithBidirectionalInference(
+    node: AST.StaticMethodCall,
+    typeRef: ClassType,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Term] = {
+    val name = node.name
+    val args = node.args.toArray
+
+    val preliminaryParams = new Array[Term](args.length)
+    var hasNonClosureError = false
+    for (i <- args.indices) {
+      if (untypedClosureIndices.contains(i)) {
+        preliminaryParams(i) = null
+      } else {
+        calls.typed(args(i), context) match {
+          case Some(term) => preliminaryParams(i) = term
+          case None =>
+            hasNonClosureError = true
+            preliminaryParams(i) = null
+        }
+      }
+    }
+    if (hasNonClosureError) return None
+
+    val candidates = new JTreeSet[Method](new MethodComparator)
+    calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)
+    if (candidates.isEmpty) {
+      calls.reportMethodNotFound(node, typeRef, name, Array[Type]())
+      return None
+    }
+
+    val nonClosureTypes = preliminaryParams.zipWithIndex.collect {
+      case (term, i) if term != null => (i, term.`type`)
+    }.toMap
+
+    val applicableMethods = overloadSupport.collectPartialInstanceApplicables(
+      typeRef,
+      candidates.asScala,
+      node,
+      preliminaryParams,
+      expected
+    )
+    if (applicableMethods.isEmpty) {
+      calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray)
+      return None
+    }
+
+    val method = overloadSupport.selectMostSpecificApplicable(
+      applicableMethods,
+      nonClosureTypes.keys.toSeq.sorted
+    ) match {
+      case CandidateSelection.Selected(selected) => selected.method
+      case CandidateSelection.Ambiguous(first, second) =>
+        calls.reportAmbiguousMethod(node, first.method, second.method, name)
+        return None
+      case CandidateSelection.NoMatch =>
+        calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray)
+        return None
+    }
+
+    val classSubst = TypeSubstitution.classSubstitution(typeRef)
+    val nonClosureParams = preliminaryParams.filter(_ != null)
+    val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(
+      typing, node, method, nonClosureParams, classSubst, expected
+    )
+    val preliminaryExpectedArgs = method.arguments.map { argType =>
+      TypeSubstitution.substituteType(argType, classSubst, preliminaryMethodSubst, defaultToBound = false)
+    }
+
+    val finalParams = new Array[Term](args.length)
+    var hasError = false
+    for (i <- args.indices) {
+      if (untypedClosureIndices.contains(i)) {
+        val expectedType = if (i < preliminaryExpectedArgs.length) preliminaryExpectedArgs(i) else null
+        calls.typed(args(i), context, expectedType) match {
+          case Some(term) => finalParams(i) = term
+          case None =>
+            hasError = true
+        }
+      } else {
+        finalParams(i) = preliminaryParams(i)
+      }
+    }
+    if (hasError) return None
+
+    val finalMethodSubst = GenericMethodTypeArguments.infer(typing, node, method, finalParams, classSubst, expected)
+    val finalExpectedArgs = TypeSubst.args(method, classSubst, finalMethodSubst)
+
+    for {
+      finalProcessedParams <- calls.prepareCallParams(node, node.args, method, finalParams, finalExpectedArgs)
+    } yield {
+      val call = new CallStatic(typeRef, method, finalProcessedParams)
+      val castType = TypeSubst(method.returnType, classSubst, finalMethodSubst)
+      TypeSubst.withCast(call, castType)
     }
   }
 

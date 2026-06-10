@@ -110,4 +110,42 @@ class SamConversionSpec extends AbstractShellSpec {
       assert(Shell.Success(23) == result)
     }
   }
+
+  describe("Argument-position lambdas") {
+    it("types an untyped lambda against a static call's parameter (Comparator)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = Colls::mutableListOf(1, 3, 2)
+          |    Collections::sort(xs, (a, b) -> (b as Int) - (a as Int))
+          |    return xs.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgPositionLambda.on",
+        Array()
+      )
+      assert(Shell.Success("[3, 2, 1]") == result)
+    }
+
+    it("casts a type-variable-typed value to a primitive inside the lambda") {
+      val result = shell.run(
+        """
+          |import { java.util.Comparator }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val cmp: Comparator = (a, b) -> (a as Int) - (b as Int)
+          |    return cmp.compare(10, 4)
+          |  }
+          |}
+          |""".stripMargin,
+        "TypeVarPrimitiveCast.on",
+        Array()
+      )
+      assert(Shell.Success(6) == result)
+    }
+  }
 }

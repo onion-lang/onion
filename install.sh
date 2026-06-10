@@ -84,21 +84,33 @@ if [ "$FROM_SOURCE" = "1" ]; then
   fi
   cp "$JAR_PATH" "$LIB_DIR/onion.jar"
 else
+  fetch() { # fetch URL [output]
+    if command -v curl >/dev/null 2>&1; then
+      if [ -n "$2" ]; then curl -fL --progress-bar -o "$2" "$1"; else curl -fsSL "$1"; fi
+    elif command -v wget >/dev/null 2>&1; then
+      if [ -n "$2" ]; then wget -q --show-progress -O "$2" "$1"; else wget -qO- "$1"; fi
+    else
+      echo "Error: curl or wget is required." >&2
+      exit 1
+    fi
+  }
+
   if [ "$VERSION" = "latest" ]; then
-    URL="https://github.com/$REPO/releases/latest/download/onion.jar"
-  else
-    URL="https://github.com/$REPO/releases/download/$VERSION/onion.jar"
+    # 'releases/latest' ignores prereleases, so resolve the newest release
+    # (prereleases included) through the API instead.
+    VERSION=$(fetch "https://api.github.com/repos/$REPO/releases?per_page=1" \
+      | grep '"tag_name"' | head -1 | sed 's/.*"tag_name"[^"]*"\([^"]*\)".*/\1/')
+    if [ -z "$VERSION" ]; then
+      echo "Error: could not determine the latest release of $REPO." >&2
+      exit 1
+    fi
+    echo ""
+    echo "Latest release: $VERSION"
   fi
+  URL="https://github.com/$REPO/releases/download/$VERSION/onion.jar"
   echo ""
   echo "Downloading $URL ..."
-  if command -v curl >/dev/null 2>&1; then
-    curl -fL --progress-bar -o "$LIB_DIR/onion.jar.tmp" "$URL"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q --show-progress -O "$LIB_DIR/onion.jar.tmp" "$URL"
-  else
-    echo "Error: curl or wget is required." >&2
-    exit 1
-  fi
+  fetch "$URL" "$LIB_DIR/onion.jar.tmp"
   mv "$LIB_DIR/onion.jar.tmp" "$LIB_DIR/onion.jar"
 fi
 echo "  $LIB_DIR/onion.jar"

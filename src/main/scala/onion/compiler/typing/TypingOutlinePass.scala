@@ -217,6 +217,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     unitContext.currentDefinition = definition
+    // Constructor arguments on enum constants parse but have no lowering yet;
+    // reject them instead of silently dropping the values.
+    for (constant <- node.constants if constant.args.nonEmpty) {
+      report(SemanticError.ENUM_CONSTANT_ARGS_UNSUPPORTED, constant, constant.name)
+    }
     find(definition.name).foreach(unitContext.currentMapper = _)
 
     // Enum extends java.lang.Enum<E>

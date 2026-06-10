@@ -103,7 +103,7 @@ public class Rand {
      * Returns a random element from the list.
      * Returns null if list is null or empty.
      */
-    public static <T> T choice(ArrayList<T> list) {
+    public static <T> T choice(java.util.List<T> list) {
         if (list == null || list.isEmpty()) return null;
         return list.get(nextInt(list.size()));
     }
@@ -123,7 +123,7 @@ public class Rand {
     /**
      * Returns a new shuffled ArrayList from the list.
      */
-    public static <T> ArrayList<T> shuffle(ArrayList<T> list) {
+    public static <T> ArrayList<T> shuffle(java.util.List<T> list) {
         ArrayList<T> copy = new ArrayList<>(list != null ? list : Collections.emptyList());
         Collections.shuffle(copy, ThreadLocalRandom.current());
         return copy;

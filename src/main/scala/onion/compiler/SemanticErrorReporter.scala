@@ -343,6 +343,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.functionBodyRequired",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.ENUM_CONSTANT_ARGS_UNSUPPORTED -> ErrorDef(
+      "error.semantic.enumConstantArgsUnsupported",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

@@ -78,5 +78,21 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(3) == result)
     }
+    it("maps over arrays (String.split pipeline)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val parts = "a,bb,ccc".split(",")
+          |    return parts.map { s => s.length() }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "ArrayPipeline.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 2, 3]") == result)
+    }
   }
 }

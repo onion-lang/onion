@@ -79,6 +79,11 @@ import collection.mutable.{HashMap, Map}
  *
  * @author Kota Mizushima
  */
+object Typing {
+  /** Pseudo receiver name for extension methods on array types. */
+  final val ArrayExtensionReceiver = "<array>"
+}
+
 class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.CompilationUnit], Seq[ClassDefinition]] {
   class TypingEnvironment
   private[compiler] val emptyTypeParams = TypeParamScope(Map.empty)
@@ -151,6 +156,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       val receiverName = method.arguments(0) match {
         case applied: AppliedClassType => applied.raw.name
         case ct: ClassType => ct.name
+        case _: ArrayType => Typing.ArrayExtensionReceiver
         case _ => null
       }
       if (receiverName != null) {

@@ -108,7 +108,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     candidates.iterator.flatMap { extMethod =>
       val container = extMethod.containerClass
       container.methods(name)
-        .find(m => Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1)
+        .find { m =>
+          Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
+            receiverKindMatches(m.arguments(0), target.`type`)
+        }
         .flatMap { method =>
           val classSubst = TypeSubstitution.classSubstitution(container)
           val knownStatic = (Array(target) ++ preliminaryParams).filter(_ != null)
@@ -146,6 +149,17 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }.nextOption()
   }
 
+  /** The backing static's first parameter must accept this receiver kind
+   *  (array-taking overloads must not be picked for List receivers and
+   *  vice versa). */
+  private def receiverKindMatches(firstParam: Type, receiver: Type): Boolean =
+    (firstParam, receiver) match {
+      case (_: ArrayType, _: ArrayType) => true
+      case (_: ArrayType, _) => false
+      case (_, _: ArrayType) => false
+      case _ => true
+    }
+
   private def collectExtensionMethods(
     targetType: ObjectType,
     name: String
@@ -157,6 +171,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       currentType match {
         case classType: ClassType =>
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
+            if (extMethod.name == name) result += extMethod
+          }
+        case _: ArrayType =>
+          typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>
             if (extMethod.name == name) result += extMethod
           }
         case _ =>

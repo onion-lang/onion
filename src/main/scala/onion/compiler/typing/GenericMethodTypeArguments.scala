@@ -151,6 +151,11 @@ private[typing] object GenericMethodTypeArguments {
             case None =>
               inferred += tv.name -> bound
           }
+        case af: TypedAST.ArrayType =>
+          actual match {
+            case aa: TypedAST.ArrayType => unify(af.base, aa.base, position)
+            case _ =>
+          }
         case apf: TypedAST.AppliedClassType =>
           def sameRawClass(c1: TypedAST.ClassType, c2: TypedAST.ClassType): Boolean =
             (c1 eq c2) || (c1.name == c2.name)
@@ -333,6 +338,11 @@ private[typing] object GenericMethodTypeArguments {
               if (!(prev eq bound)) reportError(position, INCOMPATIBLE_TYPE, prev, bound)
             case None =>
               inferred += tv.name -> bound
+          }
+        case af: TypedAST.ArrayType =>
+          actual match {
+            case aa: TypedAST.ArrayType => unify(af.base, aa.base, position)
+            case _ =>
           }
         case apf: TypedAST.AppliedClassType =>
           // 同じクラス名で型引数の数が一致するかチェック（参照比較ではなく名前比較）

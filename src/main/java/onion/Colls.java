@@ -311,6 +311,35 @@ public final class Colls {
      * @param <T> the element type
      * @return a new list containing only elements that match the predicate
      */
+    /**
+     * Array pipelines: arrays gain map/filter/toList like List does.
+     */
+    public static <T, R> List<R> map(T[] array, Function1<T, R> f) {
+        ArrayList<R> result = new ArrayList<>();
+        if (array != null) {
+            for (T item : array) result.add(f.call(item));
+        }
+        return result;
+    }
+
+    public static <T> List<T> filter(T[] array, Function1<T, Boolean> predicate) {
+        ArrayList<T> result = new ArrayList<>();
+        if (array != null) {
+            for (T item : array) {
+                if (Boolean.TRUE.equals(predicate.call(item))) result.add(item);
+            }
+        }
+        return result;
+    }
+
+    public static <T> List<T> toList(T[] array) {
+        ArrayList<T> result = new ArrayList<>();
+        if (array != null) {
+            for (T item : array) result.add(item);
+        }
+        return result;
+    }
+
     public static <T> List<T> filter(List<T> list, Function1<T, Boolean> predicate) {
         List<T> result = new ArrayList<>();
         for (T element : list) {

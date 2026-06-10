@@ -189,4 +189,48 @@ public final class Files {
     public static String getAbsolutePath(String path) {
         return new File(path).getAbsolutePath();
     }
+
+    // ========== Directory listing and glob ==========
+
+    /**
+     * Lists the entries of a directory (names only, sorted).
+     */
+    public static java.util.List<String> list(String dir) {
+        String[] names = new File(dir).list();
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        if (names != null) {
+            java.util.Arrays.sort(names);
+            for (String n : names) result.add(n);
+        }
+        return result;
+    }
+
+    /**
+     * Glob-matches files under a directory. The pattern uses standard glob
+     * syntax: * (within a segment), ** (across directories), ? and ranges.
+     *
+     * Usage:
+     *   foreach f: String in Files::glob(".", "*.on") { ... }
+     *   Files::glob("src", "**&#47;*.java")
+     *
+     * Returns relative paths (using /), sorted.
+     */
+    public static java.util.List<String> glob(String dir, String pattern) throws IOException {
+        java.nio.file.Path base = java.nio.file.Paths.get(dir);
+        java.nio.file.PathMatcher matcher =
+            base.getFileSystem().getPathMatcher("glob:" + pattern);
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        if (!java.nio.file.Files.isDirectory(base)) return result;
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(base)) {
+            walk.forEach(p -> {
+                java.nio.file.Path rel = base.relativize(p);
+                if (rel.toString().isEmpty()) return;
+                if (matcher.matches(rel)) {
+                    result.add(rel.toString().replace(File.separatorChar, '/'));
+                }
+            });
+        }
+        java.util.Collections.sort(result);
+        return result;
+    }
 }

@@ -41,5 +41,28 @@ class StdlibErgonomicsSpec extends AbstractShellSpec {
       )
       assert(result == Shell.Failure(-1))
     }
+  describe("Files glob and list") {
+    it("globs files and pipelines the result") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    Files::writeText("/tmp/onion-glob-a.on", "x")
+          |    Files::writeText("/tmp/onion-glob-b.on", "y")
+          |    Files::writeText("/tmp/onion-glob-c.txt", "z")
+          |    val found = Files::glob("/tmp", "onion-glob-*.on")
+          |    Files::delete("/tmp/onion-glob-a.on")
+          |    Files::delete("/tmp/onion-glob-b.on")
+          |    Files::delete("/tmp/onion-glob-c.txt")
+          |    return found.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "GlobBasic.on",
+        Array()
+      )
+      assert(Shell.Success("[onion-glob-a.on, onion-glob-b.on]") == result)
+    }
   }
 }

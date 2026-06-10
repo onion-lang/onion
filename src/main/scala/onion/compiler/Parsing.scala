@@ -101,7 +101,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.line, error.column),
-        Message("error.parsing.syntax_error", displayTokenImage(error.found), error.expected)
+        syntaxErrorMessage(error.found, error.expected)
       )
     }
   }
@@ -124,7 +124,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.beginLine, error.beginColumn),
-        Message("error.parsing.syntax_error", displayTokenImage(error.image), expected)
+        syntaxErrorMessage(error.image, expected)
       )
     }
   }
@@ -135,6 +135,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * When multiple tokens are expected, this creates a more readable message
    * like "';' or 'newline'" instead of just showing the first one.
    */
+  /**
+   * A lone double quote can only come from an unterminated string literal
+   * (complete strings lex as a single STRING token); report it as such
+   * instead of listing unrelated expected tokens.
+   */
+  private def syntaxErrorMessage(found: String, expected: String): String =
+    if (found == "\"") Message("error.parsing.unterminated_string")
+    else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
+
   /** Make control characters and EOF visible in error messages. */
   private def displayTokenImage(image: String): String =
     if (image == null || image.isEmpty) "<EOF>"

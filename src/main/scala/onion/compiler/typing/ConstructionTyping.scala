@@ -33,7 +33,10 @@ final class ConstructionTyping(
               bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
               None
             case Right(method) =>
-              Some(new Call(target, method, params))
+              // Specialize the element type for generic collections so
+              // xs[i] on a List[Integer] has type Integer, not Object
+              val elementType = TypeSubst.withClassOnly(method.returnType, target.`type`)
+              Some(TypeSubst.withCast(new Call(target, method, params), elementType))
           }
         }
       }

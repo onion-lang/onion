@@ -73,15 +73,22 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
    - Simplifies complex constructs
    - Output: Normalized untyped AST
 
-3. **Type Checking** (`src/main/scala/onion/compiler/Typing.scala`, 86KB - largest component)
-   - Type inference and validation
-   - Symbol resolution and name binding
-   - Method resolution with overloading
-   - Access control checking
+3. **Type Checking** (`src/main/scala/onion/compiler/Typing.scala` + `typing/` package - largest component)
+   - `Typing.scala` is a thin facade/orchestrator; the implementation lives in
+     `src/main/scala/onion/compiler/typing/` (~60 focused classes)
+   - Four sequential passes over all compilation units:
+     1. `TypingHeaderPass` - registers classes/interfaces/records/enums/aliases
+     2. `TypingOutlinePass` - members, inheritance, type parameters
+     3. `TypingBodyPass` - types method/constructor bodies (delegates to
+        `MethodCallTyping`, `OperatorTyping`, `ControlExpressionTyping`,
+        `SelectExpressionTyping`, `TryExpressionTyping`, `ClosureTyping`, etc.)
+     4. `TypingDuplicationPass` - duplicate/erasure-collision detection
+   - State: global registries in `typing/session/TypingGlobalState`; per-unit
+     mutable state in `typing/session/TypingUnitContext` (switched by `TypingSession.activate`)
+   - Type inference, method resolution with overloading, access control
    - Key supporting files:
      - `ClassTable.scala` - Class symbol table
      - `LocalContext.scala` - Local variable environments
-     - `Symbol.scala` - Symbol definitions
      - `SemanticErrorReporter.scala` - Error collection
    - Output: Typed AST (`TypedAST.scala`, 37KB)
 

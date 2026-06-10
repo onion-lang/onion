@@ -94,5 +94,25 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[1, 2, 3]") == result)
     }
+    it("destructures map entries with foreach (k, v)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val ages = ["alice": 12, "bob": 34]
+          |    var s = ""
+          |    foreach (name, age) in ages {
+          |      s = s + name + "=" + age + ";"
+          |    }
+          |    return s
+          |  }
+          |}
+          |""".stripMargin,
+        "ForeachKV.on",
+        Array()
+      )
+      assert(Shell.Success("alice=12;bob=34;") == result)
+    }
   }
 }

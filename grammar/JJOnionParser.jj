@@ -138,6 +138,25 @@ public class JJOnionParser implements Parser {
     }
   }
 
+  /**
+   * foreach (k, v) in map { body } desugars to iterating the entry set:
+   * foreach __e: Map$Entry in map.entrySet() { val k = __e.getKey(); val v = __e.getValue(); { body } }
+   */
+  private AST.ForeachExpression desugarMapForeach(Location loc, String kName, String vName, AST.Expression mapExpr, AST.BlockExpression body) {
+    String entryName = "__foreach_entry";
+    AST.TypeNode entryType = new AST.TypeNode(loc, new AST.ReferenceType("java.util.Map$Entry", true), false);
+    AST.Argument entryArg = new AST.Argument(loc, entryName, entryType, null, false);
+    AST.Expression entrySet = new AST.MethodCall(loc, mapExpr, "entrySet", (List<AST.Expression>)AST.NIL());
+    AST.Expression getKey = new AST.MethodCall(loc, new AST.Id(loc, entryName), "getKey", (List<AST.Expression>)AST.NIL());
+    AST.Expression getValue = new AST.MethodCall(loc, new AST.Id(loc, entryName), "getValue", (List<AST.Expression>)AST.NIL());
+    ArrayBuffer<AST.BlockElement> elems = new ArrayBuffer<AST.BlockElement>();
+    append(elems, new AST.LocalVariableDeclaration(loc, AST.M_FINAL(), kName, null, getKey));
+    append(elems, new AST.LocalVariableDeclaration(loc, AST.M_FINAL(), vName, null, getValue));
+    append(elems, body);
+    AST.BlockExpression newBody = new AST.BlockExpression(loc, toList(elems));
+    return new AST.ForeachExpression(loc, entryArg, entrySet, newBody);
+  }
+
   private AST.Expression rangeNew(Location loc, AST.Expression start, AST.Expression end, boolean inclusive) {
     ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();
     append(args, start);
@@ -1466,10 +1485,16 @@ AST.WhileExpression while_expression() :{Token t; AST.Expression e; AST.BlockExp
   t="while" e=term() b=block() {return new AST.WhileExpression(p(t), e, b);}
 }
 
-AST.ForeachExpression foreach_expression() :{Token t; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{
-  t="foreach" a=argument() (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
-    return new AST.ForeachExpression(p(t), a, e, b);
-  }
+AST.ForeachExpression foreach_expression() :{Token t, k = null, v = null; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{
+  t="foreach"
+  ( LOOKAHEAD("(")
+    "(" k=id() "," v=id() ")" (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
+      return desugarMapForeach(p(t), c(k), c(v), e, b);
+    }
+  | a=argument() (LOOKAHEAD({la("in")}) id()) e=term() b=block() {
+      return new AST.ForeachExpression(p(t), a, e, b);
+    }
+  )
 }
 
 AST.ForInitializer for_initializer() :{AST.LocalVariableDeclaration d; AST.Expression e; Token t;}{

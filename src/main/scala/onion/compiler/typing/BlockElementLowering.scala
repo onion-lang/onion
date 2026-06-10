@@ -87,6 +87,10 @@ final class BlockElementLowering(
           new NOP(node.location)
         } else {
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
+          if (elementVar == null) {
+            // The element type failed to resolve (already reported)
+            return new NOP(node.location)
+          }
           val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
 
           if (collection.isArrayType) {

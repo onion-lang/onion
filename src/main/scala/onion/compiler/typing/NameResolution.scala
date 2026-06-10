@@ -120,7 +120,8 @@ class NameResolver(private val context: NameResolutionContext) {
 
   private def forName(name: String, qualified: Boolean): ClassType = {
     if (qualified) {
-      context.table.loadOrNull(name)
+      val direct = context.table.loadOrNull(name)
+      if (direct != null) direct else forNestedName(name)
     } else {
       context.currentTypeParams.get(name).map(_.variableType).getOrElse {
         val module = context.currentUnit.module
@@ -137,6 +138,29 @@ class NameResolver(private val context: NameResolutionContext) {
             .orNull
         }
       }
+    }
+  }
+
+  /**
+   * Resolve dotted names that denote nested classes: Map.Entry becomes
+   * java.util.Map$Entry (resolving the head through imports), and
+   * a.b.C.D tries a.b.C$D and deeper $-joined variants.
+   */
+  private def forNestedName(name: String): ClassType = {
+    if (!name.contains(".")) return null
+    val parts = name.split("\\.")
+    // a.b.C.D -> a.b.C$D, a.b$C$D, ...
+    val dollarVariants = (parts.length - 1 to 1 by -1).iterator.map { i =>
+      parts.take(i).mkString(".") + "$" + parts.drop(i).mkString("$")
+    }
+    dollarVariants.map(context.table.loadOrNull).find(_ != null).getOrElse {
+      // Head resolved through imports: Map.Entry with java.util.Map imported
+      val rest = parts.tail.mkString("$")
+      imports.iterator
+        .flatMap(_.matches(parts.head))
+        .map(fqcn => context.table.loadOrNull(fqcn + "$" + rest))
+        .find(_ != null)
+        .orNull
     }
   }
 

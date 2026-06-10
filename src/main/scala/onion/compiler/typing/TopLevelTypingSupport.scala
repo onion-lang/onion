@@ -27,7 +27,7 @@ private[compiler] final class TopLevelTypingSupport(
   def prepareUnit(unit: AST.CompilationUnit): PreparedUnit = {
     val context = new LocalContext
     val statements = Buffer[ActionStatement]()
-    typing.setMapper(typing.find(typing.topClass))
+    typing.find(typing.topClass).foreach(typing.setMapper)
     val klass = typing.loadTopClass.asInstanceOf[ClassDefinition]
     val argsType = entryPointSupport.stringArgsType
     val startMethod = entryPointSupport.createStartMethod(unit, klass, argsType)

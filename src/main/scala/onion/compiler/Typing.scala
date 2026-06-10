@@ -191,15 +191,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def put(astNode: AST.Node, kernelNode: Node): Unit = {
     session.global.bindings.bind(astNode, kernelNode)
   }
-  private[compiler] def lookupAST(kernelNode: Node): AST.Node = session.global.bindings.astOf(kernelNode).getOrElse(null)
-  /** Option-returning version of lookupAST */
-  private[compiler] def lookupASTOpt(kernelNode: Node): Option[AST.Node] = session.global.bindings.astOf(kernelNode)
-  private[compiler] def lookupKernelNode(astNode: AST.Node): Node = session.global.bindings.typedOf(astNode).getOrElse(null)
-  /** Option-returning version of lookupKernelNode */
-  private[compiler] def lookupKernelNodeOpt(astNode: AST.Node): Option[Node] = session.global.bindings.typedOf(astNode)
-  def typedNodeOf(astNode: AST.Node): Option[TypedAST.Node] = lookupKernelNodeOpt(astNode)
+  private[compiler] def lookupAST(kernelNode: Node): Option[AST.Node] = session.global.bindings.astOf(kernelNode)
+  private[compiler] def lookupKernelNode(astNode: AST.Node): Option[Node] = session.global.bindings.typedOf(astNode)
+  /** Typed lookup: returns the typed node bound to `astNode` if it exists and has type `A`. */
+  private[compiler] def kernelNodeOf[A <: Node : scala.reflect.ClassTag](astNode: AST.Node): Option[A] =
+    lookupKernelNode(astNode).collect { case a: A => a }
+  def typedNodeOf(astNode: AST.Node): Option[TypedAST.Node] = lookupKernelNode(astNode)
   private[compiler] def add(className: String, mapper: NameResolver): Unit = session.global.mappers(className) = mapper
-  private[compiler] def find(className: String): NameResolver = session.global.mappers.get(className).getOrElse(null)
+  private[compiler] def find(className: String): Option[NameResolver] = session.global.mappers.get(className)
   // Extension method registration
   private[compiler] def registerExtensionDeclaration(decl: AST.ExtensionDeclaration, container: ClassDefinition): Unit = {
     session.global.extensions.registerDeclaration(decl, container)
@@ -210,8 +209,6 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def lookupExtensionMethods(receiverFqcn: String): Seq[ExtensionMethodDefinition] = {
     session.global.extensions.methodsFor(receiverFqcn)
   }
-  /** Option-returning version of find */
-  private[compiler] def findOpt(className: String): Option[NameResolver] = session.global.mappers.get(className)
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
   private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =

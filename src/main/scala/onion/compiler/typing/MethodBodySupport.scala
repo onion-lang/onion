@@ -34,22 +34,21 @@ private[compiler] final class MethodBodySupport(
     context
   }
 
-  def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit = {
-    val constructor = typing.lookupKernelNode(node).asInstanceOf[ConstructorDefinition]
-    if constructor == null then return
-    val context = prepareConstructorContext(constructor, node.args)
-    val params = typedTerms(node.superInits.toArray, context)
-    val superClass = bodyContext.definition.superClass
-    val matched = superClass.findConstructor(params)
-    if matched.length == 0 then
-      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, superClass, termTypes(params), superClass.constructors)
-    else if matched.length > 1 then
-      bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, termTypes(params)), Array[AnyRef](superClass, termTypes(params)))
-    else
-      val init = new Super(superClass, matched(0).getArgs, params)
-      finishConstructorBody(constructor, init, node.block, context)
-    reportConstructorOnly(context)
-  }
+  def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
+    typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
+      val context = prepareConstructorContext(constructor, node.args)
+      val params = typedTerms(node.superInits.toArray, context)
+      val superClass = bodyContext.definition.superClass
+      val matched = superClass.findConstructor(params)
+      if matched.length == 0 then
+        bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, superClass, termTypes(params), superClass.constructors)
+      else if matched.length > 1 then
+        bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, termTypes(params)), Array[AnyRef](superClass, termTypes(params)))
+      else
+        val init = new Super(superClass, matched(0).getArgs, params)
+        finishConstructorBody(constructor, init, node.block, context)
+      reportConstructorOnly(context)
+    }
 
   def finishConstructorBody(
     constructor: ConstructorDefinition,
@@ -84,17 +83,16 @@ private[compiler] final class MethodBodySupport(
     node: AST.MethodDeclaration,
     receiverType: Type,
     definition: ClassDefinition
-  ): Unit = {
-    val extMethod = typing.lookupKernelNode(node).asInstanceOf[ExtensionMethodDefinition]
-    if extMethod == null || node.block == null then return
-
-    val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
-    typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
-      val staticMethod = findStaticExtensionMethod(definition, node, extMethod, receiverType)
-      if staticMethod != null then
-        processExtensionMethodBody(extMethod, staticMethod, node, receiverType)
-    }
-  }
+  ): Unit =
+    if node.block != null then
+      typing.kernelNodeOf[ExtensionMethodDefinition](node).foreach { extMethod =>
+        val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
+          val staticMethod = findStaticExtensionMethod(definition, node, extMethod, receiverType)
+          if staticMethod != null then
+            processExtensionMethodBody(extMethod, staticMethod, node, receiverType)
+        }
+      }
 
   private def prepareMethodContext(
     method: MethodDefinition,

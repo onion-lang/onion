@@ -15,20 +15,20 @@ private[compiler] final class ClassInitializerSupport(
     definition: ClassDefinition,
     instanceInitializers: Buffer[ActionStatement],
     staticInitializers: Buffer[ActionStatement]
-  ): Unit = {
-    val field = typing.lookupKernelNode(node).asInstanceOf[FieldDefinition]
-    collectInitializer(node.modifiers, node.init, field, definition, instanceInitializers, staticInitializers)
-  }
+  ): Unit =
+    typing.kernelNodeOf[FieldDefinition](node).foreach { field =>
+      collectInitializer(node.modifiers, node.init, field, definition, instanceInitializers, staticInitializers)
+    }
 
   def collectDelegatedFieldInitializer(
     node: AST.DelegatedFieldDeclaration,
     definition: ClassDefinition,
     instanceInitializers: Buffer[ActionStatement],
     staticInitializers: Buffer[ActionStatement]
-  ): Unit = {
-    val field = typing.lookupKernelNode(node).asInstanceOf[FieldDefinition]
-    collectInitializer(node.modifiers, node.init, field, definition, instanceInitializers, staticInitializers)
-  }
+  ): Unit =
+    typing.kernelNodeOf[FieldDefinition](node).foreach { field =>
+      collectInitializer(node.modifiers, node.init, field, definition, instanceInitializers, staticInitializers)
+    }
 
   def injectInstanceInitializers(classDef: ClassDefinition, initializers: Seq[ActionStatement]): Unit = {
     if initializers.isEmpty then return
@@ -49,7 +49,7 @@ private[compiler] final class ClassInitializerSupport(
     instanceInitializers: Buffer[ActionStatement],
     staticInitializers: Buffer[ActionStatement]
   ): Unit = {
-    if init == null || field == null then return
+    if init == null then return
     val context = new LocalContext
     val isStatic = Modifier.isStatic(modifiers)
     context.setStatic(isStatic)

@@ -42,8 +42,7 @@ private[compiler] object DuplicationChecks {
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 
-            val implAst = typing.lookupAST(impl.asInstanceOf[Node])
-            val location = if implAst != null then implAst.location else fallback
+            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
 
             // Check if trying to override a final method
             if Modifier.isFinal(contract.modifier) then
@@ -70,8 +69,7 @@ private[compiler] object DuplicationChecks {
     for m <- clazz.methods do
       val key = (m.name, erasedMethodDesc(m))
       if seen.contains(key) then
-        val ast = typing.lookupAST(m.asInstanceOf[Node])
-        val location = if ast != null then ast.location else fallback
+        val location = typing.lookupAST(m.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, location, clazz, m.name, key._2)
       else
         seen(key) = m

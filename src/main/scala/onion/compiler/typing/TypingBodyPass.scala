@@ -86,15 +86,15 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   }
   def openFrame[A](context: LocalContext)(block: => A): A = context.openFrame(block)
 
-  def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
-    val method = typing.lookupKernelNode(node).asInstanceOf[MethodDefinition]
-    if (method == null) return
-    if (node.block == null) return
-    val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
-    typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
-      methodBodySupport.processMethodLikeBody(method, node.args, node.block)
+  def processMethodDeclaration(node: AST.MethodDeclaration): Unit =
+    if (node.block != null) {
+      typing.kernelNodeOf[MethodDefinition](node).foreach { method =>
+        val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
+          methodBodySupport.processMethodLikeBody(method, node.args, node.block)
+        }
+      }
     }
-  }
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     methodBodySupport.processConstructorDeclaration(node)
   def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
@@ -105,11 +105,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
 
   def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =
     declarationBodySupport.processExtensionDeclaration(node)
-  def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit = {
-    val function = typing.lookupKernelNode(node).asInstanceOf[MethodDefinition]
-    if (function == null) return
-    methodBodySupport.processMethodLikeBody(function, node.args, node.block)
-  }
+  def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit =
+    typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
+      methodBodySupport.processMethodLikeBody(function, node.args, node.block)
+    }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =
     assignmentTyping.processLocalAssign(node, context)

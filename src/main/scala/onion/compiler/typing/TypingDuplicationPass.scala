@@ -6,6 +6,7 @@ import onion.compiler.toolbox.Classes
 import onion.compiler.typing.session.TypingUnitContext
 
 import scala.jdk.CollectionConverters.*
+import scala.reflect.ClassTag
 import java.util.{TreeSet => JTreeSet}
 
 final class TypingDuplicationPass(private val typing: Typing, private val unitContext: TypingUnitContext) {
@@ -17,13 +18,11 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private val seenGlobalVariables = new JTreeSet[FieldRef](new FieldComparator)
   private val seenFunctions = new JTreeSet[Method](new MethodComparator)
 
-  private def withKernel[T <: Node](ast: AST.Node)(f: T => Unit): Unit = {
-    val kernel = typing.lookupKernelNode(ast)
-    if (kernel != null) f(kernel.asInstanceOf[T])
-  }
+  private def withKernel[T <: Node : ClassTag](ast: AST.Node)(f: T => Unit): Unit =
+    typing.kernelNodeOf[T](ast).foreach(f)
 
   def run(): Unit = {
-    typing.setMapper(typing.find(typing.topClass))
+    typing.find(typing.topClass).foreach(typing.setMapper)
     seenGlobalVariables.clear()
     seenFunctions.clear()
     unit.toplevels.foreach {
@@ -40,7 +39,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     seenFields.clear()
     seenConstructors.clear()
     typing.setDefinition(clazz)
-    typing.setMapper(typing.find(clazz.name))
+    typing.find(clazz.name).foreach(typing.setMapper)
   }
 
   private def registerField(ast: AST.Node, field: FieldDefinition): Unit =
@@ -127,23 +126,21 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     }
   }
 
-  private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
-    val clazz = typing.lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    if (clazz == null) return
-    resetForTypeDeclaration(clazz)
-    for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
-    for (section <- node.sections) processAccessSection(section)
-    generateForwardedMethods()
-    DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
-    DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
-    DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
-  }
+  private def processClassDeclaration(node: AST.ClassDeclaration): Unit =
+    withKernel[ClassDefinition](node) { clazz =>
+      resetForTypeDeclaration(clazz)
+      for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
+      for (section <- node.sections) processAccessSection(section)
+      generateForwardedMethods()
+      DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
+      DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
+      DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
+    }
 
-  private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
-    val clazz = typing.lookupKernelNode(node).asInstanceOf[ClassDefinition]
-    if (clazz == null) return
-    resetForTypeDeclaration(clazz)
-    for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
-    DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
-  }
+  private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit =
+    withKernel[ClassDefinition](node) { clazz =>
+      resetForTypeDeclaration(clazz)
+      for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
+      DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
+    }
 }

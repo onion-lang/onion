@@ -26,11 +26,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     typing.report(error, location, items*)
   private def put(ast: AST.Node, kernel: TypedAST.Node): Unit =
     typing.put(ast, kernel)
-  private def find(name: String): NameResolver =
+  private def find(name: String): Option[NameResolver] =
     typing.find(name)
-  private def lookupKernelNode(ast: AST.Node): TypedAST.Node =
-    typing.lookupKernelNode(ast)
-  private def lookupAST(kernel: TypedAST.Node): AST.Node =
+  private def lookupAST(kernel: TypedAST.Node): Option[AST.Node] =
     typing.lookupAST(kernel)
   private def load(name: String): ClassType =
     typing.load(name)
@@ -54,7 +52,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private var constructorCount = 0
 
   def run(): Unit = {
-    typing.setMapper(find(topClass))
+    find(topClass).foreach(typing.setMapper)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -68,10 +66,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
+  private def processClassDeclaration(node: AST.ClassDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     constructorCount = 0
-    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    typing.setMapper(find(definition_.name))
+    typing.setDefinition(definition)
+    find(definition.name).foreach(typing.setMapper)
 
     val classTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = classTypeParams
@@ -87,9 +85,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     if (constructorCount == 0) definition_.addDefaultConstructor
   }
 
-  private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = {
-    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    typing.setMapper(find(definition_.name))
+  private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+    typing.setDefinition(definition)
+    find(definition.name).foreach(typing.setMapper)
 
     val interfaceTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = interfaceTypeParams
@@ -102,9 +100,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processRecordDeclaration(node: AST.RecordDeclaration): Unit = {
-    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    typing.setMapper(find(definition_.name))
+  private def processRecordDeclaration(node: AST.RecordDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+    typing.setDefinition(definition)
+    find(definition.name).foreach(typing.setMapper)
 
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)
@@ -198,9 +196,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = {
-    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    typing.setMapper(find(definition_.name))
+  private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+    typing.setDefinition(definition)
+    find(definition.name).foreach(typing.setMapper)
 
     // Enum extends java.lang.Enum<E>
     val enumClass = load("java.lang.Enum")
@@ -257,32 +255,31 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = {
-    // Get the container class registered in HeaderPass
-    typing.setDefinition(lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    typing.setMapper(find(definition_.name))
+  private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+    // The container class was registered in HeaderPass
+    typing.setDefinition(definition)
+    find(definition.name).foreach(typing.setMapper)
 
     // Resolve the receiver type (the type being extended)
     val receiverType = mapFrom(node.receiverType)
     if (receiverType == null) {
       report(SemanticError.CLASS_NOT_FOUND, node.receiverType, node.receiverType.desc.toString, mapper_.getCandidateClassNames)
-      return
-    }
+    } else {
+      // Get the FQCN for the receiver type (for extension method lookup)
+      val receiverFqcn = receiverType match {
+        case ct: ClassType => ct.name
+        case at: ArrayType => s"[${at.component}"  // array representation
+        case _ => receiverType.toString
+      }
 
-    // Get the FQCN for the receiver type (for extension method lookup)
-    val receiverFqcn = receiverType match {
-      case ct: ClassType => ct.name
-      case at: ArrayType => s"[${at.component}"  // array representation
-      case _ => receiverType.toString
-    }
+      // Process each method in the extension
+      for (method <- node.methods) {
+        processExtensionMethodDeclaration(method, receiverType, receiverFqcn)
+      }
 
-    // Process each method in the extension
-    for (method <- node.methods) {
-      processExtensionMethodDeclaration(method, receiverType, receiverFqcn)
+      // Add default constructor to container class
+      definition.addDefaultConstructor
     }
-
-    // Add default constructor to container class
-    definition_.addDefaultConstructor
   }
 
   private def processExtensionMethodDeclaration(
@@ -526,24 +523,22 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       case node: ClassDefinition =>
         if (node.isResolutionComplete) return
         val interfaces = Buffer[ClassType]()
-        val resolver = find(node.name)
-        val superClass =
-          if (node.isInterface) {
-            val ast = lookupAST(node).asInstanceOf[AST.InterfaceDeclaration]
+        val superClass = (find(node.name), lookupAST(node)) match {
+          case (Some(resolver), Some(ast: AST.InterfaceDeclaration)) =>
             for (typeSpec <- ast.superInterfaces) {
               val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
               if (superType != null) interfaces += superType
             }
             rootClass
-          } else {
-            val ast = lookupAST(node).asInstanceOf[AST.ClassDeclaration]
+          case (Some(resolver), Some(ast: AST.ClassDeclaration)) =>
             val superClass0 = validateSuperType(ast.superClass, mustBeInterface = false, resolver)
             for (typeSpec <- ast.superInterfaces) {
               val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
               if (superType != null) interfaces += superType
             }
             superClass0
-          }
+          case _ => rootClass
+        }
 
         constructTypeHierarchy(superClass, visit)
         interfaces.foreach(constructTypeHierarchy(_, visit))

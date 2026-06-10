@@ -12,9 +12,9 @@ private[compiler] final class DeclarationBodySupport(
   processMethodDeclaration: AST.MethodDeclaration => Unit,
   processConstructorDeclaration: AST.ConstructorDeclaration => Unit
 ) {
-  def processClassDeclaration(node: AST.ClassDeclaration): Unit = {
-    typing.setDefinition(typing.lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    typing.setMapper(typing.find(typing.definition_.name))
+  def processClassDeclaration(node: AST.ClassDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+    typing.setDefinition(definition)
+    typing.find(definition.name).foreach(typing.setMapper)
     val classTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
     typing.openTypeParams(typing.emptyTypeParams ++ classTypeParams) {
       val instanceInitializers = Buffer[ActionStatement]()
@@ -38,16 +38,15 @@ private[compiler] final class DeclarationBodySupport(
     }
   }
 
-  def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = {
-    typing.setDefinition(typing.lookupKernelNode(node).asInstanceOf[ClassDefinition])
-    if (typing.definition_ == null) return
-    typing.setMapper(typing.find(typing.definition_.name))
+  def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+    typing.setDefinition(definition)
+    typing.find(definition.name).foreach(typing.setMapper)
 
     val receiverType = typing.mapFrom(node.receiverType)
-    if (receiverType == null) return
-
-    for (methodNode <- node.methods) {
-      methodBodySupport.processExtensionMethodDeclaration(methodNode, receiverType, typing.definition_)
+    if (receiverType != null) {
+      for (methodNode <- node.methods) {
+        methodBodySupport.processExtensionMethodDeclaration(methodNode, receiverType, definition)
+      }
     }
   }
 }

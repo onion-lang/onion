@@ -48,6 +48,14 @@ private[compiler] final class InstanceMethodCallSupport(
       return typeMethodCallWithNamedArgs(node, target, targetType, context, expected)
     }
 
+    // Zero-arg record copy is a full clone: p.copy()
+    if (name == "copy" && node.args.isEmpty) {
+      tryRecordCopy(node, target, targetType, context) match {
+        case some @ Some(_) => return some
+        case None =>
+      }
+    }
+
     if (params == null) {
       val untypedClosureIndices = node.args.zipWithIndex.collect {
         case (expr, i) if isClosureWithUntypedParams(expr) => i
@@ -74,6 +82,69 @@ private[compiler] final class InstanceMethodCallSupport(
     }
   }
 
+  /**
+   * Partial record copy with named arguments: p.copy(y = 9) fills the
+   * unmentioned components from the receiver's getters.
+   */
+  private def tryRecordCopy(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    context: LocalContext
+  ): Option[Term] = {
+    if (node.name != "copy") return None
+    val definition = targetType match {
+      case d: ClassDefinition => d
+      case applied: AppliedClassType =>
+        applied.raw match {
+          case d: ClassDefinition => d
+          case _ => return None
+        }
+      case _ => return None
+    }
+    val components = definition.recordComponents.getOrElse(return None)
+
+    val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
+    node.args.foreach {
+      case AST.NamedArgument(_, name, value) => named(name) = value
+      case _ => return None // positional args mixed in: use the regular path
+    }
+    for (name <- named.keys if !components.exists(_._1 == name)) {
+      calls.reportMethodNotFound(node, targetType, s"copy(${name} = ...)", Array[Type]())
+      return Some(null).filter(_ != null) // reported; abort typing
+    }
+
+    val classSubst = TypeSubstitution.classSubstitution(targetType)
+    val fullParams = new Array[Term](components.length)
+    var i = 0
+    while (i < components.length) {
+      val (cname, ctype) = components(i)
+      val expectedType = TypeSubstitution.substituteType(ctype, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+      named.get(cname) match {
+        case Some(expr) =>
+          calls.typed(expr, context, expectedType) match {
+            case Some(term) => fullParams(i) = term
+            case None => return Some(null).filter(_ != null)
+          }
+        case None =>
+          targetType.findMethod(cname, Array[Term]()) match {
+            case Array(getter, _*) => fullParams(i) = new Call(target, getter, Array[Term]())
+            case _ => return None
+          }
+      }
+      i += 1
+    }
+
+    targetType.findMethod("copy", fullParams) match {
+      case Array(method, _*) =>
+        calls.buildResolvedCall(node, method, fullParams, node.typeArgs, classSubst, null)(
+          expectedArgs => calls.processParamsWithExpected(node, fullParams, expectedArgs),
+          finalParams => new Call(target, method, finalParams)
+        )
+      case _ => None
+    }
+  }
+
   private def typeMethodCallWithNamedArgs(
     node: AST.MethodCall,
     target: Term,
@@ -81,6 +152,9 @@ private[compiler] final class InstanceMethodCallSupport(
     context: LocalContext,
     expected: Type
   ): Option[Term] = {
+    val recordCopy = tryRecordCopy(node, target, targetType, context)
+    if (recordCopy.isDefined) return recordCopy
+
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(targetType, node.name, candidates, calls.isInstanceMethod)
     if (candidates.isEmpty) {

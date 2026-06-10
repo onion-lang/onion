@@ -53,6 +53,27 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   def run(): Unit = {
     find(topClass).foreach(unitContext.currentMapper = _)
+    // Pre-pass: register every declared type's type parameters before any
+    // hierarchy resolution, so 'class A : B[String]' works even when B is
+    // declared later in the file.
+    unit.toplevels.foreach {
+      case node: AST.ClassDeclaration =>
+        typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+          find(definition.name).foreach(unitContext.currentMapper = _)
+          val tps = createTypeParams(node.typeParameters)
+          declaredTypeParams_(node) = tps
+          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
+        }
+      case node: AST.InterfaceDeclaration =>
+        typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+          find(definition.name).foreach(unitContext.currentMapper = _)
+          val tps = createTypeParams(node.typeParameters)
+          declaredTypeParams_(node) = tps
+          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
+        }
+      case _ =>
+    }
+    find(topClass).foreach(unitContext.currentMapper = _)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -71,7 +92,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     unitContext.currentDefinition = definition
     find(definition.name).foreach(unitContext.currentMapper = _)
 
-    val classTypeParams = createTypeParams(node.typeParameters)
+    val classTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = classTypeParams
     definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
@@ -89,7 +110,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     unitContext.currentDefinition = definition
     find(definition.name).foreach(unitContext.currentMapper = _)
 
-    val interfaceTypeParams = createTypeParams(node.typeParameters)
+    val interfaceTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = interfaceTypeParams
     definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
@@ -506,20 +527,28 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       case node: ClassDefinition =>
         if (node.isResolutionComplete) return
         val interfaces = Buffer[ClassType]()
+        // The node's own type parameters must be in scope while resolving its
+        // supertypes so that 'class Sub[T] : Super[T]' can mention T.
+        def ownTypeParams(astNode: AST.Node, params: List[AST.TypeParameter]): Seq[TypeParam] =
+          declaredTypeParams_.getOrElse(astNode, createTypeParams(params))
         val superClass = (find(node.name), lookupAST(node)) match {
           case (Some(resolver), Some(ast: AST.InterfaceDeclaration)) =>
-            for (typeSpec <- ast.superInterfaces) {
-              val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
-              if (superType != null) interfaces += superType
+            openTypeParams(typing.emptyTypeParams ++ ownTypeParams(ast, ast.typeParameters)) {
+              for (typeSpec <- ast.superInterfaces) {
+                val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
+                if (superType != null) interfaces += superType
+              }
             }
             rootClass
           case (Some(resolver), Some(ast: AST.ClassDeclaration)) =>
-            val superClass0 = validateSuperType(ast.superClass, mustBeInterface = false, resolver)
-            for (typeSpec <- ast.superInterfaces) {
-              val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
-              if (superType != null) interfaces += superType
+            openTypeParams(typing.emptyTypeParams ++ ownTypeParams(ast, ast.typeParameters)) {
+              val superClass0 = validateSuperType(ast.superClass, mustBeInterface = false, resolver)
+              for (typeSpec <- ast.superInterfaces) {
+                val superType = validateSuperType(typeSpec, mustBeInterface = true, resolver)
+                if (superType != null) interfaces += superType
+              }
+              superClass0
             }
-            superClass0
           case _ => rootClass
         }
 

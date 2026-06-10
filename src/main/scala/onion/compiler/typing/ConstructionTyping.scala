@@ -65,8 +65,13 @@ final class ConstructionTyping(
   }
 
   def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] = {
-    val typeRef = typing.mapFrom(node.typeRef).asInstanceOf[ClassType]
-    if (typeRef == null) return None
+    val typeRef = typing.mapFromOpt(node.typeRef) match {
+      case Some(ct: ClassType) => ct
+      case Some(other) =>
+        bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
+        return None
+      case None => return None
+    }
 
     // Check if trying to instantiate an abstract class
     val classToCheck = typeRef match {

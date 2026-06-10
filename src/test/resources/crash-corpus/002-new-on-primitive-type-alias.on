@@ -1,0 +1,6 @@
+// Crash: same bug as 001 reached through a type alias — mapFrom resolves the
+// alias to BasicType.INT and ConstructionTyping.typeNewObject's unconditional
+// asInstanceOf[ClassType] threw ClassCastException.
+type MyInt = Int
+val x = new MyInt(3)
+IO::println("ok")

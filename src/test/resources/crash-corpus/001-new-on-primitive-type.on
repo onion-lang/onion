@@ -1,0 +1,4 @@
+// Crash: ConstructionTyping.typeNewObject cast mapFrom's result to ClassType
+// before checking what it was; `new` on a primitive type threw ClassCastException.
+val x = new Int(3)
+IO::println(x)

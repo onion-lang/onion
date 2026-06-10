@@ -17,15 +17,28 @@ final class OperatorTyping(
 ) {
 
   def createEquals(kind: BinaryKind, lhs: Term, rhs: Term): Term = {
-    val params = Array[Term](new AsInstanceOf(rhs, bodyContext.rootClass))
-    val target = lhs.`type`.asInstanceOf[ObjectType]
-    val methods = target.findMethod("equals", params)
-    var node: Term = new Call(lhs, methods(0), params)
-    if (kind == NOT_EQUAL) {
-      node = new UnaryTerm(NOT, BasicType.BOOLEAN, node)
+    lhs.`type` match {
+      case target: ObjectType =>
+        val params = Array[Term](new AsInstanceOf(rhs, bodyContext.rootClass))
+        val methods = target.findMethod("equals", params)
+        if (methods.isEmpty) {
+          referenceEquals(kind, lhs, rhs)
+        } else {
+          var node: Term = new Call(lhs, methods(0), params)
+          if (kind == NOT_EQUAL) {
+            node = new UnaryTerm(NOT, BasicType.BOOLEAN, node)
+          }
+          node
+        }
+      case _ =>
+        // No equals method to dispatch to (e.g. a null literal on the left):
+        // fall back to reference comparison, which is the sensible semantics here.
+        referenceEquals(kind, lhs, rhs)
     }
-    node
   }
+
+  private def referenceEquals(kind: BinaryKind, lhs: Term, rhs: Term): Term =
+    new BinaryTerm(kind, BasicType.BOOLEAN, lhs, rhs)
 
   def processEquals(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term = {
     var left: Term = typed(node.lhs, context).getOrElse(null)

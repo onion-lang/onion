@@ -7,6 +7,67 @@ import onion.compiler.TypedAST.*
 import scala.collection.mutable
 
 private[compiler] object CapturedVariableCollector {
+  /** Returns the outer class type if the statement tree (including nested
+   *  closures) contains an OuterThis reference. */
+  def findOuterThis(stmt: ActionStatement): Option[ClassType] = {
+    var found: Option[ClassType] = None
+    def scanTerm(term: Term): Unit = if (found.isEmpty) term match {
+      case o: OuterThis => found = Some(o.`type`)
+      case c: NewClosure => scanStatement(c.block)
+      case other =>
+        productChildren(other).foreach {
+          case t: Term => scanTerm(t)
+          case st: ActionStatement => scanStatement(st)
+          case _ =>
+        }
+    }
+    def scanStatement(statement: ActionStatement): Unit = if (found.isEmpty) {
+      productChildren(statement).foreach {
+        case t: Term => scanTerm(t)
+        case st: ActionStatement => scanStatement(st)
+        case seq: Seq[?] => seq.foreach {
+          case t: Term => scanTerm(t)
+          case st: ActionStatement => scanStatement(st)
+          case _ =>
+        }
+        case arr: Array[?] => arr.foreach {
+          case t: Term => scanTerm(t)
+          case st: ActionStatement => scanStatement(st)
+          case _ =>
+        }
+        case _ =>
+      }
+    }
+    scanStatement(stmt)
+    found
+  }
+
+  private def productChildren(node: AnyRef): Seq[AnyRef] = node match {
+    case p: Product => p.productIterator.collect { case r: AnyRef => r }.toSeq
+    case _ => reflectiveChildren(node)
+  }
+
+  // TypedAST terms/statements are plain classes, not case classes, so walk
+  // their public accessor methods that return Terms/Statements/collections.
+  private def reflectiveChildren(node: AnyRef): Seq[AnyRef] = {
+    node.getClass.getMethods.iterator
+      .filter(m => m.getParameterCount == 0 && !m.getName.contains("$") &&
+        (classOf[Term].isAssignableFrom(m.getReturnType) ||
+         classOf[ActionStatement].isAssignableFrom(m.getReturnType) ||
+         m.getReturnType.isArray ||
+         classOf[java.util.List[?]].isAssignableFrom(m.getReturnType)))
+      .flatMap { m =>
+        try {
+          m.invoke(node) match {
+            case null => Nil
+            case arr: Array[?] => arr.toSeq.collect { case r: AnyRef => r }
+            case list: java.util.List[?] => scala.jdk.CollectionConverters.ListHasAsScala(list).asScala.toSeq.collect { case r: AnyRef => r }
+            case other: AnyRef => Seq(other)
+          }
+        } catch { case _: Throwable => Nil }
+      }.toSeq
+  }
+
   def collect(stmt: ActionStatement, frame: onion.compiler.LocalFrame = null): Seq[ClosureLocalBinding] = {
     // Use (frameIndex, index) as key to handle nested closures correctly
     val captured = mutable.LinkedHashMap[(Int, Int), ClosureLocalBinding]()

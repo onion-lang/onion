@@ -31,12 +31,25 @@ final class ClosureCodegen(
       new ClosureLocalBinding(v.frameIndex, v.index, v.tp, v.isMutable, isBoxed)
     }
 
-    val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, capturedVars)
+    val outerThisType = CapturedVariableCollector.findOuterThis(closure.block)
+
+    val closureBytes = generateClosureClass(closureClassName, interfaceType, closure.method, closure.block, capturedVars, outerThisType)
     registerCompiledClass(CompiledClass(closureClassName.replace('/', '.'), outputDirectory, closureBytes))
 
     val closureType = AsmUtil.objectType(closureClassName)
     gen.newInstance(closureType)
     gen.dup()
+
+    // Pass the enclosing instance first so unqualified instance calls
+    // (typed as OuterThis) work inside the closure. In a nested closure the
+    // enclosing instance lives in the enclosing closure's own this$0 field.
+    for outerType <- outerThisType do
+      localVars match
+        case closureCtx: ClosureLocalVarContext =>
+          gen.loadThis()
+          gen.getField(AsmUtil.objectType(closureCtx.closureClassName), "this$0", asmType(outerType))
+        case _ =>
+          gen.loadThis()
 
     // When emitting code to capture a variable:
     // - capturedVar.frameIndex is relative to the NEW closure being created
@@ -71,9 +84,10 @@ final class ClosureCodegen(
         val ref = new RefLocal(adjustedFrame, capturedVar.index, capturedVar.tp)
         asmCodeGen.emitRefLocal(gen, ref, localVars)
 
+    val ctorParamTypes = outerThisType.map(asmType).toSeq ++ capturedVars.map(capturedFieldType)
     val ctorDesc = AsmType.getMethodDescriptor(
       AsmType.VOID_TYPE,
-      capturedVars.map(capturedFieldType).toArray*
+      ctorParamTypes.toArray*
     )
 
     gen.visitMethodInsn(
@@ -90,7 +104,8 @@ final class ClosureCodegen(
     interfaceType: ClassType,
     method: TypedAST.Method,
     block: ActionStatement,
-    capturedVars: Seq[ClosureLocalBinding]
+    capturedVars: Seq[ClosureLocalBinding],
+    outerThisType: Option[ClassType]
   ): Array[Byte] = {
     val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
 
@@ -103,6 +118,9 @@ final class ClosureCodegen(
       Array(AsmUtil.internalName(interfaceType.name))
     )
 
+    for outerType <- outerThisType do
+      cw.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "this$0", asmType(outerType).getDescriptor, null, null)
+
     for capturedVar <- capturedVars do
       val fieldType = capturedFieldType(capturedVar)
       cw.visitField(
@@ -113,7 +131,7 @@ final class ClosureCodegen(
         null
       )
 
-    generateClosureConstructor(cw, className, capturedVars)
+    generateClosureConstructor(cw, className, capturedVars, outerThisType)
     generateClosureMethod(cw, className, method, block, capturedVars)
     generateBridgeMethod(cw, className, interfaceType, method)
 
@@ -173,10 +191,11 @@ final class ClosureCodegen(
       case _ => ()
   }
 
-  private def generateClosureConstructor(cw: ClassWriter, className: String, capturedVars: Seq[ClosureLocalBinding]): Unit = {
+  private def generateClosureConstructor(cw: ClassWriter, className: String, capturedVars: Seq[ClosureLocalBinding], outerThisType: Option[ClassType]): Unit = {
+    val ctorParamTypes = outerThisType.map(asmType).toSeq ++ capturedVars.map(capturedFieldType)
     val ctorDesc = AsmType.getMethodDescriptor(
       AsmType.VOID_TYPE,
-      capturedVars.map(capturedFieldType).toArray*
+      ctorParamTypes.toArray*
     )
 
     val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", ctorDesc, null, null)
@@ -186,9 +205,15 @@ final class ClosureCodegen(
     gen.loadThis()
     gen.invokeConstructor(AsmUtil.objectType(AsmUtil.JavaLangObject), AsmMethod.getMethod("void <init>()"))
 
+    val paramOffset = if (outerThisType.isDefined) 1 else 0
+    for outerType <- outerThisType do
+      gen.loadThis()
+      gen.loadArg(0)
+      gen.putField(AsmUtil.objectType(className), "this$0", asmType(outerType))
+
     for (capturedVar, paramIndex) <- capturedVars.zipWithIndex do
       gen.loadThis()
-      gen.loadArg(paramIndex)
+      gen.loadArg(paramOffset + paramIndex)
       gen.putField(
         AsmUtil.objectType(className),
         s"captured_${capturedVar.frameIndex}_${capturedVar.index}",

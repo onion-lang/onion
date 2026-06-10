@@ -155,6 +155,13 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
     /**
      * Creates a successful result containing the given value.
      */
+    /**
+     * Monadic unit used by do-notation's 'ret'.
+     */
+    static <T, E> Result<T, E> successful(T value) {
+        return ok(value);
+    }
+
     static <T, E> Result<T, E> ok(T value) {
         return new Ok<>(value);
     }
@@ -227,6 +234,13 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
      * Transforms the success value using a function that returns a Result.
      */
     <U> Result<U, E> flatMap(Function1<T, Result<U, E>> f);
+
+    /**
+     * Monadic bind used by do-notation: do[Result] '{' x <- res; ... '}'.
+     */
+    default <U> Result<U, E> bind(Function1<T, Result<U, E>> f) {
+        return flatMap(f);
+    }
 
     /**
      * Gets the success value or throws the error (wrapped in RuntimeException if not Throwable).

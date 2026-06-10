@@ -119,6 +119,13 @@ public sealed interface Option<T> permits Option.Some, Option.None {
     /**
      * Creates a Some containing the given non-null value.
      */
+    /**
+     * Monadic unit used by do-notation's 'ret'.
+     */
+    static <T> Option<T> successful(T value) {
+        return some(value);
+    }
+
     static <T> Option<T> some(T value) {
         return new Some<>(value);
     }
@@ -162,6 +169,13 @@ public sealed interface Option<T> permits Option.Some, Option.None {
      * Transforms the contained value using a function that returns an Option.
      */
     <U> Option<U> flatMap(Function1<T, Option<U>> f);
+
+    /**
+     * Monadic bind used by do-notation: do[Option] '{' x <- opt; ... '}'.
+     */
+    default <U> Option<U> bind(Function1<T, Option<U>> f) {
+        return flatMap(f);
+    }
 
     /**
      * Returns this option if the predicate is satisfied, None otherwise.

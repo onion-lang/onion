@@ -115,6 +115,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         newToplevels += rewriteFunctionDeclaration(declaration)
       case declaration: AST.GlobalVariableDeclaration =>
         newToplevels += rewriteGlobalVariableDeclaration(declaration)
+      case element: AST.BlockElement =>
+        // Top-level statements need desugaring too (do-notation et al.);
+        // they previously passed through untouched, so a DoExpression
+        // reached typing and the whole statement vanished silently
+        newToplevels += rewriteBlockElement(element)
       case otherwise =>
         newToplevels += otherwise
     }

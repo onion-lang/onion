@@ -618,4 +618,60 @@ public final class Json {
         }
         return sb.toString();
     }
+
+    // ========== Navigable JSON values ==========
+
+    /**
+     * Parses JSON into a navigable value supporting indexing:
+     *   val v = Json::value(text)
+     *   v["user"]["name"].asString()
+     *   v["tags"][0].asString()
+     */
+    public static Value value(String json) throws JsonParseException {
+        return new Value(parse(json));
+    }
+
+    public static final class Value {
+        private final Object raw;
+
+        public Value(Object raw) { this.raw = raw; }
+
+        /** Object member access; returns a null-holding Value when absent. */
+        public Value get(String key) {
+            if (raw instanceof java.util.Map<?, ?> m) return new Value(m.get(key));
+            return new Value(null);
+        }
+
+        /** Array element access; returns a null-holding Value when out of range. */
+        public Value get(int index) {
+            if (raw instanceof java.util.List<?> l && index >= 0 && index < l.size()) {
+                return new Value(l.get(index));
+            }
+            return new Value(null);
+        }
+
+        public boolean isNull() { return raw == null; }
+
+        public int size() {
+            if (raw instanceof java.util.List<?> l) return l.size();
+            if (raw instanceof java.util.Map<?, ?> m) return m.size();
+            return 0;
+        }
+
+        public String asString() { return raw == null ? null : String.valueOf(raw); }
+
+        public int asInt() { return raw instanceof Number n ? n.intValue() : 0; }
+
+        public long asLong() { return raw instanceof Number n ? n.longValue() : 0L; }
+
+        public double asDouble() { return raw instanceof Number n ? n.doubleValue() : 0.0; }
+
+        public boolean asBoolean() { return Boolean.TRUE.equals(raw); }
+
+        /** The underlying Map/List/String/Number/Boolean/null. */
+        public Object raw() { return raw; }
+
+        @Override
+        public String toString() { return stringify(raw); }
+    }
 }

@@ -68,4 +68,24 @@ class StdlibErgonomicsSpec extends AbstractShellSpec {
       assert(Shell.Success("[a.on, b.on]") == result)
     }
   }
+
+  describe("Json values") {
+    it("navigates JSON with indexing and as-conversions") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v = Json::value("{\"name\": \"onion\", \"tags\": [\"jvm\"], \"meta\": {\"stars\": 30}}")
+          |    return v["name"].asString() + ":" + v["tags"][0].asString() +
+          |      ":" + (v["meta"]["stars"].asInt() + 1) + ":" + v["missing"].isNull()
+          |  }
+          |}
+          |""".stripMargin,
+        "JsonValueNav.on",
+        Array()
+      )
+      assert(Shell.Success("onion:jvm:31:true") == result)
+    }
+  }
 }

@@ -331,6 +331,7 @@ These are frequently confused with other languages. **Always check these:**
 | `else if condition { }` | ✓ correct - `else if` chains are supported (also as expressions) |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
+| `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
 
@@ -398,8 +399,8 @@ These are frequently confused with other languages. **Always check these:**
 
 | Wrong | Correct (Onion) |
 |-------|-----------------|
-| `x -> x * 2` | `(x: Int) -> x * 2` - type annotation often needed |
-| `(x) -> expr` (single param) | `(x: Type) -> expr` - type usually required |
+| `x -> x * 2` | ✓ correct - bare single param works; expression bodies too |
+| `(x) -> expr` | ✓ correct - param types inferred from the expected function type |
 | `func(arg)` for lambda | `func.call(arg)` or `func(arg)` - both work |
 | `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |

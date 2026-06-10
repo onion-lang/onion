@@ -114,13 +114,19 @@ class Parsing(config: CompilerConfig) extends AnyRef
     fileName: String,
     problems: ArrayBuffer[CompileError]
   ): Unit = {
-    val error = e.currentToken.next
-    val expected = formatExpectedTokens(e)
-    problems += CompileError(
-      fileName,
-      new Location(error.beginLine, error.beginColumn),
-      Message("error.parsing.syntax_error", error.image, expected)
-    )
+    // Message-only ParseExceptions (e.g. from string-interpolation splitting)
+    // carry no token information; report their message at an unknown location.
+    if (e.currentToken == null) {
+      problems += CompileError(fileName, new Location(1, 1), e.getMessage)
+    } else {
+      val error = e.currentToken.next
+      val expected = formatExpectedTokens(e)
+      problems += CompileError(
+        fileName,
+        new Location(error.beginLine, error.beginColumn),
+        Message("error.parsing.syntax_error", error.image, expected)
+      )
+    }
   }
 
   /**

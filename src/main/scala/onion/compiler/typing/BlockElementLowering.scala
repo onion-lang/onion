@@ -82,7 +82,7 @@ final class BlockElementLowering(
         }
         if (collection == null) {
           new NOP(node.location)
-        } else if (collection.isBasicType) {
+        } else if (collection.isBasicType || collection.isNullType) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.collection, bodyContext.load("java.util.Collection"), collection.`type`)
           new NOP(node.location)
         } else {

@@ -1,0 +1,4 @@
+// Crash: the lexer ends the string literal at the inner quote, leaving an
+// unclosed #{...}; the interpolation splitter threw RuntimeException (I0000)
+// instead of reporting a syntax error.
+IO::println("v: #{IO::println("a")}")

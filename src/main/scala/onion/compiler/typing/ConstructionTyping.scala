@@ -23,7 +23,7 @@ final class ConstructionTyping(
             bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
             None
           } else Some(new RefArray(target, index))
-        } else if (target.isBasicType) {
+        } else if (target.isBasicType || target.isNullType) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.lhs, bodyContext.rootClass, target.`type`)
           None
         } else {
@@ -295,7 +295,9 @@ final class ConstructionTyping(
     // Fill missing arguments with default values
     argsWithDefaults.indices.foreach { i =>
       if (!filled(i)) {
-        result(i) = argsWithDefaults(i).defaultValue.get
+        result(i) = argsWithDefaults(i).defaultValue.getOrElse {
+          throw new IllegalStateException(s"constructor argument ${argsWithDefaults(i).name} has no default despite the required-argument check")
+        }
         filled(i) = true
       }
     }

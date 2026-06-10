@@ -41,7 +41,7 @@ final class AssignmentTyping(
     val target = typed(indexing.lhs, context).getOrElse(null)
     var index = typed(indexing.rhs, context).getOrElse(null)
     if (value == null || target == null || index == null) return null
-    if (target.isBasicType) {
+    if (target.isBasicType || target.isNullType) {
       bodyContext.report(INCOMPATIBLE_TYPE, indexing.lhs, bodyContext.rootClass, target.`type`)
       return null
     }

@@ -39,18 +39,28 @@ final class StringInterpolationTyping(
       }
 
       if (i < typedExprs.length) {
-        val expr = typedExprs(i)
+        // A null literal would otherwise match append(char[]) and NPE at runtime;
+        // cast it to Object so append(Object) renders it as "null"
+        val expr =
+          if (typedExprs(i).`type`.isNullType) new AsInstanceOf(typedExprs(i), bodyContext.rootClass)
+          else typedExprs(i)
         val appendMethods = sbType.findMethod("append", Array(expr))
         if (appendMethods.nonEmpty) {
           result = new Call(result, appendMethods(0), Array(expr))
         } else {
-          val toStringMethods = expr.`type`.asInstanceOf[ObjectType].findMethod("toString", Array[Term]())
-          if (toStringMethods.nonEmpty) {
-            val stringExpr = new Call(expr, toStringMethods(0), Array[Term]())
-            val appendStringMethods = sbType.findMethod("append", Array(stringExpr))
-            if (appendStringMethods.nonEmpty) {
-              result = new Call(result, appendStringMethods(0), Array(stringExpr))
-            }
+          expr.`type` match {
+            case objectType: ObjectType =>
+              val toStringMethods = objectType.findMethod("toString", Array[Term]())
+              if (toStringMethods.nonEmpty) {
+                val stringExpr = new Call(expr, toStringMethods(0), Array[Term]())
+                val appendStringMethods = sbType.findMethod("append", Array(stringExpr))
+                if (appendStringMethods.nonEmpty) {
+                  result = new Call(result, appendStringMethods(0), Array(stringExpr))
+                }
+              }
+            case other =>
+              bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
+              return None
           }
         }
       }

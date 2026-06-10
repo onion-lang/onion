@@ -1,0 +1,5 @@
+// Crash: AdditionTyping cast the operand type to ObjectType for the toString
+// call; a null literal operand (NullType) threw ClassCastException.
+// (Also fixed semantics: "x" + null now yields "xnull" via String.valueOf.)
+val s: String = "x" + null
+IO::println(s)

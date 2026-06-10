@@ -81,16 +81,15 @@ private[typing] class AdditionTyping(
     }
 
   /**
-   * Create a toString() method call on the given term.
+   * Convert a term to String via String.valueOf(Object), which matches Java's
+   * concatenation semantics for null ("a" + null == "anull") and never NPEs.
    */
   private def toStringCall(node: AST.Expression, term: Term): Term = {
-    // Unwrap NullableType to get the inner type for method lookup
-    val targetType = term.`type` match {
-      case nullableType: NullableType => nullableType.innerType.asInstanceOf[ObjectType]
-      case other => other.asInstanceOf[ObjectType]
-    }
-    val toStringMethod = body.findMethod(node, targetType, "toString")
-    new Call(term, toStringMethod, Array.empty)
+    val stringType = bodyContext.load("java.lang.String")
+    val arg: Term = new AsInstanceOf(term, bodyContext.rootClass)
+    val valueOfMethods = stringType.findMethod("valueOf", Array[Term](arg))
+    // String.valueOf(Object) always exists on the JDK
+    new CallStatic(stringType, valueOfMethods(0), Array[Term](arg))
   }
 
   /**

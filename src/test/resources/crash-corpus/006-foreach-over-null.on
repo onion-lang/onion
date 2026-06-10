@@ -1,0 +1,6 @@
+// Crash: BlockElementLowering's foreach lowering cast the collection type to
+// ObjectType after only checking isBasicType; a null literal collection threw
+// ClassCastException while looking up iterator().
+foreach x: Object in null {
+  IO::println(x)
+}

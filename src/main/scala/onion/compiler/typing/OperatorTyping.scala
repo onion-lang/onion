@@ -78,13 +78,19 @@ final class OperatorTyping(
     left = Boxing.tryUnboxToInteger(bodyContext.table, left)
     right = Boxing.tryUnboxToInteger(bodyContext.table, right)
     if (!left.`type`.isBasicType) {
-        val params = Array[Term](right)
-        tryFindMethod(node, left.`type`.asInstanceOf[ObjectType], "add", params) match {
-          case Left(_) =>
-          bodyContext.report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
+      left.`type` match {
+        case target: ObjectType =>
+          val params = Array[Term](right)
+          tryFindMethod(node, target, "add", params) match {
+            case Left(_) =>
+              bodyContext.report(METHOD_NOT_FOUND, node, left.`type`, "add", types(params))
+              return null
+            case Right(method) =>
+              return new Call(left, method, params)
+          }
+        case _ =>
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
           return null
-        case Right(method) =>
-          return new Call(left, method, params)
       }
     }
     if (!right.`type`.isBasicType) {

@@ -1,0 +1,3 @@
+// Crash: AssignmentTyping.processArrayAssign cast the target type to ObjectType
+// after only checking isBasicType; a null literal target threw ClassCastException.
+null[0] = 1

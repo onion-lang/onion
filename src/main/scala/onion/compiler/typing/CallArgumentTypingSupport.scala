@@ -183,7 +183,9 @@ private[compiler] final class CallArgumentTypingSupport(
 
     argsWithDefaults.indices.foreach { i =>
       if (!filled(i)) {
-        result(i) = argsWithDefaults(i).defaultValue.get
+        result(i) = argsWithDefaults(i).defaultValue.getOrElse {
+          throw new IllegalStateException(s"argument ${argsWithDefaults(i).name} has no default despite the required-argument check")
+        }
         filled(i) = true
       }
     }

@@ -87,5 +87,36 @@ class StringInterpolationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("a=1, b=2, c=3, sum=6") == result)
     }
+    it("renders null as 'null' in interpolation") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "value: #{null}"
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("value: null") == result)
+    }
+
+    it("concatenates null like Java (\"x\" + null == \"xnull\")") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "x" + null
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("xnull") == result)
+    }
   }
 }

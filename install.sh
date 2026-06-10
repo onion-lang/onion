@@ -121,6 +121,21 @@ if java --sun-misc-unsafe-memory-access=allow -version >/dev/null 2>&1; then
   JVM_FLAGS="--sun-misc-unsafe-memory-access=allow"
 fi
 
+# ---- AppCDS archive (halves JVM startup for scripts) ----
+echo ""
+echo "Generating class-data-sharing archive (faster startup)..."
+CDS_TMP="$(mktemp /tmp/onion-cds-XXXXXX.on)"
+echo 'IO::println("")' > "$CDS_TMP"
+if java $JVM_FLAGS -XX:ArchiveClassesAtExit="$LIB_DIR/onion.jsa" \
+     -cp "$LIB_DIR/onion.jar" onion.tools.ScriptRunner "$CDS_TMP" >/dev/null 2>&1 \
+   && [ -f "$LIB_DIR/onion.jsa" ]; then
+  echo "  $LIB_DIR/onion.jsa"
+else
+  rm -f "$LIB_DIR/onion.jsa"
+  echo "  (skipped — JVM does not support dynamic CDS)"
+fi
+rm -f "$CDS_TMP"
+
 # ---- Write launchers ----
 write_launcher() {
   name="$1"
@@ -134,8 +149,10 @@ if [ -z "\$JAVA_HOME" ]; then
 else
     JAVA_CMD="\$JAVA_HOME/bin/java"
 fi
+CDS_FLAGS=""
+[ -f "$LIB_DIR/onion.jsa" ] && CDS_FLAGS="-XX:SharedArchiveFile=$LIB_DIR/onion.jsa"
 $extra
-exec "\$JAVA_CMD" $JVM_FLAGS -cp "\$ONION_JAR\${CLASSPATH:+:\$CLASSPATH}" $main_class "\$@"
+exec "\$JAVA_CMD" $JVM_FLAGS \$CDS_FLAGS -cp "\$ONION_JAR\${CLASSPATH:+:\$CLASSPATH}" $main_class "\$@"
 LAUNCHER
   chmod +x "$BIN_DIR/$name"
   echo "  $BIN_DIR/$name"
@@ -143,7 +160,7 @@ LAUNCHER
 
 write_launcher onion onion.tools.ScriptRunner 'if [ "$1" = "repl" ]; then
     shift
-    exec "$JAVA_CMD" '"$JVM_FLAGS"' -cp "$ONION_JAR${CLASSPATH:+:$CLASSPATH}" onion.tools.Repl "$@"
+    exec "$JAVA_CMD" '"$JVM_FLAGS"' $CDS_FLAGS -cp "$ONION_JAR${CLASSPATH:+:$CLASSPATH}" onion.tools.Repl "$@"
 fi'
 write_launcher onionc onion.tools.CompilerFrontend ""
 write_launcher onion-repl onion.tools.Repl ""

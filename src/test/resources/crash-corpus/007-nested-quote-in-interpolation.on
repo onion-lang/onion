@@ -1,4 +1,5 @@
-// Crash: the lexer ends the string literal at the inner quote, leaving an
-// unclosed #{...}; the interpolation splitter threw RuntimeException (I0000)
-// instead of reporting a syntax error.
+// Originally a crash: the lexer ended the string at the inner quote and the
+// interpolation splitter threw RuntimeException (I0000). Since #124 nested
+// string literals inside #{...} are supported, so this now simply compiles
+// (still guarded here against future lexer regressions).
 IO::println("v: #{IO::println("a")}")

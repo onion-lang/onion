@@ -334,7 +334,14 @@ public class JJOnionParser implements Parser {
       int interpEnd = interpStart + 2;
       while (interpEnd < str.length() && braceCount > 0) {
         char c = str.charAt(interpEnd);
-        if (c == '{') braceCount++;
+        if (c == '"') {
+          // Skip over a nested string literal so its braces don't count
+          interpEnd++;
+          while (interpEnd < str.length() && str.charAt(interpEnd) != '"') {
+            if (str.charAt(interpEnd) == '\\') interpEnd++;
+            interpEnd++;
+          }
+        } else if (c == '{') braceCount++;
         else if (c == '}') braceCount--;
         interpEnd++;
       }
@@ -395,7 +402,14 @@ public class JJOnionParser implements Parser {
       int interpEnd = interpStart + 2;
       while (interpEnd < str.length() && braceCount > 0) {
         char c = str.charAt(interpEnd);
-        if (c == '{') braceCount++;
+        if (c == '"') {
+          // Skip over a nested string literal so its braces don't count
+          interpEnd++;
+          while (interpEnd < str.length() && str.charAt(interpEnd) != '"') {
+            if (str.charAt(interpEnd) == '\\') interpEnd++;
+            interpEnd++;
+          }
+        } else if (c == '{') braceCount++;
         else if (c == '}') braceCount--;
         interpEnd++;
       }
@@ -643,15 +657,23 @@ TOKEN:
   >
 | <STRING:
     "\""
-    ( (~["\"","\\","\n","\r"])
+    ( (~["\"","\\","\n","\r","#"])
     | ("\\"
         ( ["n","t","b","r","f","\\","'","\""]
         | ["0"-"7"] ( ["0"-"7"] )?
         | ["0"-"3"] ["0"-"7"] ["0"-"7"]
         )
       )
+    | "#" ( "{" <INTERP_BODY> "}" )?
     )*
     "\""
+  >
+| <#INTERP_STRING: "\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
+| <#INTERP_BODY:
+    ( ~["{","}","\"","\n","\r"]
+    | <INTERP_STRING>
+    | "{" ( ~["{","}","\"","\n","\r"] | <INTERP_STRING> )* "}"
+    )*
   >
 | <MULTI_LINE_STRING:
     "\"\"\""

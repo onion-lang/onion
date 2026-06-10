@@ -118,5 +118,53 @@ class StringInterpolationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("xnull") == result)
     }
+    it("supports string literals inside interpolation") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m = ["k": "vee"]
+          |    return "value: #{m.get("k")}"
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("value: vee") == result)
+    }
+
+    it("supports nested braces and strings inside interpolation") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "outer #{ ["a": 41].get("a") as Integer + 1 } end"
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("outer 42 end") == result)
+    }
+
+    it("leaves bare hash characters alone") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "issue #124 and #tag"
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("issue #124 and #tag") == result)
+    }
   }
 }

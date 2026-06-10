@@ -30,7 +30,10 @@ object ReflectionRefs {
 
   private final class GenericTypeMapper(table: ClassTable) {
     private val bridge = new OnionTypeConversion(table)
-    private val root = table.rootClass
+    // Resolved lazily: GenericTypeMapper is constructed while a ReflectClassType
+    // is still being built, and loading java.lang.Object eagerly here re-enters
+    // ClassTable.loadOrNull before the entry is cached, recursing forever (#125)
+    private lazy val root = table.rootClass
 
     def typeParamEnv(typeParams: Array[TypedAST.TypeParameter]): Map[String, TypedAST.TypeVariableType] =
       typeParams.map { tp =>

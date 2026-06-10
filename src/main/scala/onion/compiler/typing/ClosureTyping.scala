@@ -270,7 +270,9 @@ final class ClosureTyping(
 
     val paramCount = baseType.typeParameters.length
     if (paramCount == argTypes.length + 1) {
-      val ret = inferredReturnType.getOrElse(bodyContext.rootClass)
+      // void cannot instantiate a type parameter; a side-effect-only body
+      // becomes FunctionN[..., Object] and the block returns null
+      val ret = inferredReturnType.filter(_ != BasicType.VOID).getOrElse(bodyContext.rootClass)
       AppliedClassType(baseType, (argTypes.toIndexedSeq :+ ret).toList)
     } else {
       rawType
@@ -364,6 +366,11 @@ final class ClosureTyping(
         val stmt = termToStatement(last)
         statements += stmt
         new Return(defaultValue(returnType))
+      } else if (last.`type` == BasicType.VOID && !returnType.isBasicType) {
+        // Side-effect-only body against a reference-typed SAM return
+        // (e.g. Future::async(() -> IO::println(...))): run it, return null
+        statements += termToStatement(last)
+        new Return(new NullValue(node.location))
       } else {
         last match {
           case st: StatementTerm =>

@@ -139,11 +139,17 @@ private[typing] object GenericMethodTypeArguments {
                 case _ =>
                   unify(w.upperBound, actual, position)
         case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+          // Type arguments are reference types: box primitives (Future::async
+          // of an Int-returning lambda is a Future[Integer], not Future[int])
+          val bound = actual match {
+            case bt: BasicType if bt != BasicType.VOID => typing.boxedTypeArgument(bt)
+            case other => other
+          }
           inferred.get(tv.name) match {
             case Some(prev) =>
-              if (!(prev eq actual)) reportError(position, INCOMPATIBLE_TYPE, prev, actual)
+              if (!(prev eq bound)) reportError(position, INCOMPATIBLE_TYPE, prev, bound)
             case None =>
-              inferred += tv.name -> actual
+              inferred += tv.name -> bound
           }
         case apf: TypedAST.AppliedClassType =>
           def sameRawClass(c1: TypedAST.ClassType, c2: TypedAST.ClassType): Boolean =
@@ -316,11 +322,17 @@ private[typing] object GenericMethodTypeArguments {
                 case _ =>
                   unify(w.upperBound, actual, position)
         case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
+          // Type arguments are reference types: box primitives (Future::async
+          // of an Int-returning lambda is a Future[Integer], not Future[int])
+          val bound = actual match {
+            case bt: BasicType if bt != BasicType.VOID => typing.boxedTypeArgument(bt)
+            case other => other
+          }
           inferred.get(tv.name) match {
             case Some(prev) =>
-              if (!(prev eq actual)) reportError(position, INCOMPATIBLE_TYPE, prev, actual)
+              if (!(prev eq bound)) reportError(position, INCOMPATIBLE_TYPE, prev, bound)
             case None =>
-              inferred += tv.name -> actual
+              inferred += tv.name -> bound
           }
         case apf: TypedAST.AppliedClassType =>
           // 同じクラス名で型引数の数が一致するかチェック（参照比較ではなく名前比較）

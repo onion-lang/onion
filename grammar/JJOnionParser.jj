@@ -1245,12 +1245,12 @@ AST.LocalVariableDeclaration local_var_declaration() :{Token keyword, t; int dec
     ":" ty=type() ["=" eols() e=term()]
   | "=" eols() e=term()
   )
-  eos() {return new AST.LocalVariableDeclaration(p(keyword), declMods, c(t), ty, e);}
+  eos_or_block_end() {return new AST.LocalVariableDeclaration(p(keyword), declMods, c(t), ty, e);}
 }
 
 AST.BreakExpression terminated_break_expression() :{Token t;}{
   {enterSection();}
-  t="break" eos() {return new AST.BreakExpression(p(t));}
+  t="break" eos_or_block_end() {return new AST.BreakExpression(p(t));}
 }
 
 AST.BreakExpression break_expression() :{Token t;}{
@@ -1259,7 +1259,7 @@ AST.BreakExpression break_expression() :{Token t;}{
 
 AST.ContinueExpression terminated_continue_expression() :{Token t; AST.ContinueExpression st;}{
   {enterSection();}
-  t="continue" eos() {return new AST.ContinueExpression(p(t));}
+  t="continue" eos_or_block_end() {return new AST.ContinueExpression(p(t));}
 }
 
 AST.ContinueExpression continue_expression() :{Token t; AST.ContinueExpression st;}{
@@ -1268,7 +1268,7 @@ AST.ContinueExpression continue_expression() :{Token t; AST.ContinueExpression s
 
 AST.ThrowExpression terminated_throw_expression() :{Token t; AST.Expression e;}{
   {enterSection();}
-  t="throw" e=term() eos() {return new AST.ThrowExpression(p(t), e);}
+  t="throw" e=term() eos_or_block_end() {return new AST.ThrowExpression(p(t), e);}
 }
 
 AST.ThrowExpression throw_expression() :{Token t; AST.Expression e;}{
@@ -1305,8 +1305,18 @@ AST.Expression expression_element() :{AST.Expression e;}{
   e=assignable() eos_or_block_end() {return e;}
 }
 
-AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null;}{
-  t="if" e=term() b1=block() [LOOKAHEAD(2) "else" b2=block()] {return new AST.IfExpression(p(t), e, b1, b2);}
+AST.IfExpression if_expression() :{Token t; AST.Expression e; AST.BlockExpression b1, b2 = null; AST.IfExpression elif = null; ArrayBuffer<AST.BlockElement> elifElems = new ArrayBuffer<AST.BlockElement>();}{
+  t="if" e=term() b1=block()
+  [ LOOKAHEAD(2) "else"
+    ( b2=block()
+    | elif=if_expression() {
+        // else-if chain: wrap the nested if in a synthetic block
+        append(elifElems, elif);
+        b2 = new AST.BlockExpression(elif.location(), toList(elifElems));
+      }
+    )
+  ]
+  {return new AST.IfExpression(p(t), e, b1, b2);}
 }
 
 AST.Pattern case_pattern() :{
@@ -1376,7 +1386,10 @@ AST.SelectExpression select_expression() :{
 
 AST.ReturnExpression terminated_return_expression() :{Token t; AST.Expression e = null;}{
   {enterSection();}
-  t="return" [e=term()] eos() {return new AST.ReturnExpression(p(t), e);}
+  t="return"
+  // Take a return value unless the next token already terminates the statement
+  [ LOOKAHEAD({ getToken(1).kind != EOL && getToken(1).kind != EOF && !la(";") && !la("}") }) e=term() ]
+  eos_or_block_end() {return new AST.ReturnExpression(p(t), e);}
 }
 
 AST.ReturnExpression return_expression() :{Token t; AST.Expression e = null;}{

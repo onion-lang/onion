@@ -328,10 +328,10 @@ These are frequently confused with other languages. **Always check these:**
 |--------------------------|-----------------|
 | `if (condition) { }` | `if condition { }` - no parentheses around condition |
 | `while (condition) { }` | `while condition { }` - no parentheses |
-| `else if condition { }` | `else { if condition { } }` - no `else if` keyword |
+| `else if condition { }` | ✓ correct - `else if` chains are supported (also as expressions) |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
-| `i += 1` or `i++` | `i = i + 1` - limited compound operators (only `++` in for loops) |
+| `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
 
 ### Methods & Classes

@@ -35,10 +35,14 @@ private[compiler] object DuplicationChecks {
 
       for (contract <- view.raw.methods) {
         if !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
-          val key = (contract.name, erasedParamDescriptor(contract.arguments))
-          implByErasedParams.get(key).foreach { impl =>
-            val specializedArgs =
-              contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+          val specializedArgs =
+            contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+          // An implementation may declare the specialized parameter types
+          // (id(x: String) for Id[String]) or the erased ones (id(x: Object)):
+          // look the contract up under both keys.
+          val specializedKey = (contract.name, erasedParamDescriptor(specializedArgs))
+          val erasedKey = (contract.name, erasedParamDescriptor(contract.arguments))
+          implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey)).foreach { impl =>
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 

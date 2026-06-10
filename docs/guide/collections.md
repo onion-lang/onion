@@ -69,8 +69,12 @@ Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
 Nested class names work in type positions:
 
 ```onion
+foreach (name, age) in ages {            // entry destructuring
+  IO::println(name + " is " + age)
+}
+
 import { java.util.Map }
-foreach e: Map.Entry in ages.entrySet() {
+foreach e: Map.Entry in ages.entrySet() { // explicit entry form
   IO::println(e.getKey() + " is " + e.getValue())
 }
 ```

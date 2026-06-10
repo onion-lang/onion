@@ -332,6 +332,7 @@ object AsmRefs {
   class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = method.name
+    override val isVararg: Boolean = (method.access & Opcodes.ACC_VARARGS) != 0
     private val bridge = new OnionTypeConversion(table)
     private val mapper = new SignatureTypeMapper(table, classEnv, () => table.loadRequired("java.lang.Object"))
     private val parsed =

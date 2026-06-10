@@ -103,9 +103,14 @@ private[compiler] final class CallOverloadSupport(
   }
 
   def selectMostSpecificApplicable(
-    applicable: List[ApplicableMethod],
+    applicable0: List[ApplicableMethod],
     relevantIndices: Seq[Int] = Nil
   ): CandidateSelection[ApplicableMethod] = {
+    // Java-style phasing: varargs are only considered when no fixed-arity
+    // method is applicable (List.of(1,2,3) prefers of(E,E,E) over of(E...))
+    val applicable =
+      if (applicable0.exists(a => !a.method.isVararg)) applicable0.filter(a => !a.method.isVararg)
+      else applicable0
     if (applicable.isEmpty) CandidateSelection.NoMatch
     else if (applicable.length == 1) CandidateSelection.Selected(applicable.head)
     else {

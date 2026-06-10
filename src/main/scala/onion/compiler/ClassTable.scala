@@ -24,6 +24,11 @@ class ClassTable(classPath: String) {
   private val table = new ClassFileTable(classPath)
 
   def loadArray(component: TypedAST.Type, dimension: Int): TypedAST.ArrayType = {
+    // The cache is keyed by name, which is ambiguous for type variables ("T" from
+    // different methods with different bounds) and applied types (List[String] vs
+    // List[Int]); cache only arrays of simple components.
+    if (!isCacheableComponent(component))
+      return new TypedAST.ArrayType(component, dimension, this)
     val arrayName = "[" * dimension + component.name
     var array: TypedAST.ArrayType = arrayClasses.get(arrayName)
     if (array != null) return array
@@ -31,6 +36,18 @@ class ClassTable(classPath: String) {
     arrayClasses.put(arrayName, array)
     array
   }
+
+  private def isCacheableComponent(component: TypedAST.Type): Boolean =
+    component match {
+      case _: TypedAST.BasicType => true
+      case _: TypedAST.TypeVariableType => false
+      case _: TypedAST.AppliedClassType => false
+      case _: TypedAST.WildcardType => false
+      case _: TypedAST.NullableType => false
+      case array: TypedAST.ArrayType => isCacheableComponent(array.component)
+      case _: TypedAST.ClassType => true
+      case _ => false
+    }
 
   /**
    * Null-returning lookup kept for the bytecode/reflection environment internals,

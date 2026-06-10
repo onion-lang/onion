@@ -119,6 +119,7 @@ object ReflectionRefs {
   private class ReflectMethodRef(method: Method, override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
     override val modifier: Int = toOnionModifier(method.getModifiers)
     override val name: String = method.getName
+    override val isVararg: Boolean = method.isVarArgs
     private val (typeParams0, env0) = mapper.typeParamsFrom(method.getTypeParameters, baseEnv)
     override val typeParameters: Array[TypedAST.TypeParameter] = typeParams0.clone()
     private val argTypes: Array[TypedAST.Type] = method.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))

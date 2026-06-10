@@ -131,7 +131,12 @@ class AsmCodeGenerationVisitor(
       asmType(node.method.returnType),
       argTypes*
     )
-    gen.invokeStatic(ownerType, AsmMethod(node.method.name, methodDesc))
+    if node.target.isInterface then
+      // Static interface methods need an InterfaceMethodref constant (itf=true);
+      // a plain Methodref makes the JVM throw IncompatibleClassChangeError.
+      gen.visitMethodInsn(Opcodes.INVOKESTATIC, ownerType.getInternalName, node.method.name, methodDesc, true)
+    else
+      gen.invokeStatic(ownerType, AsmMethod(node.method.name, methodDesc))
   
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)

@@ -1257,7 +1257,13 @@ object TypedAST {
     def find(target: TypedAST.ObjectType, name: String, arguments: Array[TypedAST.Term]): Array[TypedAST.Method] = {
       val methods: Set[TypedAST.Method] = new TreeSet[TypedAST.Method](new TypedAST.MethodComparator)
       find(methods, target, name, arguments)
-      val sorted = methods.asScala.toArray.sortWith((m1, m2) => sorter.compare(m1, m2) < 0)
+      // Java-style phasing: a fixed-arity match beats vararg matches
+      val all = methods.asScala.toArray
+      val candidates = {
+        val fixedArity = all.filter(m => !m.isVararg || matcher.matches(m.arguments, arguments))
+        if (fixedArity.nonEmpty) fixedArity else all
+      }
+      val sorted = candidates.sortWith((m1, m2) => sorter.compare(m1, m2) < 0)
       if (sorted.length < 2 || isAmbiguous(sorted(0), sorted(1))) sorted
       else Array(sorted(0))
     }

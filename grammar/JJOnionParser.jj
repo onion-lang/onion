@@ -724,7 +724,7 @@ AST.ImportClause import_decl() :{
       (LOOKAHEAD(2) n=import_id() "." {sb.append(c(n)); sb.append(".");})+
       (n=import_id() | star="*" {n = star;}) {s = c(n); sb.append(s);}
       [<K_AS> alias=id() {s = c(alias);}]
-      eos()
+      eos_or_block_end()
       { append(imports, new Tuple2<String, String>(s, new String(sb))); }
     )*
   "}"{ return new AST.ImportClause(p(t), toList(imports)); }

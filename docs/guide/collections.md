@@ -63,3 +63,14 @@ Pass a lambda where a `Comparator` is expected:
 val xs = Colls::mutableListOf(3, 1, 2)
 Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
 ```
+
+## Map Iteration
+
+Nested class names work in type positions:
+
+```onion
+import { java.util.Map }
+foreach e: Map.Entry in ages.entrySet() {
+  IO::println(e.getKey() + " is " + e.getValue())
+}
+```

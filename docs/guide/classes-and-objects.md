@@ -257,3 +257,21 @@ class ButtonHandler <: ActionListener {
 - [Inheritance](inheritance.md) - Extending classes and implementing interfaces
 - [Java Interoperability](java-interop.md) - Working with Java classes
 - [Examples](../examples/oop.md) - Object-oriented examples
+
+## Records
+
+Records are concise immutable data classes with generated `equals`,
+`hashCode`, `toString` and `copy`:
+
+```onion
+record Point(x: Int, y: Int)
+
+val p = new Point(1, 2)
+p.x()                       // component access (methods)
+p.copy(y = 9)               // partial copy with named arguments
+p.copy()                    // full clone
+p.copy(5, 6)                // positional copy
+```
+
+Records work with `select` pattern matching when combined with sealed
+interfaces.

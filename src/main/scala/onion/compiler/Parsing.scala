@@ -22,7 +22,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
   with Processor[Seq[InputSource], Seq[AST.CompilationUnit]] {
 
   /** Maximum number of syntax errors to collect per file before stopping */
-  private val maxErrorsPerFile = 10
+  private val maxErrorsPerFile = config.maxErrorReports
 
   type Environment = Null
 

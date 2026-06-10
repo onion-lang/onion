@@ -208,5 +208,33 @@ class ErrorRecoverySpec extends AbstractShellSpec {
       assert(exception.problems.nonEmpty)
       assert(exception.problems.head.isInstanceOf[CompileError])
     }
+    it("collects multiple syntax errors across declarations in one pass") {
+      val parsing = new Parsing(defaultConfig)
+      val sources = Seq(stringSource(
+        """
+          |class A {
+          |public:
+          |  static def f(): Int {
+          |    return 1 +
+          |  }
+          |}
+          |
+          |class B {
+          |public:
+          |  static def g(): Int {
+          |    val 123 = x
+          |  }
+          |}
+        """.stripMargin
+      ))
+
+      val exception = intercept[CompilationException] {
+        parsing.processBody(sources, null)
+      }
+
+      assert(exception.problems.size >= 2,
+        s"expected at least 2 collected errors, got ${exception.problems.size}: " +
+          exception.problems.map(_.message).mkString("; "))
+    }
   }
 }

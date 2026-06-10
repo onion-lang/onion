@@ -107,47 +107,59 @@ public class JJOnionParser implements Parser {
   }
 
   /**
-   * Skip tokens until we find a synchronization point (semicolon, newline, or closing brace).
-   * Used for panic mode error recovery.
+   * Panic-mode skip for top-level error recovery. Consumes tokens while
+   * tracking brace depth (relative to the error position) and stops:
+   *   - just BEFORE a type-declaration keyword at relative depth zero
+   *     (so the next iteration can parse it as a fresh declaration), or
+   *   - just AFTER the '}' that closes the enclosing declaration, or
+   *   - just AFTER a ';' or newline at relative depth zero.
    * @return true if a sync point was found, false if EOF was reached
    */
-  private boolean skipToSyncPoint() {
-    Token t;
+  private boolean skipToToplevelSyncPoint() {
+    int depth = 0;
     while (true) {
-      t = getNextToken();
-      String img = t.image;
-      // Check for EOF
-      if (img == null || t.kind == 0) { // 0 is typically EOF
+      Token next = getToken(1);
+      if (next == null || next.kind == 0) { // 0 is EOF
         return false;
       }
-      // Sync points: semicolon, closing brace
-      if (";".equals(img) || "}".equals(img)) {
-        return true;
+      String img = next.image;
+      if (depth == 0 && isDeclarationStart(img)) {
+        return true; // leave the keyword for the next parse attempt
       }
-      // Check for newline (typically represented as "\n" or "\r\n")
-      if (img.contains("\n") && states.isEmpty()) {
+      getNextToken(); // consume
+      if ("{".equals(img)) {
+        depth++;
+      } else if ("}".equals(img)) {
+        if (depth > 0) depth--;
+        else return true; // closed the enclosing declaration
+      } else if (depth == 0 && (";".equals(img) || (img != null && img.contains("\n") && states.isEmpty()))) {
         return true;
       }
     }
   }
 
+  private boolean isDeclarationStart(String img) {
+    return "class".equals(img) || "interface".equals(img) || "record".equals(img)
+        || "enum".equals(img) || "extension".equals(img) || "type".equals(img);
+  }
+
   /**
-   * Skip tokens until we find a token with the specified image.
-   * @return true if the token was found, false if EOF was reached
+   * Summarize the expected tokens of a ParseException for collected errors.
    */
-  private boolean skipToTokenImage(String... images) {
-    Token t;
-    while (true) {
-      t = getNextToken();
-      if (t.image == null || t.kind == 0) {
-        return false;
-      }
-      for (String img : images) {
-        if (img.equals(t.image)) {
-          return true;
-        }
+  private String expectedSummary(ParseException e) {
+    if (e.expectedTokenSequences == null || e.expectedTokenSequences.length == 0) {
+      return "valid token";
+    }
+    StringBuilder sb = new StringBuilder();
+    java.util.HashSet<String> seen = new java.util.HashSet<String>();
+    for (int[] seq : e.expectedTokenSequences) {
+      if (seq.length > 0 && seen.add(e.tokenImage[seq[0]])) {
+        if (seen.size() > 3) { sb.append(", ..."); break; }
+        if (sb.length() > 0) sb.append(", ");
+        sb.append(e.tokenImage[seq[0]]);
       }
     }
+    return sb.length() == 0 ? "valid token" : sb.toString();
   }
 
   private boolean no(int m, int mset) {
@@ -656,7 +668,19 @@ AST.CompilationUnit unit() :{
 }{
   [module=module_decl()]
   [imports=import_decl()]
-  (top=top_level() {append(tops, top);})+ <EOF> {
+  (
+    try {
+      top=top_level() {append(tops, top);}
+    } catch (ParseException e) {
+      if (!errorRecoveryMode) { throw e; }
+      Token errorToken = (e.currentToken != null && e.currentToken.next != null) ? e.currentToken.next : token;
+      if (!collectError(errorToken, expectedSummary(e))) { throw e; }
+      if (!skipToToplevelSyncPoint()) {
+        // EOF reached while recovering: return what we have, errors are collected
+        return new AST.CompilationUnit(p(1, 1), null, module, imports, toList(tops));
+      }
+    }
+  )+ <EOF> {
     return new AST.CompilationUnit(p(1, 1),  null, module, imports, toList(tops));
   }
 }

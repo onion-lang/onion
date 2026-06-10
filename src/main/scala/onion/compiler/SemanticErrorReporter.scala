@@ -339,6 +339,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.lambdaParamTypeRequired",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.FUNCTION_BODY_REQUIRED -> ErrorDef(
+      "error.semantic.functionBodyRequired",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

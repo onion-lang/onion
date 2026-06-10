@@ -1,0 +1,5 @@
+// Crash (found by fuzzing run/Calculator.on): assigning null to a primitive
+// passed the boxed-assignability check (null is assignable to Integer) and
+// then Boxing.unboxing threw "node type must be object type".
+var x: Int = null
+IO::println(x)

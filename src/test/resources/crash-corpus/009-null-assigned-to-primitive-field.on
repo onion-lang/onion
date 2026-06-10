@@ -1,0 +1,8 @@
+// Crash: same unboxing bug as 008 reached through a field assignment.
+class A {
+  var x: Int
+public:
+  def set: void { this.x = null }
+  def this {}
+}
+IO::println("ok")

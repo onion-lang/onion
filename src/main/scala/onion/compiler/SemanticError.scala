@@ -120,6 +120,7 @@ object SemanticError {
   case object LAMBDA_PARAM_TYPE_REQUIRED extends SemanticError(52)
   case object CYCLIC_TYPE_ALIAS extends SemanticError(53)
   case object DUPLICATE_TYPE_ALIAS extends SemanticError(54)
+  case object FUNCTION_BODY_REQUIRED extends SemanticError(55)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

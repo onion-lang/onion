@@ -28,6 +28,12 @@ private[compiler] final class AssignabilitySupport(
       }
     }
 
+    if (expected.isBasicType && actual.`type`.isNullType) {
+      // null can never be assigned to a primitive; unboxing it would crash
+      bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
+      return null
+    }
+
     if (expected.isBasicType && !actual.`type`.isBasicType) {
       val targetBasicType = expected.asInstanceOf[BasicType]
       if (targetBasicType == BasicType.VOID) {

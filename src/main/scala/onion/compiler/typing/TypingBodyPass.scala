@@ -109,7 +109,11 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     declarationBodySupport.processExtensionDeclaration(node)
   def processFunctionDeclaration(node: AST.FunctionDeclaration, context: LocalContext): Unit =
     typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
-      methodBodySupport.processMethodLikeBody(function, node.args, node.block)
+      if (node.block == null) {
+        typing.report(SemanticError.FUNCTION_BODY_REQUIRED, node, node.name)
+      } else {
+        methodBodySupport.processMethodLikeBody(function, node.args, node.block)
+      }
     }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term =

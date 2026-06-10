@@ -1,0 +1,9 @@
+// Crash (found by fuzzing run/Generics.on): AssignmentTyping.processMemberAssign
+// did not check the typed right-hand side for null, so a member assignment whose
+// RHS failed to type (undefined variable) crashed with an NPE on value.type().
+class A {
+  val v: Int
+public:
+  def this { this.v = undefinedxyz }
+}
+IO::println("ok")

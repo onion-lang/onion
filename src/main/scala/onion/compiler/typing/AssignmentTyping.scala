@@ -89,6 +89,7 @@ final class AssignmentTyping(
         val name = selection.name
         val field: FieldRef = MemberAccess.findField(targetType, name)
         val value: Term = typed(expression, context).getOrElse(null)
+        if (value == null) return null
         if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
           if (Modifier.isFinal(field.modifier) && (context.constructor == null || !target.isInstanceOf[This])) {
             bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)

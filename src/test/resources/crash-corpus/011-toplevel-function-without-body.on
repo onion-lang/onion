@@ -1,0 +1,4 @@
+// Crash (found by fuzzing run/Factorial.on): a top-level function declaration
+// without a body was registered in the outline pass with a null block, and the
+// body pass crashed with an NPE while translating it. Now reports E0055.
+def fact(n :Int): Int

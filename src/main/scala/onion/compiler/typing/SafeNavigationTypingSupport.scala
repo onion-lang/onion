@@ -57,7 +57,7 @@ private[compiler] final class SafeNavigationTypingSupport(
         calls.reportIllegalMethodCall(node, method, name)
         None
       case Some(method) =>
-        val classSubst = TypeSubstitution.classSubstitution(targetType)
+        val classSubst = TypeSubstitution.hierarchySubstitution(targetType, method.affiliation)
         calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
           finalParams => new SafeCall(node.location, target, method, finalParams)

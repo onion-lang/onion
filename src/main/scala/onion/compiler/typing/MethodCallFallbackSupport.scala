@@ -102,7 +102,7 @@ private[compiler] final class MethodCallFallbackSupport(
         calls.reportMethodNotFound(node, targetType, name, nonClosureTypes.values.toArray)
         return None
     }
-    val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
     val nonClosureParams = preliminaryParams.filter(_ != null)
     val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(
       typing, node, method, nonClosureParams, classSubst, expected

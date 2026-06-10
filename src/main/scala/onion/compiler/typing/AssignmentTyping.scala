@@ -95,7 +95,7 @@ final class AssignmentTyping(
             bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
             return null
           }
-          val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+          val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation)
           val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
           if (value.`type`.isBottomType) return value
           val term = processAssignable(expression, expected, value)

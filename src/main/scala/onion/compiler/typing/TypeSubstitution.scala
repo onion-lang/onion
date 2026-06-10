@@ -68,6 +68,44 @@ private[compiler] object TypeSubstitution {
   }
 
   /**
+   * Substitution for a member declared on `declaring`, as seen from
+   * `receiver`: walks the inheritance chain composing extends-clause type
+   * arguments, so StringBox (: Box[String]) sees Box.get(): T as String.
+   * Falls back to the receiver's own substitution when the chain doesn't
+   * reach `declaring` (e.g. erased external classes).
+   */
+  def hierarchySubstitution(receiver: Type, declaring: TypedAST.ClassType): scala.collection.immutable.Map[String, Type] = {
+    def rawOf(ct: TypedAST.ClassType): TypedAST.ClassType = ct match {
+      case a: TypedAST.AppliedClassType => a.raw
+      case c => c
+    }
+    val targetName = rawOf(declaring).name
+    val direct = classSubstitution(receiver)
+    val receiverClass = receiver match {
+      case ct: TypedAST.ClassType => rawOf(ct)
+      case _ => return direct
+    }
+    if (receiverClass.name == targetName) return direct
+
+    def walk(current: TypedAST.ClassType, subst: scala.collection.immutable.Map[String, Type], seen: Set[String]): Option[scala.collection.immutable.Map[String, Type]] = {
+      if (current == null || seen(current.name)) return None
+      if (current.name == targetName) return Some(subst)
+      val parents = Option(current.superClass).toSeq ++ Option(current.interfaces).map(_.toSeq).getOrElse(Seq.empty)
+      parents.iterator.flatMap { parent =>
+        val parentSubst = parent match {
+          case ap: TypedAST.AppliedClassType =>
+            ap.raw.typeParameters.map(_.name)
+              .zip(ap.typeArguments.map(arg => substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = true)))
+              .toMap
+          case _ => scala.collection.immutable.Map.empty[String, Type]
+        }
+        walk(rawOf(parent), parentSubst, seen + current.name)
+      }.nextOption()
+    }
+    walk(receiverClass, direct, Set.empty).getOrElse(direct)
+  }
+
+  /**
    * Applies type substitution to a type, replacing type variables with their mapped types.
    *
    * This method recursively traverses the type structure, substituting type variables

@@ -31,5 +31,30 @@ class GenericsBridgeSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("a!") == result)
     }
+    it("substitutes extends-clause type arguments for inherited members") {
+      val result = shell.run(
+        """
+          |class Box[T extends Object] {
+          |  val item: T
+          |public:
+          |  def this(item: T) { this.item = item }
+          |  def get(): T { return this.item }
+          |}
+          |
+          |class StringBox : Box[String] {
+          |public:
+          |  def this(s: String) : (s) {}
+          |  def shout(): String { return this.get().toUpperCase() }
+          |
+          |  static def main(args: String[]): String {
+          |    return new StringBox("hi").shout()
+          |  }
+          |}
+          |""".stripMargin,
+        "InheritedSubstitution.on",
+        Array()
+      )
+      assert(Shell.Success("HI") == result)
+    }
   }
 }

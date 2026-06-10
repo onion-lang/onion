@@ -74,7 +74,7 @@ private[compiler] final class InstanceMethodCallSupport(
         calls.reportIllegalMethodCall(node, method, name)
         None
       case Some(method) =>
-        val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+        val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
         calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
           finalParams => new Call(target, method, finalParams)
@@ -170,7 +170,7 @@ private[compiler] final class InstanceMethodCallSupport(
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
       case CandidateSelection.Selected(method) =>
-        val classSubst = TypeSubstitution.classSubstitution(target.`type`)
+        val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs),

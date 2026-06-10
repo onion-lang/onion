@@ -104,6 +104,9 @@ object CapturedVariableScanner {
     case listLit: AST.ListLiteral =>
       listLit.elements.foreach(visit)
 
+    case mapLit: AST.MapLiteral =>
+      mapLit.entries.foreach { case (k, v) => visit(k); visit(v) }
+
     case cast: AST.Cast =>
       visit(cast.src)
 

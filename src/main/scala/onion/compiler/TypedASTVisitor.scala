@@ -27,6 +27,7 @@ trait TypedASTVisitor[T]:
   def visitInstanceOf(node: InstanceOf): T
   def visitIntValue(node: IntValue): T
   def visitListLiteral(node: ListLiteral): T
+  def visitMapLiteral(node: MapLiteral): T
   def visitRefLocal(node: RefLocal): T
   def visitSetLocal(node: SetLocal): T
   def visitNewClosure(node: NewClosure): T
@@ -81,6 +82,7 @@ trait TypedASTVisitor[T]:
     case n: InstanceOf => visitInstanceOf(n)
     case n: IntValue => visitIntValue(n)
     case n: ListLiteral => visitListLiteral(n)
+    case n: MapLiteral => visitMapLiteral(n)
     case n: RefLocal => visitRefLocal(n)
     case n: SetLocal => visitSetLocal(n)
     case n: NewClosure => visitNewClosure(n)
@@ -141,6 +143,7 @@ abstract class DefaultTypedASTVisitor[T] extends TypedASTVisitor[T]:
   override def visitInstanceOf(node: InstanceOf): T = defaultValue
   override def visitIntValue(node: IntValue): T = defaultValue
   override def visitListLiteral(node: ListLiteral): T = defaultValue
+  override def visitMapLiteral(node: MapLiteral): T = defaultValue
   override def visitRefLocal(node: RefLocal): T = defaultValue
   override def visitSetLocal(node: SetLocal): T = defaultValue
   override def visitNewClosure(node: NewClosure): T = defaultValue

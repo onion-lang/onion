@@ -87,6 +87,10 @@ private[compiler] object CapturedVariableCollector {
       case list: ListLiteral =>
         list.elements.foreach(visitTerm)
 
+      case map: MapLiteral =>
+        map.keys.foreach(visitTerm)
+        map.values.foreach(visitTerm)
+
       case refField: RefField =>
         visitTerm(refField.target)
 

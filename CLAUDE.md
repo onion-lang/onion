@@ -363,6 +363,7 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong (Java/Scala style) | Correct (Onion) |
 |--------------------------|-----------------|
 | `new String[] {"a", "b"}` | `["a", "b"]` creates `List`, use `new String[n]` for array |
+| `Map.of("a", 1)` | `["a": 1, "b": 2]` creates `Map` (LinkedHashMap); empty map is `[:]` |
 | `list.get(i)` | `list[i]` - both array and List use `[]` access |
 | `list.set(i, v)` | `list[i] = v` - assignment also uses `[]` |
 | `arr.length()` | `arr.length` - array length is property, not method |

@@ -1604,7 +1604,7 @@ AST.Expression primary() : {
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(p(t), c(t), es); }
 | t=id()                                                            {return new AST.Id(p(t), c(t));}
-| {enterDefault();} t="[" eols() es=terms() "]" {leaveDefault();}   {return new AST.ListLiteral(p(t), es);}
+| {enterDefault();} t="[" eols() e=bracket_literal_rest(t) {leaveDefault();} {return e;}
 | LOOKAHEAD( lambda_head() ) e=arrow_anonymous_function()                 {return e;}
 | LOOKAHEAD("do" "[") e=do_expression()                                   {return e;}
 | LOOKAHEAD("new" raw_type() "[" "]" "{") t="new" ty=raw_type() "[" "]" "{" eols() es=terms() "}"
@@ -1640,6 +1640,27 @@ List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> a
   [arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})*] {
     return toList(args);
   }
+}
+
+// Continues a '[' that has already been consumed: either a list literal
+// ([], [1, 2]) or a map literal ([:], ["a": 1, "b": 2]).
+AST.Expression bracket_literal_rest(Token t) :{
+  AST.Expression first, k, v;
+  ArrayBuffer<AST.Expression> elems = new ArrayBuffer<AST.Expression>();
+  ArrayBuffer<Tuple2<AST.Expression, AST.Expression>> entries = new ArrayBuffer<Tuple2<AST.Expression, AST.Expression>>();
+}{
+  ":" eols() "]" { return new AST.MapLiteral(p(t), toList(entries)); }
+| "]" { return new AST.ListLiteral(p(t), toList(elems)); }
+| first=argument_expr()
+  ( ":" eols() v=term() { append(entries, new Tuple2<AST.Expression, AST.Expression>(first, v)); }
+    ("," eols() k=term() ":" eols() v=term() { append(entries, new Tuple2<AST.Expression, AST.Expression>(k, v)); })*
+    eols() "]"
+    { return new AST.MapLiteral(p(t), toList(entries)); }
+  | { append(elems, first); }
+    ("," eols() k=argument_expr() { append(elems, k); })*
+    eols() "]"
+    { return new AST.ListLiteral(p(t), toList(elems)); }
+  )
 }
 
 AST.ClosureExpression arrow_anonymous_function() :{

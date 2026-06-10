@@ -275,6 +275,29 @@ class AsmCodeGenerationVisitor(
         case _ => // Already an object
       gen.invokeVirtual(listType, listAdd)
       gen.pop() // Pop boolean result
+
+  override def visitMapLiteral(node: MapLiteral): Unit =
+    // Create LinkedHashMap (preserves literal entry order)
+    val mapType = AsmUtil.objectType(AsmUtil.JavaUtilLinkedHashMap)
+    val mapCtor = AsmMethod.getMethod("void <init>()")
+    val mapPut = AsmMethod.getMethod("Object put(Object, Object)")
+    gen.newInstance(mapType)
+    gen.dup()
+    gen.invokeConstructor(mapType, mapCtor)
+
+    // Put entries
+    for i <- node.keys.indices do
+      gen.dup() // Duplicate map reference
+      visitTerm(node.keys(i))
+      node.keys(i).`type` match
+        case bt: BasicType => gen.box(asmType(bt))
+        case _ => // Already an object
+      visitTerm(node.values(i))
+      node.values(i).`type` match
+        case bt: BasicType => gen.box(asmType(bt))
+        case _ => // Already an object
+      gen.invokeVirtual(mapType, mapPut)
+      gen.pop() // Pop previous value
   
   override def visitRefLocal(node: RefLocal): Unit =
     asmCodeGen.emitRefLocal(gen, node, localVars)

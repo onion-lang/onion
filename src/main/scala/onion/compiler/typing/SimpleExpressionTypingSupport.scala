@@ -56,6 +56,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
         Some(new BoolValue(loc, v))
       case node: AST.ListLiteral =>
         typeListLiteral(node, context)
+      case node: AST.MapLiteral =>
+        typeMapLiteral(node, context)
       case node@AST.NullLiteral(loc) =>
         Some(new NullValue(loc))
       case node@AST.CurrentInstance(loc) =>
@@ -175,6 +177,56 @@ private[compiler] final class SimpleExpressionTypingSupport(
       val selection = AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name)
       typeMemberSelection(selection, context)
     }
+
+  private def typeMapLiteral(node: AST.MapLiteral, context: LocalContext): Option[Term] = {
+    val keys = new Array[Term](node.entries.size)
+    val values = new Array[Term](node.entries.size)
+    var keyType: Type = null
+    var valueType: Type = null
+    var failed = false
+    var index = 0
+
+    node.entries.foreach { case (keyExpr, valueExpr) =>
+      if (!failed) {
+        val typedKey = typed(keyExpr, context, null).orNull
+        val typedValue = typed(valueExpr, context, null).orNull
+        if (typedKey == null || typedValue == null) {
+          failed = true
+        } else {
+          keys(index) = typedKey
+          values(index) = typedValue
+          val normalizedKey = normalizeListElementType(typedKey.`type`)
+          val normalizedValue = normalizeListElementType(typedValue.`type`)
+          if (index == 0) {
+            keyType = normalizedKey
+            valueType = normalizedValue
+          } else {
+            val mergedKey = mergeListElementType(keyType, normalizedKey)
+            val mergedValue = mergeListElementType(valueType, normalizedValue)
+            if (mergedKey == null) {
+              failed = true
+              bodyContext.report(INCOMPATIBLE_TYPE, keyExpr, keyType, normalizedKey)
+            } else if (mergedValue == null) {
+              failed = true
+              bodyContext.report(INCOMPATIBLE_TYPE, valueExpr, valueType, normalizedValue)
+            } else {
+              keyType = mergedKey
+              valueType = mergedValue
+            }
+          }
+          index += 1
+        }
+      }
+    }
+
+    if (failed) None
+    else {
+      val finalKeyType = if (keys.isEmpty) bodyContext.rootClass else keyType
+      val finalValueType = if (values.isEmpty) bodyContext.rootClass else valueType
+      val mapType = AppliedClassType(bodyContext.load("java.util.Map"), scala.collection.immutable.List(finalKeyType, finalValueType))
+      Some(new MapLiteral(keys, values, mapType))
+    }
+  }
 
   private def normalizeListElementType(tp: Type): Type =
     tp match {

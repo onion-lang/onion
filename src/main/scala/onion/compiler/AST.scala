@@ -122,6 +122,7 @@ object AST {
   case class LeftShiftAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<=")
   case class LessThan(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<")
   case class ListLiteral(location: Location, elements: List[Expression]) extends Expression
+  case class MapLiteral(location: Location, entries: List[(Expression, Expression)]) extends Expression
   case class LogicalAnd(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("&&")
   case class LogicalOr(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("||")
   case class LogicalRightShift(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">>>")

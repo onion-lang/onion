@@ -6,6 +6,7 @@ import org.objectweb.asm.commons.GeneratorAdapter
 object AsmUtil {
   val JavaLangObject: String = "java.lang.Object"
   val JavaUtilArrayList: String = "java.util.ArrayList"
+  val JavaUtilLinkedHashMap: String = "java.util.LinkedHashMap"
 
   def internalName(fqcn: String): String = fqcn.replace('.', '/')
 

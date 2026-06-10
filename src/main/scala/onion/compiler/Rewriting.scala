@@ -295,6 +295,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case AST.Id(loc, name) => expr
     case AST.IsInstance(loc, target, typeRef) => AST.IsInstance(loc, rewriteExpression(target), typeRef)
     case AST.ListLiteral(loc, elements) => AST.ListLiteral(loc, elements.map(rewriteExpression))
+    case AST.MapLiteral(loc, entries) =>
+      AST.MapLiteral(loc, entries.map { case (k, v) => (rewriteExpression(k), rewriteExpression(v)) })
     case AST.MemberSelection(loc, target, name) =>
       AST.MemberSelection(loc, Option(target).map(rewriteExpression).orNull, name)
     case AST.MethodCall(loc, target, name, args, typeArgs) =>

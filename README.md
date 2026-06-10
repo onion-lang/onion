@@ -50,6 +50,9 @@ Local `val` / `var` declarations can omit types when an initializer is present, 
 val name = "Onion"
 val label = if name.length > 0 { "ok" } else { "empty" }
 
+val xs = [1, 2, 3]                       // List literal
+val ages = ["alice": 12, "bob": 34]      // Map literal (insertion-ordered)
+
 def add(x: Int, y: Int): Int = x + y
 
 val double: Int -> Int = (x) -> { return x * 2; }

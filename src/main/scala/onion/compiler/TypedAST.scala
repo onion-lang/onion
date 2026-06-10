@@ -632,6 +632,12 @@ object TypedAST {
     def getElements: Array[TypedAST.Term] = elements
   }
 
+  class MapLiteral(location: Location, val keys: Array[TypedAST.Term], val values: Array[TypedAST.Term], val `type`: TypedAST.Type) extends Term(location) {
+    def this(keys: Array[TypedAST.Term], values: Array[TypedAST.Term], `type`: TypedAST.Type) = {
+      this(null, keys, values, `type`)
+    }
+  }
+
   class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type)  extends Term(location) {
     def this(bind: ClosureLocalBinding) = {
       this(null, bind.frameIndex, bind.index, bind.tp)

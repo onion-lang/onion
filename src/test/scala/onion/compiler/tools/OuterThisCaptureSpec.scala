@@ -14,10 +14,10 @@ class OuterThisCaptureSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |class Test {
-          |  def greet(name: String): String { return "Hello, " + name }
           |public:
+          |  def greet(name: String): String { return "Hello, " + name }
           |  def run(): String {
-          |    val f = (x: String) -> this.greet(x)
+          |    val f = (x: String) -> greet(x)
           |    return f("world")
           |  }
           |  def this {}
@@ -36,8 +36,8 @@ class OuterThisCaptureSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |class Test {
-          |  def shout(s: String): String { return s + "!" }
           |public:
+          |  def shout(s: String): String { return s + "!" }
           |  def run(): String {
           |    val outer = (a: String) -> {
           |      val inner = (b: String) -> shout(a + b)

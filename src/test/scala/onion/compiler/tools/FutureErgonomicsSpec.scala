@@ -37,8 +37,8 @@ class FutureErgonomicsSpec extends AbstractShellSpec {
           |  static def main(args: String[]): String {
           |    val f = Future::async(() -> 21 * 2)
           |    val sb = new StringBuffer()
-          |    f.onSuccess { v => sb.append("got " + v) }
           |    val r = f.await()
+          |    f.onSuccess { v => sb.append("got " + v) }
           |    return sb.toString() + ":" + r
           |  }
           |}

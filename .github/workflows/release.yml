@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'sbt'
+      - name: Test
+        run: sbt test
+      - name: Build artifacts
+        run: sbt assembly dist
+      - name: Collect artifacts
+        run: |
+          mkdir -p release-artifacts
+          FAT_JAR="$(find target -name onion.jar -path '*scala-*' -not -path '*dist*' | head -1)"
+          test -f "$FAT_JAR"
+          cp "$FAT_JAR" release-artifacts/onion.jar
+          cp target/onion-dist.zip release-artifacts/onion-dist.zip
+      - name: Smoke test the fat jar
+        run: |
+          echo 'IO::println("release smoke test ok")' > /tmp/smoke.on
+          java -cp release-artifacts/onion.jar onion.tools.ScriptRunner /tmp/smoke.on | grep -q "release smoke test ok"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          case "${GITHUB_REF_NAME}" in
+            *-M*|*-RC*|*-rc*|*-alpha*|*-beta*) PRERELEASE="--prerelease" ;;
+          esac
+          gh release create "${GITHUB_REF_NAME}" $PRERELEASE \
+            --title "Onion ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            release-artifacts/onion.jar \
+            release-artifacts/onion-dist.zip

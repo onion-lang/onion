@@ -6,6 +6,42 @@ compiles into JVM class files as in-memory or real files.
 Originally, Onion was written in Java.  It has been rewritten in Scala completely except Parser,
 using JavaCC.
 
+## Installation
+
+Install the latest release with one command (requires Java 17+):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh
+```
+
+This downloads `onion.jar` from the latest GitHub Release and installs the
+`onion`, `onionc` and `onion-repl` commands into `~/.local/bin`.
+
+More options:
+
+```sh
+# Install a specific version
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0-M2
+
+# Build from a source checkout instead of downloading
+git clone https://github.com/onion-lang/onion && cd onion && ./install.sh --from-source
+
+# Install somewhere else (default: ~/.local)
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | ONION_INSTALL_DIR=/opt/onion sh
+```
+
+Once installed, run scripts directly — shebang scripts work too:
+
+```sh
+echo 'IO::println("hello")' > hello.on
+onion hello.on
+```
+
+```onion
+#!/usr/bin/env onion
+IO::println("Hello, " + args[0] + "!")
+```
+
 ## Language Snapshot
 
 Local `val` / `var` declarations can omit types when an initializer is present, and control-flow constructs such as `if` are expressions.

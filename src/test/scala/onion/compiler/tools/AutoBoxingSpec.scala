@@ -899,8 +899,6 @@ class AutoBoxingSpec extends AbstractShellSpec {
       assert(Shell.Success(5) == result)
     }
 
-    // Note: Unboxing in comparison operators not yet implemented
-    /*
     it("unboxes in comparison") {
       val result = shell.run(
         """
@@ -921,10 +919,7 @@ class AutoBoxingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("greater") == result)
     }
-    */
 
-    // Note: Unboxing in arithmetic operators not yet implemented
-    /*
     it("unboxes in arithmetic") {
       val result = shell.run(
         """
@@ -942,10 +937,7 @@ class AutoBoxingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(30) == result)
     }
-    */
 
-    // Note: Select expression has issues (unrelated to boxing)
-    /*
     it("boxes in select expression") {
       val result = shell.run(
         """
@@ -953,10 +945,13 @@ class AutoBoxingSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val x: Int = 2
-          |    select (x) {
-          |      case 1: { return "one" }
-          |      case 2: { return "two" }
-          |      else: { return "other" }
+          |    select x {
+          |    case 1:
+          |      return "one"
+          |    case 2:
+          |      return "two"
+          |    else:
+          |      return "other"
           |    }
           |  }
           |}
@@ -966,7 +961,6 @@ class AutoBoxingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("two") == result)
     }
-    */
 
     it("handles double boxing prevention") {
       val result = shell.run(
@@ -987,8 +981,6 @@ class AutoBoxingSpec extends AbstractShellSpec {
       assert(Shell.Success("42") == result)
     }
 
-    // Note: Unboxing in array indexing not yet implemented
-    /*
     it("unboxes in array indexing") {
       val result = shell.run(
         """
@@ -1009,7 +1001,6 @@ class AutoBoxingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("B") == result)
     }
-    */
 
     it("boxes all primitive types to Comparable") {
       val result = shell.run(
@@ -1028,8 +1019,6 @@ class AutoBoxingSpec extends AbstractShellSpec {
       assert(Shell.Success("42") == result)
     }
 
-    // Note: Unboxing in while condition not yet implemented
-    /*
     it("boxes in while condition") {
       val result = shell.run(
         """
@@ -1051,7 +1040,6 @@ class AutoBoxingSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(6) == result)
     }
-    */
 
     it("boxes different Float representations") {
       val result = shell.run(
@@ -1188,6 +1176,105 @@ class AutoBoxingSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(11) == result)
+    }
+  }
+
+  describe("Unboxing in operators") {
+    it("unboxes boxed operand in value equality") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val i: Integer = new Integer(42)
+          |    if i == 42 {
+          |      return "equal"
+          |    } else {
+          |      return "not equal"
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "UnboxInEquals.on",
+        Array()
+      )
+      assert(Shell.Success("equal") == result)
+    }
+
+    it("unboxes boxed operand in not-equal comparison") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val i: Integer = new Integer(42)
+          |    if 41 != i {
+          |      return "different"
+          |    } else {
+          |      return "same"
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "UnboxInNotEquals.on",
+        Array()
+      )
+      assert(Shell.Success("different") == result)
+    }
+
+    it("unboxes Boolean in logical operators") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val b: JBoolean = new JBoolean(true)
+          |    if b && true {
+          |      return "and"
+          |    } else {
+          |      return "no"
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "UnboxInLogical.on",
+        Array()
+      )
+      assert(Shell.Success("and") == result)
+    }
+
+    it("unboxes Integer in bitwise operators") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val i: Integer = new Integer(6)
+          |    return i & 3
+          |  }
+          |}
+          |""".stripMargin,
+        "UnboxInBitwise.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("unboxes Integer in shift operators") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val i: Integer = new Integer(2)
+          |    return i << 1
+          |  }
+          |}
+          |""".stripMargin,
+        "UnboxInShift.on",
+        Array()
+      )
+      assert(Shell.Success(4) == result)
     }
   }
 }

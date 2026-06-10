@@ -16,23 +16,13 @@ final class BlockElementLowering(
 ) {
 
   /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed) or null on error. */
-  private def ensureBooleanCondition(node: AST.Node, termOpt: Option[Term]): Term = {
+  private def ensureBooleanCondition(node: AST.Node, termOpt: Option[Term]): Term =
     termOpt match {
       case None => null
       case Some(term) =>
-        // Try to unbox Boolean wrapper type
-        val result = if (!term.isBasicType) {
-          Boxing.unboxedType(bodyContext.table, term.`type`) match {
-            case Some(BasicType.BOOLEAN) => Boxing.unboxing(bodyContext.table, term, BasicType.BOOLEAN)
-            case _ => term
-          }
-        } else term
-        if (result.`type` != BasicType.BOOLEAN) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
-        }
-        result
+        TypeCheckingHelpers.ensureBoolean(bodyContext.table, node, term,
+          (n, actual) => bodyContext.report(INCOMPATIBLE_TYPE, n, BasicType.BOOLEAN, actual))
     }
-  }
 
   /**
    * Checks if a statement is "terminating" (never falls through to the next statement).

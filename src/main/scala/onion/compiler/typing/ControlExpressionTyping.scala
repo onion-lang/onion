@@ -150,20 +150,9 @@ final class ControlExpressionTyping(
     body.processAssignable(node, expected, term)
 
   /** Ensures the term is boolean, unboxing if needed. Returns the term (possibly unboxed). */
-  private[typing] def ensureBoolean(node: AST.Node, term: Term): Term = {
-    if (term == null) return null
-    // Try to unbox Boolean wrapper type
-    val result = if (!term.isBasicType) {
-      Boxing.unboxedType(bodyContext.table, term.`type`) match {
-        case Some(BasicType.BOOLEAN) => Boxing.unboxing(bodyContext.table, term, BasicType.BOOLEAN)
-        case _ => term
-      }
-    } else term
-    if (result.`type` != BasicType.BOOLEAN) {
-      bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.BOOLEAN, result.`type`)
-    }
-    result
-  }
+  private[typing] def ensureBoolean(node: AST.Node, term: Term): Term =
+    TypeCheckingHelpers.ensureBoolean(bodyContext.table, node, term,
+      (n, actual) => bodyContext.report(INCOMPATIBLE_TYPE, n, BasicType.BOOLEAN, actual))
 
   private[typing] def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
     case stmtTerm: StatementTerm => stmtTerm.statement

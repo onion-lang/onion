@@ -1,7 +1,8 @@
 package onion.compiler.typing
 
-import onion.compiler.AST
+import onion.compiler.{AST, ClassTable}
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 /**
  * Common type checking utility functions shared across typing components.
@@ -65,5 +66,24 @@ private[typing] object TypeCheckingHelpers {
   def sameTypes(left: Array[Type], right: Array[Type]): Boolean = {
     if (left.length != right.length) return false
     left.indices.forall(i => left(i) eq right(i))
+  }
+
+  /**
+   * Ensures a term is boolean, unboxing java.lang.Boolean if needed.
+   * Reports via reportError when the result is still non-boolean and returns
+   * the (possibly unboxed) term either way; callers decide how to recover.
+   */
+  def ensureBoolean(
+    table: ClassTable,
+    node: AST.Node,
+    term: Term,
+    reportError: (AST.Node, Type) => Unit
+  ): Term = {
+    if (term == null) return null
+    val result = Boxing.tryUnboxToBoolean(table, term)
+    if (result.`type` != BasicType.BOOLEAN) {
+      reportError(node, result.`type`)
+    }
+    result
   }
 }

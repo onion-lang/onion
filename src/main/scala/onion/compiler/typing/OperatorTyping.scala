@@ -44,6 +44,11 @@ final class OperatorTyping(
     var left: Term = typed(node.lhs, context).getOrElse(null)
     var right: Term = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
+    // Comparing a boxed wrapper against a primitive compares values: unbox the wrapper side
+    if (left.isBasicType != right.isBasicType) {
+      left = tryUnboxAny(left)
+      right = tryUnboxAny(right)
+    }
     val leftType: Type = left.`type`
     val rightType: Type = right.`type`
     if ((left.isBasicType && (!right.isBasicType)) || ((!left.isBasicType) && (right.isBasicType))) {
@@ -69,6 +74,9 @@ final class OperatorTyping(
     var left: Term = typed(node.lhs, context).getOrElse(null)
     var right: Term = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
+    // Unbox wrapper operands first; non-unboxable objects (e.g. List << elem) keep the method-call path
+    left = Boxing.tryUnboxToInteger(bodyContext.table, left)
+    right = Boxing.tryUnboxToInteger(bodyContext.table, right)
     if (!left.`type`.isBasicType) {
         val params = Array[Term](right)
         tryFindMethod(node, left.`type`.asInstanceOf[ObjectType], "add", params) match {
@@ -122,9 +130,11 @@ final class OperatorTyping(
   }
 
   def processBitExpression(kind: BinaryKind, node: AST.BinaryExpression, context: LocalContext): Term = {
-    val left = typed(node.lhs, context).getOrElse(null)
-    val right = typed(node.rhs, context).getOrElse(null)
-    if (left == null || right == null) return null
+    val leftRaw = typed(node.lhs, context).getOrElse(null)
+    val rightRaw = typed(node.rhs, context).getOrElse(null)
+    if (leftRaw == null || rightRaw == null) return null
+    val left = tryUnboxAny(leftRaw)
+    val right = tryUnboxAny(rightRaw)
     if ((!left.isBasicType) || (!right.isBasicType)) {
       bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
       return null
@@ -146,8 +156,9 @@ final class OperatorTyping(
   }
 
   def processLogicalExpression(node: AST.BinaryExpression, context: LocalContext): Array[Term] = {
-    val left = typed(node.lhs, context).getOrElse(null)
-    if (left == null) return null
+    val leftRaw = typed(node.lhs, context).getOrElse(null)
+    if (leftRaw == null) return null
+    val left = Boxing.tryUnboxToBoolean(bodyContext.table, leftRaw)
 
     // For &&, apply smart cast narrowing from left side when typing right side
     val savedNarrowings = context.saveNarrowings()
@@ -159,10 +170,11 @@ final class OperatorTyping(
       }
     }
 
-    val right = typed(node.rhs, context).getOrElse(null)
+    val rightRaw = typed(node.rhs, context).getOrElse(null)
     context.restoreNarrowings(savedNarrowings)
 
-    if (right == null) return null
+    if (rightRaw == null) return null
+    val right = Boxing.tryUnboxToBoolean(bodyContext.table, rightRaw)
     val leftType: Type = left.`type`
     val rightType: Type = right.`type`
     if ((leftType != BasicType.BOOLEAN) || (rightType != BasicType.BOOLEAN)) {
@@ -301,6 +313,13 @@ final class OperatorTyping(
 
   private def types(terms: Array[Term]): Array[Type] =
     body.types(terms)
+
+  /** Try to unbox to a numeric or boolean primitive; returns the term unchanged if not a wrapper. */
+  private def tryUnboxAny(term: Term): Term = {
+    val numeric = Boxing.tryUnboxToNumeric(bodyContext.table, term, numericTypes.contains)
+    if (numeric ne term) numeric
+    else Boxing.tryUnboxToBoolean(bodyContext.table, term)
+  }
 
   private def hasNumericType(term: Term): Boolean = numeric(term.`type`)
 

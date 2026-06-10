@@ -36,6 +36,18 @@ public class Iterables {
     return result;
   }
   
+  /**
+   * Materializes any Iterable (ranges included) into a List:
+   * (1..5).toList().map { ... }
+   */
+  public static <T> List<T> toList(Iterable<T> iterable) {
+    java.util.ArrayList<T> result = new java.util.ArrayList<>();
+    if (iterable != null) {
+      for (T item : iterable) result.add(item);
+    }
+    return result;
+  }
+
   public static <A, B> B foldl(Iterable<A> it, B init, Function2<B, A, B> f) {
     B result = init;
     for(A a:it) result = f.call(result, a);

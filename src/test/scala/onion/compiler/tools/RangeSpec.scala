@@ -99,6 +99,23 @@ class RangeSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == result)
     }
 
+    it("pipelines through toList") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val sum = (1..100).toList().fold(0) { a, x => (a as Int) + (x as Int) }
+          |    return (sum as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "RangePipeline.on",
+        Array()
+      )
+      assert(Shell.Success(5050) == result)
+    }
+
     it("does not break floating point literals") {
       val result = shell.run(
         """

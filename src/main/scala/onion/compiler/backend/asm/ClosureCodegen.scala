@@ -118,6 +118,10 @@ final class ClosureCodegen(
       Array(AsmUtil.internalName(interfaceType.name))
     )
 
+    // Join the enclosing class's nest so private members stay accessible
+    val nestHostEnd = className.indexOf("$Closure")
+    cw.visitNestHost(if (nestHostEnd >= 0) className.substring(0, nestHostEnd) else className)
+
     for outerType <- outerThisType do
       cw.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "this$0", asmType(outerType).getDescriptor, null, null)
 

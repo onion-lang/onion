@@ -144,7 +144,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     if !classDef.isInterface then
       bridgeMethodEmitter.emitBridges(cw, classDef)
-    
+
+    // Closures generated for this class are nest members so they can reach
+    // the host's private members (JEP 181); see ClosureCodegen.visitNestHost
+    val internalName = name.replace('.', '/')
+    for closure <- generatedClosures do
+      val closureInternal = closure.className.replace('.', '/')
+      if closureInternal.startsWith(internalName + "$Closure") then
+        cw.visitNestMember(closureInternal)
+
     cw.visitEnd()
     
     // Return compiled class with output directory path from config

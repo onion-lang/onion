@@ -77,5 +77,26 @@ class OuterThisCaptureSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("Hello, self") == result)
     }
+    it("calls a private enclosing method from a closure (nestmates)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |  def secretGreet(name: String): String { return "psst, " + name }
+          |public:
+          |  def run(): String {
+          |    val f = (x: String) -> this.secretGreet(x)
+          |    return f("nest")
+          |  }
+          |  def this {}
+          |  static def main(args: String[]): String {
+          |    return new Test().run()
+          |  }
+          |}
+          |""".stripMargin,
+        "PrivateFromClosure.on",
+        Array()
+      )
+      assert(Shell.Success("psst, nest") == result)
+    }
   }
 }

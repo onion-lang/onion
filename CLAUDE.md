@@ -371,6 +371,7 @@ These are frequently confused with other languages. **Always check these:**
 | `arr.length()` | `arr.length` - array length is property, not method |
 | `list.size()` | `list.size` - also a property |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
+| `for (k, v) in map` | `foreach (k, v) in map { }` - map entry destructuring |
 
 ### Literals
 

@@ -41,6 +41,8 @@ class StdlibErgonomicsSpec extends AbstractShellSpec {
       )
       assert(result == Shell.Failure(-1))
     }
+  }
+
   describe("Files glob and list") {
     it("globs files and pipelines the result") {
       val result = shell.run(

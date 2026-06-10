@@ -61,7 +61,13 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     )
     if (unit.imports != null) {
       for ((key, value) <- unit.imports.mapping) {
-        imports.append(ImportItem(key, value.split("\\.").toIndexedSeq))
+        val item = ImportItem(key, value.split("\\.").toIndexedSeq)
+        // Single-class imports of unknown classes were accepted silently and
+        // only failed (confusingly) at the use site, if at all
+        if (!item.isOnDemand && typing.table_.loadOrNull(value) == null) {
+          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value)
+        }
+        imports.append(item)
       }
     }
     imports.toSeq

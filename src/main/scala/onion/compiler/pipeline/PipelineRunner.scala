@@ -147,7 +147,13 @@ final class PipelineRunner(phases: CompilationPhases) {
 
   private def internalError(phaseName: String, throwable: Throwable): CompileError = {
     val message = Option(throwable.getMessage).filter(_.nonEmpty).getOrElse(throwable.getClass.getSimpleName)
-    CompileError(null, null, s"Internal compiler error in $phaseName: $message", Some(internalErrorCode))
+    val trace = throwable.getStackTrace.iterator
+      .filter(e => e.getClassName.startsWith("onion."))
+      .take(5)
+      .map(e => s"    at ${e.getClassName}.${e.getMethodName}(${e.getFileName}:${e.getLineNumber})")
+      .mkString("\n")
+    val detail = if (trace.isEmpty) message else s"$message\n$trace"
+    CompileError(null, null, s"Internal compiler error in $phaseName: $detail", Some(internalErrorCode))
   }
 
   private def promoteWarnings(warnings: Seq[CompileWarning]): Seq[CompileError] =

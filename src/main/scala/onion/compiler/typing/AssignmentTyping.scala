@@ -123,9 +123,50 @@ final class AssignmentTyping(
         Option(processArrayAssign(node, context))
       case _: AST.MemberSelection =>
         Option(processMemberAssign(node, context))
+      case _: AST.StaticMemberSelection =>
+        Option(processStaticFieldAssign(node, context))
       case _ =>
         None
     }
+
+  def processStaticFieldAssign(node: AST.Assignment, context: LocalContext): Term = {
+    node.lhs match {
+      case selection: AST.StaticMemberSelection =>
+        typing.mapFrom(selection.typeRef) match {
+          case Some(typeRef: ClassType) =>
+            val field = MemberAccess.findField(typeRef, selection.name)
+            if (field == null) {
+              bodyContext.report(FIELD_NOT_FOUND, selection, typeRef, selection.name)
+              return null
+            }
+            if (!Modifier.isStatic(field.modifier)) {
+              bodyContext.report(FIELD_NOT_FOUND, selection, typeRef, selection.name)
+              return null
+            }
+            if (!MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+              bodyContext.report(FIELD_NOT_ACCESSIBLE, selection, typeRef, selection.name, bodyContext.definition)
+              return null
+            }
+            if (Modifier.isFinal(field.modifier)) {
+              bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
+              return null
+            }
+            val value = typed(node.rhs, context).getOrElse(null)
+            if (value == null) return null
+            if (value.`type`.isBottomType) return value
+            val term = processAssignable(node.rhs, field.`type`, value)
+            if (term == null) return null
+            new SetStaticField(typeRef, field, term)
+          case Some(other) =>
+            bodyContext.report(INCOMPATIBLE_TYPE, selection, bodyContext.rootClass, other)
+            null
+          case None => null
+        }
+      case _ =>
+        bodyContext.report(LVALUE_REQUIRED, node)
+        null
+    }
+  }
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     body.typed(node, context, expected)

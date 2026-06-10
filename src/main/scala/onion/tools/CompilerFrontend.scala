@@ -49,7 +49,8 @@ object CompilerFrontend {
     val verbose = args.exists(_ == "--verbose")
     val filteredArgs = args.filterNot(_ == "--verbose")
     try {
-      new CompilerFrontend().run(filteredArgs, verbose)
+      val exitCode = new CompilerFrontend().run(filteredArgs, verbose)
+      if (exitCode != 0) System.exit(exitCode)
     } catch {
       case e: ScriptException => throw e.getCause
     }

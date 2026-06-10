@@ -162,7 +162,12 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     methodCallTyping.typeUnqualifiedMethodCall(node, context, expected)
 
   def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] =
-    methodCallTyping.typeStaticMemberSelection(node)
+    methodCallTyping.typeStaticMemberSelection(node).flatMap {
+      case ref: RefStaticField if !MemberAccess.isMemberAccessible(ref.field, bodyContext.definition) =>
+        bodyContext.report(FIELD_NOT_ACCESSIBLE, node, ref.target, node.name, bodyContext.definition)
+        None
+      case term => Some(term)
+    }
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] =
     methodCallTyping.typeStaticMethodCall(node, context, expected)

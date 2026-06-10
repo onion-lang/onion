@@ -785,7 +785,7 @@ AST.ExtensionDeclaration extension_decl() : {
   int mset = 0;
 }{
   t="extension" receiverType=type() "{"
-    ([mset=modifiers()] method=method_decl(mset) {append(methods, method); mset = 0;})*
+    ({mset = 0;} [mset=modifiers()] method=method_decl(mset) {append(methods, method);})*
   "}" {
     return new AST.ExtensionDeclaration(p(t), receiverType, toList(methods));
   }
@@ -891,8 +891,7 @@ AST.AccessSection default_section() : {
      append(members, m); location = m.location();
    }
   )
-  {mset = 0;}
-  ([mset=modifiers()] m=member_decl(mset) {append(members, m);})*
+  ({mset = 0;} [mset=modifiers()] m=member_decl(mset) {append(members, m);})*
   {return new AST.AccessSection(location, AST.M_PRIVATE(), toList(members));}
 }
 
@@ -905,8 +904,7 @@ AST.AccessSection access_section() :{
   |t="protected" {sectionType = AST.M_PROTECTED();}
   |t="private"   {sectionType = AST.M_PRIVATE();}
   ) ":"
-  {mset = 0;}
-  ([mset=modifiers()] m=member_decl(mset) {append(members, m);})*
+  ({mset = 0;} [mset=modifiers()] m=member_decl(mset) {append(members, m);})*
   {return new AST.AccessSection(p(t), sectionType, toList(members));}
 }
 

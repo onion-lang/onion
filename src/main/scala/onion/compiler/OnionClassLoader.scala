@@ -19,10 +19,17 @@ import java.net.URLClassLoader
 class OnionClassLoader @throws(classOf[MalformedURLException]) (parent: ClassLoader, classPath: Seq[String], classes: Seq[CompiledClass]) extends
   URLClassLoader(classPath.map(cp => new File(cp).toURI.toURL).toArray, parent) {
 
-  classes.map(k => (k.className, k.content)).foreach{ case (className, content) =>
-    defineClass(className, content, 0, content.length)
-  }
+  // Define classes lazily: eager defineClass in declaration order fails when
+  // a subclass is declared before its superclass in the same script (the JVM
+  // resolves the super while defining and it isn't there yet)
+  private val pendingClasses = scala.collection.mutable.Map(classes.map(k => k.className -> k.content)*)
+
+  classes.foreach(k => loadClass(k.className))
 
   @throws(classOf[ClassNotFoundException])
-  protected override def findClass(name: String): Class[?] = super.findClass(name)
+  protected override def findClass(name: String): Class[?] =
+    pendingClasses.remove(name) match {
+      case Some(content) => defineClass(name, content, 0, content.length)
+      case None => super.findClass(name)
+    }
 }

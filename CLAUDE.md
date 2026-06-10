@@ -349,6 +349,7 @@ These are frequently confused with other languages. **Always check these:**
 | `this.field = value` in constructor | ✓ correct - fields must use `this.` |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
+| `C::field = v` unsupported? | ✓ correct - static field assignment works (public fields) |
 
 ### Imports & Types
 
@@ -394,6 +395,7 @@ These are frequently confused with other languages. **Always check these:**
 |--------------------|-----------------|
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
+| `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
 
 ### Lambdas & Functions
 
@@ -406,7 +408,7 @@ These are frequently confused with other languages. **Always check these:**
 | `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |
 | `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - paren-less trailing lambda with `=>` |
-| `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable have builtin extension pipelines |
+| `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable/arrays have builtin extension pipelines |
 
 ### Method Calls
 

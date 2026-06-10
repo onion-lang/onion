@@ -100,5 +100,26 @@ class StaticFieldSpec extends AbstractShellSpec {
       )
       assert(result == Shell.Failure(-1))
     }
+    it("rejects calling a private method from outside at compile time") {
+      val result = shell.run(
+        """
+          |class C {
+          |  def secret(): Int { return 42 }
+          |public:
+          |  def reveal(): Int { return this.secret() }
+          |  def this {}
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return new C().secret()
+          |  }
+          |}
+          |""".stripMargin,
+        "PrivateMethodCall.on",
+        Array()
+      )
+      assert(result == Shell.Failure(-1))
+    }
   }
 }

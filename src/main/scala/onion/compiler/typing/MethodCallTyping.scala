@@ -37,7 +37,11 @@ final class MethodCallTyping(
     case Array() =>
       reportMethodNotFound(node, targetType, name, argTypes)
       None
-    case Array(m) => Some(m)
+    case Array(m) =>
+      if (!MemberAccess.isMemberAccessible(m, bodyContext.definition)) {
+        bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, targetType, name, argTypes, bodyContext.definition)
+        None
+      } else Some(m)
     case _ =>
       reportAmbiguousMethods(node, name, methods)
       None

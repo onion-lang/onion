@@ -106,7 +106,11 @@ class NameResolver(private val context: NameResolutionContext) {
       TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
     case AST.ArrayType(component) =>
       val (base, dimension) = context.splitDescriptor(descriptor)
-      context.table.loadArray(map(base), dimension)
+      val mappedBase = map(base)
+      // The component class may be unresolvable (already reported); don't
+      // construct an ArrayType around null (fuzz: 'val xs: L[]')
+      if (mappedBase == null) null
+      else context.table.loadArray(mappedBase, dimension)
     case AST.WildcardType(upperBound, lowerBound) =>
       val mappedUpper = upperBound.map(map).getOrElse(context.rootClass)
       val mappedLower = lowerBound.map(map)

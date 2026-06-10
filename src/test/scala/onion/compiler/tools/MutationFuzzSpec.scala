@@ -20,8 +20,8 @@ import scala.util.Random
  */
 class MutationFuzzSpec extends AnyFunSpec {
 
-  private val SEED = 20260610L
-  private val MUTATIONS_PER_SEED = 60
+  private val SEED = sys.props.get("onion.fuzz.seed").map(_.toLong).getOrElse(20260610L)
+  private val MUTATIONS_PER_SEED = sys.props.get("onion.fuzz.mutations").map(_.toInt).getOrElse(60)
 
   private def newConfig: CompilerConfig =
     CompilerConfig(Seq("."), null, "UTF-8", "", 10)

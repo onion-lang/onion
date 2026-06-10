@@ -150,9 +150,9 @@ class Second {
 }
 ```
 
-### 3. Top-Level Statements
+### 3. Top-Level Declarations and Expressions
 
-If there's no explicit `main` method, the first top-level statement is the entry point:
+If there's no explicit `main` method, the first top-level declaration or expression is the entry point:
 
 ```onion
 IO::println("Hello, World!")
@@ -160,7 +160,7 @@ IO::println("Hello, World!")
 val x: Int = 10
 IO::println("x = " + x)
 
-// These statements execute immediately
+// These block elements execute immediately
 ```
 
 ## Examples

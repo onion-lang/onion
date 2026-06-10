@@ -7,7 +7,7 @@ line_comment         ::= '//' ... EOL
 shell_comment        ::= '#!' ... EOL
 
 compile_unit         ::= module_decl? import_decl? top_level+ EOF
-top_level            ::= statement
+top_level            ::= block_element
                        | modifiers? (class_decl | interface_decl | record_decl | function_decl | global_var_decl)
 
 module_decl          ::= 'module' id ('.' id)* eos
@@ -62,35 +62,32 @@ function_decl         ::= modifiers 'def' id type_params?
                          ['(' args? ')'] [':' return_type]
                          (block | '=' term eos | eos)
 global_var_decl       ::= modifiers ('val' | 'var') id ':' type ['=' term] eos
-local_var_stmt        ::= ('val' | 'var') id (':' type ['=' term] | '=' term) eos
+local_var_decl        ::= ('val' | 'var') id (':' type ['=' term] | '=' term) eos
 
 args                  ::= argument (',' argument)*
 argument              ::= id ':' type
 return_type           ::= 'Void' | type
 
-statement             ::= block
-                       | if_stmt | select_stmt | while_stmt | for_stmt | foreach_stmt
-                       | try_stmt | synchronized_stmt
-                       | break_stmt | continue_stmt | return_stmt | throw_stmt
-                       | local_var_stmt
-                       | expr_stmt
-                       | ';'
+block_element         ::= block
+                       | if_expr | select_expr | while_expr | for_expr | foreach_expr
+                       | try_expr | synchronized_expr
+                       | break_expr | continue_expr | return_expr | throw_expr
+                       | local_var_decl
+                       | expr_element
 
-if_stmt               ::= 'if' term block ['else' block]
-select_stmt           ::= 'select' term '{' ('case' term (',' term)* ':' statements)* ['else' ':' statements] '}'
-while_stmt            ::= 'while' term block
-for_stmt              ::= 'for' (local_var_stmt | expr_stmt | ';') [term] ';' [term] block
-foreach_stmt          ::= 'foreach' argument 'in' term block
-try_stmt              ::= 'try' block ('catch' argument block)* ['finally' block]
-synchronized_stmt     ::= 'synchronized' [term] block
-return_stmt           ::= 'return' [term] eos
-throw_stmt            ::= 'throw' term eos
-break_stmt            ::= 'break' eos
-continue_stmt         ::= 'continue' eos
-expr_stmt             ::= term eos
-statements            ::= compound_statement*
-compound_statement    ::= statement | empty_statement
-empty_statement       ::= ';'
+if_expr               ::= 'if' term block ['else' block]
+select_expr           ::= 'select' term '{' ('case' term (',' term)* ':' block_elements)* ['else' ':' block_elements] '}'
+while_expr            ::= 'while' term block
+for_expr              ::= 'for' (local_var_decl | expr_element | ';') [term] ';' [term] block
+foreach_expr          ::= 'foreach' argument 'in' term block
+try_expr              ::= 'try' block ('catch' argument block)* ['finally' block]
+synchronized_expr     ::= 'synchronized' [term] block
+return_expr           ::= 'return' [term] eos
+throw_expr            ::= 'throw' term eos
+break_expr            ::= 'break' eos
+continue_expr         ::= 'continue' eos
+expr_element          ::= term eos
+block_elements        ::= block_element+
 
 term                  ::= assignable
 assignable            ::= logical_or [assign_op assignable]

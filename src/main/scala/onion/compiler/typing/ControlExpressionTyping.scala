@@ -47,11 +47,11 @@ final class ControlExpressionTyping(
             terms += statementTerm(stmt, BasicType.VOID, element.location)
           } else {
             element match {
-              case _: AST.LocalVariableDeclaration | _: AST.EmptyExpression =>
+              case _: AST.LocalVariableDeclaration =>
                 val stmt = translate(element, context)
                 terms += statementTerm(stmt, BasicType.VOID, element.location)
-              case _ =>
-                typed(element, context) match {
+              case expr: AST.Expression =>
+                typed(expr, context) match {
                   case Some(term) => terms += term
                   case None => failed = true
                 }
@@ -140,16 +140,10 @@ final class ControlExpressionTyping(
   def typeContinueExpression(node: AST.ContinueExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BottomType.BOTTOM, node.location))
 
-  def typeExpressionBox(node: AST.ExpressionBox, context: LocalContext): Option[Term] =
-    typed(node.body, context)
-
-  def typeEmptyExpression(node: AST.EmptyExpression, context: LocalContext): Option[Term] =
-    Some(statementTerm(new NOP(node.location), BasicType.VOID, node.location))
-
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     body.typed(node, context, expected)
 
-  private def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement =
+  private def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =
     body.translate(node, context)
 
   private def processAssignable(node: AST.Node, expected: Type, term: Term): Term =

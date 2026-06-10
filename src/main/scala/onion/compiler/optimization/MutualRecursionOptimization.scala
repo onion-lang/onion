@@ -10,6 +10,7 @@ package onion.compiler.optimization
 import onion.compiler._
 import onion.compiler.TypedAST._
 import scala.collection.mutable
+import scala.util.boundary, boundary.break
 
 /**
  * Mutual Recursion Optimization
@@ -152,18 +153,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
   /**
    * Validate that a group can be optimized
    */
-  private def validateGroup(group: Seq[MethodDefinition]): Option[String] = {
+  private def validateGroup(group: Seq[MethodDefinition]): Option[String] = boundary {
     // Check 1: All methods must be private (to avoid breaking public API)
     val nonPrivateMethods = group.filterNot(isPrivate)
     if (nonPrivateMethods.nonEmpty) {
       val names = nonPrivateMethods.map(_.name).mkString(", ")
-      return Some(s"All methods must be private for mutual recursion optimization. Non-private: $names")
+      break(Some(s"All methods must be private for mutual recursion optimization. Non-private: $names"))
     }
 
     // Check 2: All methods must have same return type
     val returnTypes = group.map(_.returnType.name).toSet
     if (returnTypes.size > 1) {
-      return Some(s"Methods have different return types: ${returnTypes.mkString(", ")}")
+      break(Some(s"Methods have different return types: ${returnTypes.mkString(", ")}"))
     }
 
     // Check 3: All methods must be in same class (already guaranteed by our collection)
@@ -177,7 +178,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
       val tailCalls = TailCallGraphAnalysis.findTailCalls(method)
       val externalCalls = tailCalls.filterNot(groupNames.contains)
       if (externalCalls.nonEmpty) {
-        validationError = Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.mkString(", ")}")
+        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.mkString(", ")}"))
       }
     }
 
@@ -217,20 +218,17 @@ class MutualRecursionOptimization(config: CompilerConfig)
     val paramCount = group.head.arguments.length
 
     // Check parameter types are compatible across all methods
-    var compatibleParameters = true
-    var paramIdx = 0
-    while (paramIdx < paramCount && compatibleParameters) {
+    val incompatibleParam = (0 until paramCount).find { paramIdx =>
       val paramTypesSet = group.map(_.arguments(paramIdx).name).toSet
-      if (paramTypesSet.size > 1) {
+      val incompatible = paramTypesSet.size > 1
+      if (incompatible) {
         if (config.verbose) {
           trace(s"[Mutual TCO] ERROR: Parameter $paramIdx has different types: $paramTypesSet")
         }
-        compatibleParameters = false
       }
-      paramIdx += 1
+      incompatible
     }
-
-    if (!compatibleParameters) {
+    if (incompatibleParam.nonEmpty) {
       return
     }
 

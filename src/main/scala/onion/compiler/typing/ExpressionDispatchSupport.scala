@@ -102,18 +102,12 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.controlExpressionTyping.typeBreakExpression(node, context)
       case node: AST.ContinueExpression =>
         body.controlExpressionTyping.typeContinueExpression(node, context)
-      case node: AST.EmptyExpression =>
-        body.controlExpressionTyping.typeEmptyExpression(node, context)
-      case node: AST.ExpressionBox =>
-        body.controlExpressionTyping.typeExpressionBox(node, context)
       case node: AST.ForeachExpression =>
         body.controlExpressionTyping.typeForeachExpression(node, context)
       case node: AST.ForExpression =>
         body.controlExpressionTyping.typeForExpression(node, context)
       case node: AST.IfExpression =>
         body.controlExpressionTyping.typeIfExpression(node, context)
-      case node: AST.LocalVariableDeclaration =>
-        body.typeLocalVariableDeclarationNode(node, context)
       case node: AST.ReturnExpression =>
         body.controlExpressionTyping.typeReturnExpression(node, context)
       case node: AST.SelectExpression =>

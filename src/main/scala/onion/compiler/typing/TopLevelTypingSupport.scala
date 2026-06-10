@@ -10,7 +10,7 @@ private[compiler] final class TopLevelTypingSupport(
   typing: Typing,
   unitContext: TypingUnitContext,
   entryPointSupport: EntryPointSupport,
-  translate: (AST.CompoundExpression, LocalContext) => ActionStatement,
+  translate: (AST.BlockElement, LocalContext) => ActionStatement,
   processClassDeclaration: (AST.ClassDeclaration, LocalContext) => Unit,
   processInterfaceDeclaration: (AST.InterfaceDeclaration, LocalContext) => Unit,
   processEnumDeclaration: (AST.EnumDeclaration, LocalContext) => Unit,
@@ -41,7 +41,7 @@ private[compiler] final class TopLevelTypingSupport(
     for (element <- toplevels) {
       if (!element.isInstanceOf[AST.TypeDeclaration]) unitContext.currentDefinition = prepared.klass
       element match {
-        case node: AST.CompoundExpression =>
+        case node: AST.BlockElement =>
           prepared.context.setMethod(prepared.startMethod)
           prepared.statements += translate(node, prepared.context)
         case node: AST.ClassDeclaration =>

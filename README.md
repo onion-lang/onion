@@ -146,7 +146,7 @@ Use `onion repl`, `onion-repl`, or `sbt repl` to start the interactive REPL. The
 
 1. A main method if there is an explicit class definition and it have the main method.
 2. The main method of the class on the top.
-3. Otherwise, the first statement on the top.
+3. Otherwise, the first top-level declaration or expression.
 
 ## Limitations
 

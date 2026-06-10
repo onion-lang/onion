@@ -9,7 +9,7 @@ import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
 
-final class StatementTyping(
+final class BlockElementLowering(
   private val typing: Typing,
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
@@ -49,7 +49,7 @@ final class StatementTyping(
     case _ => false
   }
 
-  def translate(node: AST.CompoundExpression, context: LocalContext): ActionStatement = node match {
+  def translate(node: AST.BlockElement, context: LocalContext): ActionStatement = node match {
     case AST.BlockExpression(loc, elements) =>
       context.openScope {
         val statements = Buffer[ActionStatement]()
@@ -82,10 +82,6 @@ final class StatementTyping(
       } else {
         new Continue(node.location)
       }
-    case node: AST.EmptyExpression =>
-      new NOP(node.location)
-    case node@AST.ExpressionBox(_, body) =>
-      typed(body, context).map { e => new ExpressionActionStatement(node.location, e) }.getOrElse(new NOP(node.location))
     case node: AST.ForeachExpression =>
       context.openScope {
         val collection = typed(node.collection, context).getOrElse(null)
@@ -143,7 +139,12 @@ final class StatementTyping(
       }
     case node: AST.ForExpression =>
       context.openScope {
-        val init = Option(node.init).map(init => translate(init, context)).getOrElse(new NOP(node.location))
+        val init = node.init match {
+          case AST.ForInitDeclaration(declaration) => translate(declaration, context)
+          case AST.ForInitExpression(expression) =>
+            typed(expression, context).map(termToStatement(expression, _)).getOrElse(new NOP(node.location))
+          case _: AST.ForInitEmpty => new NOP(node.location)
+        }
         val condition = Option(node.condition).map { c =>
           val cond = ensureBooleanCondition(c, typed(c, context))
           if (cond != null) cond else new BoolValue(node.location, true)
@@ -337,6 +338,8 @@ final class StatementTyping(
         }
         new ConditionalLoop(node.location, condition, thenBlock)
       }
+    case node: AST.Expression =>
+      typed(node, context).map(termToStatement(node, _)).getOrElse(new NOP(node.location))
   }
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
@@ -368,4 +371,9 @@ final class StatementTyping(
 
   private def ref(bind: ClosureLocalBinding): Term =
     new RefLocal(bind)
+
+  private def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
+    case stmtTerm: StatementTerm => stmtTerm.statement
+    case _ => new ExpressionActionStatement(node.location, term)
+  }
 }

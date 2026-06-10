@@ -41,8 +41,8 @@ object TestSupport extends Assertions {
     val clazz = unit.toplevels.head.asInstanceOf[AST.ClassDeclaration]
     val method = clazz.sections.head.members.head.asInstanceOf[AST.MethodDeclaration]
     method.block.elements.head match {
-      case AST.ExpressionBox(_, body) => body
       case AST.ReturnExpression(_, result) => result
+      case body: AST.Expression => body
       case other => other.asInstanceOf[AST.Expression]
     }
   }
@@ -142,12 +142,12 @@ object TestSupport extends Assertions {
   // ============================================
 
   /** Create a block expression */
-  def block(elements: AST.CompoundExpression*): AST.BlockExpression =
+  def block(elements: AST.BlockElement*): AST.BlockExpression =
     AST.BlockExpression(defaultLoc, elements.toList)
 
-  /** Create an expression box (wraps expression in compound context) */
-  def exprBox(expr: AST.Expression): AST.ExpressionBox =
-    AST.ExpressionBox(defaultLoc, expr)
+  /** Compatibility helper for expression block elements. */
+  def exprBox(expr: AST.Expression): AST.Expression =
+    expr
 
   /** Create an if expression */
   def ifExpr(
@@ -163,12 +163,20 @@ object TestSupport extends Assertions {
 
   /** Create a for expression */
   def forExpr(
-    init: AST.CompoundExpression,
+    init: AST.ForInitializer,
     condition: AST.Expression,
     update: AST.Expression,
     body: AST.BlockExpression
   ): AST.ForExpression =
     AST.ForExpression(defaultLoc, init, condition, update, body)
+
+  /** Create a for initializer from a declaration. */
+  def forInit(init: AST.LocalVariableDeclaration): AST.ForInitializer =
+    AST.ForInitDeclaration(init)
+
+  /** Create a for initializer from an expression. */
+  def forInit(init: AST.Expression): AST.ForInitializer =
+    AST.ForInitExpression(init)
 
   /** Create a local variable declaration */
   def localVar(
@@ -191,9 +199,9 @@ object TestSupport extends Assertions {
   def continueExpr: AST.ContinueExpression =
     AST.ContinueExpression(defaultLoc)
 
-  /** Create an empty expression */
-  def emptyExpr: AST.EmptyExpression =
-    AST.EmptyExpression(defaultLoc)
+  /** Create an empty for initializer. */
+  def emptyExpr: AST.ForInitEmpty =
+    AST.ForInitEmpty(defaultLoc)
 
   // ============================================
   // Do Notation Helpers

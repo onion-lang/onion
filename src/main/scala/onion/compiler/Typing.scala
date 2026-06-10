@@ -234,16 +234,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] =
     typeSupport.createTypeParams(nodes)
 
+  // Accessors below read/write the *active* unit context (session.currentContext); they exist for
+  // collaborators that must observe whichever unit is being processed at call time
+  // (TypingTypeSupport, TypingDiagnostics, NameResolutionContext). Pass-local state is accessed
+  // directly through each pass's TypingUnitContext instead.
   private[compiler] def table_ : ClassTable = session.global.table
   private[compiler] def mapper_ : NameResolver = currentUnitContext.currentMapper
-  private[compiler] def setMapper(value: NameResolver): Unit = currentUnitContext.currentMapper = value
-  private[compiler] def staticImportedList_ : StaticImportList = currentUnitContext.staticImports
-  private[compiler] def setStaticImportedList(value: StaticImportList): Unit = currentUnitContext.staticImports = value
-  private[compiler] def definition_ : ClassDefinition = currentUnitContext.currentDefinition
-  private[compiler] def setDefinition(value: ClassDefinition): Unit = currentUnitContext.currentDefinition = value
   private[compiler] def unit_ : AST.CompilationUnit = currentUnitContext.unit
-  private[compiler] def access_ : Int = currentUnitContext.currentAccess
-  private[compiler] def setAccess(value: Int): Unit = currentUnitContext.currentAccess = value
   private[compiler] def typeParams_ : TypeParamScope = currentUnitContext.currentTypeParams
   private[compiler] def setTypeParams(value: TypeParamScope): Unit = currentUnitContext.currentTypeParams = value
   private[compiler] def declaredTypeParams_ : collection.mutable.Map[AST.Node, Seq[TypeParam]] = session.global.declaredTypeParams

@@ -28,11 +28,11 @@ class TypingSessionSpec extends AnyFunSpec with Diagrams {
       val unit1 = unit("One")
       val unit2 = unit("Two")
 
-      typing.session.activate(unit1)
+      val context1 = typing.session.activate(unit1)
       val staticImports = new StaticImportList
       staticImports.add(new StaticImportItem("java.lang.Math", true))
-      typing.setStaticImportedList(staticImports)
-      typing.setAccess(42)
+      context1.staticImports = staticImports
+      context1.currentAccess = 42
       val typeParam = TypeParam("T", new TypedAST.TypeVariableType("T", typing.rootClass), typing.rootClass)
       typing.setTypeParams(typing.emptyTypeParams ++ Seq(typeParam))
 
@@ -41,19 +41,19 @@ class TypingSessionSpec extends AnyFunSpec with Diagrams {
       }
       assert(typing.reportingEnabled)
 
-      typing.session.activate(unit2)
+      val context2 = typing.session.activate(unit2)
       assert(typing.unit_ eq unit2)
-      assert(typing.definition_ == null)
-      assert(typing.mapper_ == null)
-      assert(typing.access_ == 0)
+      assert(context2.currentDefinition == null)
+      assert(context2.currentMapper == null)
+      assert(context2.currentAccess == 0)
       assert(typing.typeParams_ == typing.emptyTypeParams)
-      assert(typing.staticImportedList_.getItems.isEmpty)
+      assert(context2.staticImports.getItems.isEmpty)
       assert(typing.reportingEnabled)
 
-      typing.session.activate(unit1)
+      val context1Again = typing.session.activate(unit1)
       assert(typing.unit_ eq unit1)
-      assert(typing.staticImportedList_ eq staticImports)
-      assert(typing.access_ == 0)
+      assert(context1Again.staticImports eq staticImports)
+      assert(context1Again.currentAccess == 0)
       assert(typing.typeParams_ == typing.emptyTypeParams)
       assert(typing.reportingEnabled)
     }

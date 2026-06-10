@@ -16,7 +16,7 @@ import TypeNarrowingAnalysis.NarrowingInfo
 
 final class TypingBodyPass(private val typing: Typing, private val unitContext: TypingUnitContext) {
   private val unit = unitContext.unit
-  private val bodyContext = TypingBodyContext.fromTyping(typing)
+  private val bodyContext = TypingBodyContext.fromTyping(typing, unitContext)
   private val methodCallTyping = new MethodCallTyping(typing, bodyContext, this)
   private val assignmentTyping = new AssignmentTyping(typing, bodyContext, this)
   private[typing] val operatorTyping = new OperatorTyping(typing, bodyContext, this)
@@ -27,7 +27,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private val additionTyping = new AdditionTyping(typing, bodyContext, this)
   private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
   private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable)
-  private val methodBodySupport = new MethodBodySupport(typing, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode)
+  private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode)
   private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
   private val assignabilitySupport = new AssignabilitySupport(typing, bodyContext)
   private val expressionDispatchSupport = new ExpressionDispatchSupport(this)
@@ -40,6 +40,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   )
   private val declarationBodySupport = new DeclarationBodySupport(
     typing,
+    unitContext,
     classInitializerSupport,
     methodBodySupport,
     processMethodDeclaration,
@@ -47,6 +48,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   )
   private val topLevelTypingSupport = new TopLevelTypingSupport(
     typing,
+    unitContext,
     entryPointSupport,
     translate,
     processClassDeclaration,
@@ -90,7 +92,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     if (node.block != null) {
       typing.kernelNodeOf[MethodDefinition](node).foreach { method =>
         val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
-        typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
+        typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
           methodBodySupport.processMethodLikeBody(method, node.args, node.block)
         }
       }

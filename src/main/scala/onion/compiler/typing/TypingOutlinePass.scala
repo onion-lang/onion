@@ -11,14 +11,14 @@ import scala.collection.mutable.{Buffer, Set => MutableSet}
 final class TypingOutlinePass(private val typing: Typing, private val unitContext: TypingUnitContext) {
   private val unit = unitContext.unit
   private def table_ = typing.table_
-  private def definition_ = typing.definition_
-  private def mapper_ = typing.mapper_
-  private def access_ = typing.access_
+  private def definition_ = unitContext.currentDefinition
+  private def mapper_ = unitContext.currentMapper
+  private def access_ = unitContext.currentAccess
   private def topClass = typing.topClass
   private def rootClass = typing.rootClass
   private def typeAliases_ = typing.typeAliases_
   private def declaredTypeParams_ = typing.declaredTypeParams_
-  private def typeParams_ = typing.typeParams_
+  private def typeParams_ = unitContext.currentTypeParams
   private def emptyTypeParams = typing.emptyTypeParams
   private def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
     typing.report(error, node, items*)
@@ -52,7 +52,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private var constructorCount = 0
 
   def run(): Unit = {
-    find(topClass).foreach(typing.setMapper)
+    find(topClass).foreach(unitContext.currentMapper = _)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -68,8 +68,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private def processClassDeclaration(node: AST.ClassDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     constructorCount = 0
-    typing.setDefinition(definition)
-    find(definition.name).foreach(typing.setMapper)
+    unitContext.currentDefinition = definition
+    find(definition.name).foreach(unitContext.currentMapper = _)
 
     val classTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = classTypeParams
@@ -86,8 +86,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
-    typing.setDefinition(definition)
-    find(definition.name).foreach(typing.setMapper)
+    unitContext.currentDefinition = definition
+    find(definition.name).foreach(unitContext.currentMapper = _)
 
     val interfaceTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = interfaceTypeParams
@@ -101,8 +101,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def processRecordDeclaration(node: AST.RecordDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
-    typing.setDefinition(definition)
-    find(definition.name).foreach(typing.setMapper)
+    unitContext.currentDefinition = definition
+    find(definition.name).foreach(unitContext.currentMapper = _)
 
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)
@@ -197,8 +197,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
-    typing.setDefinition(definition)
-    find(definition.name).foreach(typing.setMapper)
+    unitContext.currentDefinition = definition
+    find(definition.name).foreach(unitContext.currentMapper = _)
 
     // Enum extends java.lang.Enum<E>
     val enumClass = load("java.lang.Enum")
@@ -257,8 +257,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     // The container class was registered in HeaderPass
-    typing.setDefinition(definition)
-    find(definition.name).foreach(typing.setMapper)
+    unitContext.currentDefinition = definition
+    find(definition.name).foreach(unitContext.currentMapper = _)
 
     // Resolve the receiver type (the type being extended)
     val receiverType = mapFrom(node.receiverType)
@@ -342,7 +342,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def processAccessSection(section: AST.AccessSection): Unit = {
-    typing.setAccess(section.modifiers)
+    unitContext.currentAccess = section.modifiers
     section.members.foreach {
       case node: AST.FieldDeclaration => processFieldDeclaration(node)
       case node: AST.MethodDeclaration => processMethodDeclaration(node)

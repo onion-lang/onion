@@ -26,14 +26,14 @@ final class TypingBodyContext(
 }
 
 object TypingBodyContext {
-  def fromTyping(typing: Typing): TypingBodyContext =
+  def fromTyping(typing: Typing, unitContext: TypingUnitContext): TypingBodyContext =
     new TypingBodyContext(
       table = typing.table_,
-      currentDefinitionProvider = () => typing.definition_,
-      currentMapperProvider = () => typing.mapper_,
-      staticImportsProvider = () => typing.staticImportedList_,
+      currentDefinitionProvider = () => unitContext.currentDefinition,
+      currentMapperProvider = () => unitContext.currentMapper,
+      staticImportsProvider = () => unitContext.staticImports,
       rootClass = typing.rootClass,
-      sourceFileProvider = () => typing.unit_.sourceFile,
+      sourceFileProvider = () => unitContext.unit.sourceFile,
       loadClass = typing.load,
       reportNode = (error, node, items) => typing.report(error, node, items*),
       warningReporter = typing.warningReporter_

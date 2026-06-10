@@ -22,7 +22,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     typing.kernelNodeOf[T](ast).foreach(f)
 
   def run(): Unit = {
-    typing.find(typing.topClass).foreach(typing.setMapper)
+    typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
     seenGlobalVariables.clear()
     seenFunctions.clear()
     unit.toplevels.foreach {
@@ -38,8 +38,8 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     seenMethods.clear()
     seenFields.clear()
     seenConstructors.clear()
-    typing.setDefinition(clazz)
-    typing.find(clazz.name).foreach(typing.setMapper)
+    unitContext.currentDefinition = clazz
+    typing.find(clazz.name).foreach(unitContext.currentMapper = _)
   }
 
   private def registerField(ast: AST.Node, field: FieldDefinition): Unit =
@@ -93,11 +93,11 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       val index = frame.add("arg" + i, args(i))
       params(i) = new RefLocal(new ClosureLocalBinding(0, index, args(i), isMutable = true))
     }
-    val target = new Call(new RefField(new This(typing.definition_), delegated), delegator, params)
+    val target = new Call(new RefField(new This(unitContext.currentDefinition), delegated), delegator, params)
     val statement =
       if (delegator.returnType != BasicType.VOID) new StatementBlock(new Return(target))
       else new StatementBlock(new ExpressionActionStatement(target), new Return(null))
-    val node = new MethodDefinition(null, AST.M_PUBLIC, typing.definition_, delegator.name, delegator.arguments, delegator.returnType, statement)
+    val node = new MethodDefinition(null, AST.M_PUBLIC, unitContext.currentDefinition, delegator.name, delegator.arguments, delegator.returnType, statement)
     node.setFrame(frame)
     node
   }
@@ -115,7 +115,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
           } else {
             val generatedMethod = makeDelegationMethod(field, method)
             generated.add(generatedMethod)
-            typing.definition_.add(generatedMethod)
+            unitContext.currentDefinition.add(generatedMethod)
           }
         }
       }

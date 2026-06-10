@@ -2,11 +2,13 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.typing.session.TypingUnitContext
 
 import scala.collection.mutable.Buffer
 
 private[compiler] final class TopLevelTypingSupport(
   typing: Typing,
+  unitContext: TypingUnitContext,
   entryPointSupport: EntryPointSupport,
   translate: (AST.CompoundExpression, LocalContext) => ActionStatement,
   processClassDeclaration: (AST.ClassDeclaration, LocalContext) => Unit,
@@ -27,7 +29,7 @@ private[compiler] final class TopLevelTypingSupport(
   def prepareUnit(unit: AST.CompilationUnit): PreparedUnit = {
     val context = new LocalContext
     val statements = Buffer[ActionStatement]()
-    typing.find(typing.topClass).foreach(typing.setMapper)
+    typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
     val klass = typing.loadTopClass.asInstanceOf[ClassDefinition]
     val argsType = entryPointSupport.stringArgsType
     val startMethod = entryPointSupport.createStartMethod(unit, klass, argsType)
@@ -37,7 +39,7 @@ private[compiler] final class TopLevelTypingSupport(
 
   def processToplevels(toplevels: Seq[AST.Toplevel], prepared: PreparedUnit): Unit = {
     for (element <- toplevels) {
-      if (!element.isInstanceOf[AST.TypeDeclaration]) typing.setDefinition(prepared.klass)
+      if (!element.isInstanceOf[AST.TypeDeclaration]) unitContext.currentDefinition = prepared.klass
       element match {
         case node: AST.CompoundExpression =>
           prepared.context.setMethod(prepared.startMethod)

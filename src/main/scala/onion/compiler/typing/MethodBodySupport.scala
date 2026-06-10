@@ -3,10 +3,11 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
-import onion.compiler.typing.session.TypingBodyContext
+import onion.compiler.typing.session.{TypingBodyContext, TypingUnitContext}
 
 private[compiler] final class MethodBodySupport(
   typing: Typing,
+  unitContext: TypingUnitContext,
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
@@ -87,7 +88,7 @@ private[compiler] final class MethodBodySupport(
     if node.block != null then
       typing.kernelNodeOf[ExtensionMethodDefinition](node).foreach { extMethod =>
         val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
-        typing.openTypeParams(typing.typeParams_ ++ methodTypeParams) {
+        typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
           val staticMethod = findStaticExtensionMethod(definition, node, extMethod, receiverType)
           if staticMethod != null then
             processExtensionMethodBody(extMethod, staticMethod, node, receiverType)

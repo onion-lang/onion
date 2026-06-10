@@ -311,6 +311,33 @@ public class JJOnionParser implements Parser {
     leaveState();
   }
 
+  /**
+   * Build a whitespace prefix so the embedded-expression sub-parser reports
+   * positions in the coordinates of the original file. exprStartInStr is the
+   * index of the expression inside the (quote-stripped) string content;
+   * quoteLen is the length of the opening quote (1 or 3).
+   */
+  private static String interpolationPadding(String str, int exprStartInStr, Location loc, int quoteLen) {
+    int nlCount = 0;
+    int lastNl = -1;
+    for (int i = 0; i < exprStartInStr; i++) {
+      if (str.charAt(i) == '\n') { nlCount++; lastNl = i; }
+    }
+    int line;
+    int col;
+    if (nlCount == 0) {
+      line = loc.line();
+      col = loc.column() + quoteLen + exprStartInStr;
+    } else {
+      line = loc.line() + nlCount;
+      col = exprStartInStr - lastNl;
+    }
+    StringBuilder sb = new StringBuilder();
+    for (int i = 1; i < line; i++) sb.append('\n');
+    for (int i = 1; i < col; i++) sb.append(' ');
+    return sb.toString();
+  }
+
   private AST.Expression parseInterpolatedString(Location loc, String str) throws ParseException {
     // Remove quotes
     str = str.substring(1, str.length() - 1);
@@ -353,9 +380,10 @@ public class JJOnionParser implements Parser {
         throw new ParseException("Unclosed interpolation #{...} in string at " + loc + " (string literals inside #{...} are not supported)");
       }
       
-      // Parse the expression inside
+      // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
-      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(exprStr));
+      String padding = interpolationPadding(str, interpStart + 2, loc, 1);
+      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(padding + exprStr));
       try {
         AST.Expression expr = exprParser.term();
         append(expressions, expr);
@@ -421,9 +449,10 @@ public class JJOnionParser implements Parser {
         throw new ParseException("Unclosed interpolation #{...} in multi-line string at " + loc + " (string literals inside #{...} are not supported)");
       }
 
-      // Parse the expression inside
+      // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
-      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(exprStr));
+      String padding = interpolationPadding(str, interpStart + 2, loc, 3);
+      JJOnionParser exprParser = new JJOnionParser(new java.io.StringReader(padding + exprStr));
       try {
         AST.Expression expr = exprParser.term();
         append(expressions, expr);

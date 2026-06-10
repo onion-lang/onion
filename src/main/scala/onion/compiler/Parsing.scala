@@ -101,7 +101,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.line, error.column),
-        Message("error.parsing.syntax_error", error.found, error.expected)
+        Message("error.parsing.syntax_error", displayTokenImage(error.found), error.expected)
       )
     }
   }
@@ -124,7 +124,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.beginLine, error.beginColumn),
-        Message("error.parsing.syntax_error", error.image, expected)
+        Message("error.parsing.syntax_error", displayTokenImage(error.image), expected)
       )
     }
   }
@@ -135,6 +135,11 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * When multiple tokens are expected, this creates a more readable message
    * like "';' or 'newline'" instead of just showing the first one.
    */
+  /** Make control characters and EOF visible in error messages. */
+  private def displayTokenImage(image: String): String =
+    if (image == null || image.isEmpty) "<EOF>"
+    else image.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
   private def formatExpectedTokens(e: ParseException): String = {
     val sequences = e.expectedTokenSequences
     if (sequences == null || sequences.isEmpty) {
@@ -158,8 +163,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       // Show all expected tokens if 3 or fewer
       expected.init.mkString(", ") + " or " + expected.last
     } else {
-      // Show first 3 and indicate there are more
-      expected.take(3).mkString(", ") + ", ..."
+      val shown = expected.take(4)
+      shown.mkString(", ") + s", ... (${expected.size - shown.size} more)"
     }
   }
 }

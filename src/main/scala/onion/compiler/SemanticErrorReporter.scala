@@ -116,7 +116,15 @@ class SemanticErrorReporter(threshold: Int) {
   private def problem(position: Location, message: String): Unit = {
     val errorCode = Option(currentError).map(_.errorCode)
     val ctx = if (context == CompilationContext.empty) None else Some(context)
-    problems.append(CompileError(sourceFile, position, message, errorCode, ctx))
+    // Closure bodies are typed more than once (return-type inference,
+    // bidirectional trials); drop exact duplicates so each problem is
+    // reported a single time
+    val duplicate = problems.exists(p =>
+      p.sourceFile == sourceFile && p.location == position && p.message == message
+    )
+    if (!duplicate) {
+      problems.append(CompileError(sourceFile, position, message, errorCode, ctx))
+    }
   }
 
   // ========== Error definitions ==========

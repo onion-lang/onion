@@ -159,13 +159,16 @@ public class JJOnionParser implements Parser {
       return "valid token";
     }
     StringBuilder sb = new StringBuilder();
-    java.util.HashSet<String> seen = new java.util.HashSet<String>();
+    java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<String>();
     for (int[] seq : e.expectedTokenSequences) {
-      if (seq.length > 0 && seen.add(e.tokenImage[seq[0]])) {
-        if (seen.size() > 3) { sb.append(", ..."); break; }
-        if (sb.length() > 0) sb.append(", ");
-        sb.append(e.tokenImage[seq[0]]);
-      }
+      if (seq.length > 0) seen.add(e.tokenImage[seq[0]]);
+    }
+    int shown = 0;
+    for (String image : seen) {
+      if (shown == 4) { sb.append(", ... (").append(seen.size() - shown).append(" more)"); break; }
+      if (sb.length() > 0) sb.append(", ");
+      sb.append(image);
+      shown++;
     }
     return sb.length() == 0 ? "valid token" : sb.toString();
   }

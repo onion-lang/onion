@@ -43,16 +43,17 @@ private[typing] object TypeNarrowingAnalysis {
   def extractNarrowing(
     condition: AST.Expression,
     context: LocalContext,
-    typeResolver: AST.TypeNode => Type
+    typeResolver: AST.TypeNode => Option[Type]
   ): NarrowingInfo = {
     condition match {
       // x is SomeType -> narrow x to SomeType in then-branch
       case AST.IsInstance(_, AST.Id(_, name), typeRef) =>
         val binding = context.lookup(name)
         if (binding != null && !binding.isMutable) {
-          val targetType = typeResolver(typeRef)
-          if (targetType != null) {
-            return NarrowingInfo(Map(name -> targetType), Map.empty)
+          typeResolver(typeRef) match {
+            case Some(targetType) =>
+              return NarrowingInfo(Map(name -> targetType), Map.empty)
+            case None => ()
           }
         }
         NarrowingInfo.empty

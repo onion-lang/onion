@@ -1086,8 +1086,8 @@ object TypedAST {
    * @author Kota Mizushima
    */
   class ArrayType(val component: TypedAST.Type, val dimension: Int, val table: ClassTable) extends AbstractObjectType {
-    val superClass: TypedAST.ClassType        = table.load("java.lang.Object")
-    val interfaces: Seq[TypedAST.ClassType] = Seq(table.load("java.io.Serializable"), table.load("java.lang.Cloneable"))
+    val superClass: TypedAST.ClassType        = table.loadRequired("java.lang.Object")
+    val interfaces: Seq[TypedAST.ClassType] = Seq(table.loadRequired("java.io.Serializable"), table.loadRequired("java.lang.Cloneable"))
     var name: String                     = "[" * dimension + component.name
 
     def base: TypedAST.Type =  if (dimension == 1) component else table.loadArray(component, dimension - 1)

@@ -41,12 +41,8 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
     val AST.DestructuringPattern(_, constructor, fieldPatterns) = dp
 
     def resolveRecordClass(node: AST.Node, name: String): ClassDefinition = {
-      val recordType = typing.load(name)
-      recordType match {
-        case null =>
-          typing.report(NOT_A_RECORD_TYPE, node, name)
-          break(None)
-        case classDef: ClassDefinition =>
+      typing.load(name) match {
+        case Some(classDef: ClassDefinition) =>
           classDef
         case _ =>
           typing.report(NOT_A_RECORD_TYPE, node, name)

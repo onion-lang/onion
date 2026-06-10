@@ -74,7 +74,7 @@ object ReflectionRefs {
         bridge.toOnionType(c)
       case p: ParameterizedType =>
         val rawClass = p.getRawType.asInstanceOf[Class[?]]
-        val raw = table.load(rawClass.getName)
+        val raw = table.loadOrNull(rawClass.getName)
         val args = p.getActualTypeArguments.map(a => toOnionType(a, env))
         if (raw == null || args.contains(null)) null
         else TypedAST.AppliedClassType(raw, args.toList)
@@ -193,7 +193,7 @@ object ReflectionRefs {
       if (methods_ == null) {
         methods_ = new MultiTable[TypedAST.Method]
         for (method <- klass.getMethods if method.getName != CONSTRUCTOR_NAME) {
-          val owner = table.load(method.getDeclaringClass.getName)
+          val owner = table.loadOrNull(method.getDeclaringClass.getName)
           val ownerEnv = mapper.typeParamEnv(owner.typeParameters)
           methods_.add(new ReflectMethodRef(method, owner, mapper, ownerEnv))
         }
@@ -214,7 +214,7 @@ object ReflectionRefs {
       if (fields_ == null) {
         fields_ = new OrderedTable[TypedAST.FieldRef]
         for (field <- klass.getFields) {
-          val owner = table.load(field.getDeclaringClass.getName)
+          val owner = table.loadOrNull(field.getDeclaringClass.getName)
           val ownerEnv = mapper.typeParamEnv(owner.typeParameters)
           fields_.add(new ReflectFieldRef(field, owner, mapper, ownerEnv))
         }

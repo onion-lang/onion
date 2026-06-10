@@ -11,7 +11,8 @@ final class TypingBodyContext(
   private val staticImportsProvider: () => StaticImportList,
   val rootClass: ClassType,
   private val sourceFileProvider: () => String,
-  private val loadClass: String => ClassType,
+  private val loadClassRequired: String => ClassType,
+  private val loadClassOption: String => Option[ClassType],
   private val reportNode: (SemanticError, AST.Node, Seq[AnyRef]) => Unit,
   val warningReporter: WarningReporter
 ) {
@@ -19,7 +20,10 @@ final class TypingBodyContext(
   def mapper: NameResolver = currentMapperProvider()
   def staticImportedList: StaticImportList = staticImportsProvider()
   def sourceFile: String = sourceFileProvider()
-  def load(name: String): ClassType = loadClass(name)
+  /** Loads a class the compiler itself depends on (JDK / onion runtime); throws if absent. */
+  def load(name: String): ClassType = loadClassRequired(name)
+  /** Loads a class that may legitimately be absent (e.g. user-named imports). */
+  def loadOption(name: String): Option[ClassType] = loadClassOption(name)
 
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
     reportNode(error, node, items.toSeq)
@@ -34,7 +38,8 @@ object TypingBodyContext {
       staticImportsProvider = () => unitContext.staticImports,
       rootClass = typing.rootClass,
       sourceFileProvider = () => unitContext.unit.sourceFile,
-      loadClass = typing.load,
+      loadClassRequired = typing.loadRequired,
+      loadClassOption = typing.load,
       reportNode = (error, node, items) => typing.report(error, node, items*),
       warningReporter = typing.warningReporter_
     )

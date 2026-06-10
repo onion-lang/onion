@@ -44,8 +44,7 @@ private[compiler] final class DeclarationBodySupport(
     unitContext.currentDefinition = definition
     typing.find(definition.name).foreach(unitContext.currentMapper = _)
 
-    val receiverType = typing.mapFrom(node.receiverType)
-    if (receiverType != null) {
+    typing.mapFrom(node.receiverType).foreach { receiverType =>
       for (methodNode <- node.methods) {
         methodBodySupport.processExtensionMethodDeclaration(methodNode, receiverType, definition)
       }

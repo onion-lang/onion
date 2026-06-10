@@ -58,11 +58,11 @@ final class MethodLookupSupport(
       bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, name)
       null
     } else {
-      val argType = typing.mapFrom(arg.typeRef, bodyContext.mapper)
-      if (argType == null) null
-      else {
-        context.add(name, argType)
-        argType
+      typing.mapFrom(arg.typeRef, bodyContext.mapper) match {
+        case Some(argType) =>
+          context.add(name, argType)
+          argType
+        case None => null
       }
     }
   }

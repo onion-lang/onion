@@ -14,21 +14,30 @@ private[compiler] final class StaticMethodCallSupport(
 ) {
   private val overloadSupport = new CallOverloadSupport(typing, calls)
 
-  def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] = {
-    val typeRef = typing.mapFrom(node.typeRef).asInstanceOf[ClassType]
-    if (typeRef == null) return None
-    val field = MemberAccess.findField(typeRef, node.name)
-    if (field == null) {
-      typing.report(FIELD_NOT_FOUND, node, typeRef, node.name)
-      None
-    } else {
-      Some(new RefStaticField(typeRef, field))
+  private def classTypeOf(typeNode: AST.TypeNode): Option[ClassType] =
+    typing.mapFrom(typeNode) match {
+      case Some(ct: ClassType) => Some(ct)
+      case Some(other) =>
+        typing.report(INCOMPATIBLE_TYPE, typeNode, typing.rootClass, other)
+        None
+      case None => None
     }
-  }
+
+  def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] =
+    classTypeOf(node.typeRef).flatMap { typeRef =>
+      val field = MemberAccess.findField(typeRef, node.name)
+      if (field == null) {
+        typing.report(FIELD_NOT_FOUND, node, typeRef, node.name)
+        None
+      } else {
+        Some(new RefStaticField(typeRef, field))
+      }
+    }
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
-    val typeRef = typing.mapFrom(node.typeRef).asInstanceOf[ClassType]
-    if (typeRef == null) return None
+    val typeRefOpt = classTypeOf(node.typeRef)
+    if (typeRefOpt.isEmpty) return None
+    val typeRef = typeRefOpt.get
 
     if (ArgumentHelpers.hasNamedArguments(node.args)) {
       return typeStaticMethodCallWithNamedArgs(node, typeRef, context, expected)

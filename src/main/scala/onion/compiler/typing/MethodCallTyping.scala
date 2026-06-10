@@ -251,10 +251,10 @@ final class MethodCallTyping(
   private[typing] def mapTypeArgs(typeArgs: List[AST.TypeNode]): Option[Array[Type]] =
     typeArgs.foldLeft(Option(List.empty[Type])) { (accOpt, typeArg) =>
       accOpt.flatMap { acc =>
-        val mapped = typing.mapFrom(typeArg)
-        if (mapped == null) None
-        else if (mapped eq BasicType.VOID) { typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name); None }
-        else Some(acc :+ mapped)
+        typing.mapFrom(typeArg).flatMap { mapped =>
+          if (mapped eq BasicType.VOID) { typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name); None }
+          else Some(acc :+ mapped)
+        }
       }
     }.map(_.toArray)
 

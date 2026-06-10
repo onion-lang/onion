@@ -43,8 +43,7 @@ private[compiler] final class StaticImportMethodCallSupport(
     val resolved = scala.collection.mutable.Buffer[StaticImportResolved]()
     var ambiguous: Option[StaticImportAmbiguous] = None
     bodyContext.staticImportedList.getItems.foreach { item =>
-      val typeRef = bodyContext.load(item.getName)
-      if (typeRef != null) {
+      bodyContext.loadOption(item.getName).foreach { typeRef =>
         resolveStaticImportOnType(node, typeRef, params, expected, mappedTypeArgs) match {
           case found: StaticImportResolved =>
             resolved += found

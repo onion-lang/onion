@@ -202,8 +202,9 @@ final class BlockElementLowering(
         context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
-        val lhsType = mapFrom(node.typeRef)
-        if (lhsType == null) return new NOP(node.location)
+        val lhsTypeOpt = mapFrom(node.typeRef)
+        if (lhsTypeOpt.isEmpty) return new NOP(node.location)
+        val lhsType = lhsTypeOpt.get
         typing.checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
@@ -292,11 +293,11 @@ final class BlockElementLowering(
         for (resource <- node.resources) {
           val initOpt = typed(resource.init, context)
           initOpt.foreach { init =>
-            val resourceType =
+            val resourceTypeOpt =
               if (resource.typeRef != null) mapFrom(resource.typeRef)
-              else init.`type`
+              else Some(init.`type`)
 
-            if (resourceType != null) {
+            resourceTypeOpt.foreach { resourceType =>
               // Always add the variable to scope so it can be referenced in try block
               val index = context.add(resource.name, resourceType, isMutable = false)
               val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
@@ -354,7 +355,7 @@ final class BlockElementLowering(
   private def defaultValue(typeRef: Type): Term =
     body.defaultValue(typeRef)
 
-  private def mapFrom(typeNode: AST.TypeNode): Type =
+  private def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typing.mapFrom(typeNode)
 
   private def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term =

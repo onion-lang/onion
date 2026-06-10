@@ -30,7 +30,7 @@ private[compiler] final class TopLevelTypingSupport(
     val context = new LocalContext
     val statements = Buffer[ActionStatement]()
     typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
-    val klass = typing.loadTopClass.asInstanceOf[ClassDefinition]
+    val klass = typing.loadTopClass.collect { case cd: ClassDefinition => cd }.orNull
     val argsType = entryPointSupport.stringArgsType
     val startMethod = entryPointSupport.createStartMethod(unit, klass, argsType)
     context.add("args", argsType)

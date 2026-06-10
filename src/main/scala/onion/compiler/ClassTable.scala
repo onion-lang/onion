@@ -32,7 +32,12 @@ class ClassTable(classPath: String) {
     array
   }
 
-  def load(className: String): TypedAST.ClassType = {
+  /**
+   * Null-returning lookup kept for the bytecode/reflection environment internals,
+   * where absent classes flow through legacy null-tolerant resolution paths.
+   * Prefer [[load]] (Option) or [[loadRequired]] elsewhere.
+   */
+  def loadOrNull(className: String): TypedAST.ClassType = {
     var clazz: TypedAST.ClassType = lookup(className)
     if (clazz == null && missingClasses.contains(className)) return null
     if (clazz == null) {
@@ -54,10 +59,16 @@ class ClassTable(classPath: String) {
     clazz
   }
 
-  /** Option-returning version of load for safer null handling */
-  def loadOpt(className: String): Option[TypedAST.ClassType] = Option(load(className))
+  def load(className: String): Option[TypedAST.ClassType] = Option(loadOrNull(className))
 
-  def rootClass: TypedAST.ClassType = load("java.lang.Object")
+  /** Loads a class that the compiler itself depends on (JDK / onion runtime). */
+  def loadRequired(className: String): TypedAST.ClassType =
+    loadOrNull(className) match {
+      case null => throw new IllegalStateException(s"required class is not on the compiler classpath: $className")
+      case clazz => clazz
+    }
+
+  def rootClass: TypedAST.ClassType = loadRequired("java.lang.Object")
 
   def lookup(className: String): TypedAST.ClassType = {
     classes.get(className) match {

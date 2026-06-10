@@ -30,13 +30,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     typing.find(name)
   private def lookupAST(kernel: TypedAST.Node): Option[AST.Node] =
     typing.lookupAST(kernel)
-  private def load(name: String): ClassType =
-    typing.load(name)
+  private def loadRequired(name: String): ClassType =
+    typing.loadRequired(name)
   private def loadTopClass: ClassType =
-    typing.loadTopClass
-  private def mapFrom(typeNode: AST.TypeNode): Type =
+    typing.loadRequired(typing.topClass)
+  private def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typing.mapFrom(typeNode)
-  private def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Type =
+  private def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     typing.mapFrom(typeNode, mapper)
   private def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typing.typesOf(arguments)
@@ -177,14 +177,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
       // Generate toString(): String method
       val toStringModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
-      val stringType = load("java.lang.String")
-      if (stringType != null) {
-        val toStringMethod = new MethodDefinition(
-          node.location, toStringModifier, definition_, "toString",
-          Array.empty, stringType, null
-        )
-        definition_.add(toStringMethod)
-      }
+      val stringType = loadRequired("java.lang.String")
+      val toStringMethod = new MethodDefinition(
+        node.location, toStringModifier, definition_, "toString",
+        Array.empty, stringType, null
+      )
+      definition_.add(toStringMethod)
 
       // Generate copy(components...): ThisType method
       val copyModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
@@ -201,13 +199,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     find(definition.name).foreach(unitContext.currentMapper = _)
 
     // Enum extends java.lang.Enum<E>
-    val enumClass = load("java.lang.Enum")
-    if (enumClass != null) {
-      definition_.setSuperClass(enumClass)
-    } else {
-      // Fallback to Object if Enum not found
-      definition_.setSuperClass(rootClass)
-    }
+    definition_.setSuperClass(loadRequired("java.lang.Enum"))
     definition_.setInterfaces(Array.empty)
     definition_.setResolutionComplete(true)
 
@@ -227,20 +219,18 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.add(valuesMethod)
 
     // Create valueOf(String) static method
-    val stringType = load("java.lang.String")
-    if (stringType != null) {
-      val valueOfModifier = Modifier.PUBLIC | Modifier.STATIC
-      val valueOfMethod = new MethodDefinition(
-        node.location, valueOfModifier, definition_, "valueOf",
-        Array(stringType), definition_, null
-      )
-      definition_.add(valueOfMethod)
-    }
+    val stringType = loadRequired("java.lang.String")
+    val valueOfModifier = Modifier.PUBLIC | Modifier.STATIC
+    val valueOfMethod = new MethodDefinition(
+      node.location, valueOfModifier, definition_, "valueOf",
+      Array(stringType), definition_, null
+    )
+    definition_.add(valueOfMethod)
 
     // Create private constructor(String name, int ordinal)
     // The constructor calls super(name, ordinal) on java.lang.Enum
     val ctorModifier = Modifier.PRIVATE
-    if (stringType != null) {
+    locally {
       val ctorArgs = Array[Type](stringType, BasicType.INT)
       // Create super initializer that passes both parameters to Enum constructor
       val superArgs = Array[Type](stringType, BasicType.INT)
@@ -260,11 +250,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     unitContext.currentDefinition = definition
     find(definition.name).foreach(unitContext.currentMapper = _)
 
-    // Resolve the receiver type (the type being extended)
-    val receiverType = mapFrom(node.receiverType)
-    if (receiverType == null) {
-      report(SemanticError.CLASS_NOT_FOUND, node.receiverType, node.receiverType.desc.toString, mapper_.getCandidateClassNames)
-    } else {
+    // Resolve the receiver type (the type being extended);
+    // mapFrom already reports CLASS_NOT_FOUND when resolution fails
+    mapFrom(node.receiverType).foreach { receiverType =>
       // Get the FQCN for the receiver type (for extension method lookup)
       val receiverFqcn = receiverType match {
         case ct: ClassType => ct.name
@@ -296,12 +284,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (node.returnType == null) {
           report(SemanticError.RETURN_TYPE_REQUIRED, node, s"extension ${receiverFqcn}.${node.name}")
           None
-        } else Option(mapFrom(node.returnType))
+        } else mapFrom(node.returnType)
 
       for (args <- argsOption; returnType <- returnTypeOption) {
         // Extension methods are always public and static in the container class
         val modifier = Modifier.PUBLIC | Modifier.STATIC
-        val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+        val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
 
         // Create ExtensionMethodDefinition
@@ -351,9 +339,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = {
-    val typeRef = mapFrom(node.typeRef)
-    if (typeRef == null) return
+  private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = mapFrom(node.typeRef).foreach { typeRef =>
     val modifier = node.modifiers | AST.M_PUBLIC
     val classType = loadTopClass.asInstanceOf[ClassDefinition]
     val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)
@@ -367,11 +353,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       if (node.returnType == null) {
         report(SemanticError.RETURN_TYPE_REQUIRED, node, node.name)
         None
-      } else Option(mapFrom(node.returnType))
+      } else mapFrom(node.returnType)
     for (args <- argsOption; returnType <- returnTypeOption) {
       val classType = loadTopClass.asInstanceOf[ClassDefinition]
       val modifier = node.modifiers | AST.M_PUBLIC
-      val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+      val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
       val hasVararg = node.args.lastOption.exists(_.isVararg)
       val annotations = node.annotations.map(_.name).toSet
       val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes, hasVararg, annotations)
@@ -380,9 +366,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processFieldDeclaration(node: AST.FieldDeclaration): Unit = {
-    val typeRef = mapFrom(node.typeRef)
-    if (typeRef == null) return
+  private def processFieldDeclaration(node: AST.FieldDeclaration): Unit = mapFrom(node.typeRef).foreach { typeRef =>
     val modifier = node.modifiers | access_
     val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
     put(node, field)
@@ -398,11 +382,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (node.returnType == null) {
           report(SemanticError.RETURN_TYPE_REQUIRED, node, s"${definition_.name}.${node.name}")
           None
-        } else Option(mapFrom(node.returnType))
+        } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
         var modifier = node.modifiers | access_
         if (node.block == null) modifier |= AST.M_ABSTRACT
-        val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+        val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
         val annotations = node.annotations.map(_.name).toSet
         val method = new MethodDefinition(
@@ -433,10 +417,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (node.returnType == null) {
           report(SemanticError.RETURN_TYPE_REQUIRED, node, s"${definition_.name}.${node.name}")
           None
-        } else Option(mapFrom(node.returnType))
+        } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
         val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
-        val throwsTypes = node.throwsTypes.flatMap(t => Option(mapFrom(t)).map(_.asInstanceOf[ClassType])).toArray
+        val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
         val method = new MethodDefinition(
           node.location,
@@ -467,17 +451,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     }
   }
 
-  private def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = {
-    val typeRef = mapFrom(node.typeRef)
-    if (typeRef == null) return
-    if (!(typeRef.isObjectType && (typeRef.asInstanceOf[ObjectType]).isInterface)) {
-      report(SemanticError.INTERFACE_REQUIRED, node, typeRef)
-      return
+  private def processDelegatedFieldDeclaration(node: AST.DelegatedFieldDeclaration): Unit = mapFrom(node.typeRef).foreach { typeRef =>
+    typeRef match {
+      case objectType: ObjectType if objectType.isInterface =>
+        val modifier = node.modifiers | access_ | AST.M_FORWARDED
+        val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
+        put(node, field)
+        definition_.add(field)
+      case _ =>
+        report(SemanticError.INTERFACE_REQUIRED, node, typeRef)
     }
-    val modifier = node.modifiers | access_ | AST.M_FORWARDED
-    val field = new FieldDefinition(node.location, modifier, definition_, node.name, typeRef)
-    put(node, field)
-    definition_.add(field)
   }
 
   private def cyclic(start: ClassDefinition): Boolean = {
@@ -497,12 +480,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     if (node == null) {
       return if (mustBeInterface) null else table_.rootClass
     }
-    val mapped = mapFrom(node, mapper)
-    if (mapped == null) return if (mustBeInterface) null else table_.rootClass
-    val typeRef = mapped match {
-      case ct: ClassType => ct
-      case _ =>
+    val typeRef = mapFrom(node, mapper) match {
+      case Some(ct: ClassType) => ct
+      case Some(mapped) =>
         report(SemanticError.INCOMPATIBLE_TYPE, node, table_.rootClass, mapped)
+        return if (mustBeInterface) null else table_.rootClass
+      case None =>
         return if (mustBeInterface) null else table_.rootClass
     }
     val isInterface = typeRef.isInterface

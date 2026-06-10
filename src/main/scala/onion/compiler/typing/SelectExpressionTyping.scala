@@ -301,8 +301,7 @@ final class SelectExpressionTyping(
         }
 
       case typePattern @ AST.TypePattern(_, name, typeRef) =>
-        val mappedType = typing.mapFrom(typeRef)
-        if (mappedType == null) break((null, NoBindings, false, None))
+        val mappedType = typing.mapFrom(typeRef).getOrElse(break((null, NoBindings, false, None)))
 
         if (!mappedType.isObjectType) {
           bodyContext.report(INCOMPATIBLE_TYPE, typePattern, bodyContext.table.rootClass, mappedType)

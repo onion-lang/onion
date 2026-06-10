@@ -11,7 +11,7 @@ private[compiler] final class EntryPointSupport(
   addReturnNode: (ActionStatement, Type) => StatementBlock
 ) {
   def stringArgsType: ArrayType =
-    typing.loadArray(typing.load("java.lang.String"), 1)
+    typing.loadArray(typing.loadRequired("java.lang.String"), 1)
 
   def createStartMethod(
     unit: AST.CompilationUnit,

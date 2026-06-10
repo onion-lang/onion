@@ -22,7 +22,15 @@ final class ClosureTyping(
         case _ => null
       }
 
-    val rawTypeRef = Option(inferredTarget).getOrElse(typing.mapFrom(node.typeRef).asInstanceOf[ClassType])
+    val rawTypeRef: ClassType =
+      if (inferredTarget != null) inferredTarget
+      else typing.mapFrom(node.typeRef) match {
+        case Some(ct: ClassType) => ct
+        case Some(other) =>
+          bodyContext.report(INTERFACE_REQUIRED, node.typeRef, other)
+          null
+        case None => null
+      }
     if (rawTypeRef == null) {
       None
     } else if (!rawTypeRef.isInterface) {
@@ -159,9 +167,10 @@ final class ClosureTyping(
         argTypes(i) = null
         hasMissing = true
       } else {
-        val mapped = typing.mapFrom(arg.typeRef)
-        if (mapped == null) return None
-        argTypes(i) = mapped
+        typing.mapFrom(arg.typeRef) match {
+          case Some(mapped) => argTypes(i) = mapped
+          case None => return None
+        }
       }
       i += 1
     }

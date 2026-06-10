@@ -48,7 +48,7 @@ class OnionTypeConversion(table: ClassTable) {
     val returnType: TypedAST.Type = c2t.get(klass).asInstanceOf[TypedAST.Type]
     if (returnType != null) return returnType
     if (!klass.isArray) {
-      val symbol: TypedAST.ClassType = table.load(klass.getName)
+      val symbol: TypedAST.ClassType = table.loadOrNull(klass.getName)
       if (symbol != null) {
         return symbol
       }
@@ -82,7 +82,7 @@ class OnionTypeConversion(table: ClassTable) {
       case Type.DOUBLE => TypedAST.BasicType.DOUBLE
       case Type.OBJECT =>
         val className = asmType.getClassName
-        table.load(className)
+        table.loadOrNull(className)
       case Type.ARRAY =>
         val elementType = asmType.getElementType
         val dimension = asmType.getDimensions

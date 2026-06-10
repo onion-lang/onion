@@ -41,7 +41,7 @@ final class ExpressionFormTyping(
 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     typed(node.src, context).flatMap { term =>
-      Option(typing.mapFrom(node.to, bodyContext.mapper)).flatMap { destination =>
+      typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
         if (term.`type`.isBasicType && !destination.isBasicType) {
           bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
           None
@@ -54,7 +54,7 @@ final class ExpressionFormTyping(
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     for {
       target <- typed(node.target, context)
-      destinationType <- Option(typing.mapFrom(node.typeRef, bodyContext.mapper))
+      destinationType <- typing.mapFrom(node.typeRef, bodyContext.mapper)
     } yield new InstanceOf(target, destinationType)
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =

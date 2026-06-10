@@ -27,29 +27,30 @@ final class TryExpressionTyping(
     context.openScope {
       for (resource <- node.resources) {
         val initOpt = typed(resource.init, context)
-        if (initOpt.isEmpty) {
-          resourceFailed = true
-        } else {
-          val init = initOpt.get
-          val resourceType =
-            if (resource.typeRef != null) typing.mapFrom(resource.typeRef)
-            else init.`type`
-
-          if (resourceType != null) {
-            // Always add the variable to scope so it can be referenced in try block
-            val index = context.add(resource.name, resourceType, isMutable = false)
-            val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
-
-            // AutoCloseableを実装しているか確認
-            if (!TypeRules.isSuperType(autoCloseable, resourceType)) {
-              bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
-              resourceFailed = true
-            } else {
-              resourceBindings += ((binding, init))
-            }
-          } else {
+        initOpt match {
+          case None =>
             resourceFailed = true
-          }
+          case Some(init) =>
+            val resourceTypeOpt =
+              if (resource.typeRef != null) typing.mapFrom(resource.typeRef)
+              else Some(init.`type`)
+
+            resourceTypeOpt match {
+              case Some(resourceType) =>
+                // Always add the variable to scope so it can be referenced in try block
+                val index = context.add(resource.name, resourceType, isMutable = false)
+                val binding = new ClosureLocalBinding(0, index, resourceType, isMutable = false)
+
+                // AutoCloseableを実装しているか確認
+                if (!TypeRules.isSuperType(autoCloseable, resourceType)) {
+                  bodyContext.report(INCOMPATIBLE_TYPE, resource, autoCloseable, resourceType)
+                  resourceFailed = true
+                } else {
+                  resourceBindings += ((binding, init))
+                }
+              case None =>
+                resourceFailed = true
+            }
         }
       }
 

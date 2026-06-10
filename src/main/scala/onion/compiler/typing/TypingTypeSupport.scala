@@ -9,28 +9,17 @@ import collection.mutable.{Buffer, Set => MutableSet}
 final class TypingTypeSupport(private val typing: Typing) {
   def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
     val result = arguments.map { arg =>
-      val baseType = mapFrom(arg.typeRef)
-      if (baseType != null && arg.isVararg) typing.table_.loadArray(baseType, 1)
-      else baseType
+      mapFrom(arg.typeRef).map { baseType =>
+        if (arg.isVararg) typing.table_.loadArray(baseType, 1) else baseType
+      }
     }
-    if (result.forall(_ != null)) Some(result) else None
+    if (result.forall(_.isDefined)) Some(result.flatten) else None
   }
 
-  def mapFrom(typeNode: AST.TypeNode): Type = mapFrom(typeNode, typing.mapper_)
+  def mapFrom(typeNode: AST.TypeNode): Option[Type] = mapFrom(typeNode, typing.mapper_)
 
-  def mapFromOpt(typeNode: AST.TypeNode): Option[Type] = mapFromOpt(typeNode, typing.mapper_)
-
-  def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Type = {
-    val mappedType = mapper.resolveNode(typeNode)
-    if (mappedType == null) {
-      typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
-    } else {
-      validateTypeApplication(typeNode, mappedType)
-    }
-    mappedType
-  }
-
-  def mapFromOpt(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] = {
+  /** Resolves a type node; reports CLASS_NOT_FOUND itself, so callers only handle absence. */
+  def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) {
       typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
@@ -58,11 +47,12 @@ final class TypingTypeSupport(private val typing: Typing) {
         seen += tp.name
         val upper = tp.upperBound match {
           case Some(boundNode) =>
-            val mapped = mapFrom(boundNode)
-            mapped match {
-              case ct: ClassType => ct
-              case _ =>
+            mapFrom(boundNode) match {
+              case Some(ct: ClassType) => ct
+              case Some(mapped) =>
                 typing.report(INCOMPATIBLE_TYPE, boundNode, typing.rootClass, mapped)
+                typing.rootClass
+              case None =>
                 typing.rootClass
             }
           case None =>

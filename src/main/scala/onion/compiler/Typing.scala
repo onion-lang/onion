@@ -85,14 +85,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   private[compiler] def boxedClass(`type`: BasicType): ClassType =
     `type` match
-      case BasicType.BOOLEAN => load("java.lang.Boolean")
-      case BasicType.BYTE => load("java.lang.Byte")
-      case BasicType.SHORT => load("java.lang.Short")
-      case BasicType.CHAR => load("java.lang.Character")
-      case BasicType.INT => load("java.lang.Integer")
-      case BasicType.LONG => load("java.lang.Long")
-      case BasicType.FLOAT => load("java.lang.Float")
-      case BasicType.DOUBLE => load("java.lang.Double")
+      case BasicType.BOOLEAN => loadRequired("java.lang.Boolean")
+      case BasicType.BYTE => loadRequired("java.lang.Byte")
+      case BasicType.SHORT => loadRequired("java.lang.Short")
+      case BasicType.CHAR => loadRequired("java.lang.Character")
+      case BasicType.INT => loadRequired("java.lang.Integer")
+      case BasicType.LONG => loadRequired("java.lang.Long")
+      case BasicType.FLOAT => loadRequired("java.lang.Float")
+      case BasicType.DOUBLE => loadRequired("java.lang.Double")
       case _ => throw new IllegalArgumentException(s"Not a boxable primitive type: ${`type`.name}")
 
   private[compiler] def boxedTypeArgument(arg: Type): Type =
@@ -173,10 +173,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     diagnostics.checkAndReportShadowing(name, location, context)
 
   def createFQCN(moduleName: String, simpleName: String): String =  (if (moduleName != null) moduleName + "." else "") + simpleName
-  def load(name: String): ClassType = table_.load(name)
-  /** Option-returning version of load for safer null handling */
-  def loadOpt(name: String): Option[ClassType] = Option(table_.load(name))
-  def loadTopClass: ClassType = table_.load(topClass)
+  def load(name: String): Option[ClassType] = table_.load(name)
+  /** Loads a class the compiler itself depends on; throws if the classpath is broken. */
+  def loadRequired(name: String): ClassType = table_.loadRequired(name)
+  /** The top-level container class; absent when the unit has only type declarations. */
+  def loadTopClass: Option[ClassType] = table_.load(topClass)
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = diagnostics.problems
@@ -214,19 +215,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typeSupport.typesOf(arguments)
 
-  private[compiler] def mapFrom(typeNode: AST.TypeNode): Type =
+  private[compiler] def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFrom(typeNode)
 
-  /** Option-returning version of mapFrom for safer null handling */
-  private[compiler] def mapFromOpt(typeNode: AST.TypeNode): Option[Type] =
-    typeSupport.mapFromOpt(typeNode)
-
-  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Type =
+  private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     typeSupport.mapFrom(typeNode, mapper)
-
-  /** Option-returning version of mapFrom for safer null handling */
-  private[compiler] def mapFromOpt(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
-    typeSupport.mapFromOpt(typeNode, mapper)
 
   private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A =
     typeSupport.openTypeParams(scope)(block)

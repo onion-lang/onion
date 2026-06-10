@@ -101,7 +101,7 @@ class NameResolver(private val context: NameResolutionContext) {
       val mappedResult = map(result)
       if (mappedParams.exists(_ == null) || mappedResult == null) return null
       val arity = mappedParams.length
-      val functionType = context.table.load(s"onion.Function$arity")
+      val functionType = context.table.loadOrNull(s"onion.Function$arity")
       if (functionType == null) return null
       TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
     case AST.ArrayType(component) =>
@@ -120,7 +120,7 @@ class NameResolver(private val context: NameResolutionContext) {
 
   private def forName(name: String, qualified: Boolean): ClassType = {
     if (qualified) {
-      context.table.load(name)
+      context.table.loadOrNull(name)
     } else {
       context.currentTypeParams.get(name).map(_.variableType).getOrElse {
         val module = context.currentUnit.module

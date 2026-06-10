@@ -119,7 +119,7 @@ object AsmRefs {
           if (innerNames.isEmpty) internalName
           else internalName + innerNames.mkString("$", "$", "")
         val fqcn = fullInternal.replace('/', '.')
-        val raw = table.load(fqcn)
+        val raw = table.loadOrNull(fqcn)
         if (raw == null) {
           finish(null)
           return
@@ -224,12 +224,12 @@ object AsmRefs {
       val superClass0 =
         if (parsedSuper != null) parsedSuper
         else if (fallbackSuper == null) null
-        else table.load(fallbackSuper.replace('/', '.'))
+        else table.loadOrNull(fallbackSuper.replace('/', '.'))
 
       import scala.jdk.CollectionConverters._
       val interfaces0 =
         if (parsedIfaces.nonEmpty) parsedIfaces.toIndexedSeq
-        else fallbackIfaces.asScala.map(n => table.load(n.replace('/', '.'))).toIndexedSeq
+        else fallbackIfaces.asScala.map(n => table.loadOrNull(n.replace('/', '.'))).toIndexedSeq
 
       ClassInfo(typeParams, superClass0, interfaces0, finalEnv)
     }
@@ -333,7 +333,7 @@ object AsmRefs {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = method.name
     private val bridge = new OnionTypeConversion(table)
-    private val mapper = new SignatureTypeMapper(table, classEnv, () => table.load("java.lang.Object"))
+    private val mapper = new SignatureTypeMapper(table, classEnv, () => table.loadRequired("java.lang.Object"))
     private val parsed =
       if (method.signature != null) mapper.parseMethod(method.signature, method.desc)
       else null
@@ -353,7 +353,7 @@ object AsmRefs {
   class AsmFieldRef(field: FieldNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.FieldRef {
     override val modifier: Int = toOnionModifier(field.access)
     override val name: String = field.name
-    private val mapper = new SignatureTypeMapper(table, classEnv, () => table.load("java.lang.Object"))
+    private val mapper = new SignatureTypeMapper(table, classEnv, () => table.loadRequired("java.lang.Object"))
     override val `type`: TypedAST.Type =
       if (field.signature != null) mapper.parseField(field.signature, field.desc)
       else new OnionTypeConversion(table).toOnionType(Type.getType(field.desc))
@@ -364,7 +364,7 @@ object AsmRefs {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = CONSTRUCTOR_NAME
     private val bridge = new OnionTypeConversion(table)
-    private val mapper = new SignatureTypeMapper(table, classEnv, () => table.load("java.lang.Object"))
+    private val mapper = new SignatureTypeMapper(table, classEnv, () => table.loadRequired("java.lang.Object"))
     private val parsed =
       if (method.signature != null) mapper.parseMethod(method.signature, method.desc)
       else null
@@ -387,14 +387,14 @@ object AsmRefs {
     }
 
     private val modifier_ = toOnionModifier(node.access)
-    private def root: TypedAST.ClassType = if (node.name == "java/lang/Object") this else table.load("java.lang.Object")
+    private def root: TypedAST.ClassType = if (node.name == "java/lang/Object") this else table.loadRequired("java.lang.Object")
     private val genericMapper = new SignatureTypeMapper(table, Map.empty, () => root)
     private lazy val classInfo =
       if (node.signature != null) genericMapper.parseClass(node.signature, node.superName, node.interfaces.asInstanceOf[java.util.List[String]])
       else {
         import scala.jdk.CollectionConverters._
-        val super0 = if (node.superName == null) null else table.load(node.superName.replace('/', '.'))
-        val ifaces0 = node.interfaces.asInstanceOf[java.util.List[String]].asScala.map(n => table.load(n.replace('/', '.'))).toIndexedSeq
+        val super0 = if (node.superName == null) null else table.loadOrNull(node.superName.replace('/', '.'))
+        val ifaces0 = node.interfaces.asInstanceOf[java.util.List[String]].asScala.map(n => table.loadOrNull(n.replace('/', '.'))).toIndexedSeq
         genericMapper.ClassInfo(Array.empty, super0, ifaces0, Map.empty)
       }
 

@@ -1,0 +1,6 @@
+// Crash: StaticMethodCallSupport cast mapFrom's result to ClassType before
+// checking what it was; a static call through a type alias that resolves to a
+// primitive type threw ClassCastException.
+type MyInt = Int
+val x = MyInt::parseInt("3")
+IO::println(x)

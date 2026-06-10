@@ -55,7 +55,7 @@ object Boxing {
     var boxed = cache(index)
     if (boxed == null) {
       val boxedName = TABLE(index)(1).asInstanceOf[String]
-      boxed = table.load(boxedName)
+      boxed = table.loadRequired(boxedName)
       cache(index) = boxed
     }
     boxed

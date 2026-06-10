@@ -208,12 +208,12 @@ private[typing] object GenericMethodTypeArguments {
   ): Option[scala.collection.immutable.Map[String, Type]] = {
     val mappedArgsOpt = typeArgs.foldLeft(Option(Array.empty[Type])) { (accOpt, typeArg) =>
       accOpt.flatMap { acc =>
-        val mapped = typing.mapFrom(typeArg)
-        if (mapped == null) None
-        else if (mapped eq BasicType.VOID) {
-          typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name)
-          None
-        } else Some(acc :+ mapped)
+        typing.mapFrom(typeArg).flatMap { mapped =>
+          if (mapped eq BasicType.VOID) {
+            typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeArg, mapped.name)
+            None
+          } else Some(acc :+ mapped)
+        }
       }
     }
     mappedArgsOpt.flatMap(mappedArgs =>

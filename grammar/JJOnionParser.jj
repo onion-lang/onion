@@ -1606,22 +1606,41 @@ AST.Expression primary_suffix() : {
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); e = new AST.MethodCall(p(t), e, c(n), args, tas); }
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); e = new AST.MethodCall(p(t), e, c(n), args); }
-    | {e = new AST.MemberSelection(p(t), e, c(n));}
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args); }
+    | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
+        if (tl != null) {
+          // Paren-less trailing lambda: list.map { x => x * 2 }
+          args = (List<AST.Expression>)AST.NIL();
+          args = AST.appendToList(args, tl);
+          tl = null;
+          e = new AST.MethodCall(p(t), e, c(n), args);
+        } else {
+          e = new AST.MemberSelection(p(t), e, c(n));
+        }
+      }
     )
   // Safe call operator: expr?.name or expr?.method()
   | t=<SAFE_ACCESS> eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); e = new AST.SafeMethodCall(p(t), e, c(n), args, tas); }
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.SafeMethodCall(p(t), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
-          { args = AST.appendToList(args, tl); e = new AST.SafeMethodCall(p(t), e, c(n), args); }
-    | {e = new AST.SafeMemberSelection(p(t), e, c(n));}
+          { args = AST.appendToList(args, tl); tl = null; e = new AST.SafeMethodCall(p(t), e, c(n), args); }
+    | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
+        if (tl != null) {
+          args = (List<AST.Expression>)AST.NIL();
+          args = AST.appendToList(args, tl);
+          tl = null;
+          e = new AST.SafeMethodCall(p(t), e, c(n), args);
+        } else {
+          e = new AST.SafeMemberSelection(p(t), e, c(n));
+        }
+      }
     )
   | t=<K_AS> eols() type=type()                                                                    {e = new AST.Cast(p(t), e, type);}
   | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}

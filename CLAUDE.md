@@ -401,10 +401,12 @@ These are frequently confused with other languages. **Always check these:**
 |-------|-----------------|
 | `x -> x * 2` | ✓ correct - bare single param works; expression bodies too |
 | `(x) -> expr` | ✓ correct - param types inferred from the expected function type |
-| `func(arg)` for lambda | `func.call(arg)` or `func(arg)` - both work |
+| `func(arg)` for lambda | ✓ correct - function values are called directly |
+| lambda as `Runnable`/`Comparator` | ✓ correct - SAM conversion to Java functional interfaces |
 | `Int -> Int` | ✓ correct - single param function type |
 | `(Int, Int) -> Int` | ✓ correct - multi-param function type |
-| `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - trailing lambda with `=>` |
+| `list.map(x -> x * 2)` | `list.map { x => x * 2 }` - paren-less trailing lambda with `=>` |
+| `stream().map().collect()` | `list.map { ... }.filter { ... }` - List/Iterable have builtin extension pipelines |
 
 ### Method Calls
 

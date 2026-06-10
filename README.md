@@ -53,6 +53,16 @@ val label = if name.length > 0 { "ok" } else { "empty" }
 val xs = [1, 2, 3]                       // List literal
 val ages = ["alice": 12, "bob": 34]      // Map literal (insertion-ordered)
 
+val double: Int -> Int = x -> x * 2      // lambdas: bare params, expression bodies
+foreach i: Int in 0..<xs.size() {        // ranges: a..b inclusive, a..<b exclusive
+  IO::println("xs[#{i}] = #{xs.get(i)}") // interpolation (nested strings OK)
+}
+
+val cmp: Comparator[Integer] = (a, b) -> (b as Int) - (a as Int)  // SAM conversion
+Collections::sort(mutable, cmp)
+
+val branch = Proc::run("git", "branch", "--show-current")  // run external commands
+
 def add(x: Int, y: Int): Int = x + y
 
 val double: Int -> Int = (x) -> { return x * 2; }

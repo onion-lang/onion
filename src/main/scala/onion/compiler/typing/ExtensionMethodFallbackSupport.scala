@@ -79,6 +79,73 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
   }
 
+  /**
+   * Bidirectional variant for calls whose arguments contain closures with
+   * untyped parameters (list.map { x => ... }): pick the extension's backing
+   * static method first, then type each closure against its parameter type.
+   * Assumes closures are trailing arguments (same as the instance-call path).
+   */
+  def tryExtensionMethodCallBidirectional(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Term] = {
+    val name = node.name
+    val args = node.args.toArray
+
+    val preliminaryParams = new Array[Term](args.length)
+    for (i <- args.indices if !untypedClosureIndices.contains(i)) {
+      calls.typed(args(i), context) match {
+        case Some(term) => preliminaryParams(i) = term
+        case None => return None
+      }
+    }
+
+    val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
+    candidates.iterator.flatMap { extMethod =>
+      val container = extMethod.containerClass
+      container.methods(name)
+        .find(m => Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1)
+        .flatMap { method =>
+          val classSubst = TypeSubstitution.classSubstitution(container)
+          val knownStatic = (Array(target) ++ preliminaryParams).filter(_ != null)
+          val preliminarySubst = GenericMethodTypeArguments.inferWithoutDefaults(
+            typing, node, method, knownStatic, classSubst, expected
+          )
+          val preliminaryExpected = method.arguments.map { argType =>
+            TypeSubstitution.substituteType(argType, classSubst, preliminarySubst, defaultToBound = false)
+          }
+
+          var failed = false
+          val finalArgs = new Array[Term](args.length)
+          for (i <- args.indices) {
+            if (untypedClosureIndices.contains(i)) {
+              val expectedType = if (i + 1 < preliminaryExpected.length) preliminaryExpected(i + 1) else null
+              calls.typed(args(i), context, expectedType) match {
+                case Some(term) => finalArgs(i) = term
+                case None => failed = true
+              }
+            } else {
+              finalArgs(i) = preliminaryParams(i)
+            }
+          }
+          if (failed) None
+          else {
+            val staticArgs = Array(target) ++ finalArgs
+            val finalSubst = GenericMethodTypeArguments.infer(typing, node, method, staticArgs, classSubst, expected)
+            val finalExpectedArgs = TypeSubst.args(method, classSubst, finalSubst)
+            calls.processParamsWithExpected(node, staticArgs, finalExpectedArgs).map { finalParams =>
+              val call = new CallStatic(container, method, finalParams)
+              TypeSubst.withCast(call, TypeSubst(method.returnType, classSubst, finalSubst))
+            }
+          }
+        }
+    }.nextOption()
+  }
+
   private def collectExtensionMethods(
     targetType: ObjectType,
     name: String

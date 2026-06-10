@@ -89,6 +89,7 @@ nav:
       - Classes and Objects: guide/classes-and-objects.md
       - Inheritance: guide/inheritance.md
       - Lambda Expressions: guide/lambda-expressions.md
+      - Collections: guide/collections.md
       - Java Interoperability: guide/java-interop.md
   - Examples:
       - Overview: examples/overview.md

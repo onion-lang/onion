@@ -4,16 +4,20 @@ Lambda expressions provide a concise way to create anonymous functions in Onion.
 
 ## Lambda Syntax
 
-Lambdas use the `(parameters) -> { body }` syntax:
+Lambdas are written `(parameters) -> body`, where the body is either an
+expression or a block:
 
 ```onion
-// Lambda with one parameter
-val double: (Int) -> Int = (x: Int) -> { return x * 2; }
+// Expression body
+val double = (x: Int) -> x * 2
 
-// Lambda with multiple parameters
-val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
+// Bare single parameter (type inferred from the expected function type)
+val triple: Int -> Int = x -> x * 3
 
-// Lambda with no parameters
+// Multiple parameters
+val add = (a: Int, b: Int) -> a + b
+
+// Block body for multiple statements
 val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
 ```
 
@@ -35,7 +39,14 @@ When no target function type is available, parameter types must be explicit.
 
 ## Calling Lambdas
 
-Use the `.call()` method to invoke a lambda:
+Function values are called directly with function-call syntax:
+
+```onion
+val double = (x: Int) -> x * 2
+IO::println(double(21))   // 42
+```
+
+`.call()` also works:
 
 ```onion
 val square: (Int) -> Int = (x: Int) -> { return x * x; }
@@ -60,6 +71,21 @@ val doubled: Int = func1.call(10)
 // Function with 2 parameters
 val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 val sum: Int = func2.call(3, 7)
+```
+
+## Java Functional Interfaces (SAM Conversion)
+
+Lambdas convert to any Java interface with a single abstract method:
+
+```onion
+val r: Runnable = () -> IO::println("ran")
+new Thread(r).start()
+
+val cmp: Comparator[Integer] = (a, b) -> (b as Int) - (a as Int)
+Collections::sort(xs, cmp)
+
+// Argument position works too
+Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
 ```
 
 ## Closures

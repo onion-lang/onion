@@ -123,6 +123,52 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] val session = new TypingSession(config, globalState, emptyTypeParams)
   private val diagnostics = new TypingDiagnostics(this, session)
   private val typeSupport = new TypingTypeSupport(this)
+
+  // Lazy so that compilations that never reach an extension lookup (parse
+  // failures, most fuzz mutants) don't pay for scanning the builtin
+  // containers; eager registration in the constructor caused GC thrashing
+  // when thousands of compilers were constructed in one JVM.
+  private var builtinExtensionsRegistered = false
+  private def ensureBuiltinExtensions(): Unit = {
+    if (!builtinExtensionsRegistered) {
+      builtinExtensionsRegistered = true
+      registerBuiltinExtensions()
+    }
+  }
+
+  /**
+   * Registers the static helpers of the bundled collection utilities as
+   * extension methods on their first parameter's type, so scripts can write
+   * `list.map { x => ... }` instead of `Colls::map(list) { x => ... }`.
+   */
+  private def registerBuiltinExtensions(): Unit = {
+    for {
+      containerName <- Seq("onion.Colls", "onion.Iterables")
+      container <- load(containerName)
+      method <- container.methods
+      if Modifier.isStatic(method.modifier) && Modifier.isPublic(method.modifier) && method.arguments.nonEmpty
+    } {
+      val receiverName = method.arguments(0) match {
+        case applied: AppliedClassType => applied.raw.name
+        case ct: ClassType => ct.name
+        case _ => null
+      }
+      if (receiverName != null) {
+        val extMethod = new ExtensionMethodDefinition(
+          null,
+          method.modifier,
+          method.arguments(0),
+          container,
+          method.name,
+          method.arguments.drop(1),
+          method.returnType,
+          null,
+          method.typeParameters
+        )
+        registerExtensionMethod(receiverName, extMethod)
+      }
+    }
+  }
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
@@ -208,6 +254,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     session.global.extensions.registerMethod(receiverFqcn, method)
   }
   private[compiler] def lookupExtensionMethods(receiverFqcn: String): Seq[ExtensionMethodDefinition] = {
+    ensureBuiltinExtensions()
     session.global.extensions.methodsFor(receiverFqcn)
   }
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName

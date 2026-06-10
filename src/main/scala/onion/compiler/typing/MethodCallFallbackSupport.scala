@@ -56,8 +56,14 @@ private[compiler] final class MethodCallFallbackSupport(
     calls.collectMethodsMatching(targetType, name, candidates, calls.isInstanceMethod)
 
     if (candidates.isEmpty) {
-      calls.reportMethodNotFound(node, targetType, name, Array[Type]())
-      return None
+      extensionMethodFallbackSupport.tryExtensionMethodCallBidirectional(
+        node, target, targetType, context, expected, untypedClosureIndices
+      ) match {
+        case some @ Some(_) => return some
+        case None =>
+          calls.reportMethodNotFound(node, targetType, name, Array[Type]())
+          return None
+      }
     }
 
     val nonClosureTypes = preliminaryParams.zipWithIndex.collect {
@@ -73,8 +79,14 @@ private[compiler] final class MethodCallFallbackSupport(
     )
 
     if (applicableMethods.isEmpty) {
-      calls.reportMethodNotFound(node, targetType, name, nonClosureTypes.values.toArray)
-      return None
+      extensionMethodFallbackSupport.tryExtensionMethodCallBidirectional(
+        node, target, targetType, context, expected, untypedClosureIndices
+      ) match {
+        case some @ Some(_) => return some
+        case None =>
+          calls.reportMethodNotFound(node, targetType, name, nonClosureTypes.values.toArray)
+          return None
+      }
     }
 
     val method = overloadSupport.selectMostSpecificApplicable(

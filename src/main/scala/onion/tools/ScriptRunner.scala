@@ -40,7 +40,12 @@ object ScriptRunner {
       return
     }
     val verbose = args.exists(_ == "--verbose")
-    val filteredArgs = args.filterNot(_ == "--verbose")
+    val watch = args.exists(_ == "--watch")
+    val filteredArgs = args.filterNot(a => a == "--verbose" || a == "--watch")
+    if (watch) {
+      runWatching(filteredArgs, verbose)
+      return
+    }
     try {
       val exitCode = new ScriptRunner().run(filteredArgs, verbose)
       if (exitCode != 0) System.exit(exitCode)
@@ -48,6 +53,58 @@ object ScriptRunner {
     catch {
       case e: ScriptException => {
         throw e.getCause
+      }
+    }
+  }
+
+  /**
+   * --watch: run the script, then rerun it whenever the file changes.
+   * Runtime exceptions and compile errors are printed but don't stop
+   * the watch loop.
+   */
+  private def runWatching(args: Array[String], verbose: Boolean): Unit = {
+    import java.nio.file.{FileSystems, Paths, StandardWatchEventKinds}
+    val scriptPath = args.find(a => !a.startsWith("-")).getOrElse {
+      new ScriptRunner().printUsage()
+      return
+    }
+    val path = Paths.get(scriptPath).toAbsolutePath
+    val dir = path.getParent
+    val watcher = FileSystems.getDefault.newWatchService()
+    dir.register(watcher, StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_CREATE)
+
+    def runOnce(): Unit = {
+      try {
+        new ScriptRunner().run(args, verbose)
+      } catch {
+        case e: ScriptException =>
+          Option(e.getCause).getOrElse(e).printStackTrace()
+        case e: Exception =>
+          e.printStackTrace()
+      }
+      System.err.println(s"[watch] ${path.getFileName} — waiting for changes (Ctrl-C to stop)")
+    }
+
+    runOnce()
+    while (true) {
+      val key = watcher.take()
+      import scala.jdk.CollectionConverters.*
+      val touched = key.pollEvents().asScala.exists { event =>
+        event.context() match {
+          case p: java.nio.file.Path => dir.resolve(p) == path
+          case _ => false
+        }
+      }
+      key.reset()
+      if (touched) {
+        Thread.sleep(80) // editors often write in bursts
+        var drained = watcher.poll()
+        while (drained != null) {
+          drained.pollEvents()
+          drained.reset()
+          drained = watcher.poll()
+        }
+        runOnce()
       }
     }
   }

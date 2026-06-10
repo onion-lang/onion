@@ -385,10 +385,23 @@ class SemanticErrorReporter(threshold: Int) {
     val name = asString(items(1))
     val args = typeNames(asTypeArray(items(2)))
     val baseMessage = format(message("error.semantic.methodNotFound"), Seq(typeName(targetType), name, args))
-    val candidates = targetType match
-      case obj: TypedAST.ObjectType => obj.methods.map(_.name).distinct.toSeq
+    // A method with that exact name exists: show its signatures instead of
+    // a (possibly misleading) name-similarity suggestion
+    val sameName = targetType match
+      case obj: TypedAST.ObjectType => obj.methods.filter(_.name == name).toSeq
       case _ => Seq.empty
-    val suggestion = toolbox.Suggestions.formatSuggestion(name, candidates)
+    val suggestion =
+      if (sameName.nonEmpty) {
+        val signatures = sameName.take(3).map { m =>
+          s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
+        }
+        Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+      } else {
+        val candidates = targetType match
+          case obj: TypedAST.ObjectType => obj.methods.map(_.name).distinct.toSeq
+          case _ => Seq.empty
+        toolbox.Suggestions.formatSuggestion(name, candidates)
+      }
     problem(position, appendSuggestion(baseMessage, suggestion))
   }
 

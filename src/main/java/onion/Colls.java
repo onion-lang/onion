@@ -340,6 +340,30 @@ public final class Colls {
         return result;
     }
 
+    /**
+     * Combines elements left-to-right: reduce([1,2,3]) { a, b => a + b }.
+     * Returns null for an empty or null list.
+     */
+    public static <T> T reduce(List<T> list, Function2<T, T, T> f) {
+        if (list == null || list.isEmpty()) return null;
+        T acc = list.get(0);
+        for (int i = 1; i < list.size(); i++) {
+            acc = f.call(acc, list.get(i));
+        }
+        return acc;
+    }
+
+    /**
+     * Folds elements left-to-right from an initial value.
+     */
+    public static <T, R> R fold(List<T> list, R initial, Function2<R, T, R> f) {
+        R acc = initial;
+        if (list != null) {
+            for (T item : list) acc = f.call(acc, item);
+        }
+        return acc;
+    }
+
     public static <T> List<T> filter(List<T> list, Function1<T, Boolean> predicate) {
         List<T> result = new ArrayList<>();
         for (T element : list) {

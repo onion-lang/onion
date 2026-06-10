@@ -62,6 +62,9 @@ val cmp: Comparator[Integer] = (a, b) -> (b as Int) - (a as Int)  // SAM convers
 Collections::sort(mutable, cmp)
 
 val branch = Proc::run("git", "branch", "--show-current")  // run external commands
+val opts = Args::parse(args)                                // CLI flags & options
+foreach f: String in Files::glob(".", "*.on") { ... }       // glob
+// onion --watch script.on  -> rerun on every save
 
 def add(x: Int, y: Int): Int = x + y
 

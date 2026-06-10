@@ -1545,6 +1545,10 @@ object TypedAST {
         // T? ← T : allowed (widening)
         case (l: TypedAST.NullableType, _) =>
           return isSuperType(l.innerType, right) || right.isNullType
+        // Object ← T? : allowed (null is a valid Object reference, so
+        // nullable values can flow into printing/collections/equals)
+        case (l: TypedAST.ClassType, _: TypedAST.NullableType) if l.name == "java.lang.Object" =>
+          return true
         // T ← T? : NOT allowed (requires explicit unwrap)
         case (_, r: TypedAST.NullableType) =>
           return false

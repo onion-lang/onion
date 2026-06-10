@@ -47,6 +47,19 @@ private[compiler] final class MethodInvocationBuilderSupport(
     methodSubst: scala.collection.immutable.Map[String, Type]
   ): Term = {
     val castType = TypeSubst(method.returnType, classSubst, methodSubst)
-    TypeSubst.withCast(call, castType)
+    call match {
+      case _: SafeCall | _: SafeFieldAccess =>
+        // Safe navigation yields null when the target is null: keep the
+        // nullable result type instead of casting back to the raw return
+        // type (which unboxes primitives and NPEs on the null path)
+        castType match {
+          case _: NullableType | _: NullType => TypeSubst.withCast(call, castType)
+          case bt: BasicType => call // SafeCall.type is already NullableType(bt)
+          case other if other eq method.returnType => call
+          case other => TypeSubst.withCast(call, new NullableType(other))
+        }
+      case _ =>
+        TypeSubst.withCast(call, castType)
+    }
   }
 }

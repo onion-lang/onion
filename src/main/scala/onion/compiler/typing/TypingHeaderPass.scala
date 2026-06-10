@@ -41,6 +41,9 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
 
   private def buildImports(moduleName: String): Seq[ImportItem] = {
     val imports = Buffer[ImportItem](
+      // onion.* must precede java.lang.*: since Java 25 java.lang.IO exists
+      // and would otherwise shadow onion.IO
+      ImportItem("*", Seq("onion", "*")),
       ImportItem("*", Seq("java", "lang", "*")),
       ImportItem("*", Seq("java", "io", "*")),
       ImportItem("*", Seq("java", "util", "*")),
@@ -54,7 +57,6 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
       ImportItem("JFloat", Seq("java", "lang", "Float")),
       ImportItem("JDouble", Seq("java", "lang", "Double")),
       ImportItem("JBoolean", Seq("java", "lang", "Boolean")),
-      ImportItem("*", Seq("onion", "*")),
       ImportItem("*", if (moduleName != null) moduleName.split("\\.").toIndexedSeq.appended("*") else Seq("*"))
     )
     if (unit.imports != null) {

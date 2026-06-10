@@ -634,6 +634,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             // If boxed, also get the value from the box
             if binding.isBoxed then
               gen.getField(boxAsmType(binding.tp), "value", boxedValueType(binding.tp))
+              // The box stores references as Object; restore the static type
+              if !binding.tp.isBasicType then gen.checkCast(asmType(binding.tp))
           case None =>
             // For frame=0 (current closure's own variables/parameters)
             if ref.frame == 0 && closureCtx.isParameter(ref.index) then
@@ -652,6 +654,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
           val slot = localVars.slotOf(ref.index).getOrElse(localVars.getOrAllocateSlot(ref.index, boxType))
           gen.loadLocal(slot)
           gen.getField(boxType, "value", boxedValueType(ref.`type`))
+          // The box stores references as Object; restore the static type
+          if !ref.`type`.isBasicType then gen.checkCast(asmType(ref.`type`))
         else
           val slot = localVars.slotOf(ref.index).getOrElse(localVars.getOrAllocateSlot(ref.index, asmType(ref.`type`)))
           gen.loadLocal(slot)

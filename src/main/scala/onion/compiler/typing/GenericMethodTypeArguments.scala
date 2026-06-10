@@ -178,7 +178,28 @@ private[typing] object GenericMethodTypeArguments {
 
     val formalArgs =
       method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-    formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+    if (method.isVararg && formalArgs.nonEmpty) {
+      // Vararg methods: unify fixed params positionally, then unify the vararg
+      // component with each trailing argument (boxing primitives), unless the
+      // caller already passes a packed array.
+      val fixedCount = formalArgs.length - 1
+      formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+      val packed = args.length == formalArgs.length && args.last.`type`.isArrayType
+      if (packed) {
+        unify(formalArgs.last, args.last.`type`, callNode)
+      } else {
+        val component = formalArgs.last match {
+          case at: ArrayType => at.base
+          case other => other
+        }
+        args.drop(fixedCount).foreach { actual =>
+          val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
+          unify(component, actualType, callNode)
+        }
+      }
+    } else {
+      formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+    }
 
     if (expectedReturn != null) {
       val formalReturn =
@@ -335,7 +356,28 @@ private[typing] object GenericMethodTypeArguments {
 
     val formalArgs =
       method.arguments.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-    formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+    if (method.isVararg && formalArgs.nonEmpty) {
+      // Vararg methods: unify fixed params positionally, then unify the vararg
+      // component with each trailing argument (boxing primitives), unless the
+      // caller already passes a packed array.
+      val fixedCount = formalArgs.length - 1
+      formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+      val packed = args.length == formalArgs.length && args.last.`type`.isArrayType
+      if (packed) {
+        unify(formalArgs.last, args.last.`type`, callNode)
+      } else {
+        val component = formalArgs.last match {
+          case at: ArrayType => at.base
+          case other => other
+        }
+        args.drop(fixedCount).foreach { actual =>
+          val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
+          unify(component, actualType, callNode)
+        }
+      }
+    } else {
+      formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+    }
 
     if (expectedReturn != null) {
       val formalReturn =

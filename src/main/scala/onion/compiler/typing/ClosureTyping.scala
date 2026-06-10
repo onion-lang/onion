@@ -83,10 +83,11 @@ final class ClosureTyping(
       def substitutedReturn(method: Method): Type =
         TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
 
-      val candidates = typeRef.methods.filter(m => m.name == name && m.arguments.length == argTypes.length)
+      val implName = implementedMethodName(typeRef, name, argTypes.length)
+      val candidates = typeRef.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
       candidates.find(m => sameTypes(substitutedArgs(m), argTypes)) match {
         case None =>
-          bodyContext.report(METHOD_NOT_FOUND, node, typeRef, name, argTypes)
+          bodyContext.report(METHOD_NOT_FOUND, node, typeRef, implName, argTypes)
           None
         case Some(method) =>
           val expectedArgs = substitutedArgs(method)
@@ -183,7 +184,7 @@ final class ClosureTyping(
       }
       None
     } else {
-      expectedMethodArgs(inferredTarget, node.mname, args.length) match {
+      expectedMethodArgs(inferredTarget, implementedMethodName(inferredTarget, node.mname, args.length), args.length) match {
         case None =>
           None
         case Some(expectedArgs) =>
@@ -195,6 +196,32 @@ final class ClosureTyping(
           Some(argTypes)
       }
     }
+  }
+
+  /**
+   * The method a closure implements on `target`: the onion.FunctionN-style
+   * method named `name` when present, otherwise the interface's single
+   * abstract method (SAM conversion for Java functional interfaces).
+   * Abstract redeclarations of public java.lang.Object methods don't count,
+   * per Java's functional interface rules (e.g. Comparator.equals).
+   */
+  private def implementedMethodName(target: ClassType, name: String, arity: Int): String = {
+    if (target.methods.exists(m => m.name == name && m.arguments.length == arity)) name
+    else {
+      val abstracts = target.methods.filter { m =>
+        Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m)
+      }
+      abstracts.map(_.name).distinct.toList match {
+        case single :: Nil if abstracts.exists(_.arguments.length == arity) => single
+        case _ => name
+      }
+    }
+  }
+
+  private def isPublicObjectMethod(m: Method): Boolean = m.name match {
+    case "equals" => m.arguments.length == 1 && m.arguments(0).name == "java.lang.Object"
+    case "hashCode" | "toString" => m.arguments.isEmpty
+    case _ => false
   }
 
   private def expectedMethodArgs(target: ClassType, name: String, arity: Int): Option[Array[Type]] = {

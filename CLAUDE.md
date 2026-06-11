@@ -320,6 +320,9 @@ These are frequently confused with other languages. **Always check these:**
 | `Box<T>` | `Box[T]` - square brackets for generics |
 | `new Box<String>()` | `new Box[String]()` - square brackets |
 | `String \| null` | `String?` - nullable type syntax |
+| `Box[String?]` rejected? | ✓ correct - bare `[T]` accepts nullable type args (Kotlin-style) |
+| `t.method()` on bare-T value | E0057 - use `t?.method()`, `t ?: default`, `if t != null`, or `[T extends B]` |
+| `[T extends Object]` same as `[T]`? | No - `extends` makes T non-null; `[T extends B?]` opts back into nullable |
 | `==` for reference equality | `===` for reference, `==` for value equality |
 
 ### Control Flow
@@ -443,7 +446,7 @@ These are frequently confused with other languages. **Always check these:**
 ## Known Limitations
 
 - Compiler may crash on certain edge cases (examples in `run/` are verified to work)
-- Generics are erasure-based (no variance, wildcards, or reified type info)
+- Generics are erasure-based (no variance, wildcards, or reified type info); nullability of type parameters is tracked at compile time (bare `[T]` is nullable, `[T extends B]` is non-null, Java type variables are platform)
 - Diagnostics are still improving; some errors may be reported later in the pipeline
 - Tail call optimization only handles direct self-recursion (not mutual recursion or continuation-passing style)
 

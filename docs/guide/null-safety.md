@@ -191,3 +191,89 @@ The warning covers declarations, assignments, arguments and returns.
 Promote it to an error with `--warn error`, or suppress it with
 `--Wno null-to-non-nullable`. Values coming from Java APIs are not
 checked (their nullness is unknown to the compiler).
+
+## Nullable-Aware Generics
+
+Type parameters interact with nullability the same way Kotlin's do.
+
+### Bare `[T]` ranges over nullable types
+
+A type parameter declared without a bound accepts both `String` and
+`String?` as type arguments:
+
+```onion
+class Box[T] {
+  val item: T
+public:
+  def this(item: T) { this.item = item }
+  def get(): T { return this.item }
+}
+
+val maybe: String? = null
+val box = new Box[String?](maybe)   // OK: T := String?
+val out: String? = box.get()
+```
+
+Because `T` may be instantiated with a nullable type, values of type `T`
+cannot be dereferenced directly inside the generic body (E0057):
+
+```onion
+def show(): String {
+  return this.item.toString()       // E0057: item may be null
+}
+```
+
+Use safe navigation, the Elvis operator, or a null check — the same
+tools that work on `T?`:
+
+```onion
+def safe(): String? { return this.item?.toString() }
+def fallback(): String { return (this.item ?: "fb").toString() }
+def checked(): String {
+  val it = this.item
+  if it != null { return it.toString() } else { return "<null>" }
+}
+```
+
+### `[T extends B]` keeps T non-null
+
+Declaring a bound restricts the parameter to non-null types: nullable
+type arguments are rejected, and values of `T` can be dereferenced
+freely inside the body:
+
+```onion
+class Sorted[T extends Comparable] {
+  val item: T
+public:
+  def this(item: T) { this.item = item }
+  def show(): String { return this.item.toString() }  // OK
+}
+
+new Sorted[String]("ok")      // OK
+new Sorted[String?](maybe)    // error: String? does not satisfy the bound
+```
+
+This also applies to `[T extends Object]` — unlike a bare `[T]`, it
+rejects nullable arguments.
+
+### `[T extends B?]` opts back into nullable with a bound
+
+```onion
+class Cache[T extends Comparable?] { ... }   // accepts String and String?
+```
+
+### Inference
+
+Type-argument inference binds nullable types when the arguments require
+it, and merges mixed nullability:
+
+```onion
+static def first[T](a: T, b: T): T { return a }
+
+first(maybe, "solid")   // T := String?  (String? + String merge)
+```
+
+Type variables coming from Java classes are *platform* parameters:
+their nullability is unknown, so they accept nullable arguments and
+remain dereferenceable (matching how Java values are treated
+elsewhere).

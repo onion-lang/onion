@@ -271,6 +271,31 @@ class NullableGenericsSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Explicit nullable bounds") {
+    it("[T extends Object?] accepts both String and String? and stays deref-restricted") {
+      val result = shell.run(
+        """
+          |class Box[T extends Object?] {
+          |  val item: T
+          |public:
+          |  def this(item: T) { this.item = item }
+          |  def peek(): String { return "" + (this.item ?: "none") }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val none: String? = null
+          |    return new Box[String?](none).peek() + "," + new Box[String]("solid").peek()
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableBound.on",
+        Array()
+      )
+      assert(Shell.Success("none,solid") == result)
+    }
+  }
+
   describe("Elvis result type") {
     it("yields the non-null type when the fallback cannot be null") {
       val result = shell.run(

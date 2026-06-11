@@ -182,9 +182,21 @@ object DiagnosticRenderer {
     if (params.isEmpty) return ""
     params
       .map { param =>
-        param.upperBound match {
-          case Some(bound) if bound.name != "java.lang.Object" => s"${param.name} extends ${bound.name}"
-          case _ => param.name
+        param.nullability match {
+          // Bare [T] is nullable, so a declared non-null bound is always
+          // worth showing — even when it is just Object
+          case TypedAST.Nullability.NonNull =>
+            s"${param.name} extends ${param.upperBound.map(_.name).getOrElse("java.lang.Object")}"
+          case TypedAST.Nullability.Nullable =>
+            param.upperBound match {
+              case Some(bound) if bound.name != "java.lang.Object" => s"${param.name} extends ${bound.name}?"
+              case _ => param.name
+            }
+          case TypedAST.Nullability.Platform =>
+            param.upperBound match {
+              case Some(bound) if bound.name != "java.lang.Object" => s"${param.name} extends ${bound.name}"
+              case _ => param.name
+            }
         }
       }
       .mkString("[", ", ", "]")

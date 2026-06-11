@@ -162,6 +162,16 @@ final class ConstructionTyping(
       if (constructors0.nonEmpty) (constructors0, parameters0)
       else findConstructorWithBoxing(typeRef, parameters0)
     if (constructors.length == 0) {
+      // Default-parameter fallback: a constructor with defaults accepts
+      // fewer positional arguments than its signature lists
+      val defaultsCandidate = typeRef.constructors.exists {
+        case cd: ConstructorDefinition =>
+          cd.argumentsWithDefaults != null &&
+            parameters0.length < cd.argumentsWithDefaults.length &&
+            parameters0.length >= cd.minArguments
+        case _ => false
+      }
+      if (defaultsCandidate) return typeNewObjectWithNamedArgs(node, typeRef, context)
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {

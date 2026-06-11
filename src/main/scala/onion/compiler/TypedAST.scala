@@ -104,6 +104,18 @@ object TypedAST {
   }
 
   /**
+   * Non-null assertion: target!! — throws NullPointerException when target
+   * is null, otherwise yields the value with nullability stripped.
+   */
+  class NonNullAssert(location: Location, val target: TypedAST.Term, resultType: TypedAST.Type) extends Term(location) {
+    def this(target: TypedAST.Term, resultType: TypedAST.Type) = {
+      this(null, target, resultType)
+    }
+
+    def `type`: TypedAST.Type = resultType
+  }
+
+  /**
    * Safe array indexing: target?[index] — yields null when target is null,
    * the (boxed) element otherwise.
    */

@@ -169,8 +169,9 @@ Substring: hel
 |---------|-------|--------|------|
 | Nullable type | `T?` | `T?` | `@Nullable T` |
 | Safe call | `?.` | `?.` | N/A |
+| Safe indexing | `?[i]` | N/A | N/A |
 | Elvis operator | `?:` | `?:` | N/A |
-| Non-null assertion | N/A | `!!` | N/A |
+| Non-null assertion | `!!` | `!!` | N/A |
 
 ## Next Steps
 
@@ -191,6 +192,28 @@ The warning covers declarations, assignments, arguments and returns.
 Promote it to an error with `--warn error`, or suppress it with
 `--Wno null-to-non-nullable`. Values coming from Java APIs are not
 checked (their nullness is unknown to the compiler).
+
+## Safe Indexing (`?[]`) and Non-Null Assertion (`!!`)
+
+`xs?[i]` indexes a nullable receiver: null when `xs` is null, the element
+(widened to nullable) otherwise. Works for arrays, `List` and maps, and
+chains with `?.`:
+
+```onion
+val xs: List? = loadOrNull()
+val first = xs?[0]
+val len = names?[0]?.length()
+```
+
+`expr!!` asserts the value is not null: the static type loses one level
+of nullability, and a `NullPointerException` is thrown at the assertion
+site if the value is actually null. Prefer `?.`/`?:`/null checks; use
+`!!` when you know better than the type system:
+
+```onion
+val s: String? = definitelyThere()
+IO::println(s!!.length())
+```
 
 ## Nullable-Aware Generics
 

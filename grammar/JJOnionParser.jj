@@ -639,6 +639,7 @@ TOKEN : {
 | <ASSIGN:         "="            >
 | <EQ:             "=="           >
 | <NOTEQ:          "!="           >
+| <NOT_NULL:       "!!"           >
 | <REFEQ:          "==="          >
 | <REFNOTEQ:       "!=="          >
 | <ADDEQ:          "+="           >
@@ -1701,6 +1702,7 @@ AST.Expression primary_suffix() : {
     )
   | t=<K_AS> eols() type=type()                                                                    {e = new AST.Cast(p(t), e, type);}
   | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
+  | t=<NOT_NULL>                                                                                  {e = new AST.NotNullAssertion(p(t), e);}
   | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
   )
 )* {return e;}

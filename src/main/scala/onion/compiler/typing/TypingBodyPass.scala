@@ -181,6 +181,9 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeSafeIndexing(node: AST.SafeIndexing, context: LocalContext): Option[Term] =
     expressionFormTyping.typeSafeIndexing(node, context)
 
+  def typeNotNullAssertion(node: AST.NotNullAssertion, context: LocalContext): Option[Term] =
+    expressionFormTyping.typeNotNullAssertion(node, context)
+
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] =
     expressionFormTyping.typeNewArray(node, context)
 

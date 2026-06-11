@@ -59,6 +59,27 @@ final class ExpressionFormTyping(
       }
     } yield result
 
+  /**
+   * Non-null assertion expr!!: strips one level of nullability, trading a
+   * possible NullPointerException at the assertion site. Primitives can't
+   * be null, so the assertion is a no-op for them.
+   */
+  def typeNotNullAssertion(node: AST.NotNullAssertion, context: LocalContext): Option[Term] =
+    typed(node.term, context).map { target =>
+      target.`type` match {
+        case n: NullableType => new NonNullAssert(target, n.innerType)
+        case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+          new NonNullAssert(target, tv.nonNullView)
+        case bt if bt.isBasicType => target
+        case t if t.isNullType =>
+          // null!! always throws; type as Object so the expression stays usable
+          new NonNullAssert(target, bodyContext.rootClass)
+        case other =>
+          // Platform / non-null reference values still get the runtime check
+          new NonNullAssert(target, other)
+      }
+    }
+
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     typed(node.src, context).flatMap { term =>
       typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>

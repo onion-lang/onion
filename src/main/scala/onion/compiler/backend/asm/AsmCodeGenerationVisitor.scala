@@ -60,6 +60,21 @@ class AsmCodeGenerationVisitor(
     gen.arrayLoad(asmType(node.`type`))
 
   /**
+   * Non-null assertion: target!! — throw NullPointerException on null,
+   * otherwise leave the value on the stack.
+   */
+  override def visitNonNullAssert(node: NonNullAssert): Unit =
+    val okLabel = gen.newLabel()
+    visitTerm(node.target)
+    gen.dup()
+    gen.visitJumpInsn(Opcodes.IFNONNULL, okLabel)
+    gen.throwException(
+      AsmType.getObjectType("java/lang/NullPointerException"),
+      "expression evaluated to null (!! assertion failed)"
+    )
+    gen.visitLabel(okLabel)
+
+  /**
    * Safe array indexing: target?[index]
    *   target            // stack: [target]
    *   dup, ifnull L     // null check

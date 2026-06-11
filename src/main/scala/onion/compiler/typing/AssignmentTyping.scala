@@ -109,7 +109,9 @@ final class AssignmentTyping(
             return null
           }
           val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation)
-          val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+          // Keep unsubstituted type variables as T so diagnostics (W0012)
+          // name the parameter rather than its bound
+          val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
           if (value.`type`.isBottomType) return value
           val term = processAssignable(expression, expected, value)
           if (term == null) return null

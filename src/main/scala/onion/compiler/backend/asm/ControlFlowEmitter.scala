@@ -51,18 +51,34 @@ final class ControlFlowEmitter(
     gen.visitLabel(endLabel)
 
   def emitConditionalLoop(node: ConditionalLoop): Unit =
-    val startLabel = gen.newLabel()
-    val endLabel = gen.newLabel()
-    loops.push(startLabel, endLabel)
-    try
-      gen.visitLabel(startLabel)
-      visitTerm(node.condition)
-      gen.visitJumpInsn(Opcodes.IFEQ, endLabel)
-      visitStatement(node.stmt)
-      gen.visitJumpInsn(Opcodes.GOTO, startLabel)
-      gen.visitLabel(endLabel)
-    finally
-      loops.pop()
+    if node.isPostTest then
+      // do { body } while cond — body first; continue jumps to the check
+      val bodyLabel = gen.newLabel()
+      val condLabel = gen.newLabel()
+      val endLabel = gen.newLabel()
+      loops.push(condLabel, endLabel)
+      try
+        gen.visitLabel(bodyLabel)
+        visitStatement(node.stmt)
+        gen.visitLabel(condLabel)
+        visitTerm(node.condition)
+        gen.visitJumpInsn(Opcodes.IFNE, bodyLabel)
+        gen.visitLabel(endLabel)
+      finally
+        loops.pop()
+    else
+      val startLabel = gen.newLabel()
+      val endLabel = gen.newLabel()
+      loops.push(startLabel, endLabel)
+      try
+        gen.visitLabel(startLabel)
+        visitTerm(node.condition)
+        gen.visitJumpInsn(Opcodes.IFEQ, endLabel)
+        visitStatement(node.stmt)
+        gen.visitJumpInsn(Opcodes.GOTO, startLabel)
+        gen.visitLabel(endLabel)
+      finally
+        loops.pop()
 
   def emitNOP(node: NOP): Unit = ()
 

@@ -703,7 +703,7 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class ConditionalLoop(location: Location, val condition: TypedAST.Term, val stmt: TypedAST.ActionStatement) extends ActionStatement(location) {
+  class ConditionalLoop(location: Location, val condition: TypedAST.Term, val stmt: TypedAST.ActionStatement, val isPostTest: Boolean = false) extends ActionStatement(location) {
     def this(condition: TypedAST.Term, stmt: TypedAST.ActionStatement) = {
       this(null, condition, stmt)
     }

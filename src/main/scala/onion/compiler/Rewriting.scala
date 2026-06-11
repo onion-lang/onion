@@ -243,6 +243,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         Option(finBlock).map(rewriteBlockExpression).orNull)
     case AST.WhileExpression(loc, condition, block) =>
       AST.WhileExpression(loc, rewriteExpression(condition), rewriteBlockExpression(block))
+    case AST.DoWhileExpression(loc, block, condition) =>
+      AST.DoWhileExpression(loc, rewriteBlockExpression(block), rewriteExpression(condition))
 
     // Binary expressions
     case AST.Addition(loc, lhs, rhs) => AST.Addition(loc, rewriteExpression(lhs), rewriteExpression(rhs))

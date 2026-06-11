@@ -226,6 +226,7 @@ object AST {
   case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression
   case class ThrowExpression(location: Location, target: Expression) extends Expression
   case class TryExpression(location: Location, resources: List[LocalVariableDeclaration], tryBlock: BlockExpression, recClauses: List[(Argument, BlockExpression)], finBlock: BlockExpression /*nullable*/) extends Expression
+  case class DoWhileExpression(location: Location, block: BlockExpression, condition: Expression) extends Expression
   case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression
 
   case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends Toplevel {

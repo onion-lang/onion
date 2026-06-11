@@ -1327,6 +1327,7 @@ AST.BlockElement block_element():{AST.BlockElement s;}{
 | s=terminated_return_expression()   {return s;}
 | s=synchronized_expression()        {return s;}
 | s=foreach_expression()             {return s;}
+| LOOKAHEAD("do" "{") s=do_while_expression() {return s;}
 | s=expression_element()     {return s;}
 }
 
@@ -1517,6 +1518,12 @@ AST.SynchronizedExpression synchronized_expression() :{Token t; AST.Expression e
 
 AST.WhileExpression while_expression() :{Token t; AST.Expression e; AST.BlockExpression b;}{
   t="while" e=term() b=block() {return new AST.WhileExpression(p(t), e, b);}
+}
+
+AST.DoWhileExpression do_while_expression() :{Token t; AST.Expression e; AST.BlockExpression b;}{
+  t="do" b=block() "while" {enterSection();} e=term() eos_or_block_end() {
+    return new AST.DoWhileExpression(p(t), b, e);
+  }
 }
 
 AST.ForeachExpression foreach_expression() :{Token t, k = null, v = null; AST.Argument a; AST.Expression e; AST.BlockExpression b;}{

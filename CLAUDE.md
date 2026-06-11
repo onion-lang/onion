@@ -385,6 +385,7 @@ These are frequently confused with other languages. **Always check these:**
 |-------|-----------------|
 | `0` for long | `0L` - explicit `L` suffix required for Long |
 | `0.0` for float | `0.0f` - explicit `f` suffix for Float |
+| `new Double(1.5)` / `new Integer(3)` | `Double`/`Int` are primitives - just write `1.5`; boxing into Object/Number slots is automatic; wrapper classes are `JDouble`/`JInteger`/... |
 | `"str" + 123` | ✓ correct - auto string conversion |
 
 ### Inheritance & Interfaces

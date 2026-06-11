@@ -215,6 +215,37 @@ select score {
 IO::println("Grade: " + grade)
 ```
 
+### Type Patterns, Destructuring and Guards
+
+`select` also matches on types and record structure. A type pattern
+binds a new name with the narrowed type in its branch:
+
+```onion
+select o {
+  case s is String:  IO::println("string of length " + s.length())
+  case i is Integer: IO::println("int " + i)
+  else:              IO::println("something else")
+}
+```
+
+Records destructure positionally (`_` ignores a component), and `when`
+adds a guard to any pattern:
+
+```onion
+record Circle(r: Int) <: Shape
+record Rect(w: Int, h: Int) <: Shape
+
+select shape {
+  case Circle(r) when r > 10: IO::println("big circle")
+  case Circle(r):             IO::println("circle " + r)
+  case Rect(w, _):            IO::println("rect of width " + w)
+}
+```
+
+When the matched value's type is a `sealed` interface, the compiler
+checks exhaustiveness (E0042) and lists any uncovered subtypes — an
+`else` branch is unnecessary once every case is handled.
+
 ## Do Notation (Monadic Composition)
 
 Do notation provides a clean syntax for chaining operations on monadic types like `Option`, `Result`, and `Future`. It desugars to `flatMap`/`map` calls.

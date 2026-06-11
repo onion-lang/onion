@@ -333,6 +333,8 @@ These are frequently confused with other languages. **Always check these:**
 | `while (condition) { }` | `while condition { }` - no parentheses |
 | `else if condition { }` | ✓ correct - `else if` chains are supported (also as expressions) |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
+| `case s: String:` (Java/Scala pattern) | `case s is String:` - type patterns use `is`; sealed exhaustiveness (E0042) applies |
+| `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
 | `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |

@@ -47,12 +47,25 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       None
     } else {
       val method = methods(0)
+      if (!ensureInstanceAvailable(node, method, context)) return None
       val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
       calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
         expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
         finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
       )
     }
+  }
+
+  /**
+   * An unqualified call to an instance method needs 'this'; in a static
+   * context that's an error (fuzz: bare toString() inside static main used
+   * to crash codegen with "no 'this' pointer within static method").
+   */
+  private def ensureInstanceAvailable(node: AST.Node, method: Method, context: LocalContext): Boolean = {
+    if ((method.modifier & AST.M_STATIC) == 0 && context.isStatic) {
+      bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      false
+    } else true
   }
 
   private def rawUnqualifiedCall(
@@ -91,6 +104,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
       case CandidateSelection.Selected(method) =>
+        if (!ensureInstanceAvailable(node, method, context)) return None
         val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(

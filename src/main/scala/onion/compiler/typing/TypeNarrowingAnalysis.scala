@@ -76,6 +76,11 @@ private[typing] object TypeNarrowingAnalysis {
         val rightNarrowing = extractNarrowing(right, context, typeResolver)
         NarrowingInfo(leftNarrowing.positive ++ rightNarrowing.positive, Map.empty)
 
+      // !cond -> swap polarity: if !(o is String) narrows o in the else branch
+      case AST.Not(_, inner) =>
+        val innerNarrowing = extractNarrowing(inner, context, typeResolver)
+        NarrowingInfo(innerNarrowing.negative, innerNarrowing.positive)
+
       case _ => NarrowingInfo.empty
     }
   }

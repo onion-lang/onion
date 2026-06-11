@@ -90,6 +90,52 @@ class ParameterSmartCastSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == result)
     }
 
+    it("narrows the else branch of a negated is-check") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def f(o: Object): String {
+          |    if !(o is String) {
+          |      return "not-str"
+          |    } else {
+          |      return "len" + o.length()
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    return Test::f("abc") + "/" + Test::f(new Integer(1))
+          |  }
+          |}
+          |""".stripMargin,
+        "NegatedIsNarrow.on",
+        Array()
+      )
+      assert(Shell.Success("len3/not-str") == result)
+    }
+
+    it("narrows the else branch of a negated null check") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def f(s: String?): String {
+          |    if !(s != null) {
+          |      return "nil"
+          |    } else {
+          |      return "n" + s.length()
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    return Test::f("ab") + "/" + Test::f(null)
+          |  }
+          |}
+          |""".stripMargin,
+        "NegatedNullNarrow.on",
+        Array()
+      )
+      assert(Shell.Success("n2/nil") == result)
+    }
+
     it("still allows assigning to parameters") {
       val result = shell.run(
         """

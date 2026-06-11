@@ -684,16 +684,18 @@ TOKEN:
   <INTEGER:
     <DECIMAL_LITERAL> (["B","S","L"])?
   | <HEX_LITERAL> (["B","S","L"])?
+  | <BINARY_LITERAL> (["B","S","L"])?
   | <OCTAL_LITERAL> (["B","S","L"])?
   >
-| <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])* >
-| <#HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
-| <#OCTAL_LITERAL: "0" (["0"-"7"])* >
+| <#DECIMAL_LITERAL: ["1"-"9"] (["0"-"9","_"])* >
+| <#HEX_LITERAL: "0" ["x","X"] ["0"-"9","a"-"f","A"-"F"] (["0"-"9","a"-"f","A"-"F","_"])* >
+| <#BINARY_LITERAL: "0" ["b"] ["0","1"] (["0","1","_"])* >
+| <#OCTAL_LITERAL: "0" (["0"-"7","_"])* >
 | <FLOAT:
-    (["0"-"9"])+ "." (["0"-"9"])+ (<EXPONENT>)? (["F", "D"])?
-  | "." (["0"-"9"])+ (<EXPONENT>)? (["F","D"])?
-  | (["0"-"9"])+ <EXPONENT> (["F","D"])?
-  | (["0"-"9"])+ (<EXPONENT>)? ["F","D"]
+    (["0"-"9"]) (["0"-"9","_"])* "." (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? (["F", "D"])?
+  | "." (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? (["F","D"])?
+  | (["0"-"9"]) (["0"-"9","_"])* <EXPONENT> (["F","D"])?
+  | (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? ["F","D"]
   >
 | <#EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
 | <CHARACTER:
@@ -1937,12 +1939,14 @@ AST.Expression null_literal() :{Token t;}{
 
 AST.Expression integer_literal() :{Token t; String s;}{
   t=<INTEGER> {
-    s = t.image;
+    s = t.image.replace("_", "");
     if(s.endsWith("B")){
       String content = chop(s);
       byte value;
       if(content.matches("0[xX].*")) {
         value = (byte)Integer.parseInt(content.substring(2), 16);
+      } else if(content.matches("0[bB].*")) {
+        value = (byte)Integer.parseInt(content.substring(2), 2);
       } else {
         value = Byte.parseByte(content);
       }
@@ -1952,6 +1956,8 @@ AST.Expression integer_literal() :{Token t; String s;}{
       short value;
       if(content.matches("0[xX].*")) {
         value = (short)Integer.parseInt(content.substring(2), 16);
+      } else if(content.matches("0[bB].*")) {
+        value = (short)Integer.parseInt(content.substring(2), 2);
       } else {
         value = Short.parseShort(content);
       }
@@ -1961,6 +1967,8 @@ AST.Expression integer_literal() :{Token t; String s;}{
       long value;
       if(content.matches("0[xX].*")) {
         value = Long.parseLong(content.substring(2), 16);
+      } else if(content.matches("0[bB].*")) {
+        value = Long.parseLong(content.substring(2), 2);
       } else {
         value = Long.parseLong(content);
       }
@@ -1970,6 +1978,8 @@ AST.Expression integer_literal() :{Token t; String s;}{
       int value;
       if(content.matches("0[xX].*")) {
         value = Integer.parseInt(content.substring(2), 16);
+      } else if(content.matches("0[bB].*")) {
+        value = Integer.parseInt(content.substring(2), 2);
       } else {
         value = Integer.parseInt(content);
       }
@@ -1980,7 +1990,7 @@ AST.Expression integer_literal() :{Token t; String s;}{
 
 AST.Expression float_literal() :{Token t; String s;}{
   t=<FLOAT> {
-  	s = t.image;
+  	s = t.image.replace("_", "");
     if(s.endsWith("F")){
       return new AST.FloatLiteral(p(t), Float.parseFloat(chop(s)));
     }else if(s.endsWith("D")){

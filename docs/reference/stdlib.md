@@ -707,6 +707,195 @@ Colls::sortedBy(people) { p => p.age() }
 // List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
 
+## Http
+
+HTTP client utilities (uses Java 11+ HttpClient).
+
+### GET Requests
+
+```
+Http::get(url): String
+Http::get(url, headers): String    // headers: ["Key1", "Value1", ...]
+```
+
+### POST Requests
+
+```
+Http::post(url, body): String
+Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
+Http::post(url, body, headers): String
+```
+
+### Other Methods
+
+```
+Http::put(url, body): String
+Http::delete(url): String
+```
+
+### URL Utilities
+
+```
+Http::urlEncode(str): String
+Http::urlDecode(str): String
+Http::buildQuery(params): String    // params: ["key1", "val1", ...]
+```
+
+### Example
+
+```
+val response: String = Http::get("https://api.example.com/data");
+val data: Object = Json::parse(response);
+
+val postResponse: String = Http::postJson(
+  "https://api.example.com/users",
+  "{\"name\": \"Bob\"}"
+);
+```
+
+---
+
+## DateTime
+
+Date and time utilities using epoch milliseconds.
+
+### Current Time
+
+```
+DateTime::now(): Long              // Current epoch milliseconds
+DateTime::nowString(): String      // ISO format (local timezone)
+DateTime::nowString(pattern): String
+```
+
+### Parsing
+
+```
+DateTime::parse(isoString): Long
+DateTime::parse(dateTime, pattern): Long
+```
+
+### Formatting
+
+```
+DateTime::format(epochMillis): String
+DateTime::format(epochMillis, pattern): String
+```
+
+### Components
+
+```
+DateTime::year(epochMillis): Int
+DateTime::month(epochMillis): Int       // 1-12
+DateTime::day(epochMillis): Int         // 1-31
+DateTime::hour(epochMillis): Int        // 0-23
+DateTime::minute(epochMillis): Int      // 0-59
+DateTime::second(epochMillis): Int      // 0-59
+DateTime::dayOfWeek(epochMillis): Int   // 1=Monday, 7=Sunday
+DateTime::dayOfYear(epochMillis): Int   // 1-366
+```
+
+### Arithmetic
+
+```
+DateTime::addDays(epochMillis, days): Long
+DateTime::addHours(epochMillis, hours): Long
+DateTime::addMinutes(epochMillis, minutes): Long
+DateTime::addSeconds(epochMillis, seconds): Long
+DateTime::addMonths(epochMillis, months): Long
+DateTime::addYears(epochMillis, years): Long
+```
+
+### Comparison
+
+```
+DateTime::diff(time1, time2): Long       // Difference in milliseconds
+DateTime::diffDays(time1, time2): Int
+DateTime::isBefore(time1, time2): Boolean
+DateTime::isAfter(time1, time2): Boolean
+```
+
+### Factory
+
+```
+DateTime::of(year, month, day): Long
+DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::startOfDay(epochMillis): Long
+DateTime::endOfDay(epochMillis): Long
+```
+
+### Example
+
+```
+val now: Long = DateTime::now();
+IO::println("Today: " + DateTime::format(now, "yyyy-MM-dd"));
+
+val tomorrow: Long = DateTime::addDays(now, 1);
+IO::println("Tomorrow: " + DateTime::format(tomorrow));
+
+val birthday: Long = DateTime::of(1990, 5, 15);
+val age: Int = DateTime::diffDays(now, birthday) / 365;
+```
+
+---
+
+## Regex
+
+Regular expression utilities.
+
+### Matching
+
+```
+Regex::matches(input, pattern): Boolean   // Entire string matches
+Regex::find(input, pattern): Boolean      // Pattern found anywhere
+```
+
+### Extraction
+
+```
+Regex::findAll(input, pattern): String[]
+Regex::findFirst(input, pattern): String
+Regex::groups(input, pattern): String[]       // First match groups
+Regex::groupsAll(input, pattern): String[][]  // All matches groups
+```
+
+### Replacement
+
+```
+Regex::replace(input, pattern, replacement): String
+Regex::replaceFirst(input, pattern, replacement): String
+```
+
+### Splitting
+
+```
+Regex::split(input, pattern): String[]
+Regex::split(input, pattern, limit): String[]
+```
+
+### Utility
+
+```
+Regex::quote(literal): String    // Escape special characters
+Regex::isValid(pattern): Boolean
+```
+
+### Example
+
+```
+val text: String = "Email: alice@example.com, bob@test.org";
+val emails: String[] = Regex::findAll(text, "[\\w.]+@[\\w.]+");
+// ["alice@example.com", "bob@test.org"]
+
+val masked: String = Regex::replace(text, "@[\\w.]+", "@***");
+// "Email: alice@***, bob@***"
+
+if (Regex::matches("hello123", "[a-z]+\\d+")) {
+  IO::println("Pattern matched!");
+}
+```
+
+---
+
 ## Next Steps
 
 - [Language Specification](specification.md) - Formal language spec

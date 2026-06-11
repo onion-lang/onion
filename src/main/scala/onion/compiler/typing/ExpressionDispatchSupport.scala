@@ -56,6 +56,8 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.typeElvis(node, context)
       case node: AST.Indexing =>
         body.typeIndexing(node, context)
+      case node: AST.SafeIndexing =>
+        body.typeSafeIndexing(node, context)
       case node: AST.Cast =>
         body.typeCast(node, context)
       case node: AST.ClosureExpression =>

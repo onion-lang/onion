@@ -17,6 +17,9 @@ final class ExpressionFormTyping(
   def typeIndexing(node: AST.Indexing, context: LocalContext): Option[Term] =
     constructionTyping.typeIndexing(node, context)
 
+  def typeSafeIndexing(node: AST.SafeIndexing, context: LocalContext): Option[Term] =
+    constructionTyping.typeSafeIndexing(node, context)
+
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] =
     constructionTyping.typeNewArray(node, context)
 

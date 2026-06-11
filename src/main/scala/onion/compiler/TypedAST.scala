@@ -104,6 +104,18 @@ object TypedAST {
   }
 
   /**
+   * Safe array indexing: target?[index] — yields null when target is null,
+   * the (boxed) element otherwise.
+   */
+  class SafeRefArray(location: Location, val target: TypedAST.Term, val index: TypedAST.Term, val arrayType: TypedAST.ArrayType) extends Term(location) {
+    def this(target: TypedAST.Term, index: TypedAST.Term, arrayType: TypedAST.ArrayType) = {
+      this(null, target, index, arrayType)
+    }
+
+    def `type`: TypedAST.Type = NullableType.of(arrayType.base)
+  }
+
+  /**
    * @author Kota Mizushima
    */
   class SetArray(location: Location, val target: TypedAST.Term, val index: TypedAST.Term, val value: TypedAST.Term) extends Term(location) {

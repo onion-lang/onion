@@ -63,13 +63,20 @@ final class AssignmentTyping(
       if (value == null) return null
       new SetArray(target, index, value)
     } else {
-      val params = Array[Term](index, value)
-      tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "set", Array[Term](index, value)) match {
-        case Left(_) =>
-          bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
-          if (value.`type`.isBottomType) value else null
-        case Right(method) =>
-          if (value.`type`.isBottomType) value else new Call(target, method, params)
+      target.`type` match {
+        case objType: ObjectType =>
+          val params = Array[Term](index, value)
+          tryFindMethod(node, objType, "set", Array[Term](index, value)) match {
+            case Left(_) =>
+              bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
+              if (value.`type`.isBottomType) value else null
+            case Right(method) =>
+              if (value.`type`.isBottomType) value else new Call(target, method, params)
+          }
+        case other =>
+          // e.g. assigning through a nullable receiver: unwrap it first
+          bodyContext.report(INVALID_METHOD_CALL_TARGET, indexing.lhs, other)
+          null
       }
     }
   }
@@ -84,7 +91,13 @@ final class AssignmentTyping(
           bodyContext.report(INCOMPATIBLE_TYPE, selection.target, bodyContext.rootClass, target.`type`)
           return null
         }
-        val targetType = target.`type`.asInstanceOf[ObjectType]
+        val targetType = target.`type` match {
+          case objType: ObjectType => objType
+          case other =>
+            // e.g. assigning through a nullable receiver: unwrap it first
+            bodyContext.report(INVALID_METHOD_CALL_TARGET, selection.target, other)
+            return null
+        }
         if (!MemberAccess.ensureTypeAccessible(typing, selection, targetType, contextClass)) return null
         val name = selection.name
         val field: FieldRef = MemberAccess.findField(targetType, name)

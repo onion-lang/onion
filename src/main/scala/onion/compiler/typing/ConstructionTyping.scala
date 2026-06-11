@@ -55,6 +55,51 @@ final class ConstructionTyping(
       }
     } yield result
 
+  /**
+   * Safe indexing: target?[index] yields null when target is null. Arrays
+   * use a null-guarded load (SafeRefArray); collections route through a
+   * SafeCall to get(), so the element type widens to nullable either way.
+   */
+  def typeSafeIndexing(node: AST.SafeIndexing, context: LocalContext): Option[Term] =
+    for {
+      target <- typed(node.lhs, context)
+      indexRaw <- typed(node.rhs, context)
+      result <- {
+        val targetType = target.`type` match {
+          case n: NullableType => n.innerType
+          case other => other
+        }
+        if (targetType.isArrayType) {
+          val arrayType = targetType.asInstanceOf[ArrayType]
+          val index = Boxing.tryUnboxToInteger(bodyContext.table, indexRaw)
+          if (!(index.isBasicType && index.`type`.asInstanceOf[BasicType].isInteger)) {
+            bodyContext.report(INCOMPATIBLE_TYPE, node, BasicType.INT, index.`type`)
+            None
+          } else Some(new SafeRefArray(target, index, arrayType))
+        } else if (targetType.isBasicType || targetType.isNullType) {
+          bodyContext.report(INCOMPATIBLE_TYPE, node.lhs, bodyContext.rootClass, target.`type`)
+          None
+        } else {
+          targetType match {
+            case objType: ObjectType =>
+              val params = Array(indexRaw)
+              tryFindMethod(node, objType, "get", params) match {
+                case Left(_) =>
+                  bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+                  None
+                case Right(method) =>
+                  val call = new SafeCall(target, method, params)
+                  val elementType = TypeSubst.withClassOnly(method.returnType, targetType)
+                  Some(TypeSubst.withCast(call, NullableType.of(elementType)))
+              }
+            case other =>
+              bodyContext.report(INVALID_METHOD_CALL_TARGET, node.lhs, other)
+              None
+          }
+        }
+      }
+    } yield result
+
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
     val typeRefOpt = typing.mapFrom(node.typeRef, bodyContext.mapper)
     val parameters = typedTerms(node.args.toArray, context)

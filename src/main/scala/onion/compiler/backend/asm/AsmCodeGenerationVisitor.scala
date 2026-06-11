@@ -58,6 +58,33 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.target)
     visitTerm(node.index)
     gen.arrayLoad(asmType(node.`type`))
+
+  /**
+   * Safe array indexing: target?[index]
+   *   target            // stack: [target]
+   *   dup, ifnull L     // null check
+   *   index, arrayload  // stack: [element]
+   *   box if primitive  // result is nullable
+   *   goto end
+   *   L: pop, aconst_null
+   *   end:
+   */
+  override def visitSafeRefArray(node: SafeRefArray): Unit =
+    val nullLabel = gen.newLabel()
+    val endLabel = gen.newLabel()
+    visitTerm(node.target)
+    gen.dup()
+    gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+    visitTerm(node.index)
+    gen.arrayLoad(asmType(node.arrayType.base))
+    node.arrayType.base match
+      case bt: BasicType if bt != BasicType.VOID => gen.box(asmType(bt))
+      case _ =>
+    gen.goTo(endLabel)
+    gen.visitLabel(nullLabel)
+    gen.pop()
+    gen.visitInsn(Opcodes.ACONST_NULL)
+    gen.visitLabel(endLabel)
   
   override def visitSetArray(node: SetArray): Unit =
     visitTerm(node.target)

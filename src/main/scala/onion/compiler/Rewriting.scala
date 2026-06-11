@@ -257,6 +257,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case AST.GreaterOrEqual(loc, lhs, rhs) => AST.GreaterOrEqual(loc, rewriteExpression(lhs), rewriteExpression(rhs))
     case AST.GreaterThan(loc, lhs, rhs) => AST.GreaterThan(loc, rewriteExpression(lhs), rewriteExpression(rhs))
     case AST.Indexing(loc, lhs, rhs) => AST.Indexing(loc, rewriteExpression(lhs), rewriteExpression(rhs))
+    case AST.SafeIndexing(loc, lhs, rhs) => AST.SafeIndexing(loc, rewriteExpression(lhs), rewriteExpression(rhs))
     case AST.LessOrEqual(loc, lhs, rhs) => AST.LessOrEqual(loc, rewriteExpression(lhs), rewriteExpression(rhs))
     case AST.LeftShiftAssignment(loc, lhs, rhs) => AST.LeftShiftAssignment(loc, rewriteExpression(lhs), rewriteExpression(rhs))
     case AST.LessThan(loc, lhs, rhs) => AST.LessThan(loc, rewriteExpression(lhs), rewriteExpression(rhs))

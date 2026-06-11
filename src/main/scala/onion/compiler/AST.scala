@@ -116,6 +116,7 @@ object AST {
   case class GreaterThan(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">")
   case class Id(location: Location, name: String) extends Expression
   case class Indexing(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("[]")
+  case class SafeIndexing(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("?[]")
   case class IntegerLiteral(location: Location, value: Int) extends Expression
   case class IsInstance(location: Location, target: Expression, typeRef: TypeNode) extends Expression
   case class LessOrEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<=")

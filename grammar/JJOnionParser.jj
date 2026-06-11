@@ -671,6 +671,7 @@ TOKEN : {
 | <QUESTION:       "?"            >
 | <ELVIS:          "?:"           >
 | <SAFE_ACCESS:    "?."           >
+| <SAFE_INDEX:     "?["           >
 }
 
 /*
@@ -1657,6 +1658,7 @@ AST.Expression primary_suffix() : {
   e=primary()
 ( LOOKAHEAD(2)
   ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
+  | t=<SAFE_INDEX> eols() a=term() eols() "]"                                                     {e = new AST.SafeIndexing(p(t), e, a);}
   | t="." eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"

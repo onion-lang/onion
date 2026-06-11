@@ -956,7 +956,20 @@ object TypedAST {
     }
   }
 
-  case class TypeParameter(name: String, upperBound: Option[TypedAST.Type])
+  /**
+   * Nullability of a type parameter / type variable.
+   * - NonNull: declared with an explicit non-null bound ([T extends B]);
+   *   nullable type arguments are rejected and T values can be dereferenced
+   * - Nullable: bare [T] (or [T extends B?]); accepts nullable type
+   *   arguments, so T values may be null and must be checked before deref
+   * - Platform: from Java class files / reflection; nullability unknown,
+   *   treated permissively in both directions (Kotlin's platform types)
+   */
+  enum Nullability {
+    case NonNull, Nullable, Platform
+  }
+
+  case class TypeParameter(name: String, upperBound: Option[TypedAST.Type], nullability: Nullability = Nullability.Platform)
 
   object AppliedClassType {
     private val cache = scala.collection.mutable.HashMap[(TypedAST.ClassType, scala.collection.immutable.List[TypedAST.Type]), AppliedClassType]()
@@ -1019,7 +1032,30 @@ object TypedAST {
     override def typeParameters: Array[TypedAST.TypeParameter] = Array()
   }
 
-  final class TypeVariableType(val name: String, val upperBound: TypedAST.ClassType) extends AbstractClassType {
+  final class TypeVariableType private (
+    val name: String,
+    val upperBound: TypedAST.ClassType,
+    val nullability: Nullability,
+    widenTarget: TypeVariableType
+  ) extends AbstractClassType {
+    def this(name: String, upperBound: TypedAST.ClassType, nullability: Nullability = Nullability.Platform) =
+      this(name, upperBound, nullability, null)
+
+    /** True when a nullable type argument may instantiate this variable. */
+    def acceptsNullable: Boolean = nullability != Nullability.NonNull
+
+    /**
+     * The non-null view of this type variable, used by smart casts: after
+     * `if t != null`, a Nullable/Platform T narrows to its non-null view.
+     * Identity is canonical (one instance per declaration).
+     */
+    lazy val nonNullView: TypeVariableType =
+      if (nullability == Nullability.NonNull) this
+      else new TypeVariableType(name, upperBound, Nullability.NonNull, this)
+
+    /** Inverse of [[nonNullView]]: the declared variable this view narrows. */
+    def widen: TypeVariableType = if (widenTarget == null) this else widenTarget
+
     def isInterface: Boolean = upperBound.isInterface
     def modifier: Int = upperBound.modifier
     def superClass: TypedAST.ClassType = upperBound.superClass

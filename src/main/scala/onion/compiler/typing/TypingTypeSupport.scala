@@ -45,20 +45,30 @@ final class TypingTypeSupport(private val typing: Typing) {
         typing.report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
       } else {
         seen += tp.name
-        val upper = tp.upperBound match {
+        // Nullability: bare [T] means T ranges over nullable types too;
+        // an explicit non-null bound [T extends B] restricts T to non-null
+        // types; [T extends B?] opts back into nullable with bound B
+        val (upper, nullability) = tp.upperBound match {
           case Some(boundNode) =>
             mapFrom(boundNode) match {
-              case Some(ct: ClassType) => ct
+              case Some(ct: ClassType) => (ct, Nullability.NonNull)
+              case Some(n: NullableType) =>
+                n.innerType match {
+                  case ct: ClassType => (ct, Nullability.Nullable)
+                  case other =>
+                    typing.report(INCOMPATIBLE_TYPE, boundNode, typing.rootClass, other)
+                    (typing.rootClass, Nullability.Nullable)
+                }
               case Some(mapped) =>
                 typing.report(INCOMPATIBLE_TYPE, boundNode, typing.rootClass, mapped)
-                typing.rootClass
+                (typing.rootClass, Nullability.NonNull)
               case None =>
-                typing.rootClass
+                (typing.rootClass, Nullability.NonNull)
             }
           case None =>
-            typing.rootClass
+            (typing.rootClass, Nullability.Nullable)
         }
-        val variableType = new TypedAST.TypeVariableType(tp.name, upper)
+        val variableType = new TypedAST.TypeVariableType(tp.name, upper, nullability)
         result += TypeParam(tp.name, variableType, upper)
       }
     }

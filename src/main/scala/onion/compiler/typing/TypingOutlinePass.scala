@@ -62,14 +62,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           find(definition.name).foreach(unitContext.currentMapper = _)
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
-          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
+          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
         }
       case node: AST.InterfaceDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
           find(definition.name).foreach(unitContext.currentMapper = _)
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
-          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
+          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
         }
       case _ =>
     }
@@ -94,7 +94,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
     val classTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = classTypeParams
-    definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
+    definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
     if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
 
@@ -112,7 +112,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
     val interfaceTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = interfaceTypeParams
-    definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray)
+    definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
     if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
 
@@ -328,7 +328,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           args.toArray,
           returnType,
           null,  // block will be set in BodyPass
-          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray
         )
         put(node, extensionMethod)
 
@@ -346,7 +346,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           staticArgs,
           returnType,
           null,
-          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray,
           throwsTypes,
           hasVararg
         )
@@ -423,7 +423,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           args.toArray,
           returnType,
           null,
-          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray,
           throwsTypes,
           hasVararg,
           annotations
@@ -456,7 +456,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           args.toArray,
           returnType,
           null,
-          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound))).toArray,
+          methodTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray,
           throwsTypes,
           hasVararg
         )

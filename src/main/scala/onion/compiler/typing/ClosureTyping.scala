@@ -104,7 +104,7 @@ final class ClosureTyping(
 
           body.openFrame(context) {
             body.openClosure(context) {
-              if (!addClosureArguments(args, argTypes, context)) {
+              if (!addClosureArguments(args, argTypes, context, node.body)) {
                 None
               } else {
                 context.setMethod(typedMethod)
@@ -235,8 +235,13 @@ final class ClosureTyping(
   private def addClosureArguments(
     args: List[AST.Argument],
     argTypes: Array[Type],
-    context: LocalContext
+    context: LocalContext,
+    closureBody: AST.Node
   ): Boolean = {
+    // Unassigned lambda parameters behave like vals so smart casts apply
+    val assigned =
+      if (closureBody == null) args.map(_.name).toSet
+      else AssignedVariableScanner.scan(closureBody)
     var i = 0
     while (i < args.length) {
       val arg = args(i)
@@ -246,7 +251,7 @@ final class ClosureTyping(
       }
       val argType = argTypes(i)
       if (argType == null) return false
-      context.add(arg.name, argType)
+      context.add(arg.name, argType, isMutable = assigned.contains(arg.name))
       i += 1
     }
     true
@@ -288,7 +293,7 @@ final class ClosureTyping(
     typing.withSuppressedReporting {
       body.openFrame(context) {
         body.openClosure(context) {
-          if (addClosureArguments(node.args, argTypes, context)) {
+          if (addClosureArguments(node.args, argTypes, context, node.body)) {
             result = body.typed(node.body, context).map(_.`type`)
           }
         }
@@ -306,7 +311,7 @@ final class ClosureTyping(
     typing.withSuppressedReporting {
       body.openFrame(context) {
         body.openClosure(context) {
-          if (addClosureArguments(node.args, argTypes, context)) {
+          if (addClosureArguments(node.args, argTypes, context, node.body)) {
             val collected = context.startReturnTypeCollection()
             val translated = body.translate(node.body, context)
             context.stopReturnTypeCollection()

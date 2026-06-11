@@ -26,18 +26,18 @@ private[compiler] final class MethodBodySupport(
     reportUnused(context)
   }
 
-  def prepareConstructorContext(constructor: ConstructorDefinition, args: List[AST.Argument]): LocalContext = {
+  def prepareConstructorContext(constructor: ConstructorDefinition, args: List[AST.Argument], block: AST.Node): LocalContext = {
     val context = new LocalContext
     context.setConstructor(constructor)
     val paramTypes = constructor.getArgs
-    bindParameters(context, args, paramTypes)
+    bindParameters(context, args, paramTypes, block)
     constructor.setArgumentsWithDefaults(buildArgumentsWithDefaults(args, paramTypes, context))
     context
   }
 
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
-      val context = prepareConstructorContext(constructor, node.args)
+      val context = prepareConstructorContext(constructor, node.args, node.block)
       val params = typedTerms(node.superInits.toArray, context)
       val superClass = bodyContext.definition.superClass
       val matched = superClass.findConstructor(params)
@@ -106,7 +106,7 @@ private[compiler] final class MethodBodySupport(
     context.setMethod(method)
     val arguments = method.arguments
     markCapturedVariables(context, args, block)
-    bindParameters(context, args, arguments)
+    bindParameters(context, args, arguments, block)
     method.setArgumentsWithDefaults(buildArgumentsWithDefaults(args, arguments, context))
     context
   }
@@ -125,8 +125,9 @@ private[compiler] final class MethodBodySupport(
     context.add("this", receiverType)
 
     val arguments = staticMethod.arguments
+    val assigned = if (node.block == null) node.args.map(_.name).toSet else AssignedVariableScanner.scan(node.block)
     for ((arg, i) <- node.args.zipWithIndex) {
-      context.add(arg.name, arguments(i + 1))
+      context.add(arg.name, arguments(i + 1), isMutable = assigned.contains(arg.name))
     }
 
     staticMethod.setArgumentsWithDefaults(buildArgumentsWithDefaults(extArgs, arguments, context))
@@ -156,10 +157,15 @@ private[compiler] final class MethodBodySupport(
       AST.TypeNode(node.location, AST.ReferenceType(receiverType.name, true), false)
     )
 
-  private def bindParameters(context: LocalContext, args: List[AST.Argument], types: Array[Type]): Unit = {
+  private def bindParameters(context: LocalContext, args: List[AST.Argument], types: Array[Type], body: AST.Node): Unit = {
+    // Parameters never assigned in the body behave like vals, so smart
+    // casts (is / null checks) can narrow them
+    val assigned =
+      if (body == null) args.map(_.name).toSet
+      else AssignedVariableScanner.scan(body)
     var i = 0
     args.foreach { arg =>
-      context.add(arg.name, types(i))
+      context.add(arg.name, types(i), isMutable = assigned.contains(arg.name))
       context.recordDeclaration(arg.name, arg.location, isParameter = true)
       i += 1
     }

@@ -1407,12 +1407,23 @@ List<AST.LocalVariableDeclaration> resource_list() :{
 }
 
 AST.TryExpression try_expression() :{
-  Token t; AST.Argument a; AST.BlockExpression b1, b2, b3 = null;
+  Token t; AST.Argument a; AST.BlockExpression b1, b2, b3 = null; AST.TypeNode ety;
   List<AST.LocalVariableDeclaration> resources = (List<AST.LocalVariableDeclaration>)AST.NIL();
   ArrayBuffer<Tuple2<AST.Argument,AST.BlockExpression>> as = new ArrayBuffer<Tuple2<AST.Argument, AST.BlockExpression>>();
+  java.util.ArrayList<AST.TypeNode> extraTypes;
 }{
   t="try" [LOOKAHEAD(2) "(" resources=resource_list() ")"]
-  b1=block() ("catch" a=argument() b2=block() {append(as, new Tuple2<AST.Argument, AST.BlockExpression>(a, b2));})*
+  b1=block() (
+    "catch" a=argument() {extraTypes = new java.util.ArrayList<AST.TypeNode>();}
+    // Multi-catch: catch e: A | B desugars to one clause per type sharing the body
+    ("|" ety=type() {extraTypes.add(ety);})*
+    b2=block() {
+      append(as, new Tuple2<AST.Argument, AST.BlockExpression>(a, b2));
+      for (AST.TypeNode ty2 : extraTypes) {
+        append(as, new Tuple2<AST.Argument, AST.BlockExpression>(new AST.Argument(a.location(), a.name(), ty2, null, false), b2));
+      }
+    }
+  )*
   ["finally" b3=block()] {return new AST.TryExpression(p(t), resources, b1, toList(as), b3);}
 }
 

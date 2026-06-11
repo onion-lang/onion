@@ -106,10 +106,16 @@ final class ConstructionTyping(
     }
 
     // Existing positional argument handling
-    val parameters = typedTerms(node.args.toArray, context)
-    if (parameters == null) return None
+    val parameters0 = typedTerms(node.args.toArray, context)
+    if (parameters0 == null) return None
 
-    val constructors = typeRef.findConstructor(parameters)
+    val constructors0 = typeRef.findConstructor(parameters0)
+    // Exact matching is substitution-blind (an applied Pair[String, Integer]
+    // still exposes (A, B)): retry against the substituted signatures with
+    // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
+    val (constructors, parameters) =
+      if (constructors0.nonEmpty) (constructors0, parameters0)
+      else findConstructorWithBoxing(typeRef, parameters0)
     if (constructors.length == 0) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
@@ -134,6 +140,34 @@ final class ConstructionTyping(
         case _ =>
           Some(new NewObject(constructors(0), parameters))
       }
+    }
+  }
+
+  /**
+   * Boxing-aware constructor fallback: substitutes class type arguments into
+   * the constructor signatures, matches with primitive boxing, and adapts
+   * the argument terms (boxing primitives) for the unique match.
+   */
+  private def findConstructorWithBoxing(
+    typeRef: ClassType,
+    parameters: Array[Term]
+  ): (Array[ConstructorRef], Array[Term]) = {
+    val classSubst = TypeSubstitution.classSubstitution(typeRef)
+    def substitutedArgs(c: ConstructorRef): Array[Type] =
+      c.getArgs.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+    val candidates = typeRef.constructors.filter { c =>
+      val formals = substitutedArgs(c)
+      formals.length == parameters.length &&
+        formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, bodyContext.table))
+    }
+    if (candidates.length != 1) (candidates, parameters)
+    else {
+      val formals = substitutedArgs(candidates(0))
+      val adapted = parameters.zip(formals).map { (p, f) =>
+        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+        else p
+      }
+      (candidates, adapted)
     }
   }
 

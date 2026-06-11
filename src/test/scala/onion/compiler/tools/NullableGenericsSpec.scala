@@ -271,6 +271,31 @@ class NullableGenericsSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Generic constructor boxing") {
+    it("boxes primitive literals against substituted constructor signatures") {
+      val result = shell.run(
+        """
+          |class Pair[A, B] {
+          |  val a: A
+          |  val b: B
+          |public:
+          |  def this(a: A, b: B) { this.a = a; this.b = b }
+          |  def render(): String { return "" + this.a?.toString() + "/" + this.b?.toString() }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new Pair[String, Integer]("x", 42).render()
+          |  }
+          |}
+          |""".stripMargin,
+        "GenericCtorBoxing.on",
+        Array()
+      )
+      assert(Shell.Success("x/42") == result)
+    }
+  }
+
   describe("Explicit nullable bounds") {
     it("[T extends Object?] accepts both String and String? and stays deref-restricted") {
       val result = shell.run(

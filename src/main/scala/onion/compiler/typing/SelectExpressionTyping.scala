@@ -145,6 +145,28 @@ final class SelectExpressionTyping(
               isExhaustive = true
             }
           }
+        case classDef: ClassDefinition if Modifier.isEnum(classDef.modifier) =>
+          // Value matches over an enum: exhaustive when every constant
+          // appears in an unguarded Constant-reference case
+          val allPatterns = node.cases.flatMap(_._1)
+          val constantNames = classDef.fields.collect {
+            case f if Modifier.isStatic(f.modifier) && Modifier.isFinal(f.modifier) && f.`type`.name == classDef.name => f.name
+          }.toSeq
+          val matchedNames = allPatterns.collect {
+            case AST.ExpressionPattern(sel: AST.StaticMemberSelection) => sel.name
+          }.toSet
+          val allConstantRefs = allPatterns.forall {
+            case AST.ExpressionPattern(_: AST.StaticMemberSelection) => true
+            case _ => false
+          }
+          if (allConstantRefs && matchedNames.nonEmpty) {
+            val missing = constantNames.filterNot(matchedNames.contains)
+            if (missing.nonEmpty) {
+              bodyContext.report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missing.toArray)
+            } else {
+              isExhaustive = true
+            }
+          }
         case _ =>
       }
     }

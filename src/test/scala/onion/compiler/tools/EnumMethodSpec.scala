@@ -34,6 +34,49 @@ class EnumMethodSpec extends AbstractShellSpec {
       assert(Shell.Success("true,false") == result)
     }
 
+    it("reports E0042 for non-exhaustive enum select without else") {
+      val result = shell.run(
+        """
+          |enum Color { RED, GREEN, BLUE }
+          |class Test {
+          |public:
+          |  static def label(c: Color): String {
+          |    select c {
+          |    case Color::RED: return "warm"
+          |    }
+          |  }
+          |  static def main(args: String[]): String { return "no" }
+          |}
+          |""".stripMargin,
+        "EnumNonExhaustive.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("accepts an exhaustive enum select without else") {
+      val result = shell.run(
+        """
+          |enum Color { RED, GREEN, BLUE }
+          |class Test {
+          |public:
+          |  static def label(c: Color): String {
+          |    select c {
+          |    case Color::RED: return "warm"
+          |    case Color::GREEN, Color::BLUE: return "cool"
+          |    }
+          |  }
+          |  static def main(args: String[]): String {
+          |    return Test::label(Color::RED) + "/" + Test::label(Color::BLUE)
+          |  }
+          |}
+          |""".stripMargin,
+        "EnumExhaustive.on",
+        Array()
+      )
+      assert(Shell.Success("warm/cool") == result)
+    }
+
     it("supports expression-bodied and static methods") {
       val result = shell.run(
         """

@@ -492,8 +492,11 @@ class SemanticErrorReporter(threshold: Int) {
    */
   private def reportNonExhaustivePatternMatch(position: Location, items: Array[AnyRef]): Unit = {
     val sealedType = items(0).asInstanceOf[TypedAST.Type]
-    val missingTypes = items(1).asInstanceOf[Array[TypedAST.Type]]
-    val missingNames = missingTypes.map(_.displayName).mkString(", ")
+    // Missing cases are subtypes for sealed hierarchies, constant names for enums
+    val missingNames = items(1).asInstanceOf[Array[?]].map {
+      case t: TypedAST.Type => t.displayName
+      case other => String.valueOf(other)
+    }.mkString(", ")
     problem(position, format(message("error.semantic.nonExhaustivePatternMatch"),
       Seq(sealedType.displayName, missingNames)))
   }

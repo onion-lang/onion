@@ -67,10 +67,23 @@ val withQuotes: String = "She said \"Hello\""
 ```onion
 val decimal: Int = 42
 val hex: Int = 0xFF
+val binary: Int = 0b1010
 val octal: Int = 077
 val longValue: Long = 100L
+val byteValue: Byte = 5B
+val shortValue: Short = 5S
 val doubleValue: Double = 3.14
+val floatValue: Float = 3.14f
 val scientific: Double = 1.23e10
+```
+
+Underscores group digits in any numeric literal:
+
+```onion
+val million = 1_000_000
+val mask = 0xFF_FF
+val flags = 0b1010_1010
+val precise = 1_234.5
 ```
 
 ### Character Literals
@@ -91,7 +104,7 @@ val isFalse: Boolean = false
 ### Null Literal
 
 ```onion
-val nullable: String = null
+val nullable: String? = null   // null needs a nullable type (W0012 otherwise)
 ```
 
 ## Operators

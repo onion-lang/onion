@@ -21,7 +21,7 @@ More options:
 
 ```sh
 # Install a specific version
-curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0-M2
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0-M14
 
 # Build from a source checkout instead of downloading
 git clone https://github.com/onion-lang/onion && cd onion && ./install.sh --from-source
@@ -71,6 +71,51 @@ def add(x: Int, y: Int): Int = x + y
 val double: Int -> Int = (x) -> { return x * 2; }
 val inc = (x: Int) -> { return x + 1; }
 IO::println(double(21))
+```
+
+### Null Safety
+
+Kotlin-style null safety, including nullable-aware generics:
+
+```onion
+val name: String? = lookup()
+val len = name?.length() ?: 0          // safe call + Elvis
+val first = rows?[0]                   // safe indexing
+val sure: String = name!!              // non-null assertion (throws on null)
+
+if name != null {
+  IO::println(name.length())           // smart cast: name is String here
+}
+
+class Box[T] { ... }                   // bare [T] accepts String? too;
+new Box[String?](name)                 // deref inside the body needs ?. / checks
+```
+
+### Records, Enums and Primary Constructors
+
+```onion
+record Pair[A, B](first: A, second: B)
+val (a, b) = new Pair[String, Integer]("x", 42)   // destructuring
+
+enum Planet(mass: Double) {
+  MERCURY(3.3e23),
+  EARTH(5.97e24)
+public:
+  def heavierThan(other: Planet): Boolean = this.mass() > other.mass()
+}
+
+class Point(val x: Int, val y: Int) {              // primary constructor
+public:
+  def dist(): Int = this.x * this.x + this.y * this.y
+}
+
+sealed interface Shape {}
+record Circle(r: Int) <: Shape
+record Rect(w: Int, h: Int) <: Shape
+select shape {                                     // exhaustiveness-checked
+  case Circle(r):  IO::println("circle " + r)
+  case Rect(w, h): IO::println(w * h)
+}
 ```
 
 ### Do Notation for Monadic Composition

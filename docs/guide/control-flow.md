@@ -106,6 +106,18 @@ for var i: Int = 0; i < 10; i = i + 1 {
 
 Syntax: `for init; condition; update { body }`
 
+### Do-While Loop
+
+Executes the body at least once, checking the condition afterwards.
+`continue` jumps to the check, `break` exits:
+
+```onion
+var i = 0
+do {
+  i = i + 1
+} while i < 3
+```
+
 ### Foreach Loop
 
 Iterate over arrays and collections:
@@ -133,6 +145,18 @@ list << "Third"
 
 foreach item :Object in list {
   IO::println(item$String)
+}
+```
+
+Ranges iterate without building an array — `a..b` is inclusive,
+`a..<b` exclusive — and maps destructure into key/value pairs:
+
+```onion
+foreach i: Int in 0..<5 { IO::println("" + i) }     // 0 1 2 3 4
+
+val ages = ["alice": 30, "bob": 25]
+foreach (name, age) in ages {
+  IO::println(name + " is " + age)
 }
 ```
 
@@ -404,6 +428,20 @@ try {
   IO::println("File not found: " + e.getMessage())
 } catch e :IOException {
   IO::println("IO error: " + e.getMessage())
+}
+```
+
+### Multi-Catch
+
+One handler for several exception types:
+
+```onion
+try {
+  risky()
+} catch e: IllegalArgumentException | IllegalStateException {
+  IO::println("bad state or argument: " + e.getMessage())
+} catch e: Exception {
+  IO::println("anything else")
 }
 ```
 

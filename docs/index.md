@@ -7,7 +7,9 @@
 ## Key Features
 
 - **Statically Typed** - Catch errors at compile time with local type inference
-- **Null Safety** - Nullable types (`T?`) and safe call operator (`?.`) prevent null pointer exceptions
+- **Null Safety** - Nullable types (`T?`), safe calls (`?.`) and indexing (`?[]`), Elvis (`?:`), non-null assertion (`!!`), smart casts, and nullable-aware generics
+- **Data Types** - Records (generic, destructurable), data-carrying enums, and exhaustiveness-checked pattern matching over sealed hierarchies
+- **Concise Classes** - Primary constructors: `class Point(val x: Int, val y: Int)`
 - **Object-Oriented** - Classes, inheritance, interfaces, and method overloading
 - **Functional Elements** - Lambda expressions, closures, and first-class functions
 - **Monadic Composition** - Do notation for Option, Result, and Future types

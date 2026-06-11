@@ -44,6 +44,51 @@ def printMessage(msg :String) {
 printMessage("Hello")
 ```
 
+### Default Parameter Values and Named Arguments
+
+Parameters can declare defaults; call sites may omit them or pass
+arguments by name (in any order). Both work for methods and
+constructors:
+
+```onion
+def greet(name: String, greeting: String = "Hello"): String {
+  return greeting + ", " + name
+}
+
+greet("kota")                  // Hello, kota
+greet("kota", "Yo")            // Yo, kota
+greet(greeting = "Hi", name = "kota")
+```
+
+### Varargs
+
+A trailing `Type...` parameter collects extra arguments into an array;
+passing an array directly also works:
+
+```onion
+def join(parts: String...): String {
+  var r = ""
+  foreach p: String in parts { r = r + p }
+  return r
+}
+
+join("a", "b", "c")   // "abc"
+join(existingArray)   // array passes through
+```
+
+### Extension Methods
+
+`extension` blocks add methods to existing types — including Java
+classes — resolved statically at the call site:
+
+```onion
+extension String {
+  def shout(): String { return this.toUpperCase() + "!" }
+}
+
+IO::println("hello".shout())   // HELLO!
+```
+
 ## Return Statements
 
 ### Explicit Return

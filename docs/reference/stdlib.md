@@ -631,6 +631,82 @@ val result: Int = Timing::measure(() -> { return expensiveOperation(); })
 val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 ```
 
+## Strings Module
+
+String utilities (`onion.Strings`, auto-imported):
+
+```onion
+Strings::split("a,b,c", ",")          // String[] {"a","b","c"}
+Strings::join(parts, "-")             // arrays or Lists
+Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
+Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
+Strings::startsWith(s, p) / Strings::endsWith(s, p) / Strings::contains(s, sub)
+```
+
+## Files Module
+
+File I/O (`onion.Files`):
+
+```onion
+Files::readText("path.txt")            // whole file as String
+Files::readLines("path.txt")           // String[]
+Files::writeText("out.txt", content)
+Files::readBytes(path) / Files::writeBytes(path, bytes)
+Files::list("dir")                     // List of entry names
+Files::glob("dir", "*.on")             // glob-matched names
+Files::delete(path) / Files::exists(path)
+```
+
+## Json Module
+
+JSON parsing and serialization (`onion.Json`):
+
+```onion
+val obj = Json::parse("{\"name\": \"kota\"}")
+Json::getString(obj, "name")           // typed accessors: getInt/getDouble/getBoolean
+Json::stringify(obj) / Json::stringifyPretty(obj)
+
+// Navigable wrapper: index with [] and convert with as-methods
+val v = Json::value(jsonText)
+v["users"][0]["name"].asString()
+```
+
+## Proc Module
+
+Process execution for scripting (`onion.Proc`):
+
+```onion
+val r = Proc::capture("git", "status")  // r.status() / r.stdout() / r.stderr() / r.succeeded()
+Proc::run("ls", "-la")                  // stdout as String (throws on failure)
+Proc::exec("make", "build")             // exit code, output passes through
+Proc::captureIn("/tmp", "ls")           // ...In variants set the working directory
+```
+
+## Args Module
+
+Command-line argument parsing (`onion.Args`):
+
+```onion
+val parsed = Args::parse(args)
+parsed.flag("verbose")                  // --verbose
+parsed.option("out", "a.out")           // --out path (with default)
+parsed.intOption("level", 3)
+parsed.positional()                     // List of non-option arguments
+```
+
+## Colls Module
+
+Collection factories and pipelines (`onion.Colls`):
+
+```onion
+Colls::listOf("a", "b", "c")            // immutable List
+Colls::mutableListOf(1, 2, 3)           // ArrayList
+Colls::range(0, 5)                      // List [0,1,2,3,4]
+Colls::sortedBy(people) { p => p.age() }
+// map/filter/reduce/fold pipelines are extension methods on
+// List/Iterable/arrays: xs.map { x => x * 2 }.filter { x => x > 0 }
+```
+
 ## Next Steps
 
 - [Language Specification](specification.md) - Formal language spec

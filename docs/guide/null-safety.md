@@ -95,6 +95,22 @@ if name != null {
 }
 ```
 
+### Negated Conditions
+
+`!(cond)` swaps which branch narrows — useful for early-exit style:
+
+```onion
+def f(s: String?): String {
+  if !(s != null) {
+    return "nil"
+  } else {
+    return "n" + s.length()   // s narrowed to String here
+  }
+}
+
+if !(o is String) { return "not a string" }
+```
+
 ## Return Type of Safe Calls
 
 The return type of a safe call expression is always nullable (`T?`), since it can return `null` when the target is `null`:
@@ -172,12 +188,6 @@ Substring: hel
 | Safe indexing | `?[i]` | N/A | N/A |
 | Elvis operator | `?:` | `?:` | N/A |
 | Non-null assertion | `!!` | `!!` | N/A |
-
-## Next Steps
-
-- [Control Flow](control-flow.md) - if, while, for, select
-- [Functions](functions.md) - Function definitions and lambdas
-- [Variables and Types](variables-and-types.md) - Type system overview
 
 ## Null Literal Checking (W0012)
 
@@ -300,3 +310,9 @@ Type variables coming from Java classes are *platform* parameters:
 their nullability is unknown, so they accept nullable arguments and
 remain dereferenceable (matching how Java values are treated
 elsewhere).
+
+## Next Steps
+
+- [Control Flow](control-flow.md) - if, while, for, select
+- [Functions](functions.md) - Function definitions and lambdas
+- [Variables and Types](variables-and-types.md) - Type system overview

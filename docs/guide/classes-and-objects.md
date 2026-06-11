@@ -300,7 +300,15 @@ p.copy(5, 6)                // positional copy
 ```
 
 Records work with `select` pattern matching when combined with sealed
-interfaces.
+interfaces, and take type parameters:
+
+```onion
+record Pair[A, B](first: A, second: B)
+
+val p = new Pair[String, Integer]("gen", 9)
+val (s, n) = p                 // destructuring declaration
+p.copy(second = 42)            // named-argument copy
+```
 
 ## Enums
 

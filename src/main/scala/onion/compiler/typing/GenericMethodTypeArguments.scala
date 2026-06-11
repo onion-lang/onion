@@ -7,6 +7,17 @@ import onion.compiler.TypedAST.*
 import scala.collection.mutable.HashMap
 
 private[typing] object GenericMethodTypeArguments {
+  /**
+   * Merge two inferred bindings that differ only in nullability: a parameter
+   * unified with both String and String? infers String?. Returns null when
+   * the bindings are genuinely incompatible.
+   */
+  private def mergeNullability(a: Type, b: Type): Type = (a, b) match {
+    case (an: NullableType, bn) if an.innerType eq bn => an
+    case (an, bn: NullableType) if bn.innerType eq an => bn
+    case _ => null
+  }
+
   def explicitFromMappedArgs(
     typing: Typing,
     callNode: AST.Node,
@@ -44,10 +55,20 @@ private[typing] object GenericMethodTypeArguments {
     val subst = typeParams.zip(mappedArgs).map { case (p, a) => p.name -> a }.toMap
 
     val allBoundsOk = typeParams.indices.forall { i =>
-      val upper0 = typeParams(i).upperBound.getOrElse(rootClass)
+      val tp = typeParams(i)
+      val upper0 = tp.upperBound.getOrElse(rootClass)
       val upper = TypeSubstitution.substituteType(upper0, classSubst, subst, defaultToBound = true)
       val arg = mappedArgs(i)
-      if (!TypeRules.isAssignable(upper, boxedTypeArg(arg))) {
+      // Nullability must be checked apart from assignability: Object accepts
+      // T? by the top-type rule, so isAssignable can't reject String? for a
+      // non-null Object bound on its own
+      val ok = arg match {
+        case n: NullableType =>
+          tp.nullability != Nullability.NonNull && TypeRules.isAssignable(upper, boxedTypeArg(n.innerType))
+        case _ =>
+          TypeRules.isAssignable(upper, boxedTypeArg(arg))
+      }
+      if (!ok) {
         if (reportErrors) {
           val position = if (typeArgNodes == null || i >= typeArgNodes.length) callNode else typeArgNodes(i)
           reportError(position, INCOMPATIBLE_TYPE, upper, arg)
@@ -143,11 +164,18 @@ private[typing] object GenericMethodTypeArguments {
           // of an Int-returning lambda is a Future[Integer], not Future[int])
           val bound = actual match {
             case bt: BasicType if bt != BasicType.VOID => typing.boxedTypeArgument(bt)
+            // A smart-cast non-null view of a variable still binds the
+            // declared variable, so occurrences across arguments stay eq
+            case tva: TypedAST.TypeVariableType => tva.widen
             case other => other
           }
           inferred.get(tv.name) match {
             case Some(prev) =>
-              if (!(prev eq bound)) reportError(position, INCOMPATIBLE_TYPE, prev, bound)
+              if (!(prev eq bound)) {
+                val merged = mergeNullability(prev, bound)
+                if (merged != null) inferred += tv.name -> merged
+                else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
+              }
             case None =>
               inferred += tv.name -> bound
           }
@@ -331,11 +359,18 @@ private[typing] object GenericMethodTypeArguments {
           // of an Int-returning lambda is a Future[Integer], not Future[int])
           val bound = actual match {
             case bt: BasicType if bt != BasicType.VOID => typing.boxedTypeArgument(bt)
+            // A smart-cast non-null view of a variable still binds the
+            // declared variable, so occurrences across arguments stay eq
+            case tva: TypedAST.TypeVariableType => tva.widen
             case other => other
           }
           inferred.get(tv.name) match {
             case Some(prev) =>
-              if (!(prev eq bound)) reportError(position, INCOMPATIBLE_TYPE, prev, bound)
+              if (!(prev eq bound)) {
+                val merged = mergeNullability(prev, bound)
+                if (merged != null) inferred += tv.name -> merged
+                else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
+              }
             case None =>
               inferred += tv.name -> bound
           }
@@ -426,8 +461,17 @@ private[typing] object GenericMethodTypeArguments {
           .orElse(lowerConstraints.get(name))
           .getOrElse(bound)
 
+      // Nullable inferences satisfy the bound through their inner type and
+      // are rejected outright for non-null parameters (the Object top-type
+      // rule would otherwise let String? through an Object bound)
+      val boundsOk = inferredType0 match {
+        case n: NullableType =>
+          tp.nullability != Nullability.NonNull && isAssignableForBounds(bound, n.innerType)
+        case other =>
+          isAssignableForBounds(bound, other)
+      }
       val inferredType =
-        if (!isAssignableForBounds(bound, inferredType0)) {
+        if (!boundsOk) {
           reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
           bound
         } else {

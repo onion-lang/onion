@@ -196,6 +196,14 @@ class NameResolver(private val context: NameResolutionContext) {
           val varType = arg match {
             case tv: TypeVariableType => tv
             case ct: ClassType => TypeVariableType(p.name, ct)
+            // A nullable argument keeps its nullability through the alias:
+            // occurrences of the parameter behave as a nullable variable
+            // bounded by the inner type
+            case n: NullableType =>
+              n.innerType match {
+                case ct: ClassType => TypeVariableType(p.name, ct, Nullability.Nullable)
+                case _ => TypeVariableType(p.name, context.rootClass, Nullability.Nullable)
+              }
             case _ => TypeVariableType(p.name, context.rootClass)
           }
           TypeParam(p.name, varType, p.upperBound)

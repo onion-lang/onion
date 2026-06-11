@@ -1596,6 +1596,11 @@ object TypedAST {
         // nullable values can flow into printing/collections/equals)
         case (l: TypedAST.ClassType, _: TypedAST.NullableType) if l.name == "java.lang.Object" =>
           return true
+        // T (nullable-bound type variable) ← S? : a bare [T] ranges over
+        // nullable types too, so S? is a valid instantiation when S fits
+        // the bound
+        case (tv: TypedAST.TypeVariableType, r: TypedAST.NullableType) if tv.acceptsNullable =>
+          return isSuperType(tv.upperBound, r.innerType)
         // T ← T? : NOT allowed (requires explicit unwrap)
         case (_, r: TypedAST.NullableType) =>
           return false
@@ -1686,9 +1691,10 @@ object TypedAST {
                   case _ =>
                     // ? super E ← A: A must be supertype of E
                     isSuperType(actualArg, w.lowerBound.get)
-              // Expected: type variable T
+              // Expected: type variable T (respects the variable's
+              // nullability: NonNull T rejects nullable actuals)
               case (tv: TypedAST.TypeVariableType, _) =>
-                isSuperType(tv.upperBound, actualArg)
+                isSuperType(tv, actualArg)
               // Expected: concrete type, Actual: wildcard - not directly assignable
               case (_, _: TypedAST.WildcardType) =>
                 false

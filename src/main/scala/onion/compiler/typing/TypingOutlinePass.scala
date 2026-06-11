@@ -71,6 +71,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
         }
+      case node: AST.RecordDeclaration =>
+        typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+          find(definition.name).foreach(unitContext.currentMapper = _)
+          val tps = createTypeParams(node.typeParameters)
+          declaredTypeParams_(node) = tps
+          definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
+        }
       case _ =>
     }
     find(topClass).foreach(unitContext.currentMapper = _)
@@ -125,6 +132,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     unitContext.currentDefinition = definition
     find(definition.name).foreach(unitContext.currentMapper = _)
 
+    val recordTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
+    declaredTypeParams_(node) = recordTypeParams
+    definition_.setTypeParameters(recordTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray)
+
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)
 
@@ -145,7 +156,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setInterfaces(interfaces.toArray)
     definition_.setResolutionComplete(true)
 
-    // Process record components (args) to create fields and getters
+    // Process record components (args) to create fields and getters,
+    // with the record's type parameters in scope
+    openTypeParams(emptyTypeParams ++ recordTypeParams) {
     val argsOption = typesOf(node.args)
     for (args <- argsOption) {
       val argTypes = args.toArray
@@ -212,6 +225,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         argTypes, definition_, null
       )
       definition_.add(copyMethod)
+    }
     }
   }
 

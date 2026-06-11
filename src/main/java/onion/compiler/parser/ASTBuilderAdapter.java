@@ -115,7 +115,17 @@ public class ASTBuilderAdapter {
         String name,
         List<AST.Argument> args
     ) {
-        return builder.createRecordDeclaration(location, modifiers, name, args);
+        return createRecordDeclaration(location, modifiers, name, args, scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty());
+    }
+
+    public AST.RecordDeclaration createRecordDeclaration(
+        Location location,
+        int modifiers,
+        String name,
+        List<AST.Argument> args,
+        List<AST.TypeParameter> typeParameters
+    ) {
+        return builder.createRecordDeclaration(location, modifiers, name, args, typeParameters);
     }
     
     public AST.MethodDeclaration createMethodDeclaration(

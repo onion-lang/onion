@@ -992,14 +992,15 @@ AST.RecordDeclaration record_decl(int mset) : {
   Token t1, t2; List<AST.Argument> args;
   AST.TypeNode superType;
   ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
-  t1="record" t2=id() "(" args=args() ")"
+  t1="record" t2=id() [tparams=type_params()] "(" args=args() ")"
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ] [";"] {
     return new AST.RecordDeclaration(
-      p(t1), mset, c(t2), args, toList(superTypes)
+      p(t1), mset, c(t2), tparams, args, toList(superTypes)
     );
   }
 }

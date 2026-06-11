@@ -39,7 +39,8 @@ trait ASTBuilder {
     location: Location,
     modifiers: Int,
     name: String,
-    args: List[AST.Argument]
+    args: List[AST.Argument],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.RecordDeclaration
 
   def createMethodDeclaration(
@@ -193,9 +194,10 @@ class DefaultASTBuilder extends ASTBuilder {
     location: Location,
     modifiers: Int,
     name: String,
-    args: List[AST.Argument]
+    args: List[AST.Argument],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.RecordDeclaration = {
-    AST.RecordDeclaration(location, modifiers, name, args)
+    AST.RecordDeclaration(location, modifiers, name, typeParameters, args)
   }
 
   def createMethodDeclaration(

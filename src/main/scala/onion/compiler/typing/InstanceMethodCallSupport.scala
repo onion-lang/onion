@@ -123,12 +123,21 @@ private[compiler] final class InstanceMethodCallSupport(
       named.get(cname) match {
         case Some(expr) =>
           calls.typed(expr, context, expectedType) match {
-            case Some(term) => fullParams(i) = term
+            case Some(term) =>
+              // Box primitives against reference-typed components so the
+              // raw signature (copy(A, B)) still matches: copy(second = 42)
+              fullParams(i) =
+                if (!expectedType.isBasicType && term.isBasicType) onion.compiler.toolbox.Boxing.boxing(bodyContext.table, term)
+                else term
             case None => return Some(null).filter(_ != null)
           }
         case None =>
           targetType.findMethod(cname, Array[Term]()) match {
-            case Array(getter, _*) => fullParams(i) = new Call(target, getter, Array[Term]())
+            case Array(getter, _*) =>
+              // Specialize the component type for applied records so the
+              // kept value of first() on Pair[String, Integer] is a String
+              val call = new Call(target, getter, Array[Term]())
+              fullParams(i) = TypeSubst.withCast(call, TypeSubst.withClassOnly(getter.returnType, targetType))
             case _ => return None
           }
       }

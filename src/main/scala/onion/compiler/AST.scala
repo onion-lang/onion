@@ -272,7 +272,7 @@ object AST {
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], superInterfaces: List[TypeNode] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil) extends TypeDeclaration
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)

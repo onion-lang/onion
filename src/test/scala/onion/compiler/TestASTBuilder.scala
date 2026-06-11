@@ -40,10 +40,11 @@ class TestASTBuilder extends DefaultASTBuilder {
     location: Location,
     modifiers: Int,
     name: String,
-    args: List[AST.Argument]
+    args: List[AST.Argument],
+    typeParameters: List[AST.TypeParameter] = Nil
   ): AST.RecordDeclaration = {
     // Could inject additional methods here
-    super.createRecordDeclaration(location, modifiers, name, args)
+    super.createRecordDeclaration(location, modifiers, name, args, typeParameters)
   }
 }
 

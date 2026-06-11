@@ -1,393 +1,386 @@
 # Language Specification
 
-Formal specification of the Onion programming language.
+This page summarizes the syntax and semantics of Onion as implemented by the
+current compiler. The authoritative grammar is `grammar/JJOnionParser.jj`.
 
 ## Lexical Structure
 
 ### Keywords
 
-Reserved words in Onion:
+```
+abstract    break       case        catch       class       continue
+def         do          else        enum        extends     extension
+false       final       finally     for         foreach     forward
+if          import      interface   is          module      new
+null        override    private     protected   public      record
+return      sealed      select      self        static      super
+synchronized this        throw       true        try         type
+val         var         when        while
+```
 
-```
-break       case        catch       class       continue
-def         else        false       finally     for
-foreach     forward     if          import      interface
-module      new         null        private     protected
-public      record      return      select      self
-static      super       this        throw       true
-try         val         var         while
-```
+Keywords can be used as identifiers by escaping with backticks: `` `class` ``.
 
 ### Identifiers
 
-- Start with a letter or underscore
-- Followed by letters, digits, or underscores
+- Start with a letter or underscore, followed by letters, digits, underscores
 - Case-sensitive
-
-Valid identifiers:
-- `name`, `value`, `_temp`, `count123`, `myVariable`
-
-Invalid identifiers:
-- `123abc` (starts with digit)
-- `my-variable` (contains hyphen)
-- `class` (reserved keyword)
 
 ### Literals
 
-**Integer Literals:**
-- Decimal: `42`, `0`, `123`
-- Hexadecimal: `0xFF`, `0x1A2B`
-- Octal: `077`, `0123`
+**Integer literals** (underscores may group digits in any numeric literal):
+- Decimal: `42`, `1_000_000`
+- Hexadecimal: `0xFF`, `0xFF_FF`
+- Binary: `0b1010`, `0b1010_1010`
+- Octal: `077`
 
-**Long Literals:**
-- `42L`, `1234567890L`
+Suffixes select the type: `B` (Byte), `S` (Short), `L` (Long); unsuffixed
+integers are `Int`.
 
-**Floating Point:**
-- `3.14`, `0.5`, `1.23e10`
+**Floating point:** `3.14`, `1.23e10`, `1_234.5` — `Double` by default,
+`f`/`F` for `Float`, `D` for explicit `Double`.
 
-**Float Literals:**
-- `3.14f`, `0.5f`
+**Strings:** `"text"` with the usual escapes; `"""..."""` for multi-line.
+String interpolation embeds expressions with `#{expr}` (nested string
+literals inside the interpolation are allowed).
 
-**String Literals:**
-- Double quotes: `"Hello, World!"`
-- Escape sequences: `\n`, `\t`, `\\`, `\"`
+**Characters:** `'A'`, `'\n'`. **Booleans:** `true`, `false`. **Null:** `null`.
 
-**Character Literals:**
-- Single quotes: `'A'`, `'1'`, `'\n'`
+**Collection literals:** `[1, 2, 3]` builds a `List`; `["a": 1, "b": 2]`
+builds an insertion-ordered `Map`; `[:]` is the empty map.
 
-**Boolean Literals:**
-- `true`, `false`
-
-**Null Literal:**
-- `null`
+**Ranges:** `a..b` (inclusive) and `a..<b` (exclusive) — iterable in
+`foreach` without materializing a collection.
 
 ## Type System
 
 ### Primitive Types
 
-| Type | Size | Range |
-|------|------|-------|
-| `Byte` | 8-bit | -128 to 127 |
-| `Short` | 16-bit | -32768 to 32767 |
-| `Int` | 32-bit | -2³¹ to 2³¹-1 |
-| `Long` | 64-bit | -2⁶³ to 2⁶³-1 |
-| `Float` | 32-bit | IEEE 754 |
-| `Double` | 64-bit | IEEE 754 |
-| `Char` | 16-bit | Unicode character |
-| `Boolean` | N/A | `true` or `false` |
+| Type | Size |
+|------|------|
+| `Byte` / `Short` / `Int` / `Long` | 8/16/32/64-bit integers |
+| `Float` / `Double` | IEEE 754 |
+| `Char` | 16-bit Unicode |
+| `Boolean` | `true`/`false` |
+
+Capitalized names denote the primitives; the boxed wrapper classes are
+available as `JByte`, `JInteger`, `JDouble`, etc. Boxing into `Object`/
+`Number` contexts is automatic.
 
 ### Reference Types
 
-- **Class types**: `String`, `Object`, user-defined classes
-- **Interface types**: Java interfaces
-- **Array types**: `Type[]`
-- **Null type**: Type of `null` literal
-- **Bottom type**: `Nothing` for non-returning expressions
+- **Class / interface types**, including applied generics: `List[String]`,
+  `Box[T]`
+- **Array types**: `T[]`, `T?[]` (nullable elements), multi-dimensional `T[][]`
+- **Function types**: `Int -> Int`, `(Int, Int) -> String`
+- **Nullable types**: `T?` — see below
+- **Null type** (type of `null`) and **bottom type** (non-returning
+  expressions such as `return`/`throw`/`break`/`continue`)
 
-### Type Annotations
+### Nullable Types and Null Safety
 
-Types are written after a colon in declarations (e.g., `val name: String`). Local `val` / `var` declarations can omit the type when an initializer is present.
+`T` cannot hold `null`; `T?` can. `T → T?` widens implicitly; `T? → T`
+requires unwrapping:
+
+- `x?.member` — safe call, result widened to nullable
+- `xs?[i]` — safe indexing
+- `x ?: default` — Elvis; when the fallback cannot be null the result type
+  loses its nullability
+- `x!!` — non-null assertion (throws `NullPointerException` when null)
+- Smart casts: `if x != null { ... }` narrows immutable locals and
+  never-assigned parameters; `is`-checks narrow similarly, and `!(cond)`
+  swaps which branch narrows
+- Assigning the `null` literal to a non-nullable type warns (W0012)
+- `Object` accepts any nullable value (it is the top type, like Scala's `Any`)
+
+### Generics
+
+Erasure-based generics with `[]` syntax: `class Box[T]`, `def first[T](xs: List[T]): T`,
+`record Pair[A, B](first: A, second: B)`. Wildcards `?`, `? extends T`,
+`? super T` are accepted in type arguments.
+
+Type-parameter nullability follows Kotlin:
+
+- Bare `[T]` accepts nullable type arguments (`Box[String?]`); values of
+  type `T` inside the generic body cannot be dereferenced directly (E0057)
+  until narrowed with `?.`, `?:`, `!!` or a null check
+- `[T extends B]` restricts `T` to non-null types and permits direct
+  dereference; `[T extends B?]` opts back into nullable with bound `B`
+- Type variables from Java classes are *platform*: permissive in both
+  directions
+
+### Type Conversions
+
+Widening (`Byte → Short → Int → Long → Float → Double`, `Char → Int`) is
+automatic. Narrowing requires `as` (or the legacy `$`):
 
 ```onion
-val name: String
-val age: Int
-val scores: Int[]
-val inferred = "Alice"
+val i: Int = (3.14 as Int)
 ```
+
+`as` is also the reference cast: `(obj as JButton).getText()`.
+`expr is Type` tests the runtime type.
 
 ## Declarations
 
-### Variable Declaration
+### Variables
 
 ```onion
-val identifier: Type = expression
-var identifier: Type = expression
-val identifier = expression       // local only
-var identifier = expression       // local only
+val name: Type = expr     // immutable
+var name: Type = expr     // mutable
+val inferred = expr       // local type inference
+val (a, b) = recordValue  // destructuring (records / Map.Entry)
 ```
 
-### Function Declaration
+### Functions
 
 ```onion
-def identifier(param :Type, ...) :ReturnType {
-  body
+def name(param: Type, opt: Type = default): ReturnType { body }
+def name(param: Type): ReturnType = expression      // expression body
+def vararg(parts: String...): String { ... }        // varargs
+def generic[T](x: T): T { ... }                     // method type params
+```
+
+Call sites may pass arguments by name (`f(b = 2, a = 1)`); omitted
+parameters fill from defaults. Methods, constructors and records all
+support named arguments and defaults.
+
+### Classes
+
+```onion
+class Name [TypeParams] [(primary params)] [: Super[(args)]] [<: I1, I2] {
+  sections
 }
 ```
 
-### Class Declaration
+**Primary constructors:** `val`/`var` parameters declare public
+(final/mutable) fields assigned automatically; plain parameters exist only
+in the constructor (e.g. to feed `: Super(args)`). Class bodies are
+optional.
 
 ```onion
-class ClassName {
-  members
-}
-
-class ClassName : ParentClass {
-  members
-}
-
-class ClassName <: Interface {
-  members
-}
-
-class ClassName : ParentClass <: Interface1, Interface2 {
-  members
-}
+class Point(val x: Int, val y: Int)
+class Dog(name: String, val breed: String) : Animal(name)
 ```
 
-### Member Variables
+**Classic constructors** remain available:
 
 ```onion
-class Example {
-  val memberName: Type
-
-  public:
-    var publicMember: Type
-}
+def this(params) { body }
+def this(params): (superArgs) { body }
 ```
 
-### Constructors
+Members default to private; `public:` / `protected:` / `private:` sections
+set accessibility. `static def` declares static methods; `static val`
+constants. Field initializers run in declaration order.
+
+### Interfaces
 
 ```onion
-def this(params) {
-  body
-}
-
-def this(params): (superArgs) {
-  body
+interface Greeter {
+  def name(): String                                  // abstract
+  def greet(): String { return "Hello, " + this.name() }  // default method
+  def shout(): String = "HEY " + this.name()          // expression body
 }
 ```
 
-### Methods
+Methods with bodies compile to JVM default methods. `sealed interface`
+restricts implementations to the compilation unit and enables
+exhaustiveness checking in `select`.
+
+### Records
 
 ```onion
-def methodName(params) :ReturnType {
-  body
-}
-
-static def staticMethod(params) :ReturnType {
-  body
-}
+record Point(x: Int, y: Int)
+record Pair[A, B](first: A, second: B) <: SomeInterface
 ```
 
-## Block Elements
+Components become private final fields with public accessor *methods*
+(`p.x()`); `equals`/`hashCode`/`toString`/`copy` are generated. `copy`
+supports full clones, positional and named partial copies
+(`p.copy(y = 9)`). Records destructure in `val (a, b) = p` and in `select`
+patterns.
 
-Control-flow forms are expressions. Blocks evaluate to the last expression, `if`/`select`/`try` can appear where an expression is expected, and loops evaluate to `void`. `return`/`throw`/`break`/`continue` are bottom-typed (they never produce a value). Inside a block, the only declaration-form block element is a local `val`/`var`; everything else is parsed as an expression.
-
-### Expression Element
-
-```onion
-expression;
-```
-
-### Block Expression
+### Enums
 
 ```onion
-{
-  block_elements
-}
-```
+enum Color { RED, GREEN, BLUE }
 
-### If Expression
-
-```onion
-if condition {
-  body
-} else if condition {
-  body
-} else {
-  body
+enum Planet(mass: Double) {
+  MERCURY(3.3e23),
+  EARTH(5.97e24)
+public:
+  def heavierThan(other: Planet): Boolean = this.mass() > other.mass()
 }
 ```
 
-### While Loop
+Enums compile to JVM enums: `name()`, `ordinal()`, `values()`,
+`valueOf(String)` work. Record-style parameters become final fields with
+accessors; access sections after the constant list declare methods.
+`select` over an enum checks exhaustiveness when no `else` is present.
+
+### Extensions
 
 ```onion
-while condition {
-  body
+extension String {
+  def shout(): String { return this.toUpperCase() + "!" }
 }
 ```
 
-### For Loop
+### Type Aliases
 
 ```onion
-for init; condition; update {
-  body
-}
+type Names = List[String]
 ```
 
-### Foreach Loop
-
-```onion
-foreach variable :Type in collection {
-  body
-}
-```
-
-### Select Expression
-
-```onion
-select expression {
-  case value1, value2:
-    body
-  case value3:
-    body
-  else:
-    body
-}
-```
-
-### Try-Catch Expression
-
-```onion
-try {
-  body
-} catch variable :ExceptionType {
-  handler
-}
-```
-
-### Return Expression
-
-```onion
-return
-return expression
-```
-
-### Break and Continue
-
-```onion
-break
-continue
-```
-
-## Expressions
-
-### Operators
-
-**Precedence (highest to lowest):**
-
-1. Member access: `.`, `::`
-2. Postfix: `++`, `--`
-3. Unary: `!`, `-`, `+`
-4. Type cast: `$`
-5. Multiplicative: `*`, `/`, `%`
-6. Additive: `+`, `-`
-7. Relational: `<`, `>`, `<=`, `>=`
-8. Equality: `==`, `!=`
-9. Logical AND: `&&`
-10. Logical OR: `||`
-11. Assignment: `=`
-12. List append: `<<`
-
-### Lambda Expressions
-
-```onion
-(param [:Type], ...) -> { body }
-```
-
-### Type Casting
-
-```onion
-expression$TargetType
-```
-
-### Object Creation
-
-```onion
-new ClassName(args)
-new Type[size]
-```
-
-### Method Calls
-
-```onion
-object.method(args)
-Class::staticMethod(args)
-```
-
-### Array Access
-
-```onion
-array[index]
-```
-
-## Import System
-
-```onion
-import {
-  package.ClassName;
-  package.OtherClass;
-}
-```
-
-## Module System
-
-```onion
-module package.name
-
-// Class definitions
-```
-
-## Visibility Modifiers
-
-- **Private (default)**: Members are private unless marked public
-- **Public**: Declared in `public:` section
-
-```onion
-class Example {
-  var privateMember: Int
-
-  public:
-    var publicMember: Int
-
-    def publicMethod {
-      // ...
-    }
-}
-```
-
-## Delegation
+### Delegation
 
 ```onion
 class MyClass <: Interface {
-  forward val member: Interface;
-
-  public:
-    def this {
-      this.member = new Implementation;
-    }
+  forward val member: Interface
+  ...
 }
 ```
 
-The `forward` directive automatically delegates interface methods to the specified member.
+`forward` auto-delegates the interface's methods to the member.
 
-## Type Conversions
+## Statements and Expressions
 
-### Widening Conversions (Automatic)
+Control-flow forms are expressions: blocks evaluate to their last
+expression, `if`/`select`/`try` produce values, loops evaluate to `void`,
+and `return`/`throw`/`break`/`continue` are bottom-typed.
 
-- `Byte` → `Short` → `Int` → `Long` → `Float` → `Double`
-- `Char` → `Int`
-
-### Narrowing Conversions (Explicit)
-
-Require explicit cast using `$` operator:
+### Conditionals
 
 ```onion
-val d: Double = 3.14
-val i: Int = d$Int
+if cond { ... } else if cond2 { ... } else { ... }
+val label = if ok { "yes" } else { "no" }
 ```
+
+Assignment inside a parenthesized condition is allowed:
+`while (line = reader.readLine()) != null { ... }`.
+
+### Loops
+
+```onion
+while cond { ... }
+do { ... } while cond                  // body-first
+for var i = 0; i < n; i += 1 { ... }
+foreach x: Type in collection { ... }
+foreach i: Int in 0..<n { ... }
+foreach (k, v) in map { ... }
+break / continue
+```
+
+### Select (Pattern Matching)
+
+```onion
+select expr {
+case 1, 2:                ...    // value cases (any expressions)
+case Color::RED:          ...    // enum constants (exhaustiveness-checked)
+case s is String:         ...    // type pattern, binds s narrowed
+case Circle(r) when r > 9: ...   // record destructuring + guard
+case Rect(w, _):          ...    // _ ignores a component
+else:                     ...
+}
+```
+
+Matches over `sealed` interfaces and enums are exhaustiveness-checked
+(E0042) when no `else` is present; exhaustive matches can be used as
+expressions.
+
+### Exceptions
+
+```onion
+try { ... }
+catch e: IllegalArgumentException | IllegalStateException { ... }  // multi-catch
+catch e: Exception { ... }
+finally { ... }
+
+try (val r = open(); val w = openOther()) { ... }   // try-with-resources
+throw new IllegalStateException("message")
+```
+
+Resources close automatically in reverse declaration order.
+
+### Lambdas and Function Values
+
+```onion
+val f: Int -> Int = x -> x * 2          // bare param, expression body
+val g = (a: Int, b: Int) -> a + b
+list.map { x => x * 2 }                 // trailing lambda
+Future::async(() -> { return compute() })
+val r: Runnable = () -> IO::println("hi")   // SAM conversion
+```
+
+### Do Notation
+
+```onion
+do[Option] { a <- getA(); b <- getB(); ret a + b }
+do[Future] { x <- fetch(); ret x.size() }
+```
+
+Desugars to `flatMap`/`map`; works with `Option`, `Result`, `Future` and
+the script top level.
+
+### Operators
+
+Precedence (highest first):
+
+1. Member access / static access / indexing: `.` `?.` `::` `[]` `?[]`
+2. Postfix: `++` `--` `!!` / cast `as`, `$`
+3. Unary: `!` `-` `+` `~`
+4. Multiplicative: `*` `/` `%`
+5. Additive: `+` `-`
+6. Shifts: `<<` `>>` `>>>` (`<<` on collections appends)
+7. Relational: `<` `>` `<=` `>=` `is`
+8. Equality: `==` `!=` (value), `===` `!==` (reference)
+9. Bitwise: `&` `^` `|`
+10. Logical: `&&` `||`
+11. Elvis: `?:`
+12. Assignment: `=` and compound `+=` `-=` `*=` `/=` `%=` `&=` `|=` `^=` `<<=` `>>=` `>>>=`
+
+`==` on objects is value equality (`equals`); `===` compares references.
+`+` performs string concatenation when either operand is a `String`.
+
+## Imports and Modules
+
+```onion
+module my.pkg
+
+import {
+  java.util.*
+  java.lang.Long as JLong;
+}
+```
+
+`onion.*`, `java.lang.*`, `java.io.*`, `java.util.*` are imported by
+default (with `onion.*` taking priority). Single-class imports of unknown
+classes are compile errors.
+
+## Entry Points
+
+For `onion`/`runScript`, the entry point is, in order: an explicit class
+with a `main` method; the `main` method of the top class; otherwise the
+first top-level statement. Top-level statements, `def` functions and `val`/
+`var` declarations form implicit scripts; `args: String[]` is available.
+
+## Warnings
+
+`--warn off|on|error` sets the level; `--Wno codes` suppresses specific
+warnings. Notable: W0006 unused parameter, W0012 null literal flowing into
+a non-nullable type.
 
 ## Current Limitations
 
-As documented in the README:
-
-1. **Edge cases**: The compiler may still crash on certain patterns
-2. **Erasure generics**: No variance, wildcards, or reified type info
-3. **Diagnostics**: Some errors are reported later in the pipeline
+1. Generics are erasure-based (no variance or reified type info), though
+   type-parameter nullability is tracked at compile time
+2. Tail-call optimization covers direct self-recursion (plus a
+   mutual-recursion optimization pass); not general CPS
+3. Some diagnostics are still reported later in the pipeline than ideal
 
 ## Grammar Reference
 
-The complete grammar is defined in `grammar/JJOnionParser.jj` using JavaCC syntax.
+The complete grammar is `grammar/JJOnionParser.jj` (JavaCC).
 
 ## Next Steps
 

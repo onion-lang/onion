@@ -23,6 +23,8 @@ private[typing] object TypeCheckingHelpers {
       applied.typeArguments.exists(containsTypeVariable)
     case array: ArrayType =>
       containsTypeVariable(array.component)
+    case nullable: NullableType =>
+      containsTypeVariable(nullable.innerType)
     case _ => false
   }
 

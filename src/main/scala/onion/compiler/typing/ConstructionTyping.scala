@@ -27,16 +27,24 @@ final class ConstructionTyping(
           bodyContext.report(INCOMPATIBLE_TYPE, node.lhs, bodyContext.rootClass, target.`type`)
           None
         } else {
-          val params = Array(indexRaw)
-          tryFindMethod(node, target.`type`.asInstanceOf[ObjectType], "get", params) match {
-            case Left(_) =>
-              bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+          target.`type` match {
+            case objType: ObjectType =>
+              val params = Array(indexRaw)
+              tryFindMethod(node, objType, "get", params) match {
+                case Left(_) =>
+                  bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "get", types(params))
+                  None
+                case Right(method) =>
+                  // Specialize the element type for generic collections so
+                  // xs[i] on a List[Integer] has type Integer, not Object
+                  val elementType = TypeSubst.withClassOnly(method.returnType, target.`type`)
+                  Some(TypeSubst.withCast(new Call(target, method, params), elementType))
+              }
+            case other =>
+              // e.g. indexing a nullable receiver: xs[i] needs a definite
+              // object type; nullable values must be unwrapped first
+              bodyContext.report(INVALID_METHOD_CALL_TARGET, node.lhs, other)
               None
-            case Right(method) =>
-              // Specialize the element type for generic collections so
-              // xs[i] on a List[Integer] has type Integer, not Object
-              val elementType = TypeSubst.withClassOnly(method.returnType, target.`type`)
-              Some(TypeSubst.withCast(new Call(target, method, params), elementType))
           }
         }
       }

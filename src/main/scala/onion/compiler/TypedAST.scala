@@ -233,15 +233,7 @@ object TypedAST {
     }
 
     /** Result type is nullable because it can be null when target is null */
-    def `type`: TypedAST.Type = {
-      val returnType = method.returnType
-      // If return type is already nullable or null type, return as-is
-      if (returnType.isNullable || returnType.isNullType) returnType
-      // If return type is a primitive, it cannot be null - wrap in nullable
-      else if (returnType.isBasicType) new NullableType(returnType)
-      // For object types, wrap in nullable
-      else new NullableType(returnType)
-    }
+    def `type`: TypedAST.Type = NullableType.of(method.returnType)
   }
 
   /**
@@ -569,13 +561,7 @@ object TypedAST {
     }
 
     /** Result type is nullable because it can be null when target is null */
-    def `type`: TypedAST.Type = {
-      val fieldType = field.`type`
-      // If field type is already nullable or null type, return as-is
-      if (fieldType.isNullable || fieldType.isNullType) fieldType
-      // Wrap in nullable
-      else new NullableType(fieldType)
-    }
+    def `type`: TypedAST.Type = NullableType.of(field.`type`)
   }
 
   class SetField(location: Location, val target: TypedAST.Term, val field: TypedAST.FieldRef, val value: TypedAST.Term) extends Term(location) {
@@ -1007,6 +993,10 @@ object TypedAST {
         val newLower = w.lowerBound.map(substitute)
         if ((newUpper eq w.upperBound) && newLower == w.lowerBound) then w
         else new TypedAST.WildcardType(newUpper, newLower)
+      case n: TypedAST.NullableType =>
+        val newInner = substitute(n.innerType)
+        if newInner eq n.innerType then n
+        else TypedAST.NullableType.of(newInner)
       case other =>
         other
 
@@ -1394,8 +1384,29 @@ object TypedAST {
 
   /**
    * Nullable type: T? - allows null values
+   *
+   * Instances are interned via [[NullableType.of]] so that the eq-based caches
+   * and comparisons used elsewhere (AppliedClassType cache, type-argument
+   * comparison, unification) treat equal nullable types as identical.
    */
-  class NullableType(val innerType: TypedAST.Type) extends Type {
+  object NullableType {
+    private val cache = new java.util.concurrent.ConcurrentHashMap[TypedAST.Type, NullableType]()
+
+    /**
+     * Canonical constructor for nullable types.
+     * - Collapses nesting: of(T?) == T?
+     * - NullType and void cannot be meaningfully wrapped; returned as-is
+     */
+    def of(inner: TypedAST.Type): TypedAST.Type = inner match {
+      case null => null
+      case n: NullableType => n
+      case t if t.isNullType => t
+      case t if t eq BasicType.VOID => t
+      case t => cache.computeIfAbsent(t, k => new NullableType(k))
+    }
+  }
+
+  class NullableType private (val innerType: TypedAST.Type) extends Type {
     def name: String = s"${innerType.name}?"
 
     override def displayName: String = s"${innerType.displayName}?"

@@ -31,6 +31,51 @@ class SafeNavigationPrimitiveSpec extends AbstractShellSpec {
       assert(Shell.Success("n=null,m=5") == result)
     }
 
+    it("supports ?. on void-returning methods as a statement") {
+      val result = shell.run(
+        """
+          |class Greeter {
+          |  var out: StringBuffer
+          |public:
+          |  def this { this.out = new StringBuffer() }
+          |  def hello(): void { this.out.append("hi") }
+          |  def text(): String { return this.out.toString() }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val g: Greeter? = new Greeter()
+          |    g?.hello()
+          |    val none: Greeter? = null
+          |    none?.hello()
+          |    if g != null { return g.text() } else { return "?" }
+          |  }
+          |}
+          |""".stripMargin,
+        "SafeNavVoid.on",
+        Array()
+      )
+      assert(Shell.Success("hi") == result)
+    }
+
+    it("rejects indexing on a nullable receiver instead of crashing") {
+      val result = shell.run(
+        """
+          |import { java.util.* }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs: List? = new ArrayList()
+          |    return "" + xs[0]
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIndexing.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
     it("passes nullable values where Object is expected") {
       val result = shell.run(
         """

@@ -191,14 +191,16 @@ class AsmCodeGenerationVisitor(
     node.method.returnType match
       case bt: BasicType if bt != BasicType.VOID =>
         gen.box(asmType(bt))
-      case _ => // Already an object type
+      case _ => // Already an object type (or void: nothing on the stack)
 
     gen.goTo(endLabel)
 
-    // Null path: pop target and push null
+    // Null path: pop target; a void call leaves nothing on the stack, so
+    // only push null when the expression actually produces a value
     gen.visitLabel(nullLabel)
     gen.pop()
-    gen.visitInsn(Opcodes.ACONST_NULL)
+    if node.method.returnType != BasicType.VOID then
+      gen.visitInsn(Opcodes.ACONST_NULL)
 
     gen.visitLabel(endLabel)
 

@@ -117,7 +117,7 @@ class NameResolver(private val context: NameResolutionContext) {
       new TypedAST.WildcardType(mappedUpper, mappedLower)
     case AST.NullableType(inner) =>
       val mappedInner = map(inner)
-      if (mappedInner == null) null else new TypedAST.NullableType(mappedInner)
+      if (mappedInner == null) null else TypedAST.NullableType.of(mappedInner)
     case _ =>
       null
   }

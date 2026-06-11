@@ -145,6 +145,10 @@ private[compiler] object TypeSubstitution {
         val newLower = w.lowerBound.map(lb => substituteType(lb, classSubst, methodSubst, defaultToBound))
         if ((newUpper eq w.upperBound) && newLower == w.lowerBound) w
         else new TypedAST.WildcardType(newUpper, newLower)
+      case n: TypedAST.NullableType =>
+        val newInner = substituteType(n.innerType, classSubst, methodSubst, defaultToBound)
+        if (newInner eq n.innerType) n
+        else TypedAST.NullableType.of(newInner)
       case other =>
         other
     }

@@ -56,7 +56,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
           case _: NullableType | _: NullType => TypeSubst.withCast(call, castType)
           case bt: BasicType => call // SafeCall.type is already NullableType(bt)
           case other if other eq method.returnType => call
-          case other => TypeSubst.withCast(call, new NullableType(other))
+          case other => TypeSubst.withCast(call, NullableType.of(other))
         }
       case _ =>
         TypeSubst.withCast(call, castType)

@@ -139,6 +139,7 @@ private[compiler] final class MethodResolutionSupport(
     case tv: TypeVariableType => methodTypeParams.contains(tv.name)
     case applied: AppliedClassType => applied.typeArguments.exists(containsMethodTypeParam(_, methodTypeParams))
     case at: ArrayType => containsMethodTypeParam(at.base, methodTypeParams)
+    case n: NullableType => containsMethodTypeParam(n.innerType, methodTypeParams)
     case _ => false
 
   private def sameClass(c1: ClassType, c2: ClassType): Boolean =

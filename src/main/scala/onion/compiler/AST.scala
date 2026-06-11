@@ -286,5 +286,5 @@ object AST {
   case class EnumConstant(location: Location, name: String, args: List[Expression]) extends Node
 
   /** An enum type declaration */
-  case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant]) extends TypeDeclaration
+  case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant], sections: List[AccessSection] = Nil) extends TypeDeclaration
 }

@@ -297,3 +297,17 @@ foreach p: Planet in Planet::values() {
 }
 Planet::valueOf("EARTH")     // works with java.lang.Enum.valueOf
 ```
+
+Enums can declare methods in access sections after the constant list —
+instance methods see the constant's data, static methods see `values()`:
+
+```onion
+enum Planet(mass: Double) {
+  MERCURY(3.3e23),
+  EARTH(5.97e24)
+public:
+  def heavierThan(other: Planet): Boolean {
+    return this.mass() > other.mass()
+  }
+}
+```

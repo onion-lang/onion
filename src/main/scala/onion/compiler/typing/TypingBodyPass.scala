@@ -152,6 +152,14 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
         }
       }
       definition.setStaticInitializers(statements.toArray)
+
+      // Type the bodies of user-defined members
+      for (section <- node.sections; member <- section.members) {
+        member match {
+          case m: AST.MethodDeclaration => processMethodDeclaration(m)
+          case _ => // enum bodies currently support methods only
+        }
+      }
     }
 
   def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =

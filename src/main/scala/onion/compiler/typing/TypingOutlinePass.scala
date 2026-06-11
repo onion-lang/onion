@@ -296,6 +296,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, ctorArgs, block, superInit)
       definition_.add(ctor)
     }
+
+    // User-defined members (access sections after the constant list)
+    node.sections.foreach(processAccessSection)
   }
 
   private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>

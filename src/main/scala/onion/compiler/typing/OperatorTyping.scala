@@ -225,8 +225,41 @@ final class OperatorTyping(
       rightRaw <- typed(node.rhs, context)
       left = Boxing.tryUnboxToNumeric(bodyContext.table, leftRaw, numericTypes.contains)
       right = Boxing.tryUnboxToNumeric(bodyContext.table, rightRaw, numericTypes.contains)
-      result <- Option(processNumericExpression(kind, node, left, right))
+      result <- {
+        // Operator overloading: when an operand is a user type rather than a
+        // number, dispatch to the convention method (a - b => a.minus(b))
+        if (!hasNumericType(left) || !hasNumericType(right))
+          tryOperatorMethod(node, node.symbol, leftRaw, rightRaw)
+            .orElse(Option(processNumericExpression(kind, node, left, right)))
+        else
+          Option(processNumericExpression(kind, node, left, right))
+      }
     } yield result
+
+  /**
+   * Kotlin-style operator overloading: maps a binary operator to a
+   * convention method on the left operand and builds the call when found.
+   * Returns None when there is no mapping or no matching method, so callers
+   * fall back to the primitive/concat path.
+   */
+  private val operatorMethodNames: Map[String, String] =
+    Map("+" -> "plus", "-" -> "minus", "*" -> "times", "/" -> "div", "%" -> "rem")
+
+  def tryOperatorMethod(node: AST.Node, symbol: String, left: Term, right: Term): Option[Term] = {
+    val methodName = operatorMethodNames.getOrElse(symbol, return None)
+    left.`type` match {
+      case targetType: ObjectType if right.`type`.isObjectType || right.`type`.isBasicType =>
+        val params = Array(right)
+        tryFindMethod(node, targetType, methodName, params) match {
+          case Right(method) =>
+            val classSubst = TypeSubstitution.classSubstitution(targetType)
+            val resultType = TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+            Some(TypeSubst.withCast(new Call(left, method, params), resultType))
+          case Left(_) => None
+        }
+      case _ => None
+    }
+  }
 
   def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
     val ops = processLogicalExpression(node, context)

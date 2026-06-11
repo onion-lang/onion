@@ -310,6 +310,28 @@ val (s, n) = p                 // destructuring declaration
 p.copy(second = 42)            // named-argument copy
 ```
 
+## Operator Overloading
+
+Binary operators dispatch to convention methods on the left operand
+(Kotlin-style): `a + b` calls `a.plus(b)`, and likewise `-` → `minus`,
+`*` → `times`, `/` → `div`, `%` → `rem`. Compound assignment (`a += b`)
+goes through the same method. `+` keeps string concatenation whenever a
+`String` is involved, and numeric operands keep primitive arithmetic.
+
+```onion
+class Vec {
+  val x: Int
+  val y: Int
+public:
+  def this(x: Int, y: Int) { this.x = x; this.y = y }
+  def plus(o: Vec): Vec { return new Vec(this.x + o.x, this.y + o.y) }
+  def times(k: Int): Vec { return new Vec(this.x * k, this.y * k) }
+}
+
+val v = new Vec(1, 2) + new Vec(3, 4)   // Vec(4, 6)
+val w = new Vec(1, 2) * 3               // Vec(3, 6)
+```
+
 ## Enums
 
 Enums compile to standard JVM enums. Constants get `name()` / `ordinal()`;

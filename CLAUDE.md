@@ -445,6 +445,7 @@ These are frequently confused with other languages. **Always check these:**
 | `&&`, `\|\|` operators | ✓ correct - same as Java |
 | `!condition` | ✓ correct - same as Java |
 | `a ? b : c` ternary | Not supported - use `if/else` expression |
+| `operator fun plus` (Kotlin) | `def plus(o: T): T` - `+ - * / %` map to plus/minus/times/div/rem on the left operand |
 | String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
 | `this` only | `self` also works - both refer to current instance |
 | Reserved word as identifier | `` `class` `` - use backticks to escape keywords |

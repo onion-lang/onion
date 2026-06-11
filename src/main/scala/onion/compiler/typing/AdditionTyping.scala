@@ -31,7 +31,23 @@ private[typing] class AdditionTyping(
     val right = body.typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return None
 
-    tryNumericAddition(node, left, right).orElse(typeStringConcatenation(node, left, right))
+    // Operator overloading for '+': numeric first, then a user-defined
+    // plus() when neither side is a String (String keeps concatenation),
+    // and concatenation as the final fallback
+    tryNumericAddition(node, left, right)
+      .orElse(tryPlusOperator(node, left, right))
+      .orElse(typeStringConcatenation(node, left, right))
+  }
+
+  private def tryPlusOperator(node: AST.Addition, left: Term, right: Term): Option[Term] = {
+    def isString(t: Term): Boolean = t.`type` match {
+      case ct: ObjectType => ct.name == "java.lang.String"
+      case n: NullableType => n.innerType.name == "java.lang.String"
+      case _ => false
+    }
+    if (left.`type`.isObjectType && !isString(left) && !isString(right))
+      body.operatorTyping.tryOperatorMethod(node, "+", left, right)
+    else None
   }
 
   /**

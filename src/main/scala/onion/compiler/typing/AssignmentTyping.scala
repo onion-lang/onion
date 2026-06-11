@@ -141,6 +141,10 @@ final class AssignmentTyping(
       case _: AST.StaticMemberSelection =>
         Option(processStaticFieldAssign(node, context))
       case _ =>
+        // e.g. (null = expr): not an assignable target; report instead of
+        // silently dropping (a silent None leaves zero errors and a null
+        // condition reaching codegen)
+        bodyContext.report(LVALUE_REQUIRED, node)
         None
     }
 

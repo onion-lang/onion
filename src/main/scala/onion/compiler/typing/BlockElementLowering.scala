@@ -333,7 +333,8 @@ final class BlockElementLowering(
         val thenBlock = context.openLoop {
           translate(node.block, context)
         }
-        new ConditionalLoop(node.location, condition, thenBlock)
+        if (condition == null) new NOP(node.location)
+        else new ConditionalLoop(node.location, condition, thenBlock)
       }
     case node: AST.DoWhileExpression =>
       context.openScope {
@@ -341,7 +342,8 @@ final class BlockElementLowering(
           translate(node.block, context)
         }
         val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
-        new ConditionalLoop(node.location, condition, body, isPostTest = true)
+        if (condition == null) new NOP(node.location)
+        else new ConditionalLoop(node.location, condition, body, isPostTest = true)
       }
     case node: AST.Expression =>
       typed(node, context).map(termToStatement(node, _)).getOrElse(new NOP(node.location))

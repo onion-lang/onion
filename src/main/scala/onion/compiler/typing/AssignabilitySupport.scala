@@ -28,6 +28,13 @@ private[compiler] final class AssignabilitySupport(
       }
     }
 
+    if (actual.`type`.isNullType && !expected.isBasicType && !expected.isNullable && !expected.isNullType) {
+      // The null literal flowing into a non-nullable type is almost always a
+      // bug waiting for an NPE; values coming from Java stay unchecked
+      // (Kotlin's platform-type dilemma — see issue #132)
+      bodyContext.warningReporter.nullToNonNullable(node.location, expected.displayName)
+    }
+
     if (expected.isBasicType && actual.`type`.isNullType) {
       // null can never be assigned to a primitive; unboxing it would crash
       bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)

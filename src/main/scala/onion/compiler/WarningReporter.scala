@@ -80,6 +80,11 @@ class WarningReporter(
     report(WarningCategory.UnnecessaryConversion, location, s"unnecessary conversion from '$fromType' to '$toType'")
   }
 
+  def nullToNonNullable(location: Location, typeName: String): Unit = {
+    report(WarningCategory.NullToNonNullable, location,
+      s"null assigned where non-nullable '$typeName' is expected; declare the type as '$typeName?' or avoid null")
+  }
+
   def uncheckedCast(location: Location, fromType: String, toType: String): Unit = {
     report(WarningCategory.UncheckedCast, location, s"unchecked cast from '$fromType' to '$toType'")
   }

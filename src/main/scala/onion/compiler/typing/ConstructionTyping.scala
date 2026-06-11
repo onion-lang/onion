@@ -28,6 +28,11 @@ final class ConstructionTyping(
           None
         } else {
           target.`type` match {
+            case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+              // A bare [T] ranges over nullable types: indexing dereferences
+              // the receiver, so null must be excluded first
+              bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, node.lhs, tv.displayName)
+              None
             case objType: ObjectType =>
               val params = Array(indexRaw)
               tryFindMethod(node, objType, "get", params) match {

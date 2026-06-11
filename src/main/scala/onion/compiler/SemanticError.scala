@@ -122,6 +122,7 @@ object SemanticError {
   case object DUPLICATE_TYPE_ALIAS extends SemanticError(54)
   case object FUNCTION_BODY_REQUIRED extends SemanticError(55)
   case object ENUM_CONSTANT_ARGS_UNSUPPORTED extends SemanticError(56)
+  case object TYPE_PARAMETER_MAY_BE_NULL extends SemanticError(57)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

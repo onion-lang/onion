@@ -181,6 +181,115 @@ class NullableGenericsSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Dereference restriction inside generic bodies (E0057)") {
+    it("rejects unchecked dereference of a bare-T field") {
+      val result = shell.run(
+        """
+          |class Box[T] {
+          |  val item: T
+          |public:
+          |  def this(item: T) { this.item = item }
+          |  def show(): String { return this.item.toString() }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "no" }
+          |}
+          |""".stripMargin,
+        "UncheckedDeref.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("rejects unchecked dereference of a bare-T method parameter") {
+      val result = shell.run(
+        """
+          |class Util {
+          |public:
+          |  static def show[T](t: T): String { return t.toString() }
+          |  static def main(args: String[]): String { return "no" }
+          |}
+          |""".stripMargin,
+        "UncheckedParamDeref.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("allows dereference after a null check, via ?. and via ?:") {
+      val result = shell.run(
+        """
+          |class Box[T] {
+          |  val item: T
+          |public:
+          |  def this(item: T) { this.item = item }
+          |  def checked(): String {
+          |    val it = this.item
+          |    if it != null { return it.toString() } else { return "<null>" }
+          |  }
+          |  def safe(): String? { return this.item?.toString() }
+          |  def fallback(): String { return (this.item ?: "fb").toString() }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val none: String? = null
+          |    val empty = new Box[String?](none)
+          |    val full = new Box[String?]("v")
+          |    return empty.checked() + "," + empty.safe() + "," + empty.fallback() + "," +
+          |           full.checked() + "," + full.safe() + "," + full.fallback()
+          |  }
+          |}
+          |""".stripMargin,
+        "CheckedDeref.on",
+        Array()
+      )
+      assert(Shell.Success("<null>,null,fb,v,v,v") == result)
+    }
+
+    it("allows dereference of T with a non-null bound") {
+      val result = shell.run(
+        """
+          |class Box[T extends Comparable] {
+          |  val item: T
+          |public:
+          |  def this(item: T) { this.item = item }
+          |  def show(): String { return this.item.toString() }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new Box[String]("bounded").show()
+          |  }
+          |}
+          |""".stripMargin,
+        "BoundedDeref.on",
+        Array()
+      )
+      assert(Shell.Success("bounded") == result)
+    }
+  }
+
+  describe("Elvis result type") {
+    it("yields the non-null type when the fallback cannot be null") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s: String? = null
+          |    return "" + (s ?: "elvis").length()
+          |  }
+          |}
+          |""".stripMargin,
+        "ElvisNonNull.on",
+        Array()
+      )
+      assert(Shell.Success("5") == result)
+    }
+  }
+
   describe("Nullable types in function values") {
     it("accepts String? as a lambda parameter type") {
       val result = shell.run(

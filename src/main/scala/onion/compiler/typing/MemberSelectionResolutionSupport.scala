@@ -25,7 +25,15 @@ private[compiler] final class MemberSelectionResolutionSupport(
     node: AST.MemberSelection,
     target: Term
   ): Option[ResolvedMemberSelectionTarget] =
-    normalizeTarget(node.target, target, target.`type`)
+    target.`type` match {
+      // A bare [T] ranges over nullable types: plain member access needs a
+      // null check first (?. remains available)
+      case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+        bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, node, tv.displayName)
+        None
+      case _ =>
+        normalizeTarget(node.target, target, target.`type`)
+    }
 
   def normalizeSafeMemberSelectionTarget(
     node: AST.SafeMemberSelection,

@@ -16,18 +16,32 @@ private[typing] object MethodNames {
 /** Type substitution helpers to reduce boilerplate in method typing */
 private[typing] object TypeSubst {
 
-  /** Substitute type with only class-level type parameters from target type */
+  /**
+   * Substitute type with only class-level type parameters from target type.
+   * Unsubstituted variables stay as variables (rather than collapsing to
+   * their bounds) so values read out of a generic body keep their static
+   * type T and the nullable-deref check can see them.
+   */
   def withClassOnly(typ: Type, targetType: Type): Type =
     TypeSubstitution.substituteType(
       typ,
       TypeSubstitution.classSubstitution(targetType),
       Map.empty,
-      defaultToBound = true
+      defaultToBound = false
     )
 
   /** Substitute type with both class and method type parameters */
   def apply(typ: Type, classSubst: Map[String, Type], methodSubst: Map[String, Type]): Type =
     TypeSubstitution.substituteType(typ, classSubst, methodSubst, defaultToBound = true)
+
+  /**
+   * Result-type substitution for calls: like apply, but unsubstituted class
+   * type variables survive instead of collapsing to their bounds (see
+   * withClassOnly). Method type variables are always bound by inference, so
+   * this only affects T from the enclosing/receiver class.
+   */
+  def result(typ: Type, classSubst: Map[String, Type], methodSubst: Map[String, Type]): Type =
+    TypeSubstitution.substituteType(typ, classSubst, methodSubst, defaultToBound = false)
 
   /** Substitute all argument types of a method */
   def args(method: Method, classSubst: Map[String, Type], methodSubst: Map[String, Type]): Array[Type] =

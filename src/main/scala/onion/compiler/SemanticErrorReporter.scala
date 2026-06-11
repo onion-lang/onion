@@ -355,6 +355,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.enumConstantArgsUnsupported",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.TYPE_PARAMETER_MAY_BE_NULL -> ErrorDef(
+      "error.semantic.typeParameterMayBeNull",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

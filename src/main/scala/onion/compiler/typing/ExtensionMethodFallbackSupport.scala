@@ -142,7 +142,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
             val finalExpectedArgs = TypeSubst.args(method, classSubst, finalSubst)
             calls.processParamsWithExpected(node, staticArgs, finalExpectedArgs).map { finalParams =>
               val call = new CallStatic(container, method, finalParams)
-              TypeSubst.withCast(call, TypeSubst(method.returnType, classSubst, finalSubst))
+              TypeSubst.withCast(call, TypeSubst.result(method.returnType, classSubst, finalSubst))
             }
           }
         }

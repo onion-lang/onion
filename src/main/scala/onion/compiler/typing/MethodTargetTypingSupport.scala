@@ -18,6 +18,12 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
     target: Term
   ): Option[ResolvedMethodTarget] =
     target.`type` match {
+      // A bare [T] ranges over nullable types, so its values can't be
+      // dereferenced until null is excluded (Platform variables from Java
+      // classes stay permissive)
+      case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+        bodyContext.report(TYPE_PARAMETER_MAY_BE_NULL, node, tv.displayName)
+        None
       case targetType: ObjectType =>
         Some(ResolvedMethodTarget(target, targetType))
       case basicType: BasicType =>

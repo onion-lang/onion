@@ -136,7 +136,7 @@ private[compiler] final class CallOverloadSupport(
   ): Option[Term] =
     fillDefaultArguments(params, method).map { finalParams =>
       val call = new CallStatic(typeRef, method, finalParams)
-      val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+      val castType = TypeSubst.result(method.returnType, classSubst, methodSubst)
       TypeSubst.withCast(call, castType)
     }
 

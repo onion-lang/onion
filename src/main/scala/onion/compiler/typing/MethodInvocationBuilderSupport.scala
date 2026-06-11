@@ -46,7 +46,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
     classSubst: scala.collection.immutable.Map[String, Type],
     methodSubst: scala.collection.immutable.Map[String, Type]
   ): Term = {
-    val castType = TypeSubst(method.returnType, classSubst, methodSubst)
+    val castType = TypeSubst.result(method.returnType, classSubst, methodSubst)
     call match {
       case _: SafeCall | _: SafeFieldAccess =>
         // Safe navigation yields null when the target is null: keep the

@@ -142,7 +142,7 @@ private[compiler] final class MethodCallFallbackSupport(
       finalProcessedParams <- calls.prepareCallParams(node, node.args, method, finalParams, finalExpectedArgs)
     } yield {
       val call = new Call(target, method, finalProcessedParams)
-      val castType = TypeSubst(method.returnType, classSubst, finalMethodSubst)
+      val castType = TypeSubst.result(method.returnType, classSubst, finalMethodSubst)
       TypeSubst.withCast(call, castType)
     }
   }

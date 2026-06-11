@@ -2,7 +2,7 @@ package onion.compiler.typing
 
 import onion.compiler.AST
 import onion.compiler.LocalContext
-import onion.compiler.TypedAST.{NullableType, Type}
+import onion.compiler.TypedAST.{Nullability, NullableType, Type, TypeVariableType}
 
 /**
  * Type narrowing analysis for smart casts in if-expressions.
@@ -92,6 +92,14 @@ private[typing] object TypeNarrowingAnalysis {
             NarrowingInfo(Map(name -> nullableType.innerType), Map.empty)
           } else {
             NarrowingInfo(Map.empty, Map(name -> nullableType.innerType))
+          }
+        // A nullable type variable narrows to its non-null view, which
+        // permits dereferencing inside the checked branch
+        case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
+          if (positive) {
+            NarrowingInfo(Map(name -> tv.nonNullView), Map.empty)
+          } else {
+            NarrowingInfo(Map.empty, Map(name -> tv.nonNullView))
           }
         case _ => NarrowingInfo.empty
       }

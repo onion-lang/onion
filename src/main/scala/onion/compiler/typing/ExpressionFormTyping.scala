@@ -36,7 +36,24 @@ final class ExpressionFormTyping(
       result <- if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
         bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
         None
-      } else Some(new BinaryTerm(ELVIS, left.`type`, left, right))
+      } else {
+        // When the fallback can't be null, the whole expression can't be
+        // null either: T? ?: T yields T, and a nullable type variable
+        // yields its non-null view
+        def definitelyNonNull(t: Type): Boolean = t match {
+          case _: NullableType => false
+          case t if t.isNullType => false
+          case tv: TypeVariableType => tv.nullability == Nullability.NonNull
+          case _ => true
+        }
+        val resultType = left.`type` match {
+          case n: NullableType if definitelyNonNull(right.`type`) => n.innerType
+          case tv: TypeVariableType if tv.nullability == Nullability.Nullable && definitelyNonNull(right.`type`) =>
+            tv.nonNullView
+          case t => t
+        }
+        Some(new BinaryTerm(ELVIS, resultType, left, right))
+      }
     } yield result
 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =

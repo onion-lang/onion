@@ -345,6 +345,7 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong (Java/Scala style) | Correct (Onion) |
 |--------------------------|-----------------|
 | `public ClassName() { }` | `def this { }` - constructor uses `def this` |
+| `class Point(val x: Int, val y: Int)` | ✓ correct - primary constructor; val/var params become public fields, plain params feed `: Super(args)` |
 | `public ClassName(x: Int) { }` | `def this(x: Int) { }` - with params |
 | `catch (e: Exception) { }` | `catch e: Exception { }` - no parentheses |
 | `public void method()` | `public: def method(): void` - section-based access |

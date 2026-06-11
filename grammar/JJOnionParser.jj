@@ -978,12 +978,58 @@ AST.ClassDeclaration class_decl(int mset) : {
   ArrayBuffer<AST.TypeNode> ty2s = new ArrayBuffer<AST.TypeNode>();
   ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
+  java.util.ArrayList<AST.Argument> primaryParams = null;
+  java.util.ArrayList<Integer> primaryKinds = null; // 0=plain, 1=val, 2=var
+  List<AST.Expression> superArgs = null;
+  Token pk; AST.Argument pa; int kind;
 }{
-  t1="class" t2=id() [tparams=type_params()] [":" ty1=type()]
-  ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*] "{"
+  t1="class" t2=id() [tparams=type_params()]
+  [ "(" {primaryParams = new java.util.ArrayList<AST.Argument>(); primaryKinds = new java.util.ArrayList<Integer>();}
+    [ {kind = 0;} [ (pk="val" {kind = 1;} | pk="var" {kind = 2;}) ] pa=argument() {primaryParams.add(pa); primaryKinds.add(kind);}
+      ("," {kind = 0;} [ (pk="val" {kind = 1;} | pk="var" {kind = 2;}) ] pa=argument() {primaryParams.add(pa); primaryKinds.add(kind);})*
+    ] ")" ]
+  [":" ty1=type() [LOOKAHEAD(2) "(" superArgs=terms() ")"]]
+  ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*]
+  ( "{"
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
-  "}" [";"] {
+    "}" [";"]
+  | ";"   // body-less: class Dog(name: String, val breed: String) : Animal(name);
+  | LOOKAHEAD({getToken(1).kind != LBRACE}) {}
+  ) {
+    if (sec3 == null) { sec3 = option(sec1); }
+    if (primaryParams == null && superArgs != null) {
+      // class A : B(args) { } without primary params: synthesize the
+      // no-arg constructor delegating to super(args)
+      primaryParams = new java.util.ArrayList<AST.Argument>();
+      primaryKinds = new java.util.ArrayList<Integer>();
+    }
+    if (primaryParams != null) {
+      // Primary constructor sugar: val/var params become public fields with
+      // an auto-generated constructor assigning them; plain params are
+      // constructor-only (usable for super arguments)
+      ArrayBuffer<AST.MemberDeclaration> members = new ArrayBuffer<AST.MemberDeclaration>();
+      ArrayBuffer<AST.BlockElement> assigns = new ArrayBuffer<AST.BlockElement>();
+      ArrayBuffer<AST.Argument> ctorArgs = new ArrayBuffer<AST.Argument>();
+      for (int i = 0; i < primaryParams.size(); i++) {
+        AST.Argument param = primaryParams.get(i);
+        int k = primaryKinds.get(i);
+        append(ctorArgs, param);
+        if (k != 0) {
+          int fieldMods = (k == 1) ? AST.M_FINAL() : 0;
+          append(members, new AST.FieldDeclaration(param.location(), fieldMods, param.name(), param.typeRef(), null));
+          append(assigns, new AST.Assignment(param.location(),
+            new AST.MemberSelection(param.location(), new AST.CurrentInstance(param.location()), param.name()),
+            new AST.Id(param.location(), param.name())));
+        }
+      }
+      List<AST.Expression> superInits = superArgs != null ? superArgs : (List<AST.Expression>)AST.NIL();
+      append(members, new AST.ConstructorDeclaration(
+        p(t1), 0, toList(ctorArgs), superInits,
+        new AST.BlockExpression(p(t1), toList(assigns))
+      ));
+      append(sec2s, new AST.AccessSection(p(t1), AST.M_PUBLIC(), toList(members)));
+    }
     return new AST.ClassDeclaration(
       p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams
     );

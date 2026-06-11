@@ -32,6 +32,32 @@ val person: Person = new Person("Alice", 30)
 IO::println(person.greet())  // "Hello, I'm Alice"
 ```
 
+## Primary Constructors
+
+The concise way to declare a class: parameters after the class name form
+the primary constructor. `val`/`var` parameters become public fields
+(final/mutable) assigned automatically; plain parameters exist only in
+the constructor (useful for superclass arguments). Defaults and named
+arguments work like everywhere else.
+
+```onion
+class Point(val x: Int, val y: Int) {
+public:
+  def dist(): Int { return this.x * this.x + this.y * this.y }
+}
+
+class Conf(val host: String = "localhost", var port: Int = 8080)
+
+class Animal(val name: String)
+class Dog(name: String, val breed: String) : Animal(name)   // body-less is fine
+
+val p = new Point(3, 4)        // p.x, p.y readable; p.x = 9 is an error (val)
+val c = new Conf(port = 9090)  // host defaults to "localhost"
+```
+
+`def this(...)` constructors remain available for classes that need
+explicit bodies or multiple overloads.
+
 ## Fields
 
 ### Instance Fields

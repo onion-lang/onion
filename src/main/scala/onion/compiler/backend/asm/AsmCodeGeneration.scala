@@ -100,6 +100,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     
     val access = if classDef.isInterface then
       toAsmModifier(classModifier) | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT
+    else if Modifier.isEnum(classDef.modifier) then
+      // java.lang.Enum.valueOf insists on the ACC_ENUM class flag
+      toAsmModifier(classModifier) | Opcodes.ACC_SUPER | Opcodes.ACC_ENUM
     else
       toAsmModifier(classModifier) | Opcodes.ACC_SUPER
       
@@ -115,9 +118,12 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     cw.visit(Opcodes.V17, access, name, null, superName, interfaces)
     cw.visitSource(sourceFileName(classDef), null)
 
-    // Generate fields
+    // Generate fields (enum constants carry ACC_ENUM)
+    val classIsEnum = Modifier.isEnum(classDef.modifier)
     for field <- classDef.fields do
-      val fieldAccess = toAsmModifier(field.modifier)
+      var fieldAccess = toAsmModifier(field.modifier)
+      if classIsEnum && Modifier.isStatic(field.modifier) && field.`type`.name == classDef.name then
+        fieldAccess |= Opcodes.ACC_ENUM
       val fieldType = asmType(field.`type`)
       cw.visitField(fieldAccess, field.name, fieldType.getDescriptor, null, null)
     
@@ -127,11 +133,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         val ctor = ctorRef.asInstanceOf[ConstructorDefinition]
         codeConstructor(cw, ctor, name)
 
+    // Enum constant initialization arrives as ordinary static-initializer
+    // statements from typing (FIELD = new EnumType(name, ordinal, args...))
     val staticInitializers = classDef.staticInitializers
-    // Generate static initializer for enums
-    if Modifier.isEnum(classDef.modifier) then
-      codeEnumClinit(cw, classDef, name, staticInitializers)
-    else if staticInitializers.nonEmpty then
+    if staticInitializers.nonEmpty then
       codeStaticInitializer(cw, name, staticInitializers)
 
     // Generate methods. An interface method with a body is a JVM default
@@ -204,40 +209,32 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     gen.returnValue()
     gen.endMethod()
 
-  private def codeEnumClinit(
-    cw: ClassWriter,
-    classDef: ClassDefinition,
-    className: String,
-    staticInitializers: Array[ActionStatement]
-  ): Unit =
-    // Generate static initializer for enum
-    val gen = MethodEmitter.newGenerator(cw, Opcodes.ACC_STATIC, "<clinit>", AsmType.VOID_TYPE, Array.empty)
+  /** values(): build a fresh array of the enum constants. */
+  private def emitEnumValues(gen: GeneratorAdapter, className: String, classDef: ClassDefinition): Unit =
     val enumType = AsmUtil.objectType(className)
-    val stringType = AsmType.getType("Ljava/lang/String;")
-
-    // Get enum constants (static final fields of the enum type)
-    val enumFields = classDef.fields.filter { field =>
+    val constants = classDef.fields.filter { field =>
       Modifier.isStatic(field.modifier) && Modifier.isFinal(field.modifier) &&
       field.`type`.name == classDef.name
     }
-
-    // Initialize each enum constant
-    enumFields.zipWithIndex.foreach { case (field, ordinal) =>
-      // new EnumType(name, ordinal)
-      gen.newInstance(enumType)
+    gen.push(constants.length)
+    gen.newArray(enumType)
+    constants.zipWithIndex.foreach { case (field, i) =>
       gen.dup()
-      gen.push(field.name)  // name
-      gen.push(ordinal)     // ordinal
-      gen.invokeConstructor(enumType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, stringType, AsmType.INT_TYPE)))
-      gen.putStatic(enumType, field.name, enumType)
+      gen.push(i)
+      gen.getStatic(enumType, field.name, enumType)
+      gen.arrayStore(enumType)
     }
 
-    if staticInitializers.nonEmpty then
-      val localVars = new LocalVarContext(gen).withParameters(true, Array.empty)
-      emitStatementsWithContext(gen, staticInitializers, className, localVars)
-
-    gen.returnValue()
-    gen.endMethod()
+  /** valueOf(String): delegate to java.lang.Enum.valueOf with the class constant. */
+  private def emitEnumValueOf(gen: GeneratorAdapter, className: String): Unit =
+    val enumType = AsmUtil.objectType(className)
+    gen.push(enumType)
+    gen.loadArg(0)
+    gen.invokeStatic(
+      AsmType.getType(classOf[java.lang.Enum[?]]),
+      AsmMethod.getMethod("Enum valueOf(Class, String)")
+    )
+    gen.checkCast(enumType)
 
   private def codeStaticInitializer(
     cw: ClassWriter,
@@ -309,8 +306,18 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // Check for synthetic record methods (equals, hashCode, toString, copy)
     val isSyntheticRecord = Modifier.isSyntheticRecord(node.modifier)
 
+    // Synthetic enum helpers: values() and valueOf(String) have no block
+    val enumClassDef = node.classType match
+      case cd: ClassDefinition if Modifier.isEnum(cd.modifier) => cd
+      case _ => null
+    val isEnumHelper = node.block == null && isStatic && enumClassDef != null &&
+                       (node.name == "values" || node.name == "valueOf")
+
     if node.block != null then
       emitStatementsWithContext(gen, node.block.statements, className, localVars)
+    else if isEnumHelper then
+      if node.name == "values" then emitEnumValues(gen, className, enumClassDef)
+      else emitEnumValueOf(gen, className)
     else if isSyntheticRecord then
       // Generate synthetic record method bytecode
       node.classType match
@@ -328,7 +335,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       gen.loadThis()
       gen.getField(AsmUtil.objectType(className), node.name, returnType)
 
-    if !isSyntheticGetter && !isSyntheticRecord then
+    if !isSyntheticGetter && !isSyntheticRecord && !isEnumHelper then
       val needsDefault = node.block == null || !hasReturn(node.block.statements)
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else

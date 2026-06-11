@@ -1028,9 +1028,10 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
 AST.EnumDeclaration enum_decl(int mset) : {
   Token start, name;
   AST.EnumConstant constant;
+  List<AST.Argument> params = (List<AST.Argument>)AST.NIL();
   ArrayBuffer<AST.EnumConstant> constants = new ArrayBuffer<AST.EnumConstant>();
 }{
-  start = "enum" name = id() "{"
+  start = "enum" name = id() ["(" params = args() ")"] "{"
     constant = enum_constant() {append(constants, constant);}
     (
       LOOKAHEAD({la(",") && !la2("}")})
@@ -1039,7 +1040,7 @@ AST.EnumDeclaration enum_decl(int mset) : {
     [LOOKAHEAD({la(",") && la2("}")}) "," ] // trailing comma allowed when followed by }
   "}" [";"] {
     return new AST.EnumDeclaration(
-      p(start), mset, c(name), toList(constants)
+      p(start), mset, c(name), params, toList(constants)
     );
   }
 }

@@ -403,6 +403,7 @@ These are frequently confused with other languages. **Always check these:**
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
+| `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
 
 ### Lambdas & Functions
 

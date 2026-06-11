@@ -275,3 +275,25 @@ p.copy(5, 6)                // positional copy
 
 Records work with `select` pattern matching when combined with sealed
 interfaces.
+
+## Enums
+
+Enums compile to standard JVM enums. Constants get `name()` / `ordinal()`;
+`values()` and `valueOf(String)` work as in Java. Record-style parameters
+make data-carrying enums: each parameter becomes a final field with an
+accessor, and constants pass constructor arguments.
+
+```onion
+enum Color { RED, GREEN, BLUE }
+
+enum Planet(mass: Double) {
+  MERCURY(3.3e23),
+  EARTH(5.97e24)
+}
+
+IO::println("" + Planet::EARTH.mass())
+foreach p: Planet in Planet::values() {
+  IO::println(p.name() + " = " + p.mass())
+}
+Planet::valueOf("EARTH")     // works with java.lang.Enum.valueOf
+```

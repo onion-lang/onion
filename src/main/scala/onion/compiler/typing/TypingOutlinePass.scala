@@ -217,11 +217,6 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     unitContext.currentDefinition = definition
-    // Constructor arguments on enum constants parse but have no lowering yet;
-    // reject them instead of silently dropping the values.
-    for (constant <- node.constants if constant.args.nonEmpty) {
-      report(SemanticError.ENUM_CONSTANT_ARGS_UNSUPPORTED, constant, constant.name)
-    }
     find(definition.name).foreach(unitContext.currentMapper = _)
 
     // Enum extends java.lang.Enum<E>
@@ -229,11 +224,22 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setInterfaces(Array.empty)
     definition_.setResolutionComplete(true)
 
+    val paramTypes: Array[Type] = typesOf(node.params).map(_.toArray).getOrElse(Array.empty)
+
     // Create static final fields for each enum constant
     node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
       val fieldModifier = Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL
       val field = new FieldDefinition(constant.location, fieldModifier, definition_, constant.name, definition_)
       definition_.add(field)
+    }
+
+    // Record-style parameters become private final fields with public
+    // accessors (the synthetic-getter codegen path emits the bodies)
+    node.params.zip(paramTypes).foreach { case (param, paramType) =>
+      val field = new FieldDefinition(node.location, Modifier.PRIVATE | Modifier.FINAL, definition_, param.name, paramType)
+      definition_.add(field)
+      val getter = new MethodDefinition(node.location, Modifier.PUBLIC, definition_, param.name, Array.empty, paramType, null)
+      definition_.add(getter)
     }
 
     // Create values() static method that returns array of all constants
@@ -253,11 +259,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     )
     definition_.add(valueOfMethod)
 
-    // Create private constructor(String name, int ordinal)
-    // The constructor calls super(name, ordinal) on java.lang.Enum
+    // Create private constructor(String name, int ordinal, params...)
+    // The constructor calls super(name, ordinal) on java.lang.Enum and
+    // stores each parameter into its field
     val ctorModifier = Modifier.PRIVATE
     locally {
-      val ctorArgs = Array[Type](stringType, BasicType.INT)
+      val ctorArgs = Array[Type](stringType, BasicType.INT) ++ paramTypes
       // Create super initializer that passes both parameters to Enum constructor
       val superArgs = Array[Type](stringType, BasicType.INT)
       // Reference to constructor parameters (index 0 = name, index 1 = ordinal)
@@ -266,7 +273,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         new RefLocal(new ClosureLocalBinding(0, 1, BasicType.INT, false))
       )
       val superInit = new TypedAST.Super(definition_.superClass, superArgs, superTerms)
-      val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, ctorArgs, null, superInit)
+      val fieldStores: Array[ActionStatement] = node.params.zip(paramTypes).zipWithIndex.map { case ((param, paramType), i) =>
+        val field = definition_.field(param.name)
+        val paramRef = new RefLocal(new ClosureLocalBinding(0, i + 2, paramType, false))
+        new ExpressionActionStatement(new SetField(new This(definition_), field, paramRef)): ActionStatement
+      }.toArray
+      val block = if (fieldStores.isEmpty) null else new StatementBlock(fieldStores.toIndexedSeq*)
+      val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, ctorArgs, block, superInit)
       definition_.add(ctor)
     }
   }

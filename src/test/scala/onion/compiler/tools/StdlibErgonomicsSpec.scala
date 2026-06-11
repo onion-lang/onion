@@ -27,7 +27,7 @@ class StdlibErgonomicsSpec extends AbstractShellSpec {
   }
 
   describe("Enum constant arguments") {
-    it("rejects constructor arguments on enum constants with a clear error") {
+    it("rejects constant arguments when the enum declares no parameters") {
       val result = shell.run(
         """
           |enum Planet { MERCURY(1.0), EARTH(2.0) }

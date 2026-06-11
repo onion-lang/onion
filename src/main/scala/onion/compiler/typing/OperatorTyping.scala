@@ -247,6 +247,21 @@ final class OperatorTyping(
       } else Some(new UnaryTerm(kind, term.`type`, term))
     }
 
+  /** ~x — integral operands only; byte/short/char promote to int like Java. */
+  def typeUnaryIntegral(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
+    typed(node.term, context).flatMap { termRaw =>
+      val term = Boxing.tryUnboxToNumeric(bodyContext.table, termRaw, numericTypes.contains)
+      term.`type` match {
+        case BasicType.INT | BasicType.LONG =>
+          Some(new UnaryTerm(kind, term.`type`, term))
+        case BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
+          Some(new UnaryTerm(kind, BasicType.INT, new AsInstanceOf(term, BasicType.INT)))
+        case other =>
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, symbol, Array[Type](other))
+          None
+      }
+    }
+
   def typeUnaryBoolean(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     typed(node.term, context).flatMap { termRaw =>
       val term = Boxing.tryUnboxToBoolean(bodyContext.table, termRaw)

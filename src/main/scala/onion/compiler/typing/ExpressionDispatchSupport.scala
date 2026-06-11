@@ -84,6 +84,8 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.typeNewObject(node, context)
       case node@AST.Not(_, _) =>
         body.typeUnaryBoolean(node, "!", NOT, context)
+      case node@AST.BitNot(_, _) =>
+        body.typeUnaryIntegral(node, "~", BIT_NOT, context)
       case node@AST.Posit(_, _) =>
         body.typeUnaryNumeric(node, "+", PLUS, context)
       case node@AST.PostDecrement(_, _) =>

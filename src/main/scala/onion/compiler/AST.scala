@@ -160,6 +160,7 @@ object AST {
   case class PostDecrement(location: Location, term: Expression) extends UnaryExpression("--")
   case class PostIncrement(location: Location, term: Expression) extends UnaryExpression("++")
   case class NotNullAssertion(location: Location, term: Expression) extends UnaryExpression("!!")
+  case class BitNot(location: Location, term: Expression) extends UnaryExpression("~")
   case class ReferenceEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("===")
   case class ReferenceNotEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("!==")
   case class UnqualifiedFieldReference(location: Location, name: String) extends Expression

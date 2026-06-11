@@ -1680,6 +1680,7 @@ AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 ( t="+" e=unary_prefix() {e = new AST.Posit(p(t), e);}
 | t="-" e=unary_prefix() {e = new AST.Negate(p(t), e);}
 | t="!" e=unary_prefix() {e = new AST.Not(p(t), e);}
+| t=<BN> e=unary_prefix() {e = new AST.BitNot(p(t), e);}
 | e=multitive()
 ) {return e;}
 }

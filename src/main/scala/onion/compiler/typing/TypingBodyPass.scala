@@ -262,6 +262,9 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeComparableBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeComparableBinary(node, kind, context)
 
+  def typeUnaryIntegral(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
+    operatorTyping.typeUnaryIntegral(node, symbol, kind, context)
+
   def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =
     operatorTyping.typeUnaryNumeric(node, symbol, kind, context)
 

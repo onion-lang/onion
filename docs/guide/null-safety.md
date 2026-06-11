@@ -177,3 +177,17 @@ Substring: hel
 - [Control Flow](control-flow.md) - if, while, for, select
 - [Functions](functions.md) - Function definitions and lambdas
 - [Variables and Types](variables-and-types.md) - Type system overview
+
+## Null Literal Checking (W0012)
+
+Assigning the `null` literal to a non-nullable type warns:
+
+```onion
+val s: String = null     // W0012: declare as String? or avoid null
+val ok: String? = null   // fine
+```
+
+The warning covers declarations, assignments, arguments and returns.
+Promote it to an error with `--warn error`, or suppress it with
+`--Wno null-to-non-nullable`. Values coming from Java APIs are not
+checked (their nullness is unknown to the compiler).

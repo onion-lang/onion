@@ -102,7 +102,19 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
     declarationBodySupport.processClassDeclaration(node)
   }
-  def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit = { () }
+  def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit =
+    // Default methods (interface methods with bodies) get typed like
+    // instance methods; signature-only declarations have nothing to do
+    if (node.methods.exists(_.block != null)) {
+      typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+        unitContext.currentDefinition = definition
+        typing.find(definition.name).foreach(unitContext.currentMapper = _)
+        val interfaceTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(typing.emptyTypeParams ++ interfaceTypeParams) {
+          node.methods.foreach(processMethodDeclaration)
+        }
+      }
+    }
   def processEnumDeclaration(node: AST.EnumDeclaration, context: LocalContext): Unit = { () }
 
   def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =

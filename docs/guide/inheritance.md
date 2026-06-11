@@ -108,6 +108,28 @@ class Person <: Comparable {
 }
 ```
 
+### Default Methods
+
+An interface method with a body compiles to a JVM default method:
+implementing classes inherit it, may override it, and dispatch stays
+virtual through the interface type. Expression bodies work too.
+
+```onion
+interface Greeter {
+  def name(): String
+  def greet(): String { return "Hello, " + this.name() }
+  def shout(): String = "HEY " + this.name()
+}
+
+class K <: Greeter {
+public:
+  def this {}
+  def name(): String { return "kota" }
+}
+
+IO::println(new K().greet())   // Hello, kota — no override needed
+```
+
 ### Multiple Interfaces
 
 Implement multiple interfaces with a comma-separated list:

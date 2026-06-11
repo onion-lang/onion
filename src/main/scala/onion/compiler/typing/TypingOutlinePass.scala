@@ -445,7 +445,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           None
         } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
-        val modifier = AST.M_PUBLIC | AST.M_ABSTRACT
+        // A body makes this a default method (non-abstract)
+        val modifier = if (node.block == null) AST.M_PUBLIC | AST.M_ABSTRACT else AST.M_PUBLIC
         val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
         val method = new MethodDefinition(

@@ -1108,13 +1108,28 @@ AST.MethodDeclaration interface_method_decl() : {
   Token n;
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty  = null;
+  AST.BlockExpression b = null;
+  AST.Expression e = null;
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
 }{
   {enterSection();}
-  "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()] eos() {
-    return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams, throwsTypes);
-  }
+  "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
+  (  {leaveSection();} b=block() {
+       // A body makes this a default method
+       return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, b, tparams, throwsTypes);
+     }
+  |  eos() {
+       return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams, throwsTypes);
+     }
+  |  "=" eols() e=term() eos() {
+       return new AST.MethodDeclaration(
+         p(n), AST.M_PUBLIC(), c(n), args, ty,
+         new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e))),
+         tparams, throwsTypes
+       );
+     }
+  )
 }
 
 AST.TypeNode basic_type() : {

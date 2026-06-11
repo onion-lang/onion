@@ -134,10 +134,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     else if staticInitializers.nonEmpty then
       codeStaticInitializer(cw, name, staticInitializers)
 
-    // Generate methods
+    // Generate methods. An interface method with a body is a JVM default
+    // method: emitted with code and without ACC_ABSTRACT.
     for method <- classDef.methods do
       val methodDef = method.asInstanceOf[MethodDefinition]
-      if classDef.isInterface || Modifier.isAbstract(methodDef.modifier) then
+      if Modifier.isAbstract(methodDef.modifier) || (classDef.isInterface && methodDef.getBlock == null) then
         codeInterfaceMethod(cw, methodDef, name)
       else
         codeMethod(cw, methodDef, name)

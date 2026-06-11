@@ -398,7 +398,8 @@ class TailCallOptimization(config: CompilerConfig)
       case loop: ConditionalLoop =>
         val rewrittenCond = rewriteTermRefs(loop.condition, loopVarMapping)
         val rewrittenStmt = rewriteStatementRefs(loop.stmt, loopVarMapping)
-        new ConditionalLoop(loop.location, rewrittenCond, rewrittenStmt, loop.isPostTest)
+        val rewrittenUpdate = if (loop.update == null) null else rewriteStatementRefs(loop.update, loopVarMapping)
+        new ConditionalLoop(loop.location, rewrittenCond, rewrittenStmt, loop.isPostTest, loop.label, rewrittenUpdate)
 
       case _ =>
         // For other statement types, return as-is

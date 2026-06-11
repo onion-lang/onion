@@ -300,11 +300,11 @@ public class ASTBuilderAdapter {
     }
     
     public AST.BreakExpression createBreak(Location location) {
-        return new AST.BreakExpression(location);
+        return new AST.BreakExpression(location, null);
     }
     
     public AST.ContinueExpression createContinue(Location location) {
-        return new AST.ContinueExpression(location);
+        return new AST.ContinueExpression(location, null);
     }
     
     public AST.IfExpression createIf(

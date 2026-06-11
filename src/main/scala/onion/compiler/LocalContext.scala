@@ -123,6 +123,17 @@ class LocalContext {
 
   def openScope[A](body: => A): A = contextFrame.open(body)
 
+  private var labelStack: List[String] = Nil
+
+  /** Registers a loop label for the dynamic extent of its translation. */
+  def openLabeledLoop[A](name: String)(body: => A): A = {
+    labelStack = name :: labelStack
+    try body
+    finally labelStack = labelStack.tail
+  }
+
+  def hasLabel(name: String): Boolean = labelStack.contains(name)
+
   def openLoop[A](body: => A): A = {
     loopDepth += 1
     try body

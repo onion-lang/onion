@@ -17,12 +17,14 @@ final class ControlFlowEmitter(
       visitStatement(stmt)
 
   def emitBreak(node: Break): Unit =
-    loops.currentEnd match
+    val target = if (node.label != null) loops.endOf(node.label) else loops.currentEnd
+    target match
       case Some(label) => gen.goTo(label)
       case None => throw new RuntimeException("Break statement outside of loop")
 
   def emitContinue(node: Continue): Unit =
-    loops.currentStart match
+    val target = if (node.label != null) loops.startOf(node.label) else loops.currentStart
+    target match
       case Some(label) => gen.goTo(label)
       case None => throw new RuntimeException("Continue statement outside of loop")
 
@@ -56,7 +58,7 @@ final class ControlFlowEmitter(
       val bodyLabel = gen.newLabel()
       val condLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(condLabel, endLabel)
+      loops.push(node.label, condLabel, endLabel)
       try
         gen.visitLabel(bodyLabel)
         visitStatement(node.stmt)
@@ -66,10 +68,27 @@ final class ControlFlowEmitter(
         gen.visitLabel(endLabel)
       finally
         loops.pop()
+    else if node.update != null then
+      // for loop: continue runs the update before re-testing the condition
+      val condLabel = gen.newLabel()
+      val continueLabel = gen.newLabel()
+      val endLabel = gen.newLabel()
+      loops.push(node.label, continueLabel, endLabel)
+      try
+        gen.visitLabel(condLabel)
+        visitTerm(node.condition)
+        gen.visitJumpInsn(Opcodes.IFEQ, endLabel)
+        visitStatement(node.stmt)
+        gen.visitLabel(continueLabel)
+        visitStatement(node.update)
+        gen.visitJumpInsn(Opcodes.GOTO, condLabel)
+        gen.visitLabel(endLabel)
+      finally
+        loops.pop()
     else
       val startLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(startLabel, endLabel)
+      loops.push(node.label, startLabel, endLabel)
       try
         gen.visitLabel(startLabel)
         visitTerm(node.condition)

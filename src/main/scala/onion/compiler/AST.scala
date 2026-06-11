@@ -214,8 +214,10 @@ object AST {
   case class ForInitEmpty(location: Location) extends ForInitializer
 
   case class BlockExpression(location: Location, elements: List[BlockElement]) extends Expression
-  case class BreakExpression(location: Location) extends Expression
-  case class ContinueExpression(location: Location) extends Expression
+  case class BreakExpression(location: Location, label: String = null) extends Expression
+  case class ContinueExpression(location: Location, label: String = null) extends Expression
+  /** label: while/for/foreach/do — target for labeled break/continue */
+  case class LabeledLoop(location: Location, name: String, loop: Expression) extends Expression
   case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends Expression
   case class ForExpression(location: Location, init: ForInitializer, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends Expression
   case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends Expression

@@ -207,6 +207,7 @@ private[compiler] object CapturedVariableCollector {
       case loop: ConditionalLoop =>
         visitTerm(loop.condition)
         visitStatement(loop.stmt)
+        if loop.update != null then visitStatement(loop.update)
 
       case ret: Return =>
         if ret.term != null then visitTerm(ret.term)

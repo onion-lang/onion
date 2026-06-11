@@ -62,15 +62,25 @@ final class BlockElementLowering(
       if (!context.inLoop) {
         bodyContext.report(BREAK_OUTSIDE_LOOP, node)
         new NOP(node.location)
+      } else if (node.label != null && !context.hasLabel(node.label)) {
+        bodyContext.report(LABEL_NOT_FOUND, node, node.label)
+        new NOP(node.location)
       } else {
-        new Break(node.location)
+        new Break(node.location, node.label)
       }
     case node: AST.ContinueExpression =>
       if (!context.inLoop) {
         bodyContext.report(CONTINUE_OUTSIDE_LOOP, node)
         new NOP(node.location)
+      } else if (node.label != null && !context.hasLabel(node.label)) {
+        bodyContext.report(LABEL_NOT_FOUND, node, node.label)
+        new NOP(node.location)
       } else {
-        new Continue(node.location)
+        new Continue(node.location, node.label)
+      }
+    case node: AST.LabeledLoop =>
+      context.openLabeledLoop(node.name) {
+        attachLoopLabel(translate(node.loop, context), node.name)
       }
     case node: AST.ForeachExpression =>
       context.openScope {
@@ -144,11 +154,14 @@ final class BlockElementLowering(
           if (cond != null) cond else new BoolValue(node.location, true)
         }.getOrElse(new BoolValue(node.location, true))
         val update = Option(node.update).flatMap(update => typed(update, context)).getOrElse(null)
-        var loop = context.openLoop {
+        val loop = context.openLoop {
           translate(node.block, context)
         }
-        if (update != null) loop = new StatementBlock(loop, new ExpressionActionStatement(update))
-        new StatementBlock(init.location, init, new ConditionalLoop(condition, loop))
+        // The update is the continue target, not part of the body: continue
+        // must run it before re-testing the condition (otherwise a for-loop
+        // continue skips the increment and loops forever)
+        val updateStmt = if (update != null) new ExpressionActionStatement(update) else null
+        new StatementBlock(init.location, init, new ConditionalLoop(node.location, condition, loop, isPostTest = false, label = null, update = updateStmt))
       }
     case node: AST.IfExpression =>
       context.openScope {
@@ -378,6 +391,20 @@ final class BlockElementLowering(
 
   private def ref(bind: ClosureLocalBinding): Term =
     new RefLocal(bind)
+
+  /**
+   * Attaches a label to the loop produced by translating a labeled
+   * statement. for/foreach lower to a block whose last statement is the
+   * loop, so the search recurses into trailing positions.
+   */
+  private def attachLoopLabel(stmt: ActionStatement, name: String): ActionStatement = stmt match {
+    case loop: ConditionalLoop =>
+      new ConditionalLoop(loop.location, loop.condition, loop.stmt, loop.isPostTest, name, loop.update)
+    case block: StatementBlock if block.statements.nonEmpty =>
+      val relabeled = block.statements.dropRight(1) :+ attachLoopLabel(block.statements.last, name)
+      new StatementBlock(relabeled.toIndexedSeq*)
+    case other => other
+  }
 
   private def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
     case stmtTerm: StatementTerm => stmtTerm.statement

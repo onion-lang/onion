@@ -5,22 +5,26 @@ import org.objectweb.asm.Label
 import scala.collection.mutable
 
 /**
-  * Tracks loop start/end labels for break/continue handling.
+  * Tracks loop start/end labels (optionally named, for labeled
+  * break/continue) for break/continue handling.
   */
 final class LoopContext {
-  private val starts = mutable.Stack[Label]()
-  private val ends = mutable.Stack[Label]()
+  private case class Entry(name: String, start: Label, end: Label)
+  private val entries = mutable.Stack[Entry]()
 
-  def currentStart: Option[Label] = starts.headOption
-  def currentEnd: Option[Label] = ends.headOption
+  def currentStart: Option[Label] = entries.headOption.map(_.start)
+  def currentEnd: Option[Label] = entries.headOption.map(_.end)
 
-  def push(start: Label, end: Label): Unit = {
-    starts.push(start)
-    ends.push(end)
+  def startOf(name: String): Option[Label] = entries.find(_.name == name).map(_.start)
+  def endOf(name: String): Option[Label] = entries.find(_.name == name).map(_.end)
+
+  def push(start: Label, end: Label): Unit = push(null, start, end)
+
+  def push(name: String, start: Label, end: Label): Unit = {
+    entries.push(Entry(name, start, end))
   }
 
   def pop(): Unit = {
-    starts.pop()
-    ends.pop()
+    entries.pop()
   }
 }

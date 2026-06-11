@@ -213,7 +213,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case doExpr: AST.DoExpression => desugarDoExpression(doExpr)
     case AST.RetStatement(loc, e) => AST.RetStatement(loc, rewriteExpression(e))
     case b: AST.BlockExpression => rewriteBlockExpression(b)
-    case AST.BreakExpression(_) | AST.ContinueExpression(_) => expr
+    case _: AST.BreakExpression | _: AST.ContinueExpression => expr
     case AST.ForeachExpression(loc, arg, collection, statement) =>
       AST.ForeachExpression(loc, arg, rewriteExpression(collection), rewriteBlockExpression(statement))
     case AST.ForExpression(loc, init, condition, update, block) =>
@@ -245,6 +245,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.WhileExpression(loc, rewriteExpression(condition), rewriteBlockExpression(block))
     case AST.DoWhileExpression(loc, block, condition) =>
       AST.DoWhileExpression(loc, rewriteBlockExpression(block), rewriteExpression(condition))
+    case AST.LabeledLoop(loc, name, loop) =>
+      AST.LabeledLoop(loc, name, rewriteExpression(loop))
 
     // Binary expressions
     case AST.Addition(loc, lhs, rhs) => AST.Addition(loc, rewriteExpression(lhs), rewriteExpression(rhs))

@@ -359,6 +359,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.typeParameterMayBeNull",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.LABEL_NOT_FOUND -> ErrorDef(
+      "error.semantic.labelNotFound",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

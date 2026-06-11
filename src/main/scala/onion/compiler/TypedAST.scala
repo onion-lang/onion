@@ -219,7 +219,7 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class Break(location: Location) extends ActionStatement(location) {
+  class Break(location: Location, val label: String = null) extends ActionStatement(location) {
     def this() = {
       this(null)
     }
@@ -487,7 +487,7 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class Continue(location: Location) extends TypedAST.ActionStatement(location) {
+  class Continue(location: Location, val label: String = null) extends TypedAST.ActionStatement(location) {
     def this() = {
       this(null)
     }
@@ -703,7 +703,7 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class ConditionalLoop(location: Location, val condition: TypedAST.Term, val stmt: TypedAST.ActionStatement, val isPostTest: Boolean = false) extends ActionStatement(location) {
+  class ConditionalLoop(location: Location, val condition: TypedAST.Term, val stmt: TypedAST.ActionStatement, val isPostTest: Boolean = false, val label: String = null, val update: TypedAST.ActionStatement = null) extends ActionStatement(location) {
     def this(condition: TypedAST.Term, stmt: TypedAST.ActionStatement) = {
       this(null, condition, stmt)
     }

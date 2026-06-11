@@ -1359,8 +1359,15 @@ AST.FieldDeclaration field_decl(int modifiers):{
   }
 }
 
-AST.BlockElement block_element():{AST.BlockElement s;}{
-  s=local_var_declaration()  {return s;}
+AST.BlockElement block_element():{AST.BlockElement s; Token lbl; AST.Expression lp;}{
+  LOOKAHEAD({getToken(1).kind == ID && getToken(2).image.equals(":") &&
+             (getToken(3).image.equals("while") || getToken(3).image.equals("for")
+              || getToken(3).image.equals("foreach") || getToken(3).image.equals("do"))})
+  lbl=id() ":" ( lp=while_expression() | lp=for_expression() | lp=foreach_expression()
+               | LOOKAHEAD("do" "{") lp=do_while_expression() ) {
+    return new AST.LabeledLoop(p(lbl), c(lbl), lp);
+  }
+| s=local_var_declaration()  {return s;}
 | s=if_expression()          {return s;}
 | s=while_expression()       {return s;}
 | s=for_expression()         {return s;}
@@ -1410,22 +1417,30 @@ AST.BlockElement local_var_declaration() :{
   )
 }
 
-AST.BreakExpression terminated_break_expression() :{Token t;}{
+AST.BreakExpression terminated_break_expression() :{Token t, l = null;}{
   {enterSection();}
-  t="break" eos_or_block_end() {return new AST.BreakExpression(p(t));}
+  t="break" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] eos_or_block_end() {
+    return new AST.BreakExpression(p(t), l == null ? null : c(l));
+  }
 }
 
-AST.BreakExpression break_expression() :{Token t;}{
-  t="break" {return new AST.BreakExpression(p(t));}
+AST.BreakExpression break_expression() :{Token t, l = null;}{
+  t="break" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] {
+    return new AST.BreakExpression(p(t), l == null ? null : c(l));
+  }
 }
 
-AST.ContinueExpression terminated_continue_expression() :{Token t; AST.ContinueExpression st;}{
+AST.ContinueExpression terminated_continue_expression() :{Token t, l = null; AST.ContinueExpression st;}{
   {enterSection();}
-  t="continue" eos_or_block_end() {return new AST.ContinueExpression(p(t));}
+  t="continue" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] eos_or_block_end() {
+    return new AST.ContinueExpression(p(t), l == null ? null : c(l));
+  }
 }
 
-AST.ContinueExpression continue_expression() :{Token t; AST.ContinueExpression st;}{
-  t="continue" {return new AST.ContinueExpression(p(t));}
+AST.ContinueExpression continue_expression() :{Token t, l = null; AST.ContinueExpression st;}{
+  t="continue" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] {
+    return new AST.ContinueExpression(p(t), l == null ? null : c(l));
+  }
 }
 
 AST.ThrowExpression terminated_throw_expression() :{Token t; AST.Expression e;}{

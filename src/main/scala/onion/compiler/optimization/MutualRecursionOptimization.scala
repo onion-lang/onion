@@ -759,7 +759,8 @@ class MutualRecursionOptimization(config: CompilerConfig)
         case loop: ConditionalLoop =>
           val rewrittenCond = rewriteTerm(loop.condition)
           val rewrittenStmt = rewriteStatement(loop.stmt)
-          new ConditionalLoop(loop.location, rewrittenCond, rewrittenStmt, loop.isPostTest)
+          val rewrittenUpdate = if (loop.update == null) null else rewriteStatement(loop.update)
+          new ConditionalLoop(loop.location, rewrittenCond, rewrittenStmt, loop.isPostTest, loop.label, rewrittenUpdate)
 
         case _ =>
           stmt

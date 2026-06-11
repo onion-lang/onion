@@ -1335,15 +1335,22 @@ void eos_or_block_end() :{} {
 | LOOKAHEAD("}") { leaveSection(); }
 }
 
-AST.LocalVariableDeclaration local_var_declaration() :{Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;}{
+AST.BlockElement local_var_declaration() :{
+  Token keyword, t; int declMods = 0; AST.TypeNode ty = null; AST.Expression e = null;
+  ArrayBuffer<String> names = new ArrayBuffer<String>();
+}{
   {enterSection();}
   (keyword="val" {declMods = AST.M_FINAL();} | keyword="var" {declMods = 0;})
-  t=id()
-  (
-    ":" ty=type() ["=" eols() e=term()]
-  | "=" eols() e=term()
+  ( LOOKAHEAD("(")
+    "(" t=id() {append(names, c(t));} ("," t=id() {append(names, c(t));})+ ")" "=" eols() e=term()
+    eos_or_block_end() {return new AST.DestructuringDeclaration(p(keyword), declMods, toList(names), e);}
+  | t=id()
+    (
+      ":" ty=type() ["=" eols() e=term()]
+    | "=" eols() e=term()
+    )
+    eos_or_block_end() {return new AST.LocalVariableDeclaration(p(keyword), declMods, c(t), ty, e);}
   )
-  eos_or_block_end() {return new AST.LocalVariableDeclaration(p(keyword), declMods, c(t), ty, e);}
 }
 
 AST.BreakExpression terminated_break_expression() :{Token t;}{
@@ -1514,8 +1521,13 @@ AST.ForeachExpression foreach_expression() :{Token t, k = null, v = null; AST.Ar
   )
 }
 
-AST.ForInitializer for_initializer() :{AST.LocalVariableDeclaration d; AST.Expression e; Token t;}{
-  d=local_var_declaration() { return new AST.ForInitDeclaration(d); }
+AST.ForInitializer for_initializer() :{AST.BlockElement d; AST.Expression e; Token t;}{
+  d=local_var_declaration() {
+    if (d instanceof AST.DestructuringDeclaration) {
+      throw new ParseException("destructuring declarations are not allowed in for initializers");
+    }
+    return new AST.ForInitDeclaration((AST.LocalVariableDeclaration)d);
+  }
 | e=expression_element() { return new AST.ForInitExpression(e); }
 | t=";" { return new AST.ForInitEmpty(p(t)); }
 }

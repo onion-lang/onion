@@ -231,6 +231,20 @@ val age = 30         // Int
 var greeting = "Hi"  // String
 ```
 
+## Destructuring Declarations
+
+`val (a, b) = expr` binds names to the positional components of a record
+(or a `Map.Entry` via getKey/getValue). `var` makes the bindings mutable.
+The initializer is evaluated once; arity mismatches are compile errors.
+
+```onion
+record Point(x: Int, y: Int)
+
+val (a, b) = new Point(1, 2)   // a = 1, b = 2
+var (mx, my) = new Point(7, 8)
+mx = mx + 1
+```
+
 ## Generic Types (Java Generics)
 
 When using Java generic types, specify type parameters with `[]`:

@@ -377,6 +377,7 @@ These are frequently confused with other languages. **Always check these:**
 | `list.size()` | `list.size` - also a property |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
 | `for (k, v) in map` | `foreach (k, v) in map { }` - map entry destructuring |
+| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry); `var (x, y) = ...` for mutable |
 
 ### Literals
 

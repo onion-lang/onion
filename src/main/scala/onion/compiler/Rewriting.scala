@@ -193,6 +193,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteBlockElement(element: AST.BlockElement): AST.BlockElement = element match {
     case AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
       AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, Option(init).map(rewriteExpression).orNull)
+    case AST.DestructuringDeclaration(loc, modifiers, names, init) =>
+      AST.DestructuringDeclaration(loc, modifiers, names, rewriteExpression(init))
     case expr: AST.Expression =>
       rewriteExpression(expr)
   }

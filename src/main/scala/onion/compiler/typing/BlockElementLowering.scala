@@ -217,6 +217,8 @@ final class BlockElementLowering(
         }
         new ExpressionActionStatement(local)
       }
+    case node: AST.DestructuringDeclaration =>
+      translateDestructuring(node, context)
     case node: AST.ReturnExpression =>
       val returnType = context.returnType
       if (context.collectingReturnTypes) {
@@ -370,5 +372,73 @@ final class BlockElementLowering(
   private def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
     case stmtTerm: StatementTerm => stmtTerm.statement
     case _ => new ExpressionActionStatement(node.location, term)
+  }
+
+  /**
+   * val (a, b) = expr — evaluates expr once into a synthetic local, then
+   * binds each name to the corresponding positional component (record
+   * components in declaration order, or getKey/getValue for Map.Entry).
+   */
+  private def translateDestructuring(node: AST.DestructuringDeclaration, context: LocalContext): ActionStatement = {
+    val initTermOpt = typed(node.init, context)
+    if (initTermOpt.isEmpty) return new NOP(node.location)
+    val initTerm = initTermOpt.get
+    val initType = initTerm.`type`
+
+    def zeroArg(ct: ClassType, name: String): Option[Method] =
+      ct.methods(name).find(m => m.arguments.isEmpty && !Modifier.isStatic(m.modifier))
+
+    def accessors(tp: Type): Option[Seq[(Method, Type)]] = tp match {
+      case ct: ClassType =>
+        val raw = ct match {
+          case a: AppliedClassType => a.raw
+          case c => c
+        }
+        raw match {
+          case d: ClassDefinition if d.recordComponents.isDefined =>
+            val comps = d.recordComponents.get.toSeq
+            val resolved = comps.flatMap { case (compName, _) =>
+              zeroArg(ct, compName).map(m => (m, TypeSubst.withClassOnly(m.returnType, ct)))
+            }
+            if (resolved.length == comps.length) Some(resolved) else None
+          case _ =>
+            bodyContext.table.load("java.util.Map$Entry") match {
+              case Some(entryType) if TypeRules.isSuperType(entryType, ct) =>
+                for {
+                  k <- zeroArg(ct, "getKey")
+                  v <- zeroArg(ct, "getValue")
+                } yield Seq((k, TypeSubst.withClassOnly(k.returnType, ct)), (v, TypeSubst.withClassOnly(v.returnType, ct)))
+              case _ => None
+            }
+        }
+      case _ => None
+    }
+
+    accessors(initType) match {
+      case None =>
+        bodyContext.report(NOT_A_RECORD_TYPE, node.init, initType.displayName)
+        new NOP(node.location)
+      case Some(components) =>
+        if (components.length != node.names.length) {
+          bodyContext.report(WRONG_BINDING_COUNT, node, Int.box(components.length), Int.box(node.names.length), initType.displayName)
+          return new NOP(node.location)
+        }
+        val statements = Buffer[ActionStatement]()
+        val tmpIndex = context.add(context.newName, initType, isMutable = false)
+        statements += new ExpressionActionStatement(new SetLocal(node.location, 0, tmpIndex, initType, initTerm))
+        for ((name, (method, compType)) <- node.names.zip(components)) {
+          if (context.lookupOnlyCurrentScope(name) != null) {
+            bodyContext.report(DUPLICATE_LOCAL_VARIABLE, node, name)
+            return new NOP(node.location)
+          }
+          typing.checkAndReportShadowing(name, node.location, context)
+          val index = context.add(name, compType, isMutable = !Modifier.isFinal(node.modifiers))
+          context.recordDeclaration(name, node.location)
+          val call = new Call(new RefLocal(0, tmpIndex, initType), method, Array.empty[Term])
+          val value = TypeSubst.withCast(call, compType)
+          statements += new ExpressionActionStatement(new SetLocal(node.location, 0, index, compType, value))
+        }
+        new StatementBlock(statements.toIndexedSeq*)
+    }
   }
 }

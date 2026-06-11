@@ -219,6 +219,8 @@ object AST {
   case class ForExpression(location: Location, init: ForInitializer, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends Expression
   case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends Expression
   case class LocalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode/*nullable*/, init: Expression/*nullable*/) extends BlockElement
+  /** val (a, b) = expr — positional destructuring of records / Map.Entry */
+  case class DestructuringDeclaration(location: Location, modifiers: Int, names: List[String], init: Expression) extends BlockElement
   case class ReturnExpression(location: Location, result: Expression /*nullable*/) extends Expression
   case class SelectExpression(location: Location, condition: Expression, cases: List[(List[Pattern], BlockExpression)], elseBlock: BlockExpression /*nullable*/) extends Expression
   case class SynchronizedExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression

@@ -407,6 +407,29 @@ try {
 }
 ```
 
+### Try-With-Resources
+
+Resources declared in parentheses after `try` are closed automatically
+when the block exits — normally or by exception. Multiple resources
+close in reverse declaration order; `catch`/`finally` combine as usual:
+
+```onion
+import { java.io.* }
+
+try (val reader = new BufferedReader(new FileReader("file.txt"))) {
+  IO::println(reader.readLine())
+} catch e: IOException {
+  IO::println("IO error: " + e.getMessage())
+}
+
+try (val a = openA(); val b = openB()) {
+  // b closes first, then a
+}
+```
+
+The resource type needs a `close(): void` method (`AutoCloseable` /
+`Closeable` from Java interop work directly).
+
 ### Accessing Exception Information
 
 ```onion

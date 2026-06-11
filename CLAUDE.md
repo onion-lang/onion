@@ -431,6 +431,7 @@ These are frequently confused with other languages. **Always check these:**
 |--------------------|-----------------|
 | `throw new Exception();` | `throw new Exception("msg")` - same syntax |
 | `try { } catch { } finally { }` | ✓ correct - finally is supported |
+| `using r = expr { }` | `try (val r = expr) { }` - try-with-resources; multiple via `;`, closed in reverse order |
 | `catch (Type e)` | `catch e: Type` - no parens, type after colon |
 
 ### Miscellaneous

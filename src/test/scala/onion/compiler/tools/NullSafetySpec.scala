@@ -4,6 +4,49 @@ import onion.tools.Shell
 
 class NullSafetySpec extends AbstractShellSpec {
   describe("Null Safety") {
+    describe("Nullable element arrays") {
+      it("declares and uses String?[] with null elements") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val xs: String?[] = new String?[2]
+            |    xs[0] = "a"
+            |    xs[1] = null
+            |    var out = ""
+            |    foreach s: String? in xs {
+            |      out = out + (s ?: "<null>") + ";"
+            |    }
+            |    return out
+            |  }
+            |}
+            |""".stripMargin,
+          "NullableElems.on",
+          Array()
+        )
+        assert(Shell.Success("a;<null>;") == result)
+      }
+
+      it("boxes primitive element types: Int?[] holds null") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val n: Int?[] = new Int?[2]
+            |    n[0] = 5
+            |    return "" + n[0] + "," + n[1]
+            |  }
+            |}
+            |""".stripMargin,
+          "NullableIntElems.on",
+          Array()
+        )
+        assert(Shell.Success("5,null") == result)
+      }
+    }
+
     describe("Nullable type declaration") {
       it("can declare nullable type with ?") {
         val result = shell.run(

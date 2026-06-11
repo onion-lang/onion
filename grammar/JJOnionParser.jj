@@ -1231,12 +1231,15 @@ AST.TypeNode type() : {
       loc = c.location();
     }
   )
-  (LOOKAHEAD(2) "[" "]" {d++;})* {
-    left = core;
-    for(int i = 0; i < d; i++) {
-      left = new AST.ArrayType(left);
-    }
-  }
+  {left = core;}
+  // Array dims: T[] or T?[] (nullable elements; the lexer sees "?[" as one
+  // token). The whole choice is lookahead-guarded so the loop only enters
+  // on an actual empty bracket pair.
+  ( LOOKAHEAD(2)
+    ( "[" "]" {left = new AST.ArrayType(left);}
+    | <SAFE_INDEX> "]" {left = new AST.ArrayType(new AST.NullableType(left));}
+    )
+  )*
   // Lookahead avoids conflicts with nested expansions that also start with "->".
   [ LOOKAHEAD(2) <ARROW> eols() r=type() {
       ArrayBuffer<AST.TypeDescriptor> p = new ArrayBuffer<AST.TypeDescriptor>();
@@ -1782,6 +1785,13 @@ AST.Expression primary() : {
     LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]"
     ( LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]" )*
     { return new AST.NewArray(p(t), ty, toList(sizes)); }
+    // Handle: new Type?[size] - array of nullable elements ("?[" is one token)
+  | LOOKAHEAD(2) <SAFE_INDEX> eols() e=term() { append(sizes, e); } "]"
+    ( LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]" )*
+    {
+      AST.TypeNode nty = new AST.TypeNode(ty.location(), new AST.NullableType(ty.desc()), ty.isRelaxed());
+      return new AST.NewArray(p(t), nty, toList(sizes));
+    }
     // Handle: new Type() or new Type - object creation
   | [LOOKAHEAD(2) "(" eols() (es=terms()) ")"]  { return new AST.NewObject(p(t), ty, es); }
   )

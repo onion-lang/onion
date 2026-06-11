@@ -289,8 +289,8 @@ list << "apple"
 list << "cherry"
 
 val alphabetical: (Object, Object) -> Int = (a: Object, b: Object) -> {
-  val s1: String = a$String
-  val s2: String = b$String
+  val s1: String = (a as String)
+  val s2: String = (b as String)
   return s1.compareTo(s2);
 }
 
@@ -298,7 +298,7 @@ val comparator: LambdaComparator = new LambdaComparator(alphabetical)
 Collections::sort(list, comparator)
 
 foreach item :Object in list {
-  IO::println(item$String)
+  IO::println((item as String))
 }
 // Output:
 // apple

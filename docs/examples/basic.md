@@ -146,7 +146,7 @@ Using the `select` statement:
 
 **File: `Select.on`**
 ```onion
-val value: Int = (Math::random() * 10)$Int
+val value: Int = (Math::random() * 10) as Int
 
 select value {
   case 0, 1, 2, 3:
@@ -188,7 +188,7 @@ foreach num :Int in numbers {
 // Print results
 IO::println("Even numbers:")
 foreach even :Object in evens {
-  IO::println(even$Int)
+  IO::println((even as Int))
 }
 ```
 

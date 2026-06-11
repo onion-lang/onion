@@ -134,7 +134,7 @@ val len: Object? = s?.length()  // Returns boxed Integer (5), not primitive int
 ```onion
 class Main {
 public:
-  static def main(args: String[]): Unit {
+  static def main(args: String[]): void {
     // Nullable type declaration
     val maybeString: String? = null
     IO::println("maybeString is null: " + (maybeString == null))

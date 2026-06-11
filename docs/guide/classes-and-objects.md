@@ -270,7 +270,7 @@ import {
 class ButtonHandler <: ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
-      val button: JButton = event.getSource()$JButton
+      val button: JButton = event.getSource() as JButton
       button.addActionListener(self)  // Reference to this instance
     }
 }

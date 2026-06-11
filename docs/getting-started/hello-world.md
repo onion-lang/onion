@@ -86,7 +86,7 @@ You can also write programs with explicit class definitions:
 ```onion
 class HelloWorld {
   public:
-    static def main(args: String[]) {
+    static def main(args: String[]): void {
       IO::println("Hello, World!")
     }
 }
@@ -101,7 +101,7 @@ Access command-line arguments through the `main` method:
 ```onion
 class ArgsDemo {
   public:
-    static def main(args: String[]) {
+    static def main(args: String[]): void {
       IO::println("Number of arguments: " + args.length)
       for var i: Int = 0; i < args.length; i = i + 1 {
         IO::println("Arg " + i + ": " + args[i])

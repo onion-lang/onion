@@ -188,16 +188,16 @@ System::out.println("Java style")
 
 Default static imports make some class members available without `::` (for example, `println("Hello")` from `onion.IO`). The list lives in `src/main/resources/onion/default-static-imports.txt`.
 
-### Type Casting with `$`
+### Type Casting with `as`
 
-Cast expressions use the `$` operator:
+Cast expressions use the `as` operator:
 
 ```onion
 val x: Double = 3.14
-val y: Int = x$Int  // Cast to Int
+val y: Int = (x as Int)  // Cast to Int
 
 val obj: Object = "string"
-val str: String = obj$String  // Cast to String
+val str: String = (obj as String)  // Cast to String
 ```
 
 ### Pattern Matching with `select`

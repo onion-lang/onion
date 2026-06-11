@@ -105,7 +105,7 @@ Access them in your code:
 ```onion
 class MyScript {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       foreach arg :String in args {
         IO::println("Argument: " + arg)
       }
@@ -124,7 +124,7 @@ If a class has a `main` method, it's used as the entry point:
 ```onion
 class MyProgram {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       IO::println("Hello from main method")
     }
 }
@@ -137,14 +137,14 @@ If multiple classes have `main` methods, the first one is used:
 ```onion
 class First {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       IO::println("This will run")
     }
 }
 
 class Second {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       IO::println("This won't run")
     }
 }
@@ -184,7 +184,7 @@ Hello, World!
 ```onion
 class Greeter {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       if args.length > 0 {
         IO::println("Hello, " + args[0] + "!")
       } else {
@@ -231,7 +231,7 @@ import {
 
 class LineCounter {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       if args.length == 0 {
         IO::println("Usage: onion count_lines.on <filename>")
         return
@@ -338,7 +338,7 @@ Provide helpful error messages:
 ```onion
 class Script {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       if args.length < 2 {
         IO::println("Error: Missing arguments")
         IO::println("Usage: onion script.on <input> <output>")
@@ -357,7 +357,7 @@ Return appropriate exit codes:
 ```onion
 class Script {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       if args.length == 0 {
         System::exit(1)  // Error
       }

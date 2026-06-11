@@ -1895,7 +1895,9 @@ AST.Expression argument_expr() :{Token n; AST.Expression e;}{
 }
 
 List<AST.Expression> terms() :{AST.Expression arg; ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();}{
-  [arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})*] {
+  // eols() before each argument and at the end lets argument lists span
+  // multiple lines: f(\n a,\n b\n)
+  [eols() arg=argument_expr() {append(args, arg);} ("," eols() arg=argument_expr() {append(args, arg);})* eols()] {
     return toList(args);
   }
 }

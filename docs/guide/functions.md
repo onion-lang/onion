@@ -27,7 +27,7 @@ IO::println(sum)  // 8
 ### Function with No Parameters
 
 ```onion
-def getCurrentTime: String = System::currentTimeMillis()$String
+def getCurrentTime: String = System::currentTimeMillis() as String
 
 IO::println(getCurrentTime())
 ```

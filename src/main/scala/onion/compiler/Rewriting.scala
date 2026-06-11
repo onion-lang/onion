@@ -174,7 +174,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewriteDelegatedFieldDeclaration(field: AST.DelegatedFieldDeclaration): AST.DelegatedFieldDeclaration = {
-    val newInit = rewriteExpression(field.init)
+    // The initializer is optional (forward val n: List;) — don't rewrite null
+    val newInit = if (field.init == null) null else rewriteExpression(field.init)
     field.copy(init = newInit)
   }
 

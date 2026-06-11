@@ -189,7 +189,7 @@ module com.example.myapp
 
 class MyClass {
   public:
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       IO::println("Hello")
     }
 }

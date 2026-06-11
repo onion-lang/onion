@@ -144,7 +144,7 @@ list << "Second"
 list << "Third"
 
 foreach item :Object in list {
-  IO::println(item$String)
+  IO::println((item as String))
 }
 ```
 
@@ -205,7 +205,7 @@ val grade: String = select score {
 Group multiple values in a single case:
 
 ```onion
-val num: Int = (Math::random() * 10)$Int
+val num: Int = (Math::random() * 10) as Int
 
 select num {
   case 0, 1, 2, 3:

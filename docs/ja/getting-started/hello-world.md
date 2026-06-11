@@ -86,7 +86,7 @@ onion greeting.on
 ```onion
 class HelloWorld {
   public:
-    static def main(args: String[]) {
+    static def main(args: String[]): void {
       IO::println("Hello, World!")
     }
 }
@@ -101,7 +101,7 @@ class HelloWorld {
 ```onion
 class ArgsDemo {
   public:
-    static def main(args: String[]) {
+    static def main(args: String[]): void {
       IO::println("引数の数: " + args.length)
       for var i: Int = 0; i < args.length; i = i + 1 {
         IO::println("引数 " + i + ": " + args[i])

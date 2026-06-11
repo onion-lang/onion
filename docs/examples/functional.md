@@ -570,7 +570,7 @@ profile.onSuccess((p: String) -> { IO::println(p); })
 def fetchFromApi(url: String): Future[String] {
   return Future::async(() -> {
     // Simulate network request
-    Thread::sleep((Math::random() * 1000L)$Long);
+    Thread::sleep((Math::random() * 1000L) as Long);
     return "Data from " + url;
   });
 }
@@ -591,7 +591,7 @@ Future::all(api1, api2, api3).onSuccess((results: Object[]) -> {
 val combined: Future[String] = do[Future] {
   pair1 <- api1.zip(api2)
   data3 <- api3
-  ret pair1[0]$String + " | " + pair1[1]$String + " | " + data3
+  ret pair1[0] as String + " | " + pair1[1] as String + " | " + data3
 }
 ```
 

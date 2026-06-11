@@ -139,7 +139,7 @@ foreach fruit: String in list {
   IO::println(fruit)
 }
 
-val first: String = list.get(0)$String
+val first: String = list.get(0) as String
 val size: Int = list.size()
 ```
 
@@ -153,8 +153,8 @@ map.put("name", "Alice")
 map.put("age", 30)
 map.put("city", "Tokyo")
 
-val name: String = map.get("name")$String
-val age: Int = map.get("age")$Int
+val name: String = map.get("name") as String
+val age: Int = map.get("age") as Int
 
 val hasKey: Boolean = map.containsKey("name")
 ```
@@ -188,7 +188,7 @@ class MyButtonHandler <: ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
       IO::println("Button clicked!")
-      val source: JButton = event.getSource()$JButton
+      val source: JButton = event.getSource() as JButton
       IO::println("Button text: " + source.getText())
     }
 }
@@ -237,7 +237,7 @@ class Person <: Comparable {
     }
 
     def compareTo(other: Object): Int {
-      val otherPerson: Person = other$Person
+      val otherPerson: Person = (other as Person)
       return this.age - otherPerson.age
     }
 }
@@ -385,25 +385,25 @@ val app: CalculatorApp = new CalculatorApp
 
 ### Casting Objects
 
-Use the `$` operator to cast Java objects:
+Use the `as` operator to cast Java objects:
 
 ```onion
 val obj: Object = "Hello"
-val str: String = obj$String
+val str: String = (obj as String)
 
 val list: ArrayList = new ArrayList
 list.add("Item")
-val item: String = list.get(0)$String
+val item: String = list.get(0) as String
 ```
 
 ### Numeric Casting
 
 ```onion
 val random: Double = Math::random()
-val randomInt: Int = (random * 100)$Int
+val randomInt: Int = (random * 100) as Int
 
 val longValue: Long = 123456789L
-val intValue: Int = longValue$Int
+val intValue: Int = (longValue as Int)
 ```
 
 ## Common Java Classes

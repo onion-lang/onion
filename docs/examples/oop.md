@@ -95,7 +95,7 @@ class Student <: Comparable {
     }
 
     def compareTo(other: Object): Int {
-      val otherStudent: Student = other$Student
+      val otherStudent: Student = (other as Student)
       return this.grade - otherStudent.grade
     }
 
@@ -142,7 +142,7 @@ class Delegation <: List {
       this.n = new ArrayList;
     }
 
-    static def main(args: String[]) {
+    static def main(args: String[]): void {
       val list: List = new Delegation;
       list << "a";
       list << "b";
@@ -199,7 +199,7 @@ class ExampleBean <: Serializable {
       this.value = value
     }
 
-    static def main(args: String[]) {
+    static def main(args: String[]): void {
       // Create bean
       val bean: ExampleBean = new ExampleBean("Test", 42)
 
@@ -216,7 +216,7 @@ class ExampleBean <: Serializable {
         out.toByteArray()
       )
       val decoder: XMLDecoder = new XMLDecoder(inStream)
-      val restored: ExampleBean = decoder.readObject()$ExampleBean
+      val restored: ExampleBean = decoder.readObject() as ExampleBean
       decoder.close()
 
       IO::println("Name: " + restored.getName())
@@ -286,7 +286,7 @@ class Calculator : JFrame <: ActionListener {
     }
 
     def actionPerformed(event :ActionEvent) {
-      val button: JButton = event.getSource()$JButton
+      val button: JButton = event.getSource() as JButton
       val label: String = button.getText()
 
       // Handle button click
@@ -333,7 +333,7 @@ class Calculator : JFrame <: ActionListener {
       }
     }
 
-    static def main(args :String[]) {
+    static def main(args :String[]): void {
       val calc: Calculator = new Calculator
     }
 }

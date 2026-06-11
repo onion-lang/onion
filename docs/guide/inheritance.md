@@ -102,7 +102,7 @@ class Person <: Comparable {
     }
 
     def compareTo(other: Object): Int {
-      val otherPerson: Person = other$Person
+      val otherPerson: Person = (other as Person)
       return this.age - otherPerson.age
     }
 }
@@ -151,7 +151,7 @@ class Student <: Serializable, Comparable {
     }
 
     def compareTo(other: Object): Int {
-      val otherStudent: Student = other$Student
+      val otherStudent: Student = (other as Student)
       return this.id - otherStudent.id
     }
 }

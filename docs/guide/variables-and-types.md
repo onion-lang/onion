@@ -101,21 +101,21 @@ See [Null Safety](null-safety.md) for detailed information about nullable types 
 
 ## Type Casting
 
-### Using the `$` Operator
+### Using the `as` Operator
 
-Convert between types using the `$` casting operator:
+Convert between types using the `as` cast operator:
 
 ```onion
 // Numeric casting
 val x: Double = 3.14
-val y: Int = x$Int  // 3
+val y: Int = (x as Int)  // 3
 
 // Object casting
 val obj: Object = "Hello"
-val str: String = obj$String
+val str: String = (obj as String)
 
 // Random number to Int
-val random: Int = (Math::random() * 100)$Int
+val random: Int = (Math::random() * 100) as Int
 ```
 
 ### Automatic Widening
@@ -134,7 +134,7 @@ Narrowing conversions require explicit casting:
 
 ```onion
 val d: Double = 3.14
-val i: Int = d$Int  // Must use $ operator
+val i: Int = (d as Int)  // Must use an explicit cast
 ```
 
 ## Type Compatibility

@@ -45,6 +45,74 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       assert(Shell.Success("[10, 11]") == result)
     }
 
+    it("joins elements with mkString") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "b", "c"]
+          |    return xs.mkString(", ")
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineMkString.on",
+        Array()
+      )
+      assert(Shell.Success("a, b, c") == result)
+    }
+
+    it("computes min and max of a comparable list") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = [3, 1, 4, 1, 5]
+          |    return (xs.min() as Int) + ":" + (xs.max() as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineMinMax.on",
+        Array()
+      )
+      assert(Shell.Success("1:5") == result)
+    }
+
+    it("takes and drops a leading run with takeWhile/dropWhile") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = [1, 2, 3, 8, 1]
+          |    return xs.takeWhile { x => x < 5 }.toString() + xs.dropWhile { x => x < 5 }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineTakeWhile.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 2, 3][8, 1]") == result)
+    }
+
+    it("returns head and tail") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = [10, 20, 30]
+          |    return (xs.head() as Int) + ":" + xs.tail().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineHeadTail.on",
+        Array()
+      )
+      assert(Shell.Success("10:[20, 30]") == result)
+    }
+
     it("keeps explicit Colls:: calls working") {
       val result = shell.run(
         """

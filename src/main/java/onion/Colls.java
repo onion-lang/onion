@@ -577,6 +577,74 @@ public final class Colls {
     }
 
     /**
+     * Joins a list's elements into a string separated by {@code separator}:
+     * {@code ["a", "b", "c"].mkString(", ")} -> {@code "a, b, c"}.
+     */
+    public static <T> String mkString(List<T> list, String separator) {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (T element : list) {
+            if (!first) sb.append(separator);
+            sb.append(element);
+            first = false;
+        }
+        return sb.toString();
+    }
+
+    /** Joins a list's elements into a string with no separator. */
+    public static <T> String mkString(List<T> list) {
+        return mkString(list, "");
+    }
+
+    /** Alias for {@link #mkString(List, String)}. */
+    public static <T> String join(List<T> list, String separator) {
+        return mkString(list, separator);
+    }
+
+    /** The smallest element of a non-empty list of comparable elements. */
+    public static <T extends Comparable<T>> T min(List<T> list) {
+        if (list.isEmpty()) throw new NoSuchElementException("min of empty list");
+        return java.util.Collections.min(list);
+    }
+
+    /** The largest element of a non-empty list of comparable elements. */
+    public static <T extends Comparable<T>> T max(List<T> list) {
+        if (list.isEmpty()) throw new NoSuchElementException("max of empty list");
+        return java.util.Collections.max(list);
+    }
+
+    /** The first element of a non-empty list (alias for {@link #first(List)}). */
+    public static <T> T head(List<T> list) {
+        return first(list);
+    }
+
+    /** All but the first element of a non-empty list. */
+    public static <T> List<T> tail(List<T> list) {
+        if (list.isEmpty()) throw new NoSuchElementException("tail of empty list");
+        return drop(list, 1);
+    }
+
+    /** The longest leading run of elements satisfying {@code predicate}. */
+    public static <T> List<T> takeWhile(List<T> list, Function1<T, Boolean> predicate) {
+        List<T> result = new ArrayList<>();
+        for (T element : list) {
+            if (!Boolean.TRUE.equals(predicate.call(element))) break;
+            result.add(element);
+        }
+        return java.util.Collections.unmodifiableList(result);
+    }
+
+    /** The list with its longest leading run satisfying {@code predicate} removed. */
+    public static <T> List<T> dropWhile(List<T> list, Function1<T, Boolean> predicate) {
+        int i = 0;
+        for (T element : list) {
+            if (!Boolean.TRUE.equals(predicate.call(element))) break;
+            i++;
+        }
+        return drop(list, i);
+    }
+
+    /**
      * Flattens a list of lists into a single list.
      * @param list the input list of lists
      * @param <T> the element type

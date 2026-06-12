@@ -42,6 +42,19 @@ private[typing] case class MultiBindings(
 ) extends PatternBindingInfo
 
 /**
+ * Bindings for a regex pattern (case re"..." (g1, g2)): the capture groups
+ * are extracted once into a synthetic String[] local as a side effect of the
+ * match condition; each name then binds to groupsVar[i].
+ *
+ * @param groupsVar Synthetic local holding the String[] of capture groups
+ * @param names Binding names, one per capture group (all of type String)
+ */
+private[typing] case class RegexBindings(
+  groupsVar: onion.compiler.ClosureLocalBinding,
+  names: List[String]
+) extends PatternBindingInfo
+
+/**
  * Guard expression info for pattern matching.
  *
  * @param guardAst The AST expression for validation

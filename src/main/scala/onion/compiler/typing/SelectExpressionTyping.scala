@@ -102,6 +102,27 @@ final class SelectExpressionTyping(
             }
           }
 
+        case RegexBindings(_, names) =>
+          context.openScope {
+            val stringType = bodyContext.load("java.lang.String")
+            val varBinds = names.map { n =>
+              val varIndex = context.add(n, stringType, isMutable = false)
+              new ClosureLocalBinding(0, varIndex, stringType, isMutable = false, isBoxed = false)
+            }
+            val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
+              val guardTermOpt = typed(guardAst, context)
+              val guardTerm = ensureBoolean(guardAst, guardTermOpt.getOrElse(null))
+              GuardInfo(guardAst, guardTerm)
+            }
+            caseBindingData += ((bindingInfo, varBinds, typedGuardInfo))
+            typeBlockExpression(thenBlock, context) match {
+              case Some(term) =>
+                caseTerms += term
+                caseNodes += thenBlock
+              case None => break(None)
+            }
+          }
+
         case NoBindings =>
           // Type the guard (no bindings needed)
           val typedGuardInfo = guardInfo.map { case GuardInfo(guardAst, _) =>
@@ -256,6 +277,14 @@ final class SelectExpressionTyping(
             }
             new StatementBlock(caseNodes(caseIndex).location, (setCast +: bindingStmts :+ innerBody)*)
 
+          case RegexBindings(groupsVar, _) =>
+            // The condition already stored the capture groups in groupsVar;
+            // each binding reads its group from the array.
+            val bindingStmts = varBinds.zipWithIndex.map { case (varBind, i) =>
+              new ExpressionActionStatement(new SetLocal(varBind, new RefArray(new RefLocal(groupsVar), new IntValue(i))))
+            }
+            new StatementBlock(caseNodes(caseIndex).location, (bindingStmts :+ innerBody)*)
+
           case NoBindings => innerBody
         }
 
@@ -344,6 +373,46 @@ final class SelectExpressionTyping(
         bindingInfo = SingleBinding(name, conditionType)
         new BoolValue(loc, true)
 
+      case rp @ AST.RegexPattern(loc, pattern, names) =>
+        // case re"..." (g1, g2): the subject must be a (non-nullable) String.
+        // The literal is validated here at compile time: a malformed pattern
+        // and a group-count/binding-count mismatch are compile errors.
+        val stringType = bodyContext.load("java.lang.String")
+        if (!TypeRules.isAssignable(stringType, conditionType)) {
+          bodyContext.report(INCOMPATIBLE_TYPE, rp, stringType, conditionType)
+          break((null, NoBindings, false, None))
+        }
+        val compiled =
+          try {
+            java.util.regex.Pattern.compile(pattern)
+          } catch {
+            case e: java.util.regex.PatternSyntaxException =>
+              bodyContext.report(REGEX_PATTERN_INVALID, rp, e.getDescription + " (at index " + e.getIndex + ")")
+              break((null, NoBindings, false, None))
+          }
+        val groupCount = compiled.matcher("").groupCount()
+        if (names.nonEmpty && names.size != groupCount) {
+          bodyContext.report(REGEX_GROUP_MISMATCH, rp, groupCount.toString, names.size.toString)
+          break((null, NoBindings, false, None))
+        }
+        val regexType = bodyContext.load("onion.Regex")
+        val groupsMethod = regexType.methods("matchGroups").find { m =>
+          m.arguments.length == 2 && Modifier.isStatic(m.modifier)
+        }.getOrElse(break((null, NoBindings, false, None)))
+        // Evaluate the groups once, as a side effect of the condition:
+        //   (__g = Regex::matchGroups(subject, pattern)) != null
+        // matchGroups is ANCHORED (the whole subject must match) and returns
+        // null on no-match; the bindings then read __g[i] in the case body.
+        val arrayType = groupsMethod.returnType
+        val gVar = new ClosureLocalBinding(0, context.add(context.newName, arrayType, isMutable = true), arrayType, isMutable = true)
+        val groupsCall = new CallStatic(regexType, groupsMethod,
+          Array[Term](new RefLocal(bind), new StringValue(loc, pattern, stringType)))
+        bindingInfo = RegexBindings(gVar, names)
+        new Begin(loc, Array[Term](
+          new SetLocal(gVar, groupsCall),
+          new BinaryTerm(NOT_EQUAL, BasicType.BOOLEAN, new RefLocal(gVar), new NullValue(loc))
+        ))
+
       case destructuringPattern: AST.DestructuringPattern =>
         processDestructuringPattern(destructuringPattern, bind, context) match {
           case Some((check, info)) =>
@@ -375,6 +444,12 @@ final class SelectExpressionTyping(
               bindings.foreach { case BindingEntry(varName, varType, _) =>
                 context.add(varName, varType, isMutable = false)
               }
+              typed(guard, context)
+            }
+          case RegexBindings(_, names) =>
+            context.openScope {
+              val stringType = bodyContext.load("java.lang.String")
+              names.foreach(n => context.add(n, stringType, isMutable = false))
               typed(guard, context)
             }
           case NoBindings =>

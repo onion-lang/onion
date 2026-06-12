@@ -205,6 +205,8 @@ object AST {
   case class DestructuringPattern(location: Location, constructor: String, bindings: List[Pattern]) extends Pattern
   // BindingPattern is a simple variable binding (used inside destructuring)
   case class BindingPattern(location: Location, name: String) extends Pattern
+  /** re"..." (g1, g2, ...) — matches a String against a regex literal and binds its capture groups. */
+  case class RegexPattern(location: Location, pattern: String, bindings: List[String]) extends Pattern
   case class GuardedPattern(location: Location, pattern: Pattern, guard: Expression) extends Pattern
 
   abstract sealed class ForInitializer extends Node

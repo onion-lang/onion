@@ -363,6 +363,14 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.labelNotFound",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.REGEX_PATTERN_INVALID -> ErrorDef(
+      "error.semantic.regexPatternInvalid",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.REGEX_GROUP_MISMATCH -> ErrorDef(
+      "error.semantic.regexGroupMismatch",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

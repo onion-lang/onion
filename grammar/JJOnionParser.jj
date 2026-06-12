@@ -1626,8 +1626,9 @@ AST.Pattern case_pattern() :{
 }
 
 AST.Pattern simple_pattern() :{
-  Token t; AST.Expression e; AST.TypeNode ty;
+  Token t, n; AST.Expression e; AST.TypeNode ty;
   List<AST.Pattern> bindings;
+  ArrayBuffer<String> names = new ArrayBuffer<String>();
 }{
   LOOKAHEAD({getToken(1).kind == ID && getToken(1).image.equals("_")})
   t=<ID> { return new AST.WildcardPattern(p(t)); }
@@ -1637,6 +1638,11 @@ AST.Pattern simple_pattern() :{
   t=id() "is" ty=type() { return new AST.TypePattern(p(t), c(t), ty); }
 | LOOKAHEAD(2, id() "when")
   t=id() { return new AST.BindingPattern(p(t), c(t)); }
+  // Regex pattern: case re"..." (g1, g2): matches a String subject and binds
+  // its capture groups. The literal is validated at compile time (syntax and
+  // group count vs binding count).
+| t=<RE_STRING> [ "(" n=id() {append(names, c(n));} ("," n=id() {append(names, c(n));})* ")" ]
+  { return new AST.RegexPattern(p(t), t.image.substring(3, t.image.length() - 1), toList(names)); }
 | e=term() { return new AST.ExpressionPattern(e); }
 }
 

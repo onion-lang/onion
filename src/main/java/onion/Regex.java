@@ -12,6 +12,28 @@ import java.util.regex.Pattern;
 public final class Regex {
     private Regex() {} // Prevent instantiation
 
+    /** Compiled-pattern cache for matchGroups (patterns come from literals, so this stays small). */
+    private static final java.util.concurrent.ConcurrentHashMap<String, Pattern> MATCH_CACHE =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Anchored pattern match used by the {@code case re"..."} select pattern:
+     * if the WHOLE input matches, returns the capture groups (index 0 is
+     * group 1); otherwise returns null. A group that did not participate in
+     * the match yields "".
+     */
+    public static String[] matchGroups(String input, String pattern) {
+        if (input == null || pattern == null) return null;
+        Matcher m = MATCH_CACHE.computeIfAbsent(pattern, Pattern::compile).matcher(input);
+        if (!m.matches()) return null;
+        String[] result = new String[m.groupCount()];
+        for (int i = 1; i <= m.groupCount(); i++) {
+            String g = m.group(i);
+            result[i - 1] = g != null ? g : "";
+        }
+        return result;
+    }
+
     // ========== Matching ==========
 
     /**

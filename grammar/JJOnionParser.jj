@@ -200,6 +200,55 @@ public class JJOnionParser implements Parser {
   }
 
   /**
+   * Pipeline continuation: true when, skipping any EOLs after the current
+   * position, the next token is |> — so a pipeline can continue on the next
+   * line. Pure token peeking (no consumption), mirroring dotContinuationFollows.
+   */
+  private boolean pipeContinuationFollows() {
+    int i = 1;
+    while (getToken(i).kind == EOL) i++;
+    return getToken(i).kind == PIPELINE;
+  }
+
+  /**
+   * Desugars e |> rhs by injecting e as the first argument of the call on the
+   * right-hand side: f -> f(e); f(a) -> f(e, a); obj.m -> obj.m(e);
+   * obj.m(a) -> obj.m(e, a); C::m(a) -> C::m(e, a).
+   */
+  private AST.Expression pipeInto(Location loc, AST.Expression value, AST.Expression rhs) throws ParseException {
+    if (rhs instanceof AST.UnqualifiedMethodCall) {
+      AST.UnqualifiedMethodCall c = (AST.UnqualifiedMethodCall) rhs;
+      return new AST.UnqualifiedMethodCall(loc, c.name(), AST.prependToList(c.args(), value), c.typeArgs());
+    } else if (rhs instanceof AST.Id) {
+      AST.Id id = (AST.Id) rhs;
+      ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();
+      append(args, value);
+      return new AST.UnqualifiedMethodCall(loc, id.name(), toList(args));
+    } else if (rhs instanceof AST.MethodCall) {
+      AST.MethodCall c = (AST.MethodCall) rhs;
+      return new AST.MethodCall(loc, c.target(), c.name(), AST.prependToList(c.args(), value), c.typeArgs());
+    } else if (rhs instanceof AST.MemberSelection) {
+      AST.MemberSelection s = (AST.MemberSelection) rhs;
+      ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();
+      append(args, value);
+      return new AST.MethodCall(loc, s.target(), s.name(), toList(args));
+    } else if (rhs instanceof AST.StaticMethodCall) {
+      AST.StaticMethodCall c = (AST.StaticMethodCall) rhs;
+      return new AST.StaticMethodCall(loc, c.typeRef(), c.name(), AST.prependToList(c.args(), value), c.typeArgs());
+    } else if (rhs instanceof AST.StaticMemberSelection) {
+      AST.StaticMemberSelection s = (AST.StaticMemberSelection) rhs;
+      ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();
+      append(args, value);
+      return new AST.StaticMethodCall(loc, s.typeRef(), s.name(), toList(args));
+    } else {
+      ParseException e = new ParseException(
+        "the right-hand side of |> must be a call or a function name");
+      e.currentToken = token;
+      throw e;
+    }
+  }
+
+  /**
    * Desugars a scheme-prefixed raw literal token (re"..."/file"..."/http"...)
    * into the unqualified call <prefix>("raw"), keeping the body verbatim.
    */
@@ -677,6 +726,7 @@ TOKEN : {
 | <AND:            "&&"           >
 | <BAR:            "|"            >
 | <OR:             "||"           >
+| <PIPELINE:       "|>"           >
 | <EOR:            "^"            >
 | <BN:             "~"            >
 | <L2S:            "<<"           >
@@ -1710,7 +1760,7 @@ AST.Expression term() :{AST.Expression e;}{
 }
 
 AST.Expression assignable() :{Token t; AST.Expression a, b; }{
-  a=logical_or()
+  a=pipeline()
   [ LOOKAHEAD(2)
     ( t="="  eols() b=expression() {a = new AST.Assignment(p(t), a, b);}
     | t="+=" eols() b=expression() {a = new AST.AdditionAssignment(p(t), a, b);}
@@ -1726,6 +1776,21 @@ AST.Expression assignable() :{Token t; AST.Expression a, b; }{
     | t=">>>=" eols() b=expression() {a = new AST.LogicalRightShiftAssignment(p(t), a, b);}
     )
   ]{return a;}
+}
+
+// Pipeline: e |> f desugars to f(e); e |> f(a) to f(e, a); e |> obj.m(a) to
+// obj.m(e, a) — the left value is injected as the first argument (Elixir
+// style). Sits between the assignment level and logical-or so a whole
+// pipeline can be assigned: val r = xs |> filter { ... } |> println
+AST.Expression pipeline() :{Token t; AST.Expression a, b; }{
+  a=logical_or()
+  // A newline before |> keeps the pipeline going (same semantic-predicate
+  // technique as the leading-dot method-chain continuation), so stages can
+  // be stacked one per line.
+  ( LOOKAHEAD({ pipeContinuationFollows() })
+    eols() t="|>" eols() b=logical_or() {a = pipeInto(p(t), a, b);}
+  )*
+  { return a; }
 }
 
 AST.Expression logical_or() :{Token t; AST.Expression a, b; }{

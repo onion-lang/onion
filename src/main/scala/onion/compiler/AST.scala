@@ -24,6 +24,9 @@ object AST {
   def appendToList[A](list: List[A], element: A): List[A] = {
     if (element == null) list else list :+ element
   }
+
+  /** Prepend an element to an immutable list (returns new list) - used by the |> pipeline desugar */
+  def prependToList[A](list: List[A], element: A): List[A] = element +: list
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString

@@ -123,7 +123,88 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case otherwise =>
         newToplevels += otherwise
     }
+    appendAutoCliCall(newToplevels)
     unit.copy(toplevels = newToplevels.toList)
+  }
+
+  /**
+   * Auto-CLI: a top-level `def main(p1: T1, p2: T2 = default, ...)` whose
+   * parameters are all CLI-convertible (String / Int / Long / Double / Float /
+   * Boolean / Short / Byte) gets a synthesized trailing statement that parses
+   * `args` via onion.Cli and calls main with the converted values. Required
+   * params are positional; defaulted params become --name flags (Boolean
+   * defaults become switches), with the default expression evaluated
+   * in-language when the flag is absent.
+   */
+  private def appendAutoCliCall(toplevels: Buffer[AST.Toplevel]): Unit = {
+    val mainFn = toplevels.collectFirst {
+      case f: AST.FunctionDeclaration
+        if f.name == "main" && f.args.nonEmpty && f.args.forall(a => cliKindOf(a.typeRef).isDefined) => f
+    }
+    mainFn.foreach { f =>
+      val loc = f.location
+      val cliVar = "__cliArgs"
+      val spec = f.args.map { a =>
+        val kind = cliKindOf(a.typeRef).get
+        if (a.defaultValue == null) a.name
+        else if (kind == "Boolean") a.name + "?"
+        else a.name + "="
+      }.mkString(",")
+      val parseCall = AST.StaticMethodCall(
+        loc,
+        AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
+        "parse",
+        List(AST.Id(loc, "args"), AST.StringLiteral(loc, spec))
+      )
+      val decl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, cliVar, null, parseCall)
+      val argExprs = f.args.zipWithIndex.map { case (a, i) =>
+        val raw = AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i))
+        val converted = convertCliValue(loc, cliKindOf(a.typeRef).get, raw)
+        if (a.defaultValue == null) converted
+        else AST.IfExpression(
+          loc,
+          AST.Equal(loc, AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i)), AST.NullLiteral(loc)),
+          AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+          AST.BlockExpression(loc, List(converted))
+        )
+      }
+      toplevels += decl
+      toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
+    }
+  }
+
+  /** The CLI conversion kind for a parameter type, or None when unsupported. */
+  private def cliKindOf(typeRef: AST.TypeNode): Option[String] = {
+    if (typeRef == null) return None
+    typeRef.desc match {
+      case AST.PrimitiveType(AST.KInt) => Some("Int")
+      case AST.PrimitiveType(AST.KLong) => Some("Long")
+      case AST.PrimitiveType(AST.KDouble) => Some("Double")
+      case AST.PrimitiveType(AST.KFloat) => Some("Float")
+      case AST.PrimitiveType(AST.KBoolean) => Some("Boolean")
+      case AST.PrimitiveType(AST.KShort) => Some("Short")
+      case AST.PrimitiveType(AST.KByte) => Some("Byte")
+      case AST.ReferenceType("String", _) => Some("String")
+      case AST.ReferenceType("java.lang.String", _) => Some("String")
+      case _ => None
+    }
+  }
+
+  /** Builds the AST converting a raw CLI string to the parameter's type. */
+  private def convertCliValue(loc: Location, kind: String, raw: AST.Expression): AST.Expression = {
+    def parseWith(wrapper: String, method: String): AST.Expression =
+      AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType(wrapper, true), false), method, List(raw))
+    kind match {
+      case "String" => raw
+      case "Int" => parseWith("java.lang.Integer", "parseInt")
+      case "Long" => parseWith("java.lang.Long", "parseLong")
+      case "Double" => parseWith("java.lang.Double", "parseDouble")
+      case "Float" => parseWith("java.lang.Float", "parseFloat")
+      case "Boolean" => parseWith("java.lang.Boolean", "parseBoolean")
+      case "Short" => parseWith("java.lang.Short", "parseShort")
+      case "Byte" => parseWith("java.lang.Byte", "parseByte")
+      case _ => raw
+    }
   }
 
   def rewriteClassDeclaration(declaration: ClassDeclaration): ClassDeclaration = {

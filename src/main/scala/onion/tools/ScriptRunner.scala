@@ -29,19 +29,36 @@ object ScriptRunner {
 
   private def pathArray(path: String): Array[String] =  path.split(Systems.pathSeparator)
 
+  /**
+   * Index of the script-file argument: walks the leading runner options
+   * (skipping each value-taking option's value). Everything from that index
+   * on belongs to the script, so script arguments like --count are never
+   * mistaken for runner options (python/node behavior).
+   */
+  private[tools] def scriptIndex(args: Array[String]): Int = {
+    var i = 0
+    while (i < args.length && args(i).startsWith("-")) {
+      i += (if (VALUE_OPTIONS.contains(args(i))) 2 else 1)
+    }
+    i
+  }
+
   def main(args: Array[String]): Unit = {
-    // Handle help and version flags early
-    if (args.exists(a => a == "-h" || a == "--help")) {
+    // Only the runner-option prefix (before the script file) is inspected;
+    // flags after the script path are the script's own arguments.
+    val prefix = args.take(scriptIndex(args))
+    if (prefix.exists(a => a == "-h" || a == "--help")) {
       new ScriptRunner().printUsage()
       return
     }
-    if (args.exists(a => a == "-v" || a == "--version")) {
+    if (prefix.exists(a => a == "-v" || a == "--version")) {
       println(s"Onion Script Runner version $VERSION")
       return
     }
-    val verbose = args.exists(_ == "--verbose")
-    val watch = args.exists(_ == "--watch")
-    val filteredArgs = args.filterNot(a => a == "--verbose" || a == "--watch")
+    val verbose = prefix.exists(_ == "--verbose")
+    val watch = prefix.exists(_ == "--watch")
+    val si = scriptIndex(args)
+    val filteredArgs = args.take(si).filterNot(a => a == "--verbose" || a == "--watch") ++ args.drop(si)
     if (watch) {
       runWatching(filteredArgs, verbose)
       return
@@ -123,6 +140,11 @@ object ScriptRunner {
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_MAX_ERROR: Int = 10
+  /** Runner options that take a value (their value is skipped when locating the script file). */
+  private final val VALUE_OPTIONS: Set[String] = Set(
+    CLASSPATH, SCRIPT_SUPER_CLASS, ENCODING, MAX_ERROR,
+    PROFILE_FORMAT, PROFILE_OUTPUT, WARN_LEVEL, SUPPRESS_WARNINGS
+  )
 }
 
 class ScriptRunner {
@@ -146,7 +168,16 @@ class ScriptRunner {
       printUsage()
       return -1
     }
-    parser.parse(commandLine) match {
+    // Runner options end at the script file; everything after it goes to the
+    // script verbatim (so script flags like --count are never parsed here).
+    val si = ScriptRunner.scriptIndex(commandLine)
+    if (si >= commandLine.length) {
+      printUsage()
+      return -1
+    }
+    val runnerLine = commandLine.take(si + 1)
+    val passThroughArgs = commandLine.drop(si + 1)
+    parser.parse(runnerLine) match {
       case failure@ParseFailure(_, _) =>
         printFailure(failure)
         return -1
@@ -159,7 +190,7 @@ class ScriptRunner {
         createConfig(success, verbose) match {
           case None => -1
           case Some(config) =>
-            val scriptArgs = params.drop(1).toArray
+            val scriptArgs = passThroughArgs
             val result = compile(config, Array(params.head))
             emitDiagnostics(result)
             emitProfile(config, result)

@@ -29,12 +29,22 @@ final class ControlFlowEmitter(
       case None => throw new RuntimeException("Continue statement outside of loop")
 
   def emitExpressionActionStatement(node: ExpressionActionStatement): Unit =
-    visitTerm(node.term)
-    node.term.`type` match
-      case t if t.isBottomType => ()
-      case BasicType.VOID => ()
-      case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
-      case _ => gen.pop()
+    node.term match
+      case cast: AsInstanceOf if !cast.target.`type`.isBasicType && cast.destination.isBasicType =>
+        // The result is discarded, so the cast's only effect would be to unbox
+        // a reference to a primitive -- which NPEs when a generic method's
+        // erased type-variable return is null (e.g. Map[String,Int].put
+        // returning the absent previous value). Emit the underlying reference
+        // and pop it (one slot) instead of unboxing.
+        visitTerm(cast.target)
+        gen.pop()
+      case term =>
+        visitTerm(term)
+        term.`type` match
+          case t if t.isBottomType => ()
+          case BasicType.VOID => ()
+          case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
+          case _ => gen.pop()
 
   def emitIfStatement(node: IfStatement): Unit =
     val elseLabel = gen.newLabel()

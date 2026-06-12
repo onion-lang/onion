@@ -4,6 +4,51 @@ import onion.tools.Shell
 
 class AutoBoxingSpec extends AbstractShellSpec {
 
+  describe("generic methods returning a primitive-bound type variable") {
+    it("does not unbox a discarded null return (Map.put as a statement)") {
+      val result = shell.run(
+        """
+          |import { java.util.HashMap }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val m = new HashMap[String, Int]()
+          |    m.put("a", 1)
+          |    m.put("b", 2)
+          |    return (m.get("a") as Int) + (m.get("b") as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "MapPutStatement.on",
+        Array()
+      )
+      assert(Shell.Success(3) == result)
+    }
+
+    it("accumulates counts in a Map[String, Int] (put as statement)") {
+      val result = shell.run(
+        """
+          |import { java.util.HashMap }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val counts = new HashMap[String, Int]()
+          |    val words = ["a", "b", "a", "a"]
+          |    foreach w: String in words {
+          |      val cur = counts.getOrDefault(w, 0)
+          |      counts.put(w, (cur as Int) + 1)
+          |    }
+          |    return (counts.get("a") as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "WordCount.on",
+        Array()
+      )
+      assert(Shell.Success(3) == result)
+    }
+  }
+
   describe("Auto-boxing") {
     it("boxes int to Object") {
       val result = shell.run(

@@ -16,7 +16,8 @@ private[compiler] final class TopLevelTypingSupport(
   processEnumDeclaration: (AST.EnumDeclaration, LocalContext) => Unit,
   processExtensionDeclaration: AST.ExtensionDeclaration => Unit,
   processFunctionDeclaration: (AST.FunctionDeclaration, LocalContext) => Unit,
-  processGlobalVariableDeclaration: (AST.GlobalVariableDeclaration, LocalContext) => Unit
+  processGlobalVariableDeclaration: (AST.GlobalVariableDeclaration, LocalContext) => Unit,
+  processTopLevelVarDeclaration: (AST.LocalVariableDeclaration, ClassDefinition, LocalContext) => Option[ActionStatement]
 ) {
   final case class PreparedUnit(
     context: LocalContext,
@@ -41,6 +42,12 @@ private[compiler] final class TopLevelTypingSupport(
     for (element <- toplevels) {
       if (!element.isInstanceOf[AST.TypeDeclaration]) unitContext.currentDefinition = prepared.klass
       element match {
+        case node: AST.LocalVariableDeclaration if prepared.klass != null =>
+          prepared.context.setMethod(prepared.startMethod)
+          processTopLevelVarDeclaration(node, prepared.klass, prepared.context) match {
+            case Some(stmt) => prepared.statements += stmt
+            case None => prepared.statements += translate(node, prepared.context)
+          }
         case node: AST.BlockElement =>
           prepared.context.setMethod(prepared.startMethod)
           prepared.statements += translate(node, prepared.context)

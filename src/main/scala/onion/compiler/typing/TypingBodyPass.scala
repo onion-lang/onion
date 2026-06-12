@@ -56,7 +56,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     processEnumDeclaration,
     processExtensionDeclaration,
     processFunctionDeclaration,
-    processGlobalVariableDeclaration
+    processGlobalVariableDeclaration,
+    processTopLevelVarDeclaration
   )
   def run(): Unit = runUnit()
 
@@ -299,6 +300,39 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   }
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =
     blockElementLowering.translate(node, context)
+
+  /**
+   * Promote a top-level `val`/`var` declaration to a field of the script's
+   * synthetic class so that top-level functions (and later statements) can see
+   * it -- a bare local would be invisible outside the generated `start` method.
+   * Returns the in-order field-initialisation statement, or None to fall back
+   * to a plain local (no initializer). The field is non-final so `start` can
+   * assign it; immutability of a top-level `val` is not strictly enforced.
+   */
+  def processTopLevelVarDeclaration(
+    node: AST.LocalVariableDeclaration,
+    klass: ClassDefinition,
+    context: LocalContext
+  ): Option[ActionStatement] = {
+    if (node.init == null) return None
+    if (klass.field(node.name) != null) return None
+    val explicitType = if (node.typeRef == null) None else typing.mapFrom(node.typeRef)
+    val valueOpt = explicitType match {
+      case Some(t) => typed(node.init, context, t)
+      case None => typed(node.init, context)
+    }
+    valueOpt.flatMap { value =>
+      val fieldType = explicitType.getOrElse(value.`type`)
+      if (fieldType == BasicType.VOID) None
+      else {
+        val field = new FieldDefinition(node.location, AST.M_PUBLIC, klass, node.name, fieldType)
+        klass.add(field)
+        val adapted = processAssignable(node.init, fieldType, value)
+        if (adapted == null) None
+        else Some(new ExpressionActionStatement(new SetField(new This(node.location, klass), field, adapted)))
+      }
+    }
+  }
 
   def defaultValue(typeRef: Type): Term = Term.defaultValue(typeRef)
   def addReturnNode(node: ActionStatement, returnType: Type): StatementBlock = {

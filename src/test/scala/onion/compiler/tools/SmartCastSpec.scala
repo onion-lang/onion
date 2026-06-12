@@ -4,6 +4,80 @@ import onion.tools.Shell
 
 class SmartCastSpec extends AbstractShellSpec {
   describe("Smart Cast") {
+    describe("guard-clause narrowing") {
+      it("narrows after an early return on null") {
+        val result = shell.run(
+          """
+            |class Main {
+            |public:
+            |  static def f(s: String?): Int {
+            |    if s == null { return 0 }
+            |    return s.length()
+            |  }
+            |  static def main(args: String[]): Int = f("hello")
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success(5) == result)
+      }
+
+      it("narrows after a guard that throws") {
+        val result = shell.run(
+          """
+            |class Main {
+            |public:
+            |  static def f(s: String?): Int {
+            |    if s == null { throw new RuntimeException("nil") }
+            |    return s.length()
+            |  }
+            |  static def main(args: String[]): Int = f("hi")
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success(2) == result)
+      }
+
+      it("narrows after `if x != null {} else { return }`") {
+        val result = shell.run(
+          """
+            |class Main {
+            |public:
+            |  static def f(s: String?): Int {
+            |    if s != null { } else { return 0 }
+            |    return s.length()
+            |  }
+            |  static def main(args: String[]): Int = f("abc")
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success(3) == result)
+      }
+
+      it("does NOT narrow when the guard branch falls through") {
+        val result = shell.run(
+          """
+            |class Main {
+            |public:
+            |  static def f(s: String?): Int {
+            |    if s == null { IO::println("null") }
+            |    return s.length()
+            |  }
+            |  static def main(args: String[]): Int = f("hi")
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success(2) != result)
+      }
+    }
+
     describe("is operator") {
       it("narrows type after is check in then branch") {
         val result = shell.run(

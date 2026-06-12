@@ -42,21 +42,28 @@ final class BlockElementLowering(
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement = node match {
     case AST.BlockExpression(loc, elements) =>
       context.openScope {
-        val statements = Buffer[ActionStatement]()
-        var foundTerminating = false
-        for (elem <- elements) {
-          if (foundTerminating) {
-            // Report unreachable code
-            bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
-            bodyContext.warningReporter.unreachableCode(elem.location)
+        // Guard-clause narrowings (see IfExpression) leak forward to later
+        // statements in this block; bound them so they don't escape it.
+        val savedNarrowings = context.saveNarrowings()
+        try {
+          val statements = Buffer[ActionStatement]()
+          var foundTerminating = false
+          for (elem <- elements) {
+            if (foundTerminating) {
+              // Report unreachable code
+              bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+              bodyContext.warningReporter.unreachableCode(elem.location)
+            }
+            val stmt = translate(elem, context)
+            statements += stmt
+            if (!foundTerminating && isTerminating(stmt)) {
+              foundTerminating = true
+            }
           }
-          val stmt = translate(elem, context)
-          statements += stmt
-          if (!foundTerminating && isTerminating(stmt)) {
-            foundTerminating = true
-          }
+          new StatementBlock(statements.toIndexedSeq*)
+        } finally {
+          context.restoreNarrowings(savedNarrowings)
         }
-        new StatementBlock(statements.toIndexedSeq*)
       }
     case node: AST.BreakExpression =>
       if (!context.inLoop) {
@@ -186,6 +193,20 @@ final class BlockElementLowering(
           val result = translate(node.elseBlock, context)
           context.restoreNarrowings(savedNarrowings)
           result
+        }
+
+        // Guard-clause smart cast: when a branch always exits (return/throw/
+        // break/continue), the opposite condition holds for the rest of the
+        // enclosing block, so keep that narrowing in effect. The enclosing
+        // block bounds it (it saves/restores narrowings around its elements).
+        //   if x == null { return } ; x.foo()   // x narrowed to non-null
+        //   if x != null { } else { return } ; x.foo()
+        if (node.elseBlock == null) {
+          if (isTerminating(thenBlock)) {
+            narrowing.negative.foreach { case (name, tp) => context.addNarrowing(name, tp) }
+          }
+        } else if (isTerminating(elseBlock) && !isTerminating(thenBlock)) {
+          narrowing.positive.foreach { case (name, tp) => context.addNarrowing(name, tp) }
         }
 
         if (condition != null) new IfStatement(condition, thenBlock, elseBlock) else new NOP(node.location)

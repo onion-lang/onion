@@ -150,6 +150,20 @@ final class ConstructionTyping(
       return typeNewObjectWithNamedArgs(node, typeRef, context)
     }
 
+    // A lambda with untyped parameters can't be typed until its target type
+    // (the constructor parameter) is known. Resolve the constructor from the
+    // other arguments first, then type the closures against its parameters --
+    // mirroring the bidirectional inference the method-call path performs.
+    val untypedClosureIndices = node.args.zipWithIndex.collect {
+      case (closure: AST.ClosureExpression, i) if closure.args.exists(_.typeRef == null) => i
+    }.toSet
+    if (untypedClosureIndices.nonEmpty) {
+      resolveConstructorForClosures(node, typeRef, context, untypedClosureIndices) match {
+        case Some(term) => return Some(term)
+        case None => // ambiguous/unresolved: fall through to the eager path, which reports E0052 / constructor-not-found
+      }
+    }
+
     // Existing positional argument handling
     val parameters0 = typedTerms(node.args.toArray, context)
     if (parameters0 == null) return None
@@ -223,6 +237,71 @@ final class ConstructionTyping(
         else p
       }
       (candidates, adapted)
+    }
+  }
+
+  /**
+   * Resolve a constructor when some arguments are lambdas with untyped
+   * parameters: type the non-closure arguments, pick the unique constructor
+   * that matches on arity and those arguments, then type each closure against
+   * the constructor's corresponding parameter type. Returns None (to fall back
+   * to eager handling) when resolution is ambiguous or finds no single match.
+   */
+  private def resolveConstructorForClosures(
+    node: AST.NewObject,
+    typeRef: ClassType,
+    context: LocalContext,
+    closureIndices: Set[Int]
+  ): Option[Term] = {
+    val args = node.args.toArray
+    val classSubst = TypeSubstitution.classSubstitution(typeRef)
+    def substitutedArgs(c: ConstructorRef): Array[Type] =
+      c.getArgs.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+
+    val prelim = new Array[Term](args.length)
+    for (i <- args.indices if !closureIndices.contains(i)) {
+      typed(args(i), context) match {
+        case Some(t) => prelim(i) = t
+        case None => return None
+      }
+    }
+
+    val candidates = typeRef.constructors.filter { c =>
+      val formals = substitutedArgs(c)
+      formals.length == args.length &&
+        args.indices.forall { i =>
+          closureIndices.contains(i) ||
+            TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
+        }
+    }
+    if (candidates.length != 1) return None
+
+    val ctor = candidates(0)
+    val formals = substitutedArgs(ctor)
+    val finalParams = new Array[Term](args.length)
+    for (i <- args.indices) {
+      if (closureIndices.contains(i)) {
+        typed(args(i), context, formals(i)) match {
+          case Some(t) => finalParams(i) = t
+          case None => return None
+        }
+      } else {
+        val p = prelim(i)
+        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p) else p
+      }
+    }
+
+    typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val appliedCtor = new TypedAST.ConstructorRef {
+          def modifier: Int = ctor.modifier
+          def affiliation: TypedAST.ClassType = applied
+          def name: String = ctor.name
+          def getArgs: Array[TypedAST.Type] = ctor.getArgs
+        }
+        Some(new NewObject(appliedCtor, finalParams))
+      case _ =>
+        Some(new NewObject(ctor, finalParams))
     }
   }
 

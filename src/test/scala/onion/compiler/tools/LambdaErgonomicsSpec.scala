@@ -96,6 +96,47 @@ class LambdaErgonomicsSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(50) == result)
     }
+
+    it("infers a constructor-argument lambda's parameter types (issue #164)") {
+      val result = shell.run(
+        """
+          |class Calculator {
+          |  val op: Function2[Int, Int, Int]
+          |public:
+          |  def this(f: Function2[Int, Int, Int]) { this.op = f }
+          |  def apply(a: Int, b: Int): Int = this.op.call(a, b)
+          |  static def main(args: String[]): Int {
+          |    val add = new Calculator((x, y) -> x + y)
+          |    return add.apply(3, 4)
+          |  }
+          |}
+          |""".stripMargin,
+        "CtorLambdaInfer.on",
+        Array()
+      )
+      assert(Shell.Success(7) == result)
+    }
+
+    it("infers a constructor lambda for a generic class") {
+      val result = shell.run(
+        """
+          |class Holder[T] {
+          |  val value: T
+          |  val transform: Function1[T, String]
+          |public:
+          |  def this(v: T, t: Function1[T, String]) { this.value = v; this.transform = t }
+          |  def show(): String = this.transform.call(this.value)
+          |  static def main(args: String[]): String {
+          |    val h = new Holder[Int](42, n -> "val=" + n)
+          |    return h.show()
+          |  }
+          |}
+          |""".stripMargin,
+        "CtorLambdaGeneric.on",
+        Array()
+      )
+      assert(Shell.Success("val=42") == result)
+    }
   }
 
   describe("Function call syntax on values") {

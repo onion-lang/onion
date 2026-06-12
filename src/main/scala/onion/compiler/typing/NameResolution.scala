@@ -27,6 +27,35 @@ class NameResolver(private val context: NameResolutionContext) {
 
   def resolveNode(typeNode: AST.TypeNode): Type = map(typeNode.desc)
 
+  /**
+   * Java generics erase to reference types, so a primitive used as a type
+   * argument is stored as its wrapper (Int -> Integer). The surface type stays
+   * `Int`; boxing/unboxing happens transparently at use sites. This unifies
+   * primitive and reference types the way Scala/Kotlin do, so `Map[String, Int]`
+   * behaves like `Map[String, Integer]` (e.g. extension methods match, `put`
+   * returns a nullable Integer rather than NPE-unboxing).
+   */
+  private def boxTypeArgument(arg: Type): Type = arg match {
+    case bt: BasicType if bt != BasicType.VOID =>
+      val wrapper = bt match {
+        case BasicType.BOOLEAN => "java.lang.Boolean"
+        case BasicType.BYTE => "java.lang.Byte"
+        case BasicType.SHORT => "java.lang.Short"
+        case BasicType.CHAR => "java.lang.Character"
+        case BasicType.INT => "java.lang.Integer"
+        case BasicType.LONG => "java.lang.Long"
+        case BasicType.FLOAT => "java.lang.Float"
+        case BasicType.DOUBLE => "java.lang.Double"
+        case _ => null
+      }
+      if (wrapper == null) arg
+      else {
+        val loaded = context.table.loadOrNull(wrapper)
+        if (loaded == null) arg else loaded
+      }
+    case _ => arg
+  }
+
   def getCandidateClassNames: Array[String] = {
     val localClasses = context.table.classes.values.map(_.name).toSeq
     val importedClasses = imports.filterNot(_.isOnDemand).map(_.simpleName)
@@ -63,7 +92,7 @@ class NameResolver(private val context: NameResolutionContext) {
           forName(name, qualified)
       }
     case AST.ParameterizedType(base, params) =>
-      val mappedArgs = params.map(map)
+      val mappedArgs = params.map(map).map(boxTypeArgument)
       if (mappedArgs.exists(_ == null)) return null
 
       base match {

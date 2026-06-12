@@ -4,6 +4,64 @@ import onion.tools.Shell
 
 class AutoBoxingSpec extends AbstractShellSpec {
 
+  describe("primitive types unified as type arguments (#161)") {
+    it("stores a primitive value type as its wrapper, so put returns it without NPE") {
+      val result = shell.run(
+        """
+          |import { java.util.HashMap }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val m = new HashMap[String, Int]()
+          |    val prev = m.put("a", 1)
+          |    return m.get("a")
+          |  }
+          |}
+          |""".stripMargin,
+        "MapPutPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(1) == result)
+    }
+
+    it("auto-unboxes a primitive-typed get result on assignment to Int") {
+      val result = shell.run(
+        """
+          |import { java.util.HashMap }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val m = new HashMap[String, Int]()
+          |    m.put("a", 10)
+          |    val x: Int = m.get("a")
+          |    return x + 5
+          |  }
+          |}
+          |""".stripMargin,
+        "MapGetUnbox.on",
+        Array()
+      )
+      assert(Shell.Success(15) == result)
+    }
+
+    it("uses a user generic class with a primitive type argument") {
+      val result = shell.run(
+        """
+          |class Box[T] {
+          |  val value: T
+          |public:
+          |  def this(v: T) { this.value = v }
+          |  def get(): T = this.value
+          |  static def main(args: String[]): Int = new Box[Int](42).get()
+          |}
+          |""".stripMargin,
+        "BoxPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(42) == result)
+    }
+  }
+
   describe("generic methods returning a primitive-bound type variable") {
     it("does not unbox a discarded null return (Map.put as a statement)") {
       val result = shell.run(
@@ -15,7 +73,7 @@ class AutoBoxingSpec extends AbstractShellSpec {
           |    val m = new HashMap[String, Int]()
           |    m.put("a", 1)
           |    m.put("b", 2)
-          |    return (m.get("a") as Int) + (m.get("b") as Int)
+          |    return m.get("a") + m.get("b")
           |  }
           |}
           |""".stripMargin,
@@ -36,9 +94,9 @@ class AutoBoxingSpec extends AbstractShellSpec {
           |    val words = ["a", "b", "a", "a"]
           |    foreach w: String in words {
           |      val cur = counts.getOrDefault(w, 0)
-          |      counts.put(w, (cur as Int) + 1)
+          |      counts.put(w, cur + 1)
           |    }
-          |    return (counts.get("a") as Int)
+          |    return counts.get("a")
           |  }
           |}
           |""".stripMargin,

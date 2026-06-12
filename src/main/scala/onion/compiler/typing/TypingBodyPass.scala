@@ -169,7 +169,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
       if (node.block == null) {
         typing.report(SemanticError.FUNCTION_BODY_REQUIRED, node, node.name)
       } else {
-        methodBodySupport.processMethodLikeBody(function, node.args, node.block)
+        val functionTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(typing.emptyTypeParams ++ functionTypeParams) {
+          methodBodySupport.processMethodLikeBody(function, node.args, node.block)
+        }
       }
     }
   def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration, context: LocalContext): Unit = {()}

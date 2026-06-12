@@ -47,4 +47,42 @@ class FunctionWithExpressionBodySpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Success])
     }
   }
+
+  describe("top-level generic function (issue #163)") {
+    it("declares and calls a type parameter with an explicit type argument") {
+      val result = shell.run(
+        """
+          |def first[T](list: List[T]): T = list[0]
+          |IO::println(first[String](["a", "b", "c"]))
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success])
+    }
+
+    it("infers the type argument from the call") {
+      val result = shell.run(
+        """
+          |def first[T](list: List[T]): T = list[0]
+          |IO::println(first(["p", "q"]))
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success])
+    }
+
+    it("supports multiple type parameters") {
+      val result = shell.run(
+        """
+          |def pairUp[A, B](a: A, b: B): String = a + ":" + b
+          |IO::println(pairUp[String, Int]("x", 5))
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success])
+    }
+  }
 }

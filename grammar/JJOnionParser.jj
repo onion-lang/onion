@@ -912,18 +912,19 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   AST.TypeNode ty = null;
   AST.BlockExpression b = null;
   AST.Expression e = null;
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
   List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
-  anns=annotations() t1="def" t2=id() ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
+  anns=annotations() t1="def" t2=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  (b=block() | {enterSection();} eos()) {
-       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, throwsTypes, anns);
+       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns);
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t2), args, ty,
          new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e))),
-         throwsTypes, anns
+         tparams, throwsTypes, anns
        );
      }
   )

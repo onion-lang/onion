@@ -404,21 +404,26 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
-    val argsOption = typesOf(node.args)
-    val returnTypeOption =
-      if (node.returnType == null) {
-        report(SemanticError.RETURN_TYPE_REQUIRED, node, node.name)
-        None
-      } else mapFrom(node.returnType)
-    for (args <- argsOption; returnType <- returnTypeOption) {
-      val classType = loadTopClass.asInstanceOf[ClassDefinition]
-      val modifier = node.modifiers | AST.M_PUBLIC
-      val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
-      val hasVararg = node.args.lastOption.exists(_.isVararg)
-      val annotations = node.annotations.map(_.name).toSet
-      val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, Array(), throwsTypes, hasVararg, annotations)
-      put(node, method)
-      classType.add(method)
+    val functionTypeParams = createTypeParams(node.typeParameters)
+    declaredTypeParams_(node) = functionTypeParams
+    openTypeParams(emptyTypeParams ++ functionTypeParams) {
+      val argsOption = typesOf(node.args)
+      val returnTypeOption =
+        if (node.returnType == null) {
+          report(SemanticError.RETURN_TYPE_REQUIRED, node, node.name)
+          None
+        } else mapFrom(node.returnType)
+      for (args <- argsOption; returnType <- returnTypeOption) {
+        val classType = loadTopClass.asInstanceOf[ClassDefinition]
+        val modifier = node.modifiers | AST.M_PUBLIC
+        val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
+        val hasVararg = node.args.lastOption.exists(_.isVararg)
+        val annotations = node.annotations.map(_.name).toSet
+        val typeParams = functionTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray
+        val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, typeParams, throwsTypes, hasVararg, annotations)
+        put(node, method)
+        classType.add(method)
+      }
     }
   }
 

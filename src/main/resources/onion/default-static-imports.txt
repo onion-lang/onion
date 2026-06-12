@@ -9,3 +9,5 @@ onion.Iterables
 onion.Regex
 onion.DateTime
 onion.Http
+onion.Resources
+onion.Csv

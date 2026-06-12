@@ -199,6 +199,18 @@ public class JJOnionParser implements Parser {
     return dotContinuationFollows();
   }
 
+  /**
+   * Desugars a scheme-prefixed raw literal token (re"..."/file"..."/http"...)
+   * into the unqualified call <prefix>("raw"), keeping the body verbatim.
+   */
+  private AST.Expression schemeCall(Token t, int prefixLen) {
+    String name = t.image.substring(0, prefixLen);
+    String raw = t.image.substring(prefixLen + 1, t.image.length() - 1);
+    ArrayBuffer<AST.Expression> args = new ArrayBuffer<AST.Expression>();
+    append(args, new AST.StringLiteral(p(t), raw));
+    return new AST.UnqualifiedMethodCall(p(t), name, toList(args));
+  }
+
   private boolean isDeclarationStart(String img) {
     return "class".equals(img) || "interface".equals(img) || "record".equals(img)
         || "enum".equals(img) || "extension".equals(img) || "type".equals(img);
@@ -769,6 +781,15 @@ TOKEN:
     ( ~["\""] | "\"" ~["\""] | "\"\"" ~["\""] )*
     "\"\"\""
   >
+// Scheme-prefixed raw string literals: re"..." / file"..." / http"...".
+// Raw = no escape processing (a backslash passes through verbatim; \" only
+// prevents termination), so regex patterns need no double-backslash. Each
+// desugars to the unqualified call <prefix>("..."), resolved through the
+// default static imports (onion.Resources), so the literal and the function
+// form are exactly equivalent.
+| <RE_STRING:   "re\""   ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
+| <FILE_STRING: "file\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
+| <HTTP_STRING: "http\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
 | <QUOTED_ID: "`" (~["`"])+ "`" >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
@@ -1941,6 +1962,7 @@ AST.Expression primary() : {
 | e=float_literal()                                                       {return e;}
 | e=char_literal()                                                        {return e;}
 | e=string_literal()                                                      {return e;}
+| e=scheme_literal()                                                      {return e;}
 | e=boolean_literal()                                                     {return e;}
 | e=null_literal()                                                        {return e;}
 | "(" eols() e=term() eols() ")"                                          {return e;}
@@ -2148,6 +2170,14 @@ AST.Expression float_literal() :{Token t; String s;}{
 AST.Expression boolean_literal() :{Token t;}{
   t="true"  {return new AST.BooleanLiteral(p(t), true);}
 | t="false" {return new AST.BooleanLiteral(p(t), false);}
+}
+
+// Scheme-prefixed raw literal: X"raw" desugars to the unqualified call
+// X("raw") with the body kept verbatim (no escape processing).
+AST.Expression scheme_literal() :{Token t;}{
+  t=<RE_STRING>   {return schemeCall(t, 2);}
+| t=<FILE_STRING> {return schemeCall(t, 4);}
+| t=<HTTP_STRING> {return schemeCall(t, 4);}
 }
 
 AST.Expression string_literal() :{Token t; String str;}{

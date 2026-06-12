@@ -97,13 +97,16 @@ private[compiler] final class StaticImportMethodCallSupport(
         StaticImportAmbiguous(first.method, second.method)
       case CandidateSelection.Selected(chosen) =>
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        val adjusted = params.indices.map(i => calls.processAssignable(node.args(i), chosen.expectedArgs(i), params(i))).toArray
-        if (adjusted.contains(null)) StaticImportNoMatch
-        else {
-          overloadSupport.buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst) match {
-            case Some(term) => StaticImportResolved(chosen.method, term)
-            case None => StaticImportNoMatch
-          }
+        // prepareCallParams wraps trailing arguments into the vararg array (and
+        // fills defaults), so bare default-static-import calls to varargs
+        // methods like `format`/`printf` resolve the same as `IO::format`.
+        calls.prepareCallParams(node, node.args, chosen.method, params, chosen.expectedArgs) match {
+          case Some(adjusted) =>
+            overloadSupport.buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst) match {
+              case Some(term) => StaticImportResolved(chosen.method, term)
+              case None => StaticImportNoMatch
+            }
+          case None => StaticImportNoMatch
         }
       case CandidateSelection.NoMatch =>
         StaticImportNoMatch

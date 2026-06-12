@@ -131,9 +131,16 @@ final class AssignmentTyping(
 
   def typeAssignment(node: AST.Assignment, context: LocalContext): Option[Term] =
     node.lhs match {
-      case _: AST.Id =>
-        Option(processLocalAssign(node, context))
-      // Unqualified field assignments are not supported; use this.field or self.field.
+      case id: AST.Id =>
+        // A bare name that is an instance field assigns through `this`
+        // (implicit field access); otherwise it's a local assignment.
+        if (context.lookup(id.name) == null && isImplicitInstanceField(id.name, context)) {
+          val rewritten = AST.Assignment(node.location,
+            AST.MemberSelection(node.location, AST.CurrentInstance(node.location), id.name), node.rhs)
+          Option(processMemberAssign(rewritten, context))
+        } else {
+          Option(processLocalAssign(node, context))
+        }
       case _: AST.Indexing =>
         Option(processArrayAssign(node, context))
       case _: AST.MemberSelection =>
@@ -147,6 +154,13 @@ final class AssignmentTyping(
         bodyContext.report(LVALUE_REQUIRED, node)
         None
     }
+
+  /** Whether a bare name denotes a non-static field of the current class reachable through `this`. */
+  private def isImplicitInstanceField(name: String, context: LocalContext): Boolean = {
+    if (context.isStatic) return false
+    val field = bodyContext.definition.findField(name)
+    field != null && (field.modifier & AST.M_STATIC) == 0
+  }
 
   def processStaticFieldAssign(node: AST.Assignment, context: LocalContext): Term = {
     node.lhs match {

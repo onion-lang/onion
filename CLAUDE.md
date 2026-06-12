@@ -352,7 +352,7 @@ These are frequently confused with other languages. **Always check these:**
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
-| `this.field = value` in constructor | ✓ correct - fields must use `this.` |
+| `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional now (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
 | `C::field = v` unsupported? | ✓ correct - static field assignment works (public fields) |

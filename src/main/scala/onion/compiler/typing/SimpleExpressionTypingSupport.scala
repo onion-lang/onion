@@ -162,27 +162,47 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
   private def typeIdentifier(node: AST.Id, context: LocalContext): Option[Term] = {
     val bind = context.lookup(node.name)
-    if (bind == null) {
-      // A bare name that isn't a local but names a field is the common
-      // "forgot this./Class::" mistake (Onion requires explicit qualification);
-      // point at the qualified form when one would actually resolve.
-      fieldQualificationHint(node.name, context) match {
-        case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
-        case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
-      }
-      None
-    } else {
+    if (bind != null) {
       context.recordUsage(node.name)
       val effectiveType = context.getEffectiveType(node.name)
       if (effectiveType != bind.tp) Some(new AsInstanceOf(new RefLocal(bind), effectiveType))
       else Some(new RefLocal(bind))
+    } else {
+      // Implicit field access: a bare name with no local binding resolves to a
+      // field of the current class -- this.<name> for an instance field, the
+      // static field directly for a static one.
+      resolveImplicitField(node, context) match {
+        case Some(term) => Some(term)
+        case None =>
+          // Fields that can't be reached this way (e.g. an instance field from
+          // a static method) still suggest the qualified form to use.
+          fieldQualificationHint(node.name, context) match {
+            case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
+            case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+          }
+          None
+      }
     }
   }
 
   /**
-   * The qualified form to suggest when a bare name actually denotes a field:
-   * `Class::name` for a static field, `this.name` for an instance field
-   * reachable from the current (non-static) context, or None otherwise.
+   * Resolve a bare name as a field of the current class: the static field
+   * directly, or the instance field through `this` when not in a static
+   * context. None when no such field is reachable.
+   */
+  private def resolveImplicitField(node: AST.Id, context: LocalContext): Option[Term] = {
+    val field = bodyContext.definition.findField(node.name)
+    if (field == null) None
+    else if ((field.modifier & AST.M_STATIC) != 0)
+      Some(new RefStaticField(node.location, bodyContext.definition, field))
+    else if (!context.isStatic)
+      typeMemberSelection(AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name), context)
+    else None
+  }
+
+  /**
+   * The qualified form to suggest when a bare name names a field that implicit
+   * access can't reach (an instance field referenced from a static context).
    */
   private def fieldQualificationHint(name: String, context: LocalContext): Option[String] = {
     val field = bodyContext.definition.findField(name)

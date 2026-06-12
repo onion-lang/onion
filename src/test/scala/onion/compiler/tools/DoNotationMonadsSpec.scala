@@ -27,6 +27,27 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("42:true") == result)
     }
+
+    it("accepts newline-separated binds (issue #160)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val r = do[Option] {
+          |      a <- Option::some(10)
+          |      b <- Option::some(20)
+          |      ret (a as Int) + (b as Int)
+          |    }
+          |    return (r.get() as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "DoNewline.on",
+        Array()
+      )
+      assert(Shell.Success(30) == result)
+    }
   }
 
   describe("do-notation over Result") {

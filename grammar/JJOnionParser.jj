@@ -2030,8 +2030,12 @@ List<Object> do_clauses() :{
   Object stmt;
   ArrayBuffer<Object> stmts = new ArrayBuffer<Object>();
 }{
+  // Inside a do-block the lexer is in DEFAULT state, so newlines are skipped
+  // rather than emitted as EOL tokens. Clauses are therefore separated by an
+  // optional ";" or just whitespace/newlines -- keep taking clauses until "}"
+  // (or EOF). Each iteration consumes either a separator ";" or another clause.
   stmt=do_clause() { append(stmts, stmt); }
-  ( LOOKAHEAD(eols() ";") eols() ";" eols() stmt=do_clause() { append(stmts, stmt); } )*
+  ( ";" | stmt=do_clause() { append(stmts, stmt); } )*
   { return toList(stmts); }
 }
 

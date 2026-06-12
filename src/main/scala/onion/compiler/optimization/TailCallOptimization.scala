@@ -78,10 +78,13 @@ class TailCallOptimization(config: CompilerConfig)
     val block = method.getBlock
     if (block == null || block.statements.isEmpty) return false
 
-    // Only optimize private methods to avoid breaking public API
-    if (!isPrivate(method)) {
+    // Only optimize methods that cannot be overridden, so a self-call is never
+    // dynamically dispatched to a subclass: private, static (invokestatic),
+    // or final methods. Rewriting an overridable public method's body into a
+    // loop would change its dispatch behavior.
+    if (!isOptimizable(method)) {
       if (config.verbose) {
-        trace(s"[TCO] Skipping non-private method: ${method.classType.name}.${method.name}")
+        trace(s"[TCO] Skipping overridable method: ${method.classType.name}.${method.name}")
       }
       return false
     }
@@ -107,6 +110,15 @@ class TailCallOptimization(config: CompilerConfig)
   private def isPrivate(method: MethodDefinition): Boolean = {
     // Use Onion's M_PRIVATE constant, not Java's Modifier.PRIVATE
     (method.modifier & AST.M_PRIVATE) != 0
+  }
+
+  /**
+   * A method is safe to convert to a loop when it cannot be overridden, so a
+   * self-call is always this exact method: private, static, or final.
+   */
+  private def isOptimizable(method: MethodDefinition): Boolean = {
+    val m = method.modifier
+    (m & AST.M_PRIVATE) != 0 || (m & AST.M_STATIC) != 0 || (m & AST.M_FINAL) != 0
   }
 
   private def containsTailCall(stmts: Seq[ActionStatement], method: MethodDefinition): Boolean = {

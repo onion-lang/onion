@@ -165,6 +165,40 @@ public class JJOnionParser implements Parser {
     return new AST.NewObject(loc, new AST.TypeNode(loc, new AST.ReferenceType("onion.Range", true), false), toList(args));
   }
 
+  /**
+   * Leading-dot continuation: true when, skipping any EOLs after the current
+   * position, the next token is "." or "?.". Lets a method chain span lines.
+   * Pure token peeking (no consumption).
+   */
+  private boolean dotContinuationFollows() {
+    int i = 1;
+    while (getToken(i).kind == EOL) i++;
+    int k = getToken(i).kind;
+    return k == DOT || k == SAFE_ACCESS;
+  }
+
+  /**
+   * Whether primary_suffix should take another iteration: a same-line suffix
+   * ([, ?[, ., ?., as, ++, !!, --) starts right here, or a leading-dot
+   * continuation follows across newlines. Used as the (...)* loop's sole
+   * semantic guard so the loop's continuation set is decided purely here --
+   * a syntactic guard whose alternatives can start with a nullable eols()
+   * would otherwise pull <EOL> into the first-set and hard-error when the
+   * inner choice then fails to match (e.g. an expression-body method
+   * followed by a blank line).
+   */
+  private boolean suffixContinues() {
+    int k = getToken(1).kind;
+    if (k == SAFE_INDEX || k == DOT || k == SAFE_ACCESS || k == K_AS || k == NOT_NULL) {
+      return true;
+    }
+    String img = getToken(1).image;
+    if ("[".equals(img) || "++".equals(img) || "--".equals(img)) {
+      return true;
+    }
+    return dotContinuationFollows();
+  }
+
   private boolean isDeclarationStart(String img) {
     return "class".equals(img) || "interface".equals(img) || "record".equals(img)
         || "enum".equals(img) || "extension".equals(img) || "type".equals(img);
@@ -1386,7 +1420,12 @@ AST.BlockElement block_element():{AST.BlockElement s; Token lbl; AST.Expression 
 
 // End of section
 void eos() :{} {
-  (";" | <EOL> | <EOF>) { leaveSection(); }
+  // After the terminator, absorb any further EOL tokens. Leading-dot
+  // continuation peeks past newlines (see suffixContinues), which can
+  // tokenize a blank line's EOL while still IN_STATEMENT; that buffered
+  // token would otherwise leak past leaveSection() and trip the next
+  // member/statement. Trailing blank lines are insignificant anyway.
+  (";" | <EOL> | <EOF>) { leaveSection(); } eols()
 }
 
 void eols() :{} {
@@ -1395,7 +1434,7 @@ void eols() :{} {
 }
 
 void eos_or_block_end() :{} {
-  (";" | <EOL> | <EOF>) { leaveSection(); }
+  (";" | <EOL> | <EOF>) { leaveSection(); } eols()
 | LOOKAHEAD("}") { leaveSection(); }
 }
 
@@ -1774,10 +1813,30 @@ AST.Expression primary_suffix() : {
   AST.ClosureExpression tl = null;
 }{
   e=primary()
-( LOOKAHEAD(2)
+  // The loop continues only when suffixContinues() says so (a same-line
+  // suffix here, or a leading-dot chain continuing across newlines). A
+  // semantic guard keeps <EOL> out of the continuation first-set. When a
+  // dot continuation follows, eat the intervening newlines first; same-line
+  // suffixes leave the optional eols() unmatched.
+( LOOKAHEAD({ suffixContinues() })
+  eols()
   ( t="[" eols() a=term() eols() "]"                                                              {e = new AST.Indexing(p(t), e, a);}
   | t=<SAFE_INDEX> eols() a=term() eols() "]"                                                     {e = new AST.SafeIndexing(p(t), e, a);}
-  | t="." eols() n=id() (
+  | e=dot_suffix(e)
+  | e=safe_access_suffix(e)
+  | t=<K_AS> eols() type=type()                                                                    {e = new AST.Cast(p(t), e, type);}
+  | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
+  | t=<NOT_NULL>                                                                                  {e = new AST.NotNullAssertion(p(t), e);}
+  | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
+  )
+)* {return e;}
+}
+
+AST.Expression dot_suffix(AST.Expression e) : {
+  Token t, n; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
+  List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL(); AST.ClosureExpression tl = null;
+}{
+  t="." eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
@@ -1787,7 +1846,6 @@ AST.Expression primary_suffix() : {
           { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(p(t), e, c(n), args); }
     | [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()] {
         if (tl != null) {
-          // Paren-less trailing lambda: list.map { x => x * 2 }
           args = (List<AST.Expression>)AST.NIL();
           args = AST.appendToList(args, tl);
           tl = null;
@@ -1796,9 +1854,14 @@ AST.Expression primary_suffix() : {
           e = new AST.MemberSelection(p(t), e, c(n));
         }
       }
-    )
-  // Safe call operator: expr?.name or expr?.method()
-  | t=<SAFE_ACCESS> eols() n=id() (
+    ) { return e; }
+}
+
+AST.Expression safe_access_suffix(AST.Expression e) : {
+  Token t, n; List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
+  List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL(); AST.ClosureExpression tl = null;
+}{
+  t=<SAFE_ACCESS> eols() n=id() (
       LOOKAHEAD( type_arguments() eols() "(" )
         tas=type_arguments() eols() "(" eols() args=terms() ")"
         [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
@@ -1816,13 +1879,7 @@ AST.Expression primary_suffix() : {
           e = new AST.SafeMemberSelection(p(t), e, c(n));
         }
       }
-    )
-  | t=<K_AS> eols() type=type()                                                                    {e = new AST.Cast(p(t), e, type);}
-  | t="++"                                                                                        {e = new AST.PostIncrement(p(t), e);}
-  | t=<NOT_NULL>                                                                                  {e = new AST.NotNullAssertion(p(t), e);}
-  | t="--"                                                                                        {e = new AST.PostDecrement(p(t), e);}
-  )
-)* {return e;}
+    ) { return e; }
 }
 
 AST.Expression primary() : {

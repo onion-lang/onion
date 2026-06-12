@@ -163,7 +163,13 @@ private[compiler] final class SimpleExpressionTypingSupport(
   private def typeIdentifier(node: AST.Id, context: LocalContext): Option[Term] = {
     val bind = context.lookup(node.name)
     if (bind == null) {
-      bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+      // A bare name that isn't a local but names a field is the common
+      // "forgot this./Class::" mistake (Onion requires explicit qualification);
+      // point at the qualified form when one would actually resolve.
+      fieldQualificationHint(node.name, context) match {
+        case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
+        case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+      }
       None
     } else {
       context.recordUsage(node.name)
@@ -171,6 +177,19 @@ private[compiler] final class SimpleExpressionTypingSupport(
       if (effectiveType != bind.tp) Some(new AsInstanceOf(new RefLocal(bind), effectiveType))
       else Some(new RefLocal(bind))
     }
+  }
+
+  /**
+   * The qualified form to suggest when a bare name actually denotes a field:
+   * `Class::name` for a static field, `this.name` for an instance field
+   * reachable from the current (non-static) context, or None otherwise.
+   */
+  private def fieldQualificationHint(name: String, context: LocalContext): Option[String] = {
+    val field = bodyContext.definition.findField(name)
+    if (field == null) None
+    else if ((field.modifier & AST.M_STATIC) != 0) Some(s"${bodyContext.definition.name}::$name")
+    else if (!context.isStatic) Some(s"this.$name")
+    else None
   }
 
   private def typeUnqualifiedFieldReference(node: AST.UnqualifiedFieldReference, context: LocalContext): Option[Term] =

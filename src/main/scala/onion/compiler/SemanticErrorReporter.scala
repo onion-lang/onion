@@ -380,10 +380,15 @@ class SemanticErrorReporter(threshold: Int) {
     val name = asString(items(0))
     val baseMessage = format(message("error.semantic.variableNotFound"), Seq(name))
 
-    val suggestion = if (items.length > 1) {
-      val candidates = items(1).asInstanceOf[Array[String]]
-      toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
-    } else None
+    // A third item is an explicit qualified-form hint (e.g. "this.x" / "C::x")
+    // for a name that is actually a field; prefer it over name-similarity.
+    val suggestion =
+      if (items.length > 2 && items(2) != null) {
+        Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
+      } else if (items.length > 1) {
+        val candidates = items(1).asInstanceOf[Array[String]]
+        toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
+      } else None
 
     problem(position, appendSuggestion(baseMessage, suggestion))
   }

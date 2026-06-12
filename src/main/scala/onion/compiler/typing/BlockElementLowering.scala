@@ -93,7 +93,7 @@ final class BlockElementLowering(
       context.openScope {
         val collection = typed(node.collection, context).getOrElse(null)
         val arg = node.arg
-        addArgument(arg, context)
+        addForeachElement(arg, collection, context)
         var block = context.openLoop {
           translate(node.statement, context)
         }
@@ -388,6 +388,50 @@ final class BlockElementLowering(
 
   private def addArgument(arg: AST.Argument, context: LocalContext): Type =
     body.addArgument(arg, context)
+
+  /**
+   * Binds a foreach element variable, refining a bare-generic annotation to
+   * the collection's actual element type. `foreach (k, v) in map` desugars to
+   * `foreach __e: Map$Entry in map.entrySet() { val k = __e.getKey(); ... }`,
+   * but the desugar can only name the raw `Map$Entry` at parse time, so its
+   * getKey/getValue return the unsubstituted type variables. Recovering the
+   * element type from the collection (`Set[Map.Entry[K, V]]`) restores K and V.
+   */
+  private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext): Unit = {
+    if (context.lookupOnlyCurrentScope(arg.name) != null) {
+      bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
+    } else mapFrom(arg.typeRef) match {
+      case Some(annotated) =>
+        val elementType = if (collection == null) annotated else refineElementType(annotated, collection.`type`)
+        context.add(arg.name, elementType)
+      case None => ()
+    }
+  }
+
+  /**
+   * Refine a raw-generic element annotation to the collection's element type
+   * when they are the same class applied with arguments. Conservative: leaves
+   * explicit applied annotations and differing classes untouched, so ordinary
+   * `foreach x: T in coll` is unaffected.
+   */
+  private def refineElementType(annotated: Type, collectionType: Type): Type = annotated match {
+    case rawAnno: ClassType if !rawAnno.isInstanceOf[AppliedClassType] =>
+      iterableElementType(collectionType) match {
+        case Some(applied: AppliedClassType) if applied.raw.name == rawAnno.name => applied
+        case _ => annotated
+      }
+    case _ => annotated
+  }
+
+  /** The element type of a collection, via its java.lang.Iterable view. */
+  private def iterableElementType(tp: Type): Option[Type] = tp match {
+    case ct: ClassType =>
+      AppliedTypeViews.collectAppliedViewsFrom(ct).collectFirst {
+        case (raw, applied) if raw.name == "java.lang.Iterable" && applied.typeArguments.nonEmpty =>
+          applied.typeArguments.head
+      }
+    case _ => None
+  }
 
   private def processAssignable(node: AST.Node, expected: Type, term: Term): Term =
     body.processAssignable(node, expected, term)

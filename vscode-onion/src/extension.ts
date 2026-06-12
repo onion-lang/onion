@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
@@ -12,96 +13,81 @@ let client: LanguageClient | undefined;
 export function activate(context: vscode.ExtensionContext) {
     console.log('Onion Language extension is now active');
 
-    // Start the language client
-    startLanguageClient(context);
+    // Syntax highlighting works purely from the TextMate grammar and language
+    // configuration -- no running process required. The language server
+    // (onion-lsp) is optional: we only start it when an executable is actually
+    // present, so highlighting-only users never see "server not found" errors.
+    startLanguageClient();
 
-    // Register the restart command
     const restartCommand = vscode.commands.registerCommand('onion.restartServer', async () => {
         if (client) {
             await client.stop();
+            client = undefined;
         }
-        startLanguageClient(context);
-        vscode.window.showInformationMessage('Onion Language Server restarted');
+        const started = startLanguageClient();
+        if (started) {
+            vscode.window.showInformationMessage('Onion Language Server restarted');
+        } else {
+            vscode.window.showWarningMessage(
+                'Onion Language Server not found. Set onion.serverPath or ONION_HOME to enable it. Syntax highlighting still works without it.'
+            );
+        }
     });
 
     context.subscriptions.push(restartCommand);
 }
 
-function startLanguageClient(context: vscode.ExtensionContext) {
-    const config = vscode.workspace.getConfiguration('onion');
-
-    // Get server path from configuration or environment
-    let serverPath = config.get<string>('serverPath');
-
-    if (!serverPath || serverPath === '') {
-        // Try to find onion-lsp from ONION_HOME
-        const onionHome = process.env['ONION_HOME'];
-        if (onionHome) {
-            serverPath = path.join(onionHome, 'bin', 'onion-lsp');
-        } else {
-            // Try common installation paths
-            const possiblePaths = [
-                '/usr/local/bin/onion-lsp',
-                '/usr/bin/onion-lsp',
-                path.join(process.env['HOME'] || '', '.local', 'bin', 'onion-lsp')
-            ];
-
-            for (const p of possiblePaths) {
-                // We'll just use the first one; proper file existence check would need fs
-                serverPath = p;
-                break;
-            }
-        }
+/** Resolve the onion-lsp executable, or undefined if none is configured/present. */
+function resolveServerPath(): string | undefined {
+    const configured = vscode.workspace.getConfiguration('onion').get<string>('serverPath');
+    if (configured && configured.trim() !== '') {
+        return fs.existsSync(configured) ? configured : undefined;
     }
 
+    const candidates: string[] = [];
+    const onionHome = process.env['ONION_HOME'];
+    if (onionHome) {
+        candidates.push(path.join(onionHome, 'bin', 'onion-lsp'));
+    }
+    candidates.push(
+        '/usr/local/bin/onion-lsp',
+        '/usr/bin/onion-lsp',
+        path.join(process.env['HOME'] || '', '.local', 'bin', 'onion-lsp')
+    );
+
+    return candidates.find(p => fs.existsSync(p));
+}
+
+/** Start the language client if a server executable exists. Returns true if started. */
+function startLanguageClient(): boolean {
+    const serverPath = resolveServerPath();
     if (!serverPath) {
-        vscode.window.showErrorMessage(
-            'Onion Language Server not found. Please set ONION_HOME environment variable or configure onion.serverPath.'
-        );
-        return;
+        // No server available -- highlighting-only mode. Stay quiet.
+        console.log('Onion: no onion-lsp executable found; running in syntax-highlighting-only mode.');
+        return false;
     }
 
-    // Server options - run onion-lsp as a process
     const serverOptions: ServerOptions = {
-        run: {
-            command: serverPath,
-            transport: TransportKind.stdio
-        },
-        debug: {
-            command: serverPath,
-            transport: TransportKind.stdio
-        }
+        run: { command: serverPath, transport: TransportKind.stdio },
+        debug: { command: serverPath, transport: TransportKind.stdio }
     };
 
-    // Client options
     const clientOptions: LanguageClientOptions = {
-        // Register the server for Onion files
         documentSelector: [{ scheme: 'file', language: 'onion' }],
         synchronize: {
-            // Notify the server about file changes to .on files
             fileEvents: vscode.workspace.createFileSystemWatcher('**/*.on')
         },
         outputChannelName: 'Onion Language Server'
     };
 
-    // Create and start the language client
     client = new LanguageClient(
         'onionLanguageServer',
         'Onion Language Server',
         serverOptions,
         clientOptions
     );
-
-    // Start the client (also starts the server)
     client.start();
-
-    context.subscriptions.push({
-        dispose: () => {
-            if (client) {
-                client.stop();
-            }
-        }
-    });
+    return true;
 }
 
 export function deactivate(): Thenable<void> | undefined {

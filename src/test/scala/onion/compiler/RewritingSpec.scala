@@ -72,9 +72,10 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       }
     }
 
-    it("desugars a binding chain to nested bind calls") {
+    it("desugars a binding followed by ret to a single map call") {
       // do[Future] { x <- getX(); ret x }
-      // => getX().bind((x) -> { Future::successful(x) })
+      // => getX().map((x) -> { x })   — map instead of bind+successful, so a
+      // monad only needs map/bind (which is what lets do[List] work)
       val source =
         """class Test {
           |public:
@@ -86,22 +87,16 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
 
       val result = extractDoExpression(source)
       result match {
-        case AST.MethodCall(_, _: AST.UnqualifiedMethodCall, "bind", List(closure: AST.ClosureExpression), _) =>
+        case AST.MethodCall(_, _: AST.UnqualifiedMethodCall, "map", List(closure: AST.ClosureExpression), _) =>
           assert(closure.args.head.name == "x")
-          closure.body.elements.head match {
-            case AST.StaticMethodCall(_, typeRef, "successful", _, _) =>
-              assert(typeRef.desc.toString == "Future")
-            case other =>
-              fail(s"Expected closure body to be StaticMethodCall, got: $other")
-          }
         case other =>
-          fail(s"Expected MethodCall to bind, got: $other")
+          fail(s"Expected MethodCall to map, got: $other")
       }
     }
 
-    it("desugars multiple bindings to nested bind calls") {
+    it("desugars multiple bindings to bind with a final map") {
       // do[Future] { x <- getX(); y <- getY(); ret x + y }
-      // => getX().bind((x) -> { getY().bind((y) -> { Future::successful(x + y) }) })
+      // => getX().bind((x) -> { getY().map((y) -> { x + y }) })
       val source =
         """class Test {
           |public:
@@ -116,10 +111,10 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
         case AST.MethodCall(_, _, "bind", List(outerClosure: AST.ClosureExpression), _) =>
           assert(outerClosure.args.head.name == "x")
           outerClosure.body.elements.head match {
-            case AST.MethodCall(_, _, "bind", List(innerClosure: AST.ClosureExpression), _) =>
+            case AST.MethodCall(_, _, "map", List(innerClosure: AST.ClosureExpression), _) =>
               assert(innerClosure.args.head.name == "y")
             case other =>
-              fail(s"Expected nested MethodCall to bind, got: $other")
+              fail(s"Expected nested MethodCall to map, got: $other")
           }
         case other =>
           fail(s"Expected MethodCall to bind, got: $other")

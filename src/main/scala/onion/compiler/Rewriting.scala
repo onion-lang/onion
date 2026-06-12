@@ -387,6 +387,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val rewritten = rewriteExpression(expr)
         AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
 
+      // Binding followed directly by the final ret: x <- e1; ret e2
+      // => e1.map((x) -> e2). Using map instead of bind+M::successful means
+      // a monad only needs map/bind instance (or extension) methods — no
+      // static successful — which is what lets do[List] work over plain
+      // java.util.List via the Colls extension methods.
+      case (binding: AST.DoBinding) :: List(AST.RetStatement(_, retExpr)) =>
+        val bindExpr = rewriteExpression(binding.expr)
+        val rewrittenRet = rewriteExpression(retExpr)
+        val arg = AST.Argument(binding.location, binding.name, null, null, false)
+        val closureBody = AST.BlockExpression(binding.location, List(rewrittenRet))
+        val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
+        val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
+        AST.MethodCall(binding.location, bindExpr, "map", List(closure))
+
       // Binding: x <- e1; rest => e1.bind((x) -> { rest })
       case (binding: AST.DoBinding) :: rest =>
         val bindExpr = rewriteExpression(binding.expr)

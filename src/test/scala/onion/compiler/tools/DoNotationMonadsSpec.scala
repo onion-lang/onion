@@ -69,6 +69,46 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
     }
   }
 
+  describe("do-notation over List (comprehension)") {
+    it("computes a cross product with newline-separated binds") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pairs = do[List] {
+          |      x <- [1, 2]
+          |      y <- ["a", "b"]
+          |      ret x + y
+          |    }
+          |    return pairs.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "DoList.on",
+        Array()
+      )
+      assert(Shell.Success("[1a, 1b, 2a, 2b]") == result)
+    }
+
+    it("maps a single bind") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val sq = do[List] { x <- [1, 2, 3]; ret x * x }
+          |    return sq.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "DoListMap.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 4, 9]") == result)
+    }
+  }
+
   describe("do-notation at the top level") {
     it("desugars top-level statements containing do expressions") {
       val result = shell.run(

@@ -675,6 +675,14 @@ public final class Colls {
     }
 
     /**
+     * Monadic bind for lists — alias for {@link #flatMap(List, Function1)},
+     * so do[List] { x <- xs; ... } works through the do-notation desugaring.
+     */
+    public static <T, U> List<U> bind(List<T> list, Function1<T, List<U>> f) {
+        return flatMap(list, f);
+    }
+
+    /**
      * Zips two lists together into a list of pairs (as List of 2 elements).
      * @param list1 the first list
      * @param list2 the second list

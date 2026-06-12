@@ -280,6 +280,7 @@ case Color::RED:          ...    // enum constants (exhaustiveness-checked)
 case s is String:         ...    // type pattern, binds s narrowed
 case Circle(r) when r > 9: ...   // record destructuring + guard
 case Rect(w, _):          ...    // _ ignores a component
+case re"(\w+)@(\w+)" (u, h): ... // regex pattern: binds capture groups
 else:                     ...
 }
 ```
@@ -287,6 +288,12 @@ else:                     ...
 Matches over `sealed` interfaces and enums are exhaustiveness-checked
 (E0042) when no `else` is present; exhaustive matches can be used as
 expressions.
+
+Regex patterns match a `String` subject against an **anchored** regex
+literal (the whole subject must match) and bind its capture groups as
+`String` locals; guards may use the bound groups. Because the pattern is a
+literal, it is validated at compile time: a malformed regex is E0059 and a
+capture-group / binding count mismatch is E0060.
 
 ### Exceptions
 
@@ -317,10 +324,42 @@ val r: Runnable = () -> IO::println("hi")   // SAM conversion
 ```onion
 do[Option] { a <- getA(); b <- getB(); ret a + b }
 do[Future] { x <- fetch(); ret x.size() }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }   // comprehension
 ```
 
-Desugars to `flatMap`/`map`; works with `Option`, `Result`, `Future` and
-the script top level.
+`x <- e; rest` desugars to `e.bind((x) -> rest)`; a binding followed
+directly by the final `ret e2` becomes `e.map((x) -> e2)`. Any type with
+`bind`/`map` (instance or extension methods) is do-able: `Option`,
+`Result`, `Future`, `List` (comprehension), and user types. Works at the
+script top level too.
+
+### Scheme-Prefixed Literals
+
+```onion
+val p    = re"\d+-\d+"                        // compiled Pattern (RAW: no \\ escaping)
+val text = file"notes.txt".text()             // FileResource: text/lines/csv/csvRows/json/write/append
+val rows = file"data.csv".csvRows()           // List of Map (header -> value), RFC 4180
+val body = http"https://api.example.com".get() // HttpResource: get/getJson/post/postJson/put/delete
+```
+
+`prefix"raw"` is sugar for the unqualified call `prefix("raw")` resolved
+through the default static imports (`onion.Resources`), so the literal and
+the function form (`file(path)` for dynamic values) are equivalent. The
+body is raw — backslashes pass through verbatim; `\"` escapes a quote
+without consuming the backslash.
+
+### Pipeline Operator
+
+```onion
+5 |> double               // double(5)
+5 |> add(3)               // add(5, 3) — first-argument injection
+xs.map { x => x * 2 }
+  |> println              // a newline before |> continues the pipeline
+```
+
+`e |> f(args...)` injects `e` as the first argument; the right-hand side
+may be a bare function name, an unqualified or method/static call. Sits
+between assignment and `||` in precedence.
 
 ### Operators
 
@@ -363,6 +402,24 @@ For `onion`/`runScript`, the entry point is, in order: an explicit class
 with a `main` method; the `main` method of the top class; otherwise the
 first top-level statement. Top-level statements, `def` functions and `val`/
 `var` declarations form implicit scripts; `args: String[]` is available.
+
+### Auto-CLI
+
+A top-level `main` whose parameters are CLI-convertible types (`String`,
+`Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`) is invoked
+automatically with arguments parsed from the command line:
+
+```onion
+def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
+// $ onion greet.on world --count 5 --loud
+```
+
+Required parameters are positional; defaulted parameters become `--name`
+flags (`Boolean` defaults become presence switches). Values are converted
+to the declared types, default expressions are evaluated when the flag is
+absent, and a usage line is derived from the signature on error.
+Everything after the script file on the `onion` command line is passed to
+the script verbatim.
 
 ## Warnings
 

@@ -288,6 +288,30 @@ Type::methodName
 ```onion
 do[Future] { x <- asyncOp(); ret x + 1 }
 do[Option] { a <- getA(); b <- getB(); ret a + b }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }  // list comprehension: [1a, 1b, 2a, 2b]
+```
+
+**Shape-First Scripting (scheme literals, regex patterns, pipeline, auto-CLI):**
+```onion
+// Scheme-prefixed RAW string literals (no \\ escaping; sugar for re()/file()/http()):
+val p    = re"\d+-\d+"                        // compiled java.util.regex.Pattern
+val rows = file"data.csv".csvRows()           // read + RFC4180 parse, header-mapped
+val body = http"https://api.example.com/x".get()
+
+// Regex literals are first-class select patterns (ANCHORED match, compile-time
+// checked: bad pattern = E0059, group/binding count mismatch = E0060):
+select request {
+  case re"GET (\S+) HTTP/(\S+)" (path, ver): handleGet(path, ver)
+  case re"PING": pong()
+  else: bad()
+}
+
+// |> pipeline: e |> f is f(e); e |> f(a) is f(e, a); newline before |> continues
+xs.map { x => x * 2 } |> println
+
+// auto-CLI: argument parsing derived from the top-level main signature
+def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
+// $ onion script.on world --count 5 --loud   (usage auto-generated on error)
 ```
 
 **Asynchronous Programming:**
@@ -450,6 +474,11 @@ These are frequently confused with other languages. **Always check these:**
 | `this` only | `self` also works - both refer to current instance |
 | Reserved word as identifier | `` `class` `` - use backticks to escape keywords |
 | `println("Hi")` | ✓ correct - top-level function, or `IO::println` |
+| `Pattern.compile("\\d+")` | `re"\d+"` - raw regex literal (no double escaping) |
+| `new File(p).read...` | `file"path".text()` / `.lines()` / `.csv()` / `.json()` - resource literal (dynamic: `file(p)`) |
+| `x.let { f(it) }` (Kotlin) | `x \|> f` - pipeline injects x as f's first argument |
+| `when (s) { matches(...) }` | `case re"(\d+)" (n):` - regex select pattern, compile-time checked |
+| manual `args` parsing in main | `def main(name: String, n: Int = 1)` - auto-CLI derives flags/usage from the signature |
 
 ## Known Limitations
 

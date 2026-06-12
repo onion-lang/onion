@@ -1,0 +1,34 @@
+// Shape-first scripting in Onion: regex patterns, resource literals,
+// pipelines, do-notation and auto-CLI — one small script.
+//
+//   onion ShapeFirst.on            (defaults)
+//   onion ShapeFirst.on --top 2    (auto-CLI flag from the main signature)
+
+def classify(line: String): String {
+  return select line {
+    case re"GET (\S+) .*" (path):  "GET " + path
+    case re"POST (\S+) .*" (path): "POST " + path
+    else: "OTHER"
+  }
+}
+
+def main(top: Int = 3): void {
+  // file"..." is a typed resource literal: write then read+split in one step
+  file"/tmp/onion-shapefirst.log".write("GET /index HTTP/1.1\nPOST /api/users HTTP/1.1\nGET /index HTTP/1.1\nDELETE /x HTTP/1.1\n")
+
+  file"/tmp/onion-shapefirst.log".lines()
+    .map { l => classify(l) }
+    .groupBy { c => c }
+    .mapValues { xs => xs.size }
+    |> println
+
+  // do[List] is a list comprehension
+  val grid = do[List] {
+    x <- [1, 2, 3]
+    y <- [10, 20]
+    ret x * y
+  }
+  grid
+    |> take(top)
+    |> println
+}

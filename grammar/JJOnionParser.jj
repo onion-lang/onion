@@ -921,7 +921,7 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
      }
   |  ({enterSection();} "=" eols() e=term() eos()) {
        return new AST.FunctionDeclaration(
-         p(t1), modifiers, c(t1), args, ty,
+         p(t1), modifiers, c(t2), args, ty,
          new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e))),
          throwsTypes, anns
        );

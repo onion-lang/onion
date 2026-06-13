@@ -190,6 +190,57 @@ public final class Files {
         return new File(path).getAbsolutePath();
     }
 
+    // ========== Copy / Move ==========
+
+    /**
+     * Copies {@code src} to {@code dst}, replacing {@code dst} if it already exists.
+     */
+    public static void copy(String src, String dst) throws IOException {
+        java.nio.file.Files.copy(
+            java.nio.file.Paths.get(src),
+            java.nio.file.Paths.get(dst),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        );
+    }
+
+    /**
+     * Moves (renames) {@code src} to {@code dst}, replacing {@code dst} if it already exists.
+     */
+    public static void move(String src, String dst) throws IOException {
+        java.nio.file.Files.move(
+            java.nio.file.Paths.get(src),
+            java.nio.file.Paths.get(dst),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        );
+    }
+
+    /**
+     * Recursively copies the directory tree rooted at {@code src} into {@code dst}.
+     * {@code dst} is created if it does not exist; existing files are replaced.
+     */
+    public static void copyDir(String src, String dst) throws IOException {
+        final java.nio.file.Path srcPath = java.nio.file.Paths.get(src);
+        final java.nio.file.Path dstPath = java.nio.file.Paths.get(dst);
+        java.nio.file.Files.walkFileTree(srcPath, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+            @Override
+            public java.nio.file.FileVisitResult preVisitDirectory(
+                    java.nio.file.Path dir, java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+                java.nio.file.Files.createDirectories(dstPath.resolve(srcPath.relativize(dir)));
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFile(
+                    java.nio.file.Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+                java.nio.file.Files.copy(
+                    file,
+                    dstPath.resolve(srcPath.relativize(file)),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                );
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
     // ========== Directory listing and glob ==========
 
     /**

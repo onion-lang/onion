@@ -183,6 +183,9 @@ private[compiler] object CapturedVariableCollector {
             // This variable comes from an outer scope beyond the current closure
             record(adjustedFrame, capturedVar.index, capturedVar.tp)
 
+      case stmt: StatementTerm =>
+        visitStatement(stmt.statement)
+
       case _: BoolValue | _: ByteValue | _: CharacterValue | _: DoubleValue | _: FloatValue | _: IntValue |
           _: LongValue | _: ShortValue | _: StringValue | _: NullValue |
           _: RefStaticField | _: OuterThis | _: This =>

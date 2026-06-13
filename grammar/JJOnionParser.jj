@@ -378,6 +378,7 @@ public class JJOnionParser implements Parser {
     case '\\': return '\\';
     case '\'': return '\'';
     case '"' : return '"';
+    case '#' : return '#';
     default  : return c;
     }
   }
@@ -452,27 +453,48 @@ public class JJOnionParser implements Parser {
     return sb.toString();
   }
 
+  /**
+   * Finds the next real (non-escaped) interpolation start "#{" in {@code str}
+   * starting from {@code pos}.  An escaped interpolation "\#{" is skipped and
+   * does not trigger interpolation — the backslash is consumed by the lexer and
+   * {@code unescape} turns "\#" into "#".
+   */
+  private static int findInterpStart(String str, int pos) {
+    while (true) {
+      int idx = str.indexOf("#{", pos);
+      if (idx == -1) return -1;
+      // Check whether the '#' is preceded by a backslash (escaped interpolation).
+      // Count consecutive backslashes: an even number means the last one is itself
+      // escaped, so the '#' is NOT escaped; an odd number means it IS escaped.
+      int slashes = 0;
+      int k = idx - 1;
+      while (k >= 0 && str.charAt(k) == '\\') { slashes++; k--; }
+      if (slashes % 2 == 0) return idx; // not escaped
+      pos = idx + 1; // escaped — skip and keep searching
+    }
+  }
+
   private AST.Expression parseInterpolatedString(Location loc, String str) throws ParseException {
     // Remove quotes
     str = str.substring(1, str.length() - 1);
-    
+
     ArrayBuffer<String> parts = new ArrayBuffer<String>();
     ArrayBuffer<AST.Expression> expressions = new ArrayBuffer<AST.Expression>();
-    
+
     int start = 0;
     int pos = 0;
-    
+
     while (pos < str.length()) {
-      int interpStart = str.indexOf("#{", pos);
+      int interpStart = findInterpStart(str, pos);
       if (interpStart == -1) {
         // No more interpolations
         append(parts, unescape(str.substring(start)));
         break;
       }
-      
+
       // Add the string part before interpolation
       append(parts, unescape(str.substring(start, interpStart)));
-      
+
       // Find the closing brace
       int braceCount = 1;
       int interpEnd = interpStart + 2;
@@ -489,11 +511,11 @@ public class JJOnionParser implements Parser {
         else if (c == '}') braceCount--;
         interpEnd++;
       }
-      
+
       if (braceCount > 0) {
         throw new ParseException("Unclosed interpolation #{...} in string at " + loc + " (string literals inside #{...} are not supported)");
       }
-      
+
       // Parse the expression inside, padded so positions match the file
       String exprStr = str.substring(interpStart + 2, interpEnd - 1);
       String padding = interpolationPadding(str, interpStart + 2, loc, 1);
@@ -504,16 +526,16 @@ public class JJOnionParser implements Parser {
       } catch (Exception e) {
         throw new ParseException("Invalid expression in string interpolation: " + exprStr + " at " + loc);
       }
-      
+
       start = interpEnd;
       pos = interpEnd;
     }
-    
+
     // If we ended with an expression, add an empty string part
     if (parts.size() == expressions.size()) {
       append(parts, "");
     }
-    
+
     return new AST.StringInterpolation(loc, toList(parts), toList(expressions));
   }
 
@@ -810,7 +832,7 @@ TOKEN:
     "\""
     ( (~["\"","\\","\n","\r","#"])
     | ("\\"
-        ( ["n","t","b","r","f","\\","'","\""]
+        ( ["n","t","b","r","f","\\","'","\"","#"]
         | ["0"-"7"] ( ["0"-"7"] )?
         | ["0"-"3"] ["0"-"7"] ["0"-"7"]
         )
@@ -2262,7 +2284,7 @@ AST.Expression scheme_literal() :{Token t;}{
 AST.Expression string_literal() :{Token t; String str;}{
   t=<STRING> {
     str = t.image;
-    if (str.contains("#{")) {
+    if (str.contains("#{") && findInterpStart(str.substring(1, str.length()-1), 0) != -1) {
       return parseInterpolatedString(p(t), str);
     } else {
       return new AST.StringLiteral(p(t), unescape(chopEdge(str)));

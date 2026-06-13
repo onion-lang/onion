@@ -81,6 +81,71 @@ public final class Cli {
         return result;
     }
 
+    // ---- Type-safe parse helpers used by auto-CLI generated code ----
+
+    public static int parseInt(String name, String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            die("invalid value for --" + name + ": '" + value + "' (expected Int)");
+            return 0; // unreachable
+        }
+    }
+
+    public static long parseLong(String name, String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            die("invalid value for --" + name + ": '" + value + "' (expected Long)");
+            return 0L; // unreachable
+        }
+    }
+
+    public static double parseDouble(String name, String value) {
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            die("invalid value for --" + name + ": '" + value + "' (expected Double)");
+            return 0.0; // unreachable
+        }
+    }
+
+    public static float parseFloat(String name, String value) {
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException e) {
+            die("invalid value for --" + name + ": '" + value + "' (expected Float)");
+            return 0.0f; // unreachable
+        }
+    }
+
+    public static short parseShort(String name, String value) {
+        try {
+            return Short.parseShort(value);
+        } catch (NumberFormatException e) {
+            die("invalid value for --" + name + ": '" + value + "' (expected Short)");
+            return 0; // unreachable
+        }
+    }
+
+    public static byte parseByte(String name, String value) {
+        try {
+            return Byte.parseByte(value);
+        } catch (NumberFormatException e) {
+            die("invalid value for --" + name + ": '" + value + "' (expected Byte)");
+            return 0; // unreachable
+        }
+    }
+
+    public static boolean parseBoolean(String name, String value) {
+        return Boolean.parseBoolean(value);
+    }
+
+    private static void die(String message) {
+        System.err.println("error: " + message);
+        System.exit(1);
+    }
+
     private static void die(String[] names, char[] kinds, String message) {
         StringBuilder usage = new StringBuilder("usage: <script>");
         for (int j = 0; j < names.length; j++) {

@@ -139,10 +139,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def appendAutoCliCall(toplevels: Buffer[AST.Toplevel]): Unit = {
     val mainFn = toplevels.collectFirst {
       case f: AST.FunctionDeclaration
-        if f.name == "main" && f.args.nonEmpty && f.args.forall(a => cliKindOf(a.typeRef).isDefined) => f
+        if f.name == "main" && f.args.forall(a => cliKindOf(a.typeRef).isDefined) => f
     }
     mainFn.foreach { f =>
       val loc = f.location
+      // Zero-arg main: emit a direct call with no CLI preamble
+      if (f.args.isEmpty) {
+        toplevels += AST.UnqualifiedMethodCall(loc, "main", Nil)
+        return
+      }
       val cliVar = "__cliArgs"
       val spec = f.args.map { a =>
         val kind = cliKindOf(a.typeRef).get
@@ -159,7 +164,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       val decl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, cliVar, null, parseCall)
       val argExprs = f.args.zipWithIndex.map { case (a, i) =>
         val raw = AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i))
-        val converted = convertCliValue(loc, cliKindOf(a.typeRef).get, raw)
+        val converted = convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, raw)
         if (a.defaultValue == null) converted
         else AST.IfExpression(
           loc,
@@ -190,20 +195,24 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  /** Builds the AST converting a raw CLI string to the parameter's type. */
-  private def convertCliValue(loc: Location, kind: String, raw: AST.Expression): AST.Expression = {
-    def parseWith(wrapper: String, method: String): AST.Expression =
-      AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType(wrapper, true), false), method, List(raw))
+  /** Builds the AST converting a raw CLI string to the parameter's type.
+   *  For numeric types, delegates to onion.Cli.parseInt/parseLong/... which
+   *  produce friendly error messages instead of leaking NumberFormatException.
+   */
+  private def convertCliValue(loc: Location, kind: String, paramName: String, raw: AST.Expression): AST.Expression = {
+    val cliType = AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false)
+    def parseViaCli(method: String): AST.Expression =
+      AST.StaticMethodCall(loc, cliType, method, List(AST.StringLiteral(loc, paramName), raw))
     kind match {
-      case "String" => raw
-      case "Int" => parseWith("java.lang.Integer", "parseInt")
-      case "Long" => parseWith("java.lang.Long", "parseLong")
-      case "Double" => parseWith("java.lang.Double", "parseDouble")
-      case "Float" => parseWith("java.lang.Float", "parseFloat")
-      case "Boolean" => parseWith("java.lang.Boolean", "parseBoolean")
-      case "Short" => parseWith("java.lang.Short", "parseShort")
-      case "Byte" => parseWith("java.lang.Byte", "parseByte")
-      case _ => raw
+      case "String"  => raw
+      case "Int"     => parseViaCli("parseInt")
+      case "Long"    => parseViaCli("parseLong")
+      case "Double"  => parseViaCli("parseDouble")
+      case "Float"   => parseViaCli("parseFloat")
+      case "Boolean" => parseViaCli("parseBoolean")
+      case "Short"   => parseViaCli("parseShort")
+      case "Byte"    => parseViaCli("parseByte")
+      case _         => raw
     }
   }
 

@@ -216,6 +216,28 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
+  /** Builds the AST converting a regex capture (String) to a record component's
+   *  type for `record ... from re""` synthesis. Unlike convertCliValue (which
+   *  routes through onion.Cli helpers that print a message and exit), this uses
+   *  the raw wrapper parse methods so a conversion failure throws
+   *  NumberFormatException — which the synthesized parse() catches to return null.
+   */
+  private def convertCapturedValue(loc: Location, kind: String, raw: AST.Expression): AST.Expression = {
+    def parseWith(wrapper: String, method: String): AST.Expression =
+      AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType(wrapper, true), false), method, List(raw))
+    kind match {
+      case "String"  => raw
+      case "Int"     => parseWith("java.lang.Integer", "parseInt")
+      case "Long"    => parseWith("java.lang.Long", "parseLong")
+      case "Double"  => parseWith("java.lang.Double", "parseDouble")
+      case "Float"   => parseWith("java.lang.Float", "parseFloat")
+      case "Boolean" => parseWith("java.lang.Boolean", "parseBoolean")
+      case "Short"   => parseWith("java.lang.Short", "parseShort")
+      case "Byte"    => parseWith("java.lang.Byte", "parseByte")
+      case _         => raw
+    }
+  }
+
   def rewriteClassDeclaration(declaration: ClassDeclaration): ClassDeclaration = {
     val newDefaultSection = declaration.defaultSection.map(rewriteAccessSection)
     val newSections = declaration.sections.map(rewriteAccessSection)
@@ -277,7 +299,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val ctorArgs = declaration.args.zip(groupNames).map { case (arg, gName) =>
       val raw = AST.Id(loc, gName)
       cliKindOf(arg.typeRef) match {
-        case Some(kind) => convertCliValue(loc, kind, raw)
+        case Some(kind) => convertCapturedValue(loc, kind, raw)
         case None       => raw // unsupported component type; typing reports the error
       }
     }

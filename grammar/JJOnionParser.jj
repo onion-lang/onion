@@ -301,6 +301,94 @@ public class JJOnionParser implements Parser {
     return t != null && t.image.equals(s);
   }
 
+  /**
+   * Disambiguates `new C[...]` between a generic instantiation (type-argument
+   * list, e.g. `new Box[String]`, `new ArrayList[String]()`) and an array
+   * allocation (dimension expression, e.g. `new String[n]`, `new Int[3]`,
+   * `new Int[n][m]`). Pure token peeking; assumes getToken(1) is "[".
+   *
+   * Returns true when the brackets should be read as type arguments:
+   *   - the matching "]" is immediately followed by "(" (constructor call), or
+   *   - the bracket content is unambiguously "type-shaped": multiple args
+   *     (comma), a wildcard ("?"/extends/super), a nested generic ("["), or an
+   *     FQCN, or a single primitive type keyword / Capitalized identifier (type
+   *     naming convention).
+   * Returns false (array dimension) for an integer literal, a lower-case / "_"
+   * identifier (variable convention), a method call / member access inside the
+   * brackets (e.g. `new Int[arr.length]`, `new String[list.size()]`), or any
+   * other compound size expression. A top-level "." or "(" inside the brackets
+   * marks a value expression, NOT a type, unless a constructor "(" follows "]".
+   */
+  private boolean newBracketsAreTypeArgs() {
+    // getToken(1) is "[". Scan the balanced first bracket group.
+    int depth = 0;
+    int i = 1;
+    int firstKind = -1;            // first significant token kind inside depth 1
+    String firstImage = null;
+    int topLevelTokens = 0;        // count of depth-1 tokens (excluding brackets)
+    boolean sawTypeMarker = false; // comma / ? / extends / super / FQCN at top level
+    boolean sawValueMarker = false;// "." or "(" at top level => value expression
+    boolean sawNestedBracket = false;
+    int closeIndex = -1;
+    while (true) {
+      Token t = getToken(i);
+      if (t == null || t.kind == EOF) break;
+      int k = t.kind;
+      if (k == LBRACKET) {
+        depth++;
+        if (depth > 1) sawNestedBracket = true;
+        i++;
+        continue;
+      }
+      if (k == RBRACKET) {
+        depth--;
+        if (depth == 0) { closeIndex = i; i++; break; }
+        i++;
+        continue;
+      }
+      if (depth == 1 && k != EOL) {
+        if (firstKind == -1) { firstKind = k; firstImage = t.image; }
+        topLevelTokens++;
+        if (k == COMMA || k == QUESTION || k == K_EXTENDS || k == K_SUPER
+            || k == FQCN || k == SAFE_INDEX) {
+          sawTypeMarker = true;
+        } else if (k == DOT || k == LPAREN) {
+          // member access / method call => the brackets hold a value expression
+          sawValueMarker = true;
+        }
+      }
+      i++;
+    }
+    if (closeIndex < 0) return true; // malformed; let the type path report it
+    // "]" followed by "(" => generic constructor call (e.g. new Box[T](args)).
+    int j = closeIndex + 1;
+    while (getToken(j) != null && getToken(j).kind == EOL) j++;
+    if (getToken(j) != null && getToken(j).kind == LPAREN) return true;
+    // A value-expression marker with no trailing constructor "(" => array size.
+    if (sawValueMarker) return false;
+    if (sawNestedBracket || sawTypeMarker) return true;
+    // Single bare token inside the brackets.
+    if (topLevelTokens == 1 && firstKind != -1) {
+      switch (firstKind) {
+        case INTEGER:
+          return false; // array size literal
+        case K_INT: case K_LONG: case K_BYTE: case K_SHORT: case K_CHAR:
+        case K_FLOAT: case K_DOUBLE: case K_BOOLEAN:
+          return true;  // primitive used as a type argument
+        case ID: {
+          if (firstImage == null || firstImage.isEmpty()) return false;
+          char c0 = firstImage.charAt(0);
+          // Capitalized => type (generic); lower-case / "_" => variable (array).
+          return Character.isUpperCase(c0);
+        }
+        default:
+          return false; // anything else (e.g. a value expression) => array
+      }
+    }
+    // Compound content that is not type-shaped => array dimension expression.
+    return false;
+  }
+
   private <T> Option<T> option(T value) {
     return Option$.MODULE$.apply(value);
   }
@@ -2018,9 +2106,23 @@ AST.Expression primary() : {
 | LOOKAHEAD("do" "[") e=do_expression()                                   {return e;}
 | LOOKAHEAD("new" raw_type() "[" "]" "{") t="new" ty=raw_type() "[" "]" "{" eols() es=terms() "}"
     { return new AST.NewArrayWithValues(p(t), ty, es); }
-| t="new" ty=type() {
+| t="new" ty=raw_type() {
     ArrayBuffer<AST.Expression> sizes = new ArrayBuffer<AST.Expression>();
-  } (
+    ArrayBuffer<AST.TypeDescriptor> newTas = new ArrayBuffer<AST.TypeDescriptor>();
+    AST.TypeNode taNode = null;
+  }
+  // Generic instantiation: new C[T, ...] or new C[T, ...](args). A bracketed
+  // TYPE list ("type-shaped" content, or content followed by "(") is a
+  // type-argument list; a bracketed EXPRESSION is an array dimension (see the
+  // size branches below). newBracketsAreTypeArgs() makes that call by peeking.
+  [ LOOKAHEAD({getToken(1).kind == LBRACKET && newBracketsAreTypeArgs()})
+      "[" eols() taNode=type() { append(newTas, taNode.desc()); }
+      ("," eols() taNode=type() { append(newTas, taNode.desc()); })*
+      eols() "]" {
+        ty = new AST.TypeNode(ty.location(), new AST.ParameterizedType(ty.desc(), toList(newTas)), ty.isRelaxed());
+      }
+  ]
+  (
     // Handle: new Type[size] - array with size
     LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]"
     ( LOOKAHEAD(2) "[" eols() e=term() { append(sizes, e); } "]" )*

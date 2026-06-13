@@ -222,7 +222,7 @@ select value {
 | Field declarations | `Type field` | `val/var field: Type` |
 | Variable declarations | `Type variable` | `val/var variable[: Type] = value` |
 | Static access | `Class.method()` | `Class::method()` |
-| Type casting | `(Type) value` | `value$Type` |
+| Type casting | `(Type) value` | `value as Type` |
 | Lambda syntax | `(x) -> x + 1` | `(x :Int) -> { return x + 1; }` |
 | Pattern matching | `switch` (Java 14+) | `select` |
 | List append | `list.add(x)` | `list << x` |

@@ -270,6 +270,27 @@ When the matched value's type is a `sealed` interface, the compiler
 checks exhaustiveness (E0042) and lists any uncovered subtypes — an
 `else` branch is unnecessary once every case is handled.
 
+### Regex Patterns
+
+A regex literal is a first-class pattern: `case re"..." (g1, g2)` matches a
+`String` subject against an **anchored** regex (the whole string must match)
+and binds its capture groups as `String` locals. Guards can use the bound
+groups:
+
+```onion
+select request {
+  case re"GET (\S+) HTTP/(\S+)" (path, ver): handleGet(path, ver)
+  case re"POST (\S+)" (path):                handlePost(path)
+  case re"(\d+)-(\d+)" (lo, hi) when Integer::parseInt(lo) < 20: low(lo, hi)
+  case re"PING":                             pong()   // exact-match test
+  else:                                      bad()
+}
+```
+
+Because the pattern is a literal, it is validated at compile time: a
+malformed regex is E0059 and a capture-group / binding count mismatch is
+E0060. The body is raw — `\d` needs no double escaping.
+
 ## Do Notation (Monadic Composition)
 
 Do notation provides a clean syntax for chaining operations on monadic types like `Option`, `Result`, and `Future`. It desugars to `flatMap`/`map` calls.
@@ -331,6 +352,20 @@ val posts: Future[List] = do[Future] {
   posts <- fetchPosts(user)
   ret posts
 }
+```
+
+### With List (Comprehensions)
+
+`do[List]` iterates every combination of its bindings — a list
+comprehension:
+
+```onion
+val pairs = do[List] {
+  x <- [1, 2]
+  y <- ["a", "b"]
+  ret x + y
+}
+// [1a, 1b, 2a, 2b]
 ```
 
 ### Mixing with Regular Expressions

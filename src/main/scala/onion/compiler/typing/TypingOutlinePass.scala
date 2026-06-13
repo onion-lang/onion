@@ -225,8 +225,32 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         argTypes, definition_, null
       )
       definition_.add(copyMethod)
+
+      // Pattern-attached records (`record ... from re"..."`): validate that every
+      // component type can be derived from a captured String, then register the
+      // synthesized parse/parseAll static methods so their bodies type normally.
+      // When a component type is unsupported we report E0061 and skip synthesis so
+      // the otherwise-invalid bodies don't produce noisy follow-on errors.
+      // A componentless record has nothing to parse into, so a `from` clause on it
+      // is meaningless; skip synthesis (no parse/parseAll) rather than emit a select
+      // whose zero bindings would also dodge the E0060 group-count check.
+      if (node.fromPattern.isDefined && node.args.nonEmpty) {
+        val unsupported = node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
+        unsupported.foreach { case (arg, argType) =>
+          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName)
+        }
+        if (unsupported.isEmpty) node.synthesizedMethods.foreach(processMethodDeclaration)
+      }
     }
     }
+  }
+
+  /** Component types a `from re"..."` clause can produce from a captured String. */
+  private def isFromDerivableType(tp: Type): Boolean = tp match {
+    case BasicType.INT | BasicType.LONG | BasicType.DOUBLE | BasicType.FLOAT |
+         BasicType.BOOLEAN | BasicType.SHORT | BasicType.BYTE => true
+    case ct: ClassType => ct.name == "java.lang.String"
+    case _ => false
   }
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>

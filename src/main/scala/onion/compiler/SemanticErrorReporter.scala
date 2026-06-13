@@ -371,6 +371,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.regexGroupMismatch",
       Seq(items => asString(items(0)), items => asString(items(1)))
     ),
+    SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED -> ErrorDef(
+      "error.semantic.recordFromComponentUnsupported",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

@@ -27,6 +27,17 @@ object AST {
 
   /** Prepend an element to an immutable list (returns new list) - used by the |> pipeline desugar */
   def prependToList[A](list: List[A], element: A): List[A] = element +: list
+
+  /**
+   * Java-callable factory for a record declaration with an optional `from re"..."` clause.
+   * `fromRaw` is the raw regex body (no `re"`/`"` delimiters) or null when the clause is absent.
+   */
+  def recordDeclaration(
+    location: Location, modifiers: Int, name: String,
+    typeParameters: List[TypeParameter], args: List[Argument],
+    superInterfaces: List[TypeNode], fromRaw: String
+  ): RecordDeclaration =
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), Nil)
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString
@@ -281,7 +292,12 @@ object AST {
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil) extends TypeDeclaration
+  /**
+   * @param fromPattern        Raw regex from a `record ... from re"..."` clause, used to
+   *                           synthesize the static `parse`/`parseAll` methods (None when absent).
+   * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
+   */
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, synthesizedMethods: List[MethodDeclaration] = Nil) extends TypeDeclaration
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)

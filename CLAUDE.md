@@ -306,6 +306,15 @@ select request {
   else: bad()
 }
 
+// Pattern-attached records: `from re"..."` derives a typed parser from the shape.
+// `from` is a soft keyword (only before a regex literal). One group per component;
+// supported component types: String/Int/Long/Double/Float/Boolean/Short/Byte
+// (group/count mismatch = E0060, bad regex = E0059, bad component type = E0061).
+record Access(time: String, method: String, path: String, status: Int)
+  from re"(\S+) (\w+) (\S+) (\d+)"
+val a: Access? = Access::parse("127.0.0.1 GET /index 200")  // ANCHORED; null on no-match/convert-fail
+val rows: List = Access::parseAll(logText)                  // per-line parse, nulls dropped
+
 // |> pipeline: e |> f is f(e); e |> f(a) is f(e, a); newline before |> continues
 xs.map { x => x * 2 } |> println
 
@@ -430,6 +439,7 @@ These are frequently confused with other languages. **Always check these:**
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
+| derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `<:` |
 
 ### Lambdas & Functions
 

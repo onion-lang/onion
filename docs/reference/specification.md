@@ -200,6 +200,35 @@ supports full clones, positional and named partial copies
 (`p.copy(y = 9)`). Records destructure in `val (a, b) = p` and in `select`
 patterns.
 
+#### Pattern-attached records (`from re"..."`)
+
+A record can derive a typed parser from its shape by attaching a regex
+literal right after the component list (before any `<:` supertypes). `from`
+is a soft keyword, recognized only when immediately followed by a regex
+literal, so it stays usable as an ordinary identifier:
+
+```onion
+record Access(time: String, method: String, path: String, status: Int)
+  from re"(\S+) (\w+) (\S+) (\d+)"
+```
+
+Two static methods are synthesized:
+
+- `Access::parse(s: String): Access?` — ANCHORED match of the whole string.
+  Each capture group is converted to its component's declared type; the
+  record is returned on success. On no-match **or** a conversion failure
+  (e.g. a non-numeric `status`), it returns `null` — which composes with
+  smart casts and the elvis operator.
+- `Access::parseAll(text: String): List[Access]` — splits `text` into lines,
+  parses each, drops the `null`s, and returns the matches.
+
+Supported component types are `String` (identity) and the wrapper-parsable
+primitives `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`.
+The capture-group count must equal the component count and the regex must be
+valid — both are checked at compile time (group/count mismatch is **E0060**,
+a malformed regex is **E0059**), and an unsupported component type is
+**E0061**.
+
 ### Enums
 
 ```onion

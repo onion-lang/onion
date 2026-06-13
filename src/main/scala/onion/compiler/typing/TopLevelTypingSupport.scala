@@ -13,6 +13,7 @@ private[compiler] final class TopLevelTypingSupport(
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
   processClassDeclaration: (AST.ClassDeclaration, LocalContext) => Unit,
   processInterfaceDeclaration: (AST.InterfaceDeclaration, LocalContext) => Unit,
+  processRecordDeclaration: (AST.RecordDeclaration, LocalContext) => Unit,
   processEnumDeclaration: (AST.EnumDeclaration, LocalContext) => Unit,
   processExtensionDeclaration: AST.ExtensionDeclaration => Unit,
   processFunctionDeclaration: (AST.FunctionDeclaration, LocalContext) => Unit,
@@ -55,6 +56,8 @@ private[compiler] final class TopLevelTypingSupport(
           processClassDeclaration(node, prepared.context)
         case node: AST.InterfaceDeclaration =>
           processInterfaceDeclaration(node, prepared.context)
+        case node: AST.RecordDeclaration =>
+          processRecordDeclaration(node, prepared.context)
         case node: AST.EnumDeclaration =>
           processEnumDeclaration(node, prepared.context)
         case node: AST.ExtensionDeclaration =>

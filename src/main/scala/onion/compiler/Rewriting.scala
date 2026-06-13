@@ -219,7 +219,104 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = {
-    declaration
+    declaration.fromPattern match {
+      // A componentless record has nothing to parse into, so don't synthesize methods.
+      case Some(pattern) if declaration.args.nonEmpty =>
+        declaration.copy(synthesizedMethods = synthesizeFromMethods(declaration, pattern))
+      case _ => declaration
+    }
+  }
+
+  /**
+   * Pattern-attached records: `record Name(c1: T1, ...) from re"..."` derives a typed
+   * parser from the record shape. We synthesize two static methods as ordinary AST so
+   * they go through normal typing (which also reuses the regex select-pattern's compile-time
+   * E0059/E0060 checks):
+   *
+   *   static def parse(s: String): Name? {
+   *     try {
+   *       return select s {
+   *         case re"<pattern>" (g0, g1, ...): new Name(convert(g0), convert(g1), ...)
+   *         else: null
+   *       }
+   *     } catch __e: NumberFormatException { return null }
+   *   }
+   *
+   *   static def parseAll(text: String): List[Name] {
+   *     val __acc: ArrayList = new ArrayList
+   *     foreach __line: String in Strings::lines(text) {
+   *       val __r: Name? = Name::parse(__line)
+   *       if __r != null { __acc.add(__r) }
+   *     }
+   *     return __acc
+   *   }
+   *
+   * Conversions reuse the auto-CLI wrapper-parse helpers (Integer::parseInt, ...). Bad
+   * component types and regex/group-count issues are reported at typing time, so any
+   * record reaches typing intact even when its `from` clause is invalid.
+   */
+  private def synthesizeFromMethods(declaration: AST.RecordDeclaration, pattern: String): List[AST.MethodDeclaration] = {
+    val loc = declaration.location
+    val recordName = declaration.name
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
+
+    // --- parse(s: String): Name? ---
+    val groupNames = declaration.args.indices.map(i => s"__g$i").toList
+    val regexPattern = AST.RegexPattern(loc, pattern, groupNames)
+    val ctorArgs = declaration.args.zip(groupNames).map { case (arg, gName) =>
+      val raw = AST.Id(loc, gName)
+      cliKindOf(arg.typeRef) match {
+        case Some(kind) => convertCliValue(loc, kind, raw)
+        case None       => raw // unsupported component type; typing reports the error
+      }
+    }
+    // Build to Name? so the select unifies cleanly with the `else: null` branch
+    // (avoids a spurious "null assigned where non-nullable" warning at synthesis).
+    val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
+    val selectExpr = AST.SelectExpression(
+      loc,
+      AST.Id(loc, "__s"),
+      List((List(regexPattern), AST.BlockExpression(loc, List(buildExpr)))),
+      AST.BlockExpression(loc, List(AST.NullLiteral(loc)))
+    )
+    val tryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, selectExpr)))
+    val catchArg = AST.Argument(loc, "__nfe", AST.TypeNode(loc, AST.ReferenceType("NumberFormatException", false), false))
+    val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
+    val parseTry = AST.TryExpression(loc, Nil, tryBody, List((catchArg, catchBody)), null)
+    val parseBody = AST.BlockExpression(loc, List(parseTry))
+    val parseMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "parse",
+      List(AST.Argument(loc, "__s", stringType)), nullableRecordType, parseBody
+    )
+
+    // --- parseAll(text: String): List[Name] ---
+    val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType(recordName, false))), false)
+    val arrayListType = AST.TypeNode(loc, AST.ReferenceType("ArrayList", false), false)
+    // Declare the accumulator with the List[Name] return type and widen the freshly
+    // built ArrayList to it via a cast, so `return __acc` matches without E0000.
+    val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
+    val accDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__acc", listType, accInit)
+    val linesCall = AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType("Strings", false), false), "lines", List(AST.Id(loc, "__text")))
+    val parseCall = AST.StaticMethodCall(loc, recordType, "parse", List(AST.Id(loc, "__line")))
+    val rDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__r", nullableRecordType, parseCall)
+    val addCall = AST.MethodCall(loc, AST.Id(loc, "__acc"), "add", List(AST.Id(loc, "__r")))
+    val guardedAdd = AST.IfExpression(
+      loc,
+      AST.NotEqual(loc, AST.Id(loc, "__r"), AST.NullLiteral(loc)),
+      AST.BlockExpression(loc, List(addCall)),
+      null
+    )
+    val foreachBody = AST.BlockExpression(loc, List(rDecl, guardedAdd))
+    val foreach = AST.ForeachExpression(loc, AST.Argument(loc, "__line", stringType), linesCall, foreachBody)
+    val parseAllBody = AST.BlockExpression(loc, List(accDecl, foreach, AST.ReturnExpression(loc, AST.Id(loc, "__acc"))))
+    val parseAllMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "parseAll",
+      List(AST.Argument(loc, "__text", stringType)), listType, parseAllBody
+    )
+
+    List(parseMethod, parseAllMethod)
   }
 
   def rewriteFunctionDeclaration(declaration: AST.FunctionDeclaration): AST.FunctionDeclaration = {

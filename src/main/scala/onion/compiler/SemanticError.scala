@@ -126,6 +126,7 @@ object SemanticError {
   case object LABEL_NOT_FOUND extends SemanticError(58)
   case object REGEX_PATTERN_INVALID extends SemanticError(59)
   case object REGEX_GROUP_MISMATCH extends SemanticError(60)
+  case object RECORD_FROM_COMPONENT_UNSUPPORTED extends SemanticError(61)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

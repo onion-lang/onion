@@ -53,6 +53,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     translate,
     processClassDeclaration,
     processInterfaceDeclaration,
+    processRecordDeclaration,
     processEnumDeclaration,
     processExtensionDeclaration,
     processFunctionDeclaration,
@@ -103,6 +104,20 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def processClassDeclaration(node: AST.ClassDeclaration, context: LocalContext): Unit = {
     declarationBodySupport.processClassDeclaration(node)
   }
+  def processRecordDeclaration(node: AST.RecordDeclaration, context: LocalContext): Unit =
+    // Pattern-attached records carry synthesized parse/parseAll methods (built in
+    // Rewriting); type their bodies like ordinary record methods. Plain records have
+    // no synthesizedMethods, so there is nothing to do.
+    if (node.synthesizedMethods.nonEmpty) {
+      typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+        unitContext.currentDefinition = definition
+        typing.find(definition.name).foreach(unitContext.currentMapper = _)
+        val recordTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(typing.emptyTypeParams ++ recordTypeParams) {
+          node.synthesizedMethods.foreach(processMethodDeclaration)
+        }
+      }
+    }
   def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit =
     // Default methods (interface methods with bodies) get typed like
     // instance methods; signature-only declarations have nothing to do

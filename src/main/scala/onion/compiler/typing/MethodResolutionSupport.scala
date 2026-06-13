@@ -99,9 +99,42 @@ private[compiler] final class MethodResolutionSupport(
         val a2 = specializedArgs(m2)
         if TypeRules.isAllSuperType(a2, a1) then -1
         else if TypeRules.isAllSuperType(a1, a2) then 1
-        else 0
+        else primitiveExactTiebreak(a1, a2)
       }
     }
+
+  /**
+   * Java-style most-specific tiebreak for primitive vs. reference overloads.
+   *
+   * When the subtype rule leaves two overloads incomparable (e.g.
+   * `remove(int)` vs `remove(Object)` called with an Onion `Int`), prefer the
+   * candidate whose formal parameter is the *exact* primitive matching the
+   * primitive argument over one taking a reference/boxed/`Object` formal. This
+   * mirrors JLS overload resolution narrowly: it only fires at positions where
+   * the actual argument is a primitive and exactly one formal is that same
+   * primitive while the other is a non-basic (reference) type. If both sides
+   * "win" some positions (or neither does), the result stays ambiguous (0).
+   */
+  private def primitiveExactTiebreak(a1: Array[Type], a2: Array[Type]): Int = {
+    if a1.length != a2.length || a1.length != params.length then return 0
+    var oneBetter = false
+    var twoBetter = false
+    var i = 0
+    while i < params.length do
+      val actual = params(i).`type`
+      if actual != null && actual.isBasicType then
+        val f1 = a1(i)
+        val f2 = a2(i)
+        val f1Exact = (f1 eq actual)
+        val f2Exact = (f2 eq actual)
+        // "loses" = the other formal is a reference type (not the same primitive)
+        if f1Exact && !f2Exact && !f2.isBasicType then oneBetter = true
+        else if f2Exact && !f1Exact && !f1.isBasicType then twoBetter = true
+      i += 1
+    if oneBetter && !twoBetter then -1
+    else if twoBetter && !oneBetter then 1
+    else 0
+  }
 
   private def ownerViewSubst(method: Method): scala.collection.immutable.Map[String, Type] = {
     val owner0 = method.affiliation match

@@ -50,6 +50,16 @@ private[typing] object TypeCheckingHelpers {
     if (right.isBottomType) return left
     if (left eq right) return left
     if (left.isNullType && right.isNullType) return left
+    // LUB(null, T) where T is a reference type is the *nullable* form T?, not the
+    // raw T: the merged value genuinely may be null, so the result type must admit
+    // it. Without this, branch merges that mix `null` with a reference type yield a
+    // non-null type and spuriously trip the W0012 null-flow warning even when the
+    // target is already declared nullable. (NullableType.of collapses T?? and
+    // passes through types that can't be wrapped.)
+    if (left.isNullType && !right.isNullType && right.isObjectType && !right.isNullable)
+      return NullableType.of(right)
+    if (right.isNullType && !left.isNullType && left.isObjectType && !left.isNullable)
+      return NullableType.of(left)
     if ((left eq BasicType.VOID) || (right eq BasicType.VOID)) {
       if ((left eq BasicType.VOID) && (right eq BasicType.VOID)) return BasicType.VOID
       reportError(node, left, right)

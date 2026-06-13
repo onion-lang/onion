@@ -1682,6 +1682,15 @@ object TypedAST {
       (left, right) match
         case (lraw, rapp: TypedAST.AppliedClassType) if lraw eq rapp.raw =>
           return true
+        // Java raw-type erasure compatibility: an applied expected type
+        // (e.g. List[String]) accepts a RAW actual (a plain ClassType, e.g.
+        // `new ArrayList()`) of the same OR a sub class. Under erasure the raw
+        // actual is unchecked-assignable to any parameterization of a supertype,
+        // so we compare against the erased (raw) form of the expected type.
+        case (lapp: TypedAST.AppliedClassType, rraw: TypedAST.ClassType)
+          if !rraw.isInstanceOf[TypedAST.AppliedClassType]
+            && !rraw.isInstanceOf[TypedAST.TypeVariableType] =>
+          return isSuperTypeForClass(lapp.raw, rraw)
         case (lapp: TypedAST.AppliedClassType, rapp: TypedAST.AppliedClassType)
           if (lapp.raw eq rapp.raw) && lapp.typeArguments.length == rapp.typeArguments.length =>
           val expectedArgs = lapp.typeArguments

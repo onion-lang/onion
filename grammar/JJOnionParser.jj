@@ -1253,12 +1253,15 @@ AST.ClassDeclaration class_decl(int mset) : {
 }
 
 AST.RecordDeclaration record_decl(int mset) : {
-  Token t1, t2, rt, mk; List<AST.Argument> args;
+  Token t1, t2, rt, mk, lt, enm, et; List<AST.Argument> args, largs;
   AST.TypeNode superType;
+  AST.BlockExpression lb, eb;
   ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   String fromRaw = null;
   ArrayBuffer<String> deriveBuf = new ArrayBuffer<String>();
+  ArrayBuffer<AST.LawClause> lawBuf = new ArrayBuffer<AST.LawClause>();
+  ArrayBuffer<AST.ExampleClause> exBuf = new ArrayBuffer<AST.ExampleClause>();
 }{
   t1="record" t2=id() [tparams=type_params()] "(" args=args() ")"
   // Optional `from re"..."` clause (shape-first records). `from` is a soft keyword
@@ -1276,12 +1279,25 @@ AST.RecordDeclaration record_decl(int mset) : {
     <ID> <NOT> "(" mk=id() {append(deriveBuf, c(mk));}
           ("," mk=id() {append(deriveBuf, c(mk));})* ")"
   ]
+  // Optional `law name(p: T) { expr }` / `example [name] { expr }` clauses (B3). Both are
+  // soft keywords recognized only here; each becomes a boolean static method the compiler
+  // executes at build time (LawCheckPhase). `law` is property-checked over generated args.
+  (
+    LOOKAHEAD({getToken(1).image.equals("law") && getToken(2).kind == ID})
+      <ID> lt=<ID> "(" largs=args() ")" lb=block()
+      { append(lawBuf, new AST.LawClause(p(lt), c(lt), largs, lb)); }
+  |
+    LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || getToken(2).kind == ID)})
+      et=<ID> { enm = null; } [ LOOKAHEAD({getToken(1).kind == ID}) enm=<ID> ] eb=block()
+      { append(exBuf, AST.exampleClause(p(et), enm == null ? null : c(enm), eb)); }
+  )*
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ] [";"] {
     return AST.recordDeclaration(
-      p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf)
+      p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf),
+      toList(lawBuf), toList(exBuf)
     );
   }
 }

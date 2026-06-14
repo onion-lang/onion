@@ -35,9 +35,17 @@ object AST {
   def recordDeclaration(
     location: Location, modifiers: Int, name: String,
     typeParameters: List[TypeParameter], args: List[Argument],
-    superInterfaces: List[TypeNode], fromRaw: String, derives: List[String]
+    superInterfaces: List[TypeNode], fromRaw: String, derives: List[String],
+    laws: List[LawClause], examples: List[ExampleClause]
   ): RecordDeclaration =
-    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, Nil)
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil)
+
+  /** Java-callable factory for an `example` clause; `name` may be null (unnamed example). */
+  def exampleClause(location: Location, name: String, body: BlockExpression): ExampleClause =
+    ExampleClause(location, Option(name), body)
+  /** Java-callable factory for a top-level `example`; `name` may be null. */
+  def topLevelExample(location: Location, name: String, body: BlockExpression): TopLevelExample =
+    TopLevelExample(location, Option(name), body)
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString
@@ -297,7 +305,13 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil) extends TypeDeclaration
+  /** A `law name(p: T) { boolean-expr }` clause on a record — a compile-time property check. */
+  case class LawClause(location: Location, name: String, params: List[Argument], body: BlockExpression) extends Node
+  /** An `example { boolean-expr }` clause on a record — a compile-time concrete check. */
+  case class ExampleClause(location: Location, name: Option[String], body: BlockExpression) extends Node
+  /** A top-level `example { boolean-expr }`, desugared to a static boolean method in <File>Main. */
+  case class TopLevelExample(location: Location, name: Option[String], body: BlockExpression) extends Toplevel
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)

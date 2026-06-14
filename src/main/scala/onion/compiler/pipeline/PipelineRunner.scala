@@ -18,7 +18,8 @@ final case class CompilationPhases(
   typing: CompilerPhase[Seq[AST.CompilationUnit], TypingPhaseResult],
   tailCallOptimization: CompilerPhase[Seq[TypedAST.ClassDefinition], Seq[TypedAST.ClassDefinition]],
   mutualRecursionOptimization: CompilerPhase[Seq[TypedAST.ClassDefinition], Seq[TypedAST.ClassDefinition]],
-  bytecodeGeneration: CompilerPhase[Seq[TypedAST.ClassDefinition], Seq[CompiledClass]]
+  bytecodeGeneration: CompilerPhase[Seq[TypedAST.ClassDefinition], Seq[CompiledClass]],
+  lawCheck: CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]]
 )
 
 object PipelineRunner {
@@ -35,7 +36,8 @@ object PipelineRunner {
         override def name: String = "MutualRecursionOptimization"
         override def run(input: Seq[TypedAST.ClassDefinition], ctx: PhaseContext): Seq[TypedAST.ClassDefinition] = process(input)
       },
-      bytecodeGeneration = new BytecodeGenerationPhase(config)
+      bytecodeGeneration = new BytecodeGenerationPhase(config),
+      lawCheck = new onion.compiler.verification.LawCheckPhase(config)
     )
 }
 
@@ -108,7 +110,13 @@ final class PipelineRunner(phases: CompilationPhases) {
       case Some(optimizedMutual) =>
         runPhase(phases.bytecodeGeneration, optimizedMutual, ctx)(_ => ()) match {
           case None => result(Seq.empty, ctx, request)
-          case Some(classes) => result(classes, ctx, request)
+          case Some(classes) =>
+            // B3: run law/example checks on the generated classes; a failure surfaces as a
+            // CompilationException (caught by runPhase) and fails compilation.
+            runPhase(phases.lawCheck, classes, ctx)(_ => ()) match {
+              case None => result(Seq.empty, ctx, request)
+              case Some(checked) => result(checked, ctx, request)
+            }
         }
     }
 

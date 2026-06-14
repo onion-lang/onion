@@ -23,5 +23,6 @@ case class CompilerConfig(
   suppressedWarnings: Set[WarningCategory] = Set.empty,
   dumpAst: Boolean = false,
   dumpTypedAst: Boolean = false,
-  compileProfile: onion.compiler.pipeline.CompileProfileSettings = onion.compiler.pipeline.CompileProfileSettings()
+  compileProfile: onion.compiler.pipeline.CompileProfileSettings = onion.compiler.pipeline.CompileProfileSettings(),
+  checkLaws: Boolean = true
 )

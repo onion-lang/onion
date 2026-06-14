@@ -263,9 +263,40 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val dataMethods = if ((hasJson || hasYaml) && derivable) synthesizeDataMethods(declaration) else Nil
     val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") else Nil
     val yamlMethods = if (hasYaml && derivable) synthesizeFormatMethods(declaration, "Yaml", "Yaml") else Nil
-    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods
-    if (all.isEmpty) declaration else declaration.copy(synthesizedMethods = all)
+    // law/example clauses (B3): each becomes a boolean static method the compiler runs at
+    // build time (LawCheckPhase). No `derivable` guard — a componentless record can still
+    // carry laws/examples (the law's own params drive generation).
+    val lawMethods = declaration.laws.map(synthesizeLawMethod)
+    val exampleMethods = declaration.examples.zipWithIndex.map { case (ex, i) => synthesizeExampleMethod(ex, i) }
+    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ lawMethods ++ exampleMethods
+    if (all.isEmpty) declaration
+    else declaration.copy(synthesizedMethods = all, laws = Nil, examples = Nil)
   }
+
+  /** `law name(p: T) { expr }` -> `static def onion$$law$$name(p: T): boolean { return expr }`. */
+  private def synthesizeLawMethod(law: AST.LawClause): AST.MethodDeclaration = {
+    val boolType = AST.TypeNode(law.location, AST.PrimitiveType(AST.KBoolean), false)
+    AST.MethodDeclaration(law.location, AST.M_PUBLIC | AST.M_STATIC,
+      "onion$$law$$" + law.name, law.params, boolType, wrapReturningBoolean(law.body))
+  }
+
+  /** `example [name] { expr }` -> `static def onion$$example$$<name|idx>(): boolean { return expr }`. */
+  private def synthesizeExampleMethod(ex: AST.ExampleClause, idx: Int): AST.MethodDeclaration = {
+    val boolType = AST.TypeNode(ex.location, AST.PrimitiveType(AST.KBoolean), false)
+    val suffix = ex.name.getOrElse(idx.toString)
+    AST.MethodDeclaration(ex.location, AST.M_PUBLIC | AST.M_STATIC,
+      "onion$$example$$" + suffix, Nil, boolType, wrapReturningBoolean(ex.body))
+  }
+
+  /** Make a `{ ...; lastExpr }` block return its last expression, so the synthesized boolean
+   *  method yields a value. An already-`return`ed tail is left as-is. */
+  private def wrapReturningBoolean(block: AST.BlockExpression): AST.BlockExpression =
+    block.elements.reverse match {
+      case (_: AST.ReturnExpression) :: _ => block
+      case (last: AST.Expression) :: rest =>
+        AST.BlockExpression(block.location, rest.reverse :+ AST.ReturnExpression(last.location, last))
+      case _ => block
+    }
 
   /**
    * Pattern-attached records: `record Name(c1: T1, ...) from re"..."` derives a typed

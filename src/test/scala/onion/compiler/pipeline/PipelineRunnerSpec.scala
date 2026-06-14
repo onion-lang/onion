@@ -25,7 +25,8 @@ class PipelineRunnerSpec extends AnyFunSpec with Matchers {
         "Typing",
         "TailCallOptimization",
         "MutualRecursionOptimization",
-        "BytecodeGeneration"
+        "BytecodeGeneration",
+        "LawCheck"
       )
     }
 
@@ -59,6 +60,11 @@ class PipelineRunnerSpec extends AnyFunSpec with Matchers {
           override val name: String = "BytecodeGeneration"
           override def run(input: Seq[TypedAST.ClassDefinition], ctx: PhaseContext): Seq[CompiledClass] =
             fail("bytecode generation should not run after a rewriting failure")
+        },
+        lawCheck = new CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
+          override val name: String = "LawCheck"
+          override def run(input: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] =
+            fail("law check should not run after a rewriting failure")
         }
       )
 

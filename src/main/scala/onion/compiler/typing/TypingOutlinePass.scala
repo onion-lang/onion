@@ -236,6 +236,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // whose zero bindings would also dodge the E0060 group-count check.
       val hasFrom = node.fromPattern.isDefined
       val hasData = node.derives.exists(m => m == "Json" || m == "Yaml")
+      // law/example methods (B3) register unconditionally — independent of from/derive and of
+      // args.nonEmpty (a componentless record can still carry laws/examples; the law's own
+      // params drive the check). from/data methods stay gated on the component-type check.
+      val (checkMethods, derivedMethods) = node.synthesizedMethods.partition(m =>
+        m.name.startsWith("onion$$law$$") || m.name.startsWith("onion$$example$$"))
+      checkMethods.foreach(processMethodDeclaration)
       if ((hasFrom || hasData) && node.args.nonEmpty) {
         val unsupportedFrom =
           if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
@@ -250,7 +256,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           report(SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName)
         }
         if (unsupportedFrom.isEmpty && unsupportedData.isEmpty)
-          node.synthesizedMethods.foreach(processMethodDeclaration)
+          derivedMethods.foreach(processMethodDeclaration)
       }
       // Unknown derive! markers — Json and Yaml are supported at present.
       node.derives.filterNot(m => m == "Json" || m == "Yaml").foreach { mk =>

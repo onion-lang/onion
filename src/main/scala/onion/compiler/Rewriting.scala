@@ -255,10 +255,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case Some(pattern) if declaration.args.nonEmpty => synthesizeFromMethods(declaration, pattern)
       case _ => Nil
     }
-    val jsonMethods =
-      if (declaration.derives.contains("Json") && declaration.args.nonEmpty) synthesizeJsonMethods(declaration)
-      else Nil
-    val all = fromMethods ++ jsonMethods
+    val hasJson = declaration.derives.contains("Json")
+    val hasYaml = declaration.derives.contains("Yaml")
+    val derivable = declaration.args.nonEmpty
+    // Format-agnostic core (toMap/fromMap) synthesized once when any data format is
+    // requested, then thin per-format sugar layered on top.
+    val dataMethods = if ((hasJson || hasYaml) && derivable) synthesizeDataMethods(declaration) else Nil
+    val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") else Nil
+    val yamlMethods = if (hasYaml && derivable) synthesizeFormatMethods(declaration, "Yaml", "Yaml") else Nil
+    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods
     if (all.isEmpty) declaration else declaration.copy(synthesizedMethods = all)
   }
 
@@ -399,72 +404,112 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   /**
-   * `derive!(Json)` records: synthesize the JSON round-trip from the record shape.
-   * Two static methods go through normal typing (the synthesizedMethods path), so
-   * `record User(name: String, age: Int) derive!(Json)` gains both directions:
+   * `derive!(Json)` / `derive!(Yaml)` records: synthesize a format-agnostic core
+   * (toMap/fromMap) once, plus thin per-format wrappers, so a record's shape yields
+   * both directions of every requested format:
    *
+   *   static def toMap(__v: User): Map {
+   *     val __m: Map = Json::object()
+   *     __m.put("name", __v.name()); __m.put("age", __v.age())
+   *     return __m
+   *   }
+   *   static def fromMap(__m: Object): User? {
+   *     try { return (new User(Json::getString(__m,"name"), Json::getInt(__m,"age")) as User?) }
+   *     catch __e: Exception { return null }
+   *   }
    *   static def fromJson(__s: String): User? {
-   *     try {
-   *       val __o: Object = Json::parse(__s)
-   *       return (new User(Json::getString(__o,"name"), Json::getInt(__o,"age")) as User?)
-   *     } catch __e: Exception { return null }
+   *     try { return User::fromMap(Json::parse(__s)) } catch __e: Exception { return null }
    *   }
-   *   static def toJson(__v: User): String {
-   *     val __o: Map = Json::object()
-   *     __o.put("name", __v.name()); __o.put("age", __v.age())
-   *     return Json::stringify(__o)
-   *   }
+   *   static def toJson(__v: User): String { return Json::stringify(User::toMap(__v)) }
+   *   // ...and fromYaml/toYaml the same way over Yaml::parse / Yaml::stringify.
    *
-   * Catch is `Exception`, not NumberFormatException: `Json::parse` throws a checked
-   * JsonParseException, and a missing/wrong-typed numeric key unboxes a null wrapper
-   * into a primitive ctor argument (NPE). Both collapse to null, keeping the same
-   * "failure -> null" contract as the `from re"..."` parse(). Unsupported component
-   * types are reported (E0062) at typing time, which also skips registration.
+   * `Json::object()` is a neutral LinkedHashMap factory and `Json::getXxx(obj, key)` reads
+   * the shared Map intermediate, so both are reused for Yaml — the intermediate
+   * representation is format-agnostic. Two-level catch: fromMap catches the unbox NPE from
+   * a missing/wrong-typed numeric key, the fromXxx wrapper catches the parser's checked
+   * exception. Both collapse to null (same "failure -> null" contract as parse()). A new
+   * format needs only an stdlib type with parse/stringify over the Map — no macro change.
+   * Unsupported component types are reported (E0062) at typing time, skipping registration.
    */
-  private def synthesizeJsonMethods(declaration: AST.RecordDeclaration): List[AST.MethodDeclaration] = {
+  private def synthesizeDataMethods(declaration: AST.RecordDeclaration): List[AST.MethodDeclaration] = {
+    val loc = declaration.location
+    val recordName = declaration.name
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
+    val mapType = AST.TypeNode(loc, AST.ReferenceType("Map", false), false)
+    val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
+
+    // --- toMap(v: Name): Map ---  (record -> shared Map intermediate)
+    val objCall = AST.StaticMethodCall(loc, jsonType, "object", Nil)
+    val mapDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__m", mapType, objCall)
+    val putCalls: List[AST.Expression] = declaration.args.map { arg =>
+      AST.MethodCall(loc, AST.Id(loc, "__m"), "put",
+        List(AST.StringLiteral(loc, arg.name), AST.MethodCall(loc, AST.Id(loc, "__v"), arg.name, Nil)))
+    }
+    val toMapElems: List[AST.BlockElement] = (mapDecl :: putCalls) :+ AST.ReturnExpression(loc, AST.Id(loc, "__m"))
+    val toMapMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "toMap",
+      List(AST.Argument(loc, "__v", recordType)), mapType,
+      AST.BlockExpression(loc, toMapElems)
+    )
+
+    // --- fromMap(m: Object): Name? ---  (shared Map intermediate -> record)
+    val ctorArgs: List[AST.Expression] = declaration.args.map { arg =>
+      val getter = cliKindOf(arg.typeRef).map(jsonGetterOf).getOrElse("getString")
+      AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
+    }
+    val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
+    val tryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, buildExpr)))
+    val catchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
+    val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
+    val fromMapTry = AST.TryExpression(loc, Nil, tryBody, List((catchArg, catchBody)), null)
+    val fromMapMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "fromMap",
+      List(AST.Argument(loc, "__m", objectType)), nullableRecordType,
+      AST.BlockExpression(loc, List(fromMapTry))
+    )
+
+    List(toMapMethod, fromMapMethod)
+  }
+
+  /**
+   * Per-format sugar over toMap/fromMap: `fromXxx(s) = fromMap(Xxx::parse(s))` and
+   * `toXxx(v) = Xxx::stringify(toMap(v))`. `format` is the method-name suffix and
+   * `typeName` the stdlib type (both "Json" or "Yaml"). The fromXxx wrapper carries its
+   * own catch for the parser's checked exception (fromMap already catches unbox NPEs).
+   */
+  private def synthesizeFormatMethods(declaration: AST.RecordDeclaration, format: String, typeName: String): List[AST.MethodDeclaration] = {
     val loc = declaration.location
     val recordName = declaration.name
     val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
     val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
     val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
-    val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
-    val mapType = AST.TypeNode(loc, AST.ReferenceType("Map", false), false)
-    val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
+    val fmtType = AST.TypeNode(loc, AST.ReferenceType(typeName, false), false)
 
-    // --- fromJson(s: String): Name? ---
-    val parseCall = AST.StaticMethodCall(loc, jsonType, "parse", List(AST.Id(loc, "__s")))
-    val oDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__o", objectType, parseCall)
-    val ctorArgs: List[AST.Expression] = declaration.args.map { arg =>
-      val getter = cliKindOf(arg.typeRef).map(jsonGetterOf).getOrElse("getString")
-      AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__o"), AST.StringLiteral(loc, arg.name)))
-    }
-    val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
-    val tryBody = AST.BlockExpression(loc, List(oDecl, AST.ReturnExpression(loc, buildExpr)))
-    val catchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
-    val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
-    val fromTry = AST.TryExpression(loc, Nil, tryBody, List((catchArg, catchBody)), null)
-    val fromJsonMethod = AST.MethodDeclaration(
-      loc, AST.M_PUBLIC | AST.M_STATIC, "fromJson",
+    // fromXxx(s: String): Name?  ==  fromMap(Xxx::parse(s))
+    val parseCall = AST.StaticMethodCall(loc, fmtType, "parse", List(AST.Id(loc, "__s")))
+    val fromMapCall = AST.StaticMethodCall(loc, recordType, "fromMap", List(parseCall))
+    val fromTryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, fromMapCall)))
+    val fromCatchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
+    val fromCatchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
+    val fromTry = AST.TryExpression(loc, Nil, fromTryBody, List((fromCatchArg, fromCatchBody)), null)
+    val fromMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, s"from$format",
       List(AST.Argument(loc, "__s", stringType)), nullableRecordType,
       AST.BlockExpression(loc, List(fromTry))
     )
 
-    // --- toJson(v: Name): String ---
-    val objCall = AST.StaticMethodCall(loc, jsonType, "object", Nil)
-    val mapDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__o", mapType, objCall)
-    val putCalls: List[AST.Expression] = declaration.args.map { arg =>
-      AST.MethodCall(loc, AST.Id(loc, "__o"), "put",
-        List(AST.StringLiteral(loc, arg.name), AST.MethodCall(loc, AST.Id(loc, "__v"), arg.name, Nil)))
-    }
-    val stringifyCall = AST.StaticMethodCall(loc, jsonType, "stringify", List(AST.Id(loc, "__o")))
-    val toElements: List[AST.BlockElement] = (mapDecl :: putCalls) :+ AST.ReturnExpression(loc, stringifyCall)
-    val toJsonMethod = AST.MethodDeclaration(
-      loc, AST.M_PUBLIC | AST.M_STATIC, "toJson",
+    // toXxx(v: Name): String  ==  Xxx::stringify(toMap(v))
+    val toMapCall = AST.StaticMethodCall(loc, recordType, "toMap", List(AST.Id(loc, "__v")))
+    val stringifyCall = AST.StaticMethodCall(loc, fmtType, "stringify", List(toMapCall))
+    val toMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, s"to$format",
       List(AST.Argument(loc, "__v", recordType)), stringType,
-      AST.BlockExpression(loc, toElements)
+      AST.BlockExpression(loc, List(AST.ReturnExpression(loc, stringifyCall)))
     )
 
-    List(fromJsonMethod, toJsonMethod)
+    List(fromMethod, toMethod)
   }
 
   /**

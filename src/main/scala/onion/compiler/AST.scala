@@ -35,9 +35,9 @@ object AST {
   def recordDeclaration(
     location: Location, modifiers: Int, name: String,
     typeParameters: List[TypeParameter], args: List[Argument],
-    superInterfaces: List[TypeNode], fromRaw: String
+    superInterfaces: List[TypeNode], fromRaw: String, derives: List[String]
   ): RecordDeclaration =
-    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), Nil)
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, Nil)
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString
@@ -297,7 +297,7 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, synthesizedMethods: List[MethodDeclaration] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil) extends TypeDeclaration
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil)

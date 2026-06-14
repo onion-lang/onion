@@ -234,12 +234,27 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // A componentless record has nothing to parse into, so a `from` clause on it
       // is meaningless; skip synthesis (no parse/parseAll) rather than emit a select
       // whose zero bindings would also dodge the E0060 group-count check.
-      if (node.fromPattern.isDefined && node.args.nonEmpty) {
-        val unsupported = node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
-        unsupported.foreach { case (arg, argType) =>
+      val hasFrom = node.fromPattern.isDefined
+      val hasJson = node.derives.contains("Json")
+      if ((hasFrom || hasJson) && node.args.nonEmpty) {
+        val unsupportedFrom =
+          if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
+          else Nil
+        unsupportedFrom.foreach { case (arg, argType) =>
           report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName)
         }
-        if (unsupported.isEmpty) node.synthesizedMethods.foreach(processMethodDeclaration)
+        val unsupportedJson =
+          if (hasJson) node.args.zip(argTypes).filterNot { case (_, argType) => isJsonDerivableType(argType) }
+          else Nil
+        unsupportedJson.foreach { case (arg, argType) =>
+          report(SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName)
+        }
+        if (unsupportedFrom.isEmpty && unsupportedJson.isEmpty)
+          node.synthesizedMethods.foreach(processMethodDeclaration)
+      }
+      // Unknown derive! markers — only Json is supported at present.
+      node.derives.filterNot(_ == "Json").foreach { mk =>
+        report(SemanticError.RECORD_DERIVE_UNKNOWN_MARKER, node, mk)
       }
     }
     }
@@ -252,6 +267,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     case ct: ClassType => ct.name == "java.lang.String"
     case _ => false
   }
+
+  /** Component types `derive!(Json)` can serialize — the same scalar set as `from`. */
+  private def isJsonDerivableType(tp: Type): Boolean = isFromDerivableType(tp)
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     unitContext.currentDefinition = definition

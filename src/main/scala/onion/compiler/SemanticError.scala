@@ -127,6 +127,8 @@ object SemanticError {
   case object REGEX_PATTERN_INVALID extends SemanticError(59)
   case object REGEX_GROUP_MISMATCH extends SemanticError(60)
   case object RECORD_FROM_COMPONENT_UNSUPPORTED extends SemanticError(61)
+  case object RECORD_DERIVE_COMPONENT_UNSUPPORTED extends SemanticError(62)
+  case object RECORD_DERIVE_UNKNOWN_MARKER extends SemanticError(63)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

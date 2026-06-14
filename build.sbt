@@ -67,6 +67,11 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
 
 def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
   val parserOutput = output / "onion" / "compiler" / "parser"
+  // Regenerate from scratch. JavaCC overwrites same-named files but never removes
+  // ones it no longer emits, so a grammar change that adds or removes a token would
+  // otherwise leave orphaned *.java behind and break the build until the directory is
+  // cleaned by hand. Wiping it first makes `.jj` edits self-sufficient under sbt.
+  IO.delete(parserOutput)
   IO.createDirectory(parserOutput)
   Fork.java(
     ForkOptions().withOutputStrategy(
@@ -94,8 +99,12 @@ lazy val onionSettings = Seq(
   scalaVersion := "3.3.7",
   name := "onion",
   organization := "org.onion_lang",
+  // Generated parser sources come in via sourceGenerators (managedSources); listing
+  // sourceManaged here too made them unmanaged as well, so the directory was scanned
+  // before javacc's IO.delete ran and a regenerate-from-scratch tripped over the
+  // already-scanned (now removed) files. Keep only the hand-written source roots.
   Compile / unmanagedSourceDirectories  := {
-    (Seq((Compile / javaSource).value) ++ Seq((Compile / scalaSource).value) ++ Seq((Compile / sourceManaged).value))
+    Seq((Compile / javaSource).value, (Compile / scalaSource).value)
   },
   scalacOptions ++= Seq("-encoding", "utf8", "-unchecked", "-deprecation", "-feature", "-language:implicitConversions", "-language:existentials"),
   javacOptions ++= Seq("-sourcepath", "src.lib", "-Xlint:unchecked", "-source", "17"),
@@ -119,7 +128,10 @@ lazy val onionSettings = Seq(
     if(grammar.lastModified() > parser.lastModified()) {
       javacc(cp, dir / "java", s.log)
     } else {
-      Seq()
+      // Up to date: still report the already-generated sources so they stay on the
+      // compile source path. They are managedSources now (no longer also listed as
+      // unmanaged), so an empty Seq() here would drop the parser from the build.
+      (dir / "java" ** "*.java").get
     }
   }.taskValue,
   Compile / packageBin / packageOptions := {

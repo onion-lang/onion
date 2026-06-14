@@ -43,5 +43,26 @@ class NumericLiteralSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("170 15") == result)
     }
+
+    it("accepts both lowercase and uppercase float/double suffixes (f/F/d/D)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a: Float  = 2.5f
+          |    val b: Float  = 2.5F
+          |    val c: Double = 2.5d
+          |    val e: Double = 2.5D
+          |    val g: Float  = 3f
+          |    return "" + a + " " + b + " " + c + " " + e + " " + g
+          |  }
+          |}
+          |""".stripMargin,
+        "FloatSuffixes.on",
+        Array()
+      )
+      assert(Shell.Success("2.5 2.5 2.5 2.5 3.0") == result)
+    }
   }
 }

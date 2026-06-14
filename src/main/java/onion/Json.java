@@ -180,6 +180,42 @@ public final class Json {
         return (value instanceof Boolean) ? (Boolean) value : null;
     }
 
+    /**
+     * Get a Long value from a JSON object by key.
+     * @return Long value, or null if not found or not a number
+     */
+    public static Long getLong(Object obj, String key) {
+        Object value = get(obj, key);
+        return (value instanceof Number) ? ((Number) value).longValue() : null;
+    }
+
+    /**
+     * Get a Float value from a JSON object by key.
+     * @return Float value, or null if not found or not a number
+     */
+    public static Float getFloat(Object obj, String key) {
+        Object value = get(obj, key);
+        return (value instanceof Number) ? ((Number) value).floatValue() : null;
+    }
+
+    /**
+     * Get a Short value from a JSON object by key.
+     * @return Short value, or null if not found or not a number
+     */
+    public static Short getShort(Object obj, String key) {
+        Object value = get(obj, key);
+        return (value instanceof Number) ? ((Number) value).shortValue() : null;
+    }
+
+    /**
+     * Get a Byte value from a JSON object by key.
+     * @return Byte value, or null if not found or not a number
+     */
+    public static Byte getByte(Object obj, String key) {
+        Object value = get(obj, key);
+        return (value instanceof Number) ? ((Number) value).byteValue() : null;
+    }
+
     // ========== Builder helpers ==========
 
     /**

@@ -250,12 +250,16 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = {
-    declaration.fromPattern match {
-      // A componentless record has nothing to parse into, so don't synthesize methods.
-      case Some(pattern) if declaration.args.nonEmpty =>
-        declaration.copy(synthesizedMethods = synthesizeFromMethods(declaration, pattern))
-      case _ => declaration
+    // A componentless record has nothing to derive into, so don't synthesize methods.
+    val fromMethods = declaration.fromPattern match {
+      case Some(pattern) if declaration.args.nonEmpty => synthesizeFromMethods(declaration, pattern)
+      case _ => Nil
     }
+    val jsonMethods =
+      if (declaration.derives.contains("Json") && declaration.args.nonEmpty) synthesizeJsonMethods(declaration)
+      else Nil
+    val all = fromMethods ++ jsonMethods
+    if (all.isEmpty) declaration else declaration.copy(synthesizedMethods = all)
   }
 
   /**
@@ -347,7 +351,169 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       List(AST.Argument(loc, "__text", stringType)), listType, parseAllBody
     )
 
-    List(parseMethod, parseAllMethod)
+    // --- format(v: Name): String --- (the inverse direction, when invertible)
+    // A pattern is invertible when it is purely literal text + flat top-level
+    // capture groups: then format renders the record by dropping each component
+    // string into its group's slot. parse(format(x)) == x for data that doesn't
+    // collide with the literals. Non-literal separators (\s+, ., alternation,
+    // quantified/nested/non-capturing groups) have no unique rendering, so we
+    // skip format rather than guess (see formatSegments).
+    val formatMethodOpt = formatSegments(pattern).flatMap { segs =>
+      if (segs.count(_.isEmpty) != declaration.args.length) None
+      else {
+        var slot = 0
+        val parts: List[AST.Expression] = segs.map {
+          case Some(literal) => AST.StringLiteral(loc, literal)
+          case None =>
+            val comp = declaration.args(slot); slot += 1
+            AST.MethodCall(loc, AST.Id(loc, "__v"), comp.name, Nil)
+        }
+        // Lead with "" so the whole chain is String-typed even when the first
+        // segment is a slot or a non-String component.
+        val chain = parts match {
+          case (s: AST.StringLiteral) :: _ => parts
+          case _ => AST.StringLiteral(loc, "") :: parts
+        }
+        val body = chain.reduceLeft((a, b) => AST.Addition(loc, a, b))
+        Some(AST.MethodDeclaration(
+          loc, AST.M_PUBLIC | AST.M_STATIC, "format",
+          List(AST.Argument(loc, "__v", recordType)), stringType,
+          AST.BlockExpression(loc, List(AST.ReturnExpression(loc, body)))
+        ))
+      }
+    }
+
+    List(parseMethod, parseAllMethod) ++ formatMethodOpt
+  }
+
+  /** Maps a record component kind (from cliKindOf) to its Json static getter. */
+  private def jsonGetterOf(kind: String): String = kind match {
+    case "Int"     => "getInt"
+    case "Long"    => "getLong"
+    case "Double"  => "getDouble"
+    case "Float"   => "getFloat"
+    case "Boolean" => "getBoolean"
+    case "Short"   => "getShort"
+    case "Byte"    => "getByte"
+    case _         => "getString" // String, and the unsupported fallback (typing rejects bad components)
+  }
+
+  /**
+   * `derive!(Json)` records: synthesize the JSON round-trip from the record shape.
+   * Two static methods go through normal typing (the synthesizedMethods path), so
+   * `record User(name: String, age: Int) derive!(Json)` gains both directions:
+   *
+   *   static def fromJson(__s: String): User? {
+   *     try {
+   *       val __o: Object = Json::parse(__s)
+   *       return (new User(Json::getString(__o,"name"), Json::getInt(__o,"age")) as User?)
+   *     } catch __e: Exception { return null }
+   *   }
+   *   static def toJson(__v: User): String {
+   *     val __o: Map = Json::object()
+   *     __o.put("name", __v.name()); __o.put("age", __v.age())
+   *     return Json::stringify(__o)
+   *   }
+   *
+   * Catch is `Exception`, not NumberFormatException: `Json::parse` throws a checked
+   * JsonParseException, and a missing/wrong-typed numeric key unboxes a null wrapper
+   * into a primitive ctor argument (NPE). Both collapse to null, keeping the same
+   * "failure -> null" contract as the `from re"..."` parse(). Unsupported component
+   * types are reported (E0062) at typing time, which also skips registration.
+   */
+  private def synthesizeJsonMethods(declaration: AST.RecordDeclaration): List[AST.MethodDeclaration] = {
+    val loc = declaration.location
+    val recordName = declaration.name
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
+    val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
+    val mapType = AST.TypeNode(loc, AST.ReferenceType("Map", false), false)
+    val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
+
+    // --- fromJson(s: String): Name? ---
+    val parseCall = AST.StaticMethodCall(loc, jsonType, "parse", List(AST.Id(loc, "__s")))
+    val oDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__o", objectType, parseCall)
+    val ctorArgs: List[AST.Expression] = declaration.args.map { arg =>
+      val getter = cliKindOf(arg.typeRef).map(jsonGetterOf).getOrElse("getString")
+      AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__o"), AST.StringLiteral(loc, arg.name)))
+    }
+    val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
+    val tryBody = AST.BlockExpression(loc, List(oDecl, AST.ReturnExpression(loc, buildExpr)))
+    val catchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
+    val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
+    val fromTry = AST.TryExpression(loc, Nil, tryBody, List((catchArg, catchBody)), null)
+    val fromJsonMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "fromJson",
+      List(AST.Argument(loc, "__s", stringType)), nullableRecordType,
+      AST.BlockExpression(loc, List(fromTry))
+    )
+
+    // --- toJson(v: Name): String ---
+    val objCall = AST.StaticMethodCall(loc, jsonType, "object", Nil)
+    val mapDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__o", mapType, objCall)
+    val putCalls: List[AST.Expression] = declaration.args.map { arg =>
+      AST.MethodCall(loc, AST.Id(loc, "__o"), "put",
+        List(AST.StringLiteral(loc, arg.name), AST.MethodCall(loc, AST.Id(loc, "__v"), arg.name, Nil)))
+    }
+    val stringifyCall = AST.StaticMethodCall(loc, jsonType, "stringify", List(AST.Id(loc, "__o")))
+    val toElements: List[AST.BlockElement] = (mapDecl :: putCalls) :+ AST.ReturnExpression(loc, stringifyCall)
+    val toJsonMethod = AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "toJson",
+      List(AST.Argument(loc, "__v", recordType)), stringType,
+      AST.BlockExpression(loc, toElements)
+    )
+
+    List(fromJsonMethod, toJsonMethod)
+  }
+
+  /**
+   * Decompose a regex into an ordered list of segments for `format` synthesis:
+   * `Some(text)` is a literal fragment (unescaped), `None` is a capture-group
+   * slot. Returns None — meaning "not invertible, don't synthesize format" —
+   * when the pattern contains anything whose rendering isn't unique: a
+   * character class / shorthand outside a group (`.`, `\d`, `[...]`), a
+   * quantifier or alternation outside a group, a non-capturing/lookaround
+   * group, a nested group, or a quantifier applied to a group.
+   */
+  private def formatSegments(pattern: String): Option[List[Option[String]]] = {
+    val segs = scala.collection.mutable.ListBuffer[Option[String]]()
+    val lit = new StringBuilder
+    def flush(): Unit = { if (lit.nonEmpty) { segs += Some(lit.toString); lit.setLength(0) } }
+    val literalEscapes = ".()[]{}+*?|^$\\/-"
+    var i = 0
+    val n = pattern.length
+    while (i < n) {
+      pattern.charAt(i) match {
+        case '\\' =>
+          if (i + 1 >= n) return None
+          val nx = pattern.charAt(i + 1)
+          if (literalEscapes.indexOf(nx.toInt) >= 0) { lit.append(nx); i += 2 }
+          else return None // \d \w \s ... — a class, no unique rendering
+        case '(' =>
+          if (i + 1 < n && pattern.charAt(i + 1) == '?') return None // non-capturing / lookaround
+          flush()
+          var j = i + 1
+          var closed = false
+          while (j < n && !closed) {
+            pattern.charAt(j) match {
+              case '\\' => j += 2
+              case '(' => return None // nested group breaks the flat slot model
+              case ')' => closed = true
+              case _ => j += 1
+            }
+          }
+          if (!closed) return None
+          segs += None
+          i = j + 1
+          if (i < n && "*+?{".indexOf(pattern.charAt(i).toInt) >= 0) return None // quantified group
+        case '^' | '$' => i += 1 // zero-width anchor, contributes no text
+        case c if ".[]{}*+?|".indexOf(c.toInt) >= 0 => return None // metachar outside a group
+        case c => lit.append(c); i += 1
+      }
+    }
+    flush()
+    Some(segs.toList)
   }
 
   def rewriteFunctionDeclaration(declaration: AST.FunctionDeclaration): AST.FunctionDeclaration = {

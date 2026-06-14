@@ -898,10 +898,10 @@ TOKEN:
 | <#BINARY_LITERAL: "0" ["b"] ["0","1"] (["0","1","_"])* >
 | <#OCTAL_LITERAL: "0" (["0"-"7","_"])* >
 | <FLOAT:
-    (["0"-"9"]) (["0"-"9","_"])* "." (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? (["F", "D"])?
-  | "." (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? (["F","D"])?
-  | (["0"-"9"]) (["0"-"9","_"])* <EXPONENT> (["F","D"])?
-  | (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? ["F","D"]
+    (["0"-"9"]) (["0"-"9","_"])* "." (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? (["F","f","D","d"])?
+  | "." (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? (["F","f","D","d"])?
+  | (["0"-"9"]) (["0"-"9","_"])* <EXPONENT> (["F","f","D","d"])?
+  | (["0"-"9"]) (["0"-"9","_"])* (<EXPONENT>)? ["F","f","D","d"]
   >
 | <#EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
 | <CHARACTER:
@@ -1253,11 +1253,12 @@ AST.ClassDeclaration class_decl(int mset) : {
 }
 
 AST.RecordDeclaration record_decl(int mset) : {
-  Token t1, t2, rt; List<AST.Argument> args;
+  Token t1, t2, rt, mk; List<AST.Argument> args;
   AST.TypeNode superType;
   ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   String fromRaw = null;
+  ArrayBuffer<String> deriveBuf = new ArrayBuffer<String>();
 }{
   t1="record" t2=id() [tparams=type_params()] "(" args=args() ")"
   // Optional `from re"..."` clause (shape-first records). `from` is a soft keyword
@@ -1267,12 +1268,20 @@ AST.RecordDeclaration record_decl(int mset) : {
   [ LOOKAHEAD({getToken(1).image.equals("from") && getToken(2).kind == RE_STRING})
     <ID> rt=<RE_STRING> { fromRaw = rt.image.substring(3, rt.image.length() - 1); }
   ]
+  // Optional `derive!(Marker, ...)` clause. `derive` is a soft keyword recognized only
+  // when immediately followed by `!`, so it stays usable as an ordinary identifier. The
+  // `!` makes macro expansion visible at the use site; each marker drives code synthesis
+  // (e.g. Json -> fromJson/toJson) in the Rewriting phase.
+  [ LOOKAHEAD({getToken(1).image.equals("derive") && getToken(2).kind == NOT})
+    <ID> <NOT> "(" mk=id() {append(deriveBuf, c(mk));}
+          ("," mk=id() {append(deriveBuf, c(mk));})* ")"
+  ]
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ] [";"] {
     return AST.recordDeclaration(
-      p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw
+      p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf)
     );
   }
 }
@@ -2360,9 +2369,9 @@ AST.Expression integer_literal() :{Token t; String s;}{
 AST.Expression float_literal() :{Token t; String s;}{
   t=<FLOAT> {
   	s = t.image.replace("_", "");
-    if(s.endsWith("F")){
+    if(s.endsWith("F") || s.endsWith("f")){
       return new AST.FloatLiteral(p(t), Float.parseFloat(chop(s)));
-    }else if(s.endsWith("D")){
+    }else if(s.endsWith("D") || s.endsWith("d")){
       return new AST.DoubleLiteral(p(t), Double.parseDouble(chop(s)));
     }else{
       return new AST.DoubleLiteral(p(t), Double.parseDouble(s));

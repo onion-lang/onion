@@ -375,6 +375,14 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.recordFromComponentUnsupported",
       Seq(items => asString(items(0)), items => asString(items(1)))
     ),
+    SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED -> ErrorDef(
+      "error.semantic.recordDeriveComponentUnsupported",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.RECORD_DERIVE_UNKNOWN_MARKER -> ErrorDef(
+      "error.semantic.recordDeriveUnknownMarker",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

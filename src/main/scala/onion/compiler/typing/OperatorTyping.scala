@@ -30,10 +30,32 @@ final class OperatorTyping(
           }
           node
         }
+      case _: NullableType =>
+        // Nullable receiver: a direct lhs.equals(rhs) can't be emitted (and would NPE
+        // when lhs is null), so route through java.util.Objects.equals for null-safe
+        // value equality — both null is equal, one null is not, otherwise equals().
+        nullSafeEquals(kind, lhs, rhs)
       case _ =>
         // No equals method to dispatch to (e.g. a null literal on the left):
         // fall back to reference comparison, which is the sensible semantics here.
         referenceEquals(kind, lhs, rhs)
+    }
+  }
+
+  /** Null-safe value equality for a statically-nullable operand, via java.util.Objects.equals. */
+  private def nullSafeEquals(kind: BinaryKind, lhs: Term, rhs: Term): Term = {
+    val objectsType = bodyContext.load("java.util.Objects")
+    val rootClass = bodyContext.rootClass
+    val params = Array[Term](new AsInstanceOf(lhs, rootClass), new AsInstanceOf(rhs, rootClass))
+    val methods = objectsType.findMethod("equals", params)
+    if (methods.isEmpty) {
+      referenceEquals(kind, lhs, rhs)
+    } else {
+      var node: Term = new CallStatic(objectsType, methods(0), params)
+      if (kind == NOT_EQUAL) {
+        node = new UnaryTerm(NOT, BasicType.BOOLEAN, node)
+      }
+      node
     }
   }
 

@@ -671,6 +671,83 @@ val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
 ```
 
+## Yaml Module
+
+YAML serialization and parsing for flat block-mapping documents
+(`onion.Yaml`). Shares the same intermediate representation as `Json` —
+scalars map to the same Java types — so `derive!(Yaml)` builds on exactly
+the same `toMap` / `fromMap` core as `derive!(Json)`.
+
+Scope: flat block mapping only (no nested maps, no sequences, no anchors).
+
+### Yaml::parse
+
+Parse a YAML flat block-mapping string into a `LinkedHashMap`:
+
+```onion
+val data = Yaml::parse("name: Alice\nage: 30\n")
+// data is a LinkedHashMap; scalars follow the same type inference as Json::parse
+```
+
+Scalar type inference rules (identical to `Json`):
+- `""` or `null` → `null`
+- `true` / `false` → `Boolean`
+- Bare integer (matches `-?\d+`) → `Long`
+- Floating-point pattern or number containing `.`/`e`/`E` → `Double`
+- Quoted `"..."` → `String` (unescaped, no further coercion)
+- Anything else → `String`
+
+Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
+`fromYaml` catches this and returns `null` instead.
+
+### Yaml::stringify
+
+Serialize a `Map` (or scalar) to a YAML flat block-mapping string:
+
+```onion
+val m = ["name": "Alice", "age": 30L]
+val yaml = Yaml::stringify(m)
+// "name: Alice\nage: 30\n"
+```
+
+String values that would be misread on parse-back (those containing `:`,
+`#`, newlines, or that look like numbers or booleans) are automatically
+double-quoted. Numbers and booleans are rendered verbatim.
+
+### Round-trip guarantee
+
+For any `Map` produced by `Yaml::parse`, `Yaml::parse(Yaml::stringify(m))`
+returns an equal map. Equivalently, for any record annotated with
+`derive!(Yaml)`, `fromYaml(toYaml(v)) == v` holds for all scalar-component
+values.
+
+### Usage with `derive!(Yaml)`
+
+`derive!(Yaml)` synthesizes `fromYaml` and `toYaml` on any scalar-component
+record; see [Records — derive!](specification.md#derive--record-serde-derivation)
+for the full contract.
+
+```onion
+record Config(host: String, port: Int, debug: Boolean) derive!(Yaml)
+
+val cfg = new Config("localhost", 8080, false)
+val yaml = Config::toYaml(cfg)
+// "host: localhost\nport: 8080\ndebug: false\n"
+
+val cfg2 = Config::fromYaml(yaml)   // Config? — null on parse/convert failure
+```
+
+`derive!(Json, Yaml)` is also valid; both formats share the internal
+`toMap` / `fromMap` core, so there is no duplication:
+
+```onion
+record User(name: String, age: Int) derive!(Json, Yaml)
+
+val u = new User("ko", 3)
+val viaJson = User::fromJson(User::toJson(u))   // == u
+val viaYaml = User::fromYaml(User::toYaml(u))  // == u
+```
+
 ## Proc Module
 
 Process execution for scripting (`onion.Proc`):

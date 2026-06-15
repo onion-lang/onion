@@ -229,6 +229,90 @@ valid — both are checked at compile time (group/count mismatch is **E0060**,
 a malformed regex is **E0059**), and an unsupported component type is
 **E0061**.
 
+#### `derive!` — record serde derivation
+
+Adding `derive!(Format, ...)` after a record's component list (or after a
+`from re"..."` clause, before any `<:` supertypes) instructs the compiler to
+synthesize serialization methods from the record's shape. The `!` suffix
+signals macro-style expansion rather than a type-class constraint.
+
+```onion
+record User(name: String, age: Int) derive!(Json)
+record Config(host: String, port: Int, debug: Boolean) derive!(Json, Yaml)
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json, Yaml)
+  <: Printable
+```
+
+Supported markers are **`Json`** and **`Yaml`**; an unrecognized marker is
+**E0063**. For each marker the compiler synthesizes two static methods on the
+record:
+
+| Marker | Synthesized method | Synthesized method |
+|--------|-------------------|-------------------|
+| `Json` | `R::fromJson(s: String): R?` | `R::toJson(v: R): String` |
+| `Yaml` | `R::fromYaml(s: String): R?` | `R::toYaml(v: R): String` |
+
+All four formats share a single internal `toMap` / `fromMap` core: `toJson`
+and `toYaml` both call `toMap` and forward the resulting `Map` to
+`Json::stringify` or `Yaml::stringify`; `fromJson` and `fromYaml` parse the
+text into an intermediate `Map` (via `Json::parse` or `Yaml::parse`) and pass
+it to `fromMap`. This means the core serialization logic is written once and
+adding a new format requires only registering its `parse` / `stringify` pair
+in the stdlib — the macro itself does not change.
+
+`from-R?` methods return `null` on parse failure or a type-conversion error;
+they never throw. `to-R` methods always produce a well-formed string.
+Round-trips hold for scalar components: `fromJson(toJson(v)) == v`.
+
+Supported component types are the eight scalar primitives: `String`, `Int`,
+`Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`. A component of any
+other type is **E0062**. `derive!` may coexist with `from re"..."` on the
+same record; the two features are independent.
+
+#### `law` / `example` — compile-time specification checks
+
+A record declaration may be followed by `law` and `example` clauses. The
+compiler executes these at build time (during the `LawCheckPhase` that runs
+after type-checking). A failing check is a **compile error**, not a
+runtime error.
+
+```onion
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+  example { Pt::parse("3,4") == new Pt(3, 4) }
+
+record User(name: String, age: Int) derive!(Json)
+  law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
+  example { new User("ko", 3).name() == "ko" }
+```
+
+**`example { boolExpr }`** — a concrete assertion. The compiler evaluates
+`boolExpr` and requires it to be `true`. If it is `false`, compilation fails
+with **E0065** and a message showing the expression that returned `false`.
+
+**`law name(p: T) { boolExpr }`** — a property. The compiler generates a set
+of sample values for the parameter `p` (covering boundary values, negatives,
+and random cases) and checks `boolExpr` for each. If any sample falsifies the
+law, compilation fails with **E0064** and a report that includes the
+counterexample. Parameters may be the same scalar types supported by `derive!`
+(`String`, `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`) or
+the record type itself.
+
+Multiple `law` and `example` clauses may appear on a single record, in any
+order. They coexist freely with `from re"..."` and `derive!(...)`:
+
+```onion
+record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json)
+  law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
+  law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
+  example { R::parse("0,0") == new R(0, 0) }
+```
+
+The purpose of `law` / `example` is to bring specifications — not just
+documentation, but machine-verified contracts — inside the language itself.
+The `parse∘format == id` invariant above is checked on every compile, so a
+grammar change that breaks the round-trip fails the build immediately.
+
 ### Enums
 
 ```onion

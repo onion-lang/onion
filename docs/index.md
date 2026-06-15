@@ -9,6 +9,8 @@
 - **Statically Typed** - Catch errors at compile time with local type inference
 - **Null Safety** - Nullable types (`T?`), safe calls (`?.`) and indexing (`?[]`), Elvis (`?:`), non-null assertion (`!!`), smart casts, and nullable-aware generics
 - **Data Types** - Records (generic, destructurable), data-carrying enums, and exhaustiveness-checked pattern matching over sealed hierarchies
+- **Bidirectional Records** - One `record ... from re"..." derive!(Json, Yaml)` declaration derives parse/format and JSON/YAML serde in *both* directions
+- **Compile-Time Specs** - `law` / `example` clauses on a record are executed by the compiler at build time, so invariants like `parse∘format == id` are machine-checked
 - **Concise Classes** - Primary constructors: `class Point(val x: Int, val y: Int)`
 - **Object-Oriented** - Classes, inheritance, interfaces, and method overloading
 - **Functional Elements** - Lambda expressions, closures, and first-class functions
@@ -89,7 +91,10 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 - [Functions](guide/functions.md) - Function definitions and lambda expressions
 - [Lambda Expressions](guide/lambda-expressions.md) - Closures and trailing lambda syntax
 - [Classes and Objects](guide/classes-and-objects.md) - Object-oriented programming
+- [Inheritance](guide/inheritance.md) - Subclassing and interface implementation
+- [Collections](guide/collections.md) - Lists, maps, and built-in pipelines
 - [Java Interoperability](guide/java-interop.md) - Using Java libraries
+- [Scripting](guide/scripting.md) - re""/file"" literals, derive!, law/example, pipelines, auto-CLI
 
 ## Reference
 

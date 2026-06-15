@@ -301,6 +301,37 @@ val result: Future[Int] = do[Future] {
 }
 ```
 
+## Json モジュール
+
+JSON のパースとシリアライズ。中間表現は Java の Map / List / scalar（String / Long / Double / Boolean / null）です。
+
+### Json::parse / Json::stringify
+
+```onion
+val obj = Json::parse("{\"name\":\"ko\",\"age\":3}")   // Object（実体は Map）
+val name = Json::getString(obj, "name")                // "ko"
+val age = Json::getInt(obj, "age")                     // 3
+
+val m = Json::object()                                  // 空の Map
+m.put("x", 1)
+val text = Json::stringify(m)                           // {"x":1}
+```
+
+`getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
+
+## Yaml モジュール
+
+YAML（flat block mapping のサブセット）のパースとシリアライズ。中間表現は Json と共通です。
+
+### Yaml::parse / Yaml::stringify
+
+```onion
+val obj = Yaml::parse("name: ko\nage: 3")    // Object（実体は Map）
+val text = Yaml::stringify(obj)               // "name: ko\nage: 3\n"
+```
+
+scalar の型推論は Json と一致します（`3`→Long、`3.5`→Double、`true`→Boolean、`null`→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、`record ... derive!(Yaml)` の土台になっています。
+
 ## 次のステップ
 
 - [基本構文](../guide/basic-syntax.md) - 言語構文の詳細

@@ -320,6 +320,15 @@ public class JJOnionParser implements Parser {
    * marks a value expression, NOT a type, unless a constructor "(" follows "]".
    */
   private boolean newBracketsAreTypeArgs() {
+    // A primitive element type never takes type arguments, so its "[..]" is always an array
+    // size -- e.g. new Int[N] where N is an (uppercase) variable, not a type argument.
+    switch (getToken(0).kind) {
+      case K_INT: case K_LONG: case K_BYTE: case K_SHORT: case K_CHAR:
+      case K_FLOAT: case K_DOUBLE: case K_BOOLEAN:
+        return false;
+      default:
+        break;
+    }
     // getToken(1) is "[". Scan the balanced first bracket group.
     int depth = 0;
     int i = 1;

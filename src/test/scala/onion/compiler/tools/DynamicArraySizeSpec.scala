@@ -152,5 +152,24 @@ class DynamicArraySizeSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(7) == result)
     }
+
+    it("allocates with an uppercase variable size (new Int[N], not a type arg)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val N: Int = 5
+          |    val arr = new Int[N]
+          |    arr[0] = 7
+          |    return arr[0] + arr.length
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(12) == result)
+    }
   }
 }

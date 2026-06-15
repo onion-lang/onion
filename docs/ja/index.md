@@ -82,10 +82,14 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 ## 言語ガイド
 
 - [基本構文](guide/basic-syntax.md) - 変数、演算子、式
+- [変数と型](guide/variables-and-types.md) - 型システムとキャスト
+- [制御フロー](guide/control-flow.md) - if、ループ、select、例外処理
+- [Null安全](guide/null-safety.md) - nullable型とスマートキャスト
+- [スクリプティング](guide/scripting.md) - リテラル、derive!、law/example、パイプライン
 
 ## リファレンス
 
-- [標準ライブラリ](reference/stdlib.md) - IO、Option、Result、Future、Rand、Assert、Timingなど
+- [標準ライブラリ](reference/stdlib.md) - IO、Option、Result、Future、Rand、Assert、Timing、Json、Yamlなど
 
 ## ツール
 

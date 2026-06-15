@@ -320,5 +320,45 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("{b=2, c=3}") == result)
     }
+
+    it("any/all/none on a matching list") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "bb", "ccc"]
+          |    val a = xs.any { s => s.length() > 2 }
+          |    val b = xs.all { s => s.length() > 0 }
+          |    val c = xs.none { s => s.length() > 5 }
+          |    return "" + a + "," + b + "," + c
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineQuantTrue.on",
+        Array()
+      )
+      assert(Shell.Success("true,true,true") == result)
+    }
+
+    it("any/all/none on a non-matching list") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "bb"]
+          |    val a = xs.any { s => s.length() > 5 }
+          |    val b = xs.all { s => s.length() > 1 }
+          |    val c = xs.none { s => s.length() > 0 }
+          |    return "" + a + "," + b + "," + c
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineQuantFalse.on",
+        Array()
+      )
+      assert(Shell.Success("false,false,false") == result)
+    }
   }
 }

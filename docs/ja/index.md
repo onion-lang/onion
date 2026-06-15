@@ -81,10 +81,17 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 
 ## 言語ガイド
 
+- [言語概要](guide/overview.md) - 言語の設計思想
 - [基本構文](guide/basic-syntax.md) - 変数、演算子、式
 - [変数と型](guide/variables-and-types.md) - 型システムとキャスト
-- [制御フロー](guide/control-flow.md) - if、ループ、select、例外処理
 - [Null安全](guide/null-safety.md) - nullable型とスマートキャスト
+- [制御フロー](guide/control-flow.md) - if、ループ、select、例外処理
+- [関数](guide/functions.md) - 関数定義とラムダ
+- [ラムダ式](guide/lambda-expressions.md) - クロージャと末尾ラムダ
+- [クラスとオブジェクト](guide/classes-and-objects.md) - オブジェクト指向
+- [継承](guide/inheritance.md) - サブクラスとインターフェース実装
+- [コレクション](guide/collections.md) - リスト、マップ、組み込みパイプライン
+- [Javaとの相互運用](guide/java-interop.md) - Javaライブラリの利用
 - [スクリプティング](guide/scripting.md) - リテラル、derive!、law/example、パイプライン
 
 ## リファレンス

@@ -55,11 +55,20 @@ private[typing] object MemberAccess {
   def ensureTypeAccessible(typing: Typing, node: AST.Node, target: ObjectType, context: ClassType): Boolean = {
     if (target.isArrayType) {
       val component = target.asInstanceOf[ArrayType].component
-      if (!component.isBasicType) {
-        if (!isTypeAccessible(component.asInstanceOf[ClassType], context)) {
-          typing.report(CLASS_NOT_ACCESSIBLE, node, target, context)
-          return false
-        }
+      // The component may be nullable (e.g. String?[]) or itself an array; only a plain
+      // ClassType carries accessibility to check. Unwrap a NullableType; skip anything else
+      // (previously this cast component straight to ClassType and crashed on String?[]).
+      val componentClass = component match {
+        case nt: NullableType => nt.innerType
+        case other => other
+      }
+      componentClass match {
+        case ct: ClassType =>
+          if (!isTypeAccessible(ct, context)) {
+            typing.report(CLASS_NOT_ACCESSIBLE, node, target, context)
+            return false
+          }
+        case _ => ()
       }
     } else {
       if (!isTypeAccessible(target.asInstanceOf[ClassType], context)) {

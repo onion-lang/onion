@@ -418,7 +418,7 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong | Correct (Onion) |
 |-------|-----------------|
 | `0` for long | `0L` - explicit `L` suffix required for Long |
-| `0.0` for float | `0.0f` - explicit `f` suffix for Float |
+| `0.0` for float | `0.0f` / `0.0F` - `f`/`F` suffix for Float, `d`/`D` for Double (both cases accepted) |
 | `new Double(1.5)` / `new Integer(3)` | `Double`/`Int` are primitives - just write `1.5`; boxing into Object/Number slots is automatic; wrapper classes are `JDouble`/`JInteger`/... |
 | `"str" + 123` | ✓ correct - auto string conversion |
 
@@ -440,6 +440,8 @@ These are frequently confused with other languages. **Always check these:**
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `<:` |
+| serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
+| test a record in a separate suite | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
 
 ### Lambdas & Functions
 
@@ -476,6 +478,7 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong | Correct (Onion) |
 |-------|-----------------|
 | `null` check with `== null` | ✓ correct - works as expected |
+| `a == b` where `a` is nullable (`T?`) | ✓ correct - null-safe value equality (java.util.Objects.equals): both-null is equal, one-null is not, else `equals()`; no null-check needed first |
 | `&&`, `\|\|` operators | ✓ correct - same as Java |
 | `!condition` | ✓ correct - same as Java |
 | `a ? b : c` ternary | Not supported - use `if/else` expression |

@@ -129,6 +129,8 @@ object SemanticError {
   case object RECORD_FROM_COMPONENT_UNSUPPORTED extends SemanticError(61)
   case object RECORD_DERIVE_COMPONENT_UNSUPPORTED extends SemanticError(62)
   case object RECORD_DERIVE_UNKNOWN_MARKER extends SemanticError(63)
+  case object LAW_VIOLATION extends SemanticError(64)
+  case object EXAMPLE_FAILED extends SemanticError(65)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

@@ -98,6 +98,46 @@ val hits = Access::parseAll(file"access.log".text())   // List[Access], bad line
 val one  = Access::parse(line)                          // Access? (null on no match)
 ```
 
+## Deriving Serialization with `derive!`
+
+`derive!(Json)` / `derive!(Yaml)` synthesize both directions of a format from the
+record's shape — no hand-written serializer. `derive!` is a macro (the `!` marks
+expansion at the use site), not a type class:
+
+```onion
+record User(name: String, age: Int) derive!(Json, Yaml)
+
+User::toJson(u)              // {"name":"ko","age":3}
+val a = User::fromJson(s)    // User?  (null on bad input)
+User::toYaml(u)              // name: ko\nage: 3
+val b = User::fromYaml(s)    // User?
+```
+
+Every format shares one `toMap` / `fromMap` core, so adding a format is just an
+stdlib type with `parse` / `stringify` over the shared `Map` — the macro is
+unchanged. `derive!(...)` and a `from re"..."` clause can coexist on one record.
+Supported component types are the scalars String / Int / Long / Double / Float /
+Boolean / Short / Byte; anything else is a compile error (E0062). An unknown marker
+is E0063.
+
+## Compile-Time Laws and Examples
+
+A record can carry `law` and `example` clauses that the **compiler runs at build
+time** — the specification lives in the language, not a separate test suite:
+
+```onion
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+  example { Pt::parse("3,4") == new Pt(3, 4) }
+```
+
+`example { e }` must evaluate to `true`. `law name(p: T) { e }` is property-checked:
+the compiler generates sample values for `p` and requires `e` to hold for all of
+them. A false example fails compilation (E0065); a falsified law fails with a printed
+counterexample (E0064). This turns `parse ∘ format == id` into a machine-checked
+guarantee rather than a hope. Laws whose parameter types aren't generatable are
+skipped; the check is on by default.
+
 ## Pipeline Operator
 
 `e |> f` calls `f(e)`; `e |> f(a)` injects `e` as the first argument. A

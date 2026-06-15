@@ -216,5 +216,39 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[[], [a, b]]") == result)
     }
+
+    it("removes duplicates with distinct (preserving first-occurrence order)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "b", "a", "c", "b"]
+          |    return xs.distinct().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineDistinct.on",
+        Array()
+      )
+      assert(Shell.Success("[a, b, c]") == result)
+    }
+
+    it("sorts by a key with sortedBy") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["ccc", "a", "bb"]
+          |    return xs.sortedBy { s => s.length() }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineSortedBy.on",
+        Array()
+      )
+      assert(Shell.Success("[a, bb, ccc]") == result)
+    }
   }
 }

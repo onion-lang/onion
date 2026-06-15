@@ -360,5 +360,41 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("false,false,false") == result)
     }
+
+    it("zips two lists into pairs, truncating to the shorter") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "b", "c"]
+          |    val ys = ["x", "y"]
+          |    return xs.zip(ys).toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineZip.on",
+        Array()
+      )
+      assert(Shell.Success("[[a, x], [b, y]]") == result)
+    }
+
+    it("concatenates two lists") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "b"]
+          |    val ys = ["c", "d"]
+          |    return xs.concat(ys).toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineConcat.on",
+        Array()
+      )
+      assert(Shell.Success("[a, b, c, d]") == result)
+    }
   }
 }

@@ -182,5 +182,39 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("alice=12;bob=34;") == result)
     }
+
+    it("partitions a list into [matching, non-matching]") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "bb", "ccc"]
+          |    return xs.partition { s => s.length() > 1 }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelinePartition.on",
+        Array()
+      )
+      assert(Shell.Success("[[bb, ccc], [a]]") == result)
+    }
+
+    it("partitions with an empty matching side") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "b"]
+          |    return xs.partition { s => s.length() > 5 }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelinePartitionEmpty.on",
+        Array()
+      )
+      assert(Shell.Success("[[], [a, b]]") == result)
+    }
   }
 }

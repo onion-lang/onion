@@ -67,6 +67,7 @@ val decimal: Int = 42
 val hex: Int = 0xFF
 val longValue: Long = 100L
 val doubleValue: Double = 3.14
+val floatValue: Float = 2.5f       // f/F で Float、d/D で Double（大文字・小文字どちらも可）
 val scientific: Double = 1.23e10
 ```
 

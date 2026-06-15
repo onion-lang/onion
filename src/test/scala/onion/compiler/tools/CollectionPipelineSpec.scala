@@ -286,5 +286,39 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("42") == result)
     }
+
+    it("transforms map values with mapValues") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m = ["a": 1, "b": 2]
+          |    return m.mapValues { v => (v as Int) * 10 }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineMapValues.on",
+        Array()
+      )
+      assert(Shell.Success("{a=10, b=20}") == result)
+    }
+
+    it("filters map entries with filterMap") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m = ["a": 1, "b": 2, "c": 3]
+          |    return m.filterMap { k, v => (v as Int) > 1 }.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineFilterMap.on",
+        Array()
+      )
+      assert(Shell.Success("{b=2, c=3}") == result)
+    }
   }
 }

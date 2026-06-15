@@ -250,5 +250,41 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[a, bb, ccc]") == result)
     }
+
+    it("reduces a list with reduce (no initial value)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = [1, 2, 3, 4]
+          |    val total = xs.reduce { a, b => (a as Int) + (b as Int) }
+          |    return "" + (total as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineReduce.on",
+        Array()
+      )
+      assert(Shell.Success("10") == result)
+    }
+
+    it("reduces a single-element list to that element") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = [42]
+          |    val only = xs.reduce { a, b => (a as Int) + (b as Int) }
+          |    return "" + (only as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineReduceSingle.on",
+        Array()
+      )
+      assert(Shell.Success("42") == result)
+    }
   }
 }

@@ -3,11 +3,11 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 /**
- * Top-level `val`/`var` declarations become fields of the script's synthetic
- * class (#165), so top-level functions and later statements can see them --
- * a plain local would be invisible outside the generated `start` method. The
- * field is initialised in order; a `val` declared after a function that uses
- * it (forward reference) is still not visible.
+ * Top-level `val`/`var` declarations are translated local-first -- so smart-cast /
+ * null narrowing works on them within `start`, exactly like inside a function -- and
+ * mirrored into a field of the script's synthetic class (#165) so top-level functions
+ * and later statements can still see them. The field is initialised in order; a `val`
+ * declared after a function that uses it (forward reference) is still not visible.
  */
 class TopLevelValSpec extends AbstractShellSpec {
   describe("top-level val/var visibility") {
@@ -84,6 +84,20 @@ class TopLevelValSpec extends AbstractShellSpec {
         Array()
       )
       assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("smart-casts a top-level val after a null check (#165 local-first)") {
+      val result = shell.run(
+        """
+          |val a: String? = "hello"
+          |if a != null {
+          |  IO::println(a.length)
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success])
     }
   }
 }

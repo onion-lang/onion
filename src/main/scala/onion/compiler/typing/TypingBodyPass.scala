@@ -331,21 +331,20 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   ): Option[ActionStatement] = {
     if (node.init == null) return None
     if (klass.field(node.name) != null) return None
-    val explicitType = if (node.typeRef == null) None else typing.mapFrom(node.typeRef)
-    val valueOpt = explicitType match {
-      case Some(t) => typed(node.init, context, t)
-      case None => typed(node.init, context)
-    }
-    valueOpt.flatMap { value =>
-      val fieldType = explicitType.getOrElse(value.`type`)
-      if (fieldType == BasicType.VOID) None
-      else {
-        val field = new FieldDefinition(node.location, AST.M_PUBLIC, klass, node.name, fieldType)
-        klass.add(field)
-        val adapted = processAssignable(node.init, fieldType, value)
-        if (adapted == null) None
-        else Some(new ExpressionActionStatement(new SetField(new This(node.location, klass), field, adapted)))
-      }
+    // #165, local-first: translate the declaration as an ordinary local so its binding is a
+    // ClosureLocalBinding — smart-cast / null narrowing then works for it within `start`,
+    // exactly like inside a function. Then mirror the value into a public field so later
+    // top-level functions can still reference it (the reason #165 promoted it to a field).
+    val localStmt = translate(node, context)
+    val binding = context.lookup(node.name)
+    if (binding == null || binding.tp == BasicType.VOID) Some(localStmt)
+    else {
+      val fieldType = binding.tp
+      val field = new FieldDefinition(node.location, AST.M_PUBLIC, klass, node.name, fieldType)
+      klass.add(field)
+      val readLocal = new RefLocal(node.location, binding.frameIndex, binding.index, fieldType)
+      val setField = new ExpressionActionStatement(new SetField(new This(node.location, klass), field, readLocal))
+      Some(new StatementBlock(node.location, localStmt, setField))
     }
   }
 

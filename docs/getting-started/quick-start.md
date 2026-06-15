@@ -269,6 +269,22 @@ import {
 val list: java.util.ArrayList = new java.util.ArrayList
 ```
 
+## Bidirectional Records
+
+A record can derive both directions of a boundary from a single declaration, and
+the compiler can check invariants at build time:
+
+```onion
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json)
+  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+  example { Pt::parse("3,4") == new Pt(3, 4) }
+```
+
+`from re"..."` derives `parse` / `format`, `derive!(Json, Yaml)` derives
+`fromJson` / `toJson` / `fromYaml` / `toYaml`, and the `law` / `example` clauses
+are executed by the compiler so a broken round-trip fails the build. See the
+[Scripting guide](../guide/scripting.md).
+
 ## Next Steps
 
 - [Language Guide](../guide/overview.md) - Deep dive into language features

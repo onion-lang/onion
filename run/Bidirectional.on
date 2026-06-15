@@ -1,0 +1,28 @@
+// Bidirectional records: write the relation once, get every direction for free,
+// and let the compiler check the examples at build time so the demo can't drift.
+//
+// This single `record` declaration yields:
+//   Access::parse / Access::format          (text  <-> record, from the regex)
+//   Access::fromJson / Access::toJson        (JSON  <-> record, from derive!)
+//   Access::fromYaml / Access::toYaml        (YAML  <-> record, from derive!)
+// and the two `example` clauses are executed by the compiler — a false one fails
+// the build (E0065).
+record Access(ip: String, status: Int)
+  from re"(\S+) (-?\d+)"
+  derive!(Json, Yaml)
+  example { Access::parse("1.2.3.4 200") == new Access("1.2.3.4", 200) }
+  example { Access::format(new Access("1.2.3.4", 200)) == "1.2.3.4 200" }
+
+def main(): void {
+  val a = Access::parse("10.0.0.1 404")
+  if a != null {
+    IO::println("parsed : " + a.ip() + " / " + a.status())
+    IO::println("text   : " + Access::format(a))
+    IO::println("json   : " + Access::toJson(a))
+    IO::println("yaml   :")
+    IO::println(Access::toYaml(a))
+    val back = Access::fromJson(Access::toJson(a))
+    IO::println("json round-trip : " + (back != null && back == a))
+  }
+}
+main()

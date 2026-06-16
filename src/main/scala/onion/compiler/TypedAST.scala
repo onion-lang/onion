@@ -1731,6 +1731,11 @@ object TypedAST {
               // Expected: concrete type, Actual: wildcard - not directly assignable
               case (_, _: TypedAST.WildcardType) =>
                 false
+              // Both parameterized (e.g. List[T] nested inside List[List[T]]):
+              // recurse so nested type arguments are matched structurally (and a
+              // nested type variable can unify) instead of failing on identity.
+              case (_: TypedAST.AppliedClassType, _: TypedAST.AppliedClassType) =>
+                isSuperType(expectedArg, actualArg)
               // Both concrete types: must be identical
               case _ =>
                 expectedArg eq actualArg

@@ -396,5 +396,22 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[a, b, c, d]") == result)
     }
+
+    it("flattens a list of lists") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xss = [["a", "b"], ["c"]]
+          |    return xss.flatten().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineFlatten.on",
+        Array()
+      )
+      assert(Shell.Success("[a, b, c]") == result)
+    }
   }
 }

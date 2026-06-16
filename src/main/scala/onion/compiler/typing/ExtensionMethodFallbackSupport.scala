@@ -44,9 +44,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         val applicable = collectExtensionMethods(targetType, name).filter { extMethod =>
           extMethod.name == name && isExtensionMethodApplicable(extMethod, params)
         }
-        if (applicable.isEmpty) CandidateSelection.NoMatch
-        else if (applicable.length > 1) CandidateSelection.Ambiguous(applicable(0), applicable(1))
-        else CandidateSelection.Selected(applicable.head)
+        // A user-declared `extension` shadows a builtin stdlib extension
+        // (onion.Colls / onion.Iterables) of the same name+arity: an explicit
+        // user extension expresses clear intent and should win rather than
+        // collide as an ambiguity.
+        val userDefined = applicable.filterNot(isBuiltinExtension)
+        val chosen = if (userDefined.nonEmpty) userDefined else applicable
+        if (chosen.isEmpty) CandidateSelection.NoMatch
+        else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
+        else CandidateSelection.Selected(chosen.head)
       case _ =>
         CandidateSelection.NoMatch
     }
@@ -185,6 +191,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
     collect(targetType)
     result.toSeq
+  }
+
+  /** A builtin stdlib extension (onion.Colls / onion.Iterables), as opposed to
+   *  a user-declared `extension` block — used so a user extension can shadow a
+   *  builtin of the same name instead of colliding as an ambiguity. */
+  private def isBuiltinExtension(m: ExtensionMethodDefinition): Boolean = {
+    val n = m.containerClass.name
+    n == "onion.Colls" || n == "onion.Iterables"
   }
 
   private def isExtensionMethodApplicable(

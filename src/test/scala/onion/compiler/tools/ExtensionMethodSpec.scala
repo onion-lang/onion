@@ -139,5 +139,25 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("HI") == result)
     }
+
+    it("lets a user extension method shadow a builtin Colls extension of the same name") {
+      val result = shell.run(
+        """
+          |extension List[String] {
+          |  def first(): String { return "user:" + this.get(0) }
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return ["A", "B"].first()
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("user:A") == result)
+    }
   }
 }

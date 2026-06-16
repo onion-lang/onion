@@ -413,5 +413,39 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[a, b, c]") == result)
     }
+
+    it("lists a map's keys in insertion order") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m = ["a": 1, "b": 2, "c": 3]
+          |    return m.keys().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineKeys.on",
+        Array()
+      )
+      assert(Shell.Success("[a, b, c]") == result)
+    }
+
+    it("lists a map's values in insertion order") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m = ["a": 1, "b": 2, "c": 3]
+          |    return m.values().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineValues.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 2, 3]") == result)
+    }
   }
 }

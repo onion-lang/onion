@@ -33,6 +33,17 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
     }
   }
 
+  /** Compile-only check: true if the script compiles with no errors (does NOT
+   *  run it). Used by the sample-corpus regression test so a sample that stops
+   *  compiling is caught even if it would read stdin or loop when run. */
+  def compiles(script: String, fileName: String): Boolean = {
+    val compiler: OnionCompiler = new OnionCompiler(config)
+    val result = withContextClassLoader(classLoader) {
+      compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(script), fileName)))
+    }
+    !result.hasErrors
+  }
+
   def run(classes: Seq[CompiledClass], args: Array[String]): Shell.Result = {
     val loader = new OnionClassLoader(classLoader, classpath, classes)
     withContextClassLoader(loader) {

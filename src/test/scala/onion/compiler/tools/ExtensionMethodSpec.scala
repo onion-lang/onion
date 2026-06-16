@@ -121,5 +121,23 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("Object(hello)") == result)
     }
+
+    it("supports a single-line expression-bodied method (closing brace on the same line)") {
+      val result = shell.run(
+        """
+          |extension String { def shout(): String = self.toUpperCase() }
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "hi".shout()
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("HI") == result)
+    }
   }
 }

@@ -1405,7 +1405,7 @@ AST.MethodDeclaration method_decl(int mset) : {
   (  (b=block() | {enterSection();} eos() ) {
        return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns);
      }
-  |  ({enterSection();} "=" eols() e=term() eos()) {
+  |  ({enterSection();} "=" eols() e=term() eos_or_block_end()) {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),

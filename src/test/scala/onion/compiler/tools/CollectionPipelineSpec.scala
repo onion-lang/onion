@@ -447,5 +447,42 @@ class CollectionPipelineSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[1, 2, 3]") == result)
     }
+
+    it("folds from the left with foldl") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = [1, 2, 3, 4]
+          |    val total = xs.foldl(0) { acc, x => (acc as Int) + (x as Int) }
+          |    return "" + (total as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineFoldl.on",
+        Array()
+      )
+      assert(Shell.Success("10") == result)
+    }
+
+    it("checks a universal predicate with forAll") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = ["a", "bb", "ccc"]
+          |    val a = xs.forAll { s => s.length() > 0 }
+          |    val b = xs.forAll { s => s.length() > 1 }
+          |    return "" + a + "," + b
+          |  }
+          |}
+          |""".stripMargin,
+        "PipelineForAll.on",
+        Array()
+      )
+      assert(Shell.Success("true,false") == result)
+    }
   }
 }

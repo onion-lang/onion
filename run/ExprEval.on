@@ -1,0 +1,98 @@
+// ExprEval — a small expression-tree evaluator exercising interfaces,
+// implementing classes, polymorphic dispatch (eval + show), recursion over a
+// heterogeneous tree, and collection pipelines over the results.
+interface Expr {
+  def eval(): Int
+  def show(): String
+}
+
+class Num <: Expr {
+  val value: Int
+public:
+  def this(v: Int) { this.value = v }
+  def eval(): Int { return value }
+  def show(): String { return "" + value }
+}
+
+class Add <: Expr {
+  val left: Expr
+  val right: Expr
+public:
+  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
+  def eval(): Int { return left.eval() + right.eval() }
+  def show(): String { return "(" + left.show() + " + " + right.show() + ")" }
+}
+
+class Sub <: Expr {
+  val left: Expr
+  val right: Expr
+public:
+  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
+  def eval(): Int { return left.eval() - right.eval() }
+  def show(): String { return "(" + left.show() + " - " + right.show() + ")" }
+}
+
+class Mul <: Expr {
+  val left: Expr
+  val right: Expr
+public:
+  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
+  def eval(): Int { return left.eval() * right.eval() }
+  def show(): String { return "(" + left.show() + " * " + right.show() + ")" }
+}
+
+class Neg <: Expr {
+  val arg: Expr
+public:
+  def this(a: Expr) { this.arg = a }
+  def eval(): Int { return 0 - arg.eval() }
+  def show(): String { return "-" + arg.show() }
+}
+
+val exprs = [
+  new Mul(new Add(new Num(2), new Num(3)), new Num(4)),
+  new Sub(new Num(10), new Neg(new Num(5))),
+  new Neg(new Add(new Num(1), new Num(2)))
+]
+
+foreach ex: Expr in exprs {
+  IO::println(ex.show() + " = " + ex.eval())
+}
+
+val total = exprs.fold(0) { acc, ex => (acc as Int) + (ex as Expr).eval() }
+IO::println("sumAll: " + total)
+
+val shownDesc = exprs
+  .sortedBy { ex => 0 - (ex as Expr).eval() }
+  .map { ex => (ex as Expr).show() }
+IO::println("byValueDesc: " + shownDesc.toString())
+
+class Div <: Expr {
+  val left: Expr
+  val right: Expr
+public:
+  def this(l: Expr, r: Expr) { this.left = l; this.right = r }
+  def eval(): Int { return left.eval() / right.eval() }
+  def show(): String { return "(" + left.show() + " / " + right.show() + ")" }
+}
+
+// safe evaluation: division by zero is caught and reported as a sentinel
+def safeEval(e: Expr): Int {
+  try {
+    return e.eval()
+  } catch ex: Exception {
+    return 0 - 999
+  }
+}
+
+val d1: Expr = new Div(new Num(20), new Num(4))
+val d2: Expr = new Div(new Num(7), new Num(0))
+IO::println(d1.show() + " = " + safeEval(d1))
+IO::println(d2.show() + " -> " + safeEval(d2))
+
+// pick the largest expression by value with reduce
+val pool = [d1, new Num(100), new Sub(new Num(3), new Num(9))]
+val biggest = pool.reduce { a, b =>
+  if (a as Expr).eval() > (b as Expr).eval() { a } else { b }
+}
+IO::println("biggest: " + (biggest as Expr).show() + " = " + (biggest as Expr).eval())

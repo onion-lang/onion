@@ -14,7 +14,8 @@ final class TypingBodyContext(
   private val loadClassRequired: String => ClassType,
   private val loadClassOption: String => Option[ClassType],
   private val reportNode: (SemanticError, AST.Node, Seq[AnyRef]) => Unit,
-  val warningReporter: WarningReporter
+  val warningReporter: WarningReporter,
+  private val topLevelClassProvider: () => Option[ClassType] = () => None
 ) {
   def definition: ClassDefinition = currentDefinitionProvider()
   def mapper: NameResolver = currentMapperProvider()
@@ -24,6 +25,8 @@ final class TypingBodyContext(
   def load(name: String): ClassType = loadClassRequired(name)
   /** Loads a class that may legitimately be absent (e.g. user-named imports). */
   def loadOption(name: String): Option[ClassType] = loadClassOption(name)
+  /** The synthetic top-level (<File>Main) class hosting top-level functions and val/var, if loaded. */
+  def topLevelClass: Option[ClassType] = topLevelClassProvider()
 
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
     reportNode(error, node, items.toSeq)
@@ -41,6 +44,7 @@ object TypingBodyContext {
       loadClassRequired = typing.loadRequired,
       loadClassOption = typing.load,
       reportNode = (error, node, items) => typing.report(error, node, items*),
-      warningReporter = typing.warningReporter_
+      warningReporter = typing.warningReporter_,
+      topLevelClassProvider = () => typing.loadTopClass
     )
 }

@@ -465,7 +465,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         val classType = loadTopClass.asInstanceOf[ClassDefinition]
         // final: top-level functions are never overridden, and marking them so
         // lets tail-call optimization rewrite direct self-recursion into a loop.
-        val modifier = node.modifiers | AST.M_PUBLIC | AST.M_FINAL
+        val modifier = node.modifiers | AST.M_PUBLIC | AST.M_FINAL | AST.M_STATIC
         val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
         val annotations = node.annotations.map(_.name).toSet

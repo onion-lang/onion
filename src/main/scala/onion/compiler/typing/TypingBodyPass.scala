@@ -340,10 +340,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     if (binding == null || binding.tp == BasicType.VOID) Some(localStmt)
     else {
       val fieldType = binding.tp
-      val field = new FieldDefinition(node.location, AST.M_PUBLIC, klass, node.name, fieldType)
+      val field = new FieldDefinition(node.location, AST.M_PUBLIC | AST.M_STATIC, klass, node.name, fieldType)
       klass.add(field)
       val readLocal = new RefLocal(node.location, binding.frameIndex, binding.index, fieldType)
-      val setField = new ExpressionActionStatement(new SetField(new This(node.location, klass), field, readLocal))
+      val setField = new ExpressionActionStatement(new SetStaticField(node.location, klass, field, readLocal))
       Some(new StatementBlock(node.location, localStmt, setField))
     }
   }

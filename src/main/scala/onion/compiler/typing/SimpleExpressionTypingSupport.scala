@@ -174,13 +174,25 @@ private[compiler] final class SimpleExpressionTypingSupport(
       resolveImplicitField(node, context) match {
         case Some(term) => Some(term)
         case None =>
-          // Fields that can't be reached this way (e.g. an instance field from
-          // a static method) still suggest the qualified form to use.
-          fieldQualificationHint(node.name, context) match {
-            case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
-            case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+          // A bare name may be a top-level val/var, which lives as a static field
+          // on the synthetic top-level class. Resolve it as a static-field read so
+          // top-level functions, main, and methods of other classes can all reach it.
+          val topStatic = bodyContext.topLevelClass.flatMap { tc =>
+            val f = tc.field(node.name)
+            if (f != null && (f.modifier & AST.M_STATIC) != 0) Some(new RefStaticField(node.location, tc, f))
+            else None
           }
-          None
+          topStatic match {
+            case Some(term) => Some(term)
+            case None =>
+              // Fields that can't be reached this way (e.g. an instance field from
+              // a static method) still suggest the qualified form to use.
+              fieldQualificationHint(node.name, context) match {
+                case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
+                case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+              }
+              None
+          }
       }
     }
   }

@@ -48,7 +48,7 @@ def manifestExtra(artifact: File, classpath: Classpath) = {
   Package.JarManifest(mf)
 }
 
-def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
+def distTask(target: File, out: File, artifact: File, classpath: Classpath, version: String) = {
   val libs = classpath.map(_.data).filter(isArchive)
   val libdir = out / "lib"
   IO.createDirectory(libdir)
@@ -62,7 +62,7 @@ def distTask(target: File, out: File, artifact: File, classpath: Classpath) = {
   IO.copyFile(artifact, out / "onion.jar")
   IO.copyFile(file("README.md"), out / "README.md")
   val files = (out ** AllPassFilter).get.flatMap(f=> f.relativeTo(out).map(r=>(f, r.getPath)))
-  IO.zip(files, target / "onion-dist.zip", Some(System.currentTimeMillis()))
+  IO.zip(files, target / s"onion-dist-$version.zip", Some(System.currentTimeMillis()))
 }
 
 def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
@@ -95,7 +95,6 @@ def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = {
 }
 
 lazy val onionSettings = Seq(
-  version := "0.2.0-SNAPSHOT",
   scalaVersion := "3.3.7",
   name := "onion",
   organization := "org.onion_lang",
@@ -150,13 +149,14 @@ lazy val onionSettings = Seq(
     val out = (dist / distPath).value
     val p = (Compile / packageBin).value
     val cp = (Runtime / fullClasspath).value
-    distTask(t, out, p, cp)
+    val v = version.value
+    distTask(t, out, p, cp, v)
   },
   dist / distPath := {
     target.value / "dist"
   },
   Compile / mainClass := Some("onion.tools.CompilerFrontend"),
-  assembly / assemblyJarName := "onion.jar",
+  assembly / assemblyJarName := s"onion-${version.value}.jar",
   assembly / assemblyMergeStrategy := {
     case "module-info.class" => MergeStrategy.discard
     case x =>

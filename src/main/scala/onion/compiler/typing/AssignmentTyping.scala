@@ -138,6 +138,8 @@ final class AssignmentTyping(
           val rewritten = AST.Assignment(node.location,
             AST.MemberSelection(node.location, AST.CurrentInstance(node.location), id.name), node.rhs)
           Option(processMemberAssign(rewritten, context))
+        } else if (context.lookup(id.name) == null) {
+          resolveStaticFieldAssign(id, node, context).orElse(Option(processLocalAssign(node, context)))
         } else {
           Option(processLocalAssign(node, context))
         }
@@ -160,6 +162,29 @@ final class AssignmentTyping(
     if (context.isStatic) return false
     val field = bodyContext.definition.findField(name)
     field != null && (field.modifier & AST.M_STATIC) == 0
+  }
+
+  /**
+   * A bare-name assignment may target a static field of the current class or a
+   * top-level val/var (a static field on the synthetic top-level class). Emit a
+   * SetStaticField so top-level functions, main, and other classes can reassign
+   * top-level vars. None when no such static field exists (falls back to local).
+   */
+  private def resolveStaticFieldAssign(id: AST.Id, node: AST.Assignment, context: LocalContext): Option[Term] = {
+    val ownerField: Option[(ClassType, FieldRef)] =
+      Option(bodyContext.definition.field(id.name)).map(f => (bodyContext.definition, f))
+        .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(id.name)).map(f => (tc, f))))
+    ownerField match {
+      case Some((owner, field)) if (field.modifier & AST.M_STATIC) != 0 =>
+        val value = typed(node.rhs, context).getOrElse(null)
+        if (value == null) None
+        else if (value.`type`.isBottomType) Some(value)
+        else {
+          val term = processAssignable(node.rhs, field.`type`, value)
+          if (term == null) None else Some(new SetStaticField(owner, field, term))
+        }
+      case _ => None
+    }
   }
 
   def processStaticFieldAssign(node: AST.Assignment, context: LocalContext): Term = {

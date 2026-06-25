@@ -42,6 +42,7 @@ private[compiler] final class CallArgumentTypingSupport(
     if (!method.isVararg || expectedArgs.isEmpty) return params
 
     val fixedArgCount = expectedArgs.length - 1
+    if (!expectedArgs.last.isArrayType) return params
     val varargType = expectedArgs.last.asInstanceOf[ArrayType]
 
     if (params.length == expectedArgs.length) {
@@ -68,6 +69,9 @@ private[compiler] final class CallArgumentTypingSupport(
     }
 
     val fixedArgCount = expectedArgs.length - 1
+    if (!expectedArgs.last.isArrayType) {
+      return processParamsWithExpected(node, params, expectedArgs)
+    }
     val varargType = expectedArgs.last.asInstanceOf[ArrayType]
     val componentType = varargType.base
 

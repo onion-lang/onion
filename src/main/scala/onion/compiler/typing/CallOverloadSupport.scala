@@ -147,6 +147,7 @@ private[compiler] final class CallOverloadSupport(
   ): Boolean =
     if (method.isVararg && expectedArgs.nonEmpty) {
       val fixedArgCount = expectedArgs.length - 1
+      if (!expectedArgs.last.isArrayType) return false
       val varargType = expectedArgs.last.asInstanceOf[ArrayType]
       val componentType = varargType.base
 
@@ -188,6 +189,7 @@ private[compiler] final class CallOverloadSupport(
       if (index < fixedArgCount) {
         calls.isAssignableWithBoxing(expectedArgs(index), actualType)
       } else {
+        if (!expectedArgs.last.isArrayType) return false
         val varargType = expectedArgs.last.asInstanceOf[ArrayType]
         val componentType = varargType.base
         if (index == fixedArgCount) {

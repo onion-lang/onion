@@ -71,9 +71,15 @@ private[typing] object MemberAccess {
         case _ => ()
       }
     } else {
-      if (!isTypeAccessible(target.asInstanceOf[ClassType], context)) {
-        typing.report(CLASS_NOT_ACCESSIBLE, node, target, context)
-        return false
+      target match {
+        case classTarget: ClassType if isTypeAccessible(classTarget, context) => ()
+        case _: ClassType =>
+          typing.report(CLASS_NOT_ACCESSIBLE, node, target, context)
+          return false
+        case _ =>
+          // Non-class, non-array targets (e.g., wildcard types) are not valid
+          // accessibility targets; skip the accessibility check rather than crash.
+          ()
       }
     }
     true

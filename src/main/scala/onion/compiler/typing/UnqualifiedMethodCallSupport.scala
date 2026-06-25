@@ -38,8 +38,12 @@ private[compiler] final class UnqualifiedMethodCallSupport(
             case Some(term) =>
               Some(term)
             case None =>
-              calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
-              None
+              resolveTopLevelStaticCall(node, params, expected) match {
+                case Some(term) => Some(term)
+                case None =>
+                  calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
+                  None
+              }
           }
       }
     } else if (methods.length > 1) {
@@ -82,6 +86,31 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       new Call(new This(targetType), method, params)
     }
   }
+
+  /**
+   * Fallback: a bare call may name a top-level function, which lives as a static
+   * method on the synthetic top-level class. Reachable from any scope (other
+   * classes' methods, closures, main) once top-level functions are static.
+   */
+  private def resolveTopLevelStaticCall(
+    node: AST.UnqualifiedMethodCall,
+    params: Array[Term],
+    expected: Type
+  ): Option[Term] =
+    bodyContext.topLevelClass match {
+      case Some(top) if !(top eq bodyContext.definition) =>
+        val methods = MethodResolution.findMethods(top, node.name, params, bodyContext.table)
+          .filter(m => (m.modifier & AST.M_STATIC) != 0)
+        if (methods.length == 1) {
+          val method = methods(0)
+          val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+            expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
+            finalParams => new CallStatic(top, method, finalParams)
+          )
+        } else None
+      case _ => None
+    }
 
   private def typeUnqualifiedMethodCallWithNamedArgs(
     node: AST.UnqualifiedMethodCall,

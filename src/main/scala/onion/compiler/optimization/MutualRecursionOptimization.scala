@@ -767,7 +767,12 @@ class MutualRecursionOptimization(config: CompilerConfig)
       }
     }
 
-    rewriteStatement(body).asInstanceOf[StatementBlock]
+    rewriteStatement(body) match {
+      case block: StatementBlock => block
+      case other =>
+        // Body should always be a StatementBlock; wrap defensively to avoid ClassCastException.
+        new StatementBlock(other.location, other)
+    }
   }
 
   /**

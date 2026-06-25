@@ -41,5 +41,28 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       )
       assert(result.isInstanceOf[Shell.Success])
     }
+
+    it("optimizes a zero-argument static method without crashing") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static var count: Int = 0
+          |  static def loop(): Int {
+          |    if count >= 100000 { return count }
+          |    count = count + 1
+          |    return loop()
+          |  }
+          |  static def main(args: String[]): Int {
+          |    count = 0
+          |    return loop()
+          |  }
+          |}
+          |""".stripMargin,
+        "ZeroArgStaticTCO.on",
+        Array()
+      )
+      assert(Shell.Success(100000) == result)
+    }
   }
 }

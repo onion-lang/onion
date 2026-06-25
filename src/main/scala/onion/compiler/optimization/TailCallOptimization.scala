@@ -605,7 +605,7 @@ class TailCallOptimization(config: CompilerConfig)
               case None =>
                 trace(s"[TCO transformStatement] Return: No IfStatement found, calling transformTailCall")
                 // No IfStatement found, transform as direct call
-                transformTailCall(ret.term, paramTemps)
+                transformTailCall(ret.term, paramTemps).getOrElse(ret)
             }
           case stmtTerm: StatementTerm =>
             // Explicit return: Return(StatementTerm(IfStatement))
@@ -621,13 +621,13 @@ class TailCallOptimization(config: CompilerConfig)
                 new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
               case _ =>
                 // Other StatementTerms: fallback to transformTailCall
-                transformTailCall(ret.term, paramTemps)
+                transformTailCall(ret.term, paramTemps).getOrElse(ret)
             }
 
           case _ =>
             trace(s"[TCO transformStatement] Return: Not Begin, calling transformTailCall")
             // Direct tail call (not in Begin)
-            transformTailCall(ret.term, paramTemps)
+            transformTailCall(ret.term, paramTemps).getOrElse(ret)
         }
 
       case block: StatementBlock =>
@@ -677,12 +677,12 @@ class TailCallOptimization(config: CompilerConfig)
                   case None =>
                     trace(s"[TCO transformStatement] No IfStatement found, calling transformTailCall")
                     // No IfStatement found, try to transform as direct call
-                    transformTailCall(setLocal.value, paramTemps)
+                    transformTailCall(setLocal.value, paramTemps).getOrElse(exprStmt)
                 }
               case _ =>
                 trace(s"[TCO transformStatement] Not Begin, calling transformTailCall")
                 // Direct tail call (not in Begin)
-                transformTailCall(setLocal.value, paramTemps)
+                transformTailCall(setLocal.value, paramTemps).getOrElse(exprStmt)
             }
           case _ =>
             trace(s"[TCO transformStatement] No tail call in ExpressionActionStatement")
@@ -710,7 +710,7 @@ class TailCallOptimization(config: CompilerConfig)
   private def transformTailCall(
     term: Term,
     loopVarMapping: IndexedSeq[(Int, Int, Type)]
-  ): ActionStatement = {
+  ): Option[ActionStatement] = {
     // Extract the actual Call from wrapped structures (Begin, StatementTerm, etc.)
     def extractCall(t: Term, depth: Int = 0): Option[Term] = {
       val indent = "  " * depth
@@ -751,11 +751,12 @@ class TailCallOptimization(config: CompilerConfig)
       }
     }
 
-    val actualCall = extractCall(term).getOrElse {
-      throw new RuntimeException(
-        s"transformTailCall: Could not extract Call from term type=${term.getClass.getSimpleName}"
-      )
+    val actualCallOpt = extractCall(term)
+    if (actualCallOpt.isEmpty) {
+      trace(s"[TCO transformTailCall] Could not extract Call from term type=${term.getClass.getSimpleName}, skipping TCO")
+      return None
     }
+    val actualCall = actualCallOpt.get
 
     val newArgs: Array[Term] = actualCall match {
       case call: Call => call.parameters
@@ -769,7 +770,11 @@ class TailCallOptimization(config: CompilerConfig)
 
     val assignments = mutable.ArrayBuffer[ActionStatement]()
 
-    if (newArgs.length == 1) {
+    if (newArgs.length == 0) {
+      // Zero-argument tail call: restart the loop with current variable values
+      trace(s"[TCO transformTailCall] Zero-argument tail call, emitting Continue")
+      return Some(new Continue(null))
+    } else if (newArgs.length == 1) {
       // Single argument: can directly assign to loop variable (no temp needed)
       val (_, loopVarIndex, paramType) = loopVarMapping(0)
       val newValue = newArgs(0)
@@ -808,14 +813,12 @@ class TailCallOptimization(config: CompilerConfig)
         val loopVarAssignment = new SetLocal(null, 0, loopVarIndex, paramType, tempRef)
         assignments += new ExpressionActionStatement(null, loopVarAssignment)
       }
-    } else {
-      throw new RuntimeException("transformTailCall: No arguments in tail call")
     }
 
     // Add continue statement to restart the loop
     assignments += new Continue(null)
 
     // Return a block with all assignments and continue
-    new StatementBlock(null, assignments.toSeq: _*)
+    Some(new StatementBlock(null, assignments.toSeq: _*))
   }
 }

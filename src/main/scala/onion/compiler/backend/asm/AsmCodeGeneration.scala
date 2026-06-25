@@ -809,7 +809,10 @@ object AsmCodeGeneration:
       AsmType.getType("[" * at.dimension + componentDescriptor)
     case _: NullType       => AsmUtil.objectType(AsmUtil.JavaLangObject)
     case _: BottomType     => AsmType.VOID_TYPE
-    case _                 => throw new RuntimeException(s"Unsupported type: $tp")
+    case unknown =>
+      // Defensive fallback: unknown types should not reach codegen, but emitting
+      // java.lang.Object keeps the compiler from crashing with an internal error.
+      AsmUtil.objectType(AsmUtil.JavaLangObject)
 
   /**
    * Get the box class name for a given type (for boxed mutable variables)

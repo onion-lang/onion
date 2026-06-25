@@ -20,7 +20,7 @@ private[compiler] final class MethodBodySupport(
     block: AST.BlockExpression
   ): Unit = {
     val context = prepareMethodContext(method, args, block)
-    val translatedBlock = addReturnNode(translate(block, context).asInstanceOf[StatementBlock], method.returnType)
+    val translatedBlock = addReturnNode(translate(block, context), method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
     reportUnused(context)
@@ -58,7 +58,7 @@ private[compiler] final class MethodBodySupport(
     context: LocalContext
   ): Unit = {
     constructor.superInitializer = initializer
-    constructor.block = addReturnNode(translate(block, context).asInstanceOf[StatementBlock], BasicType.VOID)
+    constructor.block = addReturnNode(translate(block, context), BasicType.VOID)
     constructor.frame = context.getContextFrame
   }
 
@@ -72,7 +72,7 @@ private[compiler] final class MethodBodySupport(
     receiverType: Type
   ): Unit = {
     val context = prepareExtensionContext(staticMethod, node, receiverType)
-    val translatedBlock = addReturnNode(translate(node.block, context).asInstanceOf[StatementBlock], staticMethod.returnType)
+    val translatedBlock = addReturnNode(translate(node.block, context), staticMethod.returnType)
     staticMethod.setBlock(translatedBlock)
     staticMethod.setFrame(context.getContextFrame)
     extMethod.setBlock(translatedBlock)

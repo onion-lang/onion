@@ -530,6 +530,21 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(sealedType.displayName, missingNames)))
   }
 
+  /**
+   * Handles INCOMPATIBLE_TYPE with a null-safety hint when a nullable value
+   * is used where a non-null type is expected.
+   */
+  private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
+    val expected = items(0).asInstanceOf[TypedAST.Type]
+    val actual = items(1).asInstanceOf[TypedAST.Type]
+    val baseMessage = format(message("error.semantic.incompatibleType"), Seq(typeName(expected), typeName(actual)))
+    val hint =
+      if (!expected.isNullable && actual.isNullable) {
+        Some(format(message("suggestion.nullableToNonNull"), Seq()))
+      } else None
+    problem(position, appendSuggestion(baseMessage, hint))
+  }
+
   // ========== Main report method ==========
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
@@ -554,6 +569,8 @@ class SemanticErrorReporter(threshold: Int) {
         reportAmbiguousConstructor(position, items)
       case SemanticError.NON_EXHAUSTIVE_PATTERN_MATCH =>
         reportNonExhaustivePatternMatch(position, items)
+      case SemanticError.INCOMPATIBLE_TYPE =>
+        reportIncompatibleType(position, items)
 
       // Data-driven cases
       case _ =>

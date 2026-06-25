@@ -445,10 +445,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private def processGlobalVariableDeclaration(node: AST.GlobalVariableDeclaration): Unit = mapFrom(node.typeRef).foreach { typeRef =>
     val modifier = node.modifiers | AST.M_PUBLIC
-    val classType = loadTopClass.asInstanceOf[ClassDefinition]
-    val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)
-    put(node, field)
-    classType.add(field)
+    loadTopClass match {
+      case classType: ClassDefinition =>
+        val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)
+        put(node, field)
+        classType.add(field)
+      case _ =>
+        // The top-level class was resolved to something other than a source
+        // class definition (e.g., a classpath collision); skip rather than crash.
+        ()
+    }
   }
 
   private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit = {
@@ -462,17 +468,22 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           None
         } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
-        val classType = loadTopClass.asInstanceOf[ClassDefinition]
-        // final: top-level functions are never overridden, and marking them so
-        // lets tail-call optimization rewrite direct self-recursion into a loop.
-        val modifier = node.modifiers | AST.M_PUBLIC | AST.M_FINAL | AST.M_STATIC
-        val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
-        val hasVararg = node.args.lastOption.exists(_.isVararg)
-        val annotations = node.annotations.map(_.name).toSet
-        val typeParams = functionTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray
-        val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, typeParams, throwsTypes, hasVararg, annotations)
-        put(node, method)
-        classType.add(method)
+        loadTopClass match {
+          case classType: ClassDefinition =>
+            // final: top-level functions are never overridden, and marking them so
+            // lets tail-call optimization rewrite direct self-recursion into a loop.
+            val modifier = node.modifiers | AST.M_PUBLIC | AST.M_FINAL | AST.M_STATIC
+            val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
+            val hasVararg = node.args.lastOption.exists(_.isVararg)
+            val annotations = node.annotations.map(_.name).toSet
+            val typeParams = functionTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability)).toArray
+            val method = new MethodDefinition(node.location, modifier, classType, node.name, args.toArray, returnType, null, typeParams, throwsTypes, hasVararg, annotations)
+            put(node, method)
+            classType.add(method)
+          case _ =>
+            // Top-level class not available as a source definition; skip.
+            ()
+        }
       }
     }
   }

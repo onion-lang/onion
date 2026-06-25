@@ -106,18 +106,24 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     val generated = new JTreeSet[Method](new MethodComparator)
 
     def generateDelegationMethods(field: FieldDefinition): Unit = {
-      val typeRef = field.`type`.asInstanceOf[ClassType]
-      val src = Classes.getInterfaceMethods(typeRef)
-      for (method <- src.asScala) {
-        if (!seenMethods.contains(method)) {
-          if (generated.contains(method)) {
-            typing.report(SemanticError.DUPLICATE_GENERATED_METHOD, field.location, method.affiliation, method.name, method.arguments)
-          } else {
-            val generatedMethod = makeDelegationMethod(field, method)
-            generated.add(generatedMethod)
-            unitContext.currentDefinition.add(generatedMethod)
+      field.`type` match {
+        case typeRef: ClassType =>
+          val src = Classes.getInterfaceMethods(typeRef)
+          for (method <- src.asScala) {
+            if (!seenMethods.contains(method)) {
+              if (generated.contains(method)) {
+                typing.report(SemanticError.DUPLICATE_GENERATED_METHOD, field.location, method.affiliation, method.name, method.arguments)
+              } else {
+                val generatedMethod = makeDelegationMethod(field, method)
+                generated.add(generatedMethod)
+                unitContext.currentDefinition.add(generatedMethod)
+              }
+            }
           }
-        }
+        case _ =>
+          // Forwarded fields must be interface/class types; non-class types
+          // cannot generate delegation methods. Skip rather than crash.
+          ()
       }
     }
 

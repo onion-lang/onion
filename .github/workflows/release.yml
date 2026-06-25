@@ -22,25 +22,48 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'sbt'
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="$(sbt -error 'print version' | tail -1)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "resolved version: $VERSION"
+      - name: Verify tag matches version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.version.outputs.version }}"
+          # Strip leading 'v' from tag for comparison
+          TAG_VERSION="${TAG#v}"
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match build version ($VERSION)" >&2
+            exit 1
+          fi
       - name: Test
         run: sbt test
       - name: Build artifacts
         run: sbt assembly dist
       - name: Collect artifacts
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           mkdir -p release-artifacts
-          FAT_JAR="$(find target -name onion.jar -path '*scala-*' -not -path '*dist*' | head -1)"
+          FAT_JAR="target/scala-3.3.7/onion-${VERSION}.jar"
           test -f "$FAT_JAR"
-          cp "$FAT_JAR" release-artifacts/onion.jar
-          cp target/onion-dist.zip release-artifacts/onion-dist.zip
+          cp "$FAT_JAR" "release-artifacts/onion-${VERSION}.jar"
+          cp "target/onion-dist-${VERSION}.zip" "release-artifacts/onion-dist-${VERSION}.zip"
+      - name: Generate checksums
+        run: |
+          cd release-artifacts
+          sha256sum * > checksums.txt
       - name: Smoke test the fat jar
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           echo 'IO::println("release smoke test ok")' > /tmp/smoke.on
-          java -cp release-artifacts/onion.jar onion.tools.ScriptRunner /tmp/smoke.on | grep -q "release smoke test ok"
+          java -cp "release-artifacts/onion-${VERSION}.jar" onion.tools.ScriptRunner /tmp/smoke.on | grep -q "release smoke test ok"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           PRERELEASE=""
           case "${GITHUB_REF_NAME}" in
             *-M*|*-RC*|*-rc*|*-alpha*|*-beta*) PRERELEASE="--prerelease" ;;
@@ -48,5 +71,6 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" $PRERELEASE \
             --title "Onion ${GITHUB_REF_NAME}" \
             --generate-notes \
-            release-artifacts/onion.jar \
-            release-artifacts/onion-dist.zip
+            release-artifacts/onion-${VERSION}.jar \
+            release-artifacts/onion-dist-${VERSION}.zip \
+            release-artifacts/checksums.txt

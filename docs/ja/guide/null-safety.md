@@ -78,7 +78,7 @@ val first = xs?[0]               // xs が null なら null
 
 ## Nullable対応ジェネリクス
 
-裸の `[T]` は nullable な型引数も受け付け（`new Box[String?](...)`）、`[T extends B]` は非nullに制限します。詳細は[仕様](../reference/specification.md)を参照してください。
+裸の `[T]` は nullable な型引数も受け付け（`new Box[String?](...)`）、`[T extends B]` は非nullに制限します。詳細は[仕様](../../reference/specification.md)を参照してください。
 
 ## 次のステップ
 

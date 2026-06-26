@@ -96,16 +96,38 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 - [Java Interoperability](guide/java-interop.md) - Using Java libraries
 - [Scripting](guide/scripting.md) - re""/file"" literals, derive!, law/example, pipelines, auto-CLI
 
-## Reference
+## Examples
 
-- [Standard Library](reference/stdlib.md) - IO, Option, Result, Future, and more
-- [Compiler Architecture](reference/compiler-architecture.md) - How the compiler works
+- [Overview](examples/overview.md) - Collection of example programs
+- [Basic Programs](examples/basic.md) - Hello World, arrays, loops, I/O
+- [Object-Oriented Examples](examples/oop.md) - Classes, inheritance, interfaces, delegation
+- [Functional Programming](examples/functional.md) - Lambdas, closures, recursion, do notation, Future
 
 ## Tools
 
-- **onionc** - Compile Onion source files to .class files
-- **onion** - Run Onion scripts directly (compile and execute)
-- **onion-repl / onion repl** - Interactive REPL for experimentation
+- [Compiler (onionc)](tools/compiler.md) - Compile Onion source files to .class files
+- [Script Runner (onion)](tools/script-runner.md) - Run Onion scripts directly (compile and execute)
+- [REPL](tools/repl.md) - Interactive REPL for experimentation
+
+## Reference
+
+- [Language Specification](reference/specification.md) - Complete Onion language specification
+- [Standard Library](reference/stdlib.md) - IO, Option, Result, Future, and more
+- [Compiler Architecture](reference/compiler-architecture.md) - How the compiler works
+- [Error Codes](reference/error-codes.md) - Common compilation errors and fixes
+- [Compiler Internals](compiler/tail-call-optimization.md) - Tail call optimization
+
+## Contributing
+
+- [Development Guide](contributing/development.md) - How to contribute to Onion
+- [Building from Source](contributing/building.md) - Build the compiler from source
+- [Releasing](RELEASING.md) - Release process
+
+## Design Notes
+
+- [Generics Design](GENERICS_DESIGN.md) - Erasure-based generics design
+- [Parser Refactoring](parser-refactoring.md) - Separating grammar from AST building
+- [Quality Bar](quality-bar.md) - Measurable practical-quality indicators
 
 ## Project History
 

@@ -349,6 +349,8 @@ When creating issues:
 5. Push tag: `git push origin v0.2.0`
 6. Create GitHub release
 
+See [RELEASING.md](../RELEASING.md) for the full release process.
+
 ## Next Steps
 
 - [Building from Source](building.md) - Detailed build instructions

@@ -322,7 +322,7 @@ Ensure they match requirements:
 Key settings:
 
 ```scala
-version := "0.2.0-SNAPSHOT"
+// Version is derived from git tags via sbt-dynver
 scalaVersion := "3.3.7"
 name := "onion"
 organization := "org.onion_lang"

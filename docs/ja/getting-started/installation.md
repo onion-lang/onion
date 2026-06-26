@@ -4,84 +4,83 @@
 
 ## 前提条件
 
-OnionはJVM上で動作し、以下が必要です：
+OnionはJVM上で動作し、以下が必要です。
 
 - **Java Development Kit (JDK) 17以降**
-- **SBT (Scala Build Tool)** - ソースからビルドする場合
 
-## インストール方法
+## クイックインストール（推奨）
 
-### 方法1: ビルド済みバイナリをダウンロード（推奨）
+インストールスクリプトを実行します。最新の `onion.jar` を GitHub Releases からダウンロードし、`onion`、`onionc`、`onion-repl` コマンドを `~/.local/bin` にインストールします。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh
+```
+
+`~/.local/bin` が PATH に含まれていることを確認してください。
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## インストールの確認
+
+Onionが正しくインストールされたことを確認します。
+
+```bash
+onionc --help
+onion repl
+onion-repl
+```
+
+## その他のインストール方法
+
+### 特定のバージョンをインストール
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0-M14
+```
+
+### ソースチェックアウトからビルド
+
+**SBT（Scala Build Tool）** が必要です。
+
+```bash
+git clone https://github.com/onion-lang/onion && cd onion && ./install.sh --from-source
+```
+
+### カスタム場所にインストール
+
+デフォルトのインストール先は `~/.local` です。`ONION_INSTALL_DIR` で変更できます。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | ONION_INSTALL_DIR=/opt/onion sh
+```
+
+### ビルド済み配布版をダウンロード
 
 1. [GitHubリリースページ](https://github.com/onion-lang/onion/releases)から最新リリースをダウンロード
-2. アーカイブを展開：
+2. アーカイブを展開:
    ```bash
    unzip onion-dist.zip
    cd onion-dist
    ```
-3. `bin`ディレクトリをPATHに追加：
+3. `bin`ディレクトリをPATHに追加:
    ```bash
    export PATH=$PATH:/path/to/onion-dist/bin
    ```
-
-### 方法2: ソースからビルド
-
-1. リポジトリをクローン：
-   ```bash
-   git clone https://github.com/onion-lang/onion.git
-   cd onion
-   ```
-
-2. SBTでプロジェクトをビルド：
-   ```bash
-   sbt compile
-   ```
-
-3. 配布パッケージを作成：
-   ```bash
-   sbt dist
-   ```
-
-   これにより`target/onion-dist.zip`に配布用ZIPが作成されます
-
-4. または、スタンドアロンJARをビルド：
-   ```bash
-   sbt assembly
-   ```
-
-   これにより現在の Scala 向け target ディレクトリ（現状は `target/scala-3.3.7/`）に `onion.jar` が作成されます
-
-5. `~/.local/bin` にコマンドを入れたい場合はローカル installer を実行：
-   ```bash
-   ./install.sh
-   ```
-
-## インストールの確認
-
-Onionが正しくインストールされたことを確認：
-
-```bash
-# 配布版を使用する場合
-onionc --help
-onion repl
-onion-repl
-
-# JARを直接使用する場合
-java -jar onion.jar --help
-```
 
 ## IDEセットアップ
 
 ### Visual Studio Code
 
-公式のOnion拡張機能はまだありませんが、以下を使用できます：
+公式のOnion拡張機能はまだありませんが、以下を使用できます。
 
 - 類似言語用の汎用シンタックスハイライト
 - 依存関係管理用のJava/Scala拡張機能
 
 ### IntelliJ IDEA
 
-Onionコンパイラ自体を開発する場合：
+Onionコンパイラ自体を開発する場合:
 
 1. Scalaプラグインをインストール
 2. プロジェクトをSBTプロジェクトとしてインポート

@@ -7,11 +7,56 @@ This guide will help you install and set up the Onion programming language on yo
 Onion runs on the JVM and requires:
 
 - **Java Development Kit (JDK) 17 or later**
-- **SBT (Scala Build Tool)** - for building from source
 
-## Installation Methods
+## Quick Install (Recommended)
 
-### Method 1: Download Pre-built Binary (Recommended)
+Run the installer script. It downloads the latest `onion.jar` from GitHub Releases and installs the `onion`, `onionc`, and `onion-repl` commands into `~/.local/bin`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh
+```
+
+Make sure `~/.local/bin` is on your PATH:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## Verify Installation
+
+Check that Onion is installed correctly:
+
+```bash
+onionc --help
+onion repl
+onion-repl
+```
+
+## Other Installation Methods
+
+### Install a Specific Version
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0-M14
+```
+
+### Build from a Source Checkout
+
+Requires **SBT (Scala Build Tool)**.
+
+```bash
+git clone https://github.com/onion-lang/onion && cd onion && ./install.sh --from-source
+```
+
+### Install to a Custom Location
+
+The default install prefix is `~/.local`. Use `ONION_INSTALL_DIR` to change it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | ONION_INSTALL_DIR=/opt/onion sh
+```
+
+### Download a Pre-built Distribution
 
 1. Download the latest release from the [GitHub Releases page](https://github.com/onion-lang/onion/releases)
 2. Extract the archive:
@@ -23,52 +68,6 @@ Onion runs on the JVM and requires:
    ```bash
    export PATH=$PATH:/path/to/onion-dist/bin
    ```
-
-### Method 2: Build from Source
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/onion-lang/onion.git
-   cd onion
-   ```
-
-2. Build the project with SBT:
-   ```bash
-   sbt compile
-   ```
-
-3. Create the distribution package:
-   ```bash
-   sbt dist
-   ```
-
-   This creates a distribution ZIP in `target/onion-dist.zip`
-
-4. Or build a standalone JAR:
-   ```bash
-   sbt assembly
-   ```
-
-   This creates `onion.jar` under the active Scala target directory (currently `target/scala-3.3.7/`)
-
-5. Run the local installer if you want shell commands in `~/.local/bin`:
-   ```bash
-   ./install.sh
-   ```
-
-## Verify Installation
-
-Check that Onion is installed correctly:
-
-```bash
-# If using the distribution
-onionc --help
-onion repl
-onion-repl
-
-# If using the JAR directly
-java -jar onion.jar --help
-```
 
 ## IDE Setup
 

@@ -96,13 +96,36 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 
 ## リファレンス
 
+- [言語仕様](reference/specification.md) - Onion言語の完全な仕様
 - [標準ライブラリ](reference/stdlib.md) - IO、Option、Result、Future、Rand、Assert、Timing、Json、Yamlなど
+- [コンパイラアーキテクチャ](reference/compiler-architecture.md) - コンパイラの内部構造
+- [エラーコード](reference/error-codes.md) - よくあるコンパイルエラーと修正方法
+- [末尾呼び出し最適化](compiler/tail-call-optimization.md) - TCOの検出と今後の変換
+
+## サンプル集
+
+- [サンプル集の概要](examples/index.md) - プログラム例の一覧
+- [基本例](examples/basic.md) - Hello World、配列、ループ、入出力
+- [オブジェクト指向の例](examples/oop.md) - クラス、継承、インターフェース、委譲
+- [関数型の例](examples/functional.md) - ラムダ、クロージャ、再帰、do記法、Future
 
 ## ツール
 
-- **onionc** - Onionソースファイルを.classファイルにコンパイル
-- **onion** - Onionスクリプトを直接実行（コンパイルして実行）
-- **onion-repl / onion repl** - 対話型REPL
+- [コンパイラ（onionc）](tools/compiler.md) - Onionソースファイルを.classファイルにコンパイル
+- [スクリプトランナー（onion）](tools/script-runner.md) - Onionスクリプトを直接実行（コンパイルして実行）
+- [REPL](tools/repl.md) - 対話型REPL
+
+## コントリビューション
+
+- [開発ガイド](contributing/development.md) - Onionへの貢献方法
+- [ソースからビルド](contributing/building.md) - コンパイラをソースからビルド
+- [リリース手順](RELEASING.md) - リリースプロセス
+
+## デザインノート
+
+- [ジェネリクス設計](GENERICS_DESIGN.md) - 消去ベースジェネリクスの設計
+- [パーサーリファクタリング](parser-refactoring.md) - Builderパターンによる文法とASTの分離
+- [品質基準](quality-bar.md) - 実用的品質の測定可能な指標
 
 ## プロジェクト履歴
 

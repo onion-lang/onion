@@ -724,7 +724,7 @@ values.
 ### Usage with `derive!(Yaml)`
 
 `derive!(Yaml)` synthesizes `fromYaml` and `toYaml` on any scalar-component
-record; see [Records — derive!](specification.md#derive--record-serde-derivation)
+record; see [Records — derive!](specification.md#derive-record-serde-derivation)
 for the full contract.
 
 ```onion

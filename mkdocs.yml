@@ -73,9 +73,42 @@ nav:
           - Hello World: ja/getting-started/hello-world.md
           - クイックスタート: ja/getting-started/quick-start.md
       - 言語ガイド:
+          - 言語概要: ja/guide/overview.md
           - 基本構文: ja/guide/basic-syntax.md
+          - 変数と型: ja/guide/variables-and-types.md
+          - Null安全: ja/guide/null-safety.md
+          - 制御フロー: ja/guide/control-flow.md
+          - 関数: ja/guide/functions.md
+          - ラムダ式: ja/guide/lambda-expressions.md
+          - クラスとオブジェクト: ja/guide/classes-and-objects.md
+          - 継承: ja/guide/inheritance.md
+          - コレクション: ja/guide/collections.md
+          - Javaとの相互運用: ja/guide/java-interop.md
+          - スクリプティング: ja/guide/scripting.md
+      - サンプル集:
+          - 概要: ja/examples/index.md
+          - 基本例: ja/examples/basic.md
+          - オブジェクト指向の例: ja/examples/oop.md
+          - 関数型の例: ja/examples/functional.md
+      - ツール:
+          - コンパイラ（onionc）: ja/tools/compiler.md
+          - スクリプトランナー（onion）: ja/tools/script-runner.md
+          - REPL: ja/tools/repl.md
       - リファレンス:
+          - 言語仕様: ja/reference/specification.md
           - 標準ライブラリ: ja/reference/stdlib.md
+          - コンパイラアーキテクチャ: ja/reference/compiler-architecture.md
+          - エラーコード: ja/reference/error-codes.md
+          - コンパイラ内部:
+              - 末尾呼び出し最適化: ja/compiler/tail-call-optimization.md
+      - コントリビューション:
+          - 開発ガイド: ja/contributing/development.md
+          - ソースからビルド: ja/contributing/building.md
+          - リリース手順: ja/RELEASING.md
+      - デザインノート:
+          - ジェネリクス設計: ja/GENERICS_DESIGN.md
+          - パーサーリファクタリング: ja/parser-refactoring.md
+          - 品質基準: ja/quality-bar.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Hello World: getting-started/hello-world.md
@@ -106,9 +139,17 @@ nav:
       - Language Specification: reference/specification.md
       - Standard Library: reference/stdlib.md
       - Compiler Architecture: reference/compiler-architecture.md
+      - Error Codes: reference/error-codes.md
+      - Compiler Internals:
+          - Tail Call Optimization: compiler/tail-call-optimization.md
   - Contributing:
       - Development Guide: contributing/development.md
       - Building from Source: contributing/building.md
+      - Releasing: RELEASING.md
+  - Design Notes:
+      - Generics Design: GENERICS_DESIGN.md
+      - Parser Refactoring: parser-refactoring.md
+      - Quality Bar: quality-bar.md
 
 extra:
   social:

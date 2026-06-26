@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.TypedAST.*
 import onion.compiler.generics.Erasure
+import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable
 
@@ -15,6 +16,61 @@ private[compiler] object DuplicationChecks {
 
   private def erasedParamDescriptor(args: Array[Type]): String =
     args.map(Erasure.asmType).map(_.getDescriptor).mkString("(", "", ")")
+
+  private def allErasedParamDescriptors(args: Array[Type], typing: Typing): Set[String] = {
+    val base = erasedParamDescriptor(args)
+    val variants = Set.newBuilder[String]
+    variants += base
+    // For each argument that is a boxed primitive, also generate a descriptor
+    // where that argument uses the primitive form, and vice versa. This lets
+    // a user implement `compare(a: Int, b: Int)` for `Comparator[Int]`.
+    if args.nonEmpty then
+      val perArg = args.map { arg =>
+        val baseDesc = Erasure.asmType(arg).getDescriptor
+        arg match
+          case bt: BasicType if bt != BasicType.VOID =>
+            Set(baseDesc, Erasure.asmType(typing.boxedTypeArgument(bt)).getDescriptor)
+          case ct: ClassType =>
+            val base = Set(baseDesc)
+            Boxing.unboxedType(typing.table_, ct) match
+              case Some(bt) => base + Erasure.asmType(bt).getDescriptor
+              case None => base
+          case _ =>
+            Set(baseDesc)
+      }
+      // Combine descriptors position-wise.
+      def combine(index: Int, current: String): Unit =
+        if index == args.length then
+          variants += current + ")"
+        else
+          perArg(index).foreach(desc => combine(index + 1, current + desc))
+      combine(0, "(")
+    variants.result()
+  }
+
+  private def primitiveAwareSuperType(implArg: Type, contractArg: Type, typing: Typing): Boolean = {
+    if TypeRules.isSuperType(implArg, contractArg) then return true
+    (implArg, contractArg) match
+      case (bt: BasicType, ct: ClassType) if bt != BasicType.VOID &&
+          typing.boxedTypeArgument(bt).name == ct.name =>
+        true
+      case (ct: ClassType, bt: BasicType) if bt != BasicType.VOID &&
+          typing.boxedTypeArgument(bt).name == ct.name =>
+        true
+      case _ => false
+  }
+
+  private def primitiveAwareAssignable(contractType: Type, implType: Type, typing: Typing): Boolean = {
+    if TypeRules.isAssignable(contractType, implType) then return true
+    (contractType, implType) match
+      case (bt: BasicType, ct: ClassType) if bt != BasicType.VOID &&
+          typing.boxedTypeArgument(bt).name == ct.name =>
+        true
+      case (ct: ClassType, bt: BasicType) if bt != BasicType.VOID &&
+          typing.boxedTypeArgument(bt).name == ct.name =>
+        true
+      case _ => false
+  }
 
   def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     if clazz.isInterface then return
@@ -54,13 +110,12 @@ private[compiler] object DuplicationChecks {
               typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
 
             specializedArgs.zip(impl.arguments).foreach { case (arg, implArg) =>
-              val checkedArg = if (!implArg.isBasicType && arg.isBasicType) typing.boxedTypeArgument(arg) else arg
-              if (!TypeRules.isSuperType(implArg, checkedArg)) {
+              if (!primitiveAwareSuperType(implArg, arg, typing)) {
                 typing.report(SemanticError.INCOMPATIBLE_TYPE, location, arg, implArg)
               }
             }
 
-            if (!TypeRules.isAssignable(specializedRet, impl.returnType)) {
+            if (!primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
               typing.report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
             }
           }
@@ -116,9 +171,9 @@ private[compiler] object DuplicationChecks {
           // Example: Picker[String].pick(T) → pick(String) (NOT pick(Object))
           val specializedArgs =
             contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
-          val key = (contract.name, erasedParamDescriptor(specializedArgs))
+          val possibleKeys = allErasedParamDescriptors(specializedArgs, typing).map(desc => (contract.name, desc))
 
-          if !implByErasedParams.contains(key) then
+          if !possibleKeys.exists(implByErasedParams.contains) then
             val paramDescriptor = specializedArgs.map(_.name).mkString(", ")
             typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
       }

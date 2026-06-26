@@ -35,7 +35,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
           val implOpt = classDef.methods.find { m =>
             m.name == rawMethod.name &&
             m.arguments.length == specializedArgs.length &&
-            m.arguments.indices.forall(i => m.arguments(i).name == specializedArgs(i).name)
+            m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
           }
 
           implOpt.foreach { impl =>
@@ -75,6 +75,30 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.returnValue()
                 gen.endMethod()
           }
+
+  private def isBridgeCompatible(implArg: TypedAST.Type, specializedArg: TypedAST.Type): Boolean = {
+    if implArg.name == specializedArg.name then return true
+    // Allow primitive implementation argument to match boxed specialized arg
+    // (e.g. Int vs Integer) and vice versa.
+    (implArg, specializedArg) match
+      case (bt: TypedAST.BasicType, ct: TypedAST.ClassType) if bt != TypedAST.BasicType.VOID =>
+        ct.name == boxedName(bt)
+      case (ct: TypedAST.ClassType, bt: TypedAST.BasicType) if bt != TypedAST.BasicType.VOID =>
+        ct.name == boxedName(bt)
+      case _ => false
+  }
+
+  private def boxedName(bt: TypedAST.BasicType): String = bt match {
+    case TypedAST.BasicType.BOOLEAN => "java.lang.Boolean"
+    case TypedAST.BasicType.BYTE    => "java.lang.Byte"
+    case TypedAST.BasicType.SHORT   => "java.lang.Short"
+    case TypedAST.BasicType.CHAR    => "java.lang.Character"
+    case TypedAST.BasicType.INT     => "java.lang.Integer"
+    case TypedAST.BasicType.LONG    => "java.lang.Long"
+    case TypedAST.BasicType.FLOAT   => "java.lang.Float"
+    case TypedAST.BasicType.DOUBLE  => "java.lang.Double"
+    case _ => ""
+  }
 
   private def substituteTypeVars(tp: TypedAST.Type, subst: Map[String, TypedAST.Type]): TypedAST.Type = tp match
     case tv: TypeVariableType => subst.getOrElse(tv.name, tv)

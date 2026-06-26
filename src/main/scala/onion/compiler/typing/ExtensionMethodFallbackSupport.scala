@@ -2,6 +2,7 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 private[compiler] final class ExtensionMethodFallbackSupport(
   typing: Typing,
@@ -57,6 +58,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         CandidateSelection.NoMatch
     }
 
+  private def staticReceiver(target: Term, extMethod: ExtensionMethodDefinition): Term =
+    extMethod.receiverType match {
+      case bt: BasicType => Boxing.unboxing(typing.table_, target, bt)
+      case _ => target
+    }
+
   private def buildExtensionCall(
     node: AST.MethodCall,
     target: Term,
@@ -66,7 +73,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     extMethod: ExtensionMethodDefinition
   ): Option[Term] = {
     val containerClass = extMethod.containerClass
-    val staticArgs = Array(target) ++ params
+    val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
     val staticMethods = containerClass.findMethod(node.name, staticArgs)
 
     staticMethods match {
@@ -116,11 +123,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       container.methods(name)
         .find { m =>
           Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
-            receiverKindMatches(m.arguments(0), target.`type`)
+            receiverKindMatches(m.arguments(0), staticReceiver(target, extMethod).`type`)
         }
         .flatMap { method =>
           val classSubst = TypeSubstitution.classSubstitution(container)
-          val knownStatic = (Array(target) ++ preliminaryParams).filter(_ != null)
+          val knownStatic = (Array(staticReceiver(target, extMethod)) ++ preliminaryParams).filter(_ != null)
           val preliminarySubst = GenericMethodTypeArguments.inferWithoutDefaults(
             typing, node, method, knownStatic, classSubst, expected
           )
@@ -143,7 +150,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           }
           if (failed) None
           else {
-            val staticArgs = Array(target) ++ finalArgs
+            val staticArgs = Array(staticReceiver(target, extMethod)) ++ finalArgs
             val finalSubst = GenericMethodTypeArguments.infer(typing, node, method, staticArgs, classSubst, expected)
             val finalExpectedArgs = TypeSubst.args(method, classSubst, finalSubst)
             calls.processParamsWithExpected(node, staticArgs, finalExpectedArgs).map { finalParams =>

@@ -55,6 +55,28 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       assert(Shell.Success("ababab") == result)
     }
 
+    it("can add methods to primitive Int") {
+      val result = shell.run(
+        """
+          |extension Int {
+          |  def double(): Int {
+          |    return self * 2
+          |  }
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + (5).double()
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("10") == result)
+    }
+
     it("can add methods to Integer") {
       val result = shell.run(
         """

@@ -4,15 +4,15 @@
 **objectively measurable indicators**. Each row has a measurement you can run
 and a threshold; the language has reached the bar when *every* row passes.
 
-Baseline figures are the ground-truth values as of 2026-06-17 (develop @ f4ad44b).
+Baseline figures are the ground-truth values as of 2026-06-26 (develop @ 6a2d0e4).
 
-| # | Dimension | How to measure | Current (2026-06-17) | Pass threshold |
+| # | Dimension | How to measure | Current (2026-06-26) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `SBT_OPTS="-Xmx2g" sbt -batch test` | 1175 pass / 0 fail | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleProgramsSpec` (compiles every `run/*.on`) | 31 / 31 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 2 (OrderReport 118, ExprEval 98) | ≥ 5 |
-| 4 | Feature coverage | checklist below demonstrated inside the large samples | partial | every item ✓ |
-| 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 2 | 0 |
+| 1 | Test suite | `SBT_OPTS="-Xmx2g" sbt -batch test` | 1191 pass / 0 fail | 0 failed, 0 skipped |
+| 2 | Sample health | `SampleProgramsSpec` (compiles every `run/*.on`) | 36 / 36 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 5 (OrderReport, StatsApp, TodoManager, ShapeProcessor, TextAnalyzer) | ≥ 5 |
+| 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
+| 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 12 / 12 | parity + all blocks verified |
 | 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | ~24 | every common error has a dedicated code |
 
@@ -38,18 +38,12 @@ A feature counts as covered once it runs inside at least one large sample
 - [x] closures stored in vals
 - [x] string interpolation `#{}`
 - [x] try / catch
-- [ ] generics used non-trivially in a large sample
-- [ ] extension methods used in a large sample
+- [x] generics used non-trivially in a large sample (`StatsApp` — `SafeBox[T]`, `Pair[A,B]`, generic `countMatches`)
+- [x] extension methods used in a large sample (`StatsApp`, `ShapeProcessor`, `TextAnalyzer`, `TodoManager`)
 
 ## Row 5 — currently open usability bugs (tracked)
 
-1. **Primitive-type extensions** — `extension Int { def double(): Int = self * 2 }`
-   then `(5).double()` raises E0005; `extension String` works. Root cause not yet
-   confirmed (the boxed-FQCN-registration hypothesis was empirically falsified).
-2. **Top-level function called from a class method** — `helper(21)` inside a class
-   method raises E0005. The clean fix is to make top-level `val`/`var` and
-   functions all static (the static field/method TypedAST nodes already exist);
-   the remaining blocker is that a bare identifier in a static function body does
-   not fall back to a static field.
+None. The two previously tracked issues have been resolved:
 
-When both reach 0 and rows 3/4 are met, the bar is cleared.
+1. **Primitive-type extensions** — fixed. `extension Int { def double(): Int = self * 2 }` and `(5).double()` now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.
+2. **Top-level function called from a class method** — fixed. Top-level `val`/`var` and functions are emitted as static members of the synthetic top-level class, and bare identifiers / unqualified calls in class methods fall back to these static members.

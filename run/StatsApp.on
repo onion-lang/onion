@@ -1,0 +1,181 @@
+// StatsApp — a larger end-to-end sample exercising user-defined generics,
+// user-defined extension methods, records, enums, and numeric processing.
+
+record Reading(value: Double, unit: String)
+
+enum Grade {
+  LOW, MID, HIGH
+}
+
+// Generic container with a bounded type parameter (non-null).
+class SafeBox[T extends Object] {
+  val value: T
+public:
+  def this(v: T) {
+    this.value = v
+  }
+  def get: T {
+    return this.value
+  }
+}
+
+// Generic Pair class.
+class Pair[A, B] {
+public:
+  val first: A
+  val second: B
+  def this(a: A, b: B) {
+    this.first = a
+    this.second = b
+  }
+  def swap: Pair[B, A] {
+    return new Pair[B, A](this.second, this.first)
+  }
+}
+
+// User-defined extension methods on primitive types.
+extension Int {
+  def squared(): Int {
+    return self * self
+  }
+  def times(n: Int): Int {
+    return self * n
+  }
+}
+
+extension Double {
+  def clamped(min: Double, max: Double): Double {
+    if self < min {
+      return min
+    }
+    if self > max {
+      return max
+    }
+    return self
+  }
+  def percentOf(total: Double): Double {
+    if total == 0.0 {
+      return 0.0
+    }
+    return (self / total) * 100.0
+  }
+}
+
+// User-defined extension methods on List.
+extension List {
+  def sumInts(): Int {
+    var total: Int = 0
+    foreach x: Object in self {
+      total = total + (x as Int)
+    }
+    return total
+  }
+  def mean(): Double {
+    if self.size == 0 {
+      return 0.0
+    }
+    var total: Double = 0.0
+    foreach x: Object in self {
+      total = total + (x as Double)
+    }
+    return total / (self.size as Double)
+  }
+}
+
+// Summarize a list of Doubles using loops.
+def summarize(values: List): String {
+  val avg = values.mean()
+  var minVal: Double = 0.0
+  var maxVal: Double = 0.0
+  if values.size > 0 {
+    minVal = values[0] as Double
+    maxVal = values[0] as Double
+    foreach x: Object in values {
+      val v = x as Double
+      if v < minVal { minVal = v }
+      if v > maxVal { maxVal = v }
+    }
+  }
+  return "mean=" + avg + " min=" + minVal + " max=" + maxVal
+}
+
+// Generic count matches using a loop.
+def countMatches(items: List, predicate: (Object) -> Boolean): Int {
+  var count: Int = 0
+  foreach item: Object in items {
+    if predicate.call(item) {
+      count = count + 1
+    }
+  }
+  return count
+}
+
+// Use primitive extension methods.
+val a = 7
+println("7 squared: " + a.squared())
+println("7 times 3: " + a.times(3))
+
+val pct = 25.0.percentOf(100.0)
+println("25% of 100: " + pct)
+
+val clamped = 150.0.clamped(0.0, 100.0)
+println("clamped: " + clamped)
+
+// Use generic container.
+val box: SafeBox[String] = new SafeBox[String]("stored")
+println("box: " + box.get())
+
+val pair = new Pair[Int, String](1, "one")
+val swapped = pair.swap
+println("swapped: " + swapped.first + "," + swapped.second)
+
+// Use list extension methods.
+val temps: List = [10.0, 20.0, 30.0, 25.0, 15.0]
+println("temps: " + summarize(temps))
+
+val counts: List = [1, 2, 3, 4, 5]
+println("sumInts: " + counts.sumInts())
+
+// Process records.
+val readings: List = [
+  new Reading(10.5, "C"),
+  new Reading(20.0, "C"),
+  new Reading(15.5, "C")
+]
+
+var totalReading: Double = 0.0
+foreach r: Object in readings {
+  totalReading = totalReading + (r as Reading).value()
+}
+println("totalReading: " + totalReading)
+
+// Enum and select.
+def gradeOf(v: Double): Grade {
+  select v {
+    case _ when v < 15.0: return Grade::LOW
+    case _ when v < 25.0: return Grade::MID
+    else: return Grade::HIGH
+  }
+}
+
+foreach r: Object in readings {
+  val reading = r as Reading
+  println("reading " + reading.value() + " -> " + gradeOf(reading.value()))
+}
+
+// Generic countMatches.
+val positives = countMatches(temps, (x: Object) -> { return (x as Double) > 18.0; })
+println("positives: " + positives)
+
+// Recursion + primitive extension.
+def factorial(n: Int): Int {
+  if n <= 1 {
+    return 1
+  }
+  return n.times(factorial(n - 1))
+}
+println("factorial(5): " + factorial(5))
+
+// String interpolation.
+val n = readings.size
+println("processed #{n} readings")

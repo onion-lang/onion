@@ -98,6 +98,23 @@ Erasure-based generics with `[]` syntax: `class Box[T]`, `def first[T](xs: List[
 `record Pair[A, B](first: A, second: B)`. Wildcards `?`, `? extends T`,
 `? super T` are accepted in type arguments.
 
+Primitive types can be used as type arguments. They are boxed internally
+(`Int` -> `Integer`), so Onion code can implement Java generic interfaces such as
+`Comparator[Int]` using primitive parameter types. The compiler generates the
+necessary bridges between the erased boxed contract and the primitive implementation.
+
+```onion
+class IntComparator <: Comparator[Int] {
+public:
+  def compare(a: Int, b: Int): Int {
+    return a - b
+  }
+}
+
+val nums: ArrayList[Int] = [5, 1, 3]
+Collections::sort(nums, new IntComparator())
+```
+
 Type-parameter nullability follows Kotlin:
 
 - Bare `[T]` accepts nullable type arguments (`Box[String?]`); values of

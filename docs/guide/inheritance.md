@@ -29,7 +29,7 @@ class Dog : Animal {
 }
 
 val dog: Dog = new Dog("Buddy")
-IO::println(dog.speak())  // "Woof!"
+println(dog.speak())  // "Woof!"
 ```
 
 ### Calling Parent Constructor
@@ -127,7 +127,7 @@ public:
   def name(): String { return "kota" }
 }
 
-IO::println(new K().greet())   // Hello, kota — no override needed
+println(new K().greet())   // Hello, kota — no override needed
 ```
 
 ### Multiple Interfaces
@@ -179,7 +179,7 @@ class Calculator : JFrame <: ActionListener {
 
     def actionPerformed(event :ActionEvent) {
       // Implement ActionListener interface
-      IO::println("Button clicked")
+      println("Button clicked")
     }
 }
 ```
@@ -222,7 +222,7 @@ class MyList <: List {
 val list: MyList = new MyList;
 list << "First";
 list << "Second";
-IO::println(list.size);
+println(list.size);
 ```
 
 The `forward` directive automatically implements interface methods by forwarding calls to the specified member.
@@ -255,7 +255,7 @@ animals[1] = new Cat
 animals[2] = new Animal
 
 foreach animal :Animal in animals {
-  IO::println(animal.speak())
+  println(animal.speak())
 }
 // Output:
 // Woof!
@@ -278,7 +278,7 @@ val list2: List = new LinkedList  // LinkedList implements List
 val lists: java.util.List = [list1, list2]
 foreach list: List in lists {
   list.add("Item")
-  IO::println("Size: " + list.size())
+  println("Size: " + list.size())
 }
 ```
 

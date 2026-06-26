@@ -25,9 +25,9 @@ Basic conditional execution:
 val age: Int = 18
 
 if age >= 18 {
-  IO::println("Adult")
+  println("Adult")
 } else {
-  IO::println("Minor")
+  println("Minor")
 }
 ```
 
@@ -39,15 +39,15 @@ Multiple conditions:
 val score: Int = 85
 
 if score >= 90 {
-  IO::println("Grade: A")
+  println("Grade: A")
 } else if score >= 80 {
-  IO::println("Grade: B")
+  println("Grade: B")
 } else if score >= 70 {
-  IO::println("Grade: C")
+  println("Grade: C")
 } else if score >= 60 {
-  IO::println("Grade: D")
+  println("Grade: D")
 } else {
-  IO::println("Grade: F")
+  println("Grade: F")
 }
 ```
 
@@ -67,7 +67,7 @@ val reader: BufferedReader = new BufferedReader(
 
 var line: String = null
 while (line = reader.readLine()) != null {
-  IO::println("Read: " + line)
+  println("Read: " + line)
 }
 ```
 
@@ -80,7 +80,7 @@ Execute while a condition is true:
 ```onion
 var count: Int = 0
 while count < 5 {
-  IO::println("Count: " + count)
+  println("Count: " + count)
   count = count + 1
 }
 ```
@@ -100,7 +100,7 @@ Traditional C-style for loop:
 
 ```onion
 for var i: Int = 0; i < 10; i = i + 1 {
-  IO::println(i)
+  println(i)
 }
 ```
 
@@ -129,7 +129,7 @@ fruits[1] = "banana"
 fruits[2] = "cherry"
 
 foreach fruit :String in fruits {
-  IO::println("Fruit: " + fruit)
+  println("Fruit: " + fruit)
 }
 ```
 
@@ -144,7 +144,7 @@ list << "Second"
 list << "Third"
 
 foreach item :Object in list {
-  IO::println((item as String))
+  println((item as String))
 }
 ```
 
@@ -152,11 +152,11 @@ Ranges iterate without building an array — `a..b` is inclusive,
 `a..<b` exclusive — and maps destructure into key/value pairs:
 
 ```onion
-foreach i: Int in 0..<5 { IO::println("" + i) }     // 0 1 2 3 4
+foreach i: Int in 0..<5 { println("" + i) }     // 0 1 2 3 4
 
 val ages = ["alice": 30, "bob": 25]
 foreach (name, age) in ages {
-  IO::println(name + " is " + age)
+  println(name + " is " + age)
 }
 ```
 
@@ -171,19 +171,19 @@ val day: Int = 3
 
 select day {
   case 1:
-    IO::println("Monday")
+    println("Monday")
   case 2:
-    IO::println("Tuesday")
+    println("Tuesday")
   case 3:
-    IO::println("Wednesday")
+    println("Wednesday")
   case 4:
-    IO::println("Thursday")
+    println("Thursday")
   case 5:
-    IO::println("Friday")
+    println("Friday")
   case 6, 7:
-    IO::println("Weekend")
+    println("Weekend")
   else:
-    IO::println("Invalid day")
+    println("Invalid day")
 }
 ```
 
@@ -209,13 +209,13 @@ val num: Int = (Math::random() * 10) as Int
 
 select num {
   case 0, 1, 2, 3:
-    IO::println("Low")
+    println("Low")
   case 4, 5, 6:
-    IO::println("Medium")
+    println("Medium")
   case 7, 8, 9:
-    IO::println("High")
+    println("High")
   else:
-    IO::println("Other")
+    println("Other")
 }
 ```
 
@@ -236,7 +236,7 @@ select score {
     grade = "F"
 }
 
-IO::println("Grade: " + grade)
+println("Grade: " + grade)
 ```
 
 ### Type Patterns, Destructuring and Guards
@@ -246,9 +246,9 @@ binds a new name with the narrowed type in its branch:
 
 ```onion
 select o {
-  case s is String:  IO::println("string of length " + s.length())
-  case i is Integer: IO::println("int " + i)
-  else:              IO::println("something else")
+  case s is String:  println("string of length " + s.length())
+  case i is Integer: println("int " + i)
+  else:              println("something else")
 }
 ```
 
@@ -260,9 +260,9 @@ record Circle(r: Int) <: Shape
 record Rect(w: Int, h: Int) <: Shape
 
 select shape {
-  case Circle(r) when r > 10: IO::println("big circle")
-  case Circle(r):             IO::println("circle " + r)
-  case Rect(w, _):            IO::println("rect of width " + w)
+  case Circle(r) when r > 10: println("big circle")
+  case Circle(r):             println("circle " + r)
+  case Rect(w, _):            println("rect of width " + w)
 }
 ```
 
@@ -377,7 +377,7 @@ val result: Option[Int] = do[Option] {
   x <- parseNumber(input)
   val doubled = x * 2        // Local declaration
   y <- validateRange(doubled)
-  IO::println("Valid: " + y) // Side effect
+  println("Valid: " + y) // Side effect
   ret y
 }
 ```
@@ -408,7 +408,7 @@ while true {
   if i >= 5 {
     break
   }
-  IO::println(i)
+  println(i)
   i = i + 1
 }
 ```
@@ -422,7 +422,7 @@ for var i: Int = 0; i < 10; i = i + 1 {
   if i % 2 == 0 {
     continue  // Skip even numbers
   }
-  IO::println(i)  // Print odd numbers only
+  println(i)  // Print odd numbers only
 }
 ```
 
@@ -441,9 +441,9 @@ val input: String = "not a number"
 
 try {
   val number: Int = JInteger::parseInt(input)
-  IO::println("Parsed: " + number)
+  println("Parsed: " + number)
 } catch e :NumberFormatException {
-  IO::println("Invalid number: " + e.getMessage())
+  println("Invalid number: " + e.getMessage())
 }
 ```
 
@@ -460,9 +460,9 @@ try {
   val reader: FileReader = new FileReader("file.txt")
   // Use reader...
 } catch e :FileNotFoundException {
-  IO::println("File not found: " + e.getMessage())
+  println("File not found: " + e.getMessage())
 } catch e :IOException {
-  IO::println("IO error: " + e.getMessage())
+  println("IO error: " + e.getMessage())
 }
 ```
 
@@ -474,9 +474,9 @@ One handler for several exception types:
 try {
   risky()
 } catch e: IllegalArgumentException | IllegalStateException {
-  IO::println("bad state or argument: " + e.getMessage())
+  println("bad state or argument: " + e.getMessage())
 } catch e: Exception {
-  IO::println("anything else")
+  println("anything else")
 }
 ```
 
@@ -490,9 +490,9 @@ close in reverse declaration order; `catch`/`finally` combine as usual:
 import { java.io.* }
 
 try (val reader = new BufferedReader(new FileReader("file.txt"))) {
-  IO::println(reader.readLine())
+  println(reader.readLine())
 } catch e: IOException {
-  IO::println("IO error: " + e.getMessage())
+  println("IO error: " + e.getMessage())
 }
 
 try (val a = openA(); val b = openB()) {
@@ -509,8 +509,8 @@ The resource type needs a `close(): void` method (`AutoCloseable` /
 try {
   val result: Int = 10 / 0
 } catch e :ArithmeticException {
-  IO::println("Error: " + e.getMessage())
-  IO::println("Type: " + e.getClass().getName())
+  println("Error: " + e.getMessage())
+  println("Type: " + e.getClass().getName())
 }
 ```
 
@@ -542,7 +542,7 @@ Validate preconditions early:
 ```onion
 def divide(a :Int, b :Int) :Int {
   if b == 0 {
-    IO::println("Error: Division by zero")
+    println("Error: Division by zero")
     return 0
   }
 

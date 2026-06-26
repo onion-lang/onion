@@ -7,7 +7,7 @@ Let's write and run your first Onion program!
 Create a file named `Hello.on`:
 
 ```onion
-IO::println("Hello, World!")
+println("Hello, World!")
 ```
 
 That's it! This single line is a complete Onion program.
@@ -44,7 +44,7 @@ java Hello
 ## Understanding the Code
 
 ```onion
-IO::println("Hello, World!")
+println("Hello, World!")
 ```
 
 - `IO` - The built-in I/O module
@@ -58,14 +58,14 @@ IO::println("Hello, World!")
 
 ```onion
 val message: String = "Hello, Onion!"
-IO::println(message)
+println(message)
 ```
 
 ### Getting User Input
 
 ```onion
 val name: String = IO::readln("What's your name? ")
-IO::println("Hello, " + name + "!")
+println("Hello, " + name + "!")
 ```
 
 Run it:
@@ -87,7 +87,7 @@ You can also write programs with explicit class definitions:
 class HelloWorld {
   public:
     static def main(args: String[]): void {
-      IO::println("Hello, World!")
+      println("Hello, World!")
     }
 }
 ```
@@ -102,9 +102,9 @@ Access command-line arguments through the `main` method:
 class ArgsDemo {
   public:
     static def main(args: String[]): void {
-      IO::println("Number of arguments: " + args.length)
+      println("Number of arguments: " + args.length)
       for var i: Int = 0; i < args.length; i = i + 1 {
-        IO::println("Arg " + i + ": " + args[i])
+        println("Arg " + i + ": " + args[i])
       }
     }
 }

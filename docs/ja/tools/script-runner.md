@@ -107,7 +107,7 @@ class MyScript {
   public:
     static def main(args :String[]): void {
       foreach arg :String in args {
-        IO::println("Argument: " + arg)
+        println("Argument: " + arg)
       }
     }
 }
@@ -125,7 +125,7 @@ class MyScript {
 class MyProgram {
   public:
     static def main(args :String[]): void {
-      IO::println("Hello from main method")
+      println("Hello from main method")
     }
 }
 ```
@@ -138,14 +138,14 @@ class MyProgram {
 class First {
   public:
     static def main(args :String[]): void {
-      IO::println("This will run")
+      println("This will run")
     }
 }
 
 class Second {
   public:
     static def main(args :String[]): void {
-      IO::println("This won't run")
+      println("This won't run")
     }
 }
 ```
@@ -155,10 +155,10 @@ class Second {
 明示的な `main` メソッドがない場合、最初のトップレベルの宣言または式がエントリーポイントになります。
 
 ```onion
-IO::println("Hello, World!")
+println("Hello, World!")
 
 val x: Int = 10
-IO::println("x = " + x)
+println("x = " + x)
 
 // これらのブロック要素は即座に実行される
 ```
@@ -169,7 +169,7 @@ IO::println("x = " + x)
 
 **hello.on:**
 ```onion
-IO::println("Hello, World!")
+println("Hello, World!")
 ```
 
 実行:
@@ -186,9 +186,9 @@ class Greeter {
   public:
     static def main(args :String[]): void {
       if args.length > 0 {
-        IO::println("Hello, " + args[0] + "!")
+        println("Hello, " + args[0] + "!")
       } else {
-        IO::println("Hello, stranger!")
+        println("Hello, stranger!")
       }
     }
 }
@@ -209,8 +209,8 @@ Hello, stranger!
 ```onion
 val a: Int = 10
 val b: Int = 20
-IO::println("Sum: " + (a + b))
-IO::println("Product: " + (a * b))
+println("Sum: " + (a + b))
+println("Product: " + (a * b))
 ```
 
 実行:
@@ -233,7 +233,7 @@ class LineCounter {
   public:
     static def main(args :String[]): void {
       if args.length == 0 {
-        IO::println("Usage: onion count_lines.on <filename>")
+        println("Usage: onion count_lines.on <filename>")
         return
       }
 
@@ -249,7 +249,7 @@ class LineCounter {
       }
 
       reader.close()
-      IO::println("Lines: " + count)
+      println("Lines: " + count)
     }
 }
 ```
@@ -322,7 +322,7 @@ Exception in thread "main" java.lang.ArithmeticException: / by zero
 **hello.on:**
 ```onion
 #!/usr/bin/env onion
-IO::println("Hello from script!")
+println("Hello from script!")
 ```
 
 実行可能にして実行:
@@ -340,8 +340,8 @@ class Script {
   public:
     static def main(args :String[]): void {
       if args.length < 2 {
-        IO::println("Error: Missing arguments")
-        IO::println("Usage: onion script.on <input> <output>")
+        println("Error: Missing arguments")
+        println("Usage: onion script.on <input> <output>")
         return
       }
 

@@ -89,9 +89,9 @@ val name: String? = getUserName()
 
 if name != null {
   // Inside this block, we know name is not null
-  IO::println("Hello, " + name)
+  println("Hello, " + name)
 } else {
-  IO::println("Hello, guest")
+  println("Hello, guest")
 }
 ```
 
@@ -137,27 +137,27 @@ public:
   static def main(args: String[]): void {
     // Nullable type declaration
     val maybeString: String? = null
-    IO::println("maybeString is null: " + (maybeString == null))
+    println("maybeString is null: " + (maybeString == null))
 
     val definiteString: String? = "hello"
-    IO::println("definiteString is null: " + (definiteString == null))
+    println("definiteString is null: " + (definiteString == null))
 
     // Safe call returns nullable result
     val upper: Object? = definiteString?.toUpperCase()
     if upper != null {
-      IO::println("Upper: " + upper)
+      println("Upper: " + upper)
     }
 
     // Safe call on null returns null
     val nullResult: Object? = maybeString?.toUpperCase()
     if nullResult == null {
-      IO::println("nullResult is null as expected")
+      println("nullResult is null as expected")
     }
 
     // Safe call with arguments
     val sub: Object? = definiteString?.substring(0, 3)
     if sub != null {
-      IO::println("Substring: " + sub)
+      println("Substring: " + sub)
     }
   }
 }
@@ -222,7 +222,7 @@ site if the value is actually null. Prefer `?.`/`?:`/null checks; use
 
 ```onion
 val s: String? = definitelyThere()
-IO::println(s!!.length())
+println(s!!.length())
 ```
 
 ## Nullable-Aware Generics

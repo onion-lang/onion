@@ -429,7 +429,7 @@ val f: Int -> Int = x -> x * 2          // bare param, expression body
 val g = (a: Int, b: Int) -> a + b
 list.map { x => x * 2 }                 // trailing lambda
 Future::async(() -> { return compute() })
-val r: Runnable = () -> IO::println("hi")   // SAM conversion
+val r: Runnable = () -> println("hi")   // SAM conversion
 ```
 
 ### Do Notation

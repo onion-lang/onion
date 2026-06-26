@@ -9,14 +9,14 @@ Onionの関数型プログラミング機能を示す例です。
 ```onion
 // シンプルなラムダ
 val double: (Int) -> Int = (x: Int) -> { return x * 2; }
-IO::println(double.call(5))  // 10
+println(double.call(5))  // 10
 
 // 複数パラメータのラムダ
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
-IO::println(add.call(3, 7))  // 10
+println(add.call(3, 7))  // 10
 
 // パラメータなしのラムダ
-val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
+val greet: () -> String = () -> { println("Hello!"); return "done"; }
 greet.call()
 ```
 
@@ -44,7 +44,7 @@ val reader: BufferedReader = new BufferedReader(
 
 var line: String = null
 while (line = reader.readLine()) != null {
-  IO::println(filter.call(line))
+  println(filter.call(line))
 }
 ```
 
@@ -76,11 +76,11 @@ def makeCounter(): () -> Int {
 val counter1: () -> Int = makeCounter()
 val counter2: () -> Int = makeCounter()
 
-IO::println(counter1.call())  // 1
-IO::println(counter1.call())  // 2
-IO::println(counter2.call())  // 1
-IO::println(counter1.call())  // 3
-IO::println(counter2.call())  // 2
+println(counter1.call())  // 1
+println(counter1.call())  // 2
+println(counter2.call())  // 1
+println(counter1.call())  // 3
+println(counter2.call())  // 2
 ```
 
 各カウンターは独自の `count` 変数を保持します。
@@ -93,7 +93,7 @@ import { java.lang.NumberFormatException; }
 
 def fact(n :Int) :Int {
   if n < 0 {
-    IO::println("Illegal argument")
+    println("Illegal argument")
     return 0
   }
   if n == 0 {
@@ -107,9 +107,9 @@ while (line = IO::readln("Enter number: ")) != null {
   try {
     val value: Int = JInteger::parseInt(line)
     val result: Int = fact(value)
-    IO::println("Factorial: " + result)
+    println("Factorial: " + result)
   } catch e :NumberFormatException {
-    IO::println("Invalid number")
+    println("Invalid number")
   }
 }
 ```
@@ -162,14 +162,14 @@ def countLines(file :File) :Int {
   }
 
   reader.close()
-  IO::println(file.name + ": " + count)
+  println(file.name + ": " + count)
   return count
 }
 
 // 利用例
 val dir: File = new File("src")
 val total: Int = countLines(dir)
-IO::println("Total lines: " + total)
+println("Total lines: " + total)
 ```
 
 **トピック:**
@@ -213,7 +213,7 @@ val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("E
 val errors: ArrayList = filter(logs, isError)
 
 foreach error: String in errors {
-  IO::println(error)
+  println(error)
 }
 ```
 
@@ -247,7 +247,7 @@ val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
 val upper: ArrayList = map(words, toUpper)
 
 foreach word: String in upper {
-  IO::println(word)
+  println(word)
 }
 ```
 
@@ -279,12 +279,12 @@ def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
 val numbers: List = [1, 2, 3, 4, 5]
 val sum: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc + n; }
 val total: Int = reduce(numbers, sum, 0)
-IO::println("Sum: " + total)  // 15
+println("Sum: " + total)  // 15
 
 // 積
 val product: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc * n; }
 val result: Int = reduce(numbers, product, 1)
-IO::println("Product: " + result)  // 120
+println("Product: " + result)  // 120
 ```
 
 ## 関数の合成
@@ -303,7 +303,7 @@ val double: (Int) -> Int = (x: Int) -> { return x * 2; }
 // 合成: 2倍してから10を加える
 val composed: (Int) -> Int = compose(addTen, double)
 
-IO::println(composed.call(5))  // (5 * 2) + 10 = 20
+println(composed.call(5))  // (5 * 2) + 10 = 20
 ```
 
 ## カリー化
@@ -316,8 +316,8 @@ def add(x: Int): (Int) -> Int = (y: Int) -> { return x + y; }
 val add5: (Int) -> Int = add(5)
 val add10: (Int) -> Int = add(10)
 
-IO::println(add5.call(3))   // 8
-IO::println(add10.call(3))  // 13
+println(add5.call(3))   // 8
+println(add10.call(3))  // 13
 ```
 
 ## 実践: ログアナライザ
@@ -357,9 +357,9 @@ def analyzeLog(filename :String) {
 
   reader.close()
 
-  IO::println("Errors: " + errorCount)
-  IO::println("Warnings: " + warningCount)
-  IO::println("Info: " + infoCount)
+  println("Errors: " + errorCount)
+  println("Warnings: " + warningCount)
+  println("Info: " + infoCount)
 }
 
 analyzeLog("app.log")
@@ -394,7 +394,7 @@ val result2: Option[Int] = do[Option] {
   ret x + y
 }
 
-IO::println(result2.getOrElse(0))  // 30
+println(result2.getOrElse(0))  // 30
 ```
 
 ### Result によるエラー処理
@@ -416,9 +416,9 @@ val calculation: Result[Int, String] = do[Result] {
 
 select calculation {
   case Result::ok(value):
-    IO::println("Result: " + value)
+    println("Result: " + value)
   case Result::err(msg):
-    IO::println("Error: " + msg)
+    println("Error: " + msg)
 }
 ```
 
@@ -484,7 +484,7 @@ val failing: Future[Int] = Future::failed(new RuntimeException("Oops!"))
 
 // デフォルト値で回復
 val recovered: Future[Int] = failing.recover((error: Throwable) -> {
-  IO::println("Error: " + error.getMessage());
+  println("Error: " + error.getMessage());
   return 0;
 })
 
@@ -503,13 +503,13 @@ val f2: Future[Int] = Future::async(() -> { Thread::sleep(200L); return 2; })
 // すべて待つ
 val all: Future[Object[]] = Future::all(f1, f2)
 all.onSuccess((results: Object[]) -> {
-  IO::println("Results: " + results[0] + ", " + results[1]);
+  println("Results: " + results[0] + ", " + results[1]);
 })
 
 // 競争: 最初に完了したものが勝つ
 val race: Future[Int] = f1.race(f2)
 race.onSuccess((winner: Int) -> {
-  IO::println("Winner: " + winner);  // 通常 f1
+  println("Winner: " + winner);  // 通常 f1
 })
 
 // 2つのFutureをzip
@@ -524,8 +524,8 @@ val future: Future[String] = Future::async(() -> {
 })
 
 future
-  .onSuccess((value: String) -> { IO::println("Success: " + value); })
-  .onFailure((error: Throwable) -> { IO::println("Failed: " + error); })
+  .onSuccess((value: String) -> { println("Success: " + value); })
+  .onFailure((error: Throwable) -> { println("Failed: " + error); })
 ```
 
 ### ブロッキング（控えめに使う）
@@ -560,7 +560,7 @@ val profile: Future[String] = do[Future] {
   ret profile.toUpperCase()
 }
 
-profile.onSuccess((p: String) -> { IO::println(p); })
+profile.onSuccess((p: String) -> { println(p); })
 // 出力: USER42'S PROFILE
 ```
 
@@ -582,9 +582,9 @@ val api3: Future[String] = fetchFromApi("/comments")
 
 // すべて完了するまで待つ
 Future::all(api1, api2, api3).onSuccess((results: Object[]) -> {
-  IO::println("Users: " + results[0])
-  IO::println("Posts: " + results[1])
-  IO::println("Comments: " + results[2])
+  println("Users: " + results[0])
+  println("Posts: " + results[1])
+  println("Comments: " + results[2])
 })
 
 // または do 記法と zip を使う
@@ -608,12 +608,12 @@ list.map { x => x * 2 }
 
 // 関数を最後に取る任意のメソッドで利用可能
 future.onSuccess { result =>
-  IO::println("Got: " + result)
+  println("Got: " + result)
 }
 
 // 末尾ラムダの前に他の引数がある場合
 api.request("GET", "/users") { response =>
-  IO::println(response.body())
+  println(response.body())
 }
 ```
 

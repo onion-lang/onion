@@ -120,7 +120,7 @@ val result: String = new StringBuilder("Hello")
   .append("!")
   .toString()
 
-IO::println(result)  // "Hello World!"
+println(result)  // "Hello World!"
 ```
 
 ## Working with Java Collections
@@ -136,7 +136,7 @@ list << "Banana"
 list << "Cherry"
 
 foreach fruit: String in list {
-  IO::println(fruit)
+  println(fruit)
 }
 
 val first: String = list.get(0) as String
@@ -170,7 +170,7 @@ set.add("green")
 set.add("blue")
 set.add("red")  // Duplicate, won't be added
 
-IO::println(set.size())  // 3
+println(set.size())  // 3
 ```
 
 ## Implementing Java Interfaces
@@ -187,9 +187,9 @@ import {
 class MyButtonHandler <: ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
-      IO::println("Button clicked!")
+      println("Button clicked!")
       val source: JButton = event.getSource() as JButton
-      IO::println("Button text: " + source.getText())
+      println("Button text: " + source.getText())
     }
 }
 
@@ -212,7 +212,7 @@ class MyTask <: Runnable {
     }
 
     def run {
-      IO::println("Task " + this.name + " is running")
+      println("Task " + this.name + " is running")
     }
 }
 
@@ -292,12 +292,12 @@ def readFile(filename :String) {
 
     var line: String = null
     while (line = reader.readLine()) != null {
-      IO::println(line)
+      println(line)
     }
 
     reader.close()
   } catch e :IOException {
-    IO::println("Error reading file: " + e.getMessage())
+    println("Error reading file: " + e.getMessage())
   }
 }
 
@@ -323,9 +323,9 @@ def writeFile(filename :String, content :String) {
     writer.newLine()
     writer.close()
 
-    IO::println("File written successfully")
+    println("File written successfully")
   } catch e :IOException {
-    IO::println("Error writing file: " + e.getMessage())
+    println("Error writing file: " + e.getMessage())
   }
 }
 
@@ -374,7 +374,7 @@ class CalculatorApp : JFrame <: ActionListener {
 
     def actionPerformed(event :ActionEvent) {
       val text: String = this.textField.getText()
-      IO::println("Calculating: " + text)
+      println("Calculating: " + text)
     }
 }
 

@@ -40,7 +40,7 @@ val u: String = s?.toUpperCase() ?: "DEFAULT"
 ```onion
 val a: String? = lookup()
 if a != null {
-  IO::println(a.length)          // a はここでは String に絞られている
+  println(a.length)          // a はここでは String に絞られている
 }
 ```
 
@@ -59,7 +59,7 @@ def f(s: String?): String {
 
 ```onion
 val a: String? = compute()
-if a == "expected" { IO::println("match") }    // a が null でも安全
+if a == "expected" { println("match") }    // a が null でも安全
 ```
 
 参照同値が必要なときは `===` を使います。
@@ -68,7 +68,7 @@ if a == "expected" { IO::println("match") }    // a が null でも安全
 
 ```onion
 val s: String? = definitelyThere()
-IO::println(s!!.length())        // null なら NullPointerException
+println(s!!.length())        // null なら NullPointerException
 
 val xs: List? = loadOrNull()
 val first = xs?[0]               // xs が null なら null

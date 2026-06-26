@@ -59,7 +59,7 @@ while true {
 try {
   riskyOperation()
 } catch e: Exception {
-  IO::println(e.message())
+  println(e.message())
 } finally {
   cleanup()
 }

@@ -15,7 +15,7 @@ Scripts can use a shebang:
 
 ```onion
 #!/usr/bin/env onion
-IO::println("hello")
+println("hello")
 ```
 
 Top-level statements run in order; `args` holds the command line.
@@ -38,7 +38,7 @@ val files = opts.positional()            // everything else
 val branch = Proc::run("git", "branch", "--show-current")  // capture stdout, throw on failure
 
 val r = Proc::capture("sh", "-c", "ls missing")            // never throws
-if r.failed() { IO::println(r.stderr()) }
+if r.failed() { println(r.stderr()) }
 
 val code = Proc::exec("make", "build")                     // inherit console, exit status
 ```
@@ -52,7 +52,7 @@ val text = Files::readText("config.txt")
 Files::writeText("out.txt", text.toUpperCase())
 
 foreach f: String in Files::glob(".", "*.on") {
-  IO::println(f)
+  println(f)
 }
 Files::glob("src", "**/*.java")    // recursive
 ```
@@ -62,7 +62,7 @@ Files::glob("src", "**/*.java")    // recursive
 ```onion
 val body = Http::get("https://api.github.com/repos/onion-lang/onion")
 val v = Json::value(body)
-IO::println(v["name"].asString() + " stars=" + v["stargazers_count"].asInt())
+println(v["name"].asString() + " stars=" + v["stargazers_count"].asInt())
 ```
 
 `Json::value` returns a navigable value: index into objects and arrays,

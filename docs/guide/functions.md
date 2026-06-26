@@ -12,7 +12,7 @@ Define functions with the `def` keyword:
 def greet(name: String): String = "Hello, " + name + "!"
 
 val message: String = greet("Alice")
-IO::println(message)  // "Hello, Alice!"
+println(message)  // "Hello, Alice!"
 ```
 
 ### Function with Multiple Parameters
@@ -21,7 +21,7 @@ IO::println(message)  // "Hello, Alice!"
 def add(a: Int, b: Int): Int = a + b
 
 val sum: Int = add(5, 3)
-IO::println(sum)  // 8
+println(sum)  // 8
 ```
 
 ### Function with No Parameters
@@ -29,7 +29,7 @@ IO::println(sum)  // 8
 ```onion
 def getCurrentTime: String = System::currentTimeMillis() as String
 
-IO::println(getCurrentTime())
+println(getCurrentTime())
 ```
 
 ### Function with No Return Value
@@ -38,7 +38,7 @@ Functions that don't return a value implicitly return nothing:
 
 ```onion
 def printMessage(msg :String) {
-  IO::println("Message: " + msg)
+  println("Message: " + msg)
 }
 
 printMessage("Hello")
@@ -86,7 +86,7 @@ extension String {
   def shout(): String { return this.toUpperCase() + "!" }
 }
 
-IO::println("hello".shout())   // HELLO!
+println("hello".shout())   // HELLO!
 ```
 
 ## Return Statements
@@ -147,7 +147,7 @@ val sum: Int = add(3, 7)  // 10
 ### Lambda with No Parameters
 
 ```onion
-val sayHello: () -> String = () -> { IO::println("Hello!"); return "done"; }
+val sayHello: () -> String = () -> { println("Hello!"); return "done"; }
 
 sayHello()
 ```
@@ -166,9 +166,9 @@ def makeCounter(): () -> Int {
 }
 
 val counter: () -> Int = makeCounter()
-IO::println(counter())  // 1
-IO::println(counter())  // 2
-IO::println(counter())  // 3
+println(counter())  // 1
+println(counter())  // 2
+println(counter())  // 3
 ```
 
 ### Capturing Loop Variables
@@ -180,8 +180,8 @@ val filter: (String) -> String = (line: String) -> {
   return line + " (line " + i + ")";
 }
 
-IO::println(filter.call("First"))   // "First (line 1)"
-IO::println(filter.call("Second"))  // "Second (line 2)"
+println(filter.call("First"))   // "First (line 1)"
+println(filter.call("Second"))  // "Second (line 2)"
 ```
 
 ## Function Types
@@ -231,7 +231,7 @@ def factorial(n :Int) :Int {
   return n * factorial(n - 1)
 }
 
-IO::println(factorial(5))  // 120
+println(factorial(5))  // 120
 ```
 
 ### Tail Recursion
@@ -255,8 +255,8 @@ def factorial(n: Int): Int {
   return factorialTail(n, 1)
 }
 
-IO::println(factorial(5))     // 120
-IO::println(factorial(1000))  // Works without stack overflow!
+println(factorial(5))     // 120
+println(factorial(1000))  // Works without stack overflow!
 ```
 
 **What is tail recursion?** A recursive call is in "tail position" when it's the last operation before returning. The compiler automatically detects this pattern and converts the recursion to an efficient loop.
@@ -285,9 +285,9 @@ class Calculator {
 }
 
 val calc: Calculator = new Calculator
-IO::println(calc.add(5, 3))           // 8
-IO::println(calc.add(2.5, 3.7))       // 6.2
-IO::println(calc.add("Hello", "!"))   // "Hello!"
+println(calc.add(5, 3))           // 8
+println(calc.add(2.5, 3.7))       // 6.2
+println(calc.add("Hello", "!"))   // "Hello!"
 ```
 
 ## Static Methods
@@ -303,8 +303,8 @@ class MathUtils {
 }
 
 // Call static methods with ::
-IO::println(MathUtils::square(5))  // 25
-IO::println(MathUtils::cube(3))    // 27
+println(MathUtils::square(5))  // 25
+println(MathUtils::cube(3))    // 27
 ```
 
 ## Function Examples

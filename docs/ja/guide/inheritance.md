@@ -26,7 +26,7 @@ class Dog : Animal {
 }
 
 val dog: Dog = new Dog("Buddy")
-IO::println(dog.speak())  // "Woof!"
+println(dog.speak())  // "Woof!"
 ```
 
 親コンストラクタへの引数は `def this(args): (superArgs) { ... }` の形式で渡します：
@@ -91,7 +91,7 @@ public:
   def name(): String { return "kota" }
 }
 
-IO::println(new K().greet())   // Hello, kota（overrideなしで使える）
+println(new K().greet())   // Hello, kota（overrideなしで使える）
 ```
 
 ## 継承とインターフェースの組み合わせ
@@ -157,7 +157,7 @@ animals[1] = new Cat
 animals[2] = new Animal
 
 foreach animal: Animal in animals {
-  IO::println(animal.speak())
+  println(animal.speak())
 }
 // Woof!
 // Meow!

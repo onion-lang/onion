@@ -145,7 +145,7 @@ class MyFeatureSpec extends AbstractShellSpec {
   "MyFeature" should "work correctly" in {
     val source = """
       |// Your test code here
-      |IO::println("Test")
+      |println("Test")
     """.stripMargin
 
     val result = runShell(source)
@@ -231,7 +231,7 @@ class TypingSpec extends AnyFlatSpec with Matchers {
 ```scala
 class IntegrationSpec extends AbstractShellSpec {
   "Compiler" should "compile and run program" in {
-    val source = """IO::println("Hello")"""
+    val source = """println("Hello")"""
     val result = runShell(source)
     result should include("Hello")
   }

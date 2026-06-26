@@ -8,7 +8,7 @@ The simplest Onion program:
 
 **File: `Hello.on`**
 ```onion
-IO::println("Hello")
+println("Hello")
 ```
 
 **Run:**
@@ -33,7 +33,7 @@ array[1] = "B"
 array[2] = "C"
 
 for var i: Int = 0; i < array.length; i = i + 1 {
-  IO::println(array[i])
+  println(array[i])
 }
 ```
 
@@ -67,7 +67,7 @@ Reading user input:
 **File: `ReadLine.on`**
 ```onion
 val name: String = IO::readln("What's your name? ")
-IO::println("Hello, " + name + "!")
+println("Hello, " + name + "!")
 ```
 
 **Run:**
@@ -124,7 +124,7 @@ list << "WORLD";
 list << "ONION";
 
 foreach object :String in list {
-  IO::println(object.toLowerCase())
+  println(object.toLowerCase())
 }
 ```
 
@@ -150,13 +150,13 @@ val value: Int = (Math::random() * 10) as Int
 
 select value {
   case 0, 1, 2, 3:
-    IO::println("Low: " + value)
+    println("Low: " + value)
   case 4, 5, 6:
-    IO::println("Medium: " + value)
+    println("Medium: " + value)
   case 7, 8, 9:
-    IO::println("High: " + value)
+    println("High: " + value)
   else:
-    IO::println("Out of range: " + value)
+    println("Out of range: " + value)
 }
 ```
 
@@ -186,9 +186,9 @@ foreach num :Int in numbers {
 }
 
 // Print results
-IO::println("Even numbers:")
+println("Even numbers:")
 foreach even :Object in evens {
-  IO::println((even as Int))
+  println((even as Int))
 }
 ```
 
@@ -208,11 +208,11 @@ Even numbers:
 val x: Int = 10
 val y: Int = 3
 
-IO::println("Addition: " + (x + y))
-IO::println("Subtraction: " + (x - y))
-IO::println("Multiplication: " + (x * y))
-IO::println("Division: " + (x / y))
-IO::println("Modulo: " + (x % y))
+println("Addition: " + (x + y))
+println("Subtraction: " + (x - y))
+println("Multiplication: " + (x * y))
+println("Division: " + (x / y))
+println("Modulo: " + (x % y))
 ```
 
 **Output:**

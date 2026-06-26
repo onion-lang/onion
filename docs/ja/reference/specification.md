@@ -411,7 +411,7 @@ val f: Int -> Int = x -> x * 2          // 裸パラメータ、式本体
 val g = (a: Int, b: Int) -> a + b
 list.map { x => x * 2 }                 // 末尾ラムダ
 Future::async(() -> { return compute() })
-val r: Runnable = () -> IO::println("hi")   // SAM 変換
+val r: Runnable = () -> println("hi")   // SAM 変換
 ```
 
 ### Do 記法

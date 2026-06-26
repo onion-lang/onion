@@ -39,7 +39,7 @@ val result: String = new StringBuilder("Hello")
   .append("!")
   .toString()
 
-IO::println(result)  // "Hello World!"
+println(result)  // "Hello World!"
 ```
 
 staticメソッドには `::` を使います：
@@ -67,7 +67,7 @@ class MyTask <: Runnable {
     }
 
     def run {
-      IO::println("Task " + this.name + " is running")
+      println("Task " + this.name + " is running")
     }
 }
 
@@ -168,12 +168,12 @@ def readFile(filename: String) {
 
     var line: String = null
     while (line = reader.readLine()) != null {
-      IO::println(line)
+      println(line)
     }
 
     reader.close()
   } catch e: IOException {
-    IO::println("Error reading file: " + e.getMessage())
+    println("Error reading file: " + e.getMessage())
   }
 }
 ```

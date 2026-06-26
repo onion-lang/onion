@@ -21,12 +21,12 @@ class Person {
 
     def haveBirthday {
       this.age = this.age + 1
-      IO::println("Happy birthday! Now " + this.age)
+      println("Happy birthday! Now " + this.age)
     }
 }
 
 val person: Person = new Person("Alice", 30)
-IO::println(person.greet())
+println(person.greet())
 person.haveBirthday()
 ```
 
@@ -67,8 +67,8 @@ class Dog : Animal {
 }
 
 val dog: Dog = new Dog("Buddy", "Golden Retriever")
-IO::println(dog.speak())
-IO::println("Breed: " + dog.getBreed())
+println(dog.speak())
+println("Breed: " + dog.getBreed())
 ```
 
 **Output:**
@@ -112,7 +112,7 @@ import { java.util.Arrays; }
 Arrays::sort(students)
 
 foreach s :Student in students {
-  IO::println(s.toString())
+  println(s.toString())
 }
 ```
 
@@ -149,7 +149,7 @@ class Delegation <: List {
       list << "c";
 
       for var i: Int = 0; i < list.size; i = i + 1 {
-        IO::println(list[i]);
+        println(list[i]);
       }
     }
 }
@@ -209,7 +209,7 @@ class ExampleBean <: Serializable {
       encoder.writeObject(bean)
       encoder.close()
 
-      IO::println("Serialized bean")
+      println("Serialized bean")
 
       // Deserialize from XML
       val inStream: ByteArrayInputStream = new ByteArrayInputStream(
@@ -219,8 +219,8 @@ class ExampleBean <: Serializable {
       val restored: ExampleBean = decoder.readObject() as ExampleBean
       decoder.close()
 
-      IO::println("Name: " + restored.getName())
-      IO::println("Value: " + restored.getValue())
+      println("Name: " + restored.getName())
+      println("Value: " + restored.getValue())
     }
 }
 ```

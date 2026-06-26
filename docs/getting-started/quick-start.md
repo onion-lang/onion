@@ -25,9 +25,9 @@ var greeting = "Hello" // Inferred as String
 val x: Int = 10
 
 if x > 5 {
-  IO::println("x is greater than 5")
+  println("x is greater than 5")
 } else {
-  IO::println("x is 5 or less")
+  println("x is 5 or less")
 }
 ```
 
@@ -36,7 +36,7 @@ if x > 5 {
 ```onion
 var i: Int = 0
 while i < 5 {
-  IO::println(i)
+  println(i)
   i = i + 1
 }
 ```
@@ -45,7 +45,7 @@ while i < 5 {
 
 ```onion
 for var i: Int = 0; i < 10; i = i + 1 {
-  IO::println("Count: " + i)
+  println("Count: " + i)
 }
 ```
 
@@ -54,7 +54,7 @@ for var i: Int = 0; i < 10; i = i + 1 {
 ```onion
 val names: java.util.List = ["Alice", "Bob", "Charlie"]
 foreach name: String in names {
-  IO::println("Hello, " + name)
+  println("Hello, " + name)
 }
 ```
 
@@ -65,13 +65,13 @@ val score: Int = 85
 
 select score {
   case 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100:
-    IO::println("Grade: A")
+    println("Grade: A")
   case 80, 81, 82, 83, 84, 85, 86, 87, 88, 89:
-    IO::println("Grade: B")
+    println("Grade: B")
   case 70, 71, 72, 73, 74, 75, 76, 77, 78, 79:
-    IO::println("Grade: C")
+    println("Grade: C")
   else:
-    IO::println("Grade: F")
+    println("Grade: F")
 }
 ```
 
@@ -83,7 +83,7 @@ select score {
 def greet(name: String): String = "Hello, " + name + "!"
 
 val message: String = greet("World")
-IO::println(message)
+println(message)
 ```
 
 ### Lambda Expressions
@@ -93,7 +93,7 @@ IO::println(message)
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
 val result: Int = add.call(5, 3)  // 8
-IO::println(result)
+println(result)
 ```
 
 ### Function with Multiple Parameters
@@ -101,7 +101,7 @@ IO::println(result)
 ```onion
 def multiply(a: Int, b: Int): Int = a * b
 
-IO::println(multiply(6, 7))  // 42
+println(multiply(6, 7))  // 42
 ```
 
 ## Arrays and Collections
@@ -121,7 +121,7 @@ colors[2] = "blue"
 
 // Iterate over array
 foreach color :String in colors {
-  IO::println(color)
+  println(color)
 }
 ```
 
@@ -137,8 +137,8 @@ list << "First"   // << is the append operator
 list << "Second"
 list << "Third"
 
-IO::println(list.size)  // 3
-IO::println(list[0])     // "First"
+println(list.size)  // 3
+println(list[0])     // "First"
 ```
 
 ## Classes and Objects
@@ -160,7 +160,7 @@ class Person {
 }
 
 val person: Person = new Person("Alice", 30)
-IO::println(person.greet)
+println(person.greet)
 ```
 
 Key points:
@@ -209,7 +209,7 @@ frame.setVisible(true)
 
 val file: File = new File("data.txt")
 if file.exists {
-  IO::println("File exists!")
+  println("File exists!")
 }
 ```
 
@@ -233,9 +233,9 @@ val num: Int = JInteger::parseInt("42")
 ```onion
 try {
   val value: Int = JInteger::parseInt("not a number")
-  IO::println(value)
+  println(value)
 } catch e :NumberFormatException {
-  IO::println("Invalid number format: " + e.getMessage)
+  println("Invalid number format: " + e.getMessage)
 }
 ```
 

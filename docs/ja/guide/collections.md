@@ -18,7 +18,7 @@ xs[2] += 1            // 複合代入
 val ages = ["alice": 12, "bob": 34]   // 挿入順を保持する LinkedHashMap
 val none = [:]                        // 空マップ
 ages.get("alice")
-foreach k: String in ages.keySet() { IO::println(k) }
+foreach k: String in ages.keySet() { println(k) }
 ```
 
 ## パイプライン
@@ -44,7 +44,7 @@ Colls::map(xs, (x: Integer) -> (x as Int) * 2)
 `a..b`（両端含む）と `a..<b`（末端を含まない）で整数範囲を作成できます：
 
 ```onion
-foreach i: Int in 1..5 { IO::println(i) }         // 1 2 3 4 5
+foreach i: Int in 1..5 { println(i) }         // 1 2 3 4 5
 foreach i: Int in 0..<xs.size() { use(xs[i]) }    // インデックスイテレーション
 
 val r = 2..4
@@ -67,12 +67,12 @@ Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
 
 ```onion
 foreach (name, age) in ages {          // エントリ分割代入
-  IO::println(name + " is " + age)
+  println(name + " is " + age)
 }
 
 import { java.util.Map }
 foreach e: Map.Entry in ages.entrySet() {  // 明示的エントリ形式
-  IO::println(e.getKey() + " is " + e.getValue())
+  println(e.getKey() + " is " + e.getValue())
 }
 ```
 

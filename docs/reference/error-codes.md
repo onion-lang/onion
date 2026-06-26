@@ -44,7 +44,7 @@ A referenced local variable does not exist in scope.  The compiler suggests simi
 
 ```onion
 val userName = "ok"
-IO::println(usrName)   // E0002, suggests userName
+println(usrName)   // E0002, suggests userName
 ```
 
 ### `E0003` — Class not found
@@ -92,7 +92,7 @@ record Circle(r: Int) <: Shape
 record Rect(w: Int, h: Int) <: Shape
 
 select shape {
-  case Circle(r): IO::println("circle")
+  case Circle(r): println("circle")
   // missing Rect case → E0042
 }
 ```

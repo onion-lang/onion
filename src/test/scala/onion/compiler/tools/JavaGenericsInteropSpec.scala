@@ -567,6 +567,64 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
       assert(Shell.Success("a") == result)
     }
 
+    it("supports Comparator[Int] implemented with primitive Int parameters") {
+      val result = shell.run(
+        """
+          |class IntComparator <: Comparator[Int] {
+          |public:
+          |  def compare(a: Int, b: Int): Int {
+          |    return a - b
+          |  }
+          |}
+          |
+          |class ComparatorIntTest {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val list: ArrayList[Int] = new ArrayList[Int]
+          |    list.add(5)
+          |    list.add(1)
+          |    list.add(3)
+          |    Collections::sort(list, new IntComparator())
+          |    return "" + list.get(0) + "," + list.get(1) + "," + list.get(2)
+          |  }
+          |}
+          |""".stripMargin,
+        "ComparatorIntTest.on",
+        Array()
+      )
+      assert(Shell.Success("1,3,5") == result)
+    }
+
+    it("supports Comparator[Double] implemented with primitive Double parameters") {
+      val result = shell.run(
+        """
+          |class DoubleComparator <: Comparator[Double] {
+          |public:
+          |  def compare(a: Double, b: Double): Int {
+          |    if a < b { return -1 }
+          |    if a > b { return 1 }
+          |    return 0
+          |  }
+          |}
+          |
+          |class ComparatorDoubleTest {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val list: ArrayList[Double] = new ArrayList[Double]
+          |    list.add(3.14)
+          |    list.add(1.5)
+          |    list.add(2.0)
+          |    Collections::sort(list, new DoubleComparator())
+          |    return "" + list.get(0) + "," + list.get(1) + "," + list.get(2)
+          |  }
+          |}
+          |""".stripMargin,
+        "ComparatorDoubleTest.on",
+        Array()
+      )
+      assert(Shell.Success("1.5,2.0,3.14") == result)
+    }
+
     it("supports Collections.newSetFromMap") {
       val result = shell.run(
         """

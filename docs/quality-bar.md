@@ -8,7 +8,7 @@ Baseline figures are the ground-truth values as of 2026-06-26 (develop @ 6a2d0e4
 
 | # | Dimension | How to measure | Current (2026-06-26) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `SBT_OPTS="-Xmx2g" sbt -batch test` | 1191 pass / 0 fail | 0 failed, 0 skipped |
+| 1 | Test suite | `SBT_OPTS="-Xmx2g" sbt -batch test` | 1193 pass / 0 fail | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleProgramsSpec` (compiles every `run/*.on`) | 36 / 36 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 5 (OrderReport, StatsApp, TodoManager, ShapeProcessor, TextAnalyzer) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |

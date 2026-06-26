@@ -6,7 +6,7 @@
 
 | # | 次元 | 測定方法 | 現在値（2026-06-26） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `SBT_OPTS="-Xmx2g" sbt -batch test` | 1191 pass / 0 fail | 0 failed, 0 skipped |
+| 1 | テストスイート | `SBT_OPTS="-Xmx2g" sbt -batch test` | 1193 pass / 0 fail | 0 failed, 0 skipped |
 | 2 | サンプルの健全性 | `SampleProgramsSpec`（すべての `run/*.on` をコンパイル） | 36 / 36 compile | すべてコンパイル、rot なし |
 | 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 5（OrderReport、StatsApp、TodoManager、ShapeProcessor、TextAnalyzer） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |

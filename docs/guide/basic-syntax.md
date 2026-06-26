@@ -256,7 +256,7 @@ val message: String = "I am " + age + " years old"
 
 ```onion
 // Static method call
-IO::println("Hello")
+println("Hello")
 
 // Instance method call
 val text: String = "hello"
@@ -280,7 +280,7 @@ val array: String[] = new String[10]
 Any expression can appear directly inside a block:
 
 ```onion
-IO::println("Hello")
+println("Hello")
 var x: Int = 10
 x = x + 1
 ```
@@ -292,7 +292,7 @@ Blocks are enclosed in curly braces:
 ```onion
 {
   val temp: Int = 5
-  IO::println(temp)
+  println(temp)
   // temp is only visible in this block
 }
 ```

@@ -19,7 +19,7 @@ xs[2] += 1                   // compound assignment
 val ages = ["alice": 12, "bob": 34]   // insertion-ordered LinkedHashMap
 val none = [:]                        // empty map
 ages.get("alice")
-foreach k: String in ages.keySet() { IO::println(k) }
+foreach k: String in ages.keySet() { println(k) }
 ```
 
 ## Pipelines
@@ -47,7 +47,7 @@ Colls::map(xs, (x: Integer) -> (x as Int) * 2)
 `a..b` (inclusive) and `a..<b` (exclusive) create iterable integer ranges:
 
 ```onion
-foreach i: Int in 1..5 { IO::println(i) }          // 1 2 3 4 5
+foreach i: Int in 1..5 { println(i) }          // 1 2 3 4 5
 foreach i: Int in 0..<xs.size() { use(xs[i]) }     // index iteration
 
 val r = 2..4
@@ -70,11 +70,11 @@ Nested class names work in type positions:
 
 ```onion
 foreach (name, age) in ages {            // entry destructuring
-  IO::println(name + " is " + age)
+  println(name + " is " + age)
 }
 
 import { java.util.Map }
 foreach e: Map.Entry in ages.entrySet() { // explicit entry form
-  IO::println(e.getKey() + " is " + e.getValue())
+  println(e.getKey() + " is " + e.getValue())
 }
 ```

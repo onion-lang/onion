@@ -25,7 +25,7 @@ class Person {
 
 ```onion
 val person: Person = new Person("Alice", 30)
-IO::println(person.greet())  // "Hello, I'm Alice"
+println(person.greet())  // "Hello, I'm Alice"
 ```
 
 ## プライマリコンストラクタ
@@ -141,9 +141,9 @@ enum Planet(mass: Double) {
   EARTH(5.97e24)
 }
 
-IO::println("" + Planet::EARTH.mass())
+println("" + Planet::EARTH.mass())
 foreach p: Planet in Planet::values() {
-  IO::println(p.name() + " = " + p.mass())
+  println(p.name() + " = " + p.mass())
 }
 ```
 

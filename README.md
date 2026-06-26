@@ -20,13 +20,13 @@ This downloads `onion.jar` from the latest GitHub Release and installs the
 Once installed, run scripts directly — shebang scripts work too:
 
 ```sh
-echo 'IO::println("hello")' > hello.on
+echo 'println("hello")' > hello.on
 onion hello.on
 ```
 
 ```onion
 #!/usr/bin/env onion
-IO::println("Hello, " + args[0] + "!")
+println("Hello, " + args[0] + "!")
 ```
 
 ## Language Snapshot
@@ -42,7 +42,7 @@ val ages = ["alice": 12, "bob": 34]      // Map literal (insertion-ordered)
 
 val double: Int -> Int = x -> x * 2      // lambdas: bare params, expression bodies
 foreach i: Int in 0..<xs.size() {        // ranges: a..b inclusive, a..<b exclusive
-  IO::println("xs[#{i}] = #{xs.get(i)}") // interpolation (nested strings OK)
+  println("xs[#{i}] = #{xs.get(i)}") // interpolation (nested strings OK)
 }
 
 val cmp: Comparator[Integer] = (a, b) -> (b as Int) - (a as Int)  // SAM conversion
@@ -57,7 +57,7 @@ def add(x: Int, y: Int): Int = x + y
 
 val double: Int -> Int = (x) -> { return x * 2; }
 val inc = (x: Int) -> { return x + 1; }
-IO::println(double(21))
+println(double(21))
 ```
 
 ### Null Safety
@@ -71,7 +71,7 @@ val first = rows?[0]                   // safe indexing
 val sure: String = name!!              // non-null assertion (throws on null)
 
 if name != null {
-  IO::println(name.length())           // smart cast: name is String here
+  println(name.length())           // smart cast: name is String here
 }
 
 class Box[T] { ... }                   // bare [T] accepts String? too;
@@ -100,8 +100,8 @@ sealed interface Shape {}
 record Circle(r: Int) <: Shape
 record Rect(w: Int, h: Int) <: Shape
 select shape {                                     // exhaustiveness-checked
-  case Circle(r):  IO::println("circle " + r)
-  case Rect(w, h): IO::println(w * h)
+  case Circle(r):  println("circle " + r)
+  case Rect(w, h): println(w * h)
 }
 ```
 
@@ -138,7 +138,7 @@ list.map { x => x * 2 }
 
 // Multiple arguments + trailing lambda
 future.onComplete(onSuccess, onFailure) { result =>
-  IO::println("Done: " + result)
+  println("Done: " + result)
 }
 ```
 
@@ -152,8 +152,8 @@ val future: Future[String] = Future::async(() -> {
 })
 
 future.map((data: String) -> { return parseJson(data); })
-      .onSuccess((result: Object) -> { IO::println(result); })
-      .onFailure((error: Throwable) -> { IO::println("Error: " + error); })
+      .onSuccess((result: Object) -> { println(result); })
+      .onFailure((error: Throwable) -> { println("Error: " + error); })
 ```
 
 ## Architecture

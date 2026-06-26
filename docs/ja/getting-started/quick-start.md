@@ -25,9 +25,9 @@ var greeting = "Hello" // Stringと推論
 val x: Int = 10
 
 if x > 5 {
-  IO::println("xは5より大きい")
+  println("xは5より大きい")
 } else {
-  IO::println("xは5以下")
+  println("xは5以下")
 }
 ```
 
@@ -36,7 +36,7 @@ if x > 5 {
 ```onion
 var i: Int = 0
 while i < 5 {
-  IO::println(i)
+  println(i)
   i = i + 1
 }
 ```
@@ -45,7 +45,7 @@ while i < 5 {
 
 ```onion
 for var i: Int = 0; i < 10; i = i + 1 {
-  IO::println("カウント: " + i)
+  println("カウント: " + i)
 }
 ```
 
@@ -54,7 +54,7 @@ for var i: Int = 0; i < 10; i = i + 1 {
 ```onion
 val names: java.util.List = ["Alice", "Bob", "Charlie"]
 foreach name: String in names {
-  IO::println("こんにちは、" + name)
+  println("こんにちは、" + name)
 }
 ```
 
@@ -65,13 +65,13 @@ val score: Int = 85
 
 select score {
   case 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100:
-    IO::println("評価: A")
+    println("評価: A")
   case 80, 81, 82, 83, 84, 85, 86, 87, 88, 89:
-    IO::println("評価: B")
+    println("評価: B")
   case 70, 71, 72, 73, 74, 75, 76, 77, 78, 79:
-    IO::println("評価: C")
+    println("評価: C")
   else:
-    IO::println("評価: F")
+    println("評価: F")
 }
 ```
 
@@ -83,7 +83,7 @@ select score {
 def greet(name: String): String = "こんにちは、" + name + "さん！"
 
 val message: String = greet("世界")
-IO::println(message)
+println(message)
 ```
 
 ### ラムダ式
@@ -93,7 +93,7 @@ IO::println(message)
 val add: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 
 val result: Int = add.call(5, 3)  // 8
-IO::println(result)
+println(result)
 ```
 
 ### 複数パラメータの関数
@@ -101,7 +101,7 @@ IO::println(result)
 ```onion
 def multiply(a: Int, b: Int): Int = a * b
 
-IO::println(multiply(6, 7))  // 42
+println(multiply(6, 7))  // 42
 ```
 
 ## 配列とコレクション
@@ -121,7 +121,7 @@ colors[2] = "青"
 
 // 配列のイテレーション
 foreach color: String in colors {
-  IO::println(color)
+  println(color)
 }
 ```
 
@@ -137,8 +137,8 @@ list << "最初"   // << は追加演算子
 list << "2番目"
 list << "3番目"
 
-IO::println(list.size)  // 3
-IO::println(list[0])     // "最初"
+println(list.size)  // 3
+println(list[0])     // "最初"
 ```
 
 ## クラスとオブジェクト
@@ -160,7 +160,7 @@ class Person {
 }
 
 val person: Person = new Person("Alice", 30)
-IO::println(person.greet)
+println(person.greet)
 ```
 
 ポイント：
@@ -209,7 +209,7 @@ frame.setVisible(true)
 
 val file: File = new File("data.txt")
 if file.exists {
-  IO::println("ファイルが存在します！")
+  println("ファイルが存在します！")
 }
 ```
 
@@ -233,9 +233,9 @@ val num: Int = JInteger::parseInt("42")
 ```onion
 try {
   val value: Int = JInteger::parseInt("数字じゃない")
-  IO::println(value)
+  println(value)
 } catch e: NumberFormatException {
-  IO::println("無効な数値形式: " + e.getMessage)
+  println("無効な数値形式: " + e.getMessage)
 }
 ```
 

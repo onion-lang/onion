@@ -44,7 +44,7 @@ val b = true + 1   // E0001
 
 ```onion
 val userName = "ok"
-IO::println(usrName)   // E0002、userName を提案
+println(usrName)   // E0002、userName を提案
 ```
 
 ### `E0003` — クラスが見つからない
@@ -92,7 +92,7 @@ record Circle(r: Int) <: Shape
 record Rect(w: Int, h: Int) <: Shape
 
 select shape {
-  case Circle(r): IO::println("circle")
+  case Circle(r): println("circle")
   // Rect ケースが欠けている → E0042
 }
 ```

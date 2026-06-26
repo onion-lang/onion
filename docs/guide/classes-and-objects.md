@@ -29,7 +29,7 @@ Instantiate objects with the `new` keyword:
 
 ```onion
 val person: Person = new Person("Alice", 30)
-IO::println(person.greet())  // "Hello, I'm Alice"
+println(person.greet())  // "Hello, I'm Alice"
 ```
 
 ## Primary Constructors
@@ -203,7 +203,7 @@ class Circle {
 }
 
 val circle: Circle = new Circle(5.0)
-IO::println("Area: " + circle.area())
+println("Area: " + circle.area())
 ```
 
 ### Method Overloading
@@ -214,15 +214,15 @@ Multiple methods with the same name but different parameters:
 class Printer {
   public:
     def print(value :Int) {
-      IO::println("Int: " + value)
+      println("Int: " + value)
     }
 
     def print(value :String) {
-      IO::println("String: " + value)
+      println("String: " + value)
     }
 
     def print(value :Double) {
-      IO::println("Double: " + value)
+      println("Double: " + value)
     }
 }
 
@@ -347,9 +347,9 @@ enum Planet(mass: Double) {
   EARTH(5.97e24)
 }
 
-IO::println("" + Planet::EARTH.mass())
+println("" + Planet::EARTH.mass())
 foreach p: Planet in Planet::values() {
-  IO::println(p.name() + " = " + p.mass())
+  println(p.name() + " = " + p.mass())
 }
 Planet::valueOf("EARTH")     // works with java.lang.Enum.valueOf
 ```

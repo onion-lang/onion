@@ -24,7 +24,7 @@
 
 ```onion
 // Hello World
-IO::println("Hello, World!")
+println("Hello, World!")
 
 // Class definition with inheritance
 class Calculator : JFrame <: ActionListener {
@@ -50,11 +50,11 @@ val filter: String -> Boolean = (line: String) -> {
 val value = 3
 select value {
   case 0, 1, 2:
-    IO::println("Low")
+    println("Low")
   case 3, 4, 5:
-    IO::println("Medium")
+    println("Medium")
   else:
-    IO::println("High")
+    println("High")
 }
 
 // Do notation for monadic composition
@@ -67,7 +67,7 @@ val result: Option[Int] = do[Option] {
 // Async programming with Future
 val future: Future[String] = Future::async(() -> { return fetchData(); })
 future.map { data => processData(data) }
-      .onSuccess { result => IO::println(result) }
+      .onSuccess { result => println(result) }
 
 // Null safety with safe call operator
 val name: String? = getUserName()  // Nullable type

@@ -173,10 +173,10 @@ def method {
   val local: Int = 10
   if true {
     val nested: Int = 20
-    IO::println(local)   // OK
-    IO::println(nested)  // OK
+    println(local)   // OK
+    println(nested)  // OK
   }
-  // IO::println(nested)  // ERROR: nested not in scope
+  // println(nested)  // ERROR: nested not in scope
 }
 ```
 

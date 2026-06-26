@@ -7,7 +7,7 @@
 `Hello.on`という名前のファイルを作成します：
 
 ```onion
-IO::println("Hello, World!")
+println("Hello, World!")
 ```
 
 これだけです！この1行が完全なOnionプログラムです。
@@ -44,7 +44,7 @@ java Hello
 ## コードの解説
 
 ```onion
-IO::println("Hello, World!")
+println("Hello, World!")
 ```
 
 - `IO` - 組み込みのI/Oモジュール
@@ -58,14 +58,14 @@ IO::println("Hello, World!")
 
 ```onion
 val message: String = "Hello, Onion!"
-IO::println(message)
+println(message)
 ```
 
 ### ユーザー入力の取得
 
 ```onion
 val name: String = IO::readln("名前は？ ")
-IO::println("こんにちは、" + name + "さん！")
+println("こんにちは、" + name + "さん！")
 ```
 
 実行：
@@ -87,7 +87,7 @@ onion greeting.on
 class HelloWorld {
   public:
     static def main(args: String[]): void {
-      IO::println("Hello, World!")
+      println("Hello, World!")
     }
 }
 ```
@@ -102,9 +102,9 @@ class HelloWorld {
 class ArgsDemo {
   public:
     static def main(args: String[]): void {
-      IO::println("引数の数: " + args.length)
+      println("引数の数: " + args.length)
       for var i: Int = 0; i < args.length; i = i + 1 {
-        IO::println("引数 " + i + ": " + args[i])
+        println("引数 " + i + ": " + args[i])
       }
     }
 }

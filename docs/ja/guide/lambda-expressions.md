@@ -17,7 +17,7 @@ val triple: Int -> Int = x -> x * 3
 val add = (a: Int, b: Int) -> a + b
 
 // ブロックボディ
-val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
+val greet: () -> String = () -> { println("Hello!"); return "done"; }
 ```
 
 ## 型推論
@@ -40,8 +40,8 @@ val upper = (s: String) -> { return s.toUpperCase(); }
 
 ```onion
 val double = (x: Int) -> x * 2
-IO::println(double(21))       // 42
-IO::println(double.call(21))  // 42
+println(double(21))       // 42
+println(double.call(21))  // 42
 ```
 
 ## 関数型
@@ -59,7 +59,7 @@ val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 シングルアブストラクトメソッド（SAM）を持つJavaインターフェースにラムダを渡せます：
 
 ```onion
-val r: Runnable = () -> IO::println("ran")
+val r: Runnable = () -> println("ran")
 new Thread(r).start()
 
 val cmp: Comparator[Integer] = (a, b) -> (b as Int) - (a as Int)
@@ -77,7 +77,7 @@ Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
 val multiplier: Int = 10
 val multiply: (Int) -> Int = (x: Int) -> { return x * multiplier; }
 
-IO::println(multiply.call(5))  // 50
+println(multiply.call(5))  // 50
 ```
 
 可変変数もキャプチャして変更できます：
@@ -89,8 +89,8 @@ val increment: () -> Int = () -> {
   return count;
 }
 
-IO::println(increment.call())  // 1
-IO::println(increment.call())  // 2
+println(increment.call())  // 1
+println(increment.call())  // 2
 ```
 
 ## 高階関数

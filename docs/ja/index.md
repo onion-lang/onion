@@ -22,7 +22,7 @@
 
 ```onion
 // Hello World
-IO::println("Hello, World!")
+println("Hello, World!")
 
 // 継承を伴うクラス定義
 class Calculator : JFrame <: ActionListener {
@@ -48,11 +48,11 @@ val filter: String -> Boolean = (line: String) -> {
 val value = 3
 select value {
   case 0, 1, 2:
-    IO::println("Low")
+    println("Low")
   case 3, 4, 5:
-    IO::println("Medium")
+    println("Medium")
   else:
-    IO::println("High")
+    println("High")
 }
 
 // モナド合成のためのdo記法
@@ -65,7 +65,7 @@ val result: Option[Int] = do[Option] {
 // Futureによる非同期プログラミング
 val future: Future[String] = Future::async(() -> { return fetchData(); })
 future.map { data => processData(data) }
-      .onSuccess { result => IO::println(result) }
+      .onSuccess { result => println(result) }
 
 // 安全呼び出し演算子によるNull安全
 val name: String? = getUserName()  // Nullable型

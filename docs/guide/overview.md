@@ -85,8 +85,8 @@ def makeCounter(): () -> Int {
 }
 
 val counter: () -> Int = makeCounter()
-IO::println(counter.call())  // 1
-IO::println(counter.call())  // 2
+println(counter.call())  // 1
+println(counter.call())  // 2
 ```
 
 Features:
@@ -181,7 +181,7 @@ def method(param: Type): ReturnType { }
 Static methods and fields use `::`:
 
 ```onion
-IO::println("Hello")
+println("Hello")
 Math::random()
 System::out.println("Java style")
 ```
@@ -207,11 +207,11 @@ Switch-style pattern matching:
 ```onion
 select value {
   case 1, 2, 3:
-    IO::println("Small")
+    println("Small")
   case 4, 5, 6:
-    IO::println("Medium")
+    println("Medium")
   else:
-    IO::println("Large")
+    println("Large")
 }
 ```
 

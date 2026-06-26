@@ -18,7 +18,7 @@ val triple: Int -> Int = x -> x * 3
 val add = (a: Int, b: Int) -> a + b
 
 // Block body for multiple statements
-val greet: () -> String = () -> { IO::println("Hello!"); return "done"; }
+val greet: () -> String = () -> { println("Hello!"); return "done"; }
 ```
 
 ## Type Inference
@@ -43,7 +43,7 @@ Function values are called directly with function-call syntax:
 
 ```onion
 val double = (x: Int) -> x * 2
-IO::println(double(21))   // 42
+println(double(21))   // 42
 ```
 
 `.call()` also works:
@@ -52,7 +52,7 @@ IO::println(double(21))   // 42
 val square: (Int) -> Int = (x: Int) -> { return x * x; }
 
 val result: Int = square.call(5)  // 25
-IO::println(result)
+println(result)
 ```
 
 ## Function Types
@@ -78,7 +78,7 @@ val sum: Int = func2.call(3, 7)
 Lambdas convert to any Java interface with a single abstract method:
 
 ```onion
-val r: Runnable = () -> IO::println("ran")
+val r: Runnable = () -> println("ran")
 new Thread(r).start()
 
 val cmp: Comparator[Integer] = (a, b) -> (b as Int) - (a as Int)
@@ -98,7 +98,7 @@ Lambdas can capture variables from their enclosing scope:
 val multiplier: Int = 10
 val multiply: (Int) -> Int = (x: Int) -> { return x * multiplier; }
 
-IO::println(multiply.call(5))  // 50
+println(multiply.call(5))  // 50
 ```
 
 ### Mutable Closures
@@ -112,9 +112,9 @@ val increment: () -> Int = () -> {
   return count;
 }
 
-IO::println(increment.call())  // 1
-IO::println(increment.call())  // 2
-IO::println(increment.call())  // 3
+println(increment.call())  // 1
+println(increment.call())  // 2
+println(increment.call())  // 3
 ```
 
 ### Counter Factory
@@ -131,10 +131,10 @@ def makeCounter(): () -> Int {
 val counter1: () -> Int = makeCounter()
 val counter2: () -> Int = makeCounter()
 
-IO::println(counter1.call())  // 1
-IO::println(counter1.call())  // 2
-IO::println(counter2.call())  // 1
-IO::println(counter1.call())  // 3
+println(counter1.call())  // 1
+println(counter1.call())  // 2
+println(counter2.call())  // 1
+println(counter1.call())  // 3
 ```
 
 ## Higher-Order Functions
@@ -172,7 +172,7 @@ val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("E
 
 val errors: List = filter(lines, isError)
 foreach error: String in errors {
-  IO::println(error)
+  println(error)
 }
 // Output:
 // ERROR: Connection failed
@@ -202,7 +202,7 @@ val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
 
 val upper: List = map(words, toUpper)
 foreach word: String in upper {
-  IO::println(word)
+  println(word)
 }
 // Output:
 // HELLO
@@ -229,7 +229,7 @@ val numbers: List = [1, 2, 3, 4, 5]
 val sum: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc + n; }
 
 val total: Int = reduce(numbers, sum, 0)
-IO::println(total)  // 15
+println(total)  // 15
 ```
 
 ## Practical Examples
@@ -250,7 +250,7 @@ def filterFile(filename: String, predicate: (String) -> Boolean) {
   var line: String = null
   while (line = reader.readLine()) != null {
     if predicate.call(line) {
-      IO::println(line)
+      println(line)
     }
   }
 
@@ -298,7 +298,7 @@ val comparator: LambdaComparator = new LambdaComparator(alphabetical)
 Collections::sort(list, comparator)
 
 foreach item :Object in list {
-  IO::println((item as String))
+  println((item as String))
 }
 // Output:
 // apple
@@ -331,7 +331,7 @@ class LambdaActionListener <: ActionListener {
 val button: JButton = new JButton("Click me")
 
 val onClick: (ActionEvent) -> Int = (event: ActionEvent) -> {
-  IO::println("Button was clicked!")
+  println("Button was clicked!")
   return 0
 }
 

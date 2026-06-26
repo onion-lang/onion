@@ -93,6 +93,29 @@ val         var         when        while
 `record Pair[A, B](first: A, second: B)`。ワイルドカード `?`、`? extends T`、
 `? super T` を型引数として受け入れます。
 
+### ジェネリクス
+
+`[]` 構文の消去ベースジェネリクス: `class Box[T]`、`def first[T](xs: List[T]): T`、
+`record Pair[A, B](first: A, second: B)`。ワイルドカード `?`、`? extends T`、
+`? super T` を型引数として受け入れます。
+
+プリミティブ型も型引数として使えます。内部ではボックス化されます
+（`Int` -> `Integer`）ので、`Comparator[Int]` のような Java 汎用インターフェースを
+プリミティブなパラメータ型で実装できます。コンパイラは消去されたボックス化された
+契約とプリミティブ実装の間のブリッジを生成します。
+
+```onion
+class IntComparator <: Comparator[Int] {
+public:
+  def compare(a: Int, b: Int): Int {
+    return a - b
+  }
+}
+
+val nums: ArrayList[Int] = [5, 1, 3]
+Collections::sort(nums, new IntComparator())
+```
+
 型パラメータの null 性は Kotlin に従います。
 
 - 裸の `[T]` は nullable 型引数を受け入れ（`Box[String?]`）。ジェネリック本体では

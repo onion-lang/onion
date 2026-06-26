@@ -4,6 +4,7 @@ import onion.compiler.*
 import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.NameResolutionContext
 import onion.compiler.typing.session.TypingUnitContext
+import onion.compiler.toolbox.Boxing
 
 import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.{Buffer, Set => MutableSet}
@@ -357,10 +358,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     // Resolve the receiver type (the type being extended);
     // mapFrom already reports CLASS_NOT_FOUND when resolution fails
     mapFrom(node.receiverType).foreach { receiverType =>
-      // Get the FQCN for the receiver type (for extension method lookup)
+      // Get the FQCN for the receiver type (for extension method lookup).
+      // Primitive receivers are registered under their boxed class name because
+      // method-call targets are boxed before extension resolution.
       val receiverFqcn = receiverType match {
         case ct: ClassType => ct.name
         case at: ArrayType => s"[${at.component}"  // array representation
+        case bt: BasicType if bt != BasicType.VOID => Boxing.boxedType(typing.table_, bt).name
         case _ => receiverType.toString
       }
 

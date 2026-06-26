@@ -1,0 +1,156 @@
+// TodoManager — in-memory task manager demonstrating records, enums,
+// extension methods, collection pipelines, and string interpolation.
+
+record Task(id: Int, title: String, priority: Priority, done: Boolean)
+
+enum Priority {
+  LOW, MEDIUM, HIGH
+}
+
+extension Priority {
+  def label(): String {
+    select self {
+      case Priority::LOW: return "low"
+      case Priority::MEDIUM: return "medium"
+      case Priority::HIGH: return "high"
+    }
+    return "unknown"
+  }
+}
+
+extension String {
+  def trimmed(): String {
+    return this.trim()
+  }
+  def quoted(): String {
+    return "\"" + this + "\""
+  }
+}
+
+extension Int {
+  def isEven(): Boolean {
+    return self % 2 == 0
+  }
+}
+
+class TodoManager {
+  val tasks: List
+  var nextId: Int
+
+public:
+  def this {
+    this.tasks = []
+    this.nextId = 1
+  }
+
+  def add(title: String, priority: Priority): Task {
+    val task = new Task(this.nextId, title.trimmed(), priority, false)
+    this.tasks << task
+    this.nextId = this.nextId + 1
+    return task
+  }
+
+  def complete(id: Int): Boolean {
+    foreach t: Object in this.tasks {
+      val task = t as Task
+      if task.id() == id {
+        val index = this.tasks.indexOf(task)
+        this.tasks[index] = new Task(task.id(), task.title(), task.priority(), true)
+        return true
+      }
+    }
+    return false
+  }
+
+  def remove(id: Int): Boolean {
+    foreach t: Object in this.tasks {
+      val task = t as Task
+      if task.id() == id {
+        this.tasks.remove(task)
+        return true
+      }
+    }
+    return false
+  }
+
+  def pending(): List {
+    val result: List = []
+    foreach t: Object in this.tasks {
+      val task = t as Task
+      if !task.done() {
+        result << task
+      }
+    }
+    return result
+  }
+
+  def byPriority(p: Priority): List {
+    val result: List = []
+    foreach t: Object in this.tasks {
+      val task = t as Task
+      if task.priority() == p {
+        result << task
+      }
+    }
+    return result
+  }
+
+  def summary(): String {
+    val total = this.tasks.size
+    val pendingCount = this.pending().size
+    return "total=" + total + " pending=" + pendingCount
+  }
+
+  def all(): List {
+    return this.tasks
+  }
+}
+
+def formatTask(t: Task): String {
+  val status = if t.done() { "[x]" } else { "[ ]" }
+  return status + " #" + t.id() + " " + t.title().quoted() + " (" + t.priority().label() + ")"
+}
+
+val manager = new TodoManager
+manager.add("Buy milk", Priority::MEDIUM)
+manager.add("Write docs", Priority::HIGH)
+manager.add("Exercise", Priority::LOW)
+manager.add("Review code", Priority::HIGH)
+manager.add("Call mom", Priority::MEDIUM)
+
+println("Summary: " + manager.summary())
+
+println("\nAll tasks:")
+foreach t: Object in manager.all() {
+  println(formatTask(t as Task))
+}
+
+println("\nPending tasks:")
+foreach t: Object in manager.pending() {
+  println(formatTask(t as Task))
+}
+
+println("\nHigh priority:")
+foreach t: Object in manager.byPriority(Priority::HIGH) {
+  println(formatTask(t as Task))
+}
+
+manager.complete(2)
+manager.complete(4)
+
+println("\nAfter completing 2 and 4:")
+println(manager.summary())
+
+manager.remove(3)
+
+println("\nAfter removing 3:")
+foreach t: Object in manager.all() {
+  println(formatTask(t as Task))
+}
+
+// Demo Int extension.
+val taskCount = manager.all().size
+println("\nTask count is even: " + taskCount.isEven())
+
+// Demo string interpolation.
+println("\nManaged #{manager.all().size} tasks")

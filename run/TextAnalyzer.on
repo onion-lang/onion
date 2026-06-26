@@ -1,0 +1,147 @@
+// TextAnalyzer — text processing with extension methods on String and List,
+// records, and simple statistics.
+
+record WordCount(word: String, count: Int)
+
+extension String {
+  def words(): List {
+    val result: List = []
+    val parts = this.split("\\s+")
+    var i: Int = 0
+    while i < parts.length {
+      val w = parts[i].trimmed()
+      if w.length() > 0 {
+        result << w.toLowerCase()
+      }
+      i = i + 1
+    }
+    return result
+  }
+
+  def trimmed(): String {
+    return this.trim()
+  }
+
+  def reversed(): String {
+    val chars = this.toCharArray()
+    var i: Int = 0
+    var j: Int = chars.length - 1
+    while i < j {
+      val tmp = chars[i]
+      chars[i] = chars[j]
+      chars[j] = tmp
+      i = i + 1
+      j = j - 1
+    }
+    return new String(chars)
+  }
+
+  def isPalindrome(): Boolean {
+    val cleaned = this.trimmed().toLowerCase()
+    return cleaned == cleaned.reversed()
+  }
+}
+
+extension List {
+  def distinctStrings(): List {
+    val result: List = []
+    foreach s: Object in self {
+      val str = s as String
+      if !result.contains(str) {
+        result << str
+      }
+    }
+    return result
+  }
+
+  def countString(target: String): Int {
+    var count: Int = 0
+    foreach s: Object in self {
+      if (s as String) == target {
+        count = count + 1
+      }
+    }
+    return count
+  }
+}
+
+def buildFrequency(words: List): List {
+  val unique = words.distinctStrings()
+  val result: List = []
+  foreach u: Object in unique {
+    val word = u as String
+    val count = words.countString(word)
+    result << new WordCount(word, count)
+  }
+  return result
+}
+
+def topN(words: List, n: Int): List {
+  val freq = buildFrequency(words)
+  // Simple bubble sort by count descending.
+  var sorted: List = []
+  foreach f: Object in freq {
+    sorted << f
+  }
+
+  var i: Int = 0
+  while i < sorted.size {
+    var j: Int = 0
+    while j < sorted.size - 1 {
+      val a = sorted[j] as WordCount
+      val b = sorted[j + 1] as WordCount
+      if a.count() < b.count() {
+        sorted[j] = b
+        sorted[j + 1] = a
+      }
+      j = j + 1
+    }
+    i = i + 1
+  }
+
+  val result: List = []
+  var k: Int = 0
+  while k < n && k < sorted.size {
+    result << sorted[k]
+    k = k + 1
+  }
+  return result
+}
+
+def sentenceStats(text: String): String {
+  val chars = text.length()
+  val ws = text.words()
+  val words = ws.size
+  val sentences = text.split("[.!?]+").length
+  return "chars=" + chars + " words=" + words + " sentences=" + sentences
+}
+
+val sample = "The quick brown fox jumps over the lazy dog. The fox was quick. A dog was lazy."
+
+println("Stats: " + sentenceStats(sample))
+
+val words = sample.words()
+println("Unique words: " + words.distinctStrings().size)
+
+val freq = buildFrequency(words)
+println("\nFrequencies:")
+foreach f: Object in freq {
+  val wc = f as WordCount
+  println("  " + wc.word() + ": " + wc.count())
+}
+
+println("\nTop 3:")
+foreach f: Object in topN(words, 3) {
+  val wc = f as WordCount
+  println("  " + wc.word() + ": " + wc.count())
+}
+
+val candidates = ["radar", "hello", "A man a plan a canal Panama", "world"]
+println("\nPalindromes:")
+foreach s: Object in candidates {
+  val str = s as String
+  println("  " + str + " -> " + str.isPalindrome())
+}
+
+// String interpolation summary.
+println("\nAnalyzed #{words.size} words from #{sample.length()} characters")

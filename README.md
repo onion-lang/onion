@@ -17,19 +17,6 @@ curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh
 This downloads `onion.jar` from the latest GitHub Release and installs the
 `onion`, `onionc` and `onion-repl` commands into `~/.local/bin`.
 
-More options:
-
-```sh
-# Install a specific version
-curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0-M14
-
-# Build from a source checkout instead of downloading
-git clone https://github.com/onion-lang/onion && cd onion && ./install.sh --from-source
-
-# Install somewhere else (default: ~/.local)
-curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | ONION_INSTALL_DIR=/opt/onion sh
-```
-
 Once installed, run scripts directly — shebang scripts work too:
 
 ```sh

@@ -11,8 +11,41 @@ private[compiler] final class AssignabilitySupport(
   bodyContext: TypingBodyContext
 ) {
 
+  /**
+   * Rebuilds an empty collection literal with the element type(s) of the
+   * expected collection, so it target-types like `val xs: List[Int] = []`. The
+   * literal type is interned, so when it already matches, the same term is
+   * returned (terminating the retype in processAssignable).
+   */
+  private def retypeEmptyCollectionLiteral(expected: Type, actual: Term): Term = {
+    val listRaw = bodyContext.load("java.util.List")
+    val mapRaw = bodyContext.load("java.util.Map")
+    actual match {
+      case ll: ListLiteral if ll.elements.isEmpty =>
+        expected match {
+          case e: AppliedClassType if e.typeArguments.length == 1 && TypeRules.isSuperType(e.raw, listRaw) =>
+            val nt = AppliedClassType(listRaw, e.typeArguments.toList)
+            if (nt eq actual.`type`) actual else new ListLiteral(ll.elements, nt)
+          case _ => actual
+        }
+      case ml: MapLiteral if ml.keys.isEmpty =>
+        expected match {
+          case e: AppliedClassType if e.typeArguments.length == 2 && TypeRules.isSuperType(e.raw, mapRaw) =>
+            val nt = AppliedClassType(mapRaw, e.typeArguments.toList)
+            if (nt eq actual.`type`) actual else new MapLiteral(ml.keys, ml.values, nt)
+          case _ => actual
+        }
+      case _ => actual
+    }
+  }
+
   def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
     if (actual == null) return null
+    // Target-type an empty collection literal ([] / [:]) to the expected
+    // collection type, then proceed normally (so `foo([])` binds [] to the
+    // parameter's element type instead of the default Object).
+    val retyped = retypeEmptyCollectionLiteral(expected, actual)
+    if (retyped ne actual) return processAssignable(node, expected, retyped)
     if (actual.`type`.isBottomType) return actual
     if (expected == actual.`type`) return actual
 

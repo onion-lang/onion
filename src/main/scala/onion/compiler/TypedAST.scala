@@ -1545,7 +1545,8 @@ object TypedAST {
       else {
         var i = 0
         while (i < arguments.length) {
-          if (!TypeRules.isSuperType(arguments(i), parameters(i).`type`)) return false
+          if (!TypeRules.isSuperType(arguments(i), parameters(i).`type`) &&
+              !TypeRules.emptyCollectionLiteralAccepts(arguments(i), parameters(i))) return false
           i += 1
         }
         true
@@ -1623,6 +1624,26 @@ object TypedAST {
   }
 
   object TypeRules {
+    /**
+     * An empty collection literal (`[]` / `[:]`) has element type Object before
+     * overload resolution, so with invariant type arguments it does not match a
+     * `List[String]` / `Map[K, V]` parameter by assignability. But an empty
+     * literal is compatible with any parameterization of the same collection, so
+     * accept it during resolution; the argument is target-typed to the parameter
+     * type once the method is chosen (see AssignabilitySupport.processAssignable).
+     */
+    def emptyCollectionLiteralAccepts(expected: TypedAST.Type, arg: TypedAST.Term): Boolean = {
+      val isEmptyLiteral = arg match {
+        case ll: TypedAST.ListLiteral => ll.elements.isEmpty
+        case ml: TypedAST.MapLiteral => ml.keys.isEmpty
+        case _ => false
+      }
+      isEmptyLiteral && ((expected, arg.`type`) match {
+        case (e: TypedAST.AppliedClassType, a: TypedAST.AppliedClassType) => isSuperType(e.raw, a.raw)
+        case _ => false
+      })
+    }
+
     def isSuperType(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
       if (left == null || right == null) return false
       if (right.isBottomType) return true

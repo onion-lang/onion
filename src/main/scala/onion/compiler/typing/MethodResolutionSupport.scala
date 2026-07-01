@@ -40,7 +40,8 @@ private[compiler] final class MethodResolutionSupport(
       if methodTypeParams.nonEmpty && containsMethodTypeParam(argsWithTypeParams(idx), methodTypeParams) then
         structuralMatch(argsWithTypeParams(idx), params(idx).`type`, methodTypeParams)
       else
-        isAssignableWithBoxing(expected(idx), params(idx).`type`)
+        isAssignableWithBoxing(expected(idx), params(idx).`type`) ||
+          TypeRules.emptyCollectionLiteralAccepts(expected(idx), params(idx))
 
     if method.isVararg && expected.nonEmpty then
       val fixedArgCount = expected.length - 1

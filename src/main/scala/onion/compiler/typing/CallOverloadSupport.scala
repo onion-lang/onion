@@ -95,7 +95,8 @@ private[compiler] final class CallOverloadSupport(
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
         Option.when(
           knownParamIndices.forall { case (index, term) =>
-            isApplicableAtIndex(method, expectedArgs, index, term.`type`)
+            isApplicableAtIndex(method, expectedArgs, index, term.`type`) ||
+              (index < expectedArgs.length && TypeRules.emptyCollectionLiteralAccepts(expectedArgs(index), term))
           }
         )(ApplicableMethod(method, expectedArgs, methodSubst))
       }
@@ -173,7 +174,9 @@ private[compiler] final class CallOverloadSupport(
     } else {
       params.length >= method.minArguments &&
       params.length <= expectedArgs.length &&
-      params.indices.forall(i => isApplicableAtIndex(method, expectedArgs, i, params(i).`type`))
+      params.indices.forall(i =>
+        isApplicableAtIndex(method, expectedArgs, i, params(i).`type`) ||
+          TypeRules.emptyCollectionLiteralAccepts(expectedArgs(i), params(i)))
     }
 
   private def isApplicableAtIndex(

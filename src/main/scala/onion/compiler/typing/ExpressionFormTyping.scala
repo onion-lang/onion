@@ -36,27 +36,51 @@ final class ExpressionFormTyping(
   def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] =
     for {
       left <- typed(node.lhs, context)
-      right <- typed(node.rhs, context)
-      result <- if (left.isBasicType || right.isBasicType || !TypeRules.isAssignable(left.`type`, right.`type`)) {
-        bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](left.`type`, right.`type`))
-        None
-      } else {
-        // When the fallback can't be null, the whole expression can't be
-        // null either: T? ?: T yields T, and a nullable type variable
-        // yields its non-null view
-        def definitelyNonNull(t: Type): Boolean = t match {
-          case _: NullableType => false
-          case t if t.isNullType => false
-          case tv: TypeVariableType => tv.nullability == Nullability.NonNull
-          case _ => true
+      right0 <- typed(node.rhs, context)
+      result <- {
+        val leftT = left.`type`
+        // A nullable primitive (Int?) stores a primitive inner in the type but a
+        // boxed value at runtime (asmType(Int?) == Integer), so its non-null form
+        // is the boxed type.
+        def boxedInner(inner: Type): Type = inner match {
+          case bt: BasicType if bt != BasicType.VOID => Boxing.boxedType(bodyContext.table, bt)
+          case other => other
         }
-        val resultType = left.`type` match {
-          case n: NullableType if definitelyNonNull(right.`type`) => n.innerType
-          case tv: TypeVariableType if tv.nullability == Nullability.Nullable && definitelyNonNull(right.`type`) =>
-            tv.nonNullView
+        // The non-null value type carried by the left operand.
+        val leftNonNull: Type = leftT match {
+          case n: NullableType => boxedInner(n.innerType)
+          case tv: TypeVariableType if tv.nullability == Nullability.Nullable => tv.nonNullView
           case t => t
         }
-        Some(new BinaryTerm(ELVIS, resultType, left, right))
+        // The elvis is emitted as `dup; ifnonnull; pop; <rhs>`: the left must be
+        // a reference and both branches must leave the same stack type. A
+        // primitive fallback against a boxed result (e.g. `Int? ?: -1`, where the
+        // left is a boxed Integer) is boxed so both branches agree; the boxed
+        // result unboxes at the use site as usual.
+        val right: Term =
+          if (right0.isBasicType && !leftNonNull.isBasicType) Boxing.boxing(bodyContext.table, right0)
+          else right0
+        if (leftT.isBasicType || (!leftNonNull.isBottomType && !TypeRules.isAssignable(leftNonNull, right.`type`))) {
+          bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftT, right0.`type`))
+          None
+        } else {
+          // When the fallback can't be null, the whole expression can't be
+          // null either: T? ?: T yields T, and a nullable type variable
+          // yields its non-null view
+          def definitelyNonNull(t: Type): Boolean = t match {
+            case _: NullableType => false
+            case t if t.isNullType => false
+            case tv: TypeVariableType => tv.nullability == Nullability.NonNull
+            case _ => true
+          }
+          val resultType = leftT match {
+            case n: NullableType if definitelyNonNull(right.`type`) => boxedInner(n.innerType)
+            case tv: TypeVariableType if tv.nullability == Nullability.Nullable && definitelyNonNull(right.`type`) =>
+              tv.nonNullView
+            case t => t
+          }
+          Some(new BinaryTerm(ELVIS, resultType, left, right))
+        }
       }
     } yield result
 

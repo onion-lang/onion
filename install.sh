@@ -107,7 +107,16 @@ else
     echo ""
     echo "Latest release: $VERSION"
   fi
-  URL="https://github.com/$REPO/releases/download/$VERSION/onion.jar"
+  # Release assets are versioned (onion-<version>.jar), so resolve the jar's
+  # download URL from the release rather than assuming a fixed name.
+  URL=$(fetch "https://api.github.com/repos/$REPO/releases/tags/$VERSION" \
+    | grep '"browser_download_url"' \
+    | sed 's/.*"browser_download_url"[^"]*"\([^"]*\)".*/\1/' \
+    | grep -E '/onion-[^/]*\.jar$' | head -1)
+  if [ -z "$URL" ]; then
+    # Fallback: the conventional versioned name (tag without a leading 'v').
+    URL="https://github.com/$REPO/releases/download/$VERSION/onion-${VERSION#v}.jar"
+  fi
   echo ""
   echo "Downloading $URL ..."
   fetch "$URL" "$LIB_DIR/onion.jar.tmp"

@@ -17,9 +17,13 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     def methodDesc(ret: TypedAST.Type, args: Array[TypedAST.Type]): String =
       AsmType.getMethodDescriptor(asmType(ret), args.map(asmType)*)
 
-    val existing = classDef.methods.map { m =>
+    // Seeded with the class's real methods and grown as bridges are emitted, so
+    // a method declared at several levels of the generic hierarchy (e.g. addLast
+    // on both List and SequencedCollection) yields a single bridge instead of a
+    // duplicate (which would be a ClassFormatError).
+    val emitted = scala.collection.mutable.HashSet.from(classDef.methods.map { m =>
       (m.name, methodDesc(m.returnType, m.arguments))
-    }.toSet
+    })
 
     for source <- sources do
       val subst: Map[String, TypedAST.Type] =
@@ -44,7 +48,8 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
             else
               val bridgeDesc = methodDesc(rawMethod.returnType, rawMethod.arguments)
               val implDesc = methodDesc(impl.returnType, impl.arguments)
-              if bridgeDesc != implDesc && !existing.contains((rawMethod.name, bridgeDesc)) then
+              if bridgeDesc != implDesc && !emitted.contains((rawMethod.name, bridgeDesc)) then
+                emitted.add((rawMethod.name, bridgeDesc))
                 val access = toAsmModifier(impl.modifier) | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
                 val bridgeArgTypes = rawMethod.arguments.map(asmType)
                 val bridgeReturnType = asmType(rawMethod.returnType)

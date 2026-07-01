@@ -1,0 +1,8 @@
+// A do-block with two `ret` statements is malformed; it must be rejected with a
+// clean diagnostic, not desugared into invalid bytecode (VerifyError).
+val r: Option[Int] = do[Option] {
+  x <- Option::some(1)
+  ret x + 10
+  ret x + 20
+}
+IO::println(r.getOrElse(-1))

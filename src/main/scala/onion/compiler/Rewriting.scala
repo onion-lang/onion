@@ -823,6 +823,18 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       ))
     }
 
+    // `ret` yields the do-block's final value and must be the last statement.
+    // A `ret` in any earlier position (e.g. two `ret`s) is malformed and would
+    // otherwise desugar into invalid bytecode, so reject it up front.
+    val strayRet = statements.dropRight(1).collectFirst {
+      case r: AST.RetStatement => r
+    }
+    strayRet.foreach { r =>
+      throw new CompilationException(Seq(
+        CompileError("", r.location, "ret must be the final statement of a do block")
+      ))
+    }
+
     desugarDoStatements(doExpr.location, monadType, statements)
   }
 

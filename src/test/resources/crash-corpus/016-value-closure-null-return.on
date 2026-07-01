@@ -1,0 +1,9 @@
+// A value-returning closure whose only explicit return is `return null` once
+// inferred NullType as its return type, so codegen emitted a value-less areturn
+// (VerifyError: operand stack underflow). The return type must widen to Object.
+val cb: (Object) -> Object = (x: Object) -> {
+  if x == null { return null }
+  IO::println("side")
+}
+cb.call("hi")
+IO::println("ok")

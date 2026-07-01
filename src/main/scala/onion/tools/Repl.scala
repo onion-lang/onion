@@ -129,11 +129,16 @@ class Repl(classpath: Seq[String]) {
         .build()
       return TerminalContext(dumb, useJLine = false)
     }
+    // Prefer the system terminal: it puts the terminal into raw mode and
+    // manages the echo attribute itself. The /dev/tty streams path (system=false)
+    // does not, so the OS echoes the typed line in addition to JLine's own
+    // rendering -- the input then appears twice. Keep the tty path only as a
+    // fallback for when the system terminal is unavailable.
     val preferred = firstNonDumb(Seq(
-      () => openTtyTerminal(Some("exec")),
       () => openSystemTerminal(Some("exec")),
-      () => openTtyTerminal(None),
-      () => openSystemTerminal(None)
+      () => openSystemTerminal(None),
+      () => openTtyTerminal(Some("exec")),
+      () => openTtyTerminal(None)
     ))
     preferred match {
       case Some(terminal) => TerminalContext(terminal, useJLine = true)
@@ -525,7 +530,17 @@ class Repl(classpath: Seq[String]) {
             val resName = s"res$resultCounter"
             val exprSnippet = ExprSnippet(snippet, resName)
             val nextSnippets = sessionSnippets.toSeq :+ exprSnippet
-            val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = true)
+            // Best-effort: resolve the result's static type so the printed line
+            // reads `resN: Type = value` (Scala-REPL style). Falls back to no
+            // type annotation if analysis fails.
+            val resultType: Option[String] = {
+              val typeSource = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = false)
+              analyzeTypedSession(typeSource, fileName) match {
+                case Right(analysis) => findSnippetType(analysis, resName).map(_.displayName)
+                case Left(_) => None
+              }
+            }
+            val source = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = true, resultType = resultType)
             withTiming("expression") {
               compileSession(source, fileName)
             } match {
@@ -566,7 +581,7 @@ class Repl(classpath: Seq[String]) {
     analyzeTypedSession(source, "typecheck.on") match {
       case Right(analysis) =>
         findSnippetType(analysis, resName) match {
-          case Some(tp) => println(s"${Colors.CYAN}$expr${Colors.RESET}: ${tp.name}")
+          case Some(tp) => println(s"${Colors.CYAN}$expr${Colors.RESET}: ${tp.displayName}")
           case None => println(s"${Colors.YELLOW}Type information is unavailable for that expression.${Colors.RESET}")
         }
       case Left(errors) =>
@@ -731,7 +746,8 @@ class Repl(classpath: Seq[String]) {
     moduleName: Option[String],
     imports: Seq[(String, String)],
     snippets: Seq[Snippet],
-    printLastResult: Boolean
+    printLastResult: Boolean,
+    resultType: Option[String] = None
   ): String = {
     val builder = new StringBuilder()
     moduleName.foreach { name =>
@@ -753,7 +769,8 @@ class Repl(classpath: Seq[String]) {
           builder.append(code).append("\n")
           builder.append("}\n")
           if (printLastResult && idx == snippets.length - 1) {
-            builder.append("IO::println(\"").append(name).append(" = \" + ").append(name).append(")\n")
+            val typePart = resultType.map(t => ": " + t).getOrElse("")
+            builder.append("IO::println(\"").append(name).append(typePart).append(" = \" + ").append(name).append(")\n")
           }
       }
     }

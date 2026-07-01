@@ -1181,6 +1181,22 @@ object TypedAST {
     import BasicType._
     def name: String = name_
 
+    // `name` is the JVM primitive name (used for descriptors/codegen); the
+    // display name is the capitalized Onion source form (`Int`, `Long`, ...),
+    // so diagnostics and the REPL show what the user actually writes. `void`
+    // stays lowercase because that is the Onion keyword.
+    override def displayName: String = name_ match {
+      case "byte"    => "Byte"
+      case "short"   => "Short"
+      case "char"    => "Char"
+      case "int"     => "Int"
+      case "long"    => "Long"
+      case "float"   => "Float"
+      case "double"  => "Double"
+      case "boolean" => "Boolean"
+      case other     => other
+    }
+
     def isNumeric: Boolean = isInteger && isReal
 
     def isInteger: Boolean = (this eq BYTE) || (this eq SHORT) || (this eq INT) || (this eq LONG)

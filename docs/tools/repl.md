@@ -48,10 +48,10 @@ onion-repl
 
 ```text
 onion> 2 + 2
-res0 = 4
+res0: Int = 4
 
 onion> res0 * 10
-res1 = 40
+res1: Int = 40
 ```
 
 ### Multi-line Definitions

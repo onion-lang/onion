@@ -30,7 +30,7 @@ import scala.jdk.CollectionConverters._
  * Features: tab completion, history, syntax highlighting, REPL commands.
  */
 object Repl {
-  val VERSION = "1.0.0"
+  val VERSION = OnionVersion.value
   val PROMPT = "onion> "
   val CONTINUATION_PROMPT = "     | "
 
@@ -536,7 +536,7 @@ class Repl(classpath: Seq[String]) {
             val resultType: Option[String] = {
               val typeSource = buildSessionSource(sessionModule, sessionImports.toSeq, nextSnippets, printLastResult = false)
               analyzeTypedSession(typeSource, fileName) match {
-                case Right(analysis) => findSnippetType(analysis, resName).map(_.displayName)
+                case Right(analysis) => findSnippetType(analysis, resName).map(formatType)
                 case Left(_) => None
               }
             }
@@ -581,12 +581,51 @@ class Repl(classpath: Seq[String]) {
     analyzeTypedSession(source, "typecheck.on") match {
       case Right(analysis) =>
         findSnippetType(analysis, resName) match {
-          case Some(tp) => println(s"${Colors.CYAN}$expr${Colors.RESET}: ${tp.displayName}")
+          case Some(tp) => println(s"${Colors.CYAN}$expr${Colors.RESET}: ${formatType(tp)}")
           case None => println(s"${Colors.YELLOW}Type information is unavailable for that expression.${Colors.RESET}")
         }
       case Left(errors) =>
         printErrors(errors)
     }
+  }
+
+  /** java.lang wrapper FQCNs shown as their Onion primitive source names. */
+  private val boxedToPrimitive: Map[String, String] = Map(
+    "java.lang.Integer" -> "Int", "java.lang.Long" -> "Long",
+    "java.lang.Double" -> "Double", "java.lang.Float" -> "Float",
+    "java.lang.Boolean" -> "Boolean", "java.lang.Byte" -> "Byte",
+    "java.lang.Short" -> "Short", "java.lang.Character" -> "Char"
+  )
+
+  /** Renders a fully-qualified class name in Onion source form: strip the
+    * package, turn nested `$` into `.`, and map boxed wrappers to primitives. */
+  private def sourceClassName(fqcn: String): String =
+    boxedToPrimitive.getOrElse(fqcn, {
+      val dot = fqcn.lastIndexOf('.')
+      val simple = if (dot >= 0) fqcn.substring(dot + 1) else fqcn
+      simple.replace('$', '.')
+    })
+
+  /** Formats a type the way it is written in Onion source (e.g.
+    * `Map[String, Int]` rather than `java.util.Map[java.lang.String,
+    * java.lang.Integer]`), for REPL `:type` and result output. */
+  private def formatType(tp: TypedAST.Type): String = tp match {
+    case n: TypedAST.NullableType => formatType(n.innerType) + "?"
+    case a: TypedAST.AppliedClassType =>
+      val base = sourceClassName(a.raw.name)
+      if (a.typeArguments.isEmpty) base
+      else base + "[" + a.typeArguments.map(formatType).mkString(", ") + "]"
+    case arr: TypedAST.ArrayType => formatType(arr.component) + ("[]" * math.max(1, arr.dimension))
+    case w: TypedAST.WildcardType =>
+      w.lowerBound match {
+        case Some(lo) => "? super " + formatType(lo)
+        case None if w.upperBound.name == "java.lang.Object" => "?"
+        case None => "? extends " + formatType(w.upperBound)
+      }
+    case bt: TypedAST.BasicType => bt.displayName
+    case tv: TypedAST.TypeVariableType => tv.name
+    case ct: TypedAST.ClassType => sourceClassName(ct.name)
+    case other => sourceClassName(other.name)
   }
 
   private def showAst(expr: String): Unit = {

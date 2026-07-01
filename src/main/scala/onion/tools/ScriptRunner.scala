@@ -23,7 +23,7 @@ import onion.tools.option._
  *
  */
 object ScriptRunner {
-  val VERSION = "1.0.0"
+  val VERSION = OnionVersion.value
 
   private def conf(optionName: String, requireArgument: Boolean) = OptionConfig(optionName, requireArgument)
 

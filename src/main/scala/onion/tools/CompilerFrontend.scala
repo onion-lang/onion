@@ -28,7 +28,7 @@ import scala.util.boundary, boundary.break
  *
  */
 object CompilerFrontend {
-  val VERSION = "1.0.0"
+  val VERSION = OnionVersion.value
 
   private def config(option: String, requireArg: Boolean): OptionConfig = new OptionConfig(option, requireArg)
 

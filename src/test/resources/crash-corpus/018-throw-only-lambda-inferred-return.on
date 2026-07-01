@@ -1,0 +1,5 @@
+// A throw-only lambda with an inferred return type once inferred BottomType as
+// its return type, so codegen emitted a value-less areturn
+// (VerifyError: operand stack underflow). The return type must widen to Object.
+val f = () -> { throw new RuntimeException("boom") }
+IO::println("ok")

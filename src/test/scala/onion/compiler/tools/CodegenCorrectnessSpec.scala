@@ -161,6 +161,22 @@ class CodegenCorrectnessSpec extends AbstractShellSpec {
       assert(Shell.Success(100000) == r)
     }
 
+    it("throw-only lambda with inferred return type compiles and throws when invoked") {
+      val r = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val f = () -> { throw new RuntimeException("boom") }
+          |    var caught: Int = 0
+          |    try { f.call() } catch e: Exception { caught = 1 }
+          |    return caught
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+
     it("value-returning closure with an early return and a void fall-through") {
       val r = shell.run(
         """

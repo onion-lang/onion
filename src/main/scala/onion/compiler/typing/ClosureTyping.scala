@@ -60,12 +60,12 @@ final class ClosureTyping(
           val inferred =
             if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes)
             else inferReturnTypeFromReturns(node, context, argTypes)
-          // A closure whose only produced value is `null` infers to NullType
-          // (the bottom of the reference lattice). NullType is not a valid method
-          // return type: codegen's default value for it is absent, yielding a
-          // value-less `areturn` (VerifyError: operand stack underflow). Widen it
-          // to Object (the declared `-> Object` bound).
-          inferred.map(t => if (t.isNullType) bodyContext.rootClass else t)
+          // A closure whose only produced value is `null` (NullType) or that
+          // never returns normally (BottomType, e.g. a throw-only body) infers
+          // to a bottom type, which is not a valid method return type: codegen's
+          // default value for it is absent, yielding a value-less `areturn`
+          // (VerifyError: operand stack underflow). Widen it to Object.
+          inferred.map(t => if (t.isNullType || t.isBottomType) bodyContext.rootClass else t)
         } else None
 
       val typeRef =

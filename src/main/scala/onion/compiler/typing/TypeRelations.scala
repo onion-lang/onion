@@ -19,10 +19,15 @@ private[typing] object TypeRelations {
     else
       (expected, actual) match
         case (expectedApplied: AppliedClassType, actualApplied: AppliedClassType) =>
+          // Type arguments are INVARIANT (generics are erasure-based, no
+          // declaration-site variance): Box[Dog] is NOT a Box[Animal], since a
+          // mutable Box[Animal] could then store a Cat and corrupt the Box[Dog].
+          // Require each argument to be mutually assignable rather than merely a
+          // subtype; wildcard variance is still handled by isSuperType above.
           sameClass(expectedApplied.raw, actualApplied.raw) &&
             expectedApplied.typeArguments.length == actualApplied.typeArguments.length &&
             expectedApplied.typeArguments.zip(actualApplied.typeArguments).forall { (expArg, actArg) =>
-              isAssignableWithBoxing(expArg, actArg, table)
+              isAssignableWithBoxing(expArg, actArg, table) && isAssignableWithBoxing(actArg, expArg, table)
             }
         case _ =>
           false

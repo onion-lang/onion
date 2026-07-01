@@ -4,12 +4,14 @@ import onion.tools.Shell
 import onion.compiler.{CompilerConfig, FileInputSource, OnionCompiler}
 
 /**
- * Regression tests for top-level `def main(args: String[])` causing a
- * ClassFormatError (duplicate method name) instead of a clean semantic error.
+ * A top-level `def main(args: String[])` must be used as the entry point (it is
+ * a public static method on the synthesized top-level class), not collide with a
+ * synthesized main. Historically this produced a ClassFormatError, then a
+ * spurious E0010; now the user's main is simply used ([#189]).
  */
 class DuplicateMainSpec extends AbstractShellSpec {
   describe("top-level def main(args: String[]) collision") {
-    it("reports a semantic error instead of ClassFormatError") {
+    it("uses the user's top-level main as the entry point") {
       val result = shell.run(
         """
           |def main(args: String[]): void {
@@ -19,11 +21,8 @@ class DuplicateMainSpec extends AbstractShellSpec {
         "DuplicateMain.on",
         Array()
       )
-      // Should be a Failure (semantic error E0010), NOT an exception/crash
-      result match {
-        case Shell.Failure(_) => succeed
-        case other => fail(s"Expected Failure but got: $other")
-      }
+      // The user's main is the entry point; a void main returns null.
+      assert(Shell.Success(null) == result)
     }
 
     it("does NOT report a duplicate error for zero-arg main") {

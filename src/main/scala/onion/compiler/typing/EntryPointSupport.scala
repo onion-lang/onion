@@ -50,22 +50,16 @@ private[compiler] final class EntryPointSupport(
     startMethod.setBlock(new StatementBlock(statements.asJava))
     startMethod.setFrame(context.getContextFrame)
     klass.add(startMethod)
-    // Guard: if the user already defined a top-level `def main(args: String[]): void`,
-    // the typing pass added it as a method on the same class.  Adding the synthesized
-    // main with the identical signature would produce a ClassFormatError at load time.
-    // Detect the collision and report a clean semantic error instead.
+    // If the user already defined a top-level `def main(args: String[])`, the
+    // typing pass added it as a public static method on this class, so it already
+    // serves as the JVM entry point. Synthesizing a competing `main` would
+    // collide, so use the user's main instead (the entry-point rule prefers a
+    // main on the top-level class; any bare top-level statements in `start` are
+    // then not run).
     val existingMain = klass.methods("main").exists { m =>
       m.arguments.length == 1 && m.arguments(0) == argsType
     }
-    if (existingMain) {
-      typing.report(
-        SemanticError.DUPLICATE_METHOD,
-        null: Location,
-        klass: AnyRef,
-        "main": AnyRef,
-        Array[Type](argsType): AnyRef
-      )
-    } else {
+    if (!existingMain) {
       klass.add(createMain(klass, startMethod, "main", Array[Type](argsType), BasicType.VOID))
     }
   }

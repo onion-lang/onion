@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.3.0-M2
+
+- **Empty collection literals are target-typed at argument position.** `foo([])`
+  and `foo([:])` now bind the empty literal to the parameter's element type, for
+  top-level, instance, static, and constructor calls ([#193]).
+
 ### 0.3.0-M1 — correctness & diagnostics
 
 Type-soundness and diagnostic-quality fixes surfaced by gap-probing real programs.
@@ -147,6 +153,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [0.2.0]: https://github.com/onion-lang/onion/releases/tag/v0.2.0
 [0.1.0]: https://github.com/onion-lang/onion/releases/tag/releases/0.1
 [#184]: https://github.com/onion-lang/onion/issues/184
+[#193]: https://github.com/onion-lang/onion/issues/193
 [#185]: https://github.com/onion-lang/onion/issues/185
 [#186]: https://github.com/onion-lang/onion/issues/186
 [#187]: https://github.com/onion-lang/onion/issues/187

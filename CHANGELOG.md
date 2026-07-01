@@ -149,7 +149,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Known limitations
 - `forward` delegation over a parameterized generic interface (e.g.
   `forward val x: List[String]`) does not yet compile; delegate over a
-  non-generic interface instead ([#184]).
+  non-generic interface instead ([#184]). *(Resolved in 0.3.0-M2.)*
 
 ## [0.1.0] - 2019-XX-XX
 

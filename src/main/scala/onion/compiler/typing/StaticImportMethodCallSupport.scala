@@ -43,10 +43,13 @@ private[compiler] final class StaticImportMethodCallSupport(
     val resolved = scala.collection.mutable.Buffer[StaticImportResolved]()
     var ambiguous: Option[StaticImportAmbiguous] = None
     bodyContext.staticImportedList.getItems.foreach { item =>
-      bodyContext.loadOption(item.getName).foreach { typeRef =>
+      if (!item.importsMethod(node.name)) ()
+      else bodyContext.loadOption(item.getName).foreach { typeRef =>
         resolveStaticImportOnType(node, typeRef, params, expected, mappedTypeArgs) match {
           case found: StaticImportResolved =>
-            resolved += found
+            // Deduplicate: the same method may be reachable through both a
+            // class-level static import and a single-method static import.
+            if (!resolved.exists(_.method eq found.method)) resolved += found
           case amb: StaticImportAmbiguous =>
             if (ambiguous.isEmpty) ambiguous = Some(amb)
           case StaticImportNoMatch =>

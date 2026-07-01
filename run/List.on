@@ -1,4 +1,4 @@
-val list: List = [];
+val list: List[String] = [];
 
 list.add("a");
 list.add("b");

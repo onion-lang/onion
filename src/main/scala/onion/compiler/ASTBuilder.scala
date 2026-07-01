@@ -13,7 +13,11 @@ trait ASTBuilder {
 
   def createModuleDeclaration(location: Location, name: String): AST.ModuleDeclaration
 
-  def createImportClause(location: Location, mapping: List[(String, String)]): AST.ImportClause
+  def createImportClause(
+    location: Location,
+    mapping: List[(String, String)],
+    staticImports: List[(String, String)]
+  ): AST.ImportClause
 
   def createClassDeclaration(
     location: Location,
@@ -162,8 +166,12 @@ class DefaultASTBuilder extends ASTBuilder {
     AST.ModuleDeclaration(location, name)
   }
 
-  def createImportClause(location: Location, mapping: List[(String, String)]): AST.ImportClause = {
-    AST.ImportClause(location, mapping)
+  def createImportClause(
+    location: Location,
+    mapping: List[(String, String)],
+    staticImports: List[(String, String)]
+  ): AST.ImportClause = {
+    AST.ImportClause(location, mapping, staticImports)
   }
 
   def createClassDeclaration(

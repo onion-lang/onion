@@ -3,16 +3,14 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 /**
- * A raw (unparameterized) Java collection such as `new ArrayList()` must be
- * assignable where a parameterized type like `List[String]` is expected, per
- * Java's raw-type erasure / unchecked-conversion rule. Previously the subtype
- * walk compared the raw actual's `List[E]` super against `List[String]` and the
- * uninstantiated `E` made it fail. `isSuperTypeForClass` now erases the expected
- * applied type to its raw form when the actual is a raw class.
+ * Onion forbids raw generic types: a generic type used without type arguments
+ * (e.g. `new ArrayList()` or a `List` annotation) is a compile error (E0066).
+ * An applied type such as `ArrayList[String]` is still assignable where
+ * `List[String]` is expected, per the usual subtype rule.
  */
 class RawGenericAssignabilitySpec extends AbstractShellSpec {
-  describe("raw generic assignability") {
-    it("returns a raw ArrayList where List[String] is the declared return type") {
+  describe("raw generic types are forbidden") {
+    it("rejects a raw `new ArrayList()`") {
       val result = shell.run(
         """
           |import { java.util.* }
@@ -31,22 +29,20 @@ class RawGenericAssignabilitySpec extends AbstractShellSpec {
         "None",
         Array()
       )
-      assert(Shell.Success("hello") == result)
+      assert(Shell.Failure(-1) == result)
     }
 
-    it("passes a raw ArrayList to a List[String] parameter") {
+    it("rejects a raw `List` annotation") {
       val result = shell.run(
         """
           |import { java.util.* }
           |class Test {
           |public:
-          |  static def size(xs: List[String]): Int {
+          |  static def size(xs: List): Int {
           |    return xs.size()
           |  }
           |  static def main(args: String[]): Int {
-          |    val raw = new ArrayList()
-          |    raw.add("a")
-          |    raw.add("b")
+          |    val raw: List[String] = ["a", "b"]
           |    return size(raw)
           |  }
           |}
@@ -54,7 +50,7 @@ class RawGenericAssignabilitySpec extends AbstractShellSpec {
         "None",
         Array()
       )
-      assert(Shell.Success(2) == result)
+      assert(Shell.Failure(-1) == result)
     }
 
     it("accepts an applied ArrayList[String] where List[String] is expected") {

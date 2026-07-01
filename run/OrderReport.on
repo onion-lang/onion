@@ -26,9 +26,9 @@ val byPrice = products.sortedBy { p => 0 - p.price() }.map { p => p.name() }
 IO::println("byPriceDesc: " + byPrice.toString())
 
 class Cart {
-  val items: List
+  val items: List[Product]
 public:
-  def this(ps: List) {
+  def this(ps: List[Product]) {
     this.items = ps
   }
   def total(): Int {

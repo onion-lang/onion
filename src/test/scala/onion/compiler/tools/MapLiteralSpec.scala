@@ -90,7 +90,7 @@ class MapLiteralSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
-          |    val m: Map = ["k": 42]
+          |    val m: Map[String, Int] = ["k": 42]
           |    return m.get("k") as Integer
           |  }
           |}

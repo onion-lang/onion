@@ -67,5 +67,24 @@ class IterablesSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(6) == result)
     }
+
+    it("sorts a list with a comparator") {
+      val result = shell.run(
+        """
+          |import { onion.Iterables }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = Colls::listOf(3, 1, 4, 1, 5, 9, 2, 6)
+          |    val ys = Iterables::sort(xs, (a: Int, b: Int) -> a - b)
+          |    return ys.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesSort.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 1, 2, 3, 4, 5, 6, 9]") == result)
+    }
   }
 }

@@ -991,7 +991,7 @@ class AutoBoxingSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
-          |    val list: List = [1, 2, 3, 4, 5]
+          |    val list: List[Int] = [1, 2, 3, 4, 5]
           |    return list.size()
           |  }
           |}
@@ -1111,7 +1111,7 @@ class AutoBoxingSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val c: Comparable = 42
+          |    val c: Comparable[Integer] = 42
           |    return c.toString()
           |  }
           |}

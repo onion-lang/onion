@@ -4,6 +4,7 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
+import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
 final class ExpressionFormTyping(
@@ -83,7 +84,7 @@ final class ExpressionFormTyping(
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     typed(node.src, context).flatMap { term =>
       typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
-        if (term.`type`.isBasicType && !destination.isBasicType) {
+        if (!isValidCast(term.`type`, destination)) {
           bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
           None
         } else {
@@ -91,6 +92,35 @@ final class ExpressionFormTyping(
         }
       }
     }
+
+  /**
+   * Determine whether a cast from `source` to `destination` is statically valid.
+   * Allows reference-to-reference casts along the type hierarchy, boxing/unboxing
+   * between a primitive and its single boxed counterpart, and casts from Object
+   * (which may fail at runtime). Rejects unrelated casts such as String -> Int.
+   */
+  private def isValidCast(source: Type, destination: Type): Boolean = {
+    if (source eq destination) return true
+    (source, destination) match {
+      case (_: NullType, bt: BasicType) =>
+        false
+      case (bt: BasicType, ct: ClassType) =>
+        (Boxing.boxedType(bodyContext.table, bt) eq ct) || ct.isInstanceOf[TypeVariableType]
+      case (ct: ClassType, bt: BasicType) =>
+        (Boxing.boxedType(bodyContext.table, bt) eq ct) || (ct eq bodyContext.rootClass) || ct.isInstanceOf[TypeVariableType]
+      case (ct: ClassType, dt: ClassType) =>
+        TypeRules.isSuperType(dt, ct) || TypeRules.isSuperType(ct, dt) || ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType]
+      case (bt1: BasicType, bt2: BasicType) =>
+        (bt1 eq bt2) || (isNumericBasic(bt1) && isNumericBasic(bt2))
+      case _ => true
+    }
+  }
+
+  private def isNumericBasic(bt: BasicType): Boolean = bt match {
+    case BasicType.INT | BasicType.LONG | BasicType.SHORT | BasicType.BYTE |
+         BasicType.FLOAT | BasicType.DOUBLE | BasicType.CHAR => true
+    case _ => false
+  }
 
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     for {

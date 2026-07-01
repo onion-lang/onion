@@ -1,0 +1,12 @@
+// An empty try block once produced an exception-table entry with
+// start_pc == end_pc, which the JVM rejects at class-load time with
+// "Illegal exception table range" (ClassFormatError). The protected region
+// must always contain at least one instruction.
+def safeDiv(a: Int, b: Int): Int {
+  try {
+  } catch e: Exception {
+    return a / b
+  }
+  return -1
+}
+IO::println(safeDiv(10, 2))

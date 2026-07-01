@@ -17,8 +17,8 @@ class SafeIndexingSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val none: List? = null
-          |    val xs: List? = ["a", "b"]
+          |    val none: List[String]? = null
+          |    val xs: List[String]? = ["a", "b"]
           |    return "" + none?[0] + "," + xs?[1]
           |  }
           |}

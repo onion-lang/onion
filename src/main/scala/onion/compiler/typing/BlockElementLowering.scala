@@ -400,7 +400,7 @@ final class BlockElementLowering(
   private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext): Unit = {
     if (context.lookupOnlyCurrentScope(arg.name) != null) {
       bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
-    } else mapFrom(arg.typeRef) match {
+    } else typing.mapFrom(arg.typeRef) match { // raw-exempt: `foreach (k,v)` desugars to a raw Map$Entry placeholder that refineElementType restores
       case Some(annotated) =>
         val elementType = if (collection == null) annotated else refineElementType(annotated, collection.`type`)
         context.add(arg.name, elementType)
@@ -439,8 +439,10 @@ final class BlockElementLowering(
   private def defaultValue(typeRef: Type): Term =
     body.defaultValue(typeRef)
 
+  // Local declaration positions (local var / try-resource / foreach element
+  // annotations) forbid raw generic types.
   private def mapFrom(typeNode: AST.TypeNode): Option[Type] =
-    typing.mapFrom(typeNode)
+    typing.mapFromDeclared(typeNode)
 
   private def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term =
     body.processNodes(nodes, typeRef, bind, context)

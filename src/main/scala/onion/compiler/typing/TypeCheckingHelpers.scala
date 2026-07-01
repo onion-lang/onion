@@ -81,6 +81,30 @@ private[typing] object TypeCheckingHelpers {
   }
 
   /**
+   * Check whether two types are the same, allowing a primitive type to match
+   * its boxed counterpart (e.g. `Int` <-> `java.lang.Integer`).
+   */
+  def sameOrBoxed(table: ClassTable, a: Type, b: Type): Boolean = {
+    if (a eq b) return true
+    (a, b) match {
+      case (bt: BasicType, ct: ClassType) if bt != BasicType.VOID =>
+        Boxing.boxedType(table, bt) eq ct
+      case (ct: ClassType, bt: BasicType) if bt != BasicType.VOID =>
+        Boxing.boxedType(table, bt) eq ct
+      case _ => false
+    }
+  }
+
+  /**
+   * Normalize a type for structural matching: wildcard types collapse to their
+   * effective bound (`? super T` -> `T`, `? extends T` -> `T`).
+   */
+  def effectiveType(tp: Type): Type = tp match {
+    case w: WildcardType => w.lowerBound.getOrElse(w.upperBound)
+    case other => other
+  }
+
+  /**
    * Ensures a term is boolean, unboxing java.lang.Boolean if needed.
    * Reports via reportError when the result is still non-boolean and returns
    * the (possibly unboxed) term either way; callers decide how to recover.

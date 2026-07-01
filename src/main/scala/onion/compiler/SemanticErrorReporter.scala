@@ -88,9 +88,12 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Type extractors ==========
 
-  private def typeName(item: AnyRef): String = item.asInstanceOf[TypedAST.Type].displayName
-  private def classTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ClassType].displayName
-  private def objectTypeName(item: AnyRef): String = item.asInstanceOf[TypedAST.ObjectType].displayName
+  private def typeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else item.asInstanceOf[TypedAST.Type].displayName
+  private def classTypeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else item.asInstanceOf[TypedAST.ClassType].displayName
+  private def objectTypeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else item.asInstanceOf[TypedAST.ObjectType].displayName
   private def asString(item: AnyRef): String = item.asInstanceOf[String]
   private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
   private def typeNames(types: Array[TypedAST.Type]): String = {
@@ -282,6 +285,10 @@ class SemanticErrorReporter(threshold: Int) {
     // Generic type errors
     SemanticError.TYPE_NOT_GENERIC -> ErrorDef(
       "error.semantic.typeNotGeneric",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.RAW_TYPE_NOT_ALLOWED -> ErrorDef(
+      "error.semantic.rawTypeNotAllowed",
       Seq(items => asString(items(0)))
     ),
     SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
@@ -539,7 +546,7 @@ class SemanticErrorReporter(threshold: Int) {
     val actual = items(1).asInstanceOf[TypedAST.Type]
     val baseMessage = format(message("error.semantic.incompatibleType"), Seq(typeName(expected), typeName(actual)))
     val hint =
-      if (!expected.isNullable && actual.isNullable) {
+      if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else None
     problem(position, appendSuggestion(baseMessage, hint))

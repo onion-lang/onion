@@ -1,0 +1,27 @@
+import {
+  onion.Iterables;
+  onion.Maps;
+}
+
+class CollectionUtilities {
+public:
+  static def main(args: String[]): String {
+    val scores = Colls::mapOf(
+      Colls::entry("Alice", 85),
+      Colls::entry("Bob", 92),
+      Colls::entry("Charlie", 78)
+    )
+
+    // Increase every score by a bonus.
+    val curved: Map[String, Int] = Maps::mapValues(scores, (v: Int) -> v + 5)
+
+    // Sort names by their curved scores descending.
+    val names = Colls::listOf("Alice", "Bob", "Charlie")
+    val sorted = Iterables::sort(names, (a: String, b: String) -> {
+      val diff = (curved.get(b) as Int) - (curved.get(a) as Int)
+      return diff
+    })
+
+    return sorted.toString()
+  }
+}

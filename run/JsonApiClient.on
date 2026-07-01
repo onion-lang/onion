@@ -1,0 +1,35 @@
+// JsonApiClient — JSON parsing and HTTP client example.
+// Demonstrates derive!(Json) records, Http::get, and graceful fallback.
+
+import { java.lang.Exception; }
+
+record User(id: Int, name: String, email: String) derive!(Json)
+
+// A stable local JSON payload shaped like a User record.
+val userJson = "{\"id\": 1, \"name\": \"Alice\", \"email\": \"alice@example.com\"}"
+
+val user = User::fromJson(userJson)
+if user != null {
+  println("parsed id=" + user.id())
+  println("parsed name=" + user.name())
+  println("parsed email=" + user.email())
+} else {
+  println("Failed to parse user JSON")
+}
+
+// Demonstrate Http::get with a fallback for offline runs.
+val url = "https://httpbin.org/get"
+try {
+  val response = Http::get(url)
+  println("http status length=" + response.length())
+} catch e: Exception {
+  println("network request skipped: " + e.getMessage())
+}
+
+// Round-trip: record -> JSON -> record.
+val bob = new User(42, "Bob", "bob@example.com")
+val json = User::toJson(bob)
+val back = User::fromJson(json)
+if back != null {
+  println("roundtrip=" + back.name())
+}

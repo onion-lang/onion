@@ -97,6 +97,12 @@ private[compiler] final class StaticMethodCallSupport(
       }
 
       if (applicable.isEmpty) {
+        val closureIndices = node.args.zipWithIndex.collect {
+          case (expr, i) if expr.isInstanceOf[AST.ClosureExpression] => i
+        }.toSet
+        if (closureIndices.nonEmpty) {
+          return typeStaticCallWithBidirectionalInference(node, typeRef, context, expected, closureIndices)
+        }
         calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters))
         None
       } else {

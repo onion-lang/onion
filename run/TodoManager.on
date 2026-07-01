@@ -34,12 +34,13 @@ extension Int {
 }
 
 class TodoManager {
-  val tasks: List
+  val tasks: List[Task]
   var nextId: Int
 
 public:
   def this {
-    this.tasks = []
+    val empty: List[Task] = []
+    this.tasks = empty
     this.nextId = 1
   }
 
@@ -73,8 +74,8 @@ public:
     return false
   }
 
-  def pending(): List {
-    val result: List = []
+  def pending(): List[Task] {
+    val result: List[Task] = []
     foreach t: Object in this.tasks {
       val task = t as Task
       if !task.done() {
@@ -84,8 +85,8 @@ public:
     return result
   }
 
-  def byPriority(p: Priority): List {
-    val result: List = []
+  def byPriority(p: Priority): List[Task] {
+    val result: List[Task] = []
     foreach t: Object in this.tasks {
       val task = t as Task
       if task.priority() == p {
@@ -101,7 +102,7 @@ public:
     return "total=" + total + " pending=" + pendingCount
   }
 
-  def all(): List {
+  def all(): List[Task] {
     return this.tasks
   }
 }

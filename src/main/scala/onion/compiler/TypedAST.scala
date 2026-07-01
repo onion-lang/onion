@@ -1523,7 +1523,8 @@ object TypedAST {
    * @author Kota Mizushima
    */
   class StandardParameterMatcher extends ParameterMatcher {
-    def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean =
+    def matches(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean = {
+      if (arguments == null || parameters == null) return false
       if (arguments.length != parameters.length) false
       else {
         var i = 0
@@ -1533,8 +1534,10 @@ object TypedAST {
         }
         true
       }
+    }
 
     def matchesVararg(arguments: Array[TypedAST.Type], parameters: Array[TypedAST.Term]): Boolean = {
+      if (arguments == null || parameters == null) return false
       if (arguments.isEmpty) return false
       val lastArgType = arguments.last
       // Vararg parameter must be an array type
@@ -1605,6 +1608,7 @@ object TypedAST {
 
   object TypeRules {
     def isSuperType(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
+      if (left == null || right == null) return false
       if (right.isBottomType) return true
       if (left.isBottomType) return right.isBottomType
 

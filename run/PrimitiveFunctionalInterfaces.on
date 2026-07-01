@@ -1,0 +1,26 @@
+import {
+  java.util.function.Predicate;
+  java.util.function.Supplier;
+  java.util.function.Function;
+}
+
+class PrimitiveFunctionalInterfaces {
+public:
+  static def main(args: String[]): String {
+    // Predicate[Int] with a primitive parameter
+    val isPositive: Predicate[Int] = (x: Int) -> x > 0
+
+    // Supplier[Int] with a primitive return value
+    val answer: Supplier[Int] = () -> 42
+
+    // Function[Int, Int] (java.util.function.Function) with primitive parameter and return
+    val doubleIt: Function[Int, Int] = (x: Int) -> x * 2
+
+    val results = Colls::mutableListOf[String]()
+    results.add("isPositive(5) = " + isPositive.test(5).toString())
+    results.add("answer.get() = " + (answer.get() as Int).toString())
+    results.add("doubleIt(21) = " + (doubleIt.apply(21) as Int).toString())
+
+    return results.toString()
+  }
+}

@@ -1,0 +1,19 @@
+import {
+  onion.Sets;
+}
+
+class SetOperations {
+public:
+  static def main(args: String[]): String {
+    val a = Sets::of("apple", "banana", "cherry")
+    val b = Sets::of("banana", "cherry", "date")
+
+    val union = Sets::union(a, b)
+    val intersection = Sets::intersection(a, b)
+    val diff = Sets::difference(a, b)
+
+    return "union=" + union.toString() +
+           " intersection=" + intersection.toString() +
+           " diff=" + diff.toString()
+  }
+}

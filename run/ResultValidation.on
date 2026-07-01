@@ -1,0 +1,68 @@
+// ResultValidation — Option, Result, and validation patterns example.
+// Builds a small user-registration validator using functional error handling.
+
+record UserInput(name: String, age: String, email: String)
+
+def nonEmpty(value: String): Option[String] {
+  if value != null && value.trim().length() > 0 {
+    return Option::some(value.trim())
+  }
+  return Option::none()
+}
+
+def parseAge(raw: String): Result[Int, String] {
+  try {
+    val age = JInteger::parseInt(raw)
+    if age >= 0 && age <= 150 {
+      return Result::ok(age)
+    }
+    return Result::err("age out of range: " + raw)
+  } catch e: NumberFormatException {
+    return Result::err("invalid age: " + raw)
+  }
+}
+
+def validateEmail(raw: String): Result[String, String] {
+  val trimmed = raw.trim()
+  if trimmed.indexOf("@") > 0 && trimmed.indexOf(".") > trimmed.indexOf("@") {
+    return Result::ok(trimmed)
+  }
+  return Result::err("invalid email: " + raw)
+}
+
+// Demonstrate do[Result] notation for composing validations.
+def validateDo(input: UserInput): Result[UserInput, String] {
+  return do[Result] {
+    nameOpt <- optionToResult(nonEmpty(input.name()), "name is required")
+    age <- parseAge(input.age())
+    email <- validateEmail(input.email())
+    ret new UserInput(nameOpt, "" + age, email)
+  }
+}
+
+// Helper: Option -> Result with a custom error message.
+def optionToResult(opt: Option[String], error: String): Result[String, String] {
+  if opt.isEmpty() {
+    return Result::err(error)
+  }
+  return Result::ok(opt.get())
+}
+
+// Helper to render results.
+def formatResult(r: Result[UserInput, String]): String {
+  if r.isOk() {
+    val value = r.getOrElse(new UserInput("", "", ""))
+    return "OK(" + value.name() + ", " + value.age() + ", " + value.email() + ")"
+  }
+  return "ERR(" + r.getError() + ")"
+}
+
+val good = new UserInput("Alice", "30", "alice@example.com")
+val badName = new UserInput("", "30", "alice@example.com")
+val badAge = new UserInput("Bob", "abc", "bob@example.com")
+val badEmail = new UserInput("Carol", "25", "not-an-email")
+
+println("good -> " + formatResult(validateDo(good)))
+println("badName -> " + formatResult(validateDo(badName)))
+println("badAge -> " + formatResult(validateDo(badAge)))
+println("badEmail -> " + formatResult(validateDo(badEmail)))

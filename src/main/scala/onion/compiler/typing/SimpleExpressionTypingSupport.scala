@@ -55,9 +55,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
       case node@AST.BooleanLiteral(loc, v) =>
         Some(new BoolValue(loc, v))
       case node: AST.ListLiteral =>
-        typeListLiteral(node, context)
+        typeListLiteral(node, context, expected)
       case node: AST.MapLiteral =>
-        typeMapLiteral(node, context)
+        typeMapLiteral(node, context, expected)
       case node@AST.NullLiteral(loc) =>
         Some(new NullValue(loc))
       case node@AST.CurrentInstance(loc) =>
@@ -98,8 +98,16 @@ private[compiler] final class SimpleExpressionTypingSupport(
     typeAssignment(new AST.Assignment(node.location, lhs, binaryOp), context)
   }
 
-  private def typeListLiteral(node: AST.ListLiteral, context: LocalContext): Option[Term] = {
+  /** The element type of an expected `List[E]`, or null if `expected` is not one. */
+  private def expectedListElement(expected: Type): Type = expected match {
+    case app: AppliedClassType if app.raw.name == "java.util.List" && app.typeArguments.length == 1 =>
+      app.typeArguments(0)
+    case _ => null
+  }
+
+  private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type = null): Option[Term] = {
     val typedElements = new Array[Term](node.elements.size)
+    val expectedElem = expectedListElement(expected)
     var elementType: Type = null
     var failed = false
     var incompatibleLeft: Type = null
@@ -108,7 +116,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
     node.elements.foreach { element =>
       if (!failed) {
-        val typedElement = typed(element, context, null).orNull
+        val typedElement = typed(element, context, expectedElem).orNull
         if (typedElement == null) {
           failed = true
         } else {
@@ -137,7 +145,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
       }
       None
     } else {
-      val finalElementType = if (typedElements.isEmpty) bodyContext.rootClass else elementType
+      val finalElementType =
+        if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
+        else elementType
       val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
       Some(new ListLiteral(typedElements, listType))
     }
@@ -233,9 +243,17 @@ private[compiler] final class SimpleExpressionTypingSupport(
       typeMemberSelection(selection, context)
     }
 
-  private def typeMapLiteral(node: AST.MapLiteral, context: LocalContext): Option[Term] = {
+  /** The (key, value) types of an expected `Map[K, V]`, or (null, null). */
+  private def expectedMapKeyValue(expected: Type): (Type, Type) = expected match {
+    case app: AppliedClassType if app.raw.name == "java.util.Map" && app.typeArguments.length == 2 =>
+      (app.typeArguments(0), app.typeArguments(1))
+    case _ => (null, null)
+  }
+
+  private def typeMapLiteral(node: AST.MapLiteral, context: LocalContext, expected: Type = null): Option[Term] = {
     val keys = new Array[Term](node.entries.size)
     val values = new Array[Term](node.entries.size)
+    val (expectedKey, expectedValue) = expectedMapKeyValue(expected)
     var keyType: Type = null
     var valueType: Type = null
     var failed = false
@@ -243,8 +261,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
     node.entries.foreach { case (keyExpr, valueExpr) =>
       if (!failed) {
-        val typedKey = typed(keyExpr, context, null).orNull
-        val typedValue = typed(valueExpr, context, null).orNull
+        val typedKey = typed(keyExpr, context, expectedKey).orNull
+        val typedValue = typed(valueExpr, context, expectedValue).orNull
         if (typedKey == null || typedValue == null) {
           failed = true
         } else {
@@ -276,8 +294,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
     if (failed) None
     else {
-      val finalKeyType = if (keys.isEmpty) bodyContext.rootClass else keyType
-      val finalValueType = if (values.isEmpty) bodyContext.rootClass else valueType
+      val finalKeyType = if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass) else keyType
+      val finalValueType = if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass) else valueType
       val mapType = AppliedClassType(bodyContext.load("java.util.Map"), scala.collection.immutable.List(finalKeyType, finalValueType))
       Some(new MapLiteral(keys, values, mapType))
     }

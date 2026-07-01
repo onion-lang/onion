@@ -169,7 +169,7 @@ class ExpressionOrientedSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val list: List = ["A", "B", "C"]
+          |    val list: List[String] = ["A", "B", "C"]
           |    var result: String = ""
           |    foreach s:String in list {
           |      result = result + s

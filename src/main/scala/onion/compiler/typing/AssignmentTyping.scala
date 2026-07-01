@@ -13,10 +13,13 @@ final class AssignmentTyping(
 ) {
 
   def processLocalAssign(node: AST.Assignment, context: LocalContext): Term = {
-    var value: Term = typed(node.rhs, context).getOrElse(null)
-    if (value == null) return null
     val id = node.lhs.asInstanceOf[AST.Id]
     val bind = context.lookup(id.name)
+    // Target-type the RHS with the variable's declared type so empty
+    // collection literals (`xs = []`) adopt it instead of defaulting to Object.
+    val expectedType = if (bind != null) bind.tp else null
+    var value: Term = typed(node.rhs, context, expectedType).getOrElse(null)
+    if (value == null) return null
     if (bind == null) {
       bodyContext.report(VARIABLE_NOT_FOUND, id, id.name, context.allNames.toArray)
       return null
@@ -101,17 +104,21 @@ final class AssignmentTyping(
         if (!MemberAccess.ensureTypeAccessible(typing, selection, targetType, contextClass)) return null
         val name = selection.name
         val field: FieldRef = MemberAccess.findField(targetType, name)
-        val value: Term = typed(expression, context).getOrElse(null)
+        // Pre-compute the field's (substituted) type so the RHS is target-typed
+        // -- lets `this.items = []` adopt List[T] rather than defaulting Object.
+        val fieldExpected: Type =
+          if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+            val subst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation)
+            TypeSubstitution.substituteType(field.`type`, subst, scala.collection.immutable.Map.empty, defaultToBound = false)
+          } else null
+        val value: Term = typed(expression, context, fieldExpected).getOrElse(null)
         if (value == null) return null
         if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
           if (Modifier.isFinal(field.modifier) && (context.constructor == null || !target.isInstanceOf[This])) {
             bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
             return null
           }
-          val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation)
-          // Keep unsubstituted type variables as T so diagnostics (W0012)
-          // name the parameter rather than its bound
-          val expected = TypeSubstitution.substituteType(field.`type`, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+          val expected = fieldExpected
           if (value.`type`.isBottomType) return value
           val term = processAssignable(expression, expected, value)
           if (term == null) return null
@@ -176,7 +183,7 @@ final class AssignmentTyping(
         .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(id.name)).map(f => (tc, f))))
     ownerField match {
       case Some((owner, field)) if (field.modifier & AST.M_STATIC) != 0 =>
-        val value = typed(node.rhs, context).getOrElse(null)
+        val value = typed(node.rhs, context, field.`type`).getOrElse(null)
         if (value == null) None
         else if (value.`type`.isBottomType) Some(value)
         else {
@@ -209,7 +216,7 @@ final class AssignmentTyping(
               bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
               return null
             }
-            val value = typed(node.rhs, context).getOrElse(null)
+            val value = typed(node.rhs, context, field.`type`).getOrElse(null)
             if (value == null) return null
             if (value.`type`.isBottomType) return value
             val term = processAssignable(node.rhs, field.`type`, value)

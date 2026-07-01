@@ -364,7 +364,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
     // --- parseAll(text: String): List[Name] ---
     val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType(recordName, false))), false)
-    val arrayListType = AST.TypeNode(loc, AST.ReferenceType("ArrayList", false), false)
+    val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(AST.ReferenceType(recordName, false))), false)
     // Declare the accumulator with the List[Name] return type and widen the freshly
     // built ArrayList to it via a cast, so `return __acc` matches without E0000.
     val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
@@ -468,10 +468,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
     val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
     val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
-    val mapType = AST.TypeNode(loc, AST.ReferenceType("Map", false), false)
+    val mapType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("Map", false), List(AST.ReferenceType("String", false), AST.ReferenceType("Object", false))), false)
     val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
 
-    // --- toMap(v: Name): Map ---  (record -> shared Map intermediate)
+    // --- toMap(v: Name): Map[String, Object] ---  (record -> shared Map intermediate)
     val objCall = AST.StaticMethodCall(loc, jsonType, "object", Nil)
     val mapDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__m", mapType, objCall)
     val putCalls: List[AST.Expression] = declaration.args.map { arg =>

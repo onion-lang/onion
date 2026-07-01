@@ -58,6 +58,17 @@ class OnionLanguageServer extends LanguageServer with LanguageClientAware {
       // Document symbols (outline)
       capabilities.setDocumentSymbolProvider(true)
 
+      // Workspace symbols
+      capabilities.setWorkspaceSymbolProvider(true)
+
+      // Signature help
+      val signatureHelpOptions = new SignatureHelpOptions()
+      signatureHelpOptions.setTriggerCharacters(java.util.Arrays.asList("(", ","))
+      capabilities.setSignatureHelpProvider(signatureHelpOptions)
+
+      // Rename
+      capabilities.setRenameProvider(true)
+
       val result = new InitializeResult(capabilities)
       val serverInfo = new ServerInfo("Onion Language Server", "1.0.0")
       result.setServerInfo(serverInfo)

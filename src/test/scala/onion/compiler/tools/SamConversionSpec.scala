@@ -137,7 +137,7 @@ class SamConversionSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
-          |    val cmp: Comparator = (a, b) -> (a as Int) - (b as Int)
+          |    val cmp: Comparator[Integer] = (a, b) -> (a as Int) - (b as Int)
           |    return cmp.compare(10, 4)
           |  }
           |}
@@ -146,6 +146,153 @@ class SamConversionSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(6) == result)
+    }
+  }
+
+  describe("Primitive type arguments for generic SAMs") {
+    it("implements Comparator[Int] with primitive-typed lambda parameters") {
+      val result = shell.run(
+        """
+          |import { java.util.Comparator }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val cmp: Comparator[Int] = (a: Int, b: Int) -> a - b
+          |    return cmp.compare(5, 3)
+          |  }
+          |}
+          |""".stripMargin,
+        "SamComparatorPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("sorts a List[Int] using a primitive-typed Comparator value") {
+      val result = shell.run(
+        """
+          |import { java.util.Comparator }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = Colls::mutableListOf(1, 3, 2)
+          |    val cmp: Comparator[Int] = (a: Int, b: Int) -> a - b
+          |    Collections::sort(xs, cmp)
+          |    return xs.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "SortListIntPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 2, 3]") == result)
+    }
+
+    it("types an explicit-typed lambda at argument position against Comparator") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = Colls::mutableListOf(3, 1, 2)
+          |    Collections::sort(xs, (a: Int, b: Int) -> a - b)
+          |    return xs.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgPositionPrimitiveLambda.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 2, 3]") == result)
+    }
+
+    it("types an explicit-typed lambda for an instance method SAM parameter") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = Colls::mutableListOf(3, 1, 2)
+          |    xs.sort((a: Int, b: Int) -> a - b)
+          |    return xs.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "InstanceMethodPrimitiveLambda.on",
+        Array()
+      )
+      assert(Shell.Success("[1, 2, 3]") == result)
+    }
+
+    it("implements Supplier[Int] with a primitive return expression") {
+      val result = shell.run(
+        """
+          |import { java.util.function.Supplier }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val s: Supplier[Int] = () -> 42
+          |    return s.get() as Int
+          |  }
+          |}
+          |""".stripMargin,
+        "SupplierIntPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(42) == result)
+    }
+
+    it("implements Predicate[Int] with a primitive parameter and boolean result") {
+      val result = shell.run(
+        """
+          |import { java.util.function.Predicate }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val p: Predicate[Int] = (x: Int) -> x > 0
+          |    return p.test(5)
+          |  }
+          |}
+          |""".stripMargin,
+        "PredicateIntPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(true) == result)
+    }
+
+    it("implements Comparator[Double] with primitive Double parameters") {
+      val result = shell.run(
+        """
+          |import { java.util.Comparator }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val cmp: Comparator[Double] = (a: Double, b: Double) -> (a - b) as Int
+          |    return cmp.compare(1.5, 2.5)
+          |  }
+          |}
+          |""".stripMargin,
+        "ComparatorDoublePrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(-1) == result)
+    }
+
+    it("implements Function1[Int, Int] with primitive parameter and return") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val f: Function1[Int, Int] = (x: Int) -> x * 2
+          |    return f.call(21) as Int
+          |  }
+          |}
+          |""".stripMargin,
+        "Function1IntIntPrimitive.on",
+        Array()
+      )
+      assert(Shell.Success(42) == result)
     }
   }
 }

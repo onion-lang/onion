@@ -206,11 +206,21 @@ final class ControlFlowEmitter(
       emitCloseResources()
       if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
 
+    // Emit the protected region and return its [start, end) labels. A NOP is
+    // emitted at the top so the region is never empty: an empty try body would
+    // make start == end, which the JVM rejects at class-load time with
+    // "Illegal exception table range". The NOP is unreachable-cost (never
+    // throws) and keeps the exception table well-formed for empty `try {}`.
+    def markTryRegion(): (org.objectweb.asm.Label, org.objectweb.asm.Label) =
+      val start = gen.mark()
+      gen.visitInsn(Opcodes.NOP)
+      visitStatement(node.tryStatement)
+      val end = gen.mark()
+      (start, end)
+
     if (node.resources.isEmpty && node.finallyStatement == null) {
       // Simple try-catch without finally and resources
-      val tryStart = gen.mark()
-      visitStatement(node.tryStatement)
-      val tryEnd = gen.mark()
+      val (tryStart, tryEnd) = markTryRegion()
 
       val endLabel = gen.newLabel()
       gen.goTo(endLabel)
@@ -227,9 +237,7 @@ final class ControlFlowEmitter(
       gen.visitLabel(endLabel)
     } else if (node.catchTypes.length == 0) {
       // Try-finally (with or without resources)
-      val tryStart = gen.mark()
-      visitStatement(node.tryStatement)
-      val tryEnd = gen.mark()
+      val (tryStart, tryEnd) = markTryRegion()
 
       // Normal completion: execute finally and jump to end
       emitFinallyWithResources()
@@ -247,9 +255,7 @@ final class ControlFlowEmitter(
       gen.visitLabel(endLabel)
     } else {
       // Try-catch-finally (with or without resources)
-      val tryStart = gen.mark()
-      visitStatement(node.tryStatement)
-      val tryEnd = gen.mark()
+      val (tryStart, tryEnd) = markTryRegion()
 
       // Normal completion: execute finally and jump to end
       emitFinallyWithResources()

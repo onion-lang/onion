@@ -140,9 +140,27 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * (complete strings lex as a single STRING token); report it as such
    * instead of listing unrelated expected tokens.
    */
-  private def syntaxErrorMessage(found: String, expected: String): String =
-    if (found == "\"") Message("error.parsing.unterminated_string")
-    else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
+  private def syntaxErrorMessage(found: String, expected: String): String = {
+    val base =
+      if (found == "\"") Message("error.parsing.unterminated_string")
+      else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
+    val hint = commonSyntaxHint(found, expected)
+    if (hint.isEmpty) base else base + " " + hint
+  }
+
+  /**
+   * Add friendly hints for common syntax mistakes.
+   */
+  private def commonSyntaxHint(found: String, expected: String): String = found match {
+    case "in" =>
+      "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
+    case "else" =>
+      "Hint: `else` must follow an `if` block. Onion does not support `if` as an expression; use `if (cond) { ... } else { ... }`."
+    case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
+      "Hint: a block `{ ... }` is expected here."
+    case _ =>
+      ""
+  }
 
   /** Make control characters and EOF visible in error messages. */
   private def displayTokenImage(image: String): String =

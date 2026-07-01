@@ -26,7 +26,9 @@ case class SymbolDefinition(
   uri: String,
   line: Int,
   startChar: Int,
-  endChar: Int
+  endChar: Int,
+  lineContent: String = "",
+  signature: String = ""
 ) {
   def toLocation: org.eclipse.lsp4j.Location = {
     val range = new Range(
@@ -189,10 +191,42 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
             items.add(item)
           }
         }
+
+        // Add user-defined symbols from the symbol table
+        symbolTable.allSymbols.foreach { symbol =>
+          if (symbol.name.toLowerCase.startsWith(prefix.toLowerCase)) {
+            val item = new CompletionItem(symbol.name)
+            item.setKind(symbolKindToCompletionItemKind(symbol.kind))
+            item.setDetail(symbolKindLabel(symbol.kind))
+            items.add(item)
+          }
+        }
       }
 
       LspEither.forLeft(items)
     }
+  }
+
+  private def symbolKindToCompletionItemKind(kind: SymbolKind): CompletionItemKind = kind match {
+    case SymbolKind.Class => CompletionItemKind.Class
+    case SymbolKind.Interface => CompletionItemKind.Interface
+    case SymbolKind.Enum => CompletionItemKind.Enum
+    case SymbolKind.Struct => CompletionItemKind.Struct
+    case SymbolKind.Method => CompletionItemKind.Method
+    case SymbolKind.Field => CompletionItemKind.Field
+    case SymbolKind.Variable => CompletionItemKind.Variable
+    case _ => CompletionItemKind.Text
+  }
+
+  private def symbolKindLabel(kind: SymbolKind): String = kind match {
+    case SymbolKind.Class => "class"
+    case SymbolKind.Interface => "interface"
+    case SymbolKind.Enum => "enum"
+    case SymbolKind.Struct => "record"
+    case SymbolKind.Method => "method"
+    case SymbolKind.Field => "field"
+    case SymbolKind.Variable => "variable"
+    case _ => "symbol"
   }
 
   override def hover(params: HoverParams): CompletableFuture[Hover] = {
@@ -205,7 +239,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
         val line = getLineAt(state.content, position.getLine)
         val word = getWordAtPosition(line, position.getCharacter)
 
-        val hoverText = getHoverInfo(word)
+        val hoverText = getHoverInfo(word, uri)
         if (hoverText != null) {
           val content = new MarkupContent()
           content.setKind(MarkupKind.MARKDOWN)
@@ -249,6 +283,93 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     }
   }
 
+  override def signatureHelp(params: SignatureHelpParams): CompletableFuture[SignatureHelp] = {
+    CompletableFuture.supplyAsync { () =>
+      val uri = params.getTextDocument.getUri
+      val position = params.getPosition
+      val state = documents.get(uri)
+
+      if (state != null) {
+        val line = getLineAt(state.content, position.getLine)
+        val methodName = findMethodNameBeforePosition(line, position.getCharacter)
+
+        if (methodName.nonEmpty) {
+          val defs = symbolTable.lookupInUri(methodName, uri)
+          val methodDefs = defs.filter(d => d.kind == SymbolKind.Method && d.signature.nonEmpty)
+          if (methodDefs.nonEmpty) {
+            val signatures = methodDefs.map { d =>
+              val sigInfo = new SignatureInformation(d.signature)
+              sigInfo.setParameters(countParameters(d.signature).map(p => new ParameterInformation(p)).asJava)
+              sigInfo
+            }
+            val help = new SignatureHelp()
+            help.setSignatures(signatures.asJava)
+            help.setActiveSignature(0)
+            help.setActiveParameter(activeParameter(line, position.getCharacter))
+            help
+          } else {
+            null
+          }
+        } else {
+          null
+        }
+      } else {
+        null
+      }
+    }
+  }
+
+  private def findMethodNameBeforePosition(line: String, char: Int): String = {
+    var parenDepth = 0
+    var i = math.min(char, line.length) - 1
+    while (i >= 0) {
+      val c = line(i)
+      if (c == ')') parenDepth += 1
+      else if (c == '(') {
+        if (parenDepth == 0) {
+          // Find the identifier immediately before '('
+          var j = i - 1
+          while (j >= 0 && line(j).isWhitespace) j -= 1
+          var start = j
+          while (start >= 0 && (line(start).isLetterOrDigit || line(start) == '_')) start -= 1
+          return line.substring(start + 1, j + 1).trim
+        } else {
+          parenDepth -= 1
+        }
+      }
+      i -= 1
+    }
+    ""
+  }
+
+  private def countParameters(signature: String): Seq[String] = {
+    val parenIdx = signature.indexOf('(')
+    if (parenIdx < 0) return Seq.empty
+    val closeIdx = signature.indexOf(')', parenIdx)
+    if (closeIdx < 0) return Seq.empty
+    val params = signature.substring(parenIdx + 1, closeIdx).trim
+    if (params.isEmpty) Seq.empty
+    else params.split(',').map(_.trim).toSeq
+  }
+
+  private def activeParameter(line: String, char: Int): Integer = {
+    var depth = 0
+    var count = 0
+    var i = math.min(char, line.length) - 1
+    while (i >= 0) {
+      val c = line(i)
+      if (c == ')') depth += 1
+      else if (c == '(') {
+        if (depth == 0) return count
+        else depth -= 1
+      } else if (c == ',' && depth == 0) {
+        count += 1
+      }
+      i -= 1
+    }
+    count
+  }
+
   override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[java.util.List[LspEither[SymbolInformation, DocumentSymbol]]] = {
     CompletableFuture.supplyAsync { () =>
       val uri = params.getTextDocument.getUri
@@ -256,34 +377,101 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
       val symbols = new java.util.ArrayList[LspEither[SymbolInformation, DocumentSymbol]]()
 
       if (state != null) {
-        // Simple regex-based symbol extraction
-        val classPattern = """(?:abstract\s+)?(?:sealed\s+)?class\s+(\w+)""".r
+        val classPattern = """(?:abstract\s+)?(?:sealed\s+)?(?:final\s+)?class\s+(\w+)""".r
         val interfacePattern = """interface\s+(\w+)""".r
-        val methodPattern = """def\s+(\w+)\s*\(""".r
         val enumPattern = """enum\s+(\w+)""".r
+        val recordPattern = """record\s+(\w+)""".r
+        val methodPattern = """def\s+(\w+)\s*[\[(]""".r
+        val fieldPattern = """(?:static\s+)?(?:val|var)\s+(\w+)\s*:""".r
 
         val lines = state.content.split("\n")
         lines.zipWithIndex.foreach { case (line, lineNum) =>
           classPattern.findFirstMatchIn(line).foreach { m =>
-            val symbol = createSymbol(m.group(1), SymbolKind.Class, uri, lineNum, m.start(1), m.end(1))
-            symbols.add(LspEither.forRight(symbol))
+            symbols.add(LspEither.forRight(createSymbol(m.group(1), SymbolKind.Class, uri, lineNum, m.start(1), m.end(1))))
           }
           interfacePattern.findFirstMatchIn(line).foreach { m =>
-            val symbol = createSymbol(m.group(1), SymbolKind.Interface, uri, lineNum, m.start(1), m.end(1))
-            symbols.add(LspEither.forRight(symbol))
-          }
-          methodPattern.findFirstMatchIn(line).foreach { m =>
-            val symbol = createSymbol(m.group(1), SymbolKind.Method, uri, lineNum, m.start(1), m.end(1))
-            symbols.add(LspEither.forRight(symbol))
+            symbols.add(LspEither.forRight(createSymbol(m.group(1), SymbolKind.Interface, uri, lineNum, m.start(1), m.end(1))))
           }
           enumPattern.findFirstMatchIn(line).foreach { m =>
-            val symbol = createSymbol(m.group(1), SymbolKind.Enum, uri, lineNum, m.start(1), m.end(1))
-            symbols.add(LspEither.forRight(symbol))
+            symbols.add(LspEither.forRight(createSymbol(m.group(1), SymbolKind.Enum, uri, lineNum, m.start(1), m.end(1))))
+          }
+          recordPattern.findFirstMatchIn(line).foreach { m =>
+            symbols.add(LspEither.forRight(createSymbol(m.group(1), SymbolKind.Struct, uri, lineNum, m.start(1), m.end(1))))
+          }
+          methodPattern.findFirstMatchIn(line).foreach { m =>
+            symbols.add(LspEither.forRight(createSymbol(m.group(1), SymbolKind.Method, uri, lineNum, m.start(1), m.end(1))))
+          }
+          // Class-level fields only (heuristic: 2-space indentation inside a class)
+          if (line.matches("""^\s{2,3}(?:static\s+)?(?:val|var)\s+.*""")) {
+            fieldPattern.findFirstMatchIn(line).foreach { m =>
+              symbols.add(LspEither.forRight(createSymbol(m.group(1), SymbolKind.Field, uri, lineNum, m.start(1), m.end(1))))
+            }
           }
         }
       }
 
       symbols
+    }
+  }
+
+  override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = {
+    CompletableFuture.supplyAsync { () =>
+      val uri = params.getTextDocument.getUri
+      val state = documents.get(uri)
+      val newName = params.getNewName
+
+      if (state == null || newName == null || newName.isEmpty) {
+        null
+      } else {
+        val position = params.getPosition
+        val line = getLineAt(state.content, position.getLine)
+        val word = extractWordAt(line, position.getCharacter)
+        if (word.isEmpty) {
+          null
+        } else {
+          val changes = new java.util.HashMap[String, java.util.List[TextEdit]]()
+          val edits = new java.util.ArrayList[TextEdit]()
+          val lines = state.content.split("\n")
+          val wordPattern = ("""(?<![A-Za-z0-9_])""" + java.util.regex.Pattern.quote(word) + """(?![A-Za-z0-9_])""").r
+
+          lines.zipWithIndex.foreach { case (lineText, lineNum) =>
+            wordPattern.findAllMatchIn(lineText).foreach { m =>
+              val range = new Range(
+                new Position(lineNum, m.start),
+                new Position(lineNum, m.end)
+              )
+              edits.add(new TextEdit(range, newName))
+            }
+          }
+
+          if (edits.isEmpty) {
+            null
+          } else {
+            changes.put(uri, edits)
+            val edit = new WorkspaceEdit()
+            edit.setChanges(changes)
+            edit
+          }
+        }
+      }
+    }
+  }
+
+  private def extractWordAt(line: String, char: Int): String = {
+    if (char < 0 || char >= line.length) {
+      ""
+    } else if (!line(char).isLetterOrDigit && line(char) != '_') {
+      ""
+    } else {
+      var start = char
+      while (start > 0 && (line(start - 1).isLetterOrDigit || line(start - 1) == '_')) {
+        start -= 1
+      }
+      var end = char
+      while (end < line.length && (line(end).isLetterOrDigit || line(end) == '_')) {
+        end += 1
+      }
+      line.substring(start, end)
     }
   }
 
@@ -314,43 +502,45 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val localVarPattern = """^\s*(?:val|var)\s+(\w+)\s*:""".r
 
     lines.zipWithIndex.foreach { case (line, lineNum) =>
+      val trimmedLine = line.trim
+
       // Class definitions
       classPattern.findAllMatchIn(line).foreach { m =>
-        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Class, uri, lineNum, m.start(1), m.end(1)))
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Class, uri, lineNum, m.start(1), m.end(1), trimmedLine))
       }
 
       // Interface definitions
       interfacePattern.findAllMatchIn(line).foreach { m =>
-        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Interface, uri, lineNum, m.start(1), m.end(1)))
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Interface, uri, lineNum, m.start(1), m.end(1), trimmedLine))
       }
 
       // Enum definitions
       enumPattern.findAllMatchIn(line).foreach { m =>
-        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Enum, uri, lineNum, m.start(1), m.end(1)))
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Enum, uri, lineNum, m.start(1), m.end(1), trimmedLine))
       }
 
       // Record definitions
       recordPattern.findAllMatchIn(line).foreach { m =>
-        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Struct, uri, lineNum, m.start(1), m.end(1)))
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Struct, uri, lineNum, m.start(1), m.end(1), trimmedLine))
       }
 
       // Method definitions
       methodPattern.findAllMatchIn(line).foreach { m =>
-        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Method, uri, lineNum, m.start(1), m.end(1)))
+        symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Method, uri, lineNum, m.start(1), m.end(1), trimmedLine, trimmedLine))
       }
 
       // Field definitions (class level val/var)
       // Only match if not inside a method (heuristic: line starts with whitespace but not too much)
-      if (line.matches("""^\s{2,6}(?:static\s+)?(?:val|var)\s+.*""")) {
+      if (line.matches("""^\s{2,3}(?:static\s+)?(?:val|var)\s+.*""")) {
         fieldPattern.findAllMatchIn(line).foreach { m =>
-          symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Field, uri, lineNum, m.start(1), m.end(1)))
+          symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Field, uri, lineNum, m.start(1), m.end(1), trimmedLine))
         }
       }
 
       // Local variable definitions (inside methods - more indentation)
       if (line.matches("""^\s{4,}(?:val|var)\s+.*""")) {
         localVarPattern.findAllMatchIn(line).foreach { m =>
-          symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Variable, uri, lineNum, m.start(1), m.end(1)))
+          symbolTable.add(SymbolDefinition(m.group(1), SymbolKind.Variable, uri, lineNum, m.start(1), m.end(1), trimmedLine))
         }
       }
 
@@ -364,10 +554,19 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
           // Calculate position relative to the line
           val argStart = m.start(1) + argMatch.start(1)
           val argEnd = m.start(1) + argMatch.end(1)
-          symbolTable.add(SymbolDefinition(argName, SymbolKind.Variable, uri, lineNum, argStart, argEnd))
+          symbolTable.add(SymbolDefinition(argName, SymbolKind.Variable, uri, lineNum, argStart, argEnd, trimmedLine))
         }
       }
     }
+  }
+
+  /**
+   * Search all indexed symbols (across all open documents) for workspace symbol
+   * requests. Returns symbols whose names contain the query string.
+   */
+  def searchSymbols(query: String): Seq[SymbolDefinition] = {
+    val lowerQuery = query.toLowerCase
+    symbolTable.allSymbols.filter(_.name.toLowerCase.contains(lowerQuery))
   }
 
   private def validateDocument(uri: String, content: String): Unit = {
@@ -375,23 +574,22 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 100)
     val compiler = new OnionCompiler(config)
 
-    val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
     val diagnostics =
-      (result.diagnostics.errors.map(errorToDiagnostic) ++ result.diagnostics.warnings.map(warningToDiagnostic)).asJava
+      try {
+        val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
+        result.diagnostics.errors.map(errorToDiagnostic(_, content)) ++
+          result.diagnostics.warnings.map(warningToDiagnostic(_, content))
+      } catch {
+        case e: Throwable =>
+          // Compiler crashes should never bring down the LSP server.
+          Seq(internalErrorToDiagnostic(e, content))
+      }
 
-    client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics))
+    client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics.asJava))
   }
 
-  private def errorToDiagnostic(error: CompileError): Diagnostic = {
-    val location = error.location
-    val line = if (location != null) Math.max(0, location.line - 1) else 0
-    val column = if (location != null) Math.max(0, location.column - 1) else 0
-
-    val range = new Range(
-      new Position(line, column),
-      new Position(line, column + 10) // Approximate end
-    )
-
+  private def errorToDiagnostic(error: CompileError, content: String): Diagnostic = {
+    val range = locationToRange(error.location, content)
     val diagnostic = new Diagnostic()
     diagnostic.setRange(range)
     diagnostic.setSeverity(DiagnosticSeverity.Error)
@@ -400,16 +598,8 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     diagnostic
   }
 
-  private def warningToDiagnostic(warning: CompileWarning): Diagnostic = {
-    val location = warning.location
-    val line = if (location != null) Math.max(0, location.line - 1) else 0
-    val column = if (location != null) Math.max(0, location.column - 1) else 0
-
-    val range = new Range(
-      new Position(line, column),
-      new Position(line, column + 10)
-    )
-
+  private def warningToDiagnostic(warning: CompileWarning, content: String): Diagnostic = {
+    val range = locationToRange(warning.location, content)
     val diagnostic = new Diagnostic()
     diagnostic.setRange(range)
     diagnostic.setSeverity(DiagnosticSeverity.Warning)
@@ -418,6 +608,41 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     diagnostic.setMessage(warning.message)
     diagnostic
   }
+
+  private def internalErrorToDiagnostic(error: Throwable, content: String): Diagnostic = {
+    val diagnostic = new Diagnostic()
+    diagnostic.setRange(new Range(new Position(0, 0), new Position(0, 0)))
+    diagnostic.setSeverity(DiagnosticSeverity.Error)
+    diagnostic.setSource("onion")
+    diagnostic.setMessage(s"Internal compiler error: ${error.getClass.getSimpleName}: ${error.getMessage}")
+    diagnostic
+  }
+
+  private def locationToRange(location: onion.compiler.Location, content: String): Range = {
+    val line = if (location != null) Math.max(0, location.line - 1) else 0
+    val column = if (location != null) Math.max(0, location.column - 1) else 0
+    val lineText = getLineAt(content, line)
+    val (start, end) = tokenRangeAt(lineText, column)
+    new Range(new Position(line, start), new Position(line, end))
+  }
+
+  private def tokenRangeAt(line: String, column: Int): (Int, Int) = {
+    if (line.isEmpty || column < 0 || column >= line.length) return (column, column)
+    var start = column
+    while (start > 0 && isIdentifierPart(line(start - 1))) start -= 1
+    var end = column
+    while (end < line.length && isIdentifierPart(line(end))) end += 1
+    if (start == end) {
+      // No identifier at the position; highlight a single non-whitespace character.
+      if (line(column).isWhitespace) (column, column)
+      else (column, column + 1)
+    } else {
+      (start, end)
+    }
+  }
+
+  private def isIdentifierPart(c: Char): Boolean =
+    c.isLetterOrDigit || c == '_' || c == ':' || c == '.'
 
   private def extractFileName(uri: String): String = {
     try {
@@ -457,7 +682,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     if (start < end) line.substring(start, end) else ""
   }
 
-  private def getHoverInfo(word: String): String = {
+  private def getHoverInfo(word: String, uri: String): String = {
     if (keywords.contains(word)) {
       s"**Keyword**: `$word`\n\n${getKeywordDescription(word)}"
     } else if (builtinTypes.contains(word)) {
@@ -465,8 +690,26 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     } else if (stdLibClasses.contains(word)) {
       s"**Module**: `$word`\n\n${getModuleDescription(word)}"
     } else {
-      null
+      val localDefs = symbolTable.lookupInUri(word, uri)
+      if (localDefs.nonEmpty) {
+        val defn = localDefs.head
+        val line = if (defn.lineContent.nonEmpty) s"\n\n```onion\n${defn.lineContent}\n```" else ""
+        s"**${symbolKindName(defn.kind)}**: `$defn.name`$line"
+      } else {
+        null
+      }
     }
+  }
+
+  private def symbolKindName(kind: SymbolKind): String = kind match {
+    case SymbolKind.Class => "Class"
+    case SymbolKind.Interface => "Interface"
+    case SymbolKind.Enum => "Enum"
+    case SymbolKind.Struct => "Record"
+    case SymbolKind.Method => "Method"
+    case SymbolKind.Field => "Field"
+    case SymbolKind.Variable => "Variable"
+    case _ => "Symbol"
   }
 
   private def getKeywordDescription(keyword: String): String = keyword match {

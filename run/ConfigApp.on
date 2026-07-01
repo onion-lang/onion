@@ -1,0 +1,67 @@
+// ConfigApp — practical CLI + config-file example.
+// Demonstrates Args parsing, YAML config loading with derive!(Yaml),
+// and fallback defaults.
+
+import {
+  java.io.File;
+  java.io.FileWriter;
+}
+
+record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
+
+// Build a temporary config file so the sample is self-contained.
+def writeTempConfig(path: String, content: String): void {
+  val writer: FileWriter = new FileWriter(path)
+  writer.write(content)
+  writer.close()
+}
+
+// Default configuration used when no file is provided.
+def defaultConfig(): ServerConfig {
+  return new ServerConfig("localhost", 8080, false)
+}
+
+// Merge CLI options over the file-based config.
+def buildConfig(args: String[]): ServerConfig {
+  val parsed = Args::parse(args)
+  val configPath: String = parsed.option("config", "")
+  val hostOverride: String = parsed.option("host", "")
+  val portOverride: Int = parsed.intOption("port", -1)
+  val debugFlag: Boolean = parsed.flag("debug")
+
+  val base: ServerConfig =
+    if configPath.length() > 0 {
+      val content = file(configPath).text()
+      val loaded = ServerConfig::fromYaml(content)
+      if loaded != null { loaded } else { defaultConfig() }
+    } else {
+      defaultConfig()
+    }
+
+  val host = if hostOverride.length() > 0 { hostOverride } else { base.host() }
+  val port = if portOverride >= 0 { portOverride } else { base.port() }
+  // Flags default to false, so an explicit --debug always means true.
+  val debug = if debugFlag { true } else { base.debug() }
+
+  return new ServerConfig(host, port, debug)
+}
+
+// Prepare a temp config file for the demo.
+val tempPath = "/tmp/onion_config_app_demo.yaml"
+writeTempConfig(tempPath, "host: 0.0.0.0\nport: 3000\ndebug: false\n")
+
+// Simulate CLI invocation: --config /tmp/... --port 9000 --debug
+val argv: String[] = new String[5]
+argv[0] = "--config"
+argv[1] = tempPath
+argv[2] = "--port"
+argv[3] = "9000"
+argv[4] = "--debug"
+val cfg = buildConfig(argv)
+
+println("host=" + cfg.host())
+println("port=" + cfg.port())
+println("debug=" + cfg.debug())
+
+// Clean up.
+new File(tempPath).delete()

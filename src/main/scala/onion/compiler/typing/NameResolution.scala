@@ -127,8 +127,13 @@ class NameResolver(private val context: NameResolutionContext) {
       }
     case AST.FunctionType(params, result) =>
       val mappedParams = params.map(map)
-      val mappedResult = map(result)
+      var mappedResult = map(result)
       if (mappedParams.exists(_ == null) || mappedResult == null) return null
+      // A side-effect-only function type (() -> void / () -> Unit) cannot use
+      // the JVM void type as a type argument, so we erase it to Object at the
+      // FunctionN interface level. This matches how closure bodies with no
+      // meaningful return are already compiled.
+      if (mappedResult eq BasicType.VOID) mappedResult = context.rootClass
       val arity = mappedParams.length
       val functionType = context.table.loadOrNull(s"onion.Function$arity")
       if (functionType == null) return null

@@ -66,7 +66,7 @@ class ForeachSpec extends AbstractShellSpec {
           |class Cat {
           |public:
           |  static def main(args: String[]): String {
-          |    val list: List = ["A", "B", "C", "D"]
+          |    val list: List[String] = ["A", "B", "C", "D"]
           |    var result: String = ""
           |    foreach s:String in list {
           |      result = result + s;

@@ -1,0 +1,29 @@
+import {
+  java.io.BufferedReader;
+  java.io.FileReader;
+}
+
+class FileWordCounter {
+public:
+  static def main(args: String[]): String {
+    if (args.length == 0) {
+      return "Usage: FileWordCounter <file>"
+    }
+
+    val reader: BufferedReader = new BufferedReader(new FileReader(args[0]))
+    var totalWords: Int = 0
+
+    var line: String = reader.readLine()
+    while (line != null) {
+      val trimmed = line.trim()
+      if (trimmed.length() > 0) {
+        val words: String[] = Strings::splitRegex(trimmed, "\\s+")
+        totalWords = totalWords + words.length
+      }
+      line = reader.readLine()
+    }
+
+    reader.close()
+    return "Total words: " + totalWords.toString()
+  }
+}

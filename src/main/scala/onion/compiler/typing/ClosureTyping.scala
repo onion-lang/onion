@@ -85,7 +85,7 @@ final class ClosureTyping(
 
       val implName = implementedMethodName(typeRef, name, argTypes.length)
       val candidates = typeRef.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
-      candidates.find(m => sameTypes(substitutedArgs(m), argTypes)) match {
+      candidates.find(m => sameTypesOrBoxed(substitutedArgs(m), argTypes)) match {
         case None =>
           bodyContext.report(METHOD_NOT_FOUND, node, typeRef, implName, argTypes)
           None
@@ -93,11 +93,15 @@ final class ClosureTyping(
           val expectedArgs = substitutedArgs(method)
           val expectedRet = substitutedReturn(method)
 
+          // Use the lambda's declared argument types as the implementation method
+          // signature so primitive parameters stay primitive. The generated bridge
+          // method boxes/unboxes between the erased interface signature (Object
+          // for type variables) and the primitive implementation signature.
           val typedMethod = new Method {
             def modifier: Int = method.modifier
             def affiliation: ClassType = method.affiliation
             def name: String = method.name
-            override def arguments: Array[Type] = expectedArgs.clone()
+            override def arguments: Array[Type] = argTypes.clone()
             override def returnType: Type = expectedRet
             override def typeParameters: Array[TypedAST.TypeParameter] = Array()
           }
@@ -116,7 +120,9 @@ final class ClosureTyping(
                       typedMethod.arguments(i), Map.empty, Map.empty, defaultToBound = true
                     )
                     val desired = expectedArgs(i)
-                    Option.when(desired ne erased) {
+                    // Only insert a reference cast when both types are reference types.
+                    // Primitive<->boxed mismatches are handled by the bridge method.
+                    Option.when((desired ne erased) && !erased.isBasicType && !desired.isBasicType) {
                       val rawBind = new ClosureLocalBinding(bind.frameIndex, bind.index, erased, bind.isMutable)
                       val casted = new AsInstanceOf(new RefLocal(rawBind), desired)
                       new ExpressionActionStatement(new SetLocal(bind, casted))
@@ -410,4 +416,25 @@ final class ClosureTyping(
 
   private def containsReturn(node: AST.Node): Boolean =
     ReturnNodeDetector.containsReturn(node)
+
+  /**
+   * Check whether the lambda's actual argument types match the substituted
+   * interface method argument types, allowing primitive types to match their
+   * boxed counterparts. This is needed because Onion boxes primitive type
+   * arguments at the generic-interface level (e.g. `Comparator[Int]` is stored
+   * as `Comparator[Integer]`) while users may still write primitive-typed
+   * lambda parameters.
+   */
+  private def sameTypesOrBoxed(expected: Array[Type], actual: Array[Type]): Boolean = {
+    if (expected.length != actual.length) return false
+    expected.indices.forall(i =>
+      sameOrBoxed(
+        TypeCheckingHelpers.effectiveType(expected(i)),
+        TypeCheckingHelpers.effectiveType(actual(i))
+      )
+    )
+  }
+
+  private def sameOrBoxed(expected: Type, actual: Type): Boolean =
+    TypeCheckingHelpers.sameOrBoxed(bodyContext.table, expected, actual)
 }

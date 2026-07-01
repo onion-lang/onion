@@ -1,0 +1,130 @@
+// ShapeProcessor — geometric shapes with records, enums, extension methods
+// on Double, and a small pipeline.
+
+record Circle(radius: Double)
+record Rectangle(width: Double, height: Double)
+record Point(x: Double, y: Double)
+
+enum ShapeKind {
+  CIRCLE, RECTANGLE, POINT
+}
+
+extension Double {
+  def squared(): Double {
+    return self * self
+  }
+  def approx(other: Double): Boolean {
+    return Math::abs(self - other) < 0.0001
+  }
+}
+
+class Shape {
+public:
+  val kind: ShapeKind
+
+  def this(k: ShapeKind) {
+    this.kind = k
+  }
+}
+
+class CircleShape : Shape {
+public:
+  val data: Circle
+
+  def this(c: Circle): (Shape) {
+    this.data = c
+  }
+  def area(): Double {
+    return Math::PI * this.data.radius().squared()
+  }
+  def perimeter(): Double {
+    return 2.0 * Math::PI * this.data.radius()
+  }
+}
+
+class RectangleShape : Shape {
+public:
+  val data: Rectangle
+
+  def this(r: Rectangle): (ShapeKind::RECTANGLE) {
+    this.data = r
+  }
+  def area(): Double {
+    return this.data.width() * this.data.height()
+  }
+  def perimeter(): Double {
+    return 2.0 * (this.data.width() + this.data.height())
+  }
+}
+
+class PointShape : Shape {
+public:
+  val data: Point
+
+  def this(p: Point): (ShapeKind::POINT) {
+    this.data = p
+  }
+}
+
+extension Shape {
+  def describe(): String {
+    if this.kind == ShapeKind::CIRCLE {
+      val c = this as CircleShape
+      return "circle r=" + c.data.radius() + " area=" + c.area()
+    }
+    if this.kind == ShapeKind::RECTANGLE {
+      val r = this as RectangleShape
+      return "rect " + r.data.width() + "x" + r.data.height() + " area=" + r.area()
+    }
+    val p = this as PointShape
+    return "point(" + p.data.x() + "," + p.data.y() + ")"
+  }
+
+  def shapeArea(): Double {
+    if this.kind == ShapeKind::CIRCLE {
+      return (this as CircleShape).area()
+    }
+    if this.kind == ShapeKind::RECTANGLE {
+      return (this as RectangleShape).area()
+    }
+    return 0.0
+  }
+}
+
+def totalArea(shapes: List): Double {
+  var sum: Double = 0.0
+  foreach s: Object in shapes {
+    sum = sum + (s as Shape).shapeArea()
+  }
+  return sum
+}
+
+def distance(p1: Point, p2: Point): Double {
+  val dx = p2.x() - p1.x()
+  val dy = p2.y() - p1.y()
+  return Math::sqrt(dx.squared() + dy.squared())
+}
+
+val shapes: List = [
+  new CircleShape(new Circle(2.0)),
+  new RectangleShape(new Rectangle(3.0, 4.0)),
+  new PointShape(new Point(0.0, 0.0)),
+  new CircleShape(new Circle(1.0))
+]
+
+println("Shapes:")
+foreach s: Object in shapes {
+  println((s as Shape).describe())
+}
+
+println("\nTotal area: " + totalArea(shapes))
+
+val p1 = new Point(0.0, 0.0)
+val p2 = new Point(3.0, 4.0)
+println("Distance (0,0)-(3,4): " + distance(p1, p2))
+
+// Verify Double extension.
+val d = 5.0
+println("5 squared: " + d.squared())
+println("3.14 approx 3.14: " + 3.14.approx(3.14))
+println("3.14 approx 3.15: " + 3.14.approx(3.15))

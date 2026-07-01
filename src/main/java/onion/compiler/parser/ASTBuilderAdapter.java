@@ -57,8 +57,12 @@ public class ASTBuilderAdapter {
         return builder.createModuleDeclaration(location, name);
     }
     
-    public AST.ImportClause createImportClause(Location location, List<scala.Tuple2<String, String>> mapping) {
-        return builder.createImportClause(location, mapping);
+    public AST.ImportClause createImportClause(
+        Location location,
+        List<scala.Tuple2<String, String>> mapping,
+        List<scala.Tuple2<String, String>> staticImports
+    ) {
+        return builder.createImportClause(location, mapping, staticImports);
     }
     
     public AST.ClassDeclaration createClassDeclaration(

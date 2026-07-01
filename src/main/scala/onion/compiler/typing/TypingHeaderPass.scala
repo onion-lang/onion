@@ -14,7 +14,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   def run(): Unit = {
     val moduleName = if (unit.module != null) unit.module.name else null
     val imports = buildImports(moduleName)
-    unitContext.staticImports = defaultStaticImports()
+    unitContext.staticImports = collectStaticImports()
 
     var nonTypeCount = 0
     unit.toplevels.foreach {
@@ -71,6 +71,19 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
       }
     }
     imports.toSeq
+  }
+
+  def collectStaticImports(): StaticImportList = {
+    val staticList = defaultStaticImports()
+    if (unit.imports != null) {
+      for ((methodName, className) <- unit.imports.staticImports) {
+        if (typing.table_.loadOrNull(className) == null) {
+          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, className)
+        }
+        staticList.add(new StaticImportItem(className, true, methodName))
+      }
+    }
+    staticList
   }
 
   private def defaultStaticImports(): StaticImportList = {

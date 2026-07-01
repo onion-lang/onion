@@ -4,8 +4,8 @@
 record WordCount(word: String, count: Int)
 
 extension String {
-  def words(): List {
-    val result: List = []
+  def words(): List[String] {
+    val result: List[String] = []
     val parts = this.split("\\s+")
     var i: Int = 0
     while i < parts.length {
@@ -43,8 +43,8 @@ extension String {
 }
 
 extension List {
-  def distinctStrings(): List {
-    val result: List = []
+  def distinctStrings(): List[String] {
+    val result: List[String] = []
     foreach s: Object in self {
       val str = s as String
       if !result.contains(str) {
@@ -65,9 +65,9 @@ extension List {
   }
 }
 
-def buildFrequency(words: List): List {
+def buildFrequency(words: List[String]): List[WordCount] {
   val unique = words.distinctStrings()
-  val result: List = []
+  val result: List[WordCount] = []
   foreach u: Object in unique {
     val word = u as String
     val count = words.countString(word)
@@ -76,12 +76,12 @@ def buildFrequency(words: List): List {
   return result
 }
 
-def topN(words: List, n: Int): List {
+def topN(words: List[String], n: Int): List[WordCount] {
   val freq = buildFrequency(words)
   // Simple bubble sort by count descending.
-  var sorted: List = []
+  var sorted: List[WordCount] = []
   foreach f: Object in freq {
-    sorted << f
+    sorted << (f as WordCount)
   }
 
   var i: Int = 0
@@ -99,7 +99,7 @@ def topN(words: List, n: Int): List {
     i = i + 1
   }
 
-  val result: List = []
+  val result: List[WordCount] = []
   var k: Int = 0
   while k < n && k < sorted.size {
     result << sorted[k]

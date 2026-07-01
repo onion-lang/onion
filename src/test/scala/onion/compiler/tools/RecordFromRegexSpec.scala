@@ -90,7 +90,7 @@ class RecordFromRegexSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    val text: String = "1.1.1.1 GET /a 200\nbadline\n2.2.2.2 POST /b 404"
-          |    val all: List = Access::parseAll(text)
+          |    val all: List[Access] = Access::parseAll(text)
           |    var sum: Int = 0
           |    foreach r: Access in all { sum = sum + r.status() }
           |    return all.size + ":" + sum

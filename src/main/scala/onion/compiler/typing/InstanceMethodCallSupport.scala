@@ -65,6 +65,12 @@ private[compiler] final class InstanceMethodCallSupport(
 
     val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
+      val closureIndices = node.args.zipWithIndex.collect {
+        case (expr, i) if expr.isInstanceOf[AST.ClosureExpression] => i
+      }.toSet
+      if (closureIndices.nonEmpty) {
+        return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, closureIndices)
+      }
       return fallback.tryExtensionMethodCall(node, target, targetType, params, expected)
     }
 

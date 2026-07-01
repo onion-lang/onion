@@ -11,7 +11,7 @@ class TodoApp {
 public:
   static def main(args: String[]): void {
     val reader: BufferedReader = new BufferedReader(new InputStreamReader(System::in));
-    val todos: ArrayList = new ArrayList();
+    val todos: ArrayList[String] = new ArrayList[String]();
 
     IO::println("=== Todo リスト ===");
     IO::println("コマンド: add <内容>, list, done <番号>, quit");

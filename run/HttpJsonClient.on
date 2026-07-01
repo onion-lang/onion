@@ -1,0 +1,19 @@
+import {
+  onion.Http;
+}
+
+class HttpJsonClient {
+public:
+  static def main(args: String[]): String {
+    if (args.length == 0) {
+      return "Usage: HttpJsonClient <url>"
+    }
+
+    try {
+      val body = Http::get(args[0])
+      return "Fetched " + body.length().toString() + " characters"
+    } catch e: Exception {
+      return "Error: " + e.getMessage()
+    }
+  }
+}

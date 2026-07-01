@@ -1,0 +1,35 @@
+import {
+  java.lang.Integer as JInt;
+}
+
+class RegexLogParser {
+public:
+  static def main(args: String[]): String {
+    val logs = Colls::mutableListOf(
+      "[INFO] request took 45ms",
+      "[WARN] request took 120ms",
+      "[INFO] request took 30ms"
+    )
+
+    val pattern = "\\d+ms"
+    var total: Int = 0
+    var count: Int = 0
+
+    for var i: Int = 0; i < logs.size(); i = i + 1 {
+      val line = logs.get(i)
+      val match = Regex::findFirst(line, pattern)
+      if (match.length() > 0) {
+        // match looks like "45ms"; strip the trailing "ms" and parse.
+        val msText = match.substring(0, match.length() - 2)
+        total = total + JInt::parseInt(msText)
+        count = count + 1
+      }
+    }
+
+    var average: Int = 0
+    if (count > 0) {
+      average = total / count
+    }
+    return "Average response time: " + average.toString() + "ms"
+  }
+}

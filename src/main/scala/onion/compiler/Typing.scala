@@ -274,6 +274,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     typeSupport.mapFrom(typeNode, mapper)
 
+  /** Like [[mapFrom]] but forbids raw generic types (declared/created positions). */
+  private[compiler] def mapFromDeclared(typeNode: AST.TypeNode): Option[Type] =
+    typeSupport.mapFrom(typeNode, mapper_, banRaw = true)
+
+  private[compiler] def mapFromDeclared(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
+    typeSupport.mapFrom(typeNode, mapper, banRaw = true)
+
   private[compiler] def openTypeParams[A](scope: TypeParamScope)(block: => A): A =
     typeSupport.openTypeParams(scope)(block)
 

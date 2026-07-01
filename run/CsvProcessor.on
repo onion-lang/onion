@@ -1,0 +1,30 @@
+import {
+  java.lang.Integer as JInt;
+}
+
+class CsvProcessor {
+public:
+  static def main(args: String[]): String {
+    // Parse a small CSV string with headers.
+    val input = "name,score\nAlice,85\nBob,92\nCharlie,78\nDiana,95\n"
+    val rows = Csv::parseWithHeader(input)
+
+    // Compute the average score.
+    var total: Int = 0
+    var count: Int = 0
+    for var i: Int = 0; i < rows.size(); i = i + 1 {
+      val row = rows.get(i)
+      val scoreText = row.get("score")
+      if (scoreText != null) {
+        total = total + JInt::parseInt(scoreText)
+        count = count + 1
+      }
+    }
+
+    var average: Int = 0
+    if (count > 0) {
+      average = total / count
+    }
+    return "Processed " + count.toString() + " rows, average score = " + average.toString()
+  }
+}

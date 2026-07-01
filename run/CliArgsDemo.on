@@ -1,0 +1,31 @@
+import {
+  onion.Args;
+}
+
+class CliArgsDemo {
+public:
+  static def main(args: String[]): String {
+    val opts = Args::parse(args)
+
+    if (opts.flag("help") || opts.flag("h")) {
+      return "Usage: CliArgsDemo [--verbose|-v] [--output=<file>] <paths...>"
+    }
+
+    val verbose = opts.flag("verbose") || opts.flag("v")
+    val output = opts.option("output", "default.txt")
+    val paths = opts.positional()
+
+    if (paths.isEmpty()) {
+      return "No input paths provided."
+    }
+
+    var summary: String = ""
+    summary = summary + "output=" + output + ", "
+    summary = summary + "paths=" + paths.toString()
+    if (verbose) {
+      summary = summary + ", verbose=true"
+    }
+
+    return summary
+  }
+}

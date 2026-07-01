@@ -391,7 +391,7 @@ class JsonSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val arr: List = Json::array()
+            |    val arr: List[Object] = Json::array()
             |    return Json::stringify(arr)
             |  }
             |}
@@ -409,7 +409,7 @@ class JsonSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val arr: List = Json::array()
+            |    val arr: List[Object] = Json::array()
             |    arr.add(new Integer(1))
             |    arr.add(new Integer(2))
             |    arr.add(new Integer(3))
@@ -430,7 +430,7 @@ class JsonSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val obj: Map = Json::object()
+            |    val obj: Map[String, Object] = Json::object()
             |    return Json::stringify(obj)
             |  }
             |}
@@ -448,7 +448,7 @@ class JsonSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val obj: Map = Json::object()
+            |    val obj: Map[String, Object] = Json::object()
             |    obj.put("name", "John")
             |    obj.put("age", new Integer(30))
             |    return Json::stringify(obj)
@@ -554,7 +554,7 @@ class JsonSpec extends AbstractShellSpec {
             |public:
             |  static def main(args: String[]): String {
             |    val obj = Json::parse("42")
-            |    val m: Map = Json::asObject(obj)
+            |    val m: Map[String, Object] = Json::asObject(obj)
             |    if (m == null) {
             |      return "null"
             |    } else {
@@ -577,7 +577,7 @@ class JsonSpec extends AbstractShellSpec {
             |public:
             |  static def main(args: String[]): String {
             |    val obj = Json::parse("42")
-            |    val arr: List = Json::asArray(obj)
+            |    val arr: List[Object] = Json::asArray(obj)
             |    if (arr == null) {
             |      return "null"
             |    } else {

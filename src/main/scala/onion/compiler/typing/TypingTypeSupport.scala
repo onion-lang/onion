@@ -9,7 +9,7 @@ import collection.mutable.{Buffer, Set => MutableSet}
 final class TypingTypeSupport(private val typing: Typing) {
   def typesOf(arguments: List[AST.Argument]): Option[List[Type]] = {
     val result = arguments.map { arg =>
-      mapFrom(arg.typeRef).map { baseType =>
+      mapFrom(arg.typeRef, typing.mapper_, banRaw = true).map { baseType =>
         if (arg.isVararg) typing.table_.loadArray(baseType, 1) else baseType
       }
     }
@@ -19,16 +19,61 @@ final class TypingTypeSupport(private val typing: Typing) {
   def mapFrom(typeNode: AST.TypeNode): Option[Type] = mapFrom(typeNode, typing.mapper_)
 
   /** Resolves a type node; reports CLASS_NOT_FOUND itself, so callers only handle absence. */
-  def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] = {
+  def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
+    mapFrom(typeNode, mapper, banRaw = false)
+
+  /**
+   * Resolves a type node. When `banRaw` is set, a reference to a generic type
+   * that omits its type arguments (a raw type such as `List` or `ArrayList`) is
+   * reported as an error: Onion forbids raw generic types in declared/created
+   * positions. Erasure contexts (`is`, `as`, static-call receivers, `catch`)
+   * keep raw types by leaving `banRaw` off, since `x is List[Int]` is not
+   * expressible under erasure.
+   */
+  def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver, banRaw: Boolean): Option[Type] = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) {
       typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
       None
     } else {
       validateTypeApplication(typeNode, mappedType)
+      if (banRaw) reportRawTypes(typeNode, typeNode.desc, mapper)
       Some(mappedType)
     }
   }
+
+  /**
+   * Walks a source type descriptor and reports RAW_TYPE_NOT_ALLOWED for every
+   * bare reference to a generic type. A reference wrapped in a
+   * `ParameterizedType` (its component) is applied and thus fine; its arguments
+   * are still checked recursively. Type variables and already-applied types are
+   * not raw.
+   */
+  private def reportRawTypes(node: AST.TypeNode, desc: AST.TypeDescriptor, mapper: NameResolver): Unit =
+    desc match {
+      case ref: AST.ReferenceType =>
+        mapper.map(ref) match {
+          case ct: ClassType
+            if !ct.isInstanceOf[TypedAST.TypeVariableType]
+              && !ct.isInstanceOf[TypedAST.AppliedClassType]
+              && ct.typeParameters.nonEmpty =>
+            typing.report(RAW_TYPE_NOT_ALLOWED, node, ref.name)
+          case _ =>
+        }
+      case AST.ParameterizedType(_, params) =>
+        params.foreach(reportRawTypes(node, _, mapper))
+      case AST.ArrayType(component) =>
+        reportRawTypes(node, component, mapper)
+      case AST.NullableType(inner) =>
+        reportRawTypes(node, inner, mapper)
+      case AST.FunctionType(params, result) =>
+        params.foreach(reportRawTypes(node, _, mapper))
+        reportRawTypes(node, result, mapper)
+      case AST.WildcardType(upper, lower) =>
+        upper.foreach(reportRawTypes(node, _, mapper))
+        lower.foreach(reportRawTypes(node, _, mapper))
+      case _ =>
+    }
 
   def openTypeParams[A](scope: TypeParamScope)(block: => A): A = {
     val prev = typing.typeParams_

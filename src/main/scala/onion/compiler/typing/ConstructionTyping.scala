@@ -101,7 +101,7 @@ final class ConstructionTyping(
     } yield result
 
   def typeNewArray(node: AST.NewArray, context: LocalContext): Option[Term] = {
-    val typeRefOpt = typing.mapFrom(node.typeRef, bodyContext.mapper)
+    val typeRefOpt = typing.mapFromDeclared(node.typeRef, bodyContext.mapper)
     val parameters = typedTerms(node.args.toArray, context)
     if (typeRefOpt.isEmpty || parameters == null) return None
     val resultType = typing.loadArray(typeRefOpt.get, parameters.length)
@@ -109,7 +109,7 @@ final class ConstructionTyping(
   }
 
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] = {
-    val elementTypeOpt = typing.mapFrom(node.typeRef, bodyContext.mapper)
+    val elementTypeOpt = typing.mapFromDeclared(node.typeRef, bodyContext.mapper)
     if (elementTypeOpt.isEmpty) return None
     val elementType = elementTypeOpt.get
     val arrayType = typing.loadArray(elementType, 1)
@@ -127,7 +127,7 @@ final class ConstructionTyping(
   }
 
   def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] = {
-    val typeRef = typing.mapFrom(node.typeRef) match {
+    val typeRef = typing.mapFromDeclared(node.typeRef) match {
       case Some(ct: ClassType) => ct
       case Some(other) =>
         bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)

@@ -11,7 +11,11 @@ package onion.compiler
  * @author Kota Mizushima
  *
  */
-class StaticImportItem(val name: String, val fqcn: Boolean) {
+class StaticImportItem(
+  val name: String,
+  val fqcn: Boolean,
+  val methodName: String = null
+) {
 
   /**
    * returns name.
@@ -25,6 +29,11 @@ class StaticImportItem(val name: String, val fqcn: Boolean) {
   def isFqcn: Boolean = fqcn
 
   /**
+   * Returns the imported method name, or null if the whole class is imported.
+   */
+  def getMethodName: String = methodName
+
+  /**
    * matches name() with name.
    * @param name
    * @return if name is matched, then return true.
@@ -36,5 +45,13 @@ class StaticImportItem(val name: String, val fqcn: Boolean) {
     else {
       this.name.lastIndexOf(name) == this.name.length - name.length
     }
+  }
+
+  /**
+   * Returns true if this import makes the given static method available.
+   */
+  def importsMethod(methodName: String): Boolean = {
+    if (this.methodName == null) true
+    else this.methodName == methodName
   }
 }

@@ -1025,20 +1025,28 @@ AST.ModuleDeclaration module_decl() :{Token t1, t2; StringBuffer sb = new String
 }
 
 AST.ImportClause import_decl() :{
-  Token t = null, n, star, alias = null;
+  Token t = null, n, star, alias = null, staticMethod = null;
   StringBuffer sb;
   String s = null;
   ArrayBuffer<Tuple2<String, String>> imports = new ArrayBuffer<Tuple2<String, String>>();
+  ArrayBuffer<Tuple2<String, String>> staticImports = new ArrayBuffer<Tuple2<String, String>>();
 }{
   t="import" "{"
-    ( {sb = new StringBuffer(); alias = null; enterSection();}
+    ( {sb = new StringBuffer(); alias = null; staticMethod = null; enterSection();}
       (LOOKAHEAD(2) n=import_id() "." {sb.append(c(n)); sb.append(".");})+
       (n=import_id() | star="*" {n = star;}) {s = c(n); sb.append(s);}
+      [ "::" staticMethod=import_id() ]
       [<K_AS> alias=id() {s = c(alias);}]
       eos_or_block_end()
-      { append(imports, new Tuple2<String, String>(s, new String(sb))); }
+      {
+        if (staticMethod != null) {
+          append(staticImports, new Tuple2<String, String>(c(staticMethod), new String(sb)));
+        } else {
+          append(imports, new Tuple2<String, String>(s, new String(sb)));
+        }
+      }
     )*
-  "}"{ return new AST.ImportClause(p(t), toList(imports)); }
+  "}"{ return new AST.ImportClause(p(t), toList(imports), toList(staticImports)); }
 }
 
 AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
@@ -1527,7 +1535,7 @@ AST.TypeNode type() : {
   | LOOKAHEAD( "(" )
       start="(" eols()
         [ arg=type() { append(fargs, arg.desc()); } ("," eols() arg=type() { append(fargs, arg.desc()); })* ]
-      eols() ")" eols() <ARROW> eols() r=type() {
+      eols() ")" eols() <ARROW> eols() r=return_type() {
         core = new AST.FunctionType(toList(fargs), r.desc());
         loc = p(start);
       }

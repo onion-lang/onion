@@ -1,0 +1,22 @@
+import { java.util.Comparator }
+
+class SortWithPrimitiveComparator {
+public:
+  static def main(args: String[]): String {
+    val xs = Colls::mutableListOf(30, 10, 20)
+
+    // Comparator[Int] accepts a lambda with primitive Int parameters.
+    // The compiler boxes the type argument internally and generates the
+    // bridge method between the erased Comparator.compare(Object, Object)
+    // and the primitive implementation.
+    val cmp: Comparator[Int] = (a: Int, b: Int) -> a - b
+    Collections::sort(xs, cmp)
+
+    // The same works when the explicit-typed lambda is written directly at
+    // argument position.
+    val ys = Colls::mutableListOf(30, 10, 20)
+    Collections::sort(ys, (a: Int, b: Int) -> a - b)
+
+    return xs.toString() + " " + ys.toString()
+  }
+}

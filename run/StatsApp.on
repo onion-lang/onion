@@ -83,7 +83,7 @@ extension List {
 }
 
 // Summarize a list of Doubles using loops.
-def summarize(values: List): String {
+def summarize(values: List[Double]): String {
   val avg = values.mean()
   var minVal: Double = 0.0
   var maxVal: Double = 0.0
@@ -100,7 +100,7 @@ def summarize(values: List): String {
 }
 
 // Generic count matches using a loop.
-def countMatches(items: List, predicate: (Object) -> Boolean): Int {
+def countMatches(items: List[Double], predicate: (Object) -> Boolean): Int {
   var count: Int = 0
   foreach item: Object in items {
     if predicate.call(item) {
@@ -130,14 +130,14 @@ val swapped = pair.swap
 println("swapped: " + swapped.first + "," + swapped.second)
 
 // Use list extension methods.
-val temps: List = [10.0, 20.0, 30.0, 25.0, 15.0]
+val temps: List[Double] = [10.0, 20.0, 30.0, 25.0, 15.0]
 println("temps: " + summarize(temps))
 
-val counts: List = [1, 2, 3, 4, 5]
+val counts: List[Int] = [1, 2, 3, 4, 5]
 println("sumInts: " + counts.sumInts())
 
 // Process records.
-val readings: List = [
+val readings: List[Reading] = [
   new Reading(10.5, "C"),
   new Reading(20.0, "C"),
   new Reading(15.5, "C")

@@ -1,0 +1,48 @@
+// AsyncDownloader — concurrent futures and do-notation example.
+// Simulates downloading several pages in parallel and aggregating results.
+
+import { java.lang.Exception; }
+
+def fetchPage(url: String, delayMs: Long): Future[String] {
+  return Future::async(() -> {
+    Thread::sleep(delayMs)
+    return "body of " + url
+  })
+}
+
+val urls = [
+  "https://example.com/a",
+  "https://example.com/b",
+  "https://example.com/c"
+]
+
+// Kick off three downloads concurrently.
+val f1 = fetchPage(urls[0] as String, 50L)
+val f2 = fetchPage(urls[1] as String, 30L)
+val f3 = fetchPage(urls[2] as String, 40L)
+
+// Wait for all of them using Future::all.
+Future::all(f1, f2, f3).onSuccess((results: Object[]) -> {
+  println("Downloaded " + results.length + " pages")
+  for var i: Int = 0; i < results.length; i = i + 1 {
+    println("  " + (results[i] as String))
+  }
+})
+
+// Demonstrate do[Future] notation.
+val combined: Future[String] = do[Future] {
+  a <- fetchPage("page-a", 20L)
+  b <- fetchPage("page-b", 20L)
+  ret a.length() + ":" + b.length()
+}
+
+println("combined length report: " + combined.getOrElse("failed"))
+
+// Error handling with futures.
+val risky: Future[Int] = Future::failed(new Exception("simulated failure"))
+
+risky.onFailure((error: Throwable) -> {
+  println("caught expected failure: " + error.getMessage())
+})
+
+println("done")

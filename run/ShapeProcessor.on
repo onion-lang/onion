@@ -91,7 +91,7 @@ extension Shape {
   }
 }
 
-def totalArea(shapes: List): Double {
+def totalArea(shapes: List[Shape]): Double {
   var sum: Double = 0.0
   foreach s: Object in shapes {
     sum = sum + (s as Shape).shapeArea()
@@ -105,8 +105,8 @@ def distance(p1: Point, p2: Point): Double {
   return Math::sqrt(dx.squared() + dy.squared())
 }
 
-val shapes: List = [
-  new CircleShape(new Circle(2.0)),
+val shapes: List[Shape] = [
+  (new CircleShape(new Circle(2.0)) as Shape),
   new RectangleShape(new Rectangle(3.0, 4.0)),
   new PointShape(new Point(0.0, 0.0)),
   new CircleShape(new Circle(1.0))

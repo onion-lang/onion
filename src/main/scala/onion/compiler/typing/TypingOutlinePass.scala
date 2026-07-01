@@ -35,10 +35,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     typing.loadRequired(name)
   private def loadTopClass: ClassType =
     typing.loadRequired(typing.topClass)
+  // Outline-pass type references are all declared positions (return types,
+  // fields, globals, throws, inheritance, extension receivers), so raw generic
+  // types are forbidden here.
   private def mapFrom(typeNode: AST.TypeNode): Option[Type] =
-    typing.mapFrom(typeNode)
+    typing.mapFromDeclared(typeNode)
   private def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
-    typing.mapFrom(typeNode, mapper)
+    typing.mapFromDeclared(typeNode, mapper)
   private def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typing.typesOf(arguments)
   private def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] =
@@ -355,9 +358,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     unitContext.currentDefinition = definition
     find(definition.name).foreach(unitContext.currentMapper = _)
 
-    // Resolve the receiver type (the type being extended);
-    // mapFrom already reports CLASS_NOT_FOUND when resolution fails
-    mapFrom(node.receiverType).foreach { receiverType =>
+    // Resolve the receiver type (the type being extended). An extension on a
+    // generic type applies across all instantiations under erasure, so the
+    // receiver is a raw-exempt position (like `is`/`as`); use the lenient
+    // resolver rather than the declared (raw-banning) one.
+    typing.mapFrom(node.receiverType).foreach { receiverType =>
       // Get the FQCN for the receiver type (for extension method lookup).
       // Primitive receivers are registered under their boxed class name because
       // method-call targets are boxed before extension resolution.

@@ -152,4 +152,19 @@ public class Iterables {
     if (n >= list.size()) return new ArrayList<>();
     return new ArrayList<>(list.subList(n, list.size()));
   }
+
+  // Sort a list using a Comparator
+  public static <T> List<T> sort(List<T> list, java.util.Comparator<? super T> comparator) {
+    List<T> result = new ArrayList<>(list);
+    Collections.sort(result, comparator);
+    return result;
+  }
+
+  // Sort a list using natural ordering (elements must be Comparable)
+  @SuppressWarnings("unchecked")
+  public static <T extends Comparable<? super T>> List<T> sort(List<T> list) {
+    List<T> result = new ArrayList<>(list);
+    Collections.sort(result);
+    return result;
+  }
 }

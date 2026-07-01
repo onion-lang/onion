@@ -1,0 +1,50 @@
+// ShellPipeline — process execution and file pipeline example.
+// Uses the Proc module to run shell commands and build a small data pipeline.
+
+import {
+  java.io.File;
+  java.io.FileWriter;
+}
+
+def writeLines(path: String, lines: List[String]): void {
+  val writer: FileWriter = new FileWriter(path)
+  foreach line: Object in lines {
+    writer.write(line as String)
+    writer.write("\n")
+  }
+  writer.close()
+}
+
+// Prepare a small input file.
+val inputPath = "/tmp/onion_shell_input.txt"
+writeLines(inputPath, ["apple", "banana", "cherry", "date", "elderberry"])
+
+// Run `wc -l` on the file and capture output.
+val countResult = Proc::capture("wc", "-l", inputPath)
+println("wc exit=" + countResult.status() + " out=" + countResult.stdout().trim())
+
+// Run `sort` and `head` as a pipeline using shell syntax via sh -c.
+val pipelineResult = Proc::capture("sh", "-c", "sort " + inputPath + " | head -n 3")
+println("pipeline exit=" + pipelineResult.status())
+println(pipelineResult.stdout())
+
+// Process output line by line.
+val sortedLines = pipelineResult.stdout().split("\n")
+println("Top " + sortedLines.length + " sorted lines:")
+for var i: Int = 0; i < sortedLines.length; i = i + 1 {
+  val line = sortedLines[i]
+  if line.length() > 0 {
+    println("  " + line)
+  }
+}
+
+// Clean up.
+new File(inputPath).delete()
+
+// Demonstrate Proc::run (throws on failure) and a simple success check.
+try {
+  val echoOut = Proc::run("echo", "hello from onion")
+  println("echo result=" + echoOut.trim())
+} catch e: Exception {
+  println("echo failed")
+}

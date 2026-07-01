@@ -104,7 +104,11 @@ object AST {
     location: Location, sourceFile: String/*nullable*/, module: ModuleDeclaration/*nullable*/,
     imports: ImportClause, toplevels: List[Toplevel]) extends Node
   case class ModuleDeclaration(location: Location, name: String) extends Node
-  case class ImportClause(location: Location, mapping: List[(String, String)]) extends Node
+  case class ImportClause(
+    location: Location,
+    mapping: List[(String, String)],
+    staticImports: List[(String, String)] = Nil
+  ) extends Node
   abstract sealed class Toplevel extends Node
   abstract sealed class BlockElement extends Toplevel
   abstract sealed class Expression extends BlockElement

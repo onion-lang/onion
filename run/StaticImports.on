@@ -1,0 +1,30 @@
+// StaticImports — demonstrates class-level and single-method static imports.
+
+import {
+  java.lang.Math;
+  java.lang.Math::toRadians;
+  java.lang.System;
+  java.lang.System::currentTimeMillis;
+}
+
+val radius: Double = 10.0
+val angle: Double = 45.0
+val radians: Double = toRadians(angle)
+val area: Double = Math::PI * radius * radius
+
+println("radius=" + radius)
+println("angle=" + angle + "deg = " + radians + "rad")
+println("area=" + area.rounded(2))
+
+val start: Long = currentTimeMillis()
+val squared: Double = radius.squared()
+val elapsed: Long = currentTimeMillis() - start
+println("squared=" + squared + " computed in " + elapsed + "ms")
+
+extension Double {
+  def squared(): Double = self * self
+  def rounded(decimals: Int): Double {
+    val factor = Math::pow(10.0, decimals as Double)
+    return (Math::round(self * factor) as Double) / factor
+  }
+}

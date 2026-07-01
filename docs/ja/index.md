@@ -108,6 +108,10 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 - [基本例](examples/basic.md) - Hello World、配列、ループ、入出力
 - [オブジェクト指向の例](examples/oop.md) - クラス、継承、インターフェース、委譲
 - [関数型の例](examples/functional.md) - ラムダ、クロージャ、再帰、do記法、Future
+- [スクリプティングとCLIの例](examples/scripting.md) - コマンドライン引数、プロセス実行、ファイル入出力
+- [JSONとHTTPの例](examples/json-http.md) - JSON/YAMLの解析、HTTPクライアント
+- [非同期・並行処理の例](examples/async.md) - Future、非同期合成、do記法
+- [エラーハンドリングの例](examples/error-handling.md) - Option、Result、検証パターン
 
 ## ツール
 

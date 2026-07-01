@@ -65,8 +65,28 @@
       {
         "command": "onion.restartServer",
         "title": "Onion: Restart Language Server"
+      },
+      {
+        "command": "onion.runScript",
+        "title": "Onion: Run Script",
+        "icon": "$(play)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "onion.runScript",
+          "when": "resourceExtname == .on",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "onion.runScript",
+          "when": "editorLangId == onion"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

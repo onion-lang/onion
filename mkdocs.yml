@@ -90,10 +90,15 @@ nav:
           - 基本例: ja/examples/basic.md
           - オブジェクト指向の例: ja/examples/oop.md
           - 関数型の例: ja/examples/functional.md
+          - スクリプティングとCLI: ja/examples/scripting.md
+          - JSONとHTTP: ja/examples/json-http.md
+          - 非同期・並行処理: ja/examples/async.md
+          - エラーハンドリング: ja/examples/error-handling.md
       - ツール:
           - コンパイラ（onionc）: ja/tools/compiler.md
           - スクリプトランナー（onion）: ja/tools/script-runner.md
           - REPL: ja/tools/repl.md
+          - 言語サーバー: ja/tools/language-server.md
       - リファレンス:
           - 言語仕様: ja/reference/specification.md
           - 標準ライブラリ: ja/reference/stdlib.md
@@ -105,6 +110,7 @@ nav:
           - 開発ガイド: ja/contributing/development.md
           - ソースからビルド: ja/contributing/building.md
           - リリース手順: ja/RELEASING.md
+          - Claude Code ガイダンス: ja/CLAUDE_ja.md
       - デザインノート:
           - ジェネリクス設計: ja/GENERICS_DESIGN.md
           - パーサーリファクタリング: ja/parser-refactoring.md
@@ -131,10 +137,15 @@ nav:
       - Basic Programs: examples/basic.md
       - Object-Oriented Examples: examples/oop.md
       - Functional Programming: examples/functional.md
+      - Scripting & CLI: examples/scripting.md
+      - JSON & HTTP: examples/json-http.md
+      - Async & Concurrency: examples/async.md
+      - Error Handling: examples/error-handling.md
   - Tools:
       - Compiler (onionc): tools/compiler.md
       - Script Runner (onion): tools/script-runner.md
       - REPL: tools/repl.md
+      - Language Server: tools/language-server.md
   - Reference:
       - Language Specification: reference/specification.md
       - Standard Library: reference/stdlib.md

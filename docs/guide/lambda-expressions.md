@@ -73,6 +73,20 @@ val func2: (Int, Int) -> Int = (x: Int, y: Int) -> { return x + y; }
 val sum: Int = func2.call(3, 7)
 ```
 
+### Void-Returning Functions
+
+For side-effect-only lambdas, the return type can be written as `void` or `Unit`. At runtime these erase to `Object`, so the lambda body returns `null`:
+
+```onion
+def repeat(n: Int, block: () -> Unit): void {
+  for var i: Int = 0; i < n; i = i + 1 {
+    block.call()
+  }
+}
+
+repeat(3, () -> { println("tick") })
+```
+
 ## Java Functional Interfaces (SAM Conversion)
 
 Lambdas convert to any Java interface with a single abstract method:
@@ -86,6 +100,32 @@ Collections::sort(xs, cmp)
 
 // Argument position works too
 Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
+```
+
+### Primitive Type Arguments
+
+Onion boxes primitive type arguments at the generic-interface level, so
+`Comparator[Int]` is represented as `Comparator[Integer]` internally. You can
+still write the lambda parameters with their primitive types:
+
+```onion
+import { java.util.Comparator }
+
+val cmp: Comparator[Int] = (a: Int, b: Int) -> a - b
+Collections::sort(xs, cmp)
+
+// The same lambda can be written directly at argument position.
+Collections::sort(xs, (a: Int, b: Int) -> a - b)
+```
+
+The compiler matches the primitive parameter types against the boxed interface
+signature and generates the necessary bridge method automatically. This also
+works for primitive return types:
+
+```onion
+import { java.util.function.Supplier }
+
+val s: Supplier[Int] = () -> 42
 ```
 
 ## Closures

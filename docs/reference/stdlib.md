@@ -372,6 +372,7 @@ Access iteration utilities for collections and arrays:
 - `Iterables::foldl(iterable, init, f)`
 - `Iterables::exists(iterable, predicate)`
 - `Iterables::forAll(iterable, predicate)`
+- `Iterables::sort(list, comparator)`
 - `Iterables::listOf(elements...)`
 
 ## Option Module
@@ -969,6 +970,62 @@ val masked: String = Regex::replace(text, "@[\\w.]+", "@***");
 if (Regex::matches("hello123", "[a-z]+\\d+")) {
   IO::println("Pattern matched!");
 }
+```
+
+---
+
+## Maps Module
+
+Map utility functions.
+
+### Construction
+
+```onion
+val m: Map[String, Int] = Maps::newMap()
+m.put("a", 1)
+```
+
+### Access
+
+```onion
+Maps::getOrDefault(m, "a", 0)     // 1
+Maps::getOrDefault(m, "x", 0)     // 0
+```
+
+### Transformation
+
+```onion
+Maps::mapValues(m, (v: Int) -> v * 2)
+Maps::filterValues(m, (v: Int) -> v > 0)
+Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
+```
+
+### Combination
+
+```onion
+val merged = Maps::merge(a, b)   // b wins on key collisions
+```
+
+---
+
+## Sets Module
+
+Set utility functions.
+
+### Construction
+
+```onion
+val a = Sets::of(1, 2, 3)
+val b = Sets::newSet[Int]()
+```
+
+### Set operations
+
+```onion
+Sets::union(a, b)
+Sets::intersection(a, b)
+Sets::difference(a, b)
+Sets::containsAll(a, b)
 ```
 
 ---

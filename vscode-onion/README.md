@@ -38,6 +38,7 @@ resolves) or point `onion.serverPath` at the executable directly.
 
 - **Onion: Restart Language Server** — Restarts the language server (or reports
   that none was found).
+- **Onion: Run Script** — Runs the current `.on` file with the Onion script runner.
 
 ## Feature Status
 
@@ -46,9 +47,13 @@ resolves) or point `onion.serverPath` at the executable directly.
 | Syntax Highlighting | ✅ Supported |
 | Editor Configuration (brackets, comments, indent) | ✅ Supported |
 | Error Diagnostics | ⏳ Requires `onion-lsp` (in development) |
-| Code Completion | ⏳ Requires `onion-lsp` (in development) |
-| Hover Documentation | ⏳ Requires `onion-lsp` (in development) |
-| Document Symbols / Outline | ⏳ Requires `onion-lsp` (in development) |
+| Code Completion | ✅ Supported with `onion-lsp` (keywords, builtins, user-defined symbols) |
+| Hover Documentation | ✅ Supported with `onion-lsp` (keywords, builtins, user-defined symbols) |
+| Document Symbols / Outline | ✅ Supported with `onion-lsp` (classes, interfaces, methods, enums) |
+| Workspace Symbols | ✅ Supported with `onion-lsp` (symbols from all open documents) |
+| Signature Help | ✅ Supported with `onion-lsp` (method signatures while typing calls) |
+| Rename Symbol | ✅ Supported with `onion-lsp` (text-based rename in the current file) |
+| Run Script | ✅ Supported |
 
 ## Development
 

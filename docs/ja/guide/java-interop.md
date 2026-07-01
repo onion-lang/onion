@@ -51,6 +51,38 @@ val time: Long = System::currentTimeMillis()
 val number: Int = JInteger::parseInt("42")
 ```
 
+### staticメソッドのインポート
+
+`Class::method` で特定のstaticメソッドをインポートし、修飾なしで呼べます：
+
+```onion
+import { java.lang.Math::max; }
+
+println(max(10, 20))  // 20
+```
+
+クラス全体のstaticメンバーをインポートすることもできます：
+
+```onion
+import { java.lang.Math }
+
+println(max(10, 20))
+println(min(10, 20))
+println(abs(-7))
+```
+
+型インポートと単一メソッドのstaticインポートを同じブロックで混在させられます：
+
+```onion
+import {
+  java.util.ArrayList;
+  java.lang.Math::abs;
+}
+
+val xs = new ArrayList[Int]()
+xs.add(abs(-5))
+```
+
 ## Javaインターフェースの実装
 
 `<:` でJavaインターフェースを実装します：

@@ -617,6 +617,31 @@ api.request("GET", "/users") { response =>
 }
 ```
 
+## Primitive Generics with Java Functional Interfaces
+
+Onion can convert lambdas to Java functional interfaces even when the type
+arguments are primitive. The compiler boxes the type parameter internally and
+generates the bridge method, so you can write `Int` parameters naturally:
+
+```onion
+import { java.util.Comparator }
+import { java.util.function.Predicate }
+
+val numbers = Colls::mutableListOf(3, 1, 4, 1, 5, 9, 2, 6)
+
+// Comparator[Int] with primitive Int parameters
+Collections::sort(numbers, (a: Int, b: Int) -> a - b)
+println(numbers)
+
+// Predicate[Int] with a primitive parameter
+val isEven: Predicate[Int] = (n: Int) -> n % 2 == 0
+numbers.removeIf(isEven)
+println(numbers)
+```
+
+This also works for `Supplier[Int]`, `Function[Int, Int]`, and other
+single-abstract-method interfaces.
+
 ## Next Steps
 
 - [Lambda Expressions Guide](../guide/lambda-expressions.md) - Detailed lambda documentation

@@ -102,6 +102,10 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 - [Basic Programs](examples/basic.md) - Hello World, arrays, loops, I/O
 - [Object-Oriented Examples](examples/oop.md) - Classes, inheritance, interfaces, delegation
 - [Functional Programming](examples/functional.md) - Lambdas, closures, recursion, do notation, Future
+- [Scripting & CLI](examples/scripting.md) - Command-line arguments, process execution, file I/O
+- [JSON & HTTP](examples/json-http.md) - JSON/YAML parsing, HTTP client basics
+- [Async & Concurrency](examples/async.md) - Futures, async composition, do-notation
+- [Error Handling](examples/error-handling.md) - Option, Result, validation patterns
 
 ## Tools
 

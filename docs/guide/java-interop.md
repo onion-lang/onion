@@ -42,6 +42,38 @@ val list: java.util.ArrayList = new java.util.ArrayList
 val file: java.io.File = new java.io.File("data.txt")
 ```
 
+## Static Imports
+
+Import static methods from Java classes so you can call them without qualification:
+
+```onion
+import { java.lang.Math::max; }
+
+println(max(10, 20))  // 20
+```
+
+You can also import an entire class's static members:
+
+```onion
+import { java.lang.Math }
+
+println(max(10, 20))
+println(min(10, 20))
+println(abs(-7))
+```
+
+Mix type imports and single-method static imports in the same block:
+
+```onion
+import {
+  java.util.ArrayList;
+  java.lang.Math::abs;
+}
+
+val xs = new ArrayList[Int]()
+xs.add(abs(-5))
+```
+
 ## Creating Java Objects
 
 ### Constructor Calls

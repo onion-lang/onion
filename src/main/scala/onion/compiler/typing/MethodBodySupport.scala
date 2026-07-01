@@ -20,10 +20,44 @@ private[compiler] final class MethodBodySupport(
     block: AST.BlockExpression
   ): Unit = {
     val context = prepareMethodContext(method, args, block)
-    val translatedBlock = addReturnNode(translate(block, context), method.returnType)
+    val translated = translate(block, context)
+    checkMissingReturn(method.returnType, translated, method.name, block)
+    val translatedBlock = addReturnNode(translated, method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
     reportUnused(context)
+  }
+
+  /**
+   * Reports MISSING_RETURN when a value-returning method body can complete
+   * normally without returning. Onion block bodies use an explicit `return`
+   * (the `= expr` form is the expression body); a body that neither returns on
+   * every path nor throws silently yields the JVM default (0 / null), so we
+   * reject it. [[definitelyReturns]] is conservative (true only when certain),
+   * so a method that really does return on all paths is never rejected.
+   */
+  private def checkMissingReturn(returnType: Type, translated: ActionStatement, name: String, at: AST.Node): Unit =
+    if (returnType != BasicType.VOID && !returnType.isBottomType && !definitelyReturns(translated))
+      bodyContext.report(MISSING_RETURN, at, name, returnType)
+
+  private def definitelyReturns(stmt: ActionStatement): Boolean = stmt match {
+    case _: Return => true
+    case _: Throw => true
+    case b: StatementBlock =>
+      val ss = b.statements
+      ss.nonEmpty && definitelyReturns(ss(ss.length - 1))
+    case i: IfStatement =>
+      i.elseStatement != null && definitelyReturns(i.thenStatement) && definitelyReturns(i.elseStatement)
+    case loop: ConditionalLoop =>
+      // An infinite loop (while/for over a constant-true or absent condition)
+      // never completes normally. A `break` would make this a false negative,
+      // which is safe (we never wrongly reject), so we do not scan for one.
+      loop.condition == null || (loop.condition match { case b: BoolValue => b.value; case _ => false })
+    case t: Try =>
+      (t.finallyStatement != null && definitelyReturns(t.finallyStatement)) ||
+        (definitelyReturns(t.tryStatement) && t.catchStatements.forall(definitelyReturns))
+    case e: ExpressionActionStatement => e.term.`type`.isBottomType
+    case _ => false
   }
 
   def prepareConstructorContext(constructor: ConstructorDefinition, args: List[AST.Argument], block: AST.Node): LocalContext = {
@@ -72,7 +106,9 @@ private[compiler] final class MethodBodySupport(
     receiverType: Type
   ): Unit = {
     val context = prepareExtensionContext(staticMethod, node, receiverType)
-    val translatedBlock = addReturnNode(translate(node.block, context), staticMethod.returnType)
+    val extTranslated = translate(node.block, context)
+    checkMissingReturn(staticMethod.returnType, extTranslated, staticMethod.name, node.block)
+    val translatedBlock = addReturnNode(extTranslated, staticMethod.returnType)
     staticMethod.setBlock(translatedBlock)
     staticMethod.setFrame(context.getContextFrame)
     extMethod.setBlock(translatedBlock)

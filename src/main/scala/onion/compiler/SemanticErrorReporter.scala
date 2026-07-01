@@ -291,6 +291,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.rawTypeNotAllowed",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.MISSING_RETURN -> ErrorDef(
+      "error.semantic.missingReturn",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
+    ),
     SemanticError.TYPE_ARGUMENT_ARITY_MISMATCH -> ErrorDef(
       "error.semantic.typeArgumentArityMismatch",
       Seq(items => asString(items(0)), items => items(1).toString, items => items(2).toString)

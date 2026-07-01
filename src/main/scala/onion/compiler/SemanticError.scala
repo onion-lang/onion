@@ -132,6 +132,7 @@ object SemanticError {
   case object LAW_VIOLATION extends SemanticError(64)
   case object EXAMPLE_FAILED extends SemanticError(65)
   case object RAW_TYPE_NOT_ALLOWED extends SemanticError(66)
+  case object MISSING_RETURN extends SemanticError(67)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

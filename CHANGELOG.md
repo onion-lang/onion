@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 0.3.0-M2
 
+- **`forward` delegation over a parameterized generic interface now works**
+  (`forward val x: List[String]`, `Map[String, Int]`, a user-defined
+  `Container[Int]`). The underlying fix corrects a bridge-generation
+  miscompilation: a method declared at several levels of a generic hierarchy
+  (e.g. `addLast` on both `List` and `SequencedCollection`) produced a *duplicate*
+  bridge method (`ClassFormatError`), which also affected hand-written classes
+  implementing such hierarchies ([#184]).
 - **Empty collection literals are target-typed at argument position.** `foo([])`
   and `foo([:])` now bind the empty literal to the parameter's element type, for
   top-level, instance, static, and constructor calls ([#193]).

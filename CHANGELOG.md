@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.3.0-M1 — correctness & diagnostics
+
+Type-soundness and diagnostic-quality fixes surfaced by gap-probing real programs.
+
+- **Type-argument invariance.** Generic type arguments are now invariant:
+  `Box[Dog]` is no longer assignable to `Box[Animal]`, closing a heap-pollution
+  hole that produced a `ClassCastException` at a distant read ([#186]).
+- **Missing-return analysis.** A value-returning method whose block body can
+  complete without returning is rejected (`E0067`) instead of silently returning
+  the JVM default (`0`/`null`) ([#185]).
+- **Elvis for nullable primitives.** `n ?: -1` (and `s?.length() ?: -1`) works
+  for `Int?`/`Long?`/`Double?`/`Boolean?`, not only for nullable references ([#187]).
+- **No more compiler crash** on a throw-only lambda with an inferred return type
+  (was a `VerifyError`) ([#188]).
+- A top-level `def main(args: String[])` is now used as the entry point instead
+  of colliding with the synthesized `main` ([#189]).
+- Writing a non-public field from outside its class is rejected (`E0014`) rather
+  than silently ignored ([#190]).
+- An invalid `re"..."` literal is a compile-time error (`E0059`) in any position,
+  not just inside `select`/`from` ([#191]).
+- A top-level `break`/`continue` followed by a statement reports the real cause
+  (`E0048`/`E0049`) instead of a misleading next-line syntax error ([#192]).
+- Diagnostics render types in Onion source form (`List[String]`) rather than the
+  JVM form (`java.util.List[java.lang.String]`), consistent with the REPL, which
+  also shows results as `resN: Type = value` ([#194]).
+- Reduced the VS Code extension's npm audit alerts (dev tooling) ([#195]).
+
 ## [0.2.0] - 2026-07-02
 
 First practical, stable release. Onion is now usable for real programs — from
@@ -120,3 +147,13 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [0.2.0]: https://github.com/onion-lang/onion/releases/tag/v0.2.0
 [0.1.0]: https://github.com/onion-lang/onion/releases/tag/releases/0.1
 [#184]: https://github.com/onion-lang/onion/issues/184
+[#185]: https://github.com/onion-lang/onion/issues/185
+[#186]: https://github.com/onion-lang/onion/issues/186
+[#187]: https://github.com/onion-lang/onion/issues/187
+[#188]: https://github.com/onion-lang/onion/issues/188
+[#189]: https://github.com/onion-lang/onion/issues/189
+[#190]: https://github.com/onion-lang/onion/issues/190
+[#191]: https://github.com/onion-lang/onion/issues/191
+[#192]: https://github.com/onion-lang/onion/issues/192
+[#194]: https://github.com/onion-lang/onion/issues/194
+[#195]: https://github.com/onion-lang/onion/issues/195

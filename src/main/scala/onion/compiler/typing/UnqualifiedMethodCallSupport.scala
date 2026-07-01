@@ -14,6 +14,28 @@ private[compiler] final class UnqualifiedMethodCallSupport(
   private val callableValueCallSupport = new CallableValueCallSupport(bodyContext, calls)
   private val staticImportMethodCallSupport = new StaticImportMethodCallSupport(bodyContext, calls)
 
+  /**
+   * A `re"..."` literal desugars to `re("...")`, resolving to `onion.Resources.re`.
+   * Its pattern is a compile-time constant, so validate it here and report E0059
+   * (as `case re"..."` / `from re"..."` already do) instead of letting an invalid
+   * pattern throw a raw PatternSyntaxException at run time.
+   */
+  private def checkRegexLiteral(node: AST.UnqualifiedMethodCall, term: Term): Unit = term match {
+    case cs: CallStatic
+      if cs.method.name == "re" && cs.method.affiliation != null &&
+         cs.method.affiliation.name == "onion.Resources" && cs.parameters.length == 1 =>
+      cs.parameters(0) match {
+        case sv: StringValue =>
+          try java.util.regex.Pattern.compile(sv.value)
+          catch {
+            case e: java.util.regex.PatternSyntaxException =>
+              bodyContext.report(SemanticError.REGEX_PATTERN_INVALID, node, e.getDescription + " (at index " + e.getIndex + ")")
+          }
+        case _ =>
+      }
+    case _ =>
+  }
+
   def typeUnqualifiedMethodCall(
     node: AST.UnqualifiedMethodCall,
     context: LocalContext,
@@ -30,6 +52,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     if (methods.length == 0) {
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
         case MethodFallbackLookup.Found(term) =>
+          checkRegexLiteral(node, term)
           Some(term)
         case MethodFallbackLookup.Error =>
           None

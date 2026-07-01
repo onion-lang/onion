@@ -124,6 +124,14 @@ final class AssignmentTyping(
           if (term == null) return null
           return new SetField(target, field, term)
         }
+        if (field != null) {
+          // The field exists but is not accessible from here (the accessible case
+          // returned above). Writing it is an error; previously this fell through
+          // to the setter lookup and silently became a no-op. A property-style
+          // setter is only considered when there is no matching field.
+          bodyContext.report(FIELD_NOT_ACCESSIBLE, selection, targetType, name, bodyContext.definition)
+          return null
+        }
         tryFindMethod(selection, targetType, setter(name), Array[Term](value)) match {
           case Right(method) =>
             if (value.`type`.isBottomType) value else new Call(target, method, Array[Term](value))

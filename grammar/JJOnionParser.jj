@@ -1050,7 +1050,14 @@ AST.ImportClause import_decl() :{
 }
 
 AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
-( LOOKAHEAD(2)
+( LOOKAHEAD({getToken(1).image.equals("break") || getToken(1).image.equals("continue")})
+  // Fast-path bare break/continue: the generic LOOKAHEAD(2) below tokenizes two
+  // tokens in the DEFAULT lexer state (where EOL is skipped), so `break\n<stmt>`
+  // buffers `break <stmt>` and the statement's EOL terminator is lost -- yielding
+  // a confusing syntax error instead of E0048/E0049. A 1-token predicate commits
+  // to block_element before that happens, so enterSection() can tokenize the EOL.
+  top=block_element()
+| LOOKAHEAD(2)
   top=block_element()
 | LOOKAHEAD("extension")
   top=extension_decl()
@@ -1690,26 +1697,26 @@ AST.BlockElement local_var_declaration() :{
 
 AST.BreakExpression terminated_break_expression() :{Token t, l = null;}{
   {enterSection();}
-  t="break" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] eos_or_block_end() {
+  t="break" [LOOKAHEAD({getToken(1).kind == ID && getToken(1).beginLine == t.endLine}) l=id()] eos_or_block_end() {
     return new AST.BreakExpression(p(t), l == null ? null : c(l));
   }
 }
 
 AST.BreakExpression break_expression() :{Token t, l = null;}{
-  t="break" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] {
+  t="break" [LOOKAHEAD({getToken(1).kind == ID && getToken(1).beginLine == t.endLine}) l=id()] {
     return new AST.BreakExpression(p(t), l == null ? null : c(l));
   }
 }
 
 AST.ContinueExpression terminated_continue_expression() :{Token t, l = null; AST.ContinueExpression st;}{
   {enterSection();}
-  t="continue" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] eos_or_block_end() {
+  t="continue" [LOOKAHEAD({getToken(1).kind == ID && getToken(1).beginLine == t.endLine}) l=id()] eos_or_block_end() {
     return new AST.ContinueExpression(p(t), l == null ? null : c(l));
   }
 }
 
 AST.ContinueExpression continue_expression() :{Token t, l = null; AST.ContinueExpression st;}{
-  t="continue" [LOOKAHEAD({getToken(1).kind == ID}) l=id()] {
+  t="continue" [LOOKAHEAD({getToken(1).kind == ID && getToken(1).beginLine == t.endLine}) l=id()] {
     return new AST.ContinueExpression(p(t), l == null ? null : c(l));
   }
 }

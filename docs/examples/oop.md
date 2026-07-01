@@ -19,7 +19,7 @@ class Person {
 
     def greet: String = "Hello, I'm " + this.name + " and I'm " + this.age + " years old"
 
-    def haveBirthday {
+    def haveBirthday: void {
       this.age = this.age + 1
       println("Happy birthday! Now " + this.age)
     }
@@ -82,9 +82,12 @@ Breed: Golden Retriever
 Implementing Java interfaces:
 
 ```onion
-import { java.lang.Comparable; }
+import {
+  java.lang.Comparable;
+  java.util.Arrays;
+}
 
-class Student <: Comparable {
+class Student <: Comparable[Object] {
   val name: String
   val grade: Int
 
@@ -108,7 +111,6 @@ students[1] = new Student("Bob", 92)
 students[2] = new Student("Charlie", 78)
 
 // Sort students by grade
-import { java.util.Arrays; }
 Arrays::sort(students)
 
 foreach s :Student in students {
@@ -129,35 +131,44 @@ Using `forward` for delegation:
 
 **File: `Delegation.on`**
 ```onion
-import {
-  java.util.List;
-  java.util.ArrayList;
+interface Logger {
+  def log(message: String): void
+  def count(): Int
 }
 
-class Delegation <: List {
-  forward val n: List;
+class BasicLogger <: Logger {
+  var n: Int
+
+  public:
+    def this { this.n = 0 }
+    def log(message: String): void {
+      this.n = this.n + 1
+      println(message)
+    }
+    def count(): Int = n
+}
+
+class Delegation <: Logger {
+  forward val delegate: Logger
 
   public:
     def this {
-      this.n = new ArrayList;
+      this.delegate = new BasicLogger();
     }
 
     static def main(args: String[]): void {
-      val list: List = new Delegation;
-      list << "a";
-      list << "b";
-      list << "c";
+      val logger: Logger = new Delegation;
+      logger.log("a");
+      logger.log("b");
+      logger.log("c");
 
-      for var i: Int = 0; i < list.size; i = i + 1 {
-        println(list[i]);
-      }
+      println("total: " + logger.count());
     }
 }
 ```
 
 **Topics:**
 - `forward` directive delegates interface methods
-- `<<` operator for adding elements
 - Implementing interfaces via delegation
 
 ## JavaBean Pattern
@@ -191,11 +202,11 @@ class ExampleBean <: Serializable {
     def getValue: Int = this.value
 
     // Setters
-    def setName(name: String) {
+    def setName(name: String): void {
       this.name = name
     }
 
-    def setValue(value: Int) {
+    def setValue(value: Int): void {
       this.value = value
     }
 
@@ -263,7 +274,7 @@ class Calculator : JFrame <: ActionListener {
       val panel: JPanel = new JPanel()
       panel.setLayout(new GridLayout(4, 4))
 
-      val buttons: java.util.List = [
+      val buttons: java.util.List[String] = [
         "7", "8", "9", "/",
         "4", "5", "6", "*",
         "1", "2", "3", "-",
@@ -285,7 +296,7 @@ class Calculator : JFrame <: ActionListener {
       setVisible(true)
     }
 
-    def actionPerformed(event :ActionEvent) {
+    def actionPerformed(event :ActionEvent): void {
       val button: JButton = event.getSource() as JButton
       val label: String = button.getText()
 
@@ -312,7 +323,7 @@ class Calculator : JFrame <: ActionListener {
       }
     }
 
-    def calculate {
+    def calculate: void {
       if this.operator != null {
         val value: Long = JLong::parseLong(this.text.getText())
         var result: Long = 0L

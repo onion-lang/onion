@@ -58,7 +58,7 @@ class Car : Vehicle {
 ```onion
 import { java.lang.Comparable; }
 
-class Person <: Comparable {
+class Person <: Comparable[Object] {
   val name: String
   val age: Int
 
@@ -110,26 +110,41 @@ class Child : ParentClass <: Interface1, Interface2 {
 `forward` でインターフェースのメソッド委譲を自動生成します：
 
 ```onion
-import {
-  java.util.List;
-  java.util.ArrayList;
+interface Logger {
+  def log(message: String): void
+  def count(): Int
 }
 
-class MyList <: List {
-  forward val internal: List;
+class BasicLogger <: Logger {
+  var n: Int
 
   public:
-    def this {
-      this.internal = new ArrayList;
+    def this { this.n = 0 }
+    def log(message: String): void {
+      this.n = this.n + 1
+      println(message)
+    }
+    def count(): Int = n
+}
+
+class PrefixLogger <: Logger {
+  forward val delegate: Logger
+
+  public:
+    def this(delegate: Logger) {
+      this.delegate = delegate
     }
 
-    def addAll(items: String[]) {
+    // 独自メソッドを追加
+    def logAll(items: String[]): void {
       foreach item: String in items {
-        this.internal << item;
+        this.delegate.log("[app] " + item)
       }
     }
 }
 ```
+
+`forward` はインターフェースのメソッド（`log`/`count`）を `delegate` メンバーへの委譲として自動実装するので、`PrefixLogger` は独自の振る舞いを足すだけで済みます。
 
 ## ポリモーフィズム
 

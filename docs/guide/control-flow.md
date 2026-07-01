@@ -138,7 +138,7 @@ With collections:
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "First"
 list << "Second"
 list << "Third"
@@ -345,9 +345,9 @@ Compose async operations:
 
 ```onion
 def fetchUser(id: Int): Future[User] { /* ... */ }
-def fetchPosts(user: User): Future[List] { /* ... */ }
+def fetchPosts(user: User): Future[List[String]] { /* ... */ }
 
-val posts: Future[List] = do[Future] {
+val posts: Future[List[String]] = do[Future] {
   user <- fetchUser(42)
   posts <- fetchPosts(user)
   ret posts

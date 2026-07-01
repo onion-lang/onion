@@ -14,8 +14,8 @@ import {
   java.lang.Long as JLong;
 }
 
-val list: ArrayList = new ArrayList
-val map: HashMap = new HashMap
+val list: ArrayList[String] = new ArrayList[String]()
+val map: HashMap[String, String] = new HashMap[String, String]()
 val file: File = new File("data.txt")
 val str: String = JLong::toString(42L)
 ```
@@ -23,7 +23,7 @@ val str: String = JLong::toString(42L)
 インポートなしで完全修飾名を使うこともできます：
 
 ```onion
-val list: java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
 ## Javaオブジェクトの生成とメソッド呼び出し
@@ -145,7 +145,7 @@ val window: MyWindow = new MyWindow
 val obj: Object = "Hello"
 val str: String = (obj as String)
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list.add("Item")
 val item: String = list.get(0) as String
 
@@ -214,7 +214,7 @@ def readFile(filename: String) {
 
 ```onion
 val text: String = file"data.txt".text()
-val lines: List = file"data.txt".lines()
+val lines: List[String] = file"data.txt".lines()
 ```
 
 ## 次のステップ

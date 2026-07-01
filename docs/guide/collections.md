@@ -74,7 +74,7 @@ foreach (name, age) in ages {            // entry destructuring
 }
 
 import { java.util.Map }
-foreach e: Map.Entry in ages.entrySet() { // explicit entry form
+foreach e: Map.Entry[String, Integer] in ages.entrySet() { // explicit entry form
   println(e.getKey() + " is " + e.getValue())
 }
 ```

@@ -70,7 +70,7 @@ if a == "expected" { println("match") }    // a が null でも安全
 val s: String? = definitelyThere()
 println(s!!.length())        // null なら NullPointerException
 
-val xs: List? = loadOrNull()
+val xs: List[Int]? = loadOrNull()
 val first = xs?[0]               // xs が null なら null
 ```
 

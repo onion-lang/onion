@@ -189,8 +189,8 @@ import {
   java.util.List;
 }
 
-def filter(items: List, predicate: (String) -> Boolean): List {
-  val result: ArrayList = new ArrayList
+def filter(items: List[String], predicate: (String) -> Boolean): List[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
     if predicate.call(item) {
@@ -201,7 +201,7 @@ def filter(items: List, predicate: (String) -> Boolean): List {
   return result
 }
 
-val lines: List = [
+val lines: List[String] = [
   "INFO: System started",
   "ERROR: Connection failed",
   "INFO: Processing data",
@@ -210,7 +210,7 @@ val lines: List = [
 
 val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
-val errors: List = filter(lines, isError)
+val errors: List[String] = filter(lines, isError)
 foreach error: String in errors {
   println(error)
 }
@@ -227,8 +227,8 @@ import {
   java.util.List;
 }
 
-def map(items: List, transform: (String) -> String): List {
-  val result: ArrayList = new ArrayList
+def map(items: List[String], transform: (String) -> String): List[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
     result << transform.call(item)
@@ -237,10 +237,10 @@ def map(items: List, transform: (String) -> String): List {
   return result
 }
 
-val words: List = ["hello", "world", "onion"]
+val words: List[String] = ["hello", "world", "onion"]
 val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
 
-val upper: List = map(words, toUpper)
+val upper: List[String] = map(words, toUpper)
 foreach word: String in upper {
   println(word)
 }
@@ -255,7 +255,7 @@ foreach word: String in upper {
 ```onion
 import { java.util.List; }
 
-def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
+def reduce(items: List[Int], operation: (Int, Int) -> Int, initial: Int): Int {
   var accumulator: Int = initial
 
   foreach item: Int in items {
@@ -265,7 +265,7 @@ def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
   return accumulator
 }
 
-val numbers: List = [1, 2, 3, 4, 5]
+val numbers: List[Int] = [1, 2, 3, 4, 5]
 val sum: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc + n; }
 
 val total: Int = reduce(numbers, sum, 0)
@@ -312,7 +312,7 @@ import {
   java.util.Comparator;
 }
 
-class LambdaComparator <: Comparator {
+class LambdaComparator <: Comparator[Object] {
   val compareFunc: (Object, Object) -> Int
 
   public:
@@ -323,7 +323,7 @@ class LambdaComparator <: Comparator {
     def compare(a: Object, b: Object): Int = this.compareFunc.call(a, b)
 }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "banana"
 list << "apple"
 list << "cherry"

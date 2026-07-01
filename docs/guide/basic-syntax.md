@@ -191,7 +191,7 @@ The `<<` operator appends to lists:
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "First"
 list << "Second"
 list << "Third"
@@ -269,7 +269,7 @@ val len: Int = text.length
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 val array: String[] = new String[10]
 ```
 
@@ -354,8 +354,8 @@ import {
   java.io.File;
 }
 
-val list: ArrayList = new ArrayList
-val map: HashMap = new HashMap
+val list: ArrayList[String] = new ArrayList[String]()
+val map: HashMap[String, String] = new HashMap[String, String]()
 val file: File = new File("data.txt")
 ```
 
@@ -364,7 +364,7 @@ val file: File = new File("data.txt")
 You can also use fully qualified names without importing:
 
 ```onion
-val list: java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
 ## Next Steps

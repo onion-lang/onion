@@ -143,8 +143,8 @@ import {
   java.util.List;
 }
 
-def filter(items: List, predicate: (String) -> Boolean): List {
-  val result: ArrayList = new ArrayList
+def filter(items: List[String], predicate: (String) -> Boolean): List[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
     if predicate.call(item) {
@@ -155,14 +155,14 @@ def filter(items: List, predicate: (String) -> Boolean): List {
   return result
 }
 
-val lines: List = [
+val lines: List[String] = [
   "INFO: System started",
   "ERROR: Connection failed",
   "ERROR: Timeout"
 ]
 
 val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
-val errors: List = filter(lines, isError)
+val errors: List[String] = filter(lines, isError)
 ```
 
 ## リストのパイプライン

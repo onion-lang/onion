@@ -317,8 +317,8 @@ import {
   java.util.List;
 }
 
-def filterLines(lines: List, predicate: (String) -> Boolean): List {
-  val result: ArrayList = new ArrayList
+def filterLines(lines: List[String], predicate: (String) -> Boolean): List[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach line: String in lines {
     if predicate.call(line) {
@@ -331,8 +331,8 @@ def filterLines(lines: List, predicate: (String) -> Boolean): List {
 
 val startsWithError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
-val lines: List = ["INFO: OK", "ERROR: Failed", "ERROR: Timeout"]
-val errors: List = filterLines(lines, startsWithError)
+val lines: List[String] = ["INFO: OK", "ERROR: Failed", "ERROR: Timeout"]
+val errors: List[String] = filterLines(lines, startsWithError)
 ```
 
 ### Map Function
@@ -343,8 +343,8 @@ import {
   java.util.List;
 }
 
-def mapLines(lines: List, transform: (String) -> String): List {
-  val result: ArrayList = new ArrayList
+def mapLines(lines: List[String], transform: (String) -> String): List[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach line: String in lines {
     result << transform.call(line)
@@ -355,8 +355,8 @@ def mapLines(lines: List, transform: (String) -> String): List {
 
 val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
 
-val lines: List = ["hello", "world"]
-val upper: List = mapLines(lines, toUpper)
+val lines: List[String] = ["hello", "world"]
+val upper: List[String] = mapLines(lines, toUpper)
 ```
 
 ## Best Practices

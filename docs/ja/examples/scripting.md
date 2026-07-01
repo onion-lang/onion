@@ -12,7 +12,7 @@ val parsed = Args::parse(args)
 val name: String = parsed.option("name", "World")
 val count: Int = parsed.intOption("count", 1)
 val verbose: Boolean = parsed.flag("verbose")
-val rest: List = parsed.positional()
+val rest: List[String] = parsed.positional()
 
 if verbose {
   println("name=" + name + " count=" + count)
@@ -43,7 +43,7 @@ file("output.txt").write("Hello from Onion\n")
 CSVファイルもサポートされています。
 
 ```onion
-val rows: List = file("data.csv").csvRows()
+val rows: List[Map[String, String]] = file("data.csv").csvRows()
 foreach row: Object in rows {
   val m = row as Map
   println("name=" + m.get("name") + " age=" + m.get("age"))

@@ -52,7 +52,7 @@ for var i: Int = 0; i < 10; i = i + 1 {
 ### Foreach Loop
 
 ```onion
-val names: java.util.List = ["Alice", "Bob", "Charlie"]
+val names: java.util.List[String] = ["Alice", "Bob", "Charlie"]
 foreach name: String in names {
   println("Hello, " + name)
 }
@@ -132,7 +132,7 @@ import {
   java.util.ArrayList;
 }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "First"   // << is the append operator
 list << "Second"
 list << "Third"
@@ -172,17 +172,30 @@ Key points:
 ### Inheritance
 
 ```onion
-import {
-  java.util.List;
-  java.util.ArrayList;
+interface Logger {
+  def log(message: String): void
+  def count(): Int
 }
 
-class MyList <: List {
-  forward val internal: List;
+class BasicLogger <: Logger {
+  var n: Int
 
   public:
-    def this {
-      this.internal = new ArrayList;
+    def this { this.n = 0 }
+    def log(message: String): void {
+      this.n = this.n + 1
+      println(message)
+    }
+    def count(): Int = n
+}
+
+// `forward` auto-implements the Logger interface by delegating to `delegate`.
+class PrefixLogger <: Logger {
+  forward val delegate: Logger
+
+  public:
+    def this(delegate: Logger) {
+      this.delegate = delegate
     }
 }
 ```
@@ -191,6 +204,7 @@ Syntax:
 - `class Child : Parent` - extends a class
 - `class Impl <: Interface` - implements an interface
 - `class Multi : Parent <: Interface` - both
+- `forward val m: Interface` - auto-implement `Interface` by delegating to `m`
 
 ## Java Interoperability
 
@@ -266,7 +280,7 @@ import {
 }
 
 // Use fully qualified names without import
-val list: java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
 ## Bidirectional Records

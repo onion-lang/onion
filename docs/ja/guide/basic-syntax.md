@@ -134,7 +134,7 @@ val text: String = (btn as JButton).getText()
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "最初"
 list << "2番目"
 list << "3番目"
@@ -229,8 +229,8 @@ import {
   java.lang.Long as JLong;
 }
 
-val list: ArrayList = new ArrayList
-val map: HashMap = new HashMap
+val list: ArrayList[String] = new ArrayList[String]()
+val map: HashMap[String, String] = new HashMap[String, String]()
 val file: File = new File("data.txt")
 val str: String = JLong::toString(42L)
 ```
@@ -240,7 +240,7 @@ val str: String = JLong::toString(42L)
 インポートなしでも完全修飾名を使用できます：
 
 ```onion
-val list: java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
 ## 次のステップ

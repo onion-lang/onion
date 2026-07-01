@@ -114,8 +114,8 @@ import {
   javax.swing.JFrame;
 }
 
-val list: ArrayList = new ArrayList
-val map: HashMap = new HashMap
+val list: ArrayList[String] = new ArrayList[String]()
+val map: HashMap[String, String] = new HashMap[String, String]()
 val window: JFrame = new JFrame("Title")
 ```
 

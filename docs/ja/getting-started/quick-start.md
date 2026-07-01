@@ -52,7 +52,7 @@ for var i: Int = 0; i < 10; i = i + 1 {
 ### Foreachループ
 
 ```onion
-val names: java.util.List = ["Alice", "Bob", "Charlie"]
+val names: java.util.List[String] = ["Alice", "Bob", "Charlie"]
 foreach name: String in names {
   println("こんにちは、" + name)
 }
@@ -132,7 +132,7 @@ import {
   java.util.ArrayList;
 }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "最初"   // << は追加演算子
 list << "2番目"
 list << "3番目"
@@ -172,17 +172,30 @@ println(person.greet)
 ### 継承
 
 ```onion
-import {
-  java.util.List;
-  java.util.ArrayList;
+interface Logger {
+  def log(message: String): void
+  def count(): Int
 }
 
-class MyList <: List {
-  forward val internal: List;
+class BasicLogger <: Logger {
+  var n: Int
 
   public:
-    def this {
-      this.internal = new ArrayList;
+    def this { this.n = 0 }
+    def log(message: String): void {
+      this.n = this.n + 1
+      println(message)
+    }
+    def count(): Int = n
+}
+
+// `forward` は Logger インターフェースを `delegate` への委譲で自動実装します。
+class PrefixLogger <: Logger {
+  forward val delegate: Logger
+
+  public:
+    def this(delegate: Logger) {
+      this.delegate = delegate
     }
 }
 ```
@@ -191,6 +204,7 @@ class MyList <: List {
 - `class Child : Parent` - クラスを継承
 - `class Impl <: Interface` - インターフェースを実装
 - `class Multi : Parent <: Interface` - 両方
+- `forward val m: Interface` - `Interface` を `m` への委譲で自動実装
 
 ## Java相互運用
 
@@ -266,7 +280,7 @@ import {
 }
 
 // インポートなしで完全修飾名を使用
-val list: java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
 ## 次のステップ

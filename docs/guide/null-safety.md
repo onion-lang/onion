@@ -210,7 +210,7 @@ checked (their nullness is unknown to the compiler).
 chains with `?.`:
 
 ```onion
-val xs: List? = loadOrNull()
+val xs: List[String]? = loadOrNull()
 val first = xs?[0]
 val len = names?[0]?.length()
 ```

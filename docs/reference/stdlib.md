@@ -280,7 +280,7 @@ Dynamic arrays:
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]
 list.add("First")
 list << "Second"  // Using << operator
 val size: Int = list.size()
@@ -296,7 +296,7 @@ Key-value maps:
 ```onion
 import { java.util.HashMap; }
 
-val map: HashMap = new HashMap
+val map: HashMap[String, String] = new HashMap[String, String]
 map.put("key1", "value1")
 map.put("key2", "value2")
 val value: Object = map.get("key1")
@@ -525,20 +525,20 @@ val result: Future[Int] = do[Future] {
 
 Random number generation utilities via `onion.Rand`.
 
-### Rand::int / Rand::long / Rand::double
+### Rand::nextInt / nextLong / nextDouble / nextBoolean
 
 Generate random numbers:
 
 ```onion
-val randomInt: Int = Rand::int()           // Random Int
-val randomLong: Long = Rand::long()        // Random Long
-val randomDouble: Double = Rand::double()  // 0.0 to 1.0
-val randomBool: Boolean = Rand::boolean()  // Random Boolean
+val randomInt: Int = Rand::nextInt()            // Random Int
+val randomLong: Long = Rand::nextLong()         // Random Long
+val randomDouble: Double = Rand::nextDouble()   // 0.0 to 1.0
+val randomBool: Boolean = Rand::nextBoolean()   // Random Boolean
 ```
 
-### Rand::nextInt
+### Rand::nextInt (bounded)
 
-Generate random integer in range:
+Generate a random integer in a range:
 
 ```onion
 val dice: Int = Rand::nextInt(6) + 1      // 1 to 6
@@ -547,16 +547,11 @@ val percent: Int = Rand::nextInt(100)     // 0 to 99
 
 ### Rand::shuffle
 
-Shuffle a list in place:
+Shuffle an array, returning a shuffled list:
 
 ```onion
-import { java.util.ArrayList; }
-
-val list: ArrayList = new ArrayList
-list.add("A")
-list.add("B")
-list.add("C")
-Rand::shuffle(list)  // Shuffles in place
+val cards: String[] = new String[]{"A", "B", "C", "D"}
+val shuffled: List[String] = Rand::shuffle(cards)
 ```
 
 ## Assert Module

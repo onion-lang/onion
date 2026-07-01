@@ -48,7 +48,7 @@ for var i: Int = 0; i < array.length; i = i + 1 {
 
 **ファイル: `StringCat.on`**
 ```onion
-val list: List = ["a", "b", "c", "d", "e", "f", "g"];
+val list: List[String] = ["a", "b", "c", "d", "e", "f", "g"];
 for var i: Int = 0; i < list.size; i = i + 1 {
   System::out.println("list[" + i + "] = " + list[i]);
 }
@@ -92,7 +92,7 @@ Hello, Alice!
 
 **ファイル: `List.on`**
 ```onion
-val list: List = [];
+val list: List[String] = [];
 
 list << "a";
 list << "b";
@@ -175,10 +175,10 @@ select value {
 import { java.util.ArrayList; }
 
 // 数値リストの作成
-val numbers: java.util.List = [10, 20, 30, 40, 50]
+val numbers: java.util.List[Int] = [10, 20, 30, 40, 50]
 
 // 偶数のフィルタリング
-val evens: ArrayList = new ArrayList
+val evens: ArrayList[Int] = new ArrayList[Int]()
 foreach num :Int in numbers {
   if num % 2 == 0 {
     evens << num

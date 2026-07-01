@@ -15,8 +15,8 @@ import {
   java.io.File;
 }
 
-val list: ArrayList = new ArrayList
-val map: HashMap = new HashMap
+val list: ArrayList[String] = new ArrayList[String]()
+val map: HashMap[String, String] = new HashMap[String, String]()
 val file: File = new File("data.txt")
 ```
 
@@ -38,7 +38,7 @@ import {
 You can use fully qualified names without importing:
 
 ```onion
-val list: java.util.ArrayList = new java.util.ArrayList
+val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 val file: java.io.File = new java.io.File("data.txt")
 ```
 
@@ -87,7 +87,7 @@ import {
   java.lang.StringBuilder;
 }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 val date: Date = new Date
 val builder: StringBuilder = new StringBuilder("Hello")
 ```
@@ -113,7 +113,7 @@ Call methods on Java objects normally:
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list.add("First")
 list.add("Second")
 list.add("Third")
@@ -162,7 +162,7 @@ println(result)  // "Hello World!"
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list << "Apple"     // << operator for add()
 list << "Banana"
 list << "Cherry"
@@ -180,7 +180,7 @@ val size: Int = list.size()
 ```onion
 import { java.util.HashMap; }
 
-val map: HashMap = new HashMap
+val map: HashMap[String, Object] = new HashMap[String, Object]()
 map.put("name", "Alice")
 map.put("age", 30)
 map.put("city", "Tokyo")
@@ -196,7 +196,7 @@ val hasKey: Boolean = map.containsKey("name")
 ```onion
 import { java.util.HashSet; }
 
-val set: HashSet = new HashSet
+val set: HashSet[String] = new HashSet[String]()
 set.add("red")
 set.add("green")
 set.add("blue")
@@ -258,7 +258,7 @@ thread.start()
 ```onion
 import { java.lang.Comparable; }
 
-class Person <: Comparable {
+class Person <: Comparable[Object] {
   val name: String
   val age: Int
 
@@ -423,7 +423,7 @@ Use the `as` operator to cast Java objects:
 val obj: Object = "Hello"
 val str: String = (obj as String)
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list.add("Item")
 val item: String = list.get(0) as String
 ```

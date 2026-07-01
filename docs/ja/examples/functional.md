@@ -187,8 +187,8 @@ import {
   java.util.List;
 }
 
-def filter(items: List, predicate: (String) -> Boolean): ArrayList {
-  val result: ArrayList = new ArrayList
+def filter(items: List[String], predicate: (String) -> Boolean): ArrayList[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
     if predicate.call(item) {
@@ -200,7 +200,7 @@ def filter(items: List, predicate: (String) -> Boolean): ArrayList {
 }
 
 // 利用例
-val logs: List = [
+val logs: List[String] = [
   "INFO: Started",
   "ERROR: Failed",
   "INFO: Processing",
@@ -210,7 +210,7 @@ val logs: List = [
 
 val isError: (String) -> Boolean = (line: String) -> { return line.startsWith("ERROR"); }
 
-val errors: ArrayList = filter(logs, isError)
+val errors: ArrayList[String] = filter(logs, isError)
 
 foreach error: String in errors {
   println(error)
@@ -230,8 +230,8 @@ ERROR: Timeout
 ```onion
 import { java.util.ArrayList; }
 
-def map(items: java.util.List, transform: (String) -> String): ArrayList {
-  val result: ArrayList = new ArrayList
+def map(items: java.util.List[String], transform: (String) -> String): ArrayList[String] {
+  val result: ArrayList[String] = new ArrayList[String]()
 
   foreach item: String in items {
     result << transform.call(item)
@@ -241,10 +241,10 @@ def map(items: java.util.List, transform: (String) -> String): ArrayList {
 }
 
 // 利用例
-val words: java.util.List = ["hello", "world", "onion"]
+val words: java.util.List[String] = ["hello", "world", "onion"]
 val toUpper: (String) -> String = (s: String) -> { return s.toUpperCase(); }
 
-val upper: ArrayList = map(words, toUpper)
+val upper: ArrayList[String] = map(words, toUpper)
 
 foreach word: String in upper {
   println(word)
@@ -265,7 +265,7 @@ ONION
 ```onion
 import { java.util.List; }
 
-def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
+def reduce(items: List[Int], operation: (Int, Int) -> Int, initial: Int): Int {
   var accumulator: Int = initial
 
   foreach item: Int in items {
@@ -276,7 +276,7 @@ def reduce(items: List, operation: (Int, Int) -> Int, initial: Int): Int {
 }
 
 // 合計
-val numbers: List = [1, 2, 3, 4, 5]
+val numbers: List[Int] = [1, 2, 3, 4, 5]
 val sum: (Int, Int) -> Int = (acc: Int, n: Int) -> { return acc + n; }
 val total: Int = reduce(numbers, sum, 0)
 println("Sum: " + total)  // 15

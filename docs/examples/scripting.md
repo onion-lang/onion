@@ -12,7 +12,7 @@ val parsed = Args::parse(args)
 val name: String = parsed.option("name", "World")
 val count: Int = parsed.intOption("count", 1)
 val verbose: Boolean = parsed.flag("verbose")
-val rest: List = parsed.positional()
+val rest: List[String] = parsed.positional()
 
 if verbose {
   println("name=" + name + " count=" + count)
@@ -43,7 +43,7 @@ file("output.txt").write("Hello from Onion\n")
 CSV files are also supported:
 
 ```onion
-val rows: List = file("data.csv").csvRows()
+val rows: List[Map[String, String]] = file("data.csv").csvRows()
 foreach row: Object in rows {
   val m = row as Map
   println("name=" + m.get("name") + " age=" + m.get("age"))
@@ -97,6 +97,10 @@ println(Math::PI)
 ```onion
 record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
 
+def defaultConfig(): ServerConfig {
+  return new ServerConfig("localhost", 8080, false)
+}
+
 val parsed = Args::parse(args)
 val configPath: String = parsed.option("config", "")
 val portOverride: Int = parsed.intOption("port", -1)
@@ -129,6 +133,8 @@ onion ConfigApp.on --config server.yaml --port 9000 --debug
 **`ShellPipeline.on`** runs `wc`, `sort`, and `head` as a pipeline.
 
 ```onion
+val inputPath = "words.txt"
+
 val countResult = Proc::capture("wc", "-l", inputPath)
 println("wc exit=" + countResult.status() + " out=" + countResult.stdout().trim())
 

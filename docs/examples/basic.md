@@ -48,7 +48,7 @@ String operations and list iteration:
 
 **File: `StringCat.on`**
 ```onion
-val list: List = ["a", "b", "c", "d", "e", "f", "g"];
+val list: List[String] = ["a", "b", "c", "d", "e", "f", "g"];
 for var i: Int = 0; i < list.size; i = i + 1 {
   System::out.println("list[" + i + "] = " + list[i]);
 }
@@ -92,7 +92,7 @@ Using ArrayList with the `<<` append operator:
 
 **File: `List.on`**
 ```onion
-val list: List = [];
+val list: List[String] = [];
 
 list << "a";
 list << "b";
@@ -175,10 +175,10 @@ Combining multiple concepts:
 import { java.util.ArrayList; }
 
 // Create numbers list
-val numbers: java.util.List = [10, 20, 30, 40, 50]
+val numbers: java.util.List[Int] = [10, 20, 30, 40, 50]
 
 // Filter even numbers
-val evens: ArrayList = new ArrayList
+val evens: ArrayList[Integer] = new ArrayList[Integer]
 foreach num :Int in numbers {
   if num % 2 == 0 {
     evens << num

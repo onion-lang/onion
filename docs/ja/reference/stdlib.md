@@ -142,7 +142,7 @@ val percent: Int = Rand::nextInt(100)     // 0から99
 ```onion
 import { java.util.ArrayList; }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 list.add("A")
 list.add("B")
 list.add("C")

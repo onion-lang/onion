@@ -91,7 +91,7 @@ Use `<:` to implement an interface:
 ```onion
 import { java.lang.Comparable; }
 
-class Person <: Comparable {
+class Person <: Comparable[Object] {
   val name: String
   val age: Int
 
@@ -140,7 +140,7 @@ import {
   java.lang.Comparable;
 }
 
-class Student <: Serializable, Comparable {
+class Student <: Serializable, Comparable[Object] {
   val id: Int
   val name: String
 
@@ -198,34 +198,45 @@ class Child : ParentClass <: Interface1, Interface2 {
 Use `forward` to delegate interface methods to a member:
 
 ```onion
-import {
-  java.util.List;
-  java.util.ArrayList;
+interface Logger {
+  def log(message: String): void
+  def count(): Int
 }
 
-class MyList <: List {
-  forward val internal: List;
+class BasicLogger <: Logger {
+  var n: Int
 
   public:
-    def this {
-      this.internal = new ArrayList;
+    def this { this.n = 0 }
+    def log(message: String): void {
+      this.n = this.n + 1
+      println(message)
+    }
+    def count(): Int = n
+}
+
+class PrefixLogger <: Logger {
+  forward val delegate: Logger
+
+  public:
+    def this(delegate: Logger) {
+      this.delegate = delegate
     }
 
-    // Custom methods
-    def addAll(items: String[]) {
+    // Custom method
+    def logAll(items: String[]): void {
       foreach item: String in items {
-        this.internal << item;
+        this.delegate.log("[app] " + item)
       }
     }
 }
 
-val list: MyList = new MyList;
-list << "First";
-list << "Second";
-println(list.size);
+val logger: PrefixLogger = new PrefixLogger(new BasicLogger())
+logger.logAll(new String[]{"First", "Second"})
+println(logger.count())   // count() is forwarded to BasicLogger -> 2
 ```
 
-The `forward` directive automatically implements interface methods by forwarding calls to the specified member.
+The `forward` directive automatically implements the interface methods (`log`/`count`) by forwarding calls to the `delegate` member, so `PrefixLogger` only needs to add its own behaviour.
 
 ## Polymorphism
 
@@ -272,11 +283,11 @@ import {
   java.util.LinkedList;
 }
 
-val list1: List = new ArrayList  // ArrayList implements List
-val list2: List = new LinkedList  // LinkedList implements List
+val list1: List[String] = new ArrayList[String]()  // ArrayList implements List
+val list2: List[String] = new LinkedList[String]()  // LinkedList implements List
 
-val lists: java.util.List = [list1, list2]
-foreach list: List in lists {
+val lists: java.util.List[List[String]] = [list1, list2]
+foreach list: List[String] in lists {
   list.add("Item")
   println("Size: " + list.size())
 }
@@ -313,18 +324,21 @@ class Circle : Shape {
 Use delegation when possible:
 
 ```onion
-// Instead of inheriting from ArrayList
-class MyList : ArrayList {
-  // ...
+interface Logger {
+  def log(message: String): void
+  def count(): Int
 }
 
-// Consider delegation
-class MyList <: List {
-  forward val internal: List;
+// Instead of inheriting from a concrete BasicLogger...
+// class PrefixLogger : BasicLogger { ... }
+
+// ...prefer delegating to the Logger interface.
+class PrefixLogger <: Logger {
+  forward val delegate: Logger
 
   public:
-    def this {
-      this.internal = new ArrayList;
+    def this(delegate: Logger) {
+      this.delegate = delegate
     }
 }
 ```

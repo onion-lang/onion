@@ -111,7 +111,7 @@ public:
   }
 }
 
-val nums: ArrayList[Int] = [5, 1, 3]
+val nums: List[Int] = [5, 1, 3]
 Collections::sort(nums, new IntComparator())
 ```
 

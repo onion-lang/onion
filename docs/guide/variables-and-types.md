@@ -50,7 +50,7 @@ import {
   java.io.File;
 }
 
-val list: ArrayList = new ArrayList
+val list: ArrayList[String] = new ArrayList[String]()
 val file: File = new File("data.txt")
 ```
 
@@ -62,7 +62,7 @@ import {
   java.util.ArrayList;
 }
 
-val list: List = new ArrayList  // Interface type
+val list: List[String] = new ArrayList[String]()  // Interface type
 ```
 
 ### Array Types
@@ -148,14 +148,15 @@ A value can be assigned to a variable if:
 3. Automatic widening applies (for primitives)
 
 ```onion
+import { java.util.ArrayList; java.util.List; }
+
 // Same type
 val s1: String = "Hello"
 val s2: String = s1  // OK
 
 // Subtype
-import { java.util.ArrayList; java.util.List; }
-val arrayList: ArrayList = new ArrayList
-val list: List = arrayList  // OK (ArrayList implements List)
+val arrayList: ArrayList[String] = new ArrayList[String]()
+val list: List[String] = arrayList  // OK (ArrayList implements List)
 
 // Widening
 val i: Int = 42

@@ -89,15 +89,15 @@ class SemanticErrorReporter(threshold: Int) {
   // ========== Type extractors ==========
 
   private def typeName(item: AnyRef): String =
-    if (item == null) "<unknown>" else item.asInstanceOf[TypedAST.Type].displayName
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.Type])
   private def classTypeName(item: AnyRef): String =
-    if (item == null) "<unknown>" else item.asInstanceOf[TypedAST.ClassType].displayName
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ClassType])
   private def objectTypeName(item: AnyRef): String =
-    if (item == null) "<unknown>" else item.asInstanceOf[TypedAST.ObjectType].displayName
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ObjectType])
   private def asString(item: AnyRef): String = item.asInstanceOf[String]
   private def asInt(item: AnyRef): String = item.asInstanceOf[Int].toString
   private def typeNames(types: Array[TypedAST.Type]): String = {
-    if (types.isEmpty) "" else types.map(_.displayName).mkString(", ")
+    if (types.isEmpty) "" else types.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")
   }
   private def asTypeArray(item: AnyRef): Array[TypedAST.Type] = item.asInstanceOf[Array[TypedAST.Type]]
 
@@ -487,7 +487,7 @@ class SemanticErrorReporter(threshold: Int) {
       val constructors = items(2).asInstanceOf[Array[TypedAST.ConstructorRef]]
       if (constructors.nonEmpty) {
         val ctorSignatures = constructors.map { ctor =>
-          s"  ${typeRef.name}(${ctor.getArgs.map(_.displayName).mkString(", ")})"
+          s"  ${typeRef.name}(${ctor.getArgs.map(onion.compiler.toolbox.TypeFormatting.sourceForm).mkString(", ")})"
         }
         Some(s"Available constructors:${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
       } else None
@@ -534,11 +534,11 @@ class SemanticErrorReporter(threshold: Int) {
     val sealedType = items(0).asInstanceOf[TypedAST.Type]
     // Missing cases are subtypes for sealed hierarchies, constant names for enums
     val missingNames = items(1).asInstanceOf[Array[?]].map {
-      case t: TypedAST.Type => t.displayName
+      case t: TypedAST.Type => onion.compiler.toolbox.TypeFormatting.sourceForm(t)
       case other => String.valueOf(other)
     }.mkString(", ")
     problem(position, format(message("error.semantic.nonExhaustivePatternMatch"),
-      Seq(sealedType.displayName, missingNames)))
+      Seq(onion.compiler.toolbox.TypeFormatting.sourceForm(sealedType), missingNames)))
   }
 
   /**

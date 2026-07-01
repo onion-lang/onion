@@ -25,7 +25,11 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          VERSION="$(sbt -error 'print version' | tail -1)"
+          # sbt can emit ANSI control sequences even with -error, so disable
+          # formatting and strip any residual escapes, then take the last line
+          # that looks like a version number.
+          RAW="$(sbt -Dsbt.log.noformat=true -Dsbt.color=false -error 'print version' 2>/dev/null)"
+          VERSION="$(printf '%s\n' "$RAW" | sed -E 's/\x1b\[[0-9;?]*[A-Za-z]//g' | grep -E '^[0-9]+\.[0-9]+' | tail -1)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "resolved version: $VERSION"
       - name: Verify tag matches version

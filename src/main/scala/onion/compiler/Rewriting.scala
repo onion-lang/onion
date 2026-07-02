@@ -103,6 +103,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewrite(unit: AST.CompilationUnit): AST.CompilationUnit = {
+    checkInstanceCoherence(unit.toplevels)
     val newToplevels = Buffer.empty[AST.Toplevel]
     for (top <- unit.toplevels) top match {
       case declaration: AST.ClassDeclaration =>
@@ -298,6 +299,27 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * layered on in later stages; for now this just makes an instance a well-formed
    * implementing class.
    */
+  /**
+   * Type-class coherence: at most one `instance` per (trait, type) within a
+   * compilation unit. Two instances for the same trait application would lower to
+   * the same class; catching it here gives a clear message instead of leaking the
+   * internal mangled name via a duplicate-class error. (Cross-unit duplicates are
+   * still caught later, since they redefine the same class.)
+   */
+  private def checkInstanceCoherence(toplevels: List[AST.Toplevel]): Unit = {
+    val seen = scala.collection.mutable.Map.empty[String, AST.InstanceDeclaration]
+    toplevels.foreach {
+      case inst: AST.InstanceDeclaration =>
+        val key = mangleInstanceClassName(inst.traitType.desc)
+        if (seen.contains(key)) {
+          throw new CompilationException(Seq(CompileError("", inst.location,
+            s"instance ${inst.traitType.desc} は既に定義されています（型クラスの instance は (trait, 型) ごとに1つまでです）")))
+        }
+        seen(key) = inst
+      case _ =>
+    }
+  }
+
   private def lowerInstanceDeclaration(declaration: AST.InstanceDeclaration): AST.ClassDeclaration = {
     val section = AST.AccessSection(declaration.location, AST.M_PUBLIC, declaration.methods)
     AST.ClassDeclaration(

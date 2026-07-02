@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.3.0-M5 — interop & diagnostics
+
+- **Basic-type keywords as static receivers.** `Long::toString(42L)`,
+  `Int::parseInt("7")`, and `Long::MAX_VALUE` now work — a basic-type keyword
+  receiver maps to its boxed class. (A fully-qualified path ending in a keyword,
+  `java.lang.Long::`, still doesn't parse; use the simple `Long::` form.) ([#202])
+- **Clearer end-of-file syntax errors.** An unexpected EOF now reports
+  "unexpected end of file — a closing `}` or `)` is probably missing" instead of
+  dumping the raw expected-token list ([#201]).
+
 ### 0.3.0-M4 — interop, null safety & docs
 
 - **Static calls on fully-qualified names.** `java.lang.Math::max(3, 7)` and
@@ -195,6 +205,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#197]: https://github.com/onion-lang/onion/issues/197
 [#200]: https://github.com/onion-lang/onion/issues/200
 [#201]: https://github.com/onion-lang/onion/issues/201
+[#202]: https://github.com/onion-lang/onion/issues/202
 [#185]: https://github.com/onion-lang/onion/issues/185
 [#186]: https://github.com/onion-lang/onion/issues/186
 [#187]: https://github.com/onion-lang/onion/issues/187

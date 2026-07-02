@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-03
+
+The headline is **type classes**; also a batch of soundness and diagnostic fixes
+surfaced by a gap-probe of real programs.
+
 - **Type classes (Rust-trait style).** Declare a `trait Numeric[T] { def zero(): T;
   def plus(a: T, b: T): T }`, give it instances (`instance Numeric[Integer] { ... }`),
   constrain a generic with `[T: Numeric]`, and call trait methods via
@@ -351,7 +356,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.8...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.0...develop
+[0.4.0]: https://github.com/onion-lang/onion/releases/tag/v0.4.0
 [0.3.8]: https://github.com/onion-lang/onion/releases/tag/v0.3.8
 [0.3.7]: https://github.com/onion-lang/onion/releases/tag/v0.3.7
 [0.3.6]: https://github.com/onion-lang/onion/releases/tag/v0.3.6

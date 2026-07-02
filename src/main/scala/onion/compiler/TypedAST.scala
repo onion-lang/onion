@@ -993,7 +993,7 @@ object TypedAST {
     case NonNull, Nullable, Platform
   }
 
-  case class TypeParameter(name: String, upperBound: Option[TypedAST.Type], nullability: Nullability = Nullability.Platform)
+  case class TypeParameter(name: String, upperBound: Option[TypedAST.Type], nullability: Nullability = Nullability.Platform, constraints: scala.collection.immutable.List[ClassType] = scala.collection.immutable.Nil)
 
   object AppliedClassType {
     private val cache = scala.collection.mutable.HashMap[(TypedAST.ClassType, scala.collection.immutable.List[TypedAST.Type]), AppliedClassType]()

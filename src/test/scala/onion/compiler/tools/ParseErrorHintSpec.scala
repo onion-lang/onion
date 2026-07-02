@@ -17,11 +17,13 @@ class ParseErrorHintSpec extends AbstractShellSpec {
     }
   }
 
-  describe("parse error hints") {
-    it("hints at a missing closer when the file ends unexpectedly") {
+  describe("parse error at EOF") {
+    it("reports a missing closer without dumping the raw expected-token list") {
       // A class body left unclosed (missing final }).
       val msgs = messages("class C {\npublic:\n  def f(): Int { return 1 }\n").mkString("\n")
-      assert(msgs.contains("closing") && (msgs.contains("}") || msgs.contains(")")))
+      // Mentions the missing bracket (locale-independent), not the keyword dump.
+      assert(msgs.contains("}") || msgs.contains(")"))
+      assert(!msgs.contains("abstract") && !msgs.contains("more)"))
     }
   }
 }

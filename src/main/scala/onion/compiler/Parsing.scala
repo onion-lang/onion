@@ -141,6 +141,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * instead of listing unrelated expected tokens.
    */
   private def syntaxErrorMessage(found: String, expected: String): String = {
+    // At EOF the expected-token list is a large, unhelpful dump; report the real
+    // problem (an unclosed block/paren) instead.
+    if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
     val base =
       if (found == "\"") Message("error.parsing.unterminated_string")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
@@ -152,10 +155,6 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * Add friendly hints for common syntax mistakes.
    */
   private def commonSyntaxHint(found: String, expected: String): String = found match {
-    case _ if found == null || found.isEmpty =>
-      // Reached EOF while more input was expected -- almost always an unclosed
-      // block/paren earlier in the file.
-      "Hint: reached the end of the file — a closing `}` or `)` is probably missing."
     case "in" =>
       "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
     case "else" =>

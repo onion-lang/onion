@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-07-02
+
+- **Compiler crash fixed: safe call on a nullable primitive.** `o?.method()`
+  where `o` is `Int?`/`Long?`/`Double?`/`Boolean?` compiled with an internal
+  error (I0000, "not a boxable type"); it now retypes the already-boxed value to
+  its wrapper class instead of re-boxing ([#218]).
+
 ## [0.3.4] - 2026-07-02
 
 - **SAM overloads are disambiguated by the lambda body.** A lambda passed to an
@@ -282,7 +289,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.4...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.5...develop
+[0.3.5]: https://github.com/onion-lang/onion/releases/tag/v0.3.5
 [0.3.4]: https://github.com/onion-lang/onion/releases/tag/v0.3.4
 [0.3.3]: https://github.com/onion-lang/onion/releases/tag/v0.3.3
 [0.3.2]: https://github.com/onion-lang/onion/releases/tag/v0.3.2
@@ -321,3 +329,4 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#216]: https://github.com/onion-lang/onion/issues/216
 [#215]: https://github.com/onion-lang/onion/issues/215
 [#217]: https://github.com/onion-lang/onion/issues/217
+[#218]: https://github.com/onion-lang/onion/issues/218

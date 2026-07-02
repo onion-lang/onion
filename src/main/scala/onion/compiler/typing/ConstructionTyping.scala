@@ -222,6 +222,11 @@ final class ConstructionTyping(
         Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs)
       )
       None
+    } else if (!MemberAccess.isMemberAccessible(constructors(0), bodyContext.definition)) {
+      // A private/protected constructor was resolvable but is not accessible here;
+      // previously this compiled and threw IllegalAccessError at runtime.
+      bodyContext.report(METHOD_NOT_ACCESSIBLE, node, constructors(0).affiliation, "new", constructors(0).getArgs, bodyContext.definition)
+      None
     } else {
       typeRef match {
         case applied: TypedAST.AppliedClassType =>

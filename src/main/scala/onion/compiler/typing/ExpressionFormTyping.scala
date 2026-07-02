@@ -60,7 +60,15 @@ final class ExpressionFormTyping(
         val right: Term =
           if (right0.isBasicType && !leftNonNull.isBasicType) Boxing.boxing(bodyContext.table, right0)
           else right0
-        if (leftT.isBasicType || (!leftNonNull.isBottomType && !TypeRules.isAssignable(leftNonNull, right.`type`))) {
+        // Compare against the right operand's non-null core: a nullable fallback
+        // (`a ?: b` where both are T?) is valid and yields a nullable result
+        // (computed below), which also makes chained `a ?: b ?: c` type-check.
+        val rightNonNull: Type = right.`type` match {
+          case n: NullableType => boxedInner(n.innerType)
+          case tv: TypeVariableType if tv.nullability == Nullability.Nullable => tv.nonNullView
+          case other => other
+        }
+        if (leftT.isBasicType || (!leftNonNull.isBottomType && !TypeRules.isAssignable(leftNonNull, rightNonNull))) {
           bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftT, right0.`type`))
           None
         } else {

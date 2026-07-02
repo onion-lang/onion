@@ -56,23 +56,11 @@ private[compiler] final class StaticMethodCallSupport(
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) {
       None
-    } else if (node.typeArgs.nonEmpty) {
-      val methods = typeRef.findMethod(node.name, parameters)
-      if (methods.length == 0) {
-        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters))
-        None
-      } else if (methods.length > 1) {
-        calls.reportAmbiguousMethods(node, node.name, methods)
-        None
-      } else {
-        val method = methods(0)
-        val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.prepareCallParams(node, node.args, method, parameters, expectedArgs),
-          finalParams => new CallStatic(typeRef, method, finalParams)
-        )
-      }
     } else {
+      // Both the explicit-type-argument and the inferred cases go through the
+      // boxing-aware applicable-method collection; buildResolvedCall applies
+      // node.typeArgs. (A strict findMethod here would reject a primitive
+      // argument against a type-variable parameter, e.g. Util::identity[Int](99).)
       val candidates = new JTreeSet[Method](new MethodComparator)
       calls.collectMethodsMatching(typeRef, node.name, candidates, calls.isStaticMethod)
       if (candidates.isEmpty) {

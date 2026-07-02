@@ -1710,7 +1710,9 @@ AST.DelegatedFieldDeclaration delegate_decl(int modifiers) : {
 }{
   {enterSection();}
   start="forward" (keyword="val" | keyword="var") name=id() ":" type = type()
-  ["=" eols() init=term()] eos() {
+  ["=" eols() init=term()] eos_or_block_end() {
+    // eos_or_block_end (not eos) so a `forward` field that is the last member on
+    // the same line as the closing brace terminates at the `}` (see field_decl).
     int declMods = modifiers;
     if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
     return new AST.DelegatedFieldDeclaration(p(start), declMods, c(name), type, init);
@@ -1724,7 +1726,10 @@ AST.FieldDeclaration field_decl(int modifiers):{
 }{
   {enterSection();}
   (keyword="val" | keyword="var") name=id() ":" type=type()
-  ["=" eols() init=term()] eos() {
+  ["=" eols() init=term()] eos_or_block_end() {
+    // eos_or_block_end (not eos) so a field that is the last member on the same
+    // line as the closing brace, `class C { public: var x: Int = 0 }`, terminates
+    // at the `}` instead of being a syntax error.
     int declMods = modifiers;
     if (keyword.image.equals("val")) declMods |= AST.M_FINAL();
     return new AST.FieldDeclaration(p(keyword), declMods, c(name), type, init);

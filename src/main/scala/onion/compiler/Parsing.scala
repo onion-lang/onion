@@ -152,6 +152,10 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * Add friendly hints for common syntax mistakes.
    */
   private def commonSyntaxHint(found: String, expected: String): String = found match {
+    case _ if found == null || found.isEmpty =>
+      // Reached EOF while more input was expected -- almost always an unclosed
+      // block/paren earlier in the file.
+      "Hint: reached the end of the file — a closing `}` or `)` is probably missing."
     case "in" =>
       "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
     case "else" =>

@@ -102,6 +102,53 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     rewritten.toSeq
   }
 
+  // Type-class dictionary passing. While rewriting a constrained generic body,
+  // `dictScope` maps (traitName, typeParamName) -> the synthetic dictionary
+  // parameter name added to the enclosing method. An abstract `Trait[T]::m(...)`
+  // (T is a type parameter here) is rewritten to a call on that dictionary
+  // parameter; a ground `Trait[Int]::m(...)` still resolves to the instance
+  // class. `typeParamsInScope` distinguishes the two.
+  private var typeParamsInScope: Set[String] = Set.empty
+  private var dictScope: scala.collection.immutable.Map[(String, String), String] = scala.collection.immutable.Map.empty
+
+  /** The dictionary parameters a constrained generic declaration needs: one per
+    * (type parameter, trait constraint), a nullable parameter of the trait type
+    * applied to the parameter, defaulted to null (so a call omitting it type-checks;
+    * the typer fills the real instance). Returns the params and the scope map. */
+  private def dictionaryParametersFor(loc: Location, typeParams: List[AST.TypeParameter])
+      : (List[AST.Argument], scala.collection.immutable.Map[(String, String), String]) = {
+    val entries = for {
+      tp <- typeParams
+      constraint <- tp.constraints
+    } yield {
+      val traitName = constraint.desc.toString
+      val paramName = "dict$" + traitName.replace(".", "$") + "$" + tp.name
+      // Nullable so the `= null` default type-checks; the typer always fills the
+      // real instance at call sites, and the body uses `!!` before calling.
+      val dictType = AST.TypeNode(loc, AST.NullableType(AST.ParameterizedType(constraint.desc, List(AST.ReferenceType(tp.name, false)))), false)
+      val arg = AST.Argument(loc, paramName, dictType, AST.NullLiteral(loc), false)
+      (arg, (traitName, tp.name) -> paramName)
+    }
+    (entries.map(_._1), entries.map(_._2).toMap)
+  }
+
+  private def withDictScope[A](names: Iterable[String], dicts: scala.collection.immutable.Map[(String, String), String])(body: => A): A = {
+    val savedTp = typeParamsInScope
+    val savedDict = dictScope
+    typeParamsInScope = savedTp ++ names
+    dictScope = savedDict ++ dicts
+    try body finally { typeParamsInScope = savedTp; dictScope = savedDict }
+  }
+  private def withTypeParams[A](names: Iterable[String])(body: => A): A = withDictScope(names, scala.collection.immutable.Map.empty)(body)
+
+  private def descReferencesTypeParam(desc: AST.TypeDescriptor): Boolean = desc match {
+    case AST.ReferenceType(name, _) => typeParamsInScope.contains(name)
+    case AST.ParameterizedType(c, ps) => descReferencesTypeParam(c) || ps.exists(descReferencesTypeParam)
+    case AST.ArrayType(c) => descReferencesTypeParam(c)
+    case AST.NullableType(i) => descReferencesTypeParam(i)
+    case _ => false
+  }
+
   def rewrite(unit: AST.CompilationUnit): AST.CompilationUnit = {
     checkInstanceCoherence(unit.toplevels)
     val newToplevels = Buffer.empty[AST.Toplevel]
@@ -280,11 +327,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  def rewriteClassDeclaration(declaration: ClassDeclaration): ClassDeclaration = {
-    val newDefaultSection = declaration.defaultSection.map(rewriteAccessSection)
-    val newSections = declaration.sections.map(rewriteAccessSection)
-    declaration.copy(defaultSection = newDefaultSection, sections = newSections)
-  }
+  def rewriteClassDeclaration(declaration: ClassDeclaration): ClassDeclaration =
+    withTypeParams(declaration.typeParameters.map(_.name)) {
+      val newDefaultSection = declaration.defaultSection.map(rewriteAccessSection)
+      val newSections = declaration.sections.map(rewriteAccessSection)
+      declaration.copy(defaultSection = newDefaultSection, sections = newSections)
+    }
 
   def rewriteInterfaceDeclaration(declaration: AST.InterfaceDeclaration): InterfaceDeclaration = {
     val newMethods = declaration.methods.map(rewriteMethodDeclaration)
@@ -331,16 +379,51 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   /** Deterministic class name for the instance of a trait application, e.g.
     * `Numeric[Integer]` -> `Numeric$$Integer`. Must agree between the instance
     * lowering and the `Trait[..]::method` dictionary-access lowering. */
-  private def mangleInstanceClassName(applied: AST.TypeDescriptor): String =
-    applied.toString.replace("[", "$$").replace("]", "").replace(",", "$").replace(" ", "").replace(".", "_")
+  private def boxedPrimitiveName(kind: AST.PrimitiveTypeKind): String = kind match {
+    case AST.KInt => "Integer"; case AST.KLong => "Long"; case AST.KDouble => "Double"
+    case AST.KFloat => "Float"; case AST.KBoolean => "Boolean"; case AST.KByte => "Byte"
+    case AST.KShort => "Short"; case AST.KChar => "Character"; case other => other.name
+  }
+  /** Canonical instance-class name for a trait application. Primitive type
+    * arguments are normalized to their boxed simple name (`Long` not `long`) so it
+    * agrees with call-site resolution, where a type argument is always boxed. Must
+    * stay in sync with MethodInvocationBuilderSupport.instanceClassName. */
+  private def mangleInstanceClassName(applied: AST.TypeDescriptor): String = applied match {
+    case AST.PrimitiveType(k) => boxedPrimitiveName(k)
+    case AST.ReferenceType(n, _) => val i = n.lastIndexOf('.'); if (i >= 0) n.substring(i + 1) else n
+    case AST.ParameterizedType(c, ps) => mangleInstanceClassName(c) + "$$" + ps.map(mangleInstanceClassName).mkString("$")
+    case AST.ArrayType(c) => mangleInstanceClassName(c) + "Array"
+    case AST.NullableType(i) => mangleInstanceClassName(i)
+    case other => other.toString.replace("[", "$$").replace("]", "").replace(",", "$").replace(" ", "").replace(".", "_")
+  }
 
   /** `Trait[TypeArgs]::method(args)` -> `new <mangled instance>().method(args)`.
     * Works for ground type arguments (the instance class exists); an abstract type
     * parameter yields a "class not found" error until dictionary passing lands. */
-  private def lowerTraitMethodCall(node: AST.TraitMethodCall): AST.Expression = {
+  private def lowerToInstanceClass(node: AST.TraitMethodCall, rewrittenArgs: List[AST.Expression]): AST.Expression = {
     val applied = AST.ParameterizedType(node.traitType.desc, node.typeArgs.map(_.desc))
     val classNode = AST.TypeNode(node.location, AST.ReferenceType(mangleInstanceClassName(applied), false), false)
-    AST.MethodCall(node.location, AST.NewObject(node.location, classNode, Nil), node.name, node.args.map(rewriteExpression), Nil)
+    AST.MethodCall(node.location, AST.NewObject(node.location, classNode, Nil), node.name, rewrittenArgs, Nil)
+  }
+
+  private def lowerTraitMethodCall(node: AST.TraitMethodCall): AST.Expression = {
+    val rewrittenArgs = node.args.map(rewriteExpression)
+    val abstractTypeParam = node.typeArgs match {
+      case single :: Nil if descReferencesTypeParam(single.desc) =>
+        single.desc match { case AST.ReferenceType(n, _) => Some(n); case _ => None }
+      case _ => None
+    }
+    abstractTypeParam.flatMap(tp => dictScope.get((node.traitType.desc.toString, tp))) match {
+      case Some(dictParamName) =>
+        // Abstract `Trait[T]::m(args)` -> `dict$Trait$T!!.m(args)`, a call on the
+        // synthesized dictionary parameter (never null: filled at the call site).
+        val dictRef = AST.NotNullAssertion(node.location, AST.Id(node.location, dictParamName))
+        AST.MethodCall(node.location, dictRef, node.name, rewrittenArgs, Nil)
+      case None =>
+        // Ground (or an abstract param with no dictionary in scope, which yields a
+        // clean error via the missing instance class).
+        lowerToInstanceClass(node, rewrittenArgs)
+    }
   }
 
   def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = {
@@ -687,8 +770,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewriteFunctionDeclaration(declaration: AST.FunctionDeclaration): AST.FunctionDeclaration = {
-    val newBlock = rewriteBlockExpression(declaration.block)
-    declaration.copy(block = newBlock)
+    val (dictParams, dicts) = dictionaryParametersFor(declaration.location, declaration.typeParameters)
+    val newBlock = withDictScope(declaration.typeParameters.map(_.name), dicts) { rewriteBlockExpression(declaration.block) }
+    declaration.copy(args = declaration.args ++ dictParams, block = newBlock)
   }
 
   def rewriteGlobalVariableDeclaration(declaration: AST.GlobalVariableDeclaration): AST.GlobalVariableDeclaration = {
@@ -709,8 +793,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   def rewriteMethodDeclaration(method: AST.MethodDeclaration): AST.MethodDeclaration = {
-    val newBlock = if (method.block != null) rewriteBlockExpression(method.block) else null
-    method.copy(block = newBlock)
+    val (dictParams, dicts) = dictionaryParametersFor(method.location, method.typeParameters)
+    val newBlock = if (method.block != null) withDictScope(method.typeParameters.map(_.name), dicts) { rewriteBlockExpression(method.block) } else null
+    method.copy(args = method.args ++ dictParams, block = newBlock)
   }
 
   def rewriteFieldDeclaration(field: AST.FieldDeclaration): AST.FieldDeclaration = {

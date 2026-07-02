@@ -18,9 +18,15 @@ class TypeClassCoherenceSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == shell.run(
         "trait Show[T] { def show(x: T): String }\ninstance Show[String] { def show(x: String): String = x }\ninstance Show[Integer] { def show(x: Integer): String { return \"\" + x } }\ndef main(args: String[]): String { return (new `Show$$String`()).show(\"ok\") }", "None", Array()))
     }
-    it("allows distinct primitive vs boxed type arguments") {
-      assert(Shell.Success("d") == shell.run(
+    it("unifies primitive and boxed of the same type (one instance per erased type)") {
+      // Numeric[Int] and Numeric[Integer] are the same erased instance, so
+      // declaring both is an overlap.
+      assert(Shell.Failure(-1) == shell.run(
         "trait Numeric[T] { def zero(): T }\ninstance Numeric[Integer] { def zero(): Integer = 0 }\ninstance Numeric[Int] { def zero(): Int = 0 }\ndef main(args: String[]): String { return \"d\" }", "None", Array()))
+    }
+    it("allows genuinely distinct type arguments to coexist") {
+      assert(Shell.Success("d") == shell.run(
+        "trait Show[T] { def show(x: T): String }\ninstance Show[Integer] { def show(x: Integer): String { return \"\" + x } }\ninstance Show[String] { def show(x: String): String = x }\ndef main(args: String[]): String { return \"d\" }", "None", Array()))
     }
   }
 }

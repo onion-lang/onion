@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-07-02
+
+- **F-bounded type parameters.** A self-referential bound such as
+  `T extends Comparable[T]` now resolves, on both generic classes and generic
+  methods (previously E0003) — the parameter is in scope while its own bound is
+  resolved ([#219]).
+- Documented map index read/write (`m[k]`, `m[k] = v`, `m[k] += v`) in the
+  collections guide.
+
 ## [0.3.5] - 2026-07-02
 
 - **Compiler crash fixed: safe call on a nullable primitive.** `o?.method()`
@@ -289,7 +298,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.5...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.6...develop
+[0.3.6]: https://github.com/onion-lang/onion/releases/tag/v0.3.6
 [0.3.5]: https://github.com/onion-lang/onion/releases/tag/v0.3.5
 [0.3.4]: https://github.com/onion-lang/onion/releases/tag/v0.3.4
 [0.3.3]: https://github.com/onion-lang/onion/releases/tag/v0.3.3
@@ -330,3 +340,4 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#215]: https://github.com/onion-lang/onion/issues/215
 [#217]: https://github.com/onion-lang/onion/issues/217
 [#218]: https://github.com/onion-lang/onion/issues/218
+[#219]: https://github.com/onion-lang/onion/issues/219

@@ -1484,6 +1484,15 @@ AST.TypeNode class_type() : {Token n;}{
 | n=id()   {return new AST.TypeNode(p(n), new AST.ReferenceType(c(n), false), false);}
 }
 
+// A dotted qualified class name (at least one dot), e.g. java.lang.Math. Used as
+// the receiver of a static call so `java.lang.Math::max(...)` works without an
+// import. (Segments must be identifiers; a basic-type keyword like Long is not.)
+AST.TypeNode dotted_class_type() : {Token n; StringBuilder sb = new StringBuilder();}{
+  n=id() {sb.append(c(n));} ("." n=id() {sb.append('.').append(c(n));})+ {
+    return new AST.TypeNode(p(n), new AST.ReferenceType(sb.toString(), true), false);
+  }
+}
+
 AST.TypeNode raw_type() :{AST.TypeNode ty; Token n; StringBuilder sb = new StringBuilder();}{
   ty = basic_type() {return ty;}
 | n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true), false);}
@@ -2164,6 +2173,14 @@ AST.Expression primary() : {
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es); }
+| LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+| LOOKAHEAD( dotted_class_type() "::" id() "(" ) ty=dotted_class_type() t="::" n=id() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+| LOOKAHEAD( dotted_class_type() "::" ) ty=dotted_class_type() t="::" n=id()
+    { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
 | LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }

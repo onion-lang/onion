@@ -18,7 +18,10 @@ xs[2] += 1                   // compound assignment
 ```onion
 val ages = ["alice": 12, "bob": 34]   // insertion-ordered LinkedHashMap
 val none = [:]                        // empty map
-ages.get("alice")
+ages.get("alice")                     // 12
+ages["alice"]                         // 12  — index read (same as get)
+ages["carol"] = 9                     // index assignment (compiles to put)
+ages["alice"] += 1                    // compound assignment through the index
 foreach k: String in ages.keySet() { println(k) }
 ```
 

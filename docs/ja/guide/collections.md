@@ -17,7 +17,10 @@ xs[2] += 1            // 複合代入
 ```onion
 val ages = ["alice": 12, "bob": 34]   // 挿入順を保持する LinkedHashMap
 val none = [:]                        // 空マップ
-ages.get("alice")
+ages.get("alice")                     // 12
+ages["alice"]                         // 12  — 添字での読み取り（get と同じ）
+ages["carol"] = 9                     // 添字での代入（put にコンパイルされる）
+ages["alice"] += 1                    // 添字を介した複合代入
 foreach k: String in ages.keySet() { println(k) }
 ```
 

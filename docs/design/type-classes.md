@@ -25,8 +25,8 @@ instance Numeric[Int] {
   def plus(a: Int, b: Int): Int = a + b
 }
 def sum[T: Numeric](xs: List[T]): T {
-  var acc = Numeric[T].zero()
-  foreach x: T in xs { acc = Numeric[T].plus(acc, x) }
+  var acc = Numeric[T]::zero()
+  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
   return acc
 }
 ```
@@ -44,7 +44,7 @@ def sum[T: Numeric](xs: List[T]): T {
 - **Context bound `[T: Numeric]`**, multi `[T: Numeric, U: Ord]`, and
   `T: A + B` — `type_params()` gains an optional `:` constraint list joined by
   `+`. Orthogonal to and after the existing `[T extends B]` upper bound.
-- **`Numeric[T].method(args)`** — explicit dictionary access, the only call form
+- **`Numeric[T]::method(args)`** — explicit dictionary access, the only call form
   in the MVP (UFCS `acc.plus(x)` is a later stage).
 
 `trait` and `instance` become **reserved tokens** (like `type`/`extension`/
@@ -81,7 +81,7 @@ constrained method receives one synthesized **dictionary parameter** per
    instead of looking one up.
 3. Thread the resolved dictionary as a trailing hidden argument.
 
-`Numeric[T].method(...)` inside a constrained body resolves to: the passed
+`Numeric[T]::method(...)` inside a constrained body resolves to: the passed
 dictionary when `T` is abstract, or the concrete instance singleton when `T` is a
 ground type.
 
@@ -147,7 +147,7 @@ ground type.
 
 **Resolved (recommended):**
 1. `trait`/`instance` reserved tokens; backtick escape retained.
-2. Dedicated `AST.TraitMethodCall` node for `Numeric[T].method(...)` — **not**
+2. Dedicated `AST.TraitMethodCall` node for `Numeric[T]::method(...)` — **not**
    reusing `StaticMethodCall` (safer; keeps trait dispatch separate from static
    resolution).
 3. Dictionary params are **trailing**, hidden, one per `(typeParam, constraint)`.
@@ -159,12 +159,12 @@ ground type.
 8. v1 scope: **single-parameter traits, ground instances only**; UFCS deferred.
 
 **Open (need the designer's call):**
-- **A. Dictionary-access syntax.** `Numeric[T].method()` reads naturally but
-  `Numeric[T]` is lexically an indexing expression, and it uses `.` while other
-  static dispatch uses `::`. Recommendation: keep `Numeric[T].method()` with a
-  `dictReferenceFollows()` peeking guard (modeled on `newBracketsAreTypeArgs`) plus
-  a typer-side fallback (reinterpret as indexing when the head resolves to a
-  value). Alternative: a `::`-based form for consistency. **Which?**
+- **A. Dictionary-access syntax — RESOLVED: `Numeric[T]::method()`** (double
+  colon), chosen by the designer. Consistent with static dispatch (`Type::method`)
+  and unambiguous: `[T]` sits before `::`, so it is clearly a type-argument list,
+  not an indexing expression — no peeking-heuristic or typer fallback needed. The
+  dedicated `AST.TraitMethodCall` node carries `(traitName, typeArgs, methodName,
+  args)`.
 - **B. Orphan-rule strictness.** v1 proposes "trait or head type local to the
   batch" + conflict detection; cross-jar coherence unenforced. Accept, or require
   a stricter/looser rule?

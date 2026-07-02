@@ -190,9 +190,59 @@ ground type.
 - `COMPUTE_FRAMES` classloading of `onion.dict.*` at compile time → needs the
   `getCommonSuperClass` override.
 - Dictionary-param arity leaking into overload resolution / TCO / duplication /
-  auto-CLI → every `Method.arguments` consumer must skip trailing dict slots.
+  auto-CLI → **avoided** by keeping dictionaries in a `dictionaryParameters` side
+  channel rather than in `arguments` (see the implementation map below); consumers
+  of `arguments` need no change.
 - Missing return-value `checkcast` on erased interface calls → typing must insert
   `AsInstanceOf` for specific-typed results.
 - Erasure collision `Numeric[Int]` vs `Numeric[Integer]` → normalize the key.
 - Bridge-method duplication for specialized instances → verify no `ClassFormatError`
   (the #184 bridge fix is the reference).
+
+## Implementation map — dictionary passing for abstract `T` (grounded)
+
+Parser layer, ground-type dictionary access, and coherence already ship on
+`develop`. What remains is making a constrained generic like
+`sum[T: Numeric](xs: List[T])` callable polymorphically. The integration points
+below were mapped against the real typing/codegen code.
+
+**Key insight — use a side channel, not `arguments`.** Put the per-`(typeParam,
+constraint)` dictionaries in a **new `MethodDefinition.dictionaryParameters`**
+field, *not* in `MethodDefinition.arguments`. Then `MethodResolution.findMethods`,
+overload specificity, tail-call optimization, `TypingDuplicationPass`, and the
+auto-CLI `main` synthesis — all of which read `arguments` — are **unaffected**.
+This removes the "arity leaks everywhere" risk the design pass warned about: the
+dictionaries only appear in the JVM descriptor and in the emitted call args.
+
+Concrete steps (each should keep the build green):
+1. **Flow the constraint.** `AST.TypeParameter.constraints` → a
+   `TypedAST.TypeParameter` field, resolved in `TypingTypeSupport.createTypeParams`
+   (each constraint resolves to the trait `ClassType`). Report a clean error for an
+   unknown trait (fixes the current silent-accept of `[T: Unknown]`).
+2. **Derive `dictionaryParameters`.** When a method/function with constrained type
+   params is registered (outline pass → `MethodDefinition`), compute one dict entry
+   per `(typeParam, constraintTrait)`: `(traitFqcn, typeParamName, dictType =
+   Trait[typeParam])`.
+3. **Body — resolve abstract-`T` `Trait[T]::m(args)`.** When the type argument is a
+   method type parameter (not ground), type it to a new `TypedAST` term
+   `DictionaryCall(dictIndex, method, args)` instead of the ground `new
+   <mangled>().m(...)` lowering (which Rewriting still does for ground types). The
+   ground path is unchanged.
+4. **Call site — one central spot.** `MethodInvocationBuilderSupport.buildResolvedCall`
+   is the shared builder for **every** call path (unqualified / instance / super /
+   static / extension). After `methodSubst` pins each `T`, append one term per
+   `method.dictionaryParameters`: for a ground `T`, `new <mangled instance>()`
+   (reuse the Rewriting mangling); for a `T` that is itself a constrained type
+   parameter of the *caller*, forward the caller's dictionary slot. Missing
+   instance → `MISSING_INSTANCE`.
+5. **Codegen.** The method descriptor is `arguments ++ dictionaryParameters`
+   (dictionaries typed as the erased trait interface); `DictionaryCall` loads its
+   dict slot (after the real-arg slots) and `invokeinterface`s the trait method
+   (unbox the erased `Object` result to `T`'s wrapper where needed); `Call`/
+   `CallStatic` already receive the appended dict terms from step 4.
+
+Scope note: this spans typing (steps 1–4) and codegen (step 5); it is **not** a
+single bounded slot, but the central `buildResolvedCall` injection and the side-
+channel design keep it contained (no resolution/arity ripple). Ship it as one
+focused pass with `sum`/`product` as the acceptance test, then reframe
+`min`/`max`/`sort` on `Ord` (Stage 2).

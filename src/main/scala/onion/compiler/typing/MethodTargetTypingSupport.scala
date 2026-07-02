@@ -51,6 +51,7 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
     node: AST.SafeMethodCall,
     target: Term
   ): Option[ResolvedMethodTarget] = {
+    val isNullablePrimitive = target.`type`.isInstanceOf[NullableType]
     val targetType = target.`type` match {
       case nullableType: NullableType => nullableType.innerType
       case other => other
@@ -63,6 +64,12 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
         if (basicType == BasicType.VOID) {
           bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, node.name)
           None
+        } else if (isNullablePrimitive) {
+          // A nullable primitive (e.g. Int?) is already a boxed value at runtime,
+          // so retype the target to the boxed class instead of boxing it again
+          // (boxing a NullableType-typed term crashes: "not a boxable type").
+          val boxedType = Boxing.boxedType(bodyContext.table, basicType).asInstanceOf[ObjectType]
+          Some(ResolvedMethodTarget(new AsInstanceOf(target, boxedType), boxedType))
         } else {
           val boxed = Boxing.boxing(bodyContext.table, target)
           Some(ResolvedMethodTarget(boxed, boxed.`type`.asInstanceOf[ObjectType]))

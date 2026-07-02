@@ -1,0 +1,5 @@
+// Safe call on a nullable primitive used to crash the compiler (I0000:
+// "node type must be boxable type") — the target normalizer boxed the
+// NullableType-typed term instead of retyping to the boxed class.
+val o: Int? = null
+IO::println(o?.toString() ?: "none")

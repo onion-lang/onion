@@ -103,6 +103,33 @@ private[compiler] final class CallOverloadSupport(
     }.toList
   }
 
+  /**
+   * SAM overload disambiguation: at a closure-argument position, drop candidates
+   * whose functional-interface parameter is value/void incompatible with the
+   * lambda body (e.g. `submit(() -> 42)` keeps submit(Callable), drops
+   * submit(Runnable)). `matchesSam(i, samParamType)` is Some(true/false) when the
+   * compatibility is known and None when it is not (then the candidate is kept).
+   * Returns the original list unchanged unless filtering leaves a smaller,
+   * non-empty set.
+   */
+  def disambiguateClosureOverloads(
+    applicable: List[ApplicableMethod],
+    closureIndices: Set[Int],
+    matchesSam: (Int, Type) => Option[Boolean]
+  ): List[ApplicableMethod] = {
+    if (applicable.length <= 1 || closureIndices.isEmpty) return applicable
+    val filtered = applicable.filter { am =>
+      closureIndices.forall { i =>
+        if (i >= am.expectedArgs.length) true
+        else matchesSam(i, am.expectedArgs(i)) match {
+          case Some(compatible) => compatible
+          case None => true
+        }
+      }
+    }
+    if (filtered.nonEmpty && filtered.length < applicable.length) filtered else applicable
+  }
+
   def selectMostSpecificApplicable(
     applicable0: List[ApplicableMethod],
     relevantIndices: Seq[Int] = Nil

@@ -370,6 +370,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     methodLookupSupport.addArgument(arg, context)
   private[typing] def typeClosureNode(node: AST.ClosureExpression, context: LocalContext, expected: Type): Option[Term] =
     closureTyping.typeClosure(node, context, expected)
+  private[typing] def closureMatchesSam(node: AST.ClosureExpression, context: LocalContext, target: Type): Option[Boolean] =
+    closureTyping.matchesSam(node, context, target)
   private[typing] def typeLocalVariableDeclarationNode(node: AST.LocalVariableDeclaration, context: LocalContext): Option[Term] = {
     val statement = blockElementLowering.translate(node, context)
     Some(new StatementTerm(node.location, statement, BasicType.VOID))

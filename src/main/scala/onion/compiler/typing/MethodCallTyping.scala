@@ -277,6 +277,9 @@ final class MethodCallTyping(
   private[typing] def typedTerms(nodes: Array[AST.Expression], context: LocalContext): Array[Term] =
     body.typedTerms(nodes, context)
 
+  private[typing] def closureMatchesSam(node: AST.ClosureExpression, context: LocalContext, target: Type): Option[Boolean] =
+    body.closureMatchesSam(node, context, target)
+
   private[typing] def processAssignable(node: AST.Node, expected: Type, term: Term): Term =
     body.processAssignable(node, expected, term)
 

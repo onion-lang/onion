@@ -237,6 +237,47 @@ final class ClosureTyping(
     case _ => false
   }
 
+  /**
+   * For SAM overload disambiguation (e.g. ExecutorService.submit): whether this
+   * lambda is value/void compatible with `target` treated as a functional
+   * interface. A value-producing body matches a non-void SAM (Callable), a void
+   * body matches a void SAM (Runnable). Returns None when `target` is not a
+   * single-abstract-method interface, the arities differ, the body's type can't
+   * be inferred, or the body never returns normally (throw-only: compatible with
+   * both) -- callers must not filter on None.
+   */
+  private[typing] def matchesSam(node: AST.ClosureExpression, context: LocalContext, target: Type): Option[Boolean] = {
+    target match {
+      case ct: ClassType =>
+        val raw = ct match { case a: AppliedClassType => a.raw; case _ => ct }
+        val abstracts = raw.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m))
+        abstracts.map(_.name).distinct.toList match {
+          case single :: Nil =>
+            abstracts.find(m => m.name == single && m.arguments.length == node.args.length) match {
+              case Some(sam) =>
+                val classSubst = TypeSubstitution.classSubstitution(ct)
+                val samReturn = TypeSubstitution.substituteType(
+                  sam.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+                val samArgs = sam.arguments.map(t => TypeSubstitution.substituteType(
+                  t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true))
+                inferBodyReturnType(node, context, samArgs) match {
+                  case Some(bodyReturn) if bodyReturn.isBottomType => None // throw-only: matches both
+                  case Some(bodyReturn) =>
+                    Some((bodyReturn == BasicType.VOID) == (samReturn == BasicType.VOID))
+                  case None => None
+                }
+              case None => None
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
+  private def inferBodyReturnType(node: AST.ClosureExpression, context: LocalContext, argTypes: Array[Type]): Option[Type] =
+    if (containsReturn(node.body)) inferReturnTypeFromReturns(node, context, argTypes)
+    else inferReturnTypeFromExpressionBody(node, context, argTypes)
+
   private def expectedMethodArgs(target: ClassType, name: String, arity: Int): Option[Array[Type]] = {
     val methodOpt = target.methods.find(m => m.name == name && m.arguments.length == arity)
     methodOpt.map { method =>

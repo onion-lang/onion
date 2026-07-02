@@ -157,8 +157,17 @@ private[compiler] final class StaticMethodCallSupport(
       return None
     }
 
-    val method = overloadSupport.selectMostSpecificApplicable(
+    val disambiguated = overloadSupport.disambiguateClosureOverloads(
       applicableMethods,
+      untypedClosureIndices,
+      (i, samType) => args(i) match {
+        case c: AST.ClosureExpression => calls.closureMatchesSam(c, context, samType)
+        case _ => None
+      }
+    )
+
+    val method = overloadSupport.selectMostSpecificApplicable(
+      disambiguated,
       nonClosureTypes.keys.toSeq.sorted
     ) match {
       case CandidateSelection.Selected(selected) => selected.method

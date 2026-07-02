@@ -84,12 +84,19 @@ final class TypingTypeSupport(private val typing: Typing) {
 
   def createTypeParams(nodes: List[AST.TypeParameter]): Seq[TypeParam] = {
     val seen = MutableSet[String]()
-    val result = Buffer[TypeParam]()
+    val distinct = Buffer[AST.TypeParameter]()
     for (tp <- nodes) {
-      if (seen.contains(tp.name)) {
-        typing.report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
-      } else {
-        seen += tp.name
+      if (seen.contains(tp.name)) typing.report(DUPLICATE_TYPE_PARAMETER, tp, tp.name)
+      else { seen += tp.name; distinct += tp }
+    }
+    // Phase 1: register placeholder type variables so a bound may reference any
+    // of these parameters, including itself (F-bounds: T extends Comparable[T]).
+    val placeholders = distinct.map { tp =>
+      TypeParam(tp.name, new TypedAST.TypeVariableType(tp.name, typing.rootClass, Nullability.Platform), typing.rootClass)
+    }.toSeq
+    // Phase 2: resolve each real bound with all the parameters in scope.
+    openTypeParams(typing.typeParams_ ++ placeholders) {
+      distinct.map { tp =>
         // Nullability: bare [T] means T ranges over nullable types too;
         // an explicit non-null bound [T extends B] restricts T to non-null
         // types; [T extends B?] opts back into nullable with bound B
@@ -114,10 +121,9 @@ final class TypingTypeSupport(private val typing: Typing) {
             (typing.rootClass, Nullability.Nullable)
         }
         val variableType = new TypedAST.TypeVariableType(tp.name, upper, nullability)
-        result += TypeParam(tp.name, variableType, upper)
-      }
+        TypeParam(tp.name, variableType, upper)
+      }.toSeq
     }
-    result.toSeq
   }
 
   private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {

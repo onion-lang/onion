@@ -46,27 +46,47 @@ public final class DateTime {
      * Parses an ISO-formatted date-time string to epoch milliseconds.
      */
     public static long parse(String dateTime) {
-        if (dateTime == null || dateTime.isEmpty()) return 0;
+        if (dateTime == null || dateTime.isEmpty())
+            throw new IllegalArgumentException("cannot parse an empty date-time string");
         try {
-            LocalDateTime ldt = LocalDateTime.parse(dateTime, ISO_FORMAT);
-            return ldt.atZone(LOCAL).toInstant().toEpochMilli();
-        } catch (Exception e) {
-            return 0;
+            return LocalDateTime.parse(dateTime, ISO_FORMAT).atZone(LOCAL).toInstant().toEpochMilli();
+        } catch (java.time.format.DateTimeParseException dt) {
+            // Fall back to a date-only value (midnight, local zone).
+            try {
+                return LocalDate.parse(dateTime, DateTimeFormatter.ISO_LOCAL_DATE)
+                    .atStartOfDay(LOCAL).toInstant().toEpochMilli();
+            } catch (java.time.format.DateTimeParseException d) {
+                throw new IllegalArgumentException("cannot parse date-time \"" + dateTime + "\"", d);
+            }
         }
     }
 
     /**
      * Parses a date-time string with the given pattern to epoch milliseconds.
+     * A date-only pattern (no time component) resolves to midnight in the local
+     * zone. Throws IllegalArgumentException if the input does not match, rather
+     * than silently returning epoch 0.
      */
     public static long parse(String dateTime, String pattern) {
-        if (dateTime == null || dateTime.isEmpty()) return 0;
+        if (dateTime == null || dateTime.isEmpty())
+            throw new IllegalArgumentException("cannot parse an empty date-time string");
         if (pattern == null) return parse(dateTime);
+        DateTimeFormatter formatter;
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
-            LocalDateTime ldt = LocalDateTime.parse(dateTime, formatter);
-            return ldt.atZone(LOCAL).toInstant().toEpochMilli();
-        } catch (Exception e) {
-            return 0;
+            formatter = DateTimeFormatter.ofPattern(pattern);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
+        }
+        try {
+            return LocalDateTime.parse(dateTime, formatter).atZone(LOCAL).toInstant().toEpochMilli();
+        } catch (java.time.format.DateTimeParseException dt) {
+            // A date-only pattern cannot build a LocalDateTime; parse as a date.
+            try {
+                return LocalDate.parse(dateTime, formatter).atStartOfDay(LOCAL).toInstant().toEpochMilli();
+            } catch (java.time.format.DateTimeParseException d) {
+                throw new IllegalArgumentException(
+                    "cannot parse \"" + dateTime + "\" with pattern \"" + pattern + "\"", d);
+            }
         }
     }
 

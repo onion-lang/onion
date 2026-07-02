@@ -27,8 +27,8 @@ final class ExpressionFormTyping(
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
     constructionTyping.typeNewArrayWithValues(node, context)
 
-  def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] =
-    constructionTyping.typeNewObject(node, context)
+  def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
+    constructionTyping.typeNewObject(node, context, expected)
 
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     stringInterpolationTyping.typeStringInterpolation(node, context)

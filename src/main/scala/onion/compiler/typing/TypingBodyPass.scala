@@ -266,8 +266,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
     expressionFormTyping.typeNewArrayWithValues(node, context)
 
-  def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] =
-    expressionFormTyping.typeNewObject(node, context)
+  def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
+    expressionFormTyping.typeNewObject(node, context, expected)
 
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     expressionFormTyping.typeStringInterpolation(node, context)

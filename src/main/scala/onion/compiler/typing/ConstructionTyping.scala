@@ -126,13 +126,37 @@ final class ConstructionTyping(
     Some(new NewArrayWithValues(arrayType, typedValues.flatten))
   }
 
-  def typeNewObject(node: AST.NewObject, context: LocalContext): Option[Term] = {
-    val typeRef = typing.mapFromDeclared(node.typeRef) match {
-      case Some(ct: ClassType) => ct
-      case Some(other) =>
-        bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
-        return None
-      case None => return None
+  /**
+   * Constructor diamond: when `new C(...)` names a generic class without type
+   * arguments and the expected type is a parameterization of that same class,
+   * adopt the expected type's arguments (e.g. `val b: Box[String] = new Box("x")`)
+   * instead of rejecting the bare type as raw (E0066). Returns None when there is
+   * nothing to infer, so the caller falls back to the raw-checking resolution.
+   */
+  private def diamondType(node: AST.NewObject, expected: Type): Option[ClassType] =
+    expected match {
+      case exp: AppliedClassType =>
+        typing.mapFrom(node.typeRef) match {
+          case Some(raw: ClassType)
+            if !raw.isInstanceOf[AppliedClassType]
+              && raw.typeParameters.nonEmpty
+              && TypeRelations.sameClass(raw, exp.raw)
+              && exp.typeArguments.length == raw.typeParameters.length =>
+            Some(AppliedClassType(raw, exp.typeArguments.toList))
+          case _ => None
+        }
+      case _ => None
+    }
+
+  def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] = {
+    val typeRef = diamondType(node, expected).getOrElse {
+      typing.mapFromDeclared(node.typeRef) match {
+        case Some(ct: ClassType) => ct
+        case Some(other) =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
+          return None
+        case None => return None
+      }
     }
 
     // Check if trying to instantiate an abstract class

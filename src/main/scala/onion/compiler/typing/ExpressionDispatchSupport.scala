@@ -81,7 +81,7 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
       case node: AST.NewArrayWithValues =>
         body.typeNewArrayWithValues(node, context)
       case node: AST.NewObject =>
-        body.typeNewObject(node, context)
+        body.typeNewObject(node, context, expected)
       case node@AST.Not(_, _) =>
         body.typeUnaryBoolean(node, "!", NOT, context)
       case node@AST.BitNot(_, _) =>

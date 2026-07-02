@@ -16,11 +16,11 @@ class TypeClassConstraintResolutionSpec extends AbstractShellSpec {
     }
     it("accepts a real trait constraint") {
       assert(Shell.Success(3) == shell.run(
-        "trait Numeric[T] { def z(): T }\ndef f[T: Numeric](x: T): T = x\ndef main(args: String[]): Int { return f(3) }", "None", Array()))
+        "trait Numeric[T] { def z(): T }\ninstance Numeric[Integer] { def z(): Integer = 0 }\ndef f[T: Numeric](x: T): T = x\ndef main(args: String[]): Int { return f(3) }", "None", Array()))
     }
     it("accepts multiple constraints and an upper bound together") {
       assert(Shell.Success("ok") == shell.run(
-        "trait A { def a(): Int }\ntrait B { def b(): Int }\ndef f[T extends Object: A + B](x: T): Int = 0\ndef main(args: String[]): String { f(\"z\")\n return \"ok\" }", "None", Array()))
+        "trait A[X] { def a(x: X): Int }\ntrait B[X] { def b(x: X): Int }\ninstance A[String] { def a(x: String): Int = 1 }\ninstance B[String] { def b(x: String): Int = 2 }\ndef f[T extends Object: A + B](x: T): Int = 0\ndef main(args: String[]): String { f(\"z\")\n return \"ok\" }", "None", Array()))
     }
   }
 }

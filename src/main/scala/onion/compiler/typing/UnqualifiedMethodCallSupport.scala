@@ -76,7 +76,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       val method = methods(0)
       if (!ensureInstanceAvailable(node, method, context)) return None
       val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-      calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+      calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
         expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
         finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
       )

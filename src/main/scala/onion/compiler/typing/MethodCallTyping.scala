@@ -145,12 +145,13 @@ final class MethodCallTyping(
     params: Array[Term],
     typeArgs: List[AST.TypeNode],
     classSubst: scala.collection.immutable.Map[String, Type],
-    expected: Type
+    expected: Type,
+    context: LocalContext = null
   )(
     prepareParams: Array[Type] => Option[Array[Term]],
     buildRawCall: Array[Term] => Term
   ): Option[Term] =
-    methodInvocationBuilderSupport.buildResolvedCall(node, method, params, typeArgs, classSubst, expected)(prepareParams, buildRawCall)
+    methodInvocationBuilderSupport.buildResolvedCall(node, method, params, typeArgs, classSubst, expected, context)(prepareParams, buildRawCall)
 
   private[typing] def castCall(
     call: Term,

@@ -9,7 +9,7 @@ import onion.tools.Shell
  * like an unconstrained one.
  */
 class TypeClassConstraintParsingSpec extends AbstractShellSpec {
-  private val numeric = "trait Numeric[T] { def zero(): T }\n"
+  private val numeric = "trait Numeric[T] { def zero(): T }\ninstance Numeric[Integer] { def zero(): Integer = 0 }\n"
   describe("[T: C] constraint syntax") {
     it("parses on a generic method") {
       assert(Shell.Success("got 5") == shell.run(

@@ -141,6 +141,28 @@ public final class Cli {
         return Boolean.parseBoolean(value);
     }
 
+    /**
+     * The trailing positional arguments from index {@code from} onward, as the
+     * rest for a `main(..., xs: String[])` parameter. Empty when there are none.
+     */
+    public static String[] rest(String[] args, int from) {
+        if (args == null || from >= args.length) return new String[0];
+        return java.util.Arrays.copyOfRange(args, from, args.length);
+    }
+
+    /**
+     * Fail with a usage message when fewer than {@code required} arguments were
+     * given, for a main with required leading parameters plus a String[] rest.
+     */
+    public static void requireArgs(String[] args, int required, String usage) {
+        int n = args == null ? 0 : args.length;
+        if (n < required) {
+            System.err.println("error: expected at least " + required + " argument(s)");
+            System.err.println("usage: <script> " + usage);
+            System.exit(1);
+        }
+    }
+
     private static void die(String message) {
         System.err.println("error: " + message);
         System.exit(1);

@@ -136,10 +136,49 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * defaults become switches), with the default expression evaluated
    * in-language when the flag is absent.
    */
+  /** Whether a parameter type is `String[]` (the rest collector for auto-CLI). */
+  private def isStringArrayParam(typeRef: AST.TypeNode): Boolean =
+    typeRef != null && (typeRef.desc match {
+      case AST.ArrayType(AST.ReferenceType("String", _)) => true
+      case AST.ArrayType(AST.ReferenceType("java.lang.String", _)) => true
+      case _ => false
+    })
+
   private def appendAutoCliCall(toplevels: Buffer[AST.Toplevel]): Unit = {
+    val allScalar = (f: AST.FunctionDeclaration) => f.args.forall(a => cliKindOf(a.typeRef).isDefined)
+    // A main with required leading scalar parameters and a trailing String[] that
+    // collects the remaining arguments, e.g. `def main(cmd: String, files: String[])`.
+    val restPattern = (f: AST.FunctionDeclaration) =>
+      f.args.length >= 2 && isStringArrayParam(f.args.last.typeRef) && f.args.last.defaultValue == null &&
+        f.args.init.forall(a => cliKindOf(a.typeRef).isDefined && a.defaultValue == null)
+
+    toplevels.collectFirst {
+      case f: AST.FunctionDeclaration if f.name == "main" && !allScalar(f) && restPattern(f) => f
+    }.foreach { f =>
+      val loc = f.location
+      val k = f.args.length - 1
+      val usage = f.args.init.map(a => "<" + a.name + ">").mkString(" ") + " <" + f.args.last.name + ">..."
+      toplevels += AST.StaticMethodCall(
+        loc,
+        AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
+        "requireArgs",
+        List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k), AST.StringLiteral(loc, usage))
+      )
+      val argExprs = f.args.zipWithIndex.map { case (a, i) =>
+        if (i < k) convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, AST.Indexing(loc, AST.Id(loc, "args"), AST.IntegerLiteral(loc, i)))
+        else AST.StaticMethodCall(
+          loc,
+          AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
+          "rest",
+          List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k))
+        )
+      }
+      toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
+      return
+    }
+
     val mainFn = toplevels.collectFirst {
-      case f: AST.FunctionDeclaration
-        if f.name == "main" && f.args.forall(a => cliKindOf(a.typeRef).isDefined) => f
+      case f: AST.FunctionDeclaration if f.name == "main" && allScalar(f) => f
     }
     mainFn.foreach { f =>
       val loc = f.location

@@ -66,6 +66,14 @@ final class OperatorTyping(
     var left: Term = typed(node.lhs, context).getOrElse(null)
     var right: Term = typed(node.rhs, context).getOrElse(null)
     if (left == null || right == null) return null
+    // A nullable operand (T?) uses null-safe value equality. Box a primitive
+    // operand so a nullable primitive compares by value against a plain primitive
+    // (`Int? == Int`), matching how `String? == String` already works.
+    if (left.`type`.isInstanceOf[NullableType] || right.`type`.isInstanceOf[NullableType]) {
+      val l = if (left.isBasicType) Boxing.boxing(bodyContext.table, left) else left
+      val r = if (right.isBasicType) Boxing.boxing(bodyContext.table, right) else right
+      return nullSafeEquals(kind, l, r)
+    }
     // Comparing a boxed wrapper against a primitive compares values: unbox the wrapper side
     if (left.isBasicType != right.isBasicType) {
       left = tryUnboxAny(left)

@@ -30,7 +30,20 @@ final class ControlExpressionTyping(
    * Delegates to TypeNarrowingAnalysis with the type resolver.
    */
   private[typing] def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo =
-    TypeNarrowingAnalysis.extractNarrowing(condition, context, typing.mapFrom)
+    TypeNarrowingAnalysis.extractNarrowing(condition, context, typing.mapFrom, fieldNullNarrow)
+
+  /** The non-null type of an immutable (`val`) nullable field of the current
+    * class, for smart-casting an implicitly-accessed field after a null check.
+    * Only final fields are eligible — they cannot change between check and use. */
+  private def fieldNullNarrow(name: String): Option[TypedAST.Type] = {
+    val field = bodyContext.definition.findField(name)
+    if (field != null && Modifier.isFinal(field.modifier)) {
+      field.`type` match {
+        case n: TypedAST.NullableType => Some(n.innerType)
+        case _ => None
+      }
+    } else None
+  }
 
   def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
     context.openScope {

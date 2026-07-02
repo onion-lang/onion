@@ -297,6 +297,14 @@ class LocalContext {
   }
 
   /**
+   * The narrowed type recorded for a name that has no local binding — i.e. an
+   * implicitly-accessed `val` field narrowed by a null check. Returns None when
+   * there is no narrowing. (When a local of the same name exists, a bare name
+   * resolves to the local, not the field, so this is only consulted for fields.)
+   */
+  def getFieldNarrowing(name: String): Option[TypedAST.Type] = narrowings.get(name)
+
+  /**
    * Adds a type narrowing for a variable.
    * Used when an is-check or null-check narrows the type.
    */

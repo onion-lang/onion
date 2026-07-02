@@ -43,7 +43,8 @@ private[typing] object TypeNarrowingAnalysis {
   def extractNarrowing(
     condition: AST.Expression,
     context: LocalContext,
-    typeResolver: AST.TypeNode => Option[Type]
+    typeResolver: AST.TypeNode => Option[Type],
+    fieldNarrow: String => Option[Type] = _ => None
   ): NarrowingInfo = {
     condition match {
       // x is SomeType -> narrow x to SomeType in then-branch
@@ -60,25 +61,25 @@ private[typing] object TypeNarrowingAnalysis {
 
       // x != null -> narrow x from T? to T in then-branch
       case AST.NotEqual(_, AST.Id(_, name), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = true)
+        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow)
       case AST.NotEqual(_, AST.NullLiteral(_), AST.Id(_, name)) =>
-        extractNullCheckNarrowing(name, context, positive = true)
+        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow)
 
       // x == null -> narrow x from T? to T in else-branch
       case AST.Equal(_, AST.Id(_, name), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = false)
+        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow)
       case AST.Equal(_, AST.NullLiteral(_), AST.Id(_, name)) =>
-        extractNullCheckNarrowing(name, context, positive = false)
+        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow)
 
       // cond1 && cond2 -> both narrowings apply in then-branch
       case AST.LogicalAnd(_, left, right) =>
-        val leftNarrowing = extractNarrowing(left, context, typeResolver)
-        val rightNarrowing = extractNarrowing(right, context, typeResolver)
+        val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow)
+        val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow)
         NarrowingInfo(leftNarrowing.positive ++ rightNarrowing.positive, Map.empty)
 
       // !cond -> swap polarity: if !(o is String) narrows o in the else branch
       case AST.Not(_, inner) =>
-        val innerNarrowing = extractNarrowing(inner, context, typeResolver)
+        val innerNarrowing = extractNarrowing(inner, context, typeResolver, fieldNarrow)
         NarrowingInfo(innerNarrowing.negative, innerNarrowing.positive)
 
       case _ => NarrowingInfo.empty
@@ -88,28 +89,28 @@ private[typing] object TypeNarrowingAnalysis {
   /**
    * Helper for null-check narrowing extraction.
    */
-  private def extractNullCheckNarrowing(name: String, context: LocalContext, positive: Boolean): NarrowingInfo = {
+  private def extractNullCheckNarrowing(
+    name: String, context: LocalContext, positive: Boolean, fieldNarrow: String => Option[Type]
+  ): NarrowingInfo = {
     val binding = context.lookup(name)
-    if (binding != null && !binding.isMutable) {
-      binding.tp match {
-        case nullableType: NullableType =>
-          if (positive) {
-            NarrowingInfo(Map(name -> nullableType.innerType), Map.empty)
-          } else {
-            NarrowingInfo(Map.empty, Map(name -> nullableType.innerType))
-          }
-        // A nullable type variable narrows to its non-null view, which
-        // permits dereferencing inside the checked branch
-        case tv: TypeVariableType if tv.nullability == Nullability.Nullable =>
-          if (positive) {
-            NarrowingInfo(Map(name -> tv.nonNullView), Map.empty)
-          } else {
-            NarrowingInfo(Map.empty, Map(name -> tv.nonNullView))
-          }
-        case _ => NarrowingInfo.empty
+    val narrowed: Option[Type] =
+      if (binding != null) {
+        // Only immutable locals are smart-cast (a mutable one could be reassigned).
+        if (binding.isMutable) None
+        else binding.tp match {
+          case nullableType: NullableType => Some(nullableType.innerType)
+          // A nullable type variable narrows to its non-null view.
+          case tv: TypeVariableType if tv.nullability == Nullability.Nullable => Some(tv.nonNullView)
+          case _ => None
+        }
+      } else {
+        // No local of this name: it may be an implicitly-accessed `val` field,
+        // which is immutable and so safe to narrow.
+        fieldNarrow(name)
       }
-    } else {
-      NarrowingInfo.empty
+    narrowed match {
+      case Some(t) => if (positive) NarrowingInfo(Map(name -> t), Map.empty) else NarrowingInfo(Map.empty, Map(name -> t))
+      case None => NarrowingInfo.empty
     }
   }
 }

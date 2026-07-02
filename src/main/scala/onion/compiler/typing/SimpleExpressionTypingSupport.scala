@@ -182,7 +182,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
       // field of the current class -- this.<name> for an instance field, the
       // static field directly for a static one.
       resolveImplicitField(node, context) match {
-        case Some(term) => Some(term)
+        case Some(term) =>
+          // Smart-cast an implicitly-accessed val field narrowed by a null check.
+          context.getFieldNarrowing(node.name) match {
+            case Some(nt) if nt != term.`type` => Some(new AsInstanceOf(term, nt))
+            case _ => Some(term)
+          }
         case None =>
           // A bare name may be a top-level val/var, which lives as a static field
           // on the synthetic top-level class. Resolve it as a static-field read so

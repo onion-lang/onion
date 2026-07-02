@@ -285,6 +285,10 @@ object AST {
    * @param methods Methods to add to the type
    */
   case class ExtensionDeclaration(location: Location, receiverType: TypeNode, methods: List[MethodDeclaration]) extends Toplevel
+  /** `instance Trait[Type] { ... }`. Lowered in Rewriting to a class implementing
+    * the trait interface; the type-class registry/singleton machinery is layered
+    * on in later stages. */
+  case class InstanceDeclaration(location: Location, modifiers: Int, traitType: TypeNode, methods: List[MethodDeclaration]) extends Toplevel
 
   abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
   case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None, constraints: List[TypeNode] = Nil) extends Node

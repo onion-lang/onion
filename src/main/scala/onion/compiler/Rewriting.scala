@@ -111,6 +111,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         newToplevels += rewriteInterfaceDeclaration(declaration)
       case declaration: AST.RecordDeclaration =>
         newToplevels += rewriteRecordDeclaration(declaration)
+      case declaration: AST.InstanceDeclaration =>
+        newToplevels += rewriteClassDeclaration(lowerInstanceDeclaration(declaration))
       case declaration: AST.FunctionDeclaration =>
         newToplevels += rewriteFunctionDeclaration(declaration)
       case declaration: AST.GlobalVariableDeclaration =>
@@ -286,6 +288,24 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteInterfaceDeclaration(declaration: AST.InterfaceDeclaration): InterfaceDeclaration = {
     val newMethods = declaration.methods.map(rewriteMethodDeclaration)
     declaration.copy(methods = newMethods)
+  }
+
+  /**
+   * Lowers `instance Trait[Type] { methods }` to a public class implementing the
+   * trait interface. The class name is derived from the trait application
+   * (`Numeric[Integer]` -> `Numeric$$Integer`) so distinct instances get distinct
+   * classes. Instance registration, coherence, and the dictionary singleton are
+   * layered on in later stages; for now this just makes an instance a well-formed
+   * implementing class.
+   */
+  private def lowerInstanceDeclaration(declaration: AST.InstanceDeclaration): AST.ClassDeclaration = {
+    val key = declaration.traitType.desc.toString
+      .replace("[", "$$").replace("]", "").replace(",", "$").replace(" ", "").replace(".", "_")
+    val section = AST.AccessSection(declaration.location, AST.M_PUBLIC, declaration.methods)
+    AST.ClassDeclaration(
+      declaration.location, declaration.modifiers, key,
+      null, List(declaration.traitType), None, List(section), Nil
+    )
   }
 
   def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = {

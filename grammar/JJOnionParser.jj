@@ -1080,6 +1080,8 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
   top=block_element()
 | LOOKAHEAD("extension")
   top=extension_decl()
+| LOOKAHEAD("instance")
+  top=instance_decl()
 | [mset=modifiers()]
   ( LOOKAHEAD("type")
     top=type_alias_decl(mset)
@@ -1101,6 +1103,23 @@ AST.ExtensionDeclaration extension_decl() : {
     ({mset = 0;} [mset=modifiers()] method=method_decl(mset) {append(methods, method);})*
   "}" {
     return new AST.ExtensionDeclaration(p(t), receiverType, toList(methods));
+  }
+}
+
+// `instance Trait[Type] { <method defs> }`: a flat method list like `extension`.
+// Lowered in Rewriting to a class implementing the trait interface; instance
+// registration / dictionary singleton come in later stages.
+AST.InstanceDeclaration instance_decl() : {
+  Token t;
+  AST.TypeNode traitType;
+  AST.MethodDeclaration method;
+  ArrayBuffer<AST.MethodDeclaration> methods = new ArrayBuffer<AST.MethodDeclaration>();
+  int mset = 0;
+}{
+  t="instance" traitType=type() "{"
+    ({mset = 0;} [mset=modifiers()] method=method_decl(mset) {append(methods, method);})*
+  "}" [";"] {
+    return new AST.InstanceDeclaration(p(t), AST.M_PUBLIC(), traitType, toList(methods));
   }
 }
 

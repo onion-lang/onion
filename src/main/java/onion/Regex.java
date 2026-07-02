@@ -154,6 +154,85 @@ public final class Regex {
         return input.split(pattern, limit);
     }
 
+    // ========== Pattern overloads (interop with re"..." literals) ==========
+    // A re"..." literal is a java.util.regex.Pattern; these overloads let the
+    // shape-first regex literals be used with the Regex helpers directly.
+
+    public static boolean matches(String input, Pattern pattern) {
+        if (input == null || pattern == null) return false;
+        return pattern.matcher(input).matches();
+    }
+
+    public static boolean find(String input, Pattern pattern) {
+        if (input == null || pattern == null) return false;
+        return pattern.matcher(input).find();
+    }
+
+    public static String[] findAll(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new String[0];
+        List<String> matches = new ArrayList<>();
+        Matcher matcher = pattern.matcher(input);
+        while (matcher.find()) matches.add(matcher.group());
+        return matches.toArray(new String[0]);
+    }
+
+    public static String findFirst(String input, Pattern pattern) {
+        if (input == null || pattern == null) return "";
+        Matcher matcher = pattern.matcher(input);
+        return matcher.find() ? matcher.group() : "";
+    }
+
+    public static String[] groups(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new String[0];
+        Matcher matcher = pattern.matcher(input);
+        if (matcher.find()) {
+            String[] result = new String[matcher.groupCount() + 1];
+            for (int i = 0; i <= matcher.groupCount(); i++) {
+                String group = matcher.group(i);
+                result[i] = group != null ? group : "";
+            }
+            return result;
+        }
+        return new String[0];
+    }
+
+    public static String[][] groupsAll(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new String[0][];
+        List<String[]> allGroups = new ArrayList<>();
+        Matcher matcher = pattern.matcher(input);
+        while (matcher.find()) {
+            String[] groups = new String[matcher.groupCount() + 1];
+            for (int i = 0; i <= matcher.groupCount(); i++) {
+                String group = matcher.group(i);
+                groups[i] = group != null ? group : "";
+            }
+            allGroups.add(groups);
+        }
+        return allGroups.toArray(new String[0][]);
+    }
+
+    public static String replace(String input, Pattern pattern, String replacement) {
+        if (input == null) return "";
+        if (pattern == null || replacement == null) return input;
+        return pattern.matcher(input).replaceAll(replacement);
+    }
+
+    public static String replaceFirst(String input, Pattern pattern, String replacement) {
+        if (input == null) return "";
+        if (pattern == null || replacement == null) return input;
+        return pattern.matcher(input).replaceFirst(replacement);
+    }
+
+    public static String[] split(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new String[0];
+        return pattern.split(input);
+    }
+
+    public static String[] split(String input, Pattern pattern, int limit) {
+        if (input == null || pattern == null) return new String[0];
+        return pattern.split(input, limit);
+    }
+
     // ========== Utility ==========
 
     /**

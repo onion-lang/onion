@@ -147,6 +147,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
     } else {
       val finalElementType =
         if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
+        // Target-type the literal: if every element fits the expected element type,
+        // adopt it, so `val xs: List[String?] = ["a", null]` builds a List[String?]
+        // instead of a List[String] that then fails to assign. Sound because a
+        // literal creates a fresh list of that element type (unlike an `as` cast).
+        // (Nullable-primitive element types like List[Int?] are not covered here.)
+        else if (expectedElem != null && TypeRules.isAssignable(expectedElem, elementType)) expectedElem
         else elementType
       val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
       Some(new ListLiteral(typedElements, listType))

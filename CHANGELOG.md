@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-02
+
+Fixes surfaced by a deeper pre-release gap-probe of real programs.
+
+- **Miscompile fixed: `!!` on a nullable primitive.** `n!!` for `Int?`/`Long?`/
+  `Double?`/`Boolean?` now unboxes to the primitive instead of leaving a boxed
+  value on the stack (which produced a `VerifyError`) ([#216]).
+- **Elvis `?:` accepts a nullable right operand.** `a ?: b` where both are `T?`
+  yields `T?`, which also makes the chained `a ?: b ?: c` idiom type-check ([#209]).
+- **Dotted (fully-qualified) name as a type argument.**
+  `java.util.List[java.lang.Integer]` parses in type-annotation positions and in
+  `new` with a constructor `()` (a `new C[FQN]` without `()` still needs an
+  import) ([#213]).
+
 ## [0.3.1] - 2026-07-02
 
 Resolves the three limitations deferred from 0.3.0.
@@ -249,7 +263,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.1...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.2...develop
+[0.3.2]: https://github.com/onion-lang/onion/releases/tag/v0.3.2
 [0.3.1]: https://github.com/onion-lang/onion/releases/tag/v0.3.1
 [0.3.0]: https://github.com/onion-lang/onion/releases/tag/v0.3.0
 [0.2.0]: https://github.com/onion-lang/onion/releases/tag/v0.2.0
@@ -279,3 +294,6 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#206]: https://github.com/onion-lang/onion/issues/206
 [#207]: https://github.com/onion-lang/onion/issues/207
 [#208]: https://github.com/onion-lang/onion/issues/208
+[#209]: https://github.com/onion-lang/onion/issues/209
+[#213]: https://github.com/onion-lang/onion/issues/213
+[#216]: https://github.com/onion-lang/onion/issues/216

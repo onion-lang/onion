@@ -28,6 +28,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
+      case node: AST.RecordDeclaration => processRecordDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
       case _ =>
@@ -167,6 +168,15 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
+    }
+
+  // A record can declare `<: Interface`, but its only methods are the synthesized
+  // accessors; an interface method with no matching accessor was previously
+  // unchecked, so the record compiled and threw AbstractMethodError at runtime.
+  private def processRecordDeclaration(node: AST.RecordDeclaration): Unit =
+    withKernel[ClassDefinition](node) { clazz =>
+      resetForTypeDeclaration(clazz)
+      DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit =

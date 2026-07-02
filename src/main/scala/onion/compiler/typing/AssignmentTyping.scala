@@ -144,7 +144,14 @@ final class AssignmentTyping(
           case Right(method) =>
             if (value.`type`.isBottomType) value else new Call(target, method, Array[Term](value))
           case Left(_) =>
-            if (value.`type`.isBottomType) value else null
+            // No matching field and no property setter: the target does not exist.
+            // Previously this returned null with no diagnostic, so a typo like
+            // `obj.wrong = v` was a silent no-op. Report it like the read path does.
+            if (value.`type`.isBottomType) value
+            else {
+              bodyContext.report(FIELD_NOT_FOUND, selection, targetType, name)
+              null
+            }
         }
       case _ =>
         bodyContext.report(LVALUE_REQUIRED, node)

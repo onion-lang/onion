@@ -1478,20 +1478,21 @@ AST.MethodDeclaration method_decl(int mset) : {
   List<AST.TypeNode> throwsTypes = scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty();
   List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
-  anns=annotations() "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  (  {enterSection();} "=" eols() e=term() eos_or_block_end() {
+  anns=annotations() {enterSection();} "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
+  (  "=" eols() e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
          tparams, throwsTypes, anns
        );
      }
-  |  b=block() {
+  |  {leaveSection();} b=block() {
        return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns);
      }
-  |  {enterSection();} eos_or_block_end() {
-       // No body: an abstract/interface method. eos_or_block_end (not eos) so a
-       // one-line `interface A { def f(): Int }` terminates at the `}`.
+  |  eos_or_block_end() {
+       // No body: an abstract/interface method. enterSection() runs before the
+       // signature (like interface_method_decl) so the trailing EOL is available
+       // to terminate the declaration even when another member follows.
        return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, null, tparams, throwsTypes, anns);
      }
   )

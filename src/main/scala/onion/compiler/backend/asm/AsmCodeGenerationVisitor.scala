@@ -73,6 +73,9 @@ class AsmCodeGenerationVisitor(
       "expression evaluated to null (!! assertion failed)"
     )
     gen.visitLabel(okLabel)
+    // A nullable primitive (e.g. Int?) is a boxed value at runtime but its
+    // non-null result type is the primitive, so unbox to match the static type.
+    if node.`type`.isBasicType then gen.unbox(asmType(node.`type`))
 
   /**
    * Safe array indexing: target?[index]

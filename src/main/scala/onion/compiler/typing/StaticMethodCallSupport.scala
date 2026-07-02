@@ -77,6 +77,7 @@ private[compiler] final class StaticMethodCallSupport(
       )
 
       def finalizeSelection(selected: ApplicableMethod): Option[Term] = {
+        if (!ensureStaticMethodAccessible(node, selected.method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
         calls.buildResolvedCall(node, selected.method, parameters, node.typeArgs, classSubst, expected)(
           expectedArgs => calls.prepareCallParams(node, node.args, selected.method, parameters, expectedArgs),
@@ -178,6 +179,7 @@ private[compiler] final class StaticMethodCallSupport(
         calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray)
         return None
     }
+    if (!ensureStaticMethodAccessible(node, method)) return None
 
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     val nonClosureParams = preliminaryParams.filter(_ != null)
@@ -237,6 +239,7 @@ private[compiler] final class StaticMethodCallSupport(
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
       case CandidateSelection.Selected(method) =>
+        if (!ensureStaticMethodAccessible(node, method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
@@ -246,4 +249,14 @@ private[compiler] final class StaticMethodCallSupport(
         }
     }
   }
+
+  /** A resolved static method must be accessible from the current class; a private
+    * one used via `C::m()` from another class was previously compiled and threw
+    * IllegalAccessError at runtime (mirrors instance-method and constructor access). */
+  private def ensureStaticMethodAccessible(node: AST.Node, method: Method): Boolean =
+    if (MemberAccess.isMemberAccessible(method, typing.currentDefinition)) true
+    else {
+      typing.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, method.name, method.arguments, typing.currentDefinition)
+      false
+    }
 }

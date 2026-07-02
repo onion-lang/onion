@@ -303,6 +303,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   // (TypingTypeSupport, TypingDiagnostics, NameResolutionContext). Pass-local state is accessed
   // directly through each pass's TypingUnitContext instead.
   private[compiler] def table_ : ClassTable = session.global.table
+  private[compiler] def currentDefinition: ClassDefinition = currentUnitContext.currentDefinition
   private[compiler] def mapper_ : NameResolver = currentUnitContext.currentMapper
   private[compiler] def unit_ : AST.CompilationUnit = currentUnitContext.unit
   private[compiler] def typeParams_ : TypeParamScope = currentUnitContext.currentTypeParams

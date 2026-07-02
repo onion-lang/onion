@@ -69,12 +69,20 @@ final class AssignmentTyping(
       target.`type` match {
         case objType: ObjectType =>
           val params = Array[Term](index, value)
+          // List/array-list style containers expose set(index, value); Map-style
+          // containers use put(key, value). Try set first, then put, so both
+          // `list[i] = v` and `map[k] = v` work.
           tryFindMethod(node, objType, "set", Array[Term](index, value)) match {
-            case Left(_) =>
-              bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
-              if (value.`type`.isBottomType) value else null
             case Right(method) =>
               if (value.`type`.isBottomType) value else new Call(target, method, params)
+            case Left(_) =>
+              tryFindMethod(node, objType, "put", Array[Term](index, value)) match {
+                case Right(method) =>
+                  if (value.`type`.isBottomType) value else new Call(target, method, params)
+                case Left(_) =>
+                  bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
+                  if (value.`type`.isBottomType) value else null
+              }
           }
         case other =>
           // e.g. assigning through a nullable receiver: unwrap it first

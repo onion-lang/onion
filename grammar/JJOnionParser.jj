@@ -1977,7 +1977,7 @@ AST.Expression logical_or() :{Token t; AST.Expression a, b; }{
   a=logical_and()
   ( LOOKAHEAD(2)
     ( t="||" eols() b=logical_and() {a = new AST.LogicalOr(p(t), a, b);}
-    | t="?:" eols() b=logical_and() {a = new AST.Elvis(p(t), a, b);}
+    | t="?:" eols() ( b=throw_expression() | b=return_expression() | b=logical_and() ) {a = new AST.Elvis(p(t), a, b);}
     )
   )*
   { return a; }

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-02
+
+- **SAM overloads are disambiguated by the lambda body.** A lambda passed to an
+  overloaded method that has both a value-returning and a void functional-interface
+  parameter — e.g. `ExecutorService.submit`, with `submit(Callable[T])` and
+  `submit(Runnable)` — now resolves by the lambda: a value-producing body
+  (`() -> 42`) picks the non-void SAM, a void body (`() -> { ... }`) picks the
+  void SAM, instead of reporting an ambiguity (E0006) ([#210]).
+
 ## [0.3.3] - 2026-07-02
 
 - **Map indexed assignment.** `m[k] = v` and `m[k] += v` now work — indexed
@@ -273,7 +282,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.3...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.4...develop
+[0.3.4]: https://github.com/onion-lang/onion/releases/tag/v0.3.4
 [0.3.3]: https://github.com/onion-lang/onion/releases/tag/v0.3.3
 [0.3.2]: https://github.com/onion-lang/onion/releases/tag/v0.3.2
 [0.3.1]: https://github.com/onion-lang/onion/releases/tag/v0.3.1
@@ -306,6 +316,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#207]: https://github.com/onion-lang/onion/issues/207
 [#208]: https://github.com/onion-lang/onion/issues/208
 [#209]: https://github.com/onion-lang/onion/issues/209
+[#210]: https://github.com/onion-lang/onion/issues/210
 [#213]: https://github.com/onion-lang/onion/issues/213
 [#216]: https://github.com/onion-lang/onion/issues/216
 [#215]: https://github.com/onion-lang/onion/issues/215

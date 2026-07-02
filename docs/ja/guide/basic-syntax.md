@@ -215,6 +215,24 @@ class Person {
 }
 ```
 
+## インターフェース
+
+インターフェースは本体を持たないメソッドシグネチャを宣言します。インターフェース全体を1行で書くことができ、本体のないメソッドの直後に閉じ `}` を同じ行に置くこともできます：
+
+```onion
+interface Shape { def area(): Double }
+
+class Circle : Object <: Shape {
+  val r: Double
+public:
+  def this(r: Double) { this.r = r }
+  override def area(): Double = 3.14 * this.r * this.r
+}
+
+val s: Shape = new Circle(2.0)
+println(s.area())   // 12.56
+```
+
 ## モジュールシステム
 
 ### Import文

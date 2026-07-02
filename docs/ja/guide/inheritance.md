@@ -146,6 +146,67 @@ class PrefixLogger <: Logger {
 
 `forward` はインターフェースのメソッド（`log`/`count`）を `delegate` メンバーへの委譲として自動実装するので、`PrefixLogger` は独自の振る舞いを足すだけで済みます。
 
+### ジェネリックインターフェースへの委譲
+
+`forward` は非ジェネリックなインターフェースだけでなく、**型引数を持つジェネリックインターフェース**に対しても機能します。`List[String]` のメンバーへ委譲すれば、そのクラスはそのまま `List[String]` として扱えます：
+
+```onion
+import {
+  java.util.List;
+  java.util.ArrayList;
+}
+
+class MyList <: List[String] {
+  forward val backing: List[String]
+
+  public:
+    def this(xs: List[String]) { backing = xs }
+}
+
+def main(args: String[]): void {
+  val base: List[String] = new ArrayList[String]()
+  base.add("a")
+  base.add("b")
+
+  // MyList は List[String] が期待される場所でそのまま使える
+  val list: List[String] = new MyList(base)
+  list.add("c")
+  println("size=" + list.size())   // size=3
+  foreach s: String in list {
+    println(s)                      // a, b, c
+  }
+}
+```
+
+**ユーザー定義のジェネリックインターフェース**でも同様です。`Container[Int]` のメンバーへ委譲すれば、そのクラスは `Container[Int]` を実装したことになります：
+
+```onion
+interface Container[T] {
+  def first(): T
+  def count(): Int
+}
+
+class IntBox <: Container[Int] {
+  public:
+    def this {}
+    def first(): Int { return 42 }
+    def count(): Int { return 3 }
+}
+
+class Wrapper <: Container[Int] {
+  forward val inner: Container[Int]
+
+  public:
+    def this(c: Container[Int]) { inner = c }
+}
+
+def main(args: String[]): void {
+  val w: Container[Int] = new Wrapper(new IntBox())
+  println("count=" + w.count())   // count=3
+  println("first=" + w.first())   // first=42
+}
+```
+
 ## ポリモーフィズム
 
 子クラスのオブジェクトを親型の変数に代入できます：

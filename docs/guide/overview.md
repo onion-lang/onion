@@ -231,9 +231,10 @@ select value {
 
 As documented in the README:
 
-1. **Edge cases** - The compiler may crash on certain code patterns
-2. **Erasure generics** - No variance, wildcards, or reified type info
-3. **Diagnostics** - Some errors are reported later in the pipeline
+1. **Robustness** - The compiler enforces a no-crash / no-miscompile bar via a mutation fuzzer, a crash-reproducer corpus, and codegen-correctness tests; if you do hit a crash or miscompilation, please file a minimal repro
+2. **Erasure generics** - No reified type info; type arguments are invariant (no variance or wildcards)
+3. **Tail-call optimization** - Covers direct and mutual self-recursion, not general continuation-passing style
+4. **Diagnostics** - Some errors are reported later in the pipeline than ideal
 
 The examples in the `run/` directory are verified to compile and execute correctly.
 

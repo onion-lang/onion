@@ -60,6 +60,38 @@ val text = (obj as JButton).getText()
 
 ローカル変数、フィールド、static 変数があります。トップレベルの `val` はスクリプトの合成クラスのフィールドに昇格されつつ、`if x != null` のスマートキャストも効きます。
 
+## ジェネリック型
+
+ジェネリック型は `[]` で型引数を指定します（raw 型は禁止 = E0066）。型引数にはプリミティブ型（`Int` など）も使え、JVM の消去に伴い境界で自動的にボックス化／アンボックス化されます：
+
+```onion
+val list: ArrayList[Int] = new ArrayList[Int]
+list.add(1)
+val x: Int = list.get(0)
+```
+
+### 型引数の不変性
+
+型引数は**不変**です。`Dog` が `Animal` の派生型であっても、`Box[Dog]` は `Box[Animal]` に代入できません（ヒープ汚染を防ぐため）。互換なのは同一のパラメータ化だけです：
+
+```onion
+class Animal { public: def this {} }
+class Dog : Animal { public: def this {} }
+
+class Box[T] {
+  val v: T
+public:
+  def this(x: T) { v = x }
+  def get(): T = v
+}
+
+val bd: Box[Dog] = new Box(new Dog())
+val same: Box[Dog] = bd        // OK: 同一のパラメータ化
+// val wide: Box[Animal] = bd  // エラー E0000: Box[Dog] は Box[Animal] ではない
+```
+
+不変性は型*引数*に適用されるもので、ジェネリッククラス自体は通常の派生関係に従います（例: `ArrayList[String]` は `List[String]`）。
+
 ## 次のステップ
 
 - [Null安全](null-safety.md) - nullable型とスマートキャスト

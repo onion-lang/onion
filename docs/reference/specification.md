@@ -559,11 +559,16 @@ a non-nullable type.
 
 ## Current Limitations
 
-1. Generics are erasure-based (no variance or reified type info), though
-   type-parameter nullability is tracked at compile time
-2. Tail-call optimization covers direct self-recursion (plus a
-   mutual-recursion optimization pass); not general CPS
+1. Generics are erasure-based (type arguments are invariant — no variance,
+   wildcards, or reified type info), though type-parameter nullability is
+   tracked at compile time
+2. Tail-call optimization covers direct and mutual self-recursion; not
+   general CPS
 3. Some diagnostics are still reported later in the pipeline than ideal
+
+The compiler enforces a no-crash / no-miscompile bar via a mutation fuzzer, a
+crash-reproducer corpus, and codegen-correctness tests.  If you do hit a crash
+or a miscompilation, please file a minimal reproducer.
 
 ## Grammar Reference
 

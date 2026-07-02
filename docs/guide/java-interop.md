@@ -42,6 +42,22 @@ val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 val file: java.io.File = new java.io.File("data.txt")
 ```
 
+This also works for static members and methods: call them directly on the dotted class name with `::`, no import required:
+
+```onion
+val m: Int = java.lang.Math::max(3, 7)             // 7
+val s: String = java.lang.Integer::toString(255)   // "255"
+val mx: Int = java.lang.Integer::MAX_VALUE         // 2147483647
+```
+
+**Caveat:** the basic-type keyword names (`Long`, `Int`, `Double`, and so on) are reserved words, not identifiers, so they cannot be used as static receivers. `Long::toString(42L)` — and even the fully qualified `java.lang.Long::toString(42L)` — fails to parse. Use a non-keyword class such as `Integer` or `Math`, or import the class under an alias and call it through that name:
+
+```onion
+import { java.lang.Long as JLong; }
+
+val s: String = JLong::toString(42L)  // "42"
+```
+
 ## Static Imports
 
 Import static methods from Java classes so you can call them without qualification:

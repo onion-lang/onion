@@ -26,6 +26,22 @@ val str: String = JLong::toString(42L)
 val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
+これはstaticメンバーやメソッドにも使えます。ドット区切りのクラス名に対して `::` で直接呼び出せ、インポートは不要です：
+
+```onion
+val m: Int = java.lang.Math::max(3, 7)             // 7
+val s: String = java.lang.Integer::toString(255)   // "255"
+val mx: Int = java.lang.Integer::MAX_VALUE         // 2147483647
+```
+
+**注意：** 基本型のキーワード名（`Long`・`Int`・`Double` など）は識別子ではなく予約語なので、staticレシーバとしては使えません。`Long::toString(42L)` は——完全修飾した `java.lang.Long::toString(42L)` でさえ——構文エラーになります。`Integer` や `Math` のようなキーワードでないクラスを使うか、エイリアスでインポートしてその名前で呼び出してください：
+
+```onion
+import { java.lang.Long as JLong; }
+
+val s: String = JLong::toString(42L)  // "42"
+```
+
 ## Javaオブジェクトの生成とメソッド呼び出し
 
 `new` でオブジェクトを生成し、メソッドを通常どおり呼び出せます：

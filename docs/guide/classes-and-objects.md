@@ -310,6 +310,41 @@ val (s, n) = p                 // destructuring declaration
 p.copy(second = 42)            // named-argument copy
 ```
 
+## Generic Classes
+
+Classes can take type parameters in `[]`. A parameter is available
+throughout the body as an ordinary type:
+
+```onion
+class Box[T] {
+  val v: T
+public:
+  def this(x: T) { v = x }
+  def get(): T = v
+}
+```
+
+When the expected type pins the type argument, the constructor infers it, so
+`new Box(...)` needs no `[T]` (the "diamond"). Explicit type arguments still
+work, and both forms are equivalent:
+
+```onion
+val b: Box[String] = new Box("x")           // T inferred as String
+val n: Box[Integer] = new Box(9)            // T inferred as Integer
+val b2: Box[String] = new Box[String]("y")  // explicit — same result
+```
+
+With no expected type to infer from, the bare generic is rejected — supply an
+expected type or explicit type arguments:
+
+```onion
+// val bad = new Box("x")   // ERROR E0066: raw generic type Box —
+                            // write `new Box[String]("x")` or annotate the target
+```
+
+Type arguments are invariant (`Box[Dog]` is not a `Box[Animal]`); see
+[Variables and Types](variables-and-types.md#generic-types-java-generics).
+
 ## Operator Overloading
 
 Binary operators dispatch to convention methods on the left operand

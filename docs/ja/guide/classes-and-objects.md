@@ -147,6 +147,28 @@ foreach p: Planet in Planet::values() {
 }
 ```
 
+## ジェネリッククラス
+
+クラスは `[]` で型パラメータを取れます。型パラメータは本体で通常の型として使えます：
+
+```onion
+class Box[T] {
+  val v: T
+public:
+  def this(x: T) { v = x }
+  def get(): T = v
+}
+```
+
+期待される型が型引数を決められる場合、コンストラクタは型引数を推論するので `new Box(...)` に `[T]` は不要です（ダイヤモンド）。明示指定も可能で、どちらも同じ結果になります：
+
+```onion
+val b: Box[String] = new Box("x")           // T は String と推論される
+val b2: Box[String] = new Box[String]("y")  // 明示指定 — 同じ結果
+```
+
+推論できる期待型が無い場合、raw なジェネリック型はエラーになります（E0066）。期待型を注釈するか、型引数を明示してください。型引数は不変です（`Box[Dog]` は `Box[Animal]` ではありません。[変数と型](variables-and-types.md)を参照）。
+
 ## 次のステップ
 
 - [継承](inheritance.md) - クラスの拡張とインターフェースの実装

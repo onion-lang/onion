@@ -21,6 +21,23 @@ ages.get("alice")
 foreach k: String in ages.keySet() { println(k) }
 ```
 
+## 空リテラル
+
+`[]` と `[:]` は自身の要素型を持たないため、コンパイラは周囲の文脈から型を決定します。これは `val` 宣言・戻り値・フィールド初期化子ではすでに機能していましたが、**引数位置**でも動作するようになりました。期待される引数の型が要素型を与えます：
+
+```onion
+import {
+  java.util.List
+  java.util.Map
+}
+
+def size(xs: List[String]): Int = xs.size()
+def count(m: Map[String, Integer]): Int = m.size()
+
+size([])      // 0  - [] は List[String] のパラメータ型を受け取る
+count([:])    // 0  - [:] は Map[String, Integer] のパラメータ型を受け取る
+```
+
 ## パイプライン
 
 `java.util.List` と `java.lang.Iterable` には `onion.Colls` / `onion.Iterables` のヘルパーが追加されており、トレイリングラムダでチェインできます：

@@ -238,6 +238,67 @@ println(logger.count())   // count() is forwarded to BasicLogger -> 2
 
 The `forward` directive automatically implements the interface methods (`log`/`count`) by forwarding calls to the `delegate` member, so `PrefixLogger` only needs to add its own behaviour.
 
+### Forwarding a Generic Interface
+
+`forward` also works over a **parameterized generic interface**, not just non-generic ones. Delegate to a `List[String]` member and the class satisfies `List[String]` for free:
+
+```onion
+import {
+  java.util.List;
+  java.util.ArrayList;
+}
+
+class MyList <: List[String] {
+  forward val backing: List[String]
+
+  public:
+    def this(xs: List[String]) { backing = xs }
+}
+
+def main(args: String[]): void {
+  val base: List[String] = new ArrayList[String]()
+  base.add("a")
+  base.add("b")
+
+  // MyList is usable anywhere a List[String] is expected
+  val list: List[String] = new MyList(base)
+  list.add("c")
+  println("size=" + list.size())   // size=3
+  foreach s: String in list {
+    println(s)                      // a, b, c
+  }
+}
+```
+
+The same works for a **user-defined generic interface** — forward to a `Container[Int]` member and the class implements `Container[Int]`:
+
+```onion
+interface Container[T] {
+  def first(): T
+  def count(): Int
+}
+
+class IntBox <: Container[Int] {
+  public:
+    def this {}
+    def first(): Int { return 42 }
+    def count(): Int { return 3 }
+}
+
+class Wrapper <: Container[Int] {
+  forward val inner: Container[Int]
+
+  public:
+    def this(c: Container[Int]) { inner = c }
+}
+
+def main(args: String[]): void {
+  val w: Container[Int] = new Wrapper(new IntBox())
+  println("count=" + w.count())   // count=3
+  println("first=" + w.first())   // first=42
+}
+```
+
 ## Polymorphism
 
 ### Type Substitution

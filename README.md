@@ -234,6 +234,7 @@ Use `onion repl`, `onion-repl`, or `sbt repl` to start the interactive REPL. The
 
 ## Limitations
 
-* The compiler still has edge cases and can crash; please report minimal repros.
-* Generics are erasure-based (no variance, wildcards, or reified type info).
-* Diagnostics are still improving; some errors may be reported later in the pipeline.
+* The compiler enforces a no-crash / no-miscompile bar (mutation fuzzer, crash-reproducer corpus, codegen-correctness tests); if you find a crash or miscompilation, please file a minimal repro.
+* Generics are erasure-based: no reified type info, and type arguments are invariant (no variance or wildcards).
+* Tail-call optimization covers direct and mutual self-recursion (not general continuation-passing style).
+* Diagnostics are still improving; some errors may be reported later in the pipeline than ideal.

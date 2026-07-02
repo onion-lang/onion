@@ -495,10 +495,10 @@ These are frequently confused with other languages. **Always check these:**
 
 ## Known Limitations
 
-- Compiler may crash on certain edge cases (examples in `run/` are verified to work)
-- Generics are erasure-based (no variance, wildcards, or reified type info); nullability of type parameters is tracked at compile time (bare `[T]` is nullable, `[T extends B]` is non-null, Java type variables are platform)
-- Diagnostics are still improving; some errors may be reported later in the pipeline
-- Tail call optimization only handles direct self-recursion (not mutual recursion or continuation-passing style)
+- The compiler enforces a no-crash / no-miscompile bar via a mutation fuzzer, a crash-reproducer corpus, and codegen-correctness tests; if you do hit a crash or miscompilation, please file a minimal repro (examples in `run/` are verified to work)
+- Generics are erasure-based (no reified type info; type arguments are invariant — no variance or wildcards); nullability of type parameters is tracked at compile time (bare `[T]` is nullable, `[T extends B]` is non-null, Java type variables are platform)
+- Diagnostics are still improving; some errors may be reported later in the pipeline than ideal
+- Tail call optimization covers direct and mutual self-recursion (not general continuation-passing style)
 
 ## Entry Points for Execution
 

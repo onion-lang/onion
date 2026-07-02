@@ -341,6 +341,26 @@ class Person {
 }
 ```
 
+## Interfaces
+
+An interface declares method signatures without bodies. A whole interface
+can sit on a single line, and a no-body method may be followed by the
+closing `}` on the same line:
+
+```onion
+interface Shape { def area(): Double }
+
+class Circle : Object <: Shape {
+  val r: Double
+public:
+  def this(r: Double) { this.r = r }
+  override def area(): Double = 3.14 * this.r * this.r
+}
+
+val s: Shape = new Circle(2.0)
+println(s.area())   // 12.56
+```
+
 ## Module System
 
 ### Import Statements

@@ -33,6 +33,44 @@ val display: String = name ?: "unknown"
 val u: String = s?.toUpperCase() ?: "DEFAULT"
 ```
 
+### NullableプリミティブでのElvis
+
+Elvis演算子は nullable な**プリミティブ**型にも使えます。結果はアンボックスされたプリミティブなので、非nullの `Int` / `Long` / `Double` などにそのまま代入できます。
+
+```onion
+val n: Int? = null
+val v: Int = n ?: -1        // -1
+
+val m: Int? = 42
+val w: Int = m ?: -1        // 42
+```
+
+プリミティブを返すメソッドへのセーフコールと組み合わせると自然です。呼び出しは `Integer?` を返し、レシーバが `null` のとき `?:` がプリミティブのフォールバックを与えます。
+
+```onion
+val s: String? = null
+val len: Int = s?.length() ?: -1    // -1（s が null）
+
+val s2: String? = "hello"
+val len2: Int = s2?.length() ?: -1  // 5
+```
+
+### 右辺に制御式を書けるElvis
+
+`?:` の右辺には `throw` や `return` などの制御式も書けます。値が欠けているときに早期に失敗・脱出する簡潔な書き方になります。
+
+```onion
+def firstName(s: String?): String {
+  val name: String = s ?: throw new RuntimeException("nil")
+  return name
+}
+
+def lenOrDefault(s: String?, default: Int): Int {
+  val v: String = s ?: return default
+  return v.length()
+}
+```
+
 ## nullチェックとスマートキャスト
 
 `if x != null` のブロック内では `x` が非null型に絞り込まれます（スマートキャスト）。**関数内でもトップレベルの `val` でも効きます。**
@@ -51,6 +89,49 @@ def f(s: String?): String {
   if !(s != null) { return "nil" }
   return "n" + s.length()        // s はここで String
 }
+```
+
+### nullableフィールドのスマートキャスト
+
+null チェックはローカル変数だけでなく、イミュータブル（`val`）な nullable フィールドも絞り込みます。`if field != null { ... }` のブロック内では、`T?` 型の `val` フィールドは `T` として扱われ、そのままメソッドを呼べます。
+
+```onion
+class Person {
+  val name: String?
+public:
+  def this(name: String?) { this.name = name }
+  def nameLength(): Int {
+    if name != null {
+      return name.length()   // ここで name は String に絞られる
+    } else {
+      return -1
+    }
+  }
+}
+
+println(new Person("Alice").nameLength())  // 5
+println(new Person(null).nameLength())     // -1
+```
+
+ミュータブル（`var`）なフィールドは絞り込まれません（チェックと使用の間に値が変わりうるため。使うと E0041）。ローカルの `val` にスナップショットしてから使います。ローカルは常に絞り込まれます。
+
+```onion
+class Counter {
+  var label: String?
+public:
+  def this(label: String?) { this.label = label }
+  def show(): Int {
+    val l = label            // ローカルの val にスナップショット
+    if l != null {
+      return l.length()      // l は String に絞られる
+    } else {
+      return -1
+    }
+  }
+}
+
+println(new Counter("hi").show())   // 2
+println(new Counter(null).show())   // -1
 ```
 
 ## nullableに対する `==` はnull安全な値等価

@@ -80,6 +80,52 @@ val s2: String? = "hello"
 val upper2: String = s2?.toUpperCase() ?: "DEFAULT"  // Returns "HELLO"
 ```
 
+### Elvis with Nullable Primitives
+
+The Elvis operator also works on nullable *primitive* types. The result is an
+unboxed primitive, so it can be assigned straight to a non-nullable `Int`,
+`Long`, `Double`, etc.:
+
+```onion
+val n: Int? = null
+val v: Int = n ?: -1        // -1
+
+val m: Int? = 42
+val w: Int = m ?: -1        // 42
+```
+
+This pairs naturally with a safe call to a primitive-returning method: the call
+yields a boxed `Integer?`, and `?:` supplies the primitive fallback when the
+receiver is `null`:
+
+```onion
+val s: String? = null
+val len: Int = s?.length() ?: -1    // -1 (s is null)
+
+val s2: String? = "hello"
+val len2: Int = s2?.length() ?: -1  // 5
+```
+
+### Elvis with a Control Expression on the Right
+
+The right-hand side of `?:` can be any expression, including control-flow
+expressions such as `throw` and `return`. This makes `?:` a concise way to fail
+fast or exit early when a value is missing:
+
+```onion
+def firstName(s: String?): String {
+  // If s is null, throw instead of producing a value
+  val name: String = s ?: throw new RuntimeException("nil")
+  return name
+}
+
+def lenOrDefault(s: String?, default: Int): Int {
+  // If s is null, return early from the method
+  val v: String = s ?: return default
+  return v.length()
+}
+```
+
 ## Null Checking with `if`
 
 You can check for `null` using standard `if` statements:
@@ -109,6 +155,53 @@ def f(s: String?): String {
 }
 
 if !(o is String) { return "not a string" }
+```
+
+### Smart-Casting Nullable Fields
+
+A null check narrows not only local variables but also immutable (`val`)
+nullable fields. Inside an `if field != null { ... }` block, a `val` field of
+type `T?` is treated as `T`, so you can call methods on it directly:
+
+```onion
+class Person {
+  val name: String?
+public:
+  def this(name: String?) { this.name = name }
+  def nameLength(): Int {
+    if name != null {
+      return name.length()   // name narrowed to String here
+    } else {
+      return -1
+    }
+  }
+}
+
+println(new Person("Alice").nameLength())  // 5
+println(new Person(null).nameLength())     // -1
+```
+
+A mutable (`var`) field is **not** narrowed, because its value could change
+between the check and the use (E0041 if you try). Snapshot it into a local
+`val` first — locals are always narrowed:
+
+```onion
+class Counter {
+  var label: String?
+public:
+  def this(label: String?) { this.label = label }
+  def show(): Int {
+    val l = label            // snapshot into a local val
+    if l != null {
+      return l.length()      // l narrowed to String
+    } else {
+      return -1
+    }
+  }
+}
+
+println(new Counter("hi").show())   // 2
+println(new Counter(null).show())   // -1
 ```
 
 ## Return Type of Safe Calls

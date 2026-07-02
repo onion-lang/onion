@@ -270,6 +270,33 @@ list.add(1)
 val x: Int = list.get(0)
 ```
 
+### Invariance of Type Arguments
+
+Type arguments are **invariant**: `Box[Dog]` is *not* assignable to
+`Box[Animal]` even though `Dog` is a subtype of `Animal`. This prevents heap
+pollution (a `Box[Animal]` view could otherwise store a non-`Dog`). Only an
+identical parameterization is compatible:
+
+```onion
+class Animal { public: def this {} }
+class Dog : Animal { public: def this {} }
+
+class Box[T] {
+  val v: T
+public:
+  def this(x: T) { v = x }
+  def get(): T = v
+}
+
+val bd: Box[Dog] = new Box(new Dog())
+val same: Box[Dog] = bd        // OK: identical parameterization
+// val wide: Box[Animal] = bd  // ERROR E0000: Box[Dog] is not a Box[Animal]
+```
+
+Invariance applies to the type *arguments*; the generic class itself still
+participates in normal subtyping (e.g., `ArrayList[String]` is a
+`List[String]`).
+
 ## Function Types
 
 Functions are represented by `Function0` through `Function10` interfaces:

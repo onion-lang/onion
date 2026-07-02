@@ -36,6 +36,32 @@ An operator was applied to a type it does not support.
 val b = true + 1   // E0001
 ```
 
+### `E0066` — Raw generic type not allowed
+
+A generic type was used without type arguments.  Onion forbids raw generic
+types; supply the type arguments explicitly.
+
+```onion
+val xs: List = [1]        // E0066: raw List
+val ok: List[Int] = [1]   // fixed
+```
+
+### `E0067` — Missing return
+
+A value-returning method has a block body that can complete without returning a
+value.  Return on every path, or use an expression body.
+
+```onion
+class C {
+public:
+  static def f(): Int { 5 + 10 }   // E0067: value is never returned
+}
+```
+
+Fixes:
+- Add an explicit `return`: `{ return 5 + 10 }`.
+- Use an expression body: `def f(): Int = 5 + 10`.
+
 ## Resolution errors
 
 ### `E0002` — Variable not found

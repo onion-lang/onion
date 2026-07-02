@@ -22,6 +22,27 @@ ages.get("alice")
 foreach k: String in ages.keySet() { println(k) }
 ```
 
+## Empty Literals
+
+`[]` and `[:]` have no element types of their own, so the compiler takes
+the type from the surrounding context. This already worked for `val`
+declarations, returns and field initializers; it now also works at
+**argument position**, where the expected parameter type supplies the
+element types:
+
+```onion
+import {
+  java.util.List
+  java.util.Map
+}
+
+def size(xs: List[String]): Int = xs.size()
+def count(m: Map[String, Integer]): Int = m.size()
+
+size([])      // 0  - [] takes the List[String] parameter type
+count([:])    // 0  - [:] takes the Map[String, Integer] parameter type
+```
+
 ## Pipelines
 
 `java.util.List` and `java.lang.Iterable` are extended with the helpers

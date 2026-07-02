@@ -299,13 +299,26 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * implementing class.
    */
   private def lowerInstanceDeclaration(declaration: AST.InstanceDeclaration): AST.ClassDeclaration = {
-    val key = declaration.traitType.desc.toString
-      .replace("[", "$$").replace("]", "").replace(",", "$").replace(" ", "").replace(".", "_")
     val section = AST.AccessSection(declaration.location, AST.M_PUBLIC, declaration.methods)
     AST.ClassDeclaration(
-      declaration.location, declaration.modifiers, key,
+      declaration.location, declaration.modifiers, mangleInstanceClassName(declaration.traitType.desc),
       null, List(declaration.traitType), None, List(section), Nil
     )
+  }
+
+  /** Deterministic class name for the instance of a trait application, e.g.
+    * `Numeric[Integer]` -> `Numeric$$Integer`. Must agree between the instance
+    * lowering and the `Trait[..]::method` dictionary-access lowering. */
+  private def mangleInstanceClassName(applied: AST.TypeDescriptor): String =
+    applied.toString.replace("[", "$$").replace("]", "").replace(",", "$").replace(" ", "").replace(".", "_")
+
+  /** `Trait[TypeArgs]::method(args)` -> `new <mangled instance>().method(args)`.
+    * Works for ground type arguments (the instance class exists); an abstract type
+    * parameter yields a "class not found" error until dictionary passing lands. */
+  private def lowerTraitMethodCall(node: AST.TraitMethodCall): AST.Expression = {
+    val applied = AST.ParameterizedType(node.traitType.desc, node.typeArgs.map(_.desc))
+    val classNode = AST.TypeNode(node.location, AST.ReferenceType(mangleInstanceClassName(applied), false), false)
+    AST.MethodCall(node.location, AST.NewObject(node.location, classNode, Nil), node.name, node.args.map(rewriteExpression), Nil)
   }
 
   def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = {
@@ -841,6 +854,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case AST.StaticMemberSelection(loc, typeRef, name) => expr
     case AST.StaticMethodCall(loc, typeRef, name, args, typeArgs) =>
       AST.StaticMethodCall(loc, typeRef, name, args.map(rewriteExpression), typeArgs)
+    case node: AST.TraitMethodCall =>
+      lowerTraitMethodCall(node)
     case AST.StringInterpolation(loc, parts, expressions) =>
       AST.StringInterpolation(loc, parts, expressions.map(rewriteExpression))
     case AST.SuperMethodCall(loc, name, args, typeArgs) =>

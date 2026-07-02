@@ -2255,6 +2255,9 @@ AST.Expression primary() : {
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es); }
+| LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.TraitMethodCall(p(t), ty, tas, c(n), es); }
 | LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }

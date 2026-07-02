@@ -200,6 +200,10 @@ object AST {
     def this(location: Location, typeRef: TypeNode, name: String, args: List[Expression]) =
       this(location, typeRef, name, args, Nil)
   }
+  /** Type-class dictionary access `Trait[TypeArgs]::method(args)`. Lowered in
+    * Rewriting to a call on the instance for the (ground) type arguments; the
+    * dictionary-passing form for abstract type parameters is a later stage. */
+  case class TraitMethodCall(location: Location, traitType: TypeNode, typeArgs: List[TypeNode], name: String, args: List[Expression]) extends Expression
   case class StringLiteral(location: Location, value: String) extends Expression
   case class StringInterpolation(location: Location, parts: List[String], expressions: List[Expression]) extends Expression
   case class Subtraction(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("-")

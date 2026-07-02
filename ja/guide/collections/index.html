@@ -1109,6 +1109,17 @@
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
+        空リテラル
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         パイプライン
       
     </span>
@@ -1128,7 +1139,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         ソート
@@ -1139,7 +1150,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         マップのイテレーション
@@ -1150,7 +1161,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -3904,6 +3915,17 @@
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
+        空リテラル
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         パイプライン
       
     </span>
@@ -3923,7 +3945,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         ソート
@@ -3934,7 +3956,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         マップのイテレーション
@@ -3945,7 +3967,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -3990,43 +4012,56 @@
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>ages.get(&quot;alice&quot;)
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>foreach k: String in ages.keySet() { println(k) }
 </span></code></pre></div>
-<h2 id="_4">パイプライン<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h2 id="_4">空リテラル<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p><code>[]</code> と <code>[:]</code> は自身の要素型を持たないため、コンパイラは周囲の文脈から型を決定します。これは <code>val</code> 宣言・戻り値・フィールド初期化子ではすでに機能していましたが、<strong>引数位置</strong>でも動作するようになりました。期待される引数の型が要素型を与えます：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>import {
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  java.util.List
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  java.util.Map
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>}
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>def size(xs: List[String]): Int = xs.size()
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>def count(m: Map[String, Integer]): Int = m.size()
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>size([])      // 0  - [] は List[String] のパラメータ型を受け取る
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>count([:])    // 0  - [:] は Map[String, Integer] のパラメータ型を受け取る
+</span></code></pre></div>
+<h2 id="_5">パイプライン<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p><code>java.util.List</code> と <code>java.lang.Iterable</code> には <code>onion.Colls</code> / <code>onion.Iterables</code> のヘルパーが追加されており、トレイリングラムダでチェインできます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val lines = [&quot;alpha beta&quot;, &quot;gamma&quot;, &quot;alpha delta&quot;]
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>val lengths = lines
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  .filter { s =&gt; s.contains(&quot;alpha&quot;) }
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  .map { s =&gt; s.length() }       // [10, 11]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val lines = [&quot;alpha beta&quot;, &quot;gamma&quot;, &quot;alpha delta&quot;]
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>val lengths = lines
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  .filter { s =&gt; s.contains(&quot;alpha&quot;) }
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  .map { s =&gt; s.length() }       // [10, 11]
 </span></code></pre></div>
 <p>静的呼び出し形式でも使えます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Colls::map(xs, (x: Integer) -&gt; (x as Int) * 2)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Colls::map(xs, (x: Integer) -&gt; (x as Int) * 2)
 </span></code></pre></div>
 <h2 id="range">範囲（Range）<a class="headerlink" href="#range" title="Permanent link">&para;</a></h2>
 <p><code>a..b</code>（両端含む）と <code>a..&lt;b</code>（末端を含まない）で整数範囲を作成できます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>foreach i: Int in 1..5 { println(i) }         // 1 2 3 4 5
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>foreach i: Int in 0..&lt;xs.size() { use(xs[i]) }    // インデックスイテレーション
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>val r = 2..4
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>r.size()       // 3
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>r.contains(3)  // true
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>foreach i: Int in 1..5 { println(i) }         // 1 2 3 4 5
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>foreach i: Int in 0..&lt;xs.size() { use(xs[i]) }    // インデックスイテレーション
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>val r = 2..4
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>r.size()       // 3
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>r.contains(3)  // true
 </span></code></pre></div>
-<h2 id="_5">ソート<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h2 id="_6">ソート<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p><code>Comparator</code> が期待される箇所にラムダを渡せます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val xs = Colls::mutableListOf(3, 1, 2)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Collections::sort(xs, (a, b) -&gt; (a as Int) - (b as Int))
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val xs = Colls::mutableListOf(3, 1, 2)
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Collections::sort(xs, (a, b) -&gt; (a as Int) - (b as Int))
 </span></code></pre></div>
-<h2 id="_6">マップのイテレーション<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="_7">マップのイテレーション<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>エントリの分割代入と明示的なエントリ型の両方が使えます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>foreach (name, age) in ages {          // エントリ分割代入
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  println(name + &quot; is &quot; + age)
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>}
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>import { java.util.Map }
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>foreach e: Map.Entry in ages.entrySet() {  // 明示的エントリ形式
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  println(e.getKey() + &quot; is &quot; + e.getValue())
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>foreach (name, age) in ages {          // エントリ分割代入
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  println(name + &quot; is &quot; + age)
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>}
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>import { java.util.Map }
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>foreach e: Map.Entry in ages.entrySet() {  // 明示的エントリ形式
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>  println(e.getKey() + &quot; is &quot; + e.getValue())
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>}
 </span></code></pre></div>
-<h2 id="_7">次のステップ<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<h2 id="_8">次のステップ<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../basic-syntax/">基本構文</a> - 配列と基本的な構文</li>
 <li><a href="../java-interop/">Javaとの相互運用</a> - Java コレクションクラスの詳細</li>

@@ -1108,6 +1108,17 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
+        ジェネリッククラス
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         次のステップ
       
     </span>
@@ -3970,6 +3981,17 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
+        ジェネリッククラス
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         次のステップ
       
     </span>
@@ -4110,7 +4132,21 @@
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>  println(p.name() + &quot; = &quot; + p.mass())
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>}
 </span></code></pre></div>
-<h2 id="_6">次のステップ<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="_6">ジェネリッククラス<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>クラスは <code>[]</code> で型パラメータを取れます。型パラメータは本体で通常の型として使えます：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>class Box[T] {
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  val v: T
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>public:
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  def this(x: T) { v = x }
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  def get(): T = v
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>}
+</span></code></pre></div>
+<p>期待される型が型引数を決められる場合、コンストラクタは型引数を推論するので <code>new Box(...)</code> に <code>[T]</code> は不要です（ダイヤモンド）。明示指定も可能で、どちらも同じ結果になります：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>val b: Box[String] = new Box(&quot;x&quot;)           // T は String と推論される
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>val b2: Box[String] = new Box[String](&quot;y&quot;)  // 明示指定 — 同じ結果
+</span></code></pre></div>
+<p>推論できる期待型が無い場合、raw なジェネリック型はエラーになります（E0066）。期待型を注釈するか、型引数を明示してください。型引数は不変です（<code>Box[Dog]</code> は <code>Box[Animal]</code> ではありません。<a href="../variables-and-types/">変数と型</a>を参照）。</p>
+<h2 id="_7">次のステップ<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../inheritance/">継承</a> - クラスの拡張とインターフェースの実装</li>
 <li><a href="../java-interop/">Javaとの相互運用</a> - Javaクラスの活用</li>

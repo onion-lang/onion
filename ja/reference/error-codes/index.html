@@ -1844,6 +1844,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0066-raw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0066 — raw なジェネリック型は使用できない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0067-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0067 — return の欠落
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4069,6 +4091,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0066-raw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0066 — raw なジェネリック型は使用できない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0067-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0067 — return の欠落
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4254,15 +4298,32 @@
 <p>演算子がサポートしていない型に適用されました。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val b = true + 1   // E0001
 </span></code></pre></div>
+<h3 id="e0066-raw"><code>E0066</code> — raw なジェネリック型は使用できない<a class="headerlink" href="#e0066-raw" title="Permanent link">&para;</a></h3>
+<p>ジェネリック型が型引数なしで使われました。Onion は raw なジェネリック型を禁止して
+います。型引数を明示的に指定してください。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val xs: List = [1]        // E0066: raw な List
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>val ok: List[Int] = [1]   // 修正版
+</span></code></pre></div>
+<h3 id="e0067-return"><code>E0067</code> — return の欠落<a class="headerlink" href="#e0067-return" title="Permanent link">&para;</a></h3>
+<p>値を返すメソッドのブロック本体が、値を返さずに末尾へ到達する可能性があります。
+すべてのパスで値を返すか、式本体を使ってください。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>class C {
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>public:
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  static def f(): Int { 5 + 10 }   // E0067: 値が返されない
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>}
+</span></code></pre></div>
+<p>修正方法:
+- 明示的な <code>return</code> を追加: <code>{ return 5 + 10 }</code>。
+- 式本体を使う: <code>def f(): Int = 5 + 10</code>。</p>
 <h2 id="_3">名前解決エラー<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <h3 id="e0002"><code>E0002</code> — 変数が見つからない<a class="headerlink" href="#e0002" title="Permanent link">&para;</a></h3>
 <p>参照されたローカル変数がスコープ内に存在しません。可能な場合、コンパイラは類似した名前を提案します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val userName = &quot;ok&quot;
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>println(usrName)   // E0002、userName を提案
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val userName = &quot;ok&quot;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>println(usrName)   // E0002、userName を提案
 </span></code></pre></div>
 <h3 id="e0003"><code>E0003</code> — クラスが見つからない<a class="headerlink" href="#e0003" title="Permanent link">&para;</a></h3>
 <p>型名を解決できません。スペルとインポートを確認してください。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
 </span></code></pre></div>
 <h3 id="e0005"><code>E0005</code> — メソッドが見つからない<a class="headerlink" href="#e0005" title="Permanent link">&para;</a></h3>
 <p>呼び出しに一致するメソッドがありません。同じ名前のメソッドが存在するが引数の型が異なる場合、コンパイラは利用可能なシグネチャを一覧表示します。</p>
@@ -4271,10 +4332,10 @@
 <h2 id="null">Null 安全エラー<a class="headerlink" href="#null" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-null"><code>E0057</code> — 型引数が null の可能性がある<a class="headerlink" href="#e0057-null" title="Permanent link">&para;</a></h3>
 <p>裸の型引数 <code>[T]</code> は nullable な型で実体化される可能性があるため、null チェックまたは非 null 制限なしには直接デリファレンスできません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>class Box[T] {
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>public:
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>class Box[T] {
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>public:
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>}
 </span></code></pre></div>
 <p>修正方法:
 - <code>?.</code> / <code>?:</code> / <code>if x != null</code> を使う。
@@ -4282,18 +4343,18 @@
 <h2 id="_4">パターンマッチングエラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sealed interface Shape {}
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>record Circle(r: Int) &lt;: Shape
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>select shape {
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sealed interface Shape {}
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>record Circle(r: Int) &lt;: Shape
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>select shape {
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>}
 </span></code></pre></div>
 <h2 id="_5">パーサーエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="_6">関連項目<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>

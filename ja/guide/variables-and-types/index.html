@@ -974,6 +974,34 @@
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
+        ジェネリック型
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ジェネリック型">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型引数の不変性
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         次のステップ
       
     </span>
@@ -3982,6 +4010,34 @@
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
+        ジェネリック型
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ジェネリック型">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型引数の不変性
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         次のステップ
       
     </span>
@@ -4047,7 +4103,30 @@
 </ul>
 <h2 id="_7">変数スコープ<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>ローカル変数、フィールド、static 変数があります。トップレベルの <code>val</code> はスクリプトの合成クラスのフィールドに昇格されつつ、<code>if x != null</code> のスマートキャストも効きます。</p>
-<h2 id="_8">次のステップ<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_8">ジェネリック型<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>ジェネリック型は <code>[]</code> で型引数を指定します（raw 型は禁止 = E0066）。型引数にはプリミティブ型（<code>Int</code> など）も使え、JVM の消去に伴い境界で自動的にボックス化／アンボックス化されます：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val list: ArrayList[Int] = new ArrayList[Int]
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>list.add(1)
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>val x: Int = list.get(0)
+</span></code></pre></div>
+<h3 id="_9">型引数の不変性<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>型引数は<strong>不変</strong>です。<code>Dog</code> が <code>Animal</code> の派生型であっても、<code>Box[Dog]</code> は <code>Box[Animal]</code> に代入できません（ヒープ汚染を防ぐため）。互換なのは同一のパラメータ化だけです：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>class Animal { public: def this {} }
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>class Dog : Animal { public: def this {} }
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>class Box[T] {
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  val v: T
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>public:
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  def this(x: T) { v = x }
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  def get(): T = v
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>}
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>val bd: Box[Dog] = new Box(new Dog())
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>val same: Box[Dog] = bd        // OK: 同一のパラメータ化
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>// val wide: Box[Animal] = bd  // エラー E0000: Box[Dog] は Box[Animal] ではない
+</span></code></pre></div>
+<p>不変性は型<em>引数</em>に適用されるもので、ジェネリッククラス自体は通常の派生関係に従います（例: <code>ArrayList[String]</code> は <code>List[String]</code>）。</p>
+<h2 id="_10">次のステップ<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../null-safety/">Null安全</a> - nullable型とスマートキャスト</li>
 <li><a href="../control-flow/">制御フロー</a> - if、ループ、select</li>

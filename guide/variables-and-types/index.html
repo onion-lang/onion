@@ -2770,6 +2770,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#invariance-of-type-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariance of Type Arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4397,6 +4408,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#invariance-of-type-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariance of Type Arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4637,10 +4659,32 @@ The initializer is evaluated once; arity mismatches are compile errors.</p>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>list.add(1)
 </span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>val x: Int = list.get(0)
 </span></code></pre></div>
+<h3 id="invariance-of-type-arguments">Invariance of Type Arguments<a class="headerlink" href="#invariance-of-type-arguments" title="Permanent link">&para;</a></h3>
+<p>Type arguments are <strong>invariant</strong>: <code>Box[Dog]</code> is <em>not</em> assignable to
+<code>Box[Animal]</code> even though <code>Dog</code> is a subtype of <code>Animal</code>. This prevents heap
+pollution (a <code>Box[Animal]</code> view could otherwise store a non-<code>Dog</code>). Only an
+identical parameterization is compatible:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>class Animal { public: def this {} }
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>class Dog : Animal { public: def this {} }
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>class Box[T] {
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>  val v: T
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>public:
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>  def this(x: T) { v = x }
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>  def get(): T = v
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>}
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>val bd: Box[Dog] = new Box(new Dog())
+</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>val same: Box[Dog] = bd        // OK: identical parameterization
+</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>// val wide: Box[Animal] = bd  // ERROR E0000: Box[Dog] is not a Box[Animal]
+</span></code></pre></div>
+<p>Invariance applies to the type <em>arguments</em>; the generic class itself still
+participates in normal subtyping (e.g., <code>ArrayList[String]</code> is a
+<code>List[String]</code>).</p>
 <h2 id="function-types">Function Types<a class="headerlink" href="#function-types" title="Permanent link">&para;</a></h2>
 <p>Functions are represented by <code>Function0</code> through <code>Function10</code> interfaces:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>val func: (Int) -&gt; Int = (x: Int) -&gt; { return x * 2; }
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>val result: Int = func(5)  // 10
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>val func: (Int) -&gt; Int = (x: Int) -&gt; { return x * 2; }
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>val result: Int = func(5)  // 10
 </span></code></pre></div>
 <p>When the target function type is known, lambda parameters can omit types. If no explicit function type is provided, the return type is inferred from the body.</p>
 <ul>

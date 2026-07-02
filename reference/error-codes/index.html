@@ -3420,6 +3420,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0066-raw-generic-type-not-allowed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0066 — Raw generic type not allowed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0067-missing-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0067 — Missing return
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4051,6 +4073,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0066-raw-generic-type-not-allowed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0066 — Raw generic type not allowed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0067-missing-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0067 — Missing return
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4236,15 +4280,32 @@
 <p>An operator was applied to a type it does not support.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val b = true + 1   // E0001
 </span></code></pre></div>
+<h3 id="e0066-raw-generic-type-not-allowed"><code>E0066</code> — Raw generic type not allowed<a class="headerlink" href="#e0066-raw-generic-type-not-allowed" title="Permanent link">&para;</a></h3>
+<p>A generic type was used without type arguments.  Onion forbids raw generic
+types; supply the type arguments explicitly.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val xs: List = [1]        // E0066: raw List
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>val ok: List[Int] = [1]   // fixed
+</span></code></pre></div>
+<h3 id="e0067-missing-return"><code>E0067</code> — Missing return<a class="headerlink" href="#e0067-missing-return" title="Permanent link">&para;</a></h3>
+<p>A value-returning method has a block body that can complete without returning a
+value.  Return on every path, or use an expression body.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>class C {
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>public:
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  static def f(): Int { 5 + 10 }   // E0067: value is never returned
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>}
+</span></code></pre></div>
+<p>Fixes:
+- Add an explicit <code>return</code>: <code>{ return 5 + 10 }</code>.
+- Use an expression body: <code>def f(): Int = 5 + 10</code>.</p>
 <h2 id="resolution-errors">Resolution errors<a class="headerlink" href="#resolution-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0002-variable-not-found"><code>E0002</code> — Variable not found<a class="headerlink" href="#e0002-variable-not-found" title="Permanent link">&para;</a></h3>
 <p>A referenced local variable does not exist in scope.  The compiler suggests similar names when possible.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val userName = &quot;ok&quot;
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>println(usrName)   // E0002, suggests userName
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val userName = &quot;ok&quot;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>println(usrName)   // E0002, suggests userName
 </span></code></pre></div>
 <h3 id="e0003-class-not-found"><code>E0003</code> — Class not found<a class="headerlink" href="#e0003-class-not-found" title="Permanent link">&para;</a></h3>
 <p>A type name could not be resolved.  Check spelling and imports.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>val xs = new ArrayLst[String]()   // E0003, suggests ArrayList
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val xs = new ArrayLst[String]()   // E0003, suggests ArrayList
 </span></code></pre></div>
 <h3 id="e0005-method-not-found"><code>E0005</code> — Method not found<a class="headerlink" href="#e0005-method-not-found" title="Permanent link">&para;</a></h3>
 <p>No method matches the call.  If a method with the same name exists but the argument types differ, the compiler lists the available signatures.</p>
@@ -4253,10 +4314,10 @@
 <h2 id="null-safety-errors">Null-safety errors<a class="headerlink" href="#null-safety-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-type-parameter-may-be-null"><code>E0057</code> — Type parameter may be null<a class="headerlink" href="#e0057-type-parameter-may-be-null" title="Permanent link">&para;</a></h3>
 <p>A bare type parameter <code>[T]</code> can be instantiated with a nullable type, so direct dereference is not allowed without a null-check or a non-null bound.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>class Box[T] {
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>public:
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>class Box[T] {
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>public:
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>}
 </span></code></pre></div>
 <p>Fixes:
 - Use <code>?.</code> / <code>?:</code> / <code>if x != null</code>.
@@ -4264,18 +4325,18 @@
 <h2 id="pattern-matching-errors">Pattern-matching errors<a class="headerlink" href="#pattern-matching-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0042-non-exhaustive-pattern-match"><code>E0042</code> — Non-exhaustive pattern match<a class="headerlink" href="#e0042-non-exhaustive-pattern-match" title="Permanent link">&para;</a></h3>
 <p>A <code>select</code> on a sealed type does not cover all cases.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sealed interface Shape {}
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>record Circle(r: Int) &lt;: Shape
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>select shape {
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  // missing Rect case → E0042
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sealed interface Shape {}
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>record Circle(r: Int) &lt;: Shape
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>select shape {
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  // missing Rect case → E0042
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>}
 </span></code></pre></div>
 <h2 id="parser-errors">Parser errors<a class="headerlink" href="#parser-errors" title="Permanent link">&para;</a></h2>
 <p>Parser errors do not carry <code>E</code> codes; they report the encountered token and the expected tokens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>

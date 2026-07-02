@@ -918,6 +918,17 @@
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
+        現在の制限
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         次のステップ
       
     </span>
@@ -3982,6 +3993,17 @@
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
+        現在の制限
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         次のステップ
       
     </span>
@@ -4119,7 +4141,16 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_8">次のステップ<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_8">現在の制限<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>README に記載のとおり:</p>
+<ol>
+<li><strong>堅牢性</strong> - コンパイラは、変異ファザー・クラッシュ再現コーパス・コード生成正当性テストによって「クラッシュしない／誤コンパイルしない」基準を維持しています。もしクラッシュや誤コンパイルに遭遇したら、最小の再現例を報告してください</li>
+<li><strong>消去ジェネリクス</strong> - reified 型情報はなし。型引数は不変（変性やワイルドカードはなし）</li>
+<li><strong>末尾呼び出し最適化</strong> - 直接自己再帰と相互自己再帰をカバー。一般的な継続渡しスタイルは対象外</li>
+<li><strong>診断</strong> - 一部のエラーは理想よりパイプラインの後半で報告される</li>
+</ol>
+<p><code>run/</code> ディレクトリの例は、コンパイルおよび実行が正しく動作することを確認済みです。</p>
+<h2 id="_9">次のステップ<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../basic-syntax/">基本構文</a> - 構文の基礎を学ぶ</li>
 <li><a href="../classes-and-objects/">クラスとオブジェクト</a> - オブジェクト指向プログラミング</li>

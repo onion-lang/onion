@@ -5211,12 +5211,16 @@ warnings. Notable: W0006 unused parameter, W0012 null literal flowing into
 a non-nullable type.</p>
 <h2 id="current-limitations">Current Limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
 <ol>
-<li>Generics are erasure-based (no variance or reified type info), though
-   type-parameter nullability is tracked at compile time</li>
-<li>Tail-call optimization covers direct self-recursion (plus a
-   mutual-recursion optimization pass); not general CPS</li>
+<li>Generics are erasure-based (type arguments are invariant — no variance,
+   wildcards, or reified type info), though type-parameter nullability is
+   tracked at compile time</li>
+<li>Tail-call optimization covers direct and mutual self-recursion; not
+   general CPS</li>
 <li>Some diagnostics are still reported later in the pipeline than ideal</li>
 </ol>
+<p>The compiler enforces a no-crash / no-miscompile bar via a mutation fuzzer, a
+crash-reproducer corpus, and codegen-correctness tests.  If you do hit a crash
+or a miscompilation, please file a minimal reproducer.</p>
 <h2 id="grammar-reference">Grammar Reference<a class="headerlink" href="#grammar-reference" title="Permanent link">&para;</a></h2>
 <p>The complete grammar is <code>grammar/JJOnionParser.jj</code> (JavaCC).</p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>

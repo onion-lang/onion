@@ -4448,9 +4448,10 @@
 <h2 id="current-limitations">Current Limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
 <p>As documented in the README:</p>
 <ol>
-<li><strong>Edge cases</strong> - The compiler may crash on certain code patterns</li>
-<li><strong>Erasure generics</strong> - No variance, wildcards, or reified type info</li>
-<li><strong>Diagnostics</strong> - Some errors are reported later in the pipeline</li>
+<li><strong>Robustness</strong> - The compiler enforces a no-crash / no-miscompile bar via a mutation fuzzer, a crash-reproducer corpus, and codegen-correctness tests; if you do hit a crash or miscompilation, please file a minimal repro</li>
+<li><strong>Erasure generics</strong> - No reified type info; type arguments are invariant (no variance or wildcards)</li>
+<li><strong>Tail-call optimization</strong> - Covers direct and mutual self-recursion, not general continuation-passing style</li>
+<li><strong>Diagnostics</strong> - Some errors are reported later in the pipeline than ideal</li>
 </ol>
 <p>The examples in the <code>run/</code> directory are verified to compile and execute correctly.</p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>

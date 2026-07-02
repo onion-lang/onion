@@ -2,318 +2,318 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://onion-lang.github.io/onion/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/GENERICS_DESIGN/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/RELEASING/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/parser-refactoring/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/quality-bar/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/compiler/tail-call-optimization/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/contributing/building/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/contributing/development/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/async/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/basic/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/error-handling/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/functional/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/json-http/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/oop/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/overview/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/examples/scripting/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/getting-started/hello-world/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/getting-started/installation/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/getting-started/quick-start/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/basic-syntax/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/classes-and-objects/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/collections/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/control-flow/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/functions/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/inheritance/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/java-interop/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/lambda-expressions/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/null-safety/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/overview/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/scripting/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/guide/variables-and-types/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/CLAUDE_ja/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/GENERICS_DESIGN/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/RELEASING/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/parser-refactoring/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/quality-bar/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/compiler/tail-call-optimization/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/contributing/building/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/contributing/development/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/async/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/basic/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/error-handling/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/functional/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/json-http/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/oop/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/examples/scripting/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/getting-started/hello-world/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/getting-started/installation/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/getting-started/quick-start/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/basic-syntax/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/classes-and-objects/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/collections/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/control-flow/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/functions/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/inheritance/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/java-interop/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/lambda-expressions/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/null-safety/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/overview/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/scripting/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/guide/variables-and-types/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/reference/compiler-architecture/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/reference/error-codes/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/reference/specification/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/reference/stdlib/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/tools/compiler/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/tools/language-server/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/tools/repl/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/ja/tools/script-runner/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/compiler-architecture/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/error-codes/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/specification/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/reference/stdlib/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/compiler/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/language-server/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/repl/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.github.io/onion/tools/script-runner/</loc>
-         <lastmod>2026-07-01</lastmod>
+         <lastmod>2026-07-02</lastmod>
     </url>
 </urlset>

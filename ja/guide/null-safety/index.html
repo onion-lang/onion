@@ -946,6 +946,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Elvis演算子 ?:">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullableelvis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NullableプリミティブでのElvis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elvis_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        右辺に制御式を書けるElvis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -956,6 +984,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="nullチェックとスマートキャスト">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullable_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nullableフィールドのスマートキャスト
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -982,7 +1027,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nullable_1" class="md-nav__link">
+  <a href="#nullable_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nullable対応ジェネリクス
@@ -3920,6 +3965,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Elvis演算子 ?:">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullableelvis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NullableプリミティブでのElvis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elvis_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        右辺に制御式を書けるElvis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3930,6 +4003,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="nullチェックとスマートキャスト">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullable_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nullableフィールドのスマートキャスト
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3956,7 +4046,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nullable_1" class="md-nav__link">
+  <a href="#nullable_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nullable対応ジェネリクス
@@ -4019,34 +4109,97 @@
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>val display: String = name ?: &quot;unknown&quot;
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>val u: String = s?.toUpperCase() ?: &quot;DEFAULT&quot;
 </span></code></pre></div>
+<h3 id="nullableelvis">NullableプリミティブでのElvis<a class="headerlink" href="#nullableelvis" title="Permanent link">&para;</a></h3>
+<p>Elvis演算子は nullable な<strong>プリミティブ</strong>型にも使えます。結果はアンボックスされたプリミティブなので、非nullの <code>Int</code> / <code>Long</code> / <code>Double</code> などにそのまま代入できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val n: Int? = null
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>val v: Int = n ?: -1        // -1
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>val m: Int? = 42
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>val w: Int = m ?: -1        // 42
+</span></code></pre></div>
+<p>プリミティブを返すメソッドへのセーフコールと組み合わせると自然です。呼び出しは <code>Integer?</code> を返し、レシーバが <code>null</code> のとき <code>?:</code> がプリミティブのフォールバックを与えます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>val s: String? = null
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>val len: Int = s?.length() ?: -1    // -1（s が null）
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>val s2: String? = &quot;hello&quot;
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>val len2: Int = s2?.length() ?: -1  // 5
+</span></code></pre></div>
+<h3 id="elvis_1">右辺に制御式を書けるElvis<a class="headerlink" href="#elvis_1" title="Permanent link">&para;</a></h3>
+<p><code>?:</code> の右辺には <code>throw</code> や <code>return</code> などの制御式も書けます。値が欠けているときに早期に失敗・脱出する簡潔な書き方になります。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def firstName(s: String?): String {
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  val name: String = s ?: throw new RuntimeException(&quot;nil&quot;)
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  return name
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>}
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>def lenOrDefault(s: String?, default: Int): Int {
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  val v: String = s ?: return default
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  return v.length()
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>}
+</span></code></pre></div>
 <h2 id="null_1">nullチェックとスマートキャスト<a class="headerlink" href="#null_1" title="Permanent link">&para;</a></h2>
 <p><code>if x != null</code> のブロック内では <code>x</code> が非null型に絞り込まれます（スマートキャスト）。<strong>関数内でもトップレベルの <code>val</code> でも効きます。</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val a: String? = lookup()
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>if a != null {
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  println(a.length)          // a はここでは String に絞られている
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val a: String? = lookup()
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>if a != null {
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  println(a.length)          // a はここでは String に絞られている
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>}
 </span></code></pre></div>
 <p><code>!(cond)</code> は絞り込まれる分岐を入れ替えるので、早期リターンに使えます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def f(s: String?): String {
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  if !(s != null) { return &quot;nil&quot; }
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  return &quot;n&quot; + s.length()        // s はここで String
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>def f(s: String?): String {
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  if !(s != null) { return &quot;nil&quot; }
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  return &quot;n&quot; + s.length()        // s はここで String
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>}
+</span></code></pre></div>
+<h3 id="nullable_1">nullableフィールドのスマートキャスト<a class="headerlink" href="#nullable_1" title="Permanent link">&para;</a></h3>
+<p>null チェックはローカル変数だけでなく、イミュータブル（<code>val</code>）な nullable フィールドも絞り込みます。<code>if field != null { ... }</code> のブロック内では、<code>T?</code> 型の <code>val</code> フィールドは <code>T</code> として扱われ、そのままメソッドを呼べます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>class Person {
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  val name: String?
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>public:
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  def this(name: String?) { this.name = name }
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  def nameLength(): Int {
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    if name != null {
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>      return name.length()   // ここで name は String に絞られる
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    } else {
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>      return -1
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    }
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>  }
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>}
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>println(new Person(&quot;Alice&quot;).nameLength())  // 5
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>println(new Person(null).nameLength())     // -1
+</span></code></pre></div>
+<p>ミュータブル（<code>var</code>）なフィールドは絞り込まれません（チェックと使用の間に値が変わりうるため。使うと E0041）。ローカルの <code>val</code> にスナップショットしてから使います。ローカルは常に絞り込まれます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>class Counter {
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  var label: String?
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>public:
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  def this(label: String?) { this.label = label }
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  def show(): Int {
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    val l = label            // ローカルの val にスナップショット
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    if l != null {
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>      return l.length()      // l は String に絞られる
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    } else {
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>      return -1
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    }
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>  }
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>}
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>println(new Counter(&quot;hi&quot;).show())   // 2
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>println(new Counter(null).show())   // -1
 </span></code></pre></div>
 <h2 id="nullable-null">nullableに対する <code>==</code> はnull安全な値等価<a class="headerlink" href="#nullable-null" title="Permanent link">&para;</a></h2>
 <p><code>==</code> は静的に nullable なレシーバに対しても <strong>値等価</strong>（<code>java.util.Objects.equals</code> 相当）です。両方 null なら等しい、片方だけ null なら非等価、それ以外は <code>equals</code> で比較します。<strong>事前の null チェックは不要です。</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val a: String? = compute()
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>if a == &quot;expected&quot; { println(&quot;match&quot;) }    // a が null でも安全
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>val a: String? = compute()
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>if a == &quot;expected&quot; { println(&quot;match&quot;) }    // a が null でも安全
 </span></code></pre></div>
 <p>参照同値が必要なときは <code>===</code> を使います。</p>
 <h2 id="null_2">非null表明 <code>!!</code> とセーフインデックス <code>?[]</code><a class="headerlink" href="#null_2" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val s: String? = definitelyThere()
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>println(s!!.length())        // null なら NullPointerException
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>val xs: List[Int]? = loadOrNull()
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>val first = xs?[0]               // xs が null なら null
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>val s: String? = definitelyThere()
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>println(s!!.length())        // null なら NullPointerException
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>val xs: List[Int]? = loadOrNull()
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>val first = xs?[0]               // xs が null なら null
 </span></code></pre></div>
 <p><code>!!</code> は「型システムより自分が確実に分かっている」ときに使い、通常は <code>?.</code> / <code>?:</code> / null チェックを優先します。</p>
-<h2 id="nullable_1">Nullable対応ジェネリクス<a class="headerlink" href="#nullable_1" title="Permanent link">&para;</a></h2>
+<h2 id="nullable_2">Nullable対応ジェネリクス<a class="headerlink" href="#nullable_2" title="Permanent link">&para;</a></h2>
 <p>裸の <code>[T]</code> は nullable な型引数も受け付け（<code>new Box[String?](...)</code>）、<code>[T extends B]</code> は非nullに制限します。詳細は<a href="../../../reference/specification/">仕様</a>を参照してください。</p>
 <h2 id="_2">次のステップ<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ul>

@@ -1417,15 +1417,20 @@ AST.MethodDeclaration method_decl(int mset) : {
   List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
   anns=annotations() "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  (  (b=block() | {enterSection();} eos() ) {
-       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns);
-     }
-  |  ({enterSection();} "=" eols() e=term() eos_or_block_end()) {
+  (  {enterSection();} "=" eols() e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
          new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e))),
          tparams, throwsTypes, anns
        );
+     }
+  |  b=block() {
+       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns);
+     }
+  |  {enterSection();} eos_or_block_end() {
+       // No body: an abstract/interface method. eos_or_block_end (not eos) so a
+       // one-line `interface A { def f(): Int }` terminates at the `}`.
+       return new AST.MethodDeclaration(p(t), mset, c(t), args, ty, null, tparams, throwsTypes, anns);
      }
   )
 }
@@ -1441,19 +1446,21 @@ AST.MethodDeclaration interface_method_decl() : {
 }{
   {enterSection();}
   "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  (  {leaveSection();} b=block() {
-       // A body makes this a default method
-       return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, b, tparams, throwsTypes);
-     }
-  |  eos() {
-       return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams, throwsTypes);
-     }
-  |  "=" eols() e=term() eos() {
+  (  "=" eols() e=term() eos_or_block_end() {
        return new AST.MethodDeclaration(
          p(n), AST.M_PUBLIC(), c(n), args, ty,
          new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e))),
          tparams, throwsTypes
        );
+     }
+  |  {leaveSection();} b=block() {
+       // A body makes this a default method
+       return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, b, tparams, throwsTypes);
+     }
+  |  eos_or_block_end() {
+       // No body: an abstract interface method. eos_or_block_end (not eos) so a
+       // one-line `interface A { def f(): Int }` terminates at the `}`.
+       return new AST.MethodDeclaration(p(n), AST.M_PUBLIC(), c(n), args, ty, null, tparams, throwsTypes);
      }
   )
 }

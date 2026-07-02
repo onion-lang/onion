@@ -7,7 +7,10 @@ import onion.compiler.typing.session.NameResolutionContext
 
 import scala.collection.mutable.Map
 
-final case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType)
+/** A resolved type parameter. `constraints` are the type-class traits from a
+  * `[T: Numeric]` context bound (resolved to their interface types); the eventual
+  * dictionary-passing derives one dictionary parameter per constraint. */
+final case class TypeParam(name: String, variableType: TypedAST.TypeVariableType, upperBound: ClassType, constraints: List[ClassType] = Nil)
 
 final case class TypeParamScope(params: Map[String, TypeParam]) {
   def get(name: String): Option[TypeParam] = params.get(name)

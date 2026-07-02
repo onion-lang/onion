@@ -121,7 +121,17 @@ final class TypingTypeSupport(private val typing: Typing) {
             (typing.rootClass, Nullability.Nullable)
         }
         val variableType = new TypedAST.TypeVariableType(tp.name, upper, nullability)
-        TypeParam(tp.name, variableType, upper)
+        // Resolve type-class context bounds (`[T: Numeric]`). mapFrom already
+        // reports E0003 for an unknown trait, so `[T: Unknown]` is no longer
+        // silently accepted. The resolved traits feed dictionary-parameter
+        // derivation for the eventual dictionary passing.
+        val constraintTypes = tp.constraints.flatMap { c =>
+          mapFrom(c) match {
+            case Some(ct: ClassType) => Some(ct)
+            case _ => None
+          }
+        }
+        TypeParam(tp.name, variableType, upper, constraintTypes)
       }.toSeq
     }
   }

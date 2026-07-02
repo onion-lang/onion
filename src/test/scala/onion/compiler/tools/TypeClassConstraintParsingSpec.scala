@@ -17,7 +17,7 @@ class TypeClassConstraintParsingSpec extends AbstractShellSpec {
     }
     it("parses a multi-parameter list with a mix of constrained/unconstrained") {
       assert(Shell.Success("1x") == shell.run(
-        "def multi[T: Numeric, U](a: T, b: U): String { return \"\" + a + b }\ndef main(args: String[]): String { return multi(1, \"x\") }", "None", Array()))
+        numeric + "def multi[T: Numeric, U](a: T, b: U): String { return \"\" + a + b }\ndef main(args: String[]): String { return multi(1, \"x\") }", "None", Array()))
     }
     it("parses on a generic class") {
       assert(Shell.Success(7) == shell.run(

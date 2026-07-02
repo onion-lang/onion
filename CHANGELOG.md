@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-02
+
+Builds on 0.2.0 with type-soundness fixes, ergonomic syntax, richer Java interop,
+and clearer diagnostics — accumulated across the `0.3.0-M1`…`0.3.0-M5` milestones
+and hardened by a pre-release gap-probe of real programs.
+
+### Highlights
+- **Soundness:** generic type arguments are invariant; a non-exhaustive `select`
+  over a sealed type is a compile error (E0042) instead of a silent `null`; a
+  value-returning method that can fall off its end is rejected (E0067).
+- **Java interop:** static calls on fully-qualified names (`java.lang.Math::max`)
+  and on basic-type keywords (`Long::toString`); SAM conversion in constructor
+  arguments (`new Thread(() -> ...)`).
+- **`forward` over a parameterized generic interface** now works.
+- **Ergonomics:** constructor diamond, elvis with a control-expression right-hand
+  side, one-line method declarations, argument-position empty literals, and
+  smart-cast of a `val` nullable field.
+- **Diagnostics & docs:** source-form types, clearer end-of-file errors, new codes
+  E0066/E0067; English + Japanese documentation synced, every example verified
+  against the compiler.
+
+### Pre-release quality pass
+A multi-domain gap-probe against the release candidate surfaced six issues; the
+three quality-critical ones were fixed for 0.3.0:
+- A non-exhaustive `select` over a sealed class/interface with non-record subtypes
+  no longer returns `null` silently — it is a compile error (E0042) ([#203]).
+- SAM conversion applies to constructor arguments, e.g. `new Thread(() -> ...)`
+  ([#204]).
+- `DateTime::parse` handles date-only patterns and fails loudly instead of
+  silently returning epoch 0 ([#206]).
+
 ### 0.3.0-M5 — interop & diagnostics
 
 - **Basic-type keywords as static receivers.** `Long::toString(42L)`,
@@ -84,6 +115,16 @@ Type-soundness and diagnostic-quality fixes surfaced by gap-probing real program
   JVM form (`java.util.List[java.lang.String]`), consistent with the REPL, which
   also shows results as `resN: Type = value` ([#194]).
 - Reduced the VS Code extension's npm audit alerts (dev tooling) ([#195]).
+
+### Known limitations (deferred to 0.3.1)
+- A lambda cast to a functional interface with `as` (`(() -> ...) as Runnable`)
+  is not SAM-converted; use a typed target instead (`val r: Runnable = () -> ...`)
+  ([#205]).
+- A static generic method called with an explicit primitive type argument and a
+  primitive value (`Util::identity[Int](99)`) fails; omit the type argument
+  (`Util::identity(99)`) or use a reference type ([#207]).
+- A top-level `main` mixing scalar and array parameters is not auto-CLI-derived;
+  use `main(args: String[])` ([#208]).
 
 ## [0.2.0] - 2026-07-02
 
@@ -194,7 +235,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.2.0...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.0...develop
+[0.3.0]: https://github.com/onion-lang/onion/releases/tag/v0.3.0
 [0.2.0]: https://github.com/onion-lang/onion/releases/tag/v0.2.0
 [0.1.0]: https://github.com/onion-lang/onion/releases/tag/releases/0.1
 [#184]: https://github.com/onion-lang/onion/issues/184
@@ -216,3 +258,9 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#192]: https://github.com/onion-lang/onion/issues/192
 [#194]: https://github.com/onion-lang/onion/issues/194
 [#195]: https://github.com/onion-lang/onion/issues/195
+[#203]: https://github.com/onion-lang/onion/issues/203
+[#204]: https://github.com/onion-lang/onion/issues/204
+[#205]: https://github.com/onion-lang/onion/issues/205
+[#206]: https://github.com/onion-lang/onion/issues/206
+[#207]: https://github.com/onion-lang/onion/issues/207
+[#208]: https://github.com/onion-lang/onion/issues/208

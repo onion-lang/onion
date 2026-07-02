@@ -293,7 +293,7 @@ Type resolution:
 
 **File**: `build.sbt`
 
-- Version: 0.2.0-SNAPSHOT
+- Version: derived from the latest git tag via sbt-dynver
 - Scala version: 3.3.7
 - Main class: `onion.tools.CompilerFrontend`
 - REPL task: `sbt repl`

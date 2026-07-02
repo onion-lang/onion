@@ -293,7 +293,7 @@ Error: Type mismatch
 
 **ファイル**: `build.sbt`
 
-- バージョン: 0.2.0-SNAPSHOT
+- バージョン: sbt-dynver により直近の git タグから導出
 - Scala バージョン: 3.3.7
 - メインクラス: `onion.tools.CompilerFrontend`
 - REPL タスク: `sbt repl`

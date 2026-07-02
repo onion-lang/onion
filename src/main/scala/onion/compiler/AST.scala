@@ -287,7 +287,7 @@ object AST {
   case class ExtensionDeclaration(location: Location, receiverType: TypeNode, methods: List[MethodDeclaration]) extends Toplevel
 
   abstract sealed class MemberDeclaration extends Node { def modifiers: Int; def name: String }
-  case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None) extends Node
+  case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None, constraints: List[TypeNode] = Nil) extends Node
   case class Annotation(location: Location, name: String) extends Node
 
   case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends MemberDeclaration {

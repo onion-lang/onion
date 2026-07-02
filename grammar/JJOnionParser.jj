@@ -1557,11 +1557,23 @@ AST.TypeNode raw_type() :{AST.TypeNode ty; Token n; StringBuilder sb = new Strin
 // Parses a type parameter list: [T], [T extends Bound]
 List<AST.TypeParameter> type_params() : {
   ArrayBuffer<AST.TypeParameter> params = new ArrayBuffer<AST.TypeParameter>();
-  Token name; AST.TypeNode bound = null;
+  Token name; AST.TypeNode bound = null; AST.TypeNode con = null;
+  ArrayBuffer<AST.TypeNode> cons = null;
 }{
-  "[" name=id() [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), c(name), option(bound))); }
-  ("," name=id() [<K_EXTENDS> bound=type()] { params.append(new AST.TypeParameter(p(name), c(name), option(bound))); })*
+  "[" name=id() [<K_EXTENDS> bound=type()] {cons = new ArrayBuffer<AST.TypeNode>();}
+      [":" con=constraint_ref() {append(cons, con);} ("+" con=constraint_ref() {append(cons, con);})*]
+      { params.append(new AST.TypeParameter(p(name), c(name), option(bound), toList(cons))); bound = null; }
+  ("," name=id() [<K_EXTENDS> bound=type()] {cons = new ArrayBuffer<AST.TypeNode>();}
+      [":" con=constraint_ref() {append(cons, con);} ("+" con=constraint_ref() {append(cons, con);})*]
+      { params.append(new AST.TypeParameter(p(name), c(name), option(bound), toList(cons))); bound = null; })*
   "]" { return toList(params); }
+}
+
+// A type-class constraint in a bound, e.g. the `Numeric` in `[T: Numeric]`. For
+// now a bare trait name (single-parameter traits, the param is implied);
+// multi-parameter constraints are a later stage.
+AST.TypeNode constraint_ref() : { AST.TypeNode ty; }{
+  ty=class_type() { return ty; }
 }
 
 // Parses a type argument list: [String], [Foo[Bar]], etc.

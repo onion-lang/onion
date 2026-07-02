@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.3.0-M3 — ergonomics & syntax
+
+- **Constructor diamond.** A generic constructor may omit its type arguments when
+  the expected type pins them: `val b: Box[String] = new Box("x")` (previously
+  E0066) ([#199]).
+- **Elvis right-hand side may be a control expression.** `x ?: throw ...` and
+  `x ?: return ...` now parse, so a null-check early-exit fits on one line ([#198]).
+- **One-line method declarations parse.** A no-body method immediately followed by
+  `}` on the same line, e.g. `interface A { def f(): Int }`, is no longer a syntax
+  error ([#196]).
+
 ### 0.3.0-M2
 
 - **`forward` delegation over a parameterized generic interface now works**
@@ -161,6 +172,9 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [0.1.0]: https://github.com/onion-lang/onion/releases/tag/releases/0.1
 [#184]: https://github.com/onion-lang/onion/issues/184
 [#193]: https://github.com/onion-lang/onion/issues/193
+[#196]: https://github.com/onion-lang/onion/issues/196
+[#198]: https://github.com/onion-lang/onion/issues/198
+[#199]: https://github.com/onion-lang/onion/issues/199
 [#185]: https://github.com/onion-lang/onion/issues/185
 [#186]: https://github.com/onion-lang/onion/issues/186
 [#187]: https://github.com/onion-lang/onion/issues/187

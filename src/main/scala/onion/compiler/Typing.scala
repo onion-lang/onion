@@ -147,6 +147,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
    * `list.map { x => ... }` instead of `Colls::map(list) { x => ... }`.
    */
   private def registerBuiltinExtensions(): Unit = {
+    // Colls and Iterables overlap (e.g. both declare take(List, int)); register a
+    // given receiver+name+erased-signature as an extension only once so a call
+    // like `xs.take(2)` is not ambiguous. The first container (Colls) wins; an
+    // identical method in a later container is skipped. Explicit static calls
+    // (Colls::take, Iterables::take) and the default Iterables import are
+    // unaffected — this only deduplicates the extension registry.
+    val registered = scala.collection.mutable.HashSet[String]()
     for {
       containerName <- Seq("onion.Colls", "onion.Iterables")
       container <- load(containerName)
@@ -159,7 +166,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         case _: ArrayType => Typing.ArrayExtensionReceiver
         case _ => null
       }
-      if (receiverName != null) {
+      val signature =
+        if (receiverName == null) null
+        else receiverName + "#" + method.name +
+          method.arguments.map(a => onion.compiler.generics.Erasure.asmType(a).getDescriptor).mkString
+      if (receiverName != null && registered.add(signature)) {
         val extMethod = new ExtensionMethodDefinition(
           null,
           method.modifier,

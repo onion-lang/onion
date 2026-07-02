@@ -174,12 +174,14 @@ final class ConstructionTyping(
       return typeNewObjectWithNamedArgs(node, typeRef, context)
     }
 
-    // A lambda with untyped parameters can't be typed until its target type
-    // (the constructor parameter) is known. Resolve the constructor from the
-    // other arguments first, then type the closures against its parameters --
-    // mirroring the bidirectional inference the method-call path performs.
+    // A lambda argument can't take its final type until its target type (the
+    // constructor parameter) is known -- in particular a Java functional
+    // interface (SAM) target, or a zero-parameter `() -> ...`. Resolve the
+    // constructor from the other arguments first, then type the closures against
+    // its parameters -- mirroring the bidirectional inference the method-call
+    // path performs for every closure argument.
     val untypedClosureIndices = node.args.zipWithIndex.collect {
-      case (closure: AST.ClosureExpression, i) if closure.args.exists(_.typeRef == null) => i
+      case (_: AST.ClosureExpression, i) => i
     }.toSet
     if (untypedClosureIndices.nonEmpty) {
       resolveConstructorForClosures(node, typeRef, context, untypedClosureIndices) match {
@@ -271,6 +273,28 @@ final class ConstructionTyping(
    * the constructor's corresponding parameter type. Returns None (to fall back
    * to eager handling) when resolution is ambiguous or finds no single match.
    */
+  /** Whether a lambda with `arity` parameters can be converted to `formal` --
+    * i.e. `formal` is an onion.FunctionN type or a Java functional interface
+    * (a single abstract non-Object method) whose SAM takes `arity` arguments.
+    * Used to disambiguate constructor overloads at a closure argument position
+    * (e.g. Thread(Runnable) vs Thread(String) for `new Thread(() -> ...)`). */
+  private def closureCanTarget(formal: Type, arity: Int): Boolean = formal match {
+    case ct: ClassType =>
+      val raw = ct match { case a: AppliedClassType => a.raw; case _ => ct }
+      val name = raw.name
+      if (name != null && name.matches("""onion\.Function\d+""")) true
+      else {
+        def isPublicObjectMethod(m: Method): Boolean = m.name match {
+          case "equals" => m.arguments.length == 1 && m.arguments(0).name == "java.lang.Object"
+          case "hashCode" | "toString" => m.arguments.isEmpty
+          case _ => false
+        }
+        val abstracts = raw.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m))
+        abstracts.map(_.name).distinct.length == 1 && abstracts.exists(_.arguments.length == arity)
+      }
+    case _ => false
+  }
+
   private def resolveConstructorForClosures(
     node: AST.NewObject,
     typeRef: ClassType,
@@ -294,7 +318,9 @@ final class ConstructionTyping(
       val formals = substitutedArgs(c)
       formals.length == args.length &&
         args.indices.forall { i =>
-          closureIndices.contains(i) ||
+          if (closureIndices.contains(i))
+            closureCanTarget(formals(i), args(i).asInstanceOf[AST.ClosureExpression].args.length)
+          else
             TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }

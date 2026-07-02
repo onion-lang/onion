@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-07-02
+
+- **Bare enum constants in `select`.** Over an enum scrutinee, `case CONST:`
+  resolves to `EnumType::CONST` (for both matching and exhaustiveness) instead of
+  failing with E0002; a local variable of the same name still takes precedence ([#220]).
+- **List `take`/`drop`/`reverse`/`first`/`last` are no longer ambiguous.** These
+  were declared with identical signatures in both `onion.Colls` and
+  `onion.Iterables`, so `xs.take(2)` failed with E0006. Builtin extension methods
+  are now deduplicated by signature; static calls and the default import are
+  unaffected ([#221]).
+
 ## [0.3.6] - 2026-07-02
 
 - **F-bounded type parameters.** A self-referential bound such as
@@ -298,7 +309,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.6...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.7...develop
+[0.3.7]: https://github.com/onion-lang/onion/releases/tag/v0.3.7
 [0.3.6]: https://github.com/onion-lang/onion/releases/tag/v0.3.6
 [0.3.5]: https://github.com/onion-lang/onion/releases/tag/v0.3.5
 [0.3.4]: https://github.com/onion-lang/onion/releases/tag/v0.3.4
@@ -341,3 +353,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#217]: https://github.com/onion-lang/onion/issues/217
 [#218]: https://github.com/onion-lang/onion/issues/218
 [#219]: https://github.com/onion-lang/onion/issues/219
+[#221]: https://github.com/onion-lang/onion/issues/221
+[#220]: https://github.com/onion-lang/onion/issues/220

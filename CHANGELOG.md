@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.3.0-M4 — interop, null safety & docs
+
+- **Static calls on fully-qualified names.** `java.lang.Math::max(3, 7)` and
+  `java.lang.Integer::MAX_VALUE` work without an import. (Basic-type keyword
+  receivers such as `Long::` remain unsupported — those are keywords, not
+  identifiers.) ([#197])
+- **Smart-cast of a `val` nullable field.** Inside `if field != null { ... }` an
+  immutable nullable field is narrowed to non-null, like a local ([#200]).
+- Syntax errors that reach end-of-file now hint that a closing `}`/`)` is likely
+  missing, rather than only listing expected tokens ([#201]).
+- **Documentation synced (English + Japanese)** with the 0.3.0 feature set: null
+  safety (elvis for nullable primitives, elvis with a `throw`/`return` right-hand
+  side, `val`-field smart cast), `forward` over a generic interface, constructor
+  diamond and type-argument invariance, fully-qualified static calls, argument-
+  position empty literals, and new error codes E0066/E0067. Every code example is
+  verified against the compiler.
+
 ### 0.3.0-M3 — ergonomics & syntax
 
 - **Constructor diamond.** A generic constructor may omit its type arguments when
@@ -175,6 +192,9 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#196]: https://github.com/onion-lang/onion/issues/196
 [#198]: https://github.com/onion-lang/onion/issues/198
 [#199]: https://github.com/onion-lang/onion/issues/199
+[#197]: https://github.com/onion-lang/onion/issues/197
+[#200]: https://github.com/onion-lang/onion/issues/200
+[#201]: https://github.com/onion-lang/onion/issues/201
 [#185]: https://github.com/onion-lang/onion/issues/185
 [#186]: https://github.com/onion-lang/onion/issues/186
 [#187]: https://github.com/onion-lang/onion/issues/187

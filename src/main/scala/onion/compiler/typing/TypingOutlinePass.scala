@@ -667,6 +667,15 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         interfaces.foreach(constructTypeHierarchy(_, visit))
         node.setSuperClass(superClass)
         node.setInterfaces(interfaces.toArray)
+        // Register this class/interface as a subtype of any sealed parent so the
+        // `select` exhaustiveness check sees it. (Record subtypes are registered
+        // separately in processRecordDeclaration.)
+        def registerSealedParent(parent: ClassType): Unit = parent match {
+          case parentDef: ClassDefinition if parentDef.isSealed => parentDef.addSealedSubtype(node)
+          case _ =>
+        }
+        registerSealedParent(superClass)
+        interfaces.foreach(registerSealedParent)
         node.setResolutionComplete(true)
       case _ =>
         constructTypeHierarchy(node.superClass, visit)

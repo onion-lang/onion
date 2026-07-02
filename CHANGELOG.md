@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   covers single-parameter traits, method/function-level constraints, and ground
   instances ([#224]).
 
+### Correctness & diagnostics
+
+Soundness and diagnostic holes surfaced by a gap-probe:
+
+- A qualified assignment to a nonexistent field (`obj.field = v`) is now a compile
+  error instead of a silent no-op that swallowed typos ([#225]).
+- A `record` that leaves an implemented interface's abstract method unimplemented
+  is now rejected at compile time (E0037) instead of throwing `AbstractMethodError`
+  at runtime ([#226]).
+- A body-less abstract method in a class may be followed by another member;
+  previously that was a syntax error unless the abstract method was last ([#227]).
+- A `new` on an inaccessible (private/protected) constructor is a compile error
+  instead of a runtime `IllegalAccessError` ([#228]).
+- A nullable primitive compares to a plain primitive with `==` (`Int? == Int`),
+  matching `String? == String` ([#229]).
+- A collection literal adopts the expected element type when its elements fit, so
+  `val xs: List[String?] = ["a", null]` builds a `List[String?]` ([#231]).
+
 ## [0.3.8] - 2026-07-02
 
 - **`re"..."` literals interoperate with the `Regex::` helpers.** A `re"..."`
@@ -377,4 +395,10 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#221]: https://github.com/onion-lang/onion/issues/221
 [#222]: https://github.com/onion-lang/onion/issues/222
 [#224]: https://github.com/onion-lang/onion/issues/224
+[#225]: https://github.com/onion-lang/onion/issues/225
+[#226]: https://github.com/onion-lang/onion/issues/226
+[#227]: https://github.com/onion-lang/onion/issues/227
+[#228]: https://github.com/onion-lang/onion/issues/228
+[#229]: https://github.com/onion-lang/onion/issues/229
+[#231]: https://github.com/onion-lang/onion/issues/231
 [#220]: https://github.com/onion-lang/onion/issues/220

@@ -105,17 +105,33 @@ final class ExpressionFormTyping(
       }
     }
 
-  def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
-    typed(node.src, context).flatMap { term =>
+  def typeCast(node: AST.Cast, context: LocalContext): Option[Term] = node.src match {
+    // A lambda takes its type from its target, so `(() -> ...) as Runnable` must
+    // type the lambda against the cast destination -- enabling SAM conversion to
+    // a functional interface (a bare lambda would default to onion.FunctionN).
+    case _: AST.ClosureExpression =>
       typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
-        if (!isValidCast(term.`type`, destination)) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
-          None
-        } else {
-          Some(new AsInstanceOf(term, destination))
+        typed(node.src, context, destination).flatMap { term =>
+          if (!isValidCast(term.`type`, destination)) {
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+            None
+          } else {
+            Some(new AsInstanceOf(term, destination))
+          }
         }
       }
-    }
+    case _ =>
+      typed(node.src, context).flatMap { term =>
+        typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
+          if (!isValidCast(term.`type`, destination)) {
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+            None
+          } else {
+            Some(new AsInstanceOf(term, destination))
+          }
+        }
+      }
+  }
 
   /**
    * Determine whether a cast from `source` to `destination` is statically valid.

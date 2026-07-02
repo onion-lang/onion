@@ -1,10 +1,18 @@
 # Type Classes for Onion (design)
 
-Status: **design proposal, awaiting designer sign-off.** Rust-trait style, chosen
-by the language designer. This document integrates a five-aspect design pass
-(syntax/parser, typing/resolution, dictionary-passing codegen, coherence, and
-stdlib/derive/roadmap), each grounded in the current compiler, into one plan with
-recommended decisions and a staged, independently-shippable roadmap.
+Status: **implemented (v1).** Rust-trait style. `trait`/`instance`/`[T: C]`/
+`Trait[T]::method`, ground dictionary access, coherence, and — the core —
+dictionary passing for constrained generics (`sum[T: Numeric]`) all ship on
+`develop`. This document keeps the original five-aspect design pass for context;
+the delivered implementation took a **simpler route than the side-channel plan
+below**: each constraint becomes a real, nullable dictionary parameter defaulted
+to `null` (so a call type-checks with the existing default-argument machinery),
+the body calls it via `dict!!.method(...)`, and the shared call builder
+(`MethodInvocationBuilderSupport.buildResolvedCall`) fills those trailing slots
+after inference with `new <instance>()` — or forwards the caller's own dictionary
+when the type is still abstract. **No codegen changes were needed.** Remaining for
+later stages: built-in `Numeric`/`Eq`/`Ord`/`Show` prelude, class-level `[T: C]`
+constraints, UFCS `x.method()`, and `derive!`-based instance derivation.
 
 ## Motivation
 

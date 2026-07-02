@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Type classes (Rust-trait style).** Declare a `trait Numeric[T] { def zero(): T;
+  def plus(a: T, b: T): T }`, give it instances (`instance Numeric[Integer] { ... }`),
+  constrain a generic with `[T: Numeric]`, and call trait methods via
+  `Numeric[T]::zero()`. A constrained generic like
+  `def sum[T: Numeric](xs: List[T]): T` works polymorphically — the compiler passes
+  the right instance (a *dictionary*) at each call site and forwards it through
+  constrained callers. Coherence is one instance per `(trait, type)` (primitive and
+  boxed unify, so `Numeric[Int]` == `Numeric[Integer]`); a missing instance is a
+  clean compile error. Ground `Trait[Int]::method(...)` also resolves directly. v1
+  covers single-parameter traits, method/function-level constraints, and ground
+  instances ([#224]).
+
 ## [0.3.8] - 2026-07-02
 
 - **`re"..."` literals interoperate with the `Regex::` helpers.** A `re"..."`
@@ -364,4 +376,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#219]: https://github.com/onion-lang/onion/issues/219
 [#221]: https://github.com/onion-lang/onion/issues/221
 [#222]: https://github.com/onion-lang/onion/issues/222
+[#224]: https://github.com/onion-lang/onion/issues/224
 [#220]: https://github.com/onion-lang/onion/issues/220

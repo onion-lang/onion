@@ -1,0 +1,25 @@
+// Type-class dictionary passing: a constrained generic (sum), a forward through a
+// constrained caller (sumTwice), and multiple constrained type parameters. Guards
+// the dictionary-passing machinery against crashing the compiler.
+trait Numeric[T] {
+  def zero(): T
+  def plus(a: T, b: T): T
+}
+instance Numeric[Integer] {
+  def zero(): Integer = 0
+  def plus(a: Integer, b: Integer): Integer = a + b
+}
+instance Numeric[Long] {
+  def zero(): Long = 0L
+  def plus(a: Long, b: Long): Long = a + b
+}
+def sum[T: Numeric](xs: List[T]): T {
+  var acc: T = Numeric[T]::zero()
+  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+  return acc
+}
+def sumTwice[T: Numeric](xs: List[T]): T = Numeric[T]::plus(sum(xs), sum(xs))
+def both[T: Numeric, U: Numeric](a: List[T], b: List[U]): String = "" + sum(a) + sumTwice(b)
+def main(args: String[]): void {
+  IO::println(both([1, 2, 3], [10L, 20L, 30L]))
+}

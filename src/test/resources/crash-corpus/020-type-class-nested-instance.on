@@ -1,0 +1,14 @@
+// Type-class syntax: a trait with an instance over a nested type argument, used
+// via Trait[List[Integer]]::method dictionary access. Guards the type-class
+// parser/lowering against crashing as dictionary-passing semantics are added.
+trait N[T] {
+  def z(): T
+  def p(a: T, b: T): T
+}
+instance N[List[Integer]] {
+  def z(): List[Integer] = [1, 2]
+  def p(a: List[Integer], b: List[Integer]): List[Integer] = a
+}
+def main(args: String[]): void {
+  IO::println(N[List[Integer]]::p(N[List[Integer]]::z(), N[List[Integer]]::z()))
+}

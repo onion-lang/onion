@@ -1,0 +1,13 @@
+// Type-class syntax: an empty trait, multi-constraint [T: A + B] with an upper
+// bound, and deeply nested Trait[T]::method chains. Guards the constraint parser
+// and the dictionary-access grammar against crashes.
+trait A { def a(): Int }
+trait B { def b(): Int }
+trait Num[T] { def z(): T
+  def p(x: T, y: T): T }
+instance Num[Integer] { def z(): Integer = 0
+  def p(x: Integer, y: Integer): Integer = x + y }
+def combine[T extends Object: A + B](x: T): Int = 0
+def main(args: String[]): void {
+  IO::println(Num[Integer]::p(Num[Integer]::p(1, 2), Num[Integer]::p(Num[Integer]::z(), 4)))
+}

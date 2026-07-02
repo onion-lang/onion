@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-07-02
+
+- **Map indexed assignment.** `m[k] = v` and `m[k] += v` now work — indexed
+  assignment falls back to `put(key, value)` for Map-style containers (`list[i] = v`
+  still uses `set`) ([#217]).
+- **Integer literal narrowing.** An in-range integer literal (or its negation)
+  target-types to a `Byte`/`Short`/`Char` assignment (`val b: Byte = 100`,
+  `val s: Short = -32768`), like Java; out-of-range literals are still rejected.
+  (Method-argument position is not covered; use `(x as Byte)` there.) ([#215]).
+
 ## [0.3.2] - 2026-07-02
 
 Fixes surfaced by a deeper pre-release gap-probe of real programs.
@@ -263,7 +273,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.2...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.3...develop
+[0.3.3]: https://github.com/onion-lang/onion/releases/tag/v0.3.3
 [0.3.2]: https://github.com/onion-lang/onion/releases/tag/v0.3.2
 [0.3.1]: https://github.com/onion-lang/onion/releases/tag/v0.3.1
 [0.3.0]: https://github.com/onion-lang/onion/releases/tag/v0.3.0
@@ -297,3 +308,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#209]: https://github.com/onion-lang/onion/issues/209
 [#213]: https://github.com/onion-lang/onion/issues/213
 [#216]: https://github.com/onion-lang/onion/issues/216
+[#215]: https://github.com/onion-lang/onion/issues/215
+[#217]: https://github.com/onion-lang/onion/issues/217

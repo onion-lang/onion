@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-02
+
+Resolves the three limitations deferred from 0.3.0.
+
+- **SAM conversion for a lambda cast with `as`.** `(() -> ...) as Runnable` (and
+  `... as Comparator[Int]`) is SAM-converted instead of rejected ([#205]).
+- **Static generic method with an explicit primitive type argument.**
+  `Util::identity[Int](99)` boxes the primitive argument instead of failing with
+  E0005 ([#207]).
+- **Auto-CLI supports a trailing `String[]` rest parameter.**
+  `def main(cmd: String, files: String[])` collects the remaining arguments into
+  `files`; too few arguments fails with a usage message instead of silently doing
+  nothing ([#208]).
+
 ## [0.3.0] - 2026-07-02
 
 Builds on 0.2.0 with type-soundness fixes, ergonomic syntax, richer Java interop,
@@ -235,7 +249,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.0...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.3.1...develop
+[0.3.1]: https://github.com/onion-lang/onion/releases/tag/v0.3.1
 [0.3.0]: https://github.com/onion-lang/onion/releases/tag/v0.3.0
 [0.2.0]: https://github.com/onion-lang/onion/releases/tag/v0.2.0
 [0.1.0]: https://github.com/onion-lang/onion/releases/tag/releases/0.1

@@ -34,7 +34,15 @@ val s: String = java.lang.Integer::toString(255)   // "255"
 val mx: Int = java.lang.Integer::MAX_VALUE         // 2147483647
 ```
 
-**注意：** 基本型のキーワード名（`Long`・`Int`・`Double` など）は識別子ではなく予約語なので、staticレシーバとしては使えません。`Long::toString(42L)` は——完全修飾した `java.lang.Long::toString(42L)` でさえ——構文エラーになります。`Integer` や `Math` のようなキーワードでないクラスを使うか、エイリアスでインポートしてその名前で呼び出してください：
+基本型のキーワード（`Long`・`Int`・`Double` など）も static レシーバとして使えます。対応するボックス型クラスにマップされます：
+
+```onion
+val s: String = Long::toString(42L)     // "42"（java.lang.Long）
+val n: Int = Int::parseInt("7")         // 7    （java.lang.Integer）
+val mx: Long = Long::MAX_VALUE          // 9223372036854775807
+```
+
+**注意：** これは単純なキーワード形式のみで動きます。キーワードで終わる*完全修飾*パス `java.lang.Long::toString(42L)` は構文エラーになります（`Long` セグメントが識別子ではなくキーワードのため）。上記の単純な `Long::` 形式を使うか、エイリアスでインポートしてください：
 
 ```onion
 import { java.lang.Long as JLong; }

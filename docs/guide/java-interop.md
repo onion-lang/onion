@@ -50,7 +50,19 @@ val s: String = java.lang.Integer::toString(255)   // "255"
 val mx: Int = java.lang.Integer::MAX_VALUE         // 2147483647
 ```
 
-**Caveat:** the basic-type keyword names (`Long`, `Int`, `Double`, and so on) are reserved words, not identifiers, so they cannot be used as static receivers. `Long::toString(42L)` — and even the fully qualified `java.lang.Long::toString(42L)` — fails to parse. Use a non-keyword class such as `Integer` or `Math`, or import the class under an alias and call it through that name:
+A basic-type keyword (`Long`, `Int`, `Double`, and so on) may also be used as a
+static receiver; it maps to its boxed class:
+
+```onion
+val s: String = Long::toString(42L)     // "42"  (java.lang.Long)
+val n: Int = Int::parseInt("7")         // 7     (java.lang.Integer)
+val mx: Long = Long::MAX_VALUE          // 9223372036854775807
+```
+
+**Caveat:** this works only for the simple keyword form. A *fully-qualified* path
+ending in a keyword — `java.lang.Long::toString(42L)` — does not parse (the `Long`
+segment is a keyword, not an identifier). Use the simple `Long::` form above, or
+import the class under an alias:
 
 ```onion
 import { java.lang.Long as JLong; }

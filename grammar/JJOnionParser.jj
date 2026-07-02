@@ -445,6 +445,22 @@ public class JJOnionParser implements Parser {
   }
 
   /*
+   * The boxed-class name for a basic-type keyword, so that a keyword can be used
+   * as a static-call receiver: Long::toString -> java.lang.Long.toString.
+   */
+  private static String boxedName(String prim) {
+    if ("Int".equals(prim))     return "java.lang.Integer";
+    if ("Long".equals(prim))    return "java.lang.Long";
+    if ("Double".equals(prim))  return "java.lang.Double";
+    if ("Float".equals(prim))   return "java.lang.Float";
+    if ("Boolean".equals(prim)) return "java.lang.Boolean";
+    if ("Byte".equals(prim))    return "java.lang.Byte";
+    if ("Short".equals(prim))   return "java.lang.Short";
+    if ("Char".equals(prim))    return "java.lang.Character";
+    return prim;
+  }
+
+  /*
    * converience method to create substring
    */
   private static String sub(String s, int sindex, int eindex) {
@@ -1493,6 +1509,14 @@ AST.TypeNode dotted_class_type() : {Token n; StringBuilder sb = new StringBuilde
   }
 }
 
+// A basic-type keyword (Long, Int, ...) as the receiver of a static call maps to
+// its boxed class, so `Long::toString(42L)` calls java.lang.Long.toString.
+AST.TypeNode boxed_class_type() : {Token t;}{
+  ( t=<K_BYTE> | t=<K_SHORT> | t=<K_CHAR> | t=<K_INT> | t=<K_LONG> | t=<K_FLOAT> | t=<K_DOUBLE> | t=<K_BOOLEAN> ) {
+    return new AST.TypeNode(p(t), new AST.ReferenceType(boxedName(t.image), true), false);
+  }
+}
+
 AST.TypeNode raw_type() :{AST.TypeNode ty; Token n; StringBuilder sb = new StringBuilder();}{
   ty = basic_type() {return ty;}
 | n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true), false);}
@@ -2173,6 +2197,14 @@ AST.Expression primary() : {
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es); }
+| LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }
+| LOOKAHEAD( boxed_class_type() "::" id() "(" ) ty=boxed_class_type() t="::" n=id() "(" es=terms() ")"
+    [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
+    { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es); }
+| LOOKAHEAD( boxed_class_type() "::" ) ty=boxed_class_type() t="::" n=id()
+    { return new AST.StaticMemberSelection(p(t), ty, c(n)); }
 | LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
     [LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda()]
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(p(t), ty, c(n), es, tas); }

@@ -262,7 +262,8 @@ public class JJOnionParser implements Parser {
 
   private boolean isDeclarationStart(String img) {
     return "class".equals(img) || "interface".equals(img) || "record".equals(img)
-        || "enum".equals(img) || "extension".equals(img) || "type".equals(img);
+        || "enum".equals(img) || "extension".equals(img) || "type".equals(img)
+        || "trait".equals(img) || "instance".equals(img);
   }
 
   /**
@@ -801,6 +802,8 @@ TOKEN:
 | <K_AS:           "as"           >
 | <K_INT:          "Int"  >
 | <K_INTERFACE:    "interface"    >
+| <K_TRAIT:        "trait"        >
+| <K_INSTANCE:     "instance"     >
 | <K_INTERNAL:     "internal"     >
 | <K_IS:           "is"           >
 | <K_LONG:         "Long"         >
@@ -1161,7 +1164,7 @@ List<AST.TypeNode> throws_clause() : {
 }
 
 AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{
-  (ty=interface_decl(modifiers) | ty=class_decl(modifiers) | ty=record_decl(modifiers) | ty=enum_decl(modifiers)) {return ty;}
+  (ty=interface_decl(modifiers) | ty=trait_decl(modifiers) | ty=class_decl(modifiers) | ty=record_decl(modifiers) | ty=enum_decl(modifiers)) {return ty;}
 }
 
 AST.BlockExpression block():{Token t; List<AST.BlockElement> elements = (List<AST.BlockElement>)AST.NIL(); AST.BlockExpression s;}{
@@ -1351,6 +1354,30 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
   start = "interface" name = id() [tparams=type_params()]
+  [ "<:"
+    superType = type() {append(superTypes, superType);}
+    ("," superType = type() {append(superTypes, superType);})*
+  ] "{"
+    (signature = interface_method_decl() {append(signatures, signature); })*
+  "}" [";"] {
+    return new AST.InterfaceDeclaration(
+      p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
+    );
+  }
+}
+
+// A `trait` is (for now) parsed exactly like an interface -- it erases to a JVM
+// interface. The type-class machinery (instances, [T: C] constraints, dictionary
+// passing) is layered on in later stages; here it just gives the surface syntax.
+AST.InterfaceDeclaration trait_decl(int mset) : {
+  Token start, name;
+  AST.TypeNode superType;
+  AST.MethodDeclaration signature;
+  ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
+  ArrayBuffer<AST.MethodDeclaration> signatures = new ArrayBuffer<AST.MethodDeclaration>();
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
+}{
+  start = "trait" name = id() [tparams=type_params()]
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*

@@ -36,6 +36,8 @@ Soundness and diagnostic holes surfaced by a gap-probe:
   matching `String? == String` ([#229]).
 - A collection literal adopts the expected element type when its elements fit, so
   `val xs: List[String?] = ["a", null]` builds a `List[String?]` ([#231]).
+- A field or `forward` member may be the last member on the same line as the
+  class's closing brace (`class C { public: var x: Int = 0 }`) ([#234]).
 
 ## [0.3.8] - 2026-07-02
 
@@ -401,4 +403,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#228]: https://github.com/onion-lang/onion/issues/228
 [#229]: https://github.com/onion-lang/onion/issues/229
 [#231]: https://github.com/onion-lang/onion/issues/231
+[#234]: https://github.com/onion-lang/onion/issues/234
 [#220]: https://github.com/onion-lang/onion/issues/220

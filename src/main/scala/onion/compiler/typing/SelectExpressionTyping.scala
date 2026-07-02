@@ -29,6 +29,12 @@ final class SelectExpressionTyping(
     val index = context.add(name, condition.`type`, isMutable = true)
     val bind = context.lookup(name)
 
+    // When the scrutinee is an enum, a bare `case CONST:` naming one of its
+    // constants resolves to `EnumType::CONST` (unless a local variable of that
+    // name shadows it). Rewriting up front keeps pattern matching and the
+    // exhaustiveness check consistent.
+    val cases = rewriteBareEnumConstants(node.cases, condition.`type`, context)
+
     val caseConditions = Buffer[Term]()
     val caseTerms = Buffer[Term]()
     val caseNodes = Buffer[AST.BlockExpression]()
@@ -36,7 +42,7 @@ final class SelectExpressionTyping(
     val caseBindingData = Buffer[(PatternBindingInfo, List[ClosureLocalBinding], Option[GuardInfo])]()
     var hasWildcardPattern = false // Track if any pattern has a wildcard
 
-    for ((patterns, thenBlock) <- node.cases) {
+    for ((patterns, thenBlock) <- cases) {
       val (cond, bindingInfo, hasWildcard, guardInfo) = processPatterns(patterns.toArray, condition.`type`, bind, context)
       if (hasWildcard) hasWildcardPattern = true
       if (cond == null) break(None)
@@ -169,7 +175,7 @@ final class SelectExpressionTyping(
         case classDef: ClassDefinition if Modifier.isEnum(classDef.modifier) =>
           // Value matches over an enum: exhaustive when every constant
           // appears in an unguarded Constant-reference case
-          val allPatterns = node.cases.flatMap(_._1)
+          val allPatterns = cases.flatMap(_._1)
           val constantNames = classDef.fields.collect {
             case f if Modifier.isStatic(f.modifier) && Modifier.isFinal(f.modifier) && f.`type`.name == classDef.name => f.name
           }.toSeq
@@ -318,6 +324,37 @@ final class SelectExpressionTyping(
     destructuringProcessor.process(dp, bind, context)
 
   /** Returns (condition, pattern binding info, hasWildcard, optional guard info) */
+  /** Rewrite a bare `case CONST:` over an enum scrutinee into `EnumType::CONST`.
+    * A local variable of the same name takes precedence (keeping the change
+    * purely additive: only previously-unresolvable identifiers are rewritten). */
+  private def rewriteBareEnumConstants(
+    cases: List[(List[AST.Pattern], AST.BlockExpression)],
+    conditionType: Type,
+    context: LocalContext
+  ): List[(List[AST.Pattern], AST.BlockExpression)] = {
+    val enumDef: Option[ClassDefinition] = conditionType match {
+      case cd: ClassDefinition if Modifier.isEnum(cd.modifier) => Some(cd)
+      case ac: AppliedClassType => ac.raw match {
+        case cd: ClassDefinition if Modifier.isEnum(cd.modifier) => Some(cd)
+        case _ => None
+      }
+      case _ => None
+    }
+    enumDef match {
+      case None => cases
+      case Some(cd) =>
+        val constants = cd.fields.collect {
+          case f if Modifier.isStatic(f.modifier) && Modifier.isFinal(f.modifier) && f.`type`.name == cd.name => f.name
+        }.toSet
+        def rewrite(p: AST.Pattern): AST.Pattern = p match {
+          case AST.ExpressionPattern(AST.Id(loc, idName)) if constants.contains(idName) && context.lookup(idName) == null =>
+            AST.ExpressionPattern(new AST.StaticMemberSelection(loc, new AST.TypeNode(loc, new AST.ReferenceType(cd.name, true), false), idName))
+          case other => other
+        }
+        cases.map { case (ps, blk) => (ps.map(rewrite), blk) }
+    }
+  }
+
   private def processPatterns(patterns: Array[AST.Pattern], conditionType: Type, bind: ClosureLocalBinding, context: LocalContext): (Term, PatternBindingInfo, Boolean, Option[GuardInfo]) = boundary {
     var bindingInfo: PatternBindingInfo = NoBindings
     var hasWildcard = false

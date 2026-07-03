@@ -55,11 +55,22 @@ final class ClosureTyping(
         case _ => false
       }
 
+      // The SAM's declared return type, still carrying any unbound type
+      // variables (e.g. `Result[U, String]` for `flatMap`'s `Function1[T,
+      // Result[U, E]]` when only E was pinned). Typing the closure body against
+      // this template lets an inner generic call there (`Result::ok(x)`) unify
+      // its already-known type arguments (E = String) from the expected type,
+      // rather than leaving them unbound so they default to Object (issue #230).
+      val samReturnTemplate: Type = inferredTarget match {
+        case applied: AppliedClassType => applied.typeArguments.lastOption.orNull
+        case _ => null
+      }
+
       val inferredReturnType =
         if ((inferredTarget == null || needsReturnTypeInference) && node.typeRef.isRelaxed) {
           val inferred =
-            if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes)
-            else inferReturnTypeFromReturns(node, context, argTypes)
+            if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes, samReturnTemplate)
+            else inferReturnTypeFromReturns(node, context, argTypes, samReturnTemplate)
           // A closure whose only produced value is `null` (NullType) or that
           // never returns normally (BottomType, e.g. a throw-only body) infers
           // to a bottom type, which is not a valid method return type: codegen's
@@ -140,7 +151,12 @@ final class ClosureTyping(
 
                 val baseBlockOpt =
                   if (useExpressionBody) {
-                    body.typed(node.body, context).flatMap { bodyTerm =>
+                    // Type the closure body's final (value) expression against the
+                    // SAM's expected return type. This flows the expected type into a
+                    // generic call there (e.g. `Result::ok(x)` against
+                    // `Result[Int, String]`) so its type arguments are pinned by the
+                    // expected type rather than defaulting to Object (issue #230).
+                    body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
                       Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
                     }
                   } else {
@@ -343,14 +359,18 @@ final class ClosureTyping(
   private def inferReturnTypeFromExpressionBody(
     node: AST.ClosureExpression,
     context: LocalContext,
-    argTypes: Array[Type]
+    argTypes: Array[Type],
+    samReturnTemplate: Type = null
   ): Option[Type] = {
     var result: Option[Type] = None
     typing.withSuppressedReporting {
       body.openFrame(context) {
         body.openClosure(context) {
           if (addClosureArguments(node.args, argTypes, context, node.body)) {
-            result = body.typed(node.body, context).map(_.`type`)
+            // Feed the SAM's expected return template (with unbound type
+            // variables) as the expected type of the body's tail expression so a
+            // generic call there pins its already-known type arguments (#230).
+            result = body.typed(node.body, context, samReturnTemplate).map(_.`type`)
           }
         }
       }
@@ -361,7 +381,8 @@ final class ClosureTyping(
   private def inferReturnTypeFromReturns(
     node: AST.ClosureExpression,
     context: LocalContext,
-    argTypes: Array[Type]
+    argTypes: Array[Type],
+    samReturnTemplate: Type = null
   ): Option[Type] = {
     var result: Option[Type] = None
     typing.withSuppressedReporting {

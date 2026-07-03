@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic call in a lambda body infers its type arguments from the expected type.**
+  `result.flatMap((x) -> Result::ok(x * x))` infers `Result[Int, String]` (the error type
+  E is pinned by the expected SAM return) instead of failing as `Result[Int, Object]`
+  ([#230]).
+
 - **A throw-only lambda no longer forces an Object element type.**
   `val f: Future[String] = Future::async(() -> { throw ... })` infers `Future[String]`
   (the closure is routed through bidirectional inference so the expected type pins the
@@ -512,6 +517,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#242]: https://github.com/onion-lang/onion/issues/242
 [#249]: https://github.com/onion-lang/onion/issues/249
 [#233]: https://github.com/onion-lang/onion/issues/233
+[#230]: https://github.com/onion-lang/onion/issues/230
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235
 [#236]: https://github.com/onion-lang/onion/issues/236

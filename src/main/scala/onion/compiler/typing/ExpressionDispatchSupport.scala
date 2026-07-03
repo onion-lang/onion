@@ -103,7 +103,7 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
       case node: AST.SuperMethodCall =>
         body.typeSuperMethodCall(node, context, expected)
       case node: AST.BlockExpression =>
-        body.controlExpressionTyping.typeBlockExpression(node, context)
+        body.controlExpressionTyping.typeBlockExpression(node, context, expected)
       case node: AST.BreakExpression =>
         body.controlExpressionTyping.typeBreakExpression(node, context)
       case node: AST.ContinueExpression =>

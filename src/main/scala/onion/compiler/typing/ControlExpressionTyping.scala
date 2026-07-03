@@ -45,7 +45,7 @@ final class ControlExpressionTyping(
     } else None
   }
 
-  def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
+  def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type = null): Option[Term] =
     context.openScope {
       if (node.elements.isEmpty) {
         Some(statementTerm(new NOP(node.location), BasicType.VOID, node.location))
@@ -64,7 +64,11 @@ final class ControlExpressionTyping(
                 val stmt = translate(element, context)
                 terms += statementTerm(stmt, BasicType.VOID, element.location)
               case expr: AST.Expression =>
-                typed(expr, context) match {
+                // Thread the block's expected type to its final (value) expression
+                // only. This lets a generic call there (e.g. `Result::ok(x)` as a
+                // closure body against `Result[Int, String]`) pin its type
+                // arguments from the expected type instead of defaulting to Object.
+                typed(expr, context, expected) match {
                   case Some(term) => terms += term
                   case None => failed = true
                 }

@@ -184,7 +184,13 @@ final class TypingTypeSupport(private val typing: Typing) {
                     } else false
                   case _ =>
                     val checkedArg = typing.boxedTypeArgument(arg)
-                    if (!TypeRules.isAssignable(upper, checkedArg)) {
+                    // Object is the top type, so any reference-type argument satisfies
+                    // an unbounded (Object) parameter. Short-circuit here: isAssignable
+                    // walks the argument's supertype chain, which is not yet established
+                    // for a self/forward reference like `class Ver <: Comparable[Ver]`
+                    // during the outline pass, and would wrongly reject it.
+                    val satisfiesObjectBound = (upper eq typing.rootClass) && !checkedArg.isBasicType
+                    if (!satisfiesObjectBound && !TypeRules.isAssignable(upper, checkedArg)) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
                       true
                     } else false

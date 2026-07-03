@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A class can implement a generic interface with itself as the type argument.**
+  `class Ver <: Comparable[Ver]` (the natural-ordering pattern) no longer fails with
+  E0000 — an unbounded type parameter accepts any reference-type argument without
+  walking the not-yet-established supertype chain ([#252]).
+
 - **`select` over a byte/short/char accepts int case labels.** `select b { case
   1: ... }` on a `Byte`/`Short`/`Char` scrutinee matches int labels by value (like
   Java's switch) instead of failing with E0000 ([#251]).
@@ -491,4 +496,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#248]: https://github.com/onion-lang/onion/issues/248
 [#250]: https://github.com/onion-lang/onion/issues/250
 [#251]: https://github.com/onion-lang/onion/issues/251
+[#252]: https://github.com/onion-lang/onion/issues/252
 [#220]: https://github.com/onion-lang/onion/issues/220

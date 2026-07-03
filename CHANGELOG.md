@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`select` over a byte/short/char accepts int case labels.** `select b { case
+  1: ... }` on a `Byte`/`Short`/`Char` scrutinee matches int labels by value (like
+  Java's switch) instead of failing with E0000 ([#251]).
+
 - **Compound assignment narrows for a byte/short/char local.** `b += 5` on a
   `Byte`/`Short`/`Char` local now type-checks (Java's `E1 = (T)(E1 op E2)`); a plain
   assignment still needs an explicit cast ([#250]).
@@ -486,4 +490,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#247]: https://github.com/onion-lang/onion/issues/247
 [#248]: https://github.com/onion-lang/onion/issues/248
 [#250]: https://github.com/onion-lang/onion/issues/250
+[#251]: https://github.com/onion-lang/onion/issues/251
 [#220]: https://github.com/onion-lang/onion/issues/220

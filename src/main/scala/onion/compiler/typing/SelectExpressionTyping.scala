@@ -372,7 +372,12 @@ final class SelectExpressionTyping(
         val typedExpr = exprOpt.getOrElse(null)
         if (typedExpr == null) break((null, NoBindings, false, None))
 
-        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`)) {
+        // An int case label matches a byte/short/char scrutinee (compared by value,
+        // as Java's switch does); the narrowing cast below (`AsInstanceOf`) normalizes
+        // it to the scrutinee type. Char scrutinees still also accept char literals.
+        val narrowableIntLabel = typedExpr.`type` == BasicType.INT &&
+          (conditionType == BasicType.BYTE || conditionType == BasicType.SHORT || conditionType == BasicType.CHAR)
+        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel) {
           bodyContext.report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }

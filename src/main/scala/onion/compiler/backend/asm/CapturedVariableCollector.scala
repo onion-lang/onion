@@ -142,6 +142,9 @@ private[compiler] object CapturedVariableCollector {
       case cast: AsInstanceOf =>
         visitTerm(cast.target)
 
+      case nn: NonNullAssert =>
+        visitTerm(nn.target)
+
       case inst: InstanceOf =>
         visitTerm(inst.target)
 
@@ -190,6 +193,16 @@ private[compiler] object CapturedVariableCollector {
           _: LongValue | _: ShortValue | _: StringValue | _: NullValue |
           _: RefStaticField | _: OuterThis | _: This =>
         ()
+
+      case other =>
+        // Defensive: recurse into any Term subtype not enumerated above (via its
+        // Term/Statement-typed accessors) rather than throwing a MatchError, which
+        // would surface as an I0000 internal error during codegen.
+        productChildren(other).foreach {
+          case t: Term => visitTerm(t)
+          case s: ActionStatement => visitStatement(s)
+          case _ => ()
+        }
     }
 
     def visitStatement(statement: ActionStatement): Unit = statement match {

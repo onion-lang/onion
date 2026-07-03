@@ -1,0 +1,11 @@
+// A !! inside a lambda body must not crash codegen (the captured-variable
+// collector had no NonNullAssert case). Also covers a type-class method inside a
+// lambda, which lowers to dict!!.method(...).
+trait Num[T] { def add(a: T, b: T): T }
+instance Num[Integer] { def add(a: Integer, b: Integer): Integer = a + b }
+def sumL[T: Num](xs: List[T], z: T): T = xs.fold(z) { acc, x => Num[T]::add(acc, x) }
+def main(args: String[]): void {
+  val f = (s: String?) -> s!!.length()
+  IO::println(f.call("hi"))
+  IO::println(sumL([1, 2, 3], 0))
+}

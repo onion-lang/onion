@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-04
+
 - **A `foreach` loop variable can be smart-cast.** A loop variable never reassigned in
   the body is effectively final, so a null / `is` check narrows it (like an unassigned
   parameter). Previously it was always mutable and never narrowed, so arithmetic on a
@@ -477,7 +479,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.0...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[0.4.1]: https://github.com/onion-lang/onion/releases/tag/v0.4.1
 [0.4.0]: https://github.com/onion-lang/onion/releases/tag/v0.4.0
 [0.3.8]: https://github.com/onion-lang/onion/releases/tag/v0.3.8
 [0.3.7]: https://github.com/onion-lang/onion/releases/tag/v0.3.7

@@ -95,6 +95,15 @@ private[typing] object GenericMethodTypeArguments {
    * Type parameters that would default to their bound are NOT included in the result.
    * This is useful for preliminary inference before closure typing, where we want
    * to preserve type variables for closure return type inference.
+   *
+   * `args` is aligned positionally with the method's formal parameters and MAY
+   * contain `null` slots for arguments not yet typed (e.g. untyped-parameter
+   * closures whose SAM parameter types are still being inferred). Those slots
+   * are skipped, so the remaining arguments still unify against their correct
+   * formal positions regardless of argument order (issue #256). Callers that
+   * hold only the resolved arguments must preserve their positions rather than
+   * collapsing them, or a determining argument after a closure would unify
+   * against the wrong formal and leave a type variable unbound.
    */
   def inferWithoutDefaults(
     typing: Typing,
@@ -231,10 +240,11 @@ private[typing] object GenericMethodTypeArguments {
     if (method.isVararg && formalArgs.nonEmpty) {
       // Vararg methods: unify fixed params positionally, then unify the vararg
       // component with each trailing argument (boxing primitives), unless the
-      // caller already passes a packed array.
+      // caller already passes a packed array. Null slots (untyped closures not
+      // yet resolved) are skipped so positions stay aligned (issue #256).
       val fixedCount = formalArgs.length - 1
-      formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
-      val packed = args.length == formalArgs.length && args.last.`type`.isArrayType
+      formalArgs.take(fixedCount).zip(args.take(fixedCount)).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
+      val packed = args.length == formalArgs.length && (args.last != null) && args.last.`type`.isArrayType
       if (packed) {
         unify(formalArgs.last, args.last.`type`, callNode)
       } else {
@@ -243,12 +253,17 @@ private[typing] object GenericMethodTypeArguments {
           case other => other
         }
         args.drop(fixedCount).foreach { actual =>
-          val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
-          unify(component, actualType, callNode)
+          if (actual != null) {
+            val actualType = if (actual.`type`.isBasicType) typing.boxedTypeArgument(actual.`type`.asInstanceOf[BasicType]) else actual.`type`
+            unify(component, actualType, callNode)
+          }
         }
       }
     } else {
-      formalArgs.zip(args).foreach { (formal, actual) => unify(formal, actual.`type`, callNode) }
+      // Skip null actuals (untyped closures whose SAM parameter types are still
+      // being inferred): remaining arguments stay aligned to their formals so a
+      // determining argument after a closure is still unified (issue #256).
+      formalArgs.zip(args).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
     }
 
     if (expectedReturn != null) {

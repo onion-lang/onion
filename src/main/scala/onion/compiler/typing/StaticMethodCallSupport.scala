@@ -217,7 +217,11 @@ private[compiler] final class StaticMethodCallSupport(
     if (!ensureStaticMethodAccessible(node, method)) return None
 
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
-    val nonClosureParams = preliminaryParams.filter(_ != null)
+    // Keep the resolved (non-closure) arguments at their original positions —
+    // closure slots stay null — so they unify against the correct formal
+    // parameters. Collapsing them shifted a determining argument that follows a
+    // closure onto the wrong formal, leaving its type variable unbound (#256).
+    val positionalKnownParams = preliminaryParams
     // With explicit type arguments (Future::async[String](...)), the closure's
     // expected parameter type is pinned by those arguments rather than inferred
     // from the other call arguments. Feeding them in here lets a throw-only
@@ -233,7 +237,7 @@ private[compiler] final class StaticMethodCallSupport(
       }
     val preliminaryMethodSubst = explicitMethodSubst.getOrElse(
       GenericMethodTypeArguments.inferWithoutDefaults(
-        typing, node, method, nonClosureParams, classSubst, expected
+        typing, node, method, positionalKnownParams, classSubst, expected
       )
     )
     val preliminaryExpectedArgs = method.arguments.map { argType =>

@@ -130,7 +130,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         }
         .flatMap { method =>
           val classSubst = TypeSubstitution.classSubstitution(container)
-          val knownStatic = (Array(staticReceiver(target, extMethod)) ++ preliminaryParams).filter(_ != null)
+          // Keep positions aligned with the backing static's formals (receiver at
+          // index 0, then each call argument): closure slots stay null and are
+          // skipped by inferWithoutDefaults, so any resolved argument still
+          // unifies against its own formal regardless of order (#256).
+          val knownStatic = Array(staticReceiver(target, extMethod)) ++ preliminaryParams
           val preliminarySubst = GenericMethodTypeArguments.inferWithoutDefaults(
             typing, node, method, knownStatic, classSubst, expected
           )

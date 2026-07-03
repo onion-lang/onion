@@ -140,9 +140,13 @@ private[compiler] final class MethodCallFallbackSupport(
         return None
     }
     val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
-    val nonClosureParams = preliminaryParams.filter(_ != null)
+    // Preserve positions of the resolved (non-closure) arguments — closure slots
+    // stay null — so each unifies against its own formal parameter. Collapsing
+    // them shifted a determining argument that follows a closure onto the wrong
+    // formal, leaving its type variable unbound (#256).
+    val positionalKnownParams = preliminaryParams
     val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(
-      typing, node, method, nonClosureParams, classSubst, expected
+      typing, node, method, positionalKnownParams, classSubst, expected
     )
     val preliminaryExpectedArgs = method.arguments.map { argType =>
       TypeSubstitution.substituteType(argType, classSubst, preliminaryMethodSubst, defaultToBound = false)

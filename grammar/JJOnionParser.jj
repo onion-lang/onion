@@ -475,6 +475,48 @@ public class JJOnionParser implements Parser {
     return s.substring(0, s.length() - 1);
   }
 
+  // Parse an int literal without ever throwing an unchecked exception (which would
+  // surface as an I0000 internal error). Overflow becomes a clean ParseException.
+  // Decimal accepts [Integer.MIN_VALUE, 2147483648]; the trailing 2147483648 is the
+  // magnitude of Integer.MIN_VALUE and casts to it, so `-2147483648` is valid.
+  // Hex/binary are 32-bit patterns ([0, 0xFFFFFFFF]), so `0xFFFFFFFF` is -1.
+  private static int parseIntLiteral(String content) throws ParseException {
+    try {
+      long lv;
+      boolean radix = content.matches("0[xXbB].*");
+      if (content.matches("0[xX].*"))      lv = Long.parseLong(content.substring(2), 16);
+      else if (content.matches("0[bB].*")) lv = Long.parseLong(content.substring(2), 2);
+      else                                  lv = Long.parseLong(content);
+      if (radix) { if (lv < 0L || lv > 0xFFFFFFFFL) throw new ParseException("integer literal out of range: " + content); }
+      else       { if (lv < Integer.MIN_VALUE || lv > 2147483648L) throw new ParseException("integer literal out of range for Int: " + content); }
+      return (int) lv;
+    } catch (NumberFormatException e) {
+      throw new ParseException("integer literal out of range: " + content);
+    }
+  }
+
+  // Long counterpart, via BigInteger so the Long.MIN_VALUE magnitude
+  // (9223372036854775808) is accepted for `-9223372036854775808L`.
+  private static long parseLongLiteral(String content) throws ParseException {
+    try {
+      java.math.BigInteger bi;
+      boolean radix = content.matches("0[xXbB].*");
+      if (content.matches("0[xX].*"))      bi = new java.math.BigInteger(content.substring(2), 16);
+      else if (content.matches("0[bB].*")) bi = new java.math.BigInteger(content.substring(2), 2);
+      else                                  bi = new java.math.BigInteger(content);
+      if (radix) {
+        if (bi.signum() < 0 || bi.bitLength() > 64) throw new ParseException("long literal out of range: " + content);
+      } else {
+        java.math.BigInteger min = java.math.BigInteger.valueOf(Long.MIN_VALUE);
+        java.math.BigInteger maxPlus1 = java.math.BigInteger.valueOf(Long.MAX_VALUE).add(java.math.BigInteger.ONE);
+        if (bi.compareTo(min) < 0 || bi.compareTo(maxPlus1) > 0) throw new ParseException("long literal out of range: " + content);
+      }
+      return bi.longValue();
+    } catch (NumberFormatException e) {
+      throw new ParseException("long literal out of range: " + content);
+    }
+  }
+
   /*
    * Returns a String which first and last character of s is omitted.
    */
@@ -2502,49 +2544,17 @@ AST.Expression integer_literal() :{Token t; String s;}{
   t=<INTEGER> {
     s = t.image.replace("_", "");
     if(s.endsWith("B")){
-      String content = chop(s);
-      byte value;
-      if(content.matches("0[xX].*")) {
-        value = (byte)Integer.parseInt(content.substring(2), 16);
-      } else if(content.matches("0[bB].*")) {
-        value = (byte)Integer.parseInt(content.substring(2), 2);
-      } else {
-        value = Byte.parseByte(content);
-      }
-      return new AST.ByteLiteral(p(t), value);
+      int iv = parseIntLiteral(chop(s));
+      if (iv < -128 || iv > 255) throw new ParseException("byte literal out of range: " + s);
+      return new AST.ByteLiteral(p(t), (byte) iv);
     }else if(s.endsWith("S")){
-      String content = chop(s);
-      short value;
-      if(content.matches("0[xX].*")) {
-        value = (short)Integer.parseInt(content.substring(2), 16);
-      } else if(content.matches("0[bB].*")) {
-        value = (short)Integer.parseInt(content.substring(2), 2);
-      } else {
-        value = Short.parseShort(content);
-      }
-      return new AST.ShortLiteral(p(t), value);
+      int iv = parseIntLiteral(chop(s));
+      if (iv < -32768 || iv > 65535) throw new ParseException("short literal out of range: " + s);
+      return new AST.ShortLiteral(p(t), (short) iv);
     }else if(s.endsWith("L")){
-      String content = chop(s);
-      long value;
-      if(content.matches("0[xX].*")) {
-        value = Long.parseLong(content.substring(2), 16);
-      } else if(content.matches("0[bB].*")) {
-        value = Long.parseLong(content.substring(2), 2);
-      } else {
-        value = Long.parseLong(content);
-      }
-      return new AST.LongLiteral(p(t), value);
+      return new AST.LongLiteral(p(t), parseLongLiteral(chop(s)));
     }else{
-      String content = s;
-      int value;
-      if(content.matches("0[xX].*")) {
-        value = Integer.parseInt(content.substring(2), 16);
-      } else if(content.matches("0[bB].*")) {
-        value = Integer.parseInt(content.substring(2), 2);
-      } else {
-        value = Integer.parseInt(content);
-      }
-      return new AST.IntegerLiteral(p(t), value);
+      return new AST.IntegerLiteral(p(t), parseIntLiteral(s));
     }
   }
 }

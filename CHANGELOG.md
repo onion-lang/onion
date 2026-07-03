@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Compiler crash fixed: integer-literal overflow.** `-2147483648`,
+  `-9223372036854775808L`, and out-of-range literals no longer crash the parser
+  with an internal error (I0000); `Int.MIN`/`Long.MIN` magnitudes parse and a
+  genuinely out-of-range literal is a clean error ([#241]).
+
 - **A bodyless interface parses**, like a bodyless class already did:
   `interface Marker`, `interface Marker;`, and `sealed interface Shape` (with the
   subtypes declared separately) no longer require an empty `{}` ([#240]).
@@ -439,4 +444,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#238]: https://github.com/onion-lang/onion/issues/238
 [#239]: https://github.com/onion-lang/onion/issues/239
 [#240]: https://github.com/onion-lang/onion/issues/240
+[#241]: https://github.com/onion-lang/onion/issues/241
 [#220]: https://github.com/onion-lang/onion/issues/220

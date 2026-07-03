@@ -1,0 +1,8 @@
+// Int.MIN / Long.MIN literal magnitudes must not crash the parser (they overflow
+// a naive Integer.parseInt/Long.parseLong). Guards integer_literal parsing.
+def main(args: String[]): void {
+  val i: Int = -2147483648
+  val l: Long = -9223372036854775808L
+  val h: Int = 0xFFFFFFFF
+  IO::println("" + i + " " + l + " " + h)
+}

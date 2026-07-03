@@ -334,6 +334,16 @@ final class OperatorTyping(
       } else Some(new UnaryTerm(kind, BasicType.BOOLEAN, term))
     }
 
+  /** The literal `1` in the operand's own type, so `x++` on a Long/Double/Float
+    * lvalue adds a matching-typed one instead of an `int` 1 (which produced
+    * mismatched bytecode and an I0000 crash). Int/short/byte/char stay `int`. */
+  private def incrementOne(t: Type): Term = t match {
+    case BasicType.LONG => new LongValue(1L)
+    case BasicType.FLOAT => new FloatValue(1.0f)
+    case BasicType.DOUBLE => new DoubleValue(1.0)
+    case _ => new IntValue(1)
+  }
+
   def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
     val operand = typed(termNode, context).getOrElse(null)
     if (operand == null) return None
@@ -355,7 +365,7 @@ final class OperatorTyping(
         val varIndex = context.add(context.newName, operand.`type`)
         new Begin(
           new SetLocal(0, varIndex, operand.`type`, operand),
-          new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, varIndex, operand.`type`), new IntValue(1))),
+          new SetLocal(ref.frame, ref.index, ref.`type`, new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, varIndex, operand.`type`), incrementOne(operand.`type`))),
           new RefLocal(0, varIndex, operand.`type`)
         )
       case ref: RefField =>
@@ -369,9 +379,26 @@ final class OperatorTyping(
           new SetField(
             new RefLocal(0, varIndex, ref.target.`type`),
             ref.field,
-            new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), new IntValue(1))
+            new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), incrementOne(operand.`type`))
           )
         )
+      case ref: RefArray =>
+        // Post-increment/decrement on an array element (`a[i]++`). Bind the array
+        // and index to temps so each is evaluated once (a side-effecting index like
+        // `a[next()]++` must run `next()` a single time), read the old value, write
+        // the updated value, and yield the old value.
+        val arrVar = context.add(context.newName, ref.target.`type`)
+        val idxVar = context.add(context.newName, ref.index.`type`)
+        val oldVar = context.add(context.newName, operand.`type`)
+        new Begin(Array[Term](
+          new SetLocal(0, arrVar, ref.target.`type`, ref.target),
+          new SetLocal(0, idxVar, ref.index.`type`, ref.index),
+          new SetLocal(0, oldVar, operand.`type`,
+            new RefArray(new RefLocal(0, arrVar, ref.target.`type`), new RefLocal(0, idxVar, ref.index.`type`))),
+          new SetArray(new RefLocal(0, arrVar, ref.target.`type`), new RefLocal(0, idxVar, ref.index.`type`),
+            new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, oldVar, operand.`type`), incrementOne(operand.`type`))),
+          new RefLocal(0, oldVar, operand.`type`)
+        ))
       case _ =>
         bodyContext.report(LVALUE_REQUIRED, termNode)
         null

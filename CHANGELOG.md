@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Compiler crash fixed: `++`/`--` on a Long/Double/Float lvalue.** The
+  increment literal now matches the operand type instead of always being an `int`
+  (which crashed codegen). `++`/`--` also work on array elements (`a[i]++`),
+  evaluating a side-effecting index once ([#248]).
+
 - **An if-expression target-types to the expected type.**
   `val e: Event = if b { new Click() } else { new Key() }` and
   `val x: String? = if b { "a" } else { null }` adopt the expected type instead of
@@ -475,4 +480,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#245]: https://github.com/onion-lang/onion/issues/245
 [#246]: https://github.com/onion-lang/onion/issues/246
 [#247]: https://github.com/onion-lang/onion/issues/247
+[#248]: https://github.com/onion-lang/onion/issues/248
 [#220]: https://github.com/onion-lang/onion/issues/220

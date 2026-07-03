@@ -1,0 +1,16 @@
+// ++/-- on Long/Double/Float locals, fields, and array elements must not crash
+// codegen (the increment literal must match the operand type, not be an int).
+class C { public: var big: Long = 10L
+  def this{} }
+def main(args: String[]): void {
+  var l = 5L
+  l++
+  var d = 2.5
+  d--
+  val c = new C()
+  c.big++
+  val a = new Double[1]
+  a[0] = 1.0
+  a[0]++
+  IO::println("" + l + " " + d + " " + c.big + " " + a[0])
+}

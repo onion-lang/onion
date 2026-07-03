@@ -12,31 +12,31 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.github.io/onion/ja/guide/scripting/">
+        <link rel="canonical" href="https://onion-lang.github.io/onion/guide/type-classes/">
       
       
-        <link rel="prev" href="../java-interop/">
+        <link rel="prev" href="../collections/">
       
       
-        <link rel="next" href="../../examples/">
+        <link rel="next" href="../scripting/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>スクリプティング - Onion Programming Language</title>
+        <title>Type Classes - Onion Programming Language</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,7 +55,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#_1" class="md-skip">
+        <a href="#type-classes" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +94,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              スクリプティング
+              Type Classes
             
           </span>
         </div>
@@ -227,7 +227,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -244,13 +244,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../ja/" class="md-tabs__link">
           
   
   
@@ -270,7 +268,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -286,11 +284,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../guide/overview/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
           
   
   
@@ -310,7 +310,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../examples/overview/" class="md-tabs__link">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -330,7 +330,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../tools/compiler/" class="md-tabs__link">
+        <a href="../../tools/compiler/" class="md-tabs__link">
           
   
   
@@ -350,7 +350,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../reference/specification/" class="md-tabs__link">
+        <a href="../../reference/specification/" class="md-tabs__link">
           
   
   
@@ -370,7 +370,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/development/" class="md-tabs__link">
+        <a href="../../contributing/development/" class="md-tabs__link">
           
   
   
@@ -390,7 +390,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../../GENERICS_DESIGN/" class="md-tabs__link">
           
   
   
@@ -424,7 +424,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -454,7 +454,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -478,31 +478,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -520,7 +517,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -538,7 +535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../" class="md-nav__link">
+      <a href="../../ja/" class="md-nav__link">
         
   
   
@@ -572,13 +569,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -587,7 +581,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_2" >
         
           
-          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
             
   
   
@@ -623,7 +617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../../ja/getting-started/installation/" class="md-nav__link">
         
   
   
@@ -651,7 +645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/hello-world/" class="md-nav__link">
+      <a href="../../ja/getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -679,7 +673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/quick-start/" class="md-nav__link">
+      <a href="../../ja/getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -712,31 +706,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
         
           
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
             
   
   
@@ -754,7 +745,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -772,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../ja/guide/overview/" class="md-nav__link">
         
   
   
@@ -800,7 +791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic-syntax/" class="md-nav__link">
+      <a href="../../ja/guide/basic-syntax/" class="md-nav__link">
         
   
   
@@ -828,7 +819,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../variables-and-types/" class="md-nav__link">
+      <a href="../../ja/guide/variables-and-types/" class="md-nav__link">
         
   
   
@@ -856,7 +847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../null-safety/" class="md-nav__link">
+      <a href="../../ja/guide/null-safety/" class="md-nav__link">
         
   
   
@@ -884,7 +875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control-flow/" class="md-nav__link">
+      <a href="../../ja/guide/control-flow/" class="md-nav__link">
         
   
   
@@ -912,7 +903,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functions/" class="md-nav__link">
+      <a href="../../ja/guide/functions/" class="md-nav__link">
         
   
   
@@ -940,7 +931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lambda-expressions/" class="md-nav__link">
+      <a href="../../ja/guide/lambda-expressions/" class="md-nav__link">
         
   
   
@@ -968,7 +959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../classes-and-objects/" class="md-nav__link">
+      <a href="../../ja/guide/classes-and-objects/" class="md-nav__link">
         
   
   
@@ -996,7 +987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../inheritance/" class="md-nav__link">
+      <a href="../../ja/guide/inheritance/" class="md-nav__link">
         
   
   
@@ -1024,7 +1015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../collections/" class="md-nav__link">
+      <a href="../../ja/guide/collections/" class="md-nav__link">
         
   
   
@@ -1052,7 +1043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../type-classes/" class="md-nav__link">
+      <a href="../../ja/guide/type-classes/" class="md-nav__link">
         
   
   
@@ -1080,7 +1071,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../java-interop/" class="md-nav__link">
+      <a href="../../ja/guide/java-interop/" class="md-nav__link">
         
   
   
@@ -1105,37 +1096,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    スクリプティング
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../ja/guide/scripting/" class="md-nav__link">
         
   
   
@@ -1151,103 +1115,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        スキームプレフィックス付きリテラル
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#from-re" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パターン付きレコード（from re"..."）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#derive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        シリアライズの導出（derive!）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#law-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        コンパイル時の法則・用例（law / example）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パイプライン演算子
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#auto-cli" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        auto-CLI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        次のステップ
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1274,13 +1141,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1289,7 +1153,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
         
           
-          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
             
   
   
@@ -1325,7 +1189,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/" class="md-nav__link">
+      <a href="../../ja/examples/" class="md-nav__link">
         
   
   
@@ -1353,7 +1217,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/basic/" class="md-nav__link">
+      <a href="../../ja/examples/basic/" class="md-nav__link">
         
   
   
@@ -1381,7 +1245,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/oop/" class="md-nav__link">
+      <a href="../../ja/examples/oop/" class="md-nav__link">
         
   
   
@@ -1409,7 +1273,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/functional/" class="md-nav__link">
+      <a href="../../ja/examples/functional/" class="md-nav__link">
         
   
   
@@ -1437,7 +1301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/scripting/" class="md-nav__link">
+      <a href="../../ja/examples/scripting/" class="md-nav__link">
         
   
   
@@ -1465,7 +1329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/json-http/" class="md-nav__link">
+      <a href="../../ja/examples/json-http/" class="md-nav__link">
         
   
   
@@ -1493,7 +1357,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/async/" class="md-nav__link">
+      <a href="../../ja/examples/async/" class="md-nav__link">
         
   
   
@@ -1521,7 +1385,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/error-handling/" class="md-nav__link">
+      <a href="../../ja/examples/error-handling/" class="md-nav__link">
         
   
   
@@ -1563,13 +1427,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1578,7 +1439,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_5" >
         
           
-          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
             
   
   
@@ -1614,7 +1475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/compiler/" class="md-nav__link">
+      <a href="../../ja/tools/compiler/" class="md-nav__link">
         
   
   
@@ -1642,7 +1503,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/script-runner/" class="md-nav__link">
+      <a href="../../ja/tools/script-runner/" class="md-nav__link">
         
   
   
@@ -1670,7 +1531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/repl/" class="md-nav__link">
+      <a href="../../ja/tools/repl/" class="md-nav__link">
         
   
   
@@ -1698,7 +1559,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/language-server/" class="md-nav__link">
+      <a href="../../ja/tools/language-server/" class="md-nav__link">
         
   
   
@@ -1740,13 +1601,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1755,7 +1613,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6" >
         
           
-          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
             
   
   
@@ -1791,7 +1649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/specification/" class="md-nav__link">
+      <a href="../../ja/reference/specification/" class="md-nav__link">
         
   
   
@@ -1819,7 +1677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/stdlib/" class="md-nav__link">
+      <a href="../../ja/reference/stdlib/" class="md-nav__link">
         
   
   
@@ -1847,7 +1705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../ja/reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -1875,7 +1733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/error-codes/" class="md-nav__link">
+      <a href="../../ja/reference/error-codes/" class="md-nav__link">
         
   
   
@@ -1957,7 +1815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
+      <a href="../../ja/compiler/tail-call-optimization/" class="md-nav__link">
         
   
   
@@ -2007,13 +1865,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -2022,7 +1877,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
         
           
-          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
             
   
   
@@ -2058,7 +1913,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/development/" class="md-nav__link">
+      <a href="../../ja/contributing/development/" class="md-nav__link">
         
   
   
@@ -2086,7 +1941,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/building/" class="md-nav__link">
+      <a href="../../ja/contributing/building/" class="md-nav__link">
         
   
   
@@ -2114,7 +1969,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../RELEASING/" class="md-nav__link">
+      <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
   
@@ -2142,7 +1997,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../CLAUDE_ja/" class="md-nav__link">
+      <a href="../../ja/CLAUDE_ja/" class="md-nav__link">
         
   
   
@@ -2184,13 +2039,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -2199,7 +2051,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
             
   
   
@@ -2235,7 +2087,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
+      <a href="../../ja/GENERICS_DESIGN/" class="md-nav__link">
         
   
   
@@ -2263,7 +2115,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../parser-refactoring/" class="md-nav__link">
+      <a href="../../ja/parser-refactoring/" class="md-nav__link">
         
   
   
@@ -2291,7 +2143,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../quality-bar/" class="md-nav__link">
+      <a href="../../ja/quality-bar/" class="md-nav__link">
         
   
   
@@ -2388,7 +2240,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -2416,7 +2268,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/hello-world/" class="md-nav__link">
+      <a href="../../getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -2444,7 +2296,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/quick-start/" class="md-nav__link">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -2476,28 +2328,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -2515,7 +2370,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2533,7 +2388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/overview/" class="md-nav__link">
+      <a href="../overview/" class="md-nav__link">
         
   
   
@@ -2561,7 +2416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/basic-syntax/" class="md-nav__link">
+      <a href="../basic-syntax/" class="md-nav__link">
         
   
   
@@ -2589,7 +2444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/variables-and-types/" class="md-nav__link">
+      <a href="../variables-and-types/" class="md-nav__link">
         
   
   
@@ -2617,7 +2472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/control-flow/" class="md-nav__link">
+      <a href="../control-flow/" class="md-nav__link">
         
   
   
@@ -2645,7 +2500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/functions/" class="md-nav__link">
+      <a href="../functions/" class="md-nav__link">
         
   
   
@@ -2673,7 +2528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/classes-and-objects/" class="md-nav__link">
+      <a href="../classes-and-objects/" class="md-nav__link">
         
   
   
@@ -2701,7 +2556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/inheritance/" class="md-nav__link">
+      <a href="../inheritance/" class="md-nav__link">
         
   
   
@@ -2729,7 +2584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/null-safety/" class="md-nav__link">
+      <a href="../null-safety/" class="md-nav__link">
         
   
   
@@ -2757,7 +2612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/lambda-expressions/" class="md-nav__link">
+      <a href="../lambda-expressions/" class="md-nav__link">
         
   
   
@@ -2785,7 +2640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/collections/" class="md-nav__link">
+      <a href="../collections/" class="md-nav__link">
         
   
   
@@ -2810,10 +2665,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../guide/type-classes/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2829,6 +2711,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#declaring-a-trait" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring a trait
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providing-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providing instances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constrained-generics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constrained generics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ground-dictionary-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ground dictionary access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constrained-functions-calling-constrained-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constrained functions calling constrained functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-own-traits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own traits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2841,7 +2820,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/scripting/" class="md-nav__link">
+      <a href="../scripting/" class="md-nav__link">
         
   
   
@@ -2869,7 +2848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/java-interop/" class="md-nav__link">
+      <a href="../java-interop/" class="md-nav__link">
         
   
   
@@ -2958,7 +2937,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -2986,7 +2965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -3014,7 +2993,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -3042,7 +3021,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -3070,7 +3049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3098,7 +3077,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3126,7 +3105,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/async/" class="md-nav__link">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -3154,7 +3133,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3243,7 +3222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/compiler/" class="md-nav__link">
+      <a href="../../tools/compiler/" class="md-nav__link">
         
   
   
@@ -3271,7 +3250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/script-runner/" class="md-nav__link">
+      <a href="../../tools/script-runner/" class="md-nav__link">
         
   
   
@@ -3299,7 +3278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/repl/" class="md-nav__link">
+      <a href="../../tools/repl/" class="md-nav__link">
         
   
   
@@ -3327,7 +3306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/language-server/" class="md-nav__link">
+      <a href="../../tools/language-server/" class="md-nav__link">
         
   
   
@@ -3416,7 +3395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/specification/" class="md-nav__link">
+      <a href="../../reference/specification/" class="md-nav__link">
         
   
   
@@ -3444,7 +3423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/stdlib/" class="md-nav__link">
+      <a href="../../reference/stdlib/" class="md-nav__link">
         
   
   
@@ -3472,7 +3451,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -3500,7 +3479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/error-codes/" class="md-nav__link">
+      <a href="../../reference/error-codes/" class="md-nav__link">
         
   
   
@@ -3582,7 +3561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../compiler/tail-call-optimization/" class="md-nav__link">
+      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
         
   
   
@@ -3679,7 +3658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/development/" class="md-nav__link">
+      <a href="../../contributing/development/" class="md-nav__link">
         
   
   
@@ -3707,7 +3686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/building/" class="md-nav__link">
+      <a href="../../contributing/building/" class="md-nav__link">
         
   
   
@@ -3735,7 +3714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../RELEASING/" class="md-nav__link">
+      <a href="../../RELEASING/" class="md-nav__link">
         
   
   
@@ -3824,7 +3803,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../GENERICS_DESIGN/" class="md-nav__link">
+      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
         
   
   
@@ -3852,7 +3831,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../parser-refactoring/" class="md-nav__link">
+      <a href="../../parser-refactoring/" class="md-nav__link">
         
   
   
@@ -3880,7 +3859,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../quality-bar/" class="md-nav__link">
+      <a href="../../quality-bar/" class="md-nav__link">
         
   
   
@@ -3935,10 +3914,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
+  <a href="#declaring-a-trait" class="md-nav__link">
     <span class="md-ellipsis">
       
-        スキームプレフィックス付きリテラル
+        Declaring a trait
       
     </span>
   </a>
@@ -3946,10 +3925,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#from-re" class="md-nav__link">
+  <a href="#providing-instances" class="md-nav__link">
     <span class="md-ellipsis">
       
-        パターン付きレコード（from re"..."）
+        Providing instances
       
     </span>
   </a>
@@ -3957,10 +3936,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#derive" class="md-nav__link">
+  <a href="#constrained-generics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        シリアライズの導出（derive!）
+        Constrained generics
       
     </span>
   </a>
@@ -3968,10 +3947,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#law-example" class="md-nav__link">
+  <a href="#ground-dictionary-access" class="md-nav__link">
     <span class="md-ellipsis">
       
-        コンパイル時の法則・用例（law / example）
+        Ground dictionary access
       
     </span>
   </a>
@@ -3979,10 +3958,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
+  <a href="#constrained-functions-calling-constrained-functions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        パイプライン演算子
+        Constrained functions calling constrained functions
       
     </span>
   </a>
@@ -3990,10 +3969,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#auto-cli" class="md-nav__link">
+  <a href="#your-own-traits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        auto-CLI
+        Your own traits
       
     </span>
   </a>
@@ -4001,10 +3980,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
+  <a href="#current-limitations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        次のステップ
+        Current limitations
       
     </span>
   </a>
@@ -4031,53 +4010,144 @@
   
 
 
-<h1 id="_1">スクリプティング<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>Onion は bash を超えたスクリプトを書くための機能を備えています。</p>
-<h2 id="_2">スキームプレフィックス付きリテラル<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
-<p><code>re"..."</code> / <code>file"..."</code> / <code>http"..."</code> は RAW 文字列リテラル（バックスラッシュをそのまま通す）で、<code>re(...)</code> / <code>file(...)</code> / <code>http(...)</code> の呼び出しに展開されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val p    = re&quot;\d+-\d+&quot;                   // コンパイル済み Pattern
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val text = file&quot;notes.txt&quot;.text()         // lines() / json() / csv() なども
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>val body = http&quot;https://api.example.com&quot;.get()
+<h1 id="type-classes">Type Classes<a class="headerlink" href="#type-classes" title="Permanent link">&para;</a></h1>
+<p>Type classes give Onion <em>ad-hoc polymorphism</em>: you can constrain a generic on the
+operations a type must support, and the compiler supplies the right implementation
+at each call. They are declared Rust-trait style, with <code>trait</code>, <code>instance</code>, and a
+<code>[T: Trait]</code> context bound.</p>
+<h2 id="declaring-a-trait">Declaring a trait<a class="headerlink" href="#declaring-a-trait" title="Permanent link">&para;</a></h2>
+<p>A <code>trait</code> describes operations over a type parameter:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>trait Numeric[T] {
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  def zero(): T
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>}
 </span></code></pre></div>
-<h2 id="from-re">パターン付きレコード（from re"..."）<a class="headerlink" href="#from-re" title="Permanent link">&para;</a></h2>
-<p>レコードに正規表現を付けると、その形から型付きパーサが導出されます。キャプチャグループが各成分の型に変換されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>record Access(time: String, method: String, path: String, status: Int)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>val hits = Access::parseAll(file&quot;access.log&quot;.text())   // List[Access]、不正行はスキップ
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>val one  = Access::parse(line)                          // Access?（不一致なら null）
+<p>A trait may have default methods, just like an interface:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>trait Greeter {
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  def name(): String
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  def greet(): String = &quot;Hi &quot; + name()
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>}
 </span></code></pre></div>
-<p>パターンが可逆（リテラル断片＋グループのみ）なら <code>format</code> も導出され、<code>parse∘format == id</code> が成り立ちます。</p>
-<h2 id="derive">シリアライズの導出（derive!）<a class="headerlink" href="#derive" title="Permanent link">&para;</a></h2>
-<p><code>derive!(Json)</code> / <code>derive!(Yaml)</code> でレコードの形から双方向のシリアライズを導出します。<code>derive!</code> は型クラスではなくマクロです（<code>!</code> が展開の印）。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>User::toJson(u)            // {&quot;name&quot;:&quot;ko&quot;,&quot;age&quot;:3}
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>val a = User::fromJson(s)  // User?
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>User::toYaml(u)            // name: ko\nage: 3
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>val b = User::fromYaml(s)  // User?
+<h2 id="providing-instances">Providing instances<a class="headerlink" href="#providing-instances" title="Permanent link">&para;</a></h2>
+<p>An <code>instance</code> implements a trait for a concrete type:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>trait Numeric[T] {
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  def zero(): T
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>}
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>instance Numeric[Integer] {
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  def zero(): Integer = 0
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>}
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>instance Numeric[Long] {
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  def zero(): Long = 0L
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>  def plus(a: Long, b: Long): Long = a + b
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>}
 </span></code></pre></div>
-<p>全フォーマットが <code>toMap</code> / <code>fromMap</code> のコアを共有するので、新フォーマットは stdlib に <code>parse</code> / <code>stringify</code> を足すだけで済みます。成分は scalar 型のみ（非対応は E0062、未知のマーカーは E0063）。<code>from re"..."</code> と1つのレコードに共存できます。</p>
-<h2 id="law-example">コンパイル時の法則・用例（law / example）<a class="headerlink" href="#law-example" title="Permanent link">&para;</a></h2>
-<p>レコードに <code>law</code> / <code>example</code> を書くと、<strong>コンパイラがビルド時に実行検証</strong>します。仕様をテストやドキュメントではなく言語の中に置けます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
+<p>There is at most <strong>one instance per <code>(trait, type)</code></strong> (coherence). Primitive and
+boxed forms are the same type, so <code>Numeric[Int]</code> and <code>Numeric[Integer]</code> are one
+instance — declaring both is an error.</p>
+<h2 id="constrained-generics">Constrained generics<a class="headerlink" href="#constrained-generics" title="Permanent link">&para;</a></h2>
+<p>Write <code>[T: Numeric]</code> to require that <code>T</code> has a <code>Numeric</code> instance. Inside the body,
+call the trait's methods through <code>Numeric[T]::method(...)</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>trait Numeric[T] {
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  def zero(): T
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>}
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>instance Numeric[Integer] {
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  def zero(): Integer = 0
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>}
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>instance Numeric[Double] {
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  def zero(): Double = 0.0
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  def plus(a: Double, b: Double): Double = a + b
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>}
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>def sum[T: Numeric](xs: List[T]): T {
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  var acc: T = Numeric[T]::zero()
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  return acc
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>}
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>def main(args: String[]): void {
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>  println(sum([1, 2, 3, 4]))     // =&gt; 10
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>  println(sum([1.5, 2.5, 3.0]))  // =&gt; 7.0
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>}
 </span></code></pre></div>
-<p><code>example</code> は <code>true</code> でなければコンパイルエラー（E0065）。<code>law</code> は生成された値で property 検査され、反例が見つかればコンパイルエラー（E0064、反例つき）。<code>parse∘format == id</code> が機械検証される仕組みです。</p>
-<h2 id="_3">パイプライン演算子<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p><code>e |&gt; f</code> は <code>f(e)</code>、<code>e |&gt; f(a)</code> は <code>f(e, a)</code> です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>xs.map { x =&gt; x * 2 } |&gt; println
+<p>The compiler resolves the instance for the inferred <code>T</code> at each call and passes it
+in for you — you never mention it. Calling a constrained function for a type with
+no instance is a compile error, not a runtime failure.</p>
+<p>You can combine a context bound with an <code>extends</code> upper bound and use several,
+<code>[T extends Comparable[T]: Numeric]</code> or <code>[T: Numeric, U: Numeric]</code>.</p>
+<h2 id="ground-dictionary-access">Ground dictionary access<a class="headerlink" href="#ground-dictionary-access" title="Permanent link">&para;</a></h2>
+<p><code>Trait[ConcreteType]::method(...)</code> works directly, outside any generic:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>trait Numeric[T] {
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  def plus(a: T, b: T): T
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>}
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>instance Numeric[Integer] {
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>def main(args: String[]): void {
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  println(Numeric[Integer]::plus(3, 4))  // =&gt; 7
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>}
 </span></code></pre></div>
-<h2 id="auto-cli">auto-CLI<a class="headerlink" href="#auto-cli" title="Permanent link">&para;</a></h2>
-<p>トップレベル <code>main</code> の型付き引数から、コマンドライン引数の解析が導出されます。必須引数は位置引数、デフォルト付きは <code>--name</code> フラグになります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>// $ onion script.on world --count 5 --loud
+<h2 id="constrained-functions-calling-constrained-functions">Constrained functions calling constrained functions<a class="headerlink" href="#constrained-functions-calling-constrained-functions" title="Permanent link">&para;</a></h2>
+<p>A constrained function can call another with the same abstract type parameter; the
+instance is forwarded automatically:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>trait Numeric[T] {
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  def zero(): T
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>}
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>instance Numeric[Integer] {
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  def zero(): Integer = 0
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>}
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>def sum[T: Numeric](xs: List[T]): T {
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  var acc: T = Numeric[T]::zero()
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  return acc
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>}
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>def sumTwice[T: Numeric](xs: List[T]): T = Numeric[T]::plus(sum(xs), sum(xs))
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>def main(args: String[]): void {
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  println(sumTwice([1, 2, 3]))  // =&gt; 12
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>}
 </span></code></pre></div>
-<h2 id="_4">次のステップ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h2 id="your-own-traits">Your own traits<a class="headerlink" href="#your-own-traits" title="Permanent link">&para;</a></h2>
+<p>Type classes are not limited to numbers — define any trait you need:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>trait Eq[T] {
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  def eq(a: T, b: T): Boolean
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>}
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>instance Eq[Integer] {
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  def eq(a: Integer, b: Integer): Boolean = a == b
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>}
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>def allSame[T: Eq](xs: List[T]): Boolean {
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  if xs.size() &lt; 2 { return true }
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  val head: T = xs.get(0)
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  foreach x: T in xs {
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    if !Eq[T]::eq(head, x) { return false }
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>  }
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>  return true
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>}
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>def main(args: String[]): void {
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>  println(allSame([7, 7, 7]))  // =&gt; true
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>  println(allSame([7, 8, 7]))  // =&gt; false
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>}
+</span></code></pre></div>
+<h2 id="current-limitations">Current limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
+<p>The first release focuses on the common cases:</p>
 <ul>
-<li><a href="../basic-syntax/">基本構文</a> - 言語構文の詳細</li>
-<li><a href="../../reference/stdlib/">標準ライブラリ</a> - 組み込みモジュール</li>
+<li>Single-parameter traits (<code>trait C[T]</code>).</li>
+<li>Context bounds on functions and methods (<code>def f[T: C]</code>); a bound on a generic
+  <em>class</em> (<code>class Box[T: C]</code>) parses but is not enforced yet.</li>
+<li>Trait methods are called explicitly via <code>Trait[T]::method(...)</code>; UFCS
+  <code>value.method(...)</code> is not yet available.</li>
+<li>Instances are for ground types (<code>instance Numeric[Integer]</code>), not parameterized
+  (<code>instance Numeric[List[T]]</code>).</li>
+<li>There is no built-in <code>Numeric</code>/<code>Eq</code>/<code>Ord</code> yet — define the traits you need.</li>
 </ul>
 
 
@@ -4114,7 +4184,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../java-interop/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Javaとの相互運用">
+          <a href="../collections/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Collections">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4124,20 +4194,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Javaとの相互運用
+                Collections
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../examples/" class="md-footer__link md-footer__link--next" aria-label="Next: 概要">
+          <a href="../scripting/" class="md-footer__link md-footer__link--next" aria-label="Next: Scripting">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                概要
+                Scripting
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -4190,10 +4260,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

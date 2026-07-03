@@ -12,13 +12,13 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.github.io/onion/ja/guide/scripting/">
+        <link rel="canonical" href="https://onion-lang.github.io/onion/ja/guide/type-classes/">
       
       
-        <link rel="prev" href="../java-interop/">
+        <link rel="prev" href="../collections/">
       
       
-        <link rel="next" href="../../examples/">
+        <link rel="next" href="../java-interop/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>スクリプティング - Onion Programming Language</title>
+        <title>型クラス - Onion Programming Language</title>
       
     
     
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              スクリプティング
+              型クラス
             
           </span>
         </div>
@@ -1049,10 +1049,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../type-classes/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    型クラス
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1068,6 +1095,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トレイトの宣言
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        インスタンスの提供
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        制約付きジェネリック
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        具体型への辞書アクセス
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        制約付き関数どうしの呼び出し
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自作のトレイト
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        現時点の制限
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1105,37 +1229,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    スクリプティング
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../scripting/" class="md-nav__link">
         
   
   
@@ -1151,103 +1248,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        スキームプレフィックス付きリテラル
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#from-re" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パターン付きレコード（from re"..."）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#derive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        シリアライズの導出（derive!）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#law-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        コンパイル時の法則・用例（law / example）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パイプライン演算子
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#auto-cli" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        auto-CLI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        次のステップ
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3938,40 +3938,7 @@
   <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        スキームプレフィックス付きリテラル
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#from-re" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パターン付きレコード（from re"..."）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#derive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        シリアライズの導出（derive!）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#law-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        コンパイル時の法則・用例（law / example）
+        トレイトの宣言
       
     </span>
   </a>
@@ -3982,18 +3949,7 @@
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        パイプライン演算子
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#auto-cli" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        auto-CLI
+        インスタンスの提供
       
     </span>
   </a>
@@ -4004,7 +3960,51 @@
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
-        次のステップ
+        制約付きジェネリック
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        具体型への辞書アクセス
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        制約付き関数どうしの呼び出し
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自作のトレイト
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        現時点の制限
       
     </span>
   </a>
@@ -4031,53 +4031,143 @@
   
 
 
-<h1 id="_1">スクリプティング<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>Onion は bash を超えたスクリプトを書くための機能を備えています。</p>
-<h2 id="_2">スキームプレフィックス付きリテラル<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
-<p><code>re"..."</code> / <code>file"..."</code> / <code>http"..."</code> は RAW 文字列リテラル（バックスラッシュをそのまま通す）で、<code>re(...)</code> / <code>file(...)</code> / <code>http(...)</code> の呼び出しに展開されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val p    = re&quot;\d+-\d+&quot;                   // コンパイル済み Pattern
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val text = file&quot;notes.txt&quot;.text()         // lines() / json() / csv() なども
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>val body = http&quot;https://api.example.com&quot;.get()
+<h1 id="_1">型クラス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>型クラスは Onion に <em>アドホック多相</em> をもたらします。ジェネリックに対して「その型が
+サポートすべき操作」を制約として課すと、コンパイラが呼び出しごとに適切な実装を渡して
+くれます。Rust のトレイト風に、<code>trait</code>・<code>instance</code>・<code>[T: Trait]</code> 制約で宣言します。</p>
+<h2 id="_2">トレイトの宣言<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p><code>trait</code> は型パラメータに対する操作を記述します。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>trait Numeric[T] {
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  def zero(): T
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>}
 </span></code></pre></div>
-<h2 id="from-re">パターン付きレコード（from re"..."）<a class="headerlink" href="#from-re" title="Permanent link">&para;</a></h2>
-<p>レコードに正規表現を付けると、その形から型付きパーサが導出されます。キャプチャグループが各成分の型に変換されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>record Access(time: String, method: String, path: String, status: Int)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>val hits = Access::parseAll(file&quot;access.log&quot;.text())   // List[Access]、不正行はスキップ
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>val one  = Access::parse(line)                          // Access?（不一致なら null）
+<p>インターフェースと同様、デフォルトメソッドを持てます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>trait Greeter {
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  def name(): String
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  def greet(): String = &quot;Hi &quot; + name()
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>}
 </span></code></pre></div>
-<p>パターンが可逆（リテラル断片＋グループのみ）なら <code>format</code> も導出され、<code>parse∘format == id</code> が成り立ちます。</p>
-<h2 id="derive">シリアライズの導出（derive!）<a class="headerlink" href="#derive" title="Permanent link">&para;</a></h2>
-<p><code>derive!(Json)</code> / <code>derive!(Yaml)</code> でレコードの形から双方向のシリアライズを導出します。<code>derive!</code> は型クラスではなくマクロです（<code>!</code> が展開の印）。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>User::toJson(u)            // {&quot;name&quot;:&quot;ko&quot;,&quot;age&quot;:3}
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>val a = User::fromJson(s)  // User?
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>User::toYaml(u)            // name: ko\nage: 3
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>val b = User::fromYaml(s)  // User?
+<h2 id="_3">インスタンスの提供<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p><code>instance</code> は具体型に対してトレイトを実装します。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>trait Numeric[T] {
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  def zero(): T
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>}
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>instance Numeric[Integer] {
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  def zero(): Integer = 0
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>}
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>instance Numeric[Long] {
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  def zero(): Long = 0L
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>  def plus(a: Long, b: Long): Long = a + b
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>}
 </span></code></pre></div>
-<p>全フォーマットが <code>toMap</code> / <code>fromMap</code> のコアを共有するので、新フォーマットは stdlib に <code>parse</code> / <code>stringify</code> を足すだけで済みます。成分は scalar 型のみ（非対応は E0062、未知のマーカーは E0063）。<code>from re"..."</code> と1つのレコードに共存できます。</p>
-<h2 id="law-example">コンパイル時の法則・用例（law / example）<a class="headerlink" href="#law-example" title="Permanent link">&para;</a></h2>
-<p>レコードに <code>law</code> / <code>example</code> を書くと、<strong>コンパイラがビルド時に実行検証</strong>します。仕様をテストやドキュメントではなく言語の中に置けます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
+<p><code>(trait, 型)</code> ごとにインスタンスは <strong>1つまで</strong>です（コヒーレンス）。プリミティブと
+ボックス型は同じ型として扱われるので、<code>Numeric[Int]</code> と <code>Numeric[Integer]</code> は同一
+インスタンスです。両方を宣言するとエラーになります。</p>
+<h2 id="_4">制約付きジェネリック<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p><code>[T: Numeric]</code> と書くと「<code>T</code> は <code>Numeric</code> インスタンスを持つ」ことを要求できます。
+本体では <code>Numeric[T]::method(...)</code> の形でトレイトのメソッドを呼びます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>trait Numeric[T] {
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  def zero(): T
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>}
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>instance Numeric[Integer] {
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  def zero(): Integer = 0
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>}
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>instance Numeric[Double] {
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  def zero(): Double = 0.0
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  def plus(a: Double, b: Double): Double = a + b
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>}
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>def sum[T: Numeric](xs: List[T]): T {
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  var acc: T = Numeric[T]::zero()
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  return acc
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>}
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>def main(args: String[]): void {
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>  println(sum([1, 2, 3, 4]))     // =&gt; 10
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>  println(sum([1.5, 2.5, 3.0]))  // =&gt; 7.0
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>}
 </span></code></pre></div>
-<p><code>example</code> は <code>true</code> でなければコンパイルエラー（E0065）。<code>law</code> は生成された値で property 検査され、反例が見つかればコンパイルエラー（E0064、反例つき）。<code>parse∘format == id</code> が機械検証される仕組みです。</p>
-<h2 id="_3">パイプライン演算子<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p><code>e |&gt; f</code> は <code>f(e)</code>、<code>e |&gt; f(a)</code> は <code>f(e, a)</code> です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>xs.map { x =&gt; x * 2 } |&gt; println
+<p>コンパイラが、推論された <code>T</code> に対するインスタンスを呼び出しごとに解決して渡します。
+利用側はインスタンスを一切書きません。インスタンスの無い型に対して制約付き関数を
+呼ぶと、実行時ではなく<strong>コンパイル時のエラー</strong>になります。</p>
+<p>制約は <code>extends</code> 上限境界と併用でき（<code>[T extends Comparable[T]: Numeric]</code>）、複数も
+書けます（<code>[T: Numeric, U: Numeric]</code>）。</p>
+<h2 id="_5">具体型への辞書アクセス<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p><code>Trait[具体型]::method(...)</code> はジェネリックの外でも直接使えます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>trait Numeric[T] {
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  def plus(a: T, b: T): T
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>}
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>instance Numeric[Integer] {
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>def main(args: String[]): void {
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  println(Numeric[Integer]::plus(3, 4))  // =&gt; 7
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>}
 </span></code></pre></div>
-<h2 id="auto-cli">auto-CLI<a class="headerlink" href="#auto-cli" title="Permanent link">&para;</a></h2>
-<p>トップレベル <code>main</code> の型付き引数から、コマンドライン引数の解析が導出されます。必須引数は位置引数、デフォルト付きは <code>--name</code> フラグになります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>// $ onion script.on world --count 5 --loud
+<h2 id="_6">制約付き関数どうしの呼び出し<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>制約付き関数は、同じ抽象型パラメータを持つ別の制約付き関数を呼べます。インスタンスは
+自動的に転送されます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>trait Numeric[T] {
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  def zero(): T
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>}
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>instance Numeric[Integer] {
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  def zero(): Integer = 0
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>}
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>def sum[T: Numeric](xs: List[T]): T {
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  var acc: T = Numeric[T]::zero()
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  return acc
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>}
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>def sumTwice[T: Numeric](xs: List[T]): T = Numeric[T]::plus(sum(xs), sum(xs))
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>def main(args: String[]): void {
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  println(sumTwice([1, 2, 3]))  // =&gt; 12
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>}
 </span></code></pre></div>
-<h2 id="_4">次のステップ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h2 id="_7">自作のトレイト<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>型クラスは数値に限りません。必要なトレイトを自由に定義できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>trait Eq[T] {
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  def eq(a: T, b: T): Boolean
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>}
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>instance Eq[Integer] {
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  def eq(a: Integer, b: Integer): Boolean = a == b
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>}
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>def allSame[T: Eq](xs: List[T]): Boolean {
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  if xs.size() &lt; 2 { return true }
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  val head: T = xs.get(0)
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  foreach x: T in xs {
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    if !Eq[T]::eq(head, x) { return false }
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>  }
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>  return true
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>}
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>def main(args: String[]): void {
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>  println(allSame([7, 7, 7]))  // =&gt; true
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>  println(allSame([7, 8, 7]))  // =&gt; false
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>}
+</span></code></pre></div>
+<h2 id="_8">現時点の制限<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>最初のリリースでは、よく使うケースに絞っています。</p>
 <ul>
-<li><a href="../basic-syntax/">基本構文</a> - 言語構文の詳細</li>
-<li><a href="../../reference/stdlib/">標準ライブラリ</a> - 組み込みモジュール</li>
+<li>単一パラメータのトレイト（<code>trait C[T]</code>）。</li>
+<li>関数・メソッドへの制約（<code>def f[T: C]</code>）。ジェネリック<em>クラス</em>への制約
+  （<code>class Box[T: C]</code>）は構文としては通りますが、まだ強制されません。</li>
+<li>トレイトのメソッドは <code>Trait[T]::method(...)</code> で明示的に呼びます。UFCS の
+  <code>value.method(...)</code> はまだ使えません。</li>
+<li>インスタンスは具体型に対するもの（<code>instance Numeric[Integer]</code>）で、パラメータ化
+  （<code>instance Numeric[List[T]]</code>）はまだ対象外です。</li>
+<li>組込の <code>Numeric</code>/<code>Eq</code>/<code>Ord</code> はまだありません。必要なトレイトは自分で定義します。</li>
 </ul>
 
 
@@ -4114,7 +4204,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../java-interop/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Javaとの相互運用">
+          <a href="../collections/" class="md-footer__link md-footer__link--prev" aria-label="Previous: コレクション">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4124,20 +4214,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Javaとの相互運用
+                コレクション
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../examples/" class="md-footer__link md-footer__link--next" aria-label="Next: 概要">
+          <a href="../java-interop/" class="md-footer__link md-footer__link--next" aria-label="Next: Javaとの相互運用">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                概要
+                Javaとの相互運用
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -12,31 +12,27 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.github.io/onion/ja/guide/scripting/">
+        <link rel="canonical" href="https://onion-lang.github.io/onion/design/type-classes/">
       
       
-        <link rel="prev" href="../java-interop/">
-      
-      
-        <link rel="next" href="../../examples/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>スクリプティング - Onion Programming Language</title>
+        <title>Type Classes for Onion (design) - Onion Programming Language</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,7 +51,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#_1" class="md-skip">
+        <a href="#type-classes-for-onion-design" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +90,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -114,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              スクリプティング
+              Type Classes for Onion (design)
             
           </span>
         </div>
@@ -227,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -244,13 +240,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../ja/" class="md-tabs__link">
           
   
   
@@ -270,7 +264,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -290,7 +284,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../guide/overview/" class="md-tabs__link">
+        <a href="../../guide/overview/" class="md-tabs__link">
           
   
   
@@ -310,7 +304,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../examples/overview/" class="md-tabs__link">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -330,7 +324,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../tools/compiler/" class="md-tabs__link">
+        <a href="../../tools/compiler/" class="md-tabs__link">
           
   
   
@@ -350,7 +344,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../reference/specification/" class="md-tabs__link">
+        <a href="../../reference/specification/" class="md-tabs__link">
           
   
   
@@ -370,7 +364,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/development/" class="md-tabs__link">
+        <a href="../../contributing/development/" class="md-tabs__link">
           
   
   
@@ -390,7 +384,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../../GENERICS_DESIGN/" class="md-tabs__link">
           
   
   
@@ -424,7 +418,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -454,7 +448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -478,31 +472,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -520,7 +511,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -538,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../" class="md-nav__link">
+      <a href="../../ja/" class="md-nav__link">
         
   
   
@@ -572,13 +563,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -587,7 +575,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_2" >
         
           
-          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
             
   
   
@@ -623,7 +611,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../../ja/getting-started/installation/" class="md-nav__link">
         
   
   
@@ -651,7 +639,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/hello-world/" class="md-nav__link">
+      <a href="../../ja/getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -679,7 +667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/quick-start/" class="md-nav__link">
+      <a href="../../ja/getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -712,31 +700,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
         
           
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
             
   
   
@@ -754,7 +739,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -772,7 +757,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../ja/guide/overview/" class="md-nav__link">
         
   
   
@@ -800,7 +785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic-syntax/" class="md-nav__link">
+      <a href="../../ja/guide/basic-syntax/" class="md-nav__link">
         
   
   
@@ -828,7 +813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../variables-and-types/" class="md-nav__link">
+      <a href="../../ja/guide/variables-and-types/" class="md-nav__link">
         
   
   
@@ -856,7 +841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../null-safety/" class="md-nav__link">
+      <a href="../../ja/guide/null-safety/" class="md-nav__link">
         
   
   
@@ -884,7 +869,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control-flow/" class="md-nav__link">
+      <a href="../../ja/guide/control-flow/" class="md-nav__link">
         
   
   
@@ -912,7 +897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functions/" class="md-nav__link">
+      <a href="../../ja/guide/functions/" class="md-nav__link">
         
   
   
@@ -940,7 +925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lambda-expressions/" class="md-nav__link">
+      <a href="../../ja/guide/lambda-expressions/" class="md-nav__link">
         
   
   
@@ -968,7 +953,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../classes-and-objects/" class="md-nav__link">
+      <a href="../../ja/guide/classes-and-objects/" class="md-nav__link">
         
   
   
@@ -996,7 +981,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../inheritance/" class="md-nav__link">
+      <a href="../../ja/guide/inheritance/" class="md-nav__link">
         
   
   
@@ -1024,7 +1009,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../collections/" class="md-nav__link">
+      <a href="../../ja/guide/collections/" class="md-nav__link">
         
   
   
@@ -1052,7 +1037,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../type-classes/" class="md-nav__link">
+      <a href="../../ja/guide/type-classes/" class="md-nav__link">
         
   
   
@@ -1080,7 +1065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../java-interop/" class="md-nav__link">
+      <a href="../../ja/guide/java-interop/" class="md-nav__link">
         
   
   
@@ -1105,37 +1090,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    スクリプティング
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../ja/guide/scripting/" class="md-nav__link">
         
   
   
@@ -1151,103 +1109,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        スキームプレフィックス付きリテラル
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#from-re" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パターン付きレコード（from re"..."）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#derive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        シリアライズの導出（derive!）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#law-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        コンパイル時の法則・用例（law / example）
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        パイプライン演算子
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#auto-cli" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        auto-CLI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        次のステップ
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1274,13 +1135,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1289,7 +1147,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
         
           
-          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
             
   
   
@@ -1325,7 +1183,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/" class="md-nav__link">
+      <a href="../../ja/examples/" class="md-nav__link">
         
   
   
@@ -1353,7 +1211,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/basic/" class="md-nav__link">
+      <a href="../../ja/examples/basic/" class="md-nav__link">
         
   
   
@@ -1381,7 +1239,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/oop/" class="md-nav__link">
+      <a href="../../ja/examples/oop/" class="md-nav__link">
         
   
   
@@ -1409,7 +1267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/functional/" class="md-nav__link">
+      <a href="../../ja/examples/functional/" class="md-nav__link">
         
   
   
@@ -1437,7 +1295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/scripting/" class="md-nav__link">
+      <a href="../../ja/examples/scripting/" class="md-nav__link">
         
   
   
@@ -1465,7 +1323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/json-http/" class="md-nav__link">
+      <a href="../../ja/examples/json-http/" class="md-nav__link">
         
   
   
@@ -1493,7 +1351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/async/" class="md-nav__link">
+      <a href="../../ja/examples/async/" class="md-nav__link">
         
   
   
@@ -1521,7 +1379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/error-handling/" class="md-nav__link">
+      <a href="../../ja/examples/error-handling/" class="md-nav__link">
         
   
   
@@ -1563,13 +1421,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1578,7 +1433,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_5" >
         
           
-          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
             
   
   
@@ -1614,7 +1469,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/compiler/" class="md-nav__link">
+      <a href="../../ja/tools/compiler/" class="md-nav__link">
         
   
   
@@ -1642,7 +1497,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/script-runner/" class="md-nav__link">
+      <a href="../../ja/tools/script-runner/" class="md-nav__link">
         
   
   
@@ -1670,7 +1525,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/repl/" class="md-nav__link">
+      <a href="../../ja/tools/repl/" class="md-nav__link">
         
   
   
@@ -1698,7 +1553,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/language-server/" class="md-nav__link">
+      <a href="../../ja/tools/language-server/" class="md-nav__link">
         
   
   
@@ -1740,13 +1595,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1755,7 +1607,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6" >
         
           
-          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
             
   
   
@@ -1791,7 +1643,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/specification/" class="md-nav__link">
+      <a href="../../ja/reference/specification/" class="md-nav__link">
         
   
   
@@ -1819,7 +1671,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/stdlib/" class="md-nav__link">
+      <a href="../../ja/reference/stdlib/" class="md-nav__link">
         
   
   
@@ -1847,7 +1699,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../ja/reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -1875,7 +1727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/error-codes/" class="md-nav__link">
+      <a href="../../ja/reference/error-codes/" class="md-nav__link">
         
   
   
@@ -1957,7 +1809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
+      <a href="../../ja/compiler/tail-call-optimization/" class="md-nav__link">
         
   
   
@@ -2007,13 +1859,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -2022,7 +1871,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
         
           
-          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
             
   
   
@@ -2058,7 +1907,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/development/" class="md-nav__link">
+      <a href="../../ja/contributing/development/" class="md-nav__link">
         
   
   
@@ -2086,7 +1935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/building/" class="md-nav__link">
+      <a href="../../ja/contributing/building/" class="md-nav__link">
         
   
   
@@ -2114,7 +1963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../RELEASING/" class="md-nav__link">
+      <a href="../../ja/RELEASING/" class="md-nav__link">
         
   
   
@@ -2142,7 +1991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../CLAUDE_ja/" class="md-nav__link">
+      <a href="../../ja/CLAUDE_ja/" class="md-nav__link">
         
   
   
@@ -2184,13 +2033,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -2199,7 +2045,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
             
   
   
@@ -2235,7 +2081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
+      <a href="../../ja/GENERICS_DESIGN/" class="md-nav__link">
         
   
   
@@ -2263,7 +2109,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../parser-refactoring/" class="md-nav__link">
+      <a href="../../ja/parser-refactoring/" class="md-nav__link">
         
   
   
@@ -2291,7 +2137,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../quality-bar/" class="md-nav__link">
+      <a href="../../ja/quality-bar/" class="md-nav__link">
         
   
   
@@ -2388,7 +2234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -2416,7 +2262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/hello-world/" class="md-nav__link">
+      <a href="../../getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -2444,7 +2290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/quick-start/" class="md-nav__link">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -2533,7 +2379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/overview/" class="md-nav__link">
+      <a href="../../guide/overview/" class="md-nav__link">
         
   
   
@@ -2561,7 +2407,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/basic-syntax/" class="md-nav__link">
+      <a href="../../guide/basic-syntax/" class="md-nav__link">
         
   
   
@@ -2589,7 +2435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/variables-and-types/" class="md-nav__link">
+      <a href="../../guide/variables-and-types/" class="md-nav__link">
         
   
   
@@ -2617,7 +2463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/control-flow/" class="md-nav__link">
+      <a href="../../guide/control-flow/" class="md-nav__link">
         
   
   
@@ -2645,7 +2491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/functions/" class="md-nav__link">
+      <a href="../../guide/functions/" class="md-nav__link">
         
   
   
@@ -2673,7 +2519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/classes-and-objects/" class="md-nav__link">
+      <a href="../../guide/classes-and-objects/" class="md-nav__link">
         
   
   
@@ -2701,7 +2547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/inheritance/" class="md-nav__link">
+      <a href="../../guide/inheritance/" class="md-nav__link">
         
   
   
@@ -2729,7 +2575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/null-safety/" class="md-nav__link">
+      <a href="../../guide/null-safety/" class="md-nav__link">
         
   
   
@@ -2757,7 +2603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/lambda-expressions/" class="md-nav__link">
+      <a href="../../guide/lambda-expressions/" class="md-nav__link">
         
   
   
@@ -2785,7 +2631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/collections/" class="md-nav__link">
+      <a href="../../guide/collections/" class="md-nav__link">
         
   
   
@@ -2813,7 +2659,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/type-classes/" class="md-nav__link">
+      <a href="../../guide/type-classes/" class="md-nav__link">
         
   
   
@@ -2841,7 +2687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/scripting/" class="md-nav__link">
+      <a href="../../guide/scripting/" class="md-nav__link">
         
   
   
@@ -2869,7 +2715,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guide/java-interop/" class="md-nav__link">
+      <a href="../../guide/java-interop/" class="md-nav__link">
         
   
   
@@ -2958,7 +2804,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -2986,7 +2832,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -3014,7 +2860,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -3042,7 +2888,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -3070,7 +2916,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3098,7 +2944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3126,7 +2972,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/async/" class="md-nav__link">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -3154,7 +3000,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3243,7 +3089,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/compiler/" class="md-nav__link">
+      <a href="../../tools/compiler/" class="md-nav__link">
         
   
   
@@ -3271,7 +3117,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/script-runner/" class="md-nav__link">
+      <a href="../../tools/script-runner/" class="md-nav__link">
         
   
   
@@ -3299,7 +3145,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/repl/" class="md-nav__link">
+      <a href="../../tools/repl/" class="md-nav__link">
         
   
   
@@ -3327,7 +3173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tools/language-server/" class="md-nav__link">
+      <a href="../../tools/language-server/" class="md-nav__link">
         
   
   
@@ -3416,7 +3262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/specification/" class="md-nav__link">
+      <a href="../../reference/specification/" class="md-nav__link">
         
   
   
@@ -3444,7 +3290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/stdlib/" class="md-nav__link">
+      <a href="../../reference/stdlib/" class="md-nav__link">
         
   
   
@@ -3472,7 +3318,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -3500,7 +3346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/error-codes/" class="md-nav__link">
+      <a href="../../reference/error-codes/" class="md-nav__link">
         
   
   
@@ -3582,7 +3428,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../compiler/tail-call-optimization/" class="md-nav__link">
+      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
         
   
   
@@ -3679,7 +3525,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/development/" class="md-nav__link">
+      <a href="../../contributing/development/" class="md-nav__link">
         
   
   
@@ -3707,7 +3553,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/building/" class="md-nav__link">
+      <a href="../../contributing/building/" class="md-nav__link">
         
   
   
@@ -3735,7 +3581,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../RELEASING/" class="md-nav__link">
+      <a href="../../RELEASING/" class="md-nav__link">
         
   
   
@@ -3824,7 +3670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../GENERICS_DESIGN/" class="md-nav__link">
+      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
         
   
   
@@ -3852,7 +3698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../parser-refactoring/" class="md-nav__link">
+      <a href="../../parser-refactoring/" class="md-nav__link">
         
   
   
@@ -3880,7 +3726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../quality-bar/" class="md-nav__link">
+      <a href="../../quality-bar/" class="md-nav__link">
         
   
   
@@ -3935,10 +3781,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
+  <a href="#motivation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        スキームプレフィックス付きリテラル
+        Motivation
       
     </span>
   </a>
@@ -3946,10 +3792,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#from-re" class="md-nav__link">
+  <a href="#surface-syntax" class="md-nav__link">
     <span class="md-ellipsis">
       
-        パターン付きレコード（from re"..."）
+        Surface syntax
       
     </span>
   </a>
@@ -3957,10 +3803,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#derive" class="md-nav__link">
+  <a href="#semantics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        シリアライズの導出（derive!）
+        Semantics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Semantics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instance-resolution-inference-ordering-critical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instance resolution &amp; inference ordering (critical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#codegen-dictionary-passing-on-the-jvm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Codegen (dictionary passing on the JVM)
       
     </span>
   </a>
@@ -3968,10 +3864,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#law-example" class="md-nav__link">
+  <a href="#coherence-orphan-rules" class="md-nav__link">
     <span class="md-ellipsis">
       
-        コンパイル時の法則・用例（law / example）
+        Coherence &amp; orphan rules
       
     </span>
   </a>
@@ -3979,10 +3875,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_3" class="md-nav__link">
+  <a href="#standard-library-derive" class="md-nav__link">
     <span class="md-ellipsis">
       
-        パイプライン演算子
+        Standard library &amp; derive!
       
     </span>
   </a>
@@ -3990,10 +3886,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#auto-cli" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        auto-CLI
+        Decisions
       
     </span>
   </a>
@@ -4001,10 +3897,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_4" class="md-nav__link">
+  <a href="#staged-roadmap-each-stage-independently-shippable-no-crashno-miscompile-bar" class="md-nav__link">
     <span class="md-ellipsis">
       
-        次のステップ
+        Staged roadmap (each stage independently shippable, no-crash/no-miscompile bar)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#top-risks-from-the-design-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top risks (from the design pass)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-map-dictionary-passing-for-abstract-t-grounded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation map — dictionary passing for abstract T (grounded)
       
     </span>
   </a>
@@ -4031,54 +3949,245 @@
   
 
 
-<h1 id="_1">スクリプティング<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>Onion は bash を超えたスクリプトを書くための機能を備えています。</p>
-<h2 id="_2">スキームプレフィックス付きリテラル<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
-<p><code>re"..."</code> / <code>file"..."</code> / <code>http"..."</code> は RAW 文字列リテラル（バックスラッシュをそのまま通す）で、<code>re(...)</code> / <code>file(...)</code> / <code>http(...)</code> の呼び出しに展開されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>val p    = re&quot;\d+-\d+&quot;                   // コンパイル済み Pattern
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val text = file&quot;notes.txt&quot;.text()         // lines() / json() / csv() なども
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>val body = http&quot;https://api.example.com&quot;.get()
+<h1 id="type-classes-for-onion-design">Type Classes for Onion (design)<a class="headerlink" href="#type-classes-for-onion-design" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>implemented (v1).</strong> Rust-trait style. <code>trait</code>/<code>instance</code>/<code>[T: C]</code>/
+<code>Trait[T]::method</code>, ground dictionary access, coherence, and — the core —
+dictionary passing for constrained generics (<code>sum[T: Numeric]</code>) all ship on
+<code>develop</code>. This document keeps the original five-aspect design pass for context;
+the delivered implementation took a <strong>simpler route than the side-channel plan
+below</strong>: each constraint becomes a real, nullable dictionary parameter defaulted
+to <code>null</code> (so a call type-checks with the existing default-argument machinery),
+the body calls it via <code>dict!!.method(...)</code>, and the shared call builder
+(<code>MethodInvocationBuilderSupport.buildResolvedCall</code>) fills those trailing slots
+after inference with <code>new &lt;instance&gt;()</code> — or forwards the caller's own dictionary
+when the type is still abstract. <strong>No codegen changes were needed.</strong> Remaining for
+later stages: built-in <code>Numeric</code>/<code>Eq</code>/<code>Ord</code>/<code>Show</code> prelude, class-level <code>[T: C]</code>
+constraints, UFCS <code>x.method()</code>, and <code>derive!</code>-based instance derivation.</p>
+<h2 id="motivation">Motivation<a class="headerlink" href="#motivation" title="Permanent link">&para;</a></h2>
+<p>Onion has erasure-based generics with no way to express "T is numeric", so
+<code>[1,2,3].sum()</code> cannot be written as a single generic method (<code>min</code>/<code>max</code> work
+only because <code>Comparable</code> is an interface Java already provides). Type classes
+give ad-hoc polymorphism: <code>Numeric</code>, <code>Eq</code>, <code>Ord</code>, <code>Show</code>, <code>Monoid</code>, and turn the
+existing <code>derive!</code> macro from a serialization one-off into real instance
+derivation.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>trait Numeric[T] {
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  def zero(): T
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  def plus(a: T, b: T): T
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>}
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>instance Numeric[Int] {
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  def zero(): Int = 0
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  def plus(a: Int, b: Int): Int = a + b
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>}
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>def sum[T: Numeric](xs: List[T]): T {
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  var acc = Numeric[T]::zero()
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  return acc
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>}
 </span></code></pre></div>
-<h2 id="from-re">パターン付きレコード（from re"..."）<a class="headerlink" href="#from-re" title="Permanent link">&para;</a></h2>
-<p>レコードに正規表現を付けると、その形から型付きパーサが導出されます。キャプチャグループが各成分の型に変換されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>record Access(time: String, method: String, path: String, status: Int)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>val hits = Access::parseAll(file&quot;access.log&quot;.text())   // List[Access]、不正行はスキップ
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>val one  = Access::parse(line)                          // Access?（不一致なら null）
-</span></code></pre></div>
-<p>パターンが可逆（リテラル断片＋グループのみ）なら <code>format</code> も導出され、<code>parse∘format == id</code> が成り立ちます。</p>
-<h2 id="derive">シリアライズの導出（derive!）<a class="headerlink" href="#derive" title="Permanent link">&para;</a></h2>
-<p><code>derive!(Json)</code> / <code>derive!(Yaml)</code> でレコードの形から双方向のシリアライズを導出します。<code>derive!</code> は型クラスではなくマクロです（<code>!</code> が展開の印）。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>User::toJson(u)            // {&quot;name&quot;:&quot;ko&quot;,&quot;age&quot;:3}
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>val a = User::fromJson(s)  // User?
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>User::toYaml(u)            // name: ko\nage: 3
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>val b = User::fromYaml(s)  // User?
-</span></code></pre></div>
-<p>全フォーマットが <code>toMap</code> / <code>fromMap</code> のコアを共有するので、新フォーマットは stdlib に <code>parse</code> / <code>stringify</code> を足すだけで済みます。成分は scalar 型のみ（非対応は E0062、未知のマーカーは E0063）。<code>from re"..."</code> と1つのレコードに共存できます。</p>
-<h2 id="law-example">コンパイル時の法則・用例（law / example）<a class="headerlink" href="#law-example" title="Permanent link">&para;</a></h2>
-<p>レコードに <code>law</code> / <code>example</code> を書くと、<strong>コンパイラがビルド時に実行検証</strong>します。仕様をテストやドキュメントではなく言語の中に置けます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
-</span></code></pre></div>
-<p><code>example</code> は <code>true</code> でなければコンパイルエラー（E0065）。<code>law</code> は生成された値で property 検査され、反例が見つかればコンパイルエラー（E0064、反例つき）。<code>parse∘format == id</code> が機械検証される仕組みです。</p>
-<h2 id="_3">パイプライン演算子<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p><code>e |&gt; f</code> は <code>f(e)</code>、<code>e |&gt; f(a)</code> は <code>f(e, a)</code> です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>xs.map { x =&gt; x * 2 } |&gt; println
-</span></code></pre></div>
-<h2 id="auto-cli">auto-CLI<a class="headerlink" href="#auto-cli" title="Permanent link">&para;</a></h2>
-<p>トップレベル <code>main</code> の型付き引数から、コマンドライン引数の解析が導出されます。必須引数は位置引数、デフォルト付きは <code>--name</code> フラグになります。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>// $ onion script.on world --count 5 --loud
-</span></code></pre></div>
-<h2 id="_4">次のステップ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h2 id="surface-syntax">Surface syntax<a class="headerlink" href="#surface-syntax" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../basic-syntax/">基本構文</a> - 言語構文の詳細</li>
-<li><a href="../../reference/stdlib/">標準ライブラリ</a> - 組み込みモジュール</li>
+<li><strong><code>trait Name[T, …] { &lt;sigs + optional default bodies&gt; }</code></strong> — a near-clone of
+  <code>interface_decl</code>, reusing <code>interface_method_decl</code> (which already parses both
+  abstract signatures and default-method bodies). Super-traits via <code>&lt;:</code>
+  (<code>trait Ord[T] &lt;: Eq[T]</code>), matching interface supertype syntax.</li>
+<li><strong><code>instance TraitName[ConcreteType, …] { &lt;method defs&gt; }</code></strong> — body is a flat
+  list of <code>method_decl</code> like <code>extension</code>; the head type list uses
+  <code>type_arguments()</code> (so <code>instance Numeric[Int]</code>, <code>instance Show[List[String]]</code>
+  parse — <code>Int</code> etc. are keyword tokens that expression indexing cannot accept).</li>
+<li><strong>Context bound <code>[T: Numeric]</code></strong>, multi <code>[T: Numeric, U: Ord]</code>, and
+  <code>T: A + B</code> — <code>type_params()</code> gains an optional <code>:</code> constraint list joined by
+  <code>+</code>. Orthogonal to and after the existing <code>[T extends B]</code> upper bound.</li>
+<li><strong><code>Numeric[T]::method(args)</code></strong> — explicit dictionary access, the only call form
+  in the MVP (UFCS <code>acc.plus(x)</code> is a later stage).</li>
 </ul>
+<p><code>trait</code> and <code>instance</code> become <strong>reserved tokens</strong> (like <code>type</code>/<code>extension</code>/
+<code>record</code>): otherwise the top-level <code>LOOKAHEAD(2) block_element()</code> at
+JJOnionParser.jj:1076 would grab <code>trait Foo</code> as an identifier-expression
+statement. The backtick escape (<code>`trait`</code>) keeps them usable as identifiers.
+Add both to <code>isDeclarationStart</code> for panic-mode resync.</p>
+<h2 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">&para;</a></h2>
+<h3 id="registration">Registration<a class="headerlink" href="#registration" title="Permanent link">&para;</a></h3>
+<p><code>trait</code> is registered by the header/outline passes as a nominal type (it erases
+to a JVM interface — see codegen). <code>instance</code> declarations populate a global
+<strong>InstanceRegistry</strong> keyed by <code>(traitFqcn, erasedHeadTypeKey)</code>
+(<code>InstanceKey</code>), living in the per-run typing global state (alongside the F-bound
+work in <code>TypingTypeSupport</code>). Coherence is checked at registration:
+<code>OVERLAPPING_INSTANCE</code> on a duplicate key.</p>
+<h3 id="constraints">Constraints<a class="headerlink" href="#constraints" title="Permanent link">&para;</a></h3>
+<p><code>AST.TypeParameter</code> gains <code>constraints: List[TypeNode]</code>; <code>TypedAST.TypeParameter</code>
+and <code>NameResolution.TypeParam</code> gain <code>constraints</code>/<code>traitBounds</code>. A constraint
+<code>[T: Numeric]</code> means "an instance <code>Numeric[T]</code> must be resolvable"; the
+constrained method receives one synthesized <strong>dictionary parameter</strong> per
+<code>(typeParam, constraint)</code>.</p>
+<h3 id="instance-resolution-inference-ordering-critical">Instance resolution &amp; inference ordering (critical)<a class="headerlink" href="#instance-resolution-inference-ordering-critical" title="Permanent link">&para;</a></h3>
+<ol>
+<li>First <strong>infer</strong> the method's type arguments from the actual value arguments
+   (existing <code>GenericMethodTypeArguments</code>). A context bound must <strong>not</strong> satisfy
+   inference by itself — <code>T</code> must be pinned by a real argument, or <code>defaultToBound</code>
+   would silently pick the wrong (or no) instance.</li>
+<li>Then, for each <code>(typeParam, constraint)</code>, look up the instance for the now-known
+   concrete <code>T</code>: <code>MISSING_INSTANCE</code> if none. When <code>T</code> is itself an abstract type
+   parameter of the <em>caller</em> (also constrained), forward the caller's dictionary
+   instead of looking one up.</li>
+<li>Thread the resolved dictionary as a trailing hidden argument.</li>
+</ol>
+<p><code>Numeric[T]::method(...)</code> inside a constrained body resolves to: the passed
+dictionary when <code>T</code> is abstract, or the concrete instance singleton when <code>T</code> is a
+ground type.</p>
+<h2 id="codegen-dictionary-passing-on-the-jvm">Codegen (dictionary passing on the JVM)<a class="headerlink" href="#codegen-dictionary-passing-on-the-jvm" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Trait → interface</strong> <code>onion.dict.Numeric</code> with erased method descriptors
+  (<code>zero()Ljava/lang/Object;</code>, <code>plus(...)</code>), lowered from an interface
+  <code>ClassDefinition</code>. Default trait methods become <strong>JVM default methods</strong>
+  (reusing the existing interface default-method support from the #136–156 batch).</li>
+<li><strong>Instance → synthetic singleton</strong> <code>onion.dict.Numeric$$Int</code>: a <code>final</code> class
+  implementing the interface with a <code>public static final INSTANCE</code>, private ctor,
+  concrete primitive-typed methods plus auto-generated <code>ACC_BRIDGE</code> erased
+  methods. Coherence-key name mangling <code>&lt;traitFqn&gt;$$&lt;erasedTypeKey&gt;</code>.</li>
+<li><strong>Constrained method</strong> gets <strong>trailing</strong> hidden params
+  <code>$dict$Numeric$T : onion.dict.Numeric</code>, one per <code>(typeParam, constraint)</code> in a
+  deterministic order (trailing minimizes disruption to arg emission and value-param
+  indices). Call sites append <code>RefStaticField(singleton.INSTANCE)</code> for concrete
+  <code>T</code>, or <code>RefLocal(dictSlot)</code> to forward an abstract <code>T</code>.</li>
+<li><strong>Boxing</strong>: <code>Numeric[Int]</code> operates on <code>Integer</code> at the interface boundary;
+  unbox at the value use sites (same pattern as the <code>!!</code>-nullable-primitive fix).</li>
+<li><strong>Verification</strong>: interface-call results are erased to <code>Object</code>; typing must
+  insert <code>AsInstanceOf</code> when the result is used at a more specific static type
+  (the codegen aspect confirmed <code>visitCall</code>/<code>visitCallStatic</code> do not auto-checkcast).</li>
+<li><strong>TCO</strong>: exclude trailing dictionary params from <code>loopVarMapping</code> so they are
+  not copied/rewritten, and include the dict arg in self-recursive calls so
+  <code>isSelfCall</code> arity still matches (else TCO silently stops firing).</li>
+<li><strong>ClassWriter</strong>: the main-class writer uses <code>COMPUTE_FRAMES</code>; add a
+  <code>getCommonSuperClass</code> override backed by the in-compilation <code>ClassTable</code> so a
+  dict/singleton merged at a control-flow join is not classloaded at compile time.</li>
+</ul>
+<h2 id="coherence-orphan-rules">Coherence &amp; orphan rules<a class="headerlink" href="#coherence-orphan-rules" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>One instance per <code>(trait, erased head-type key)</code>.</strong> v1 keys by the erased head
+  constructor, so <code>Numeric[List[Int]]</code> and <code>Numeric[List[String]]</code> collide
+  (documented limitation until parametric instances land). Normalize primitive vs
+  boxed so <code>Numeric[Int]</code> and <code>Numeric[Integer]</code> are one key.</li>
+<li><strong>Orphan rule (v1):</strong> an <code>instance</code> is allowed only if the trait <strong>or</strong> the head
+  type is declared in the same compilation batch, plus the builtin prelude. Cross-
+  jar coherence is <strong>not</strong> enforced (Onion has no persisted cross-compilation
+  symbol store) — documented, not silently wrong.</li>
+<li>Every consumer of <code>Method.arguments</code> (overload specificity in
+  <code>CallOverloadSupport</code>, vararg/named-arg handling, <code>TailCallOptimization</code>,
+  <code>TypingDuplicationPass</code> erasure-collision, auto-CLI <code>main</code> synthesis) must
+  <strong>skip trailing dictionary params</strong> so they do not corrupt resolution, arity, or
+  usage text.</li>
+</ul>
+<h2 id="standard-library-derive">Standard library &amp; <code>derive!</code><a class="headerlink" href="#standard-library-derive" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Prelude traits</strong> (Stage 1–2): <code>Numeric[T]</code> (zero/plus/times/…), <code>Eq[T]</code>,
+  <code>Ord[T]</code>, <code>Show[T]</code>, <code>Monoid[T]</code>.</li>
+<li><strong>Builtin instances</strong> shipped as hand-written Java dictionary classes for the
+  primitives (<code>Numeric[Int/Long/Double]</code>, <code>Ord</code>/<code>Show</code> for common types), seeded
+  via a <code>default-instances.txt</code> manifest (mirrors <code>default-static-imports.txt</code>).
+  This avoids a prelude-bootstrap dependency; dogfooding via <code>prelude.on</code> is a
+  later option.</li>
+<li><strong><code>sum</code>/<code>product</code></strong> are rewritten in terms of <code>Numeric</code>; <code>min</code>/<code>max</code>/<code>sort</code> can
+  be reframed on <code>Ord</code> in a later stage.</li>
+<li><strong><code>derive!</code> evolves</strong> from a serialization macro into instance derivation
+  (<code>derive!(Eq, Ord, Show)</code> for records/enums), reusing the existing structural
+  <code>toMap</code>/fold core.</li>
+</ul>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<p><strong>Resolved (recommended):</strong>
+1. <code>trait</code>/<code>instance</code> reserved tokens; backtick escape retained.
+2. Dedicated <code>AST.TraitMethodCall</code> node for <code>Numeric[T]::method(...)</code> — <strong>not</strong>
+   reusing <code>StaticMethodCall</code> (safer; keeps trait dispatch separate from static
+   resolution).
+3. Dictionary params are <strong>trailing</strong>, hidden, one per <code>(typeParam, constraint)</code>.
+4. Coherence key = <code>(trait, erased head type)</code>, v1; overlap/missing are E-codes.
+5. Inference pins <code>T</code> from arguments first; the context bound never satisfies
+   inference; dict lookup follows.
+6. Default trait methods = JVM default methods on the dict interface.
+7. Builtin instances via Java dict classes + a manifest; not a prelude.on (v1).
+8. v1 scope: <strong>single-parameter traits, ground instances only</strong>; UFCS deferred.</p>
+<p><strong>Open (need the designer's call):</strong>
+- <strong>A. Dictionary-access syntax — RESOLVED: <code>Numeric[T]::method()</code></strong> (double
+  colon), chosen by the designer. Consistent with static dispatch (<code>Type::method</code>)
+  and unambiguous: <code>[T]</code> sits before <code>::</code>, so it is clearly a type-argument list,
+  not an indexing expression — no peeking-heuristic or typer fallback needed. The
+  dedicated <code>AST.TraitMethodCall</code> node carries <code>(traitName, typeArgs, methodName,
+  args)</code>.
+- <strong>B. Orphan-rule strictness.</strong> v1 proposes "trait or head type local to the
+  batch" + conflict detection; cross-jar coherence unenforced. Accept, or require
+  a stricter/looser rule?
+- <strong>C. UFCS timing.</strong> Ship explicit-only (<code>Numeric[T].plus(a,b)</code>) in v1 and add
+  method-style <code>acc.plus(x)</code> in Stage 2 — confirm, since it fixes trait-method /
+  extension-method dispatch precedence.</p>
+<h2 id="staged-roadmap-each-stage-independently-shippable-no-crashno-miscompile-bar">Staged roadmap (each stage independently shippable, no-crash/no-miscompile bar)<a class="headerlink" href="#staged-roadmap-each-stage-independently-shippable-no-crashno-miscompile-bar" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Stage 1 — MVP.</strong> Parse <code>trait</code>/<code>instance</code>/<code>[T: Numeric]</code>; register + coherence;
+  inference→resolution→trailing-dict codegen with singleton instances;
+  <code>Numeric[Int/Long/Double]</code> Java dicts; <code>Numeric[T].method()</code> access; ship
+  <code>sum</code>/<code>product</code>. Fuzzer + crash-corpus + codegen-correctness coverage.</li>
+<li><strong>Stage 2 — <code>Eq</code>/<code>Ord</code>/<code>Show</code>.</strong> Traits + instances; reframe <code>min</code>/<code>max</code>/<code>sort</code>
+  on <code>Ord</code>; UFCS method-style calls for trait methods.</li>
+<li><strong>Stage 3 — deriving.</strong> <code>derive!(Eq, Ord, Show)</code> reusing the structural fold.</li>
+<li><strong>Stage 4 — advanced.</strong> Trait inheritance (<code>trait Ord[T] &lt;: Eq[T]</code>), parametric/
+  conditional instances (<code>instance [T: Numeric] Numeric[List[T]]</code>), full
+  applied-type coherence keys, multi-parameter traits.</li>
+</ul>
+<h2 id="top-risks-from-the-design-pass">Top risks (from the design pass)<a class="headerlink" href="#top-risks-from-the-design-pass" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>COMPUTE_FRAMES</code> classloading of <code>onion.dict.*</code> at compile time → needs the
+  <code>getCommonSuperClass</code> override.</li>
+<li>Dictionary-param arity leaking into overload resolution / TCO / duplication /
+  auto-CLI → <strong>avoided</strong> by keeping dictionaries in a <code>dictionaryParameters</code> side
+  channel rather than in <code>arguments</code> (see the implementation map below); consumers
+  of <code>arguments</code> need no change.</li>
+<li>Missing return-value <code>checkcast</code> on erased interface calls → typing must insert
+  <code>AsInstanceOf</code> for specific-typed results.</li>
+<li>Erasure collision <code>Numeric[Int]</code> vs <code>Numeric[Integer]</code> → normalize the key.</li>
+<li>Bridge-method duplication for specialized instances → verify no <code>ClassFormatError</code>
+  (the #184 bridge fix is the reference).</li>
+</ul>
+<h2 id="implementation-map-dictionary-passing-for-abstract-t-grounded">Implementation map — dictionary passing for abstract <code>T</code> (grounded)<a class="headerlink" href="#implementation-map-dictionary-passing-for-abstract-t-grounded" title="Permanent link">&para;</a></h2>
+<p>Parser layer, ground-type dictionary access, and coherence already ship on
+<code>develop</code>. What remains is making a constrained generic like
+<code>sum[T: Numeric](xs: List[T])</code> callable polymorphically. The integration points
+below were mapped against the real typing/codegen code.</p>
+<p><strong>Key insight — use a side channel, not <code>arguments</code>.</strong> Put the per-<code>(typeParam,
+constraint)</code> dictionaries in a <strong>new <code>MethodDefinition.dictionaryParameters</code></strong>
+field, <em>not</em> in <code>MethodDefinition.arguments</code>. Then <code>MethodResolution.findMethods</code>,
+overload specificity, tail-call optimization, <code>TypingDuplicationPass</code>, and the
+auto-CLI <code>main</code> synthesis — all of which read <code>arguments</code> — are <strong>unaffected</strong>.
+This removes the "arity leaks everywhere" risk the design pass warned about: the
+dictionaries only appear in the JVM descriptor and in the emitted call args.</p>
+<p>Concrete steps (each should keep the build green):
+1. <strong>Flow the constraint.</strong> <code>AST.TypeParameter.constraints</code> → a
+   <code>TypedAST.TypeParameter</code> field, resolved in <code>TypingTypeSupport.createTypeParams</code>
+   (each constraint resolves to the trait <code>ClassType</code>). Report a clean error for an
+   unknown trait (fixes the current silent-accept of <code>[T: Unknown]</code>).
+2. <strong>Derive <code>dictionaryParameters</code>.</strong> When a method/function with constrained type
+   params is registered (outline pass → <code>MethodDefinition</code>), compute one dict entry
+   per <code>(typeParam, constraintTrait)</code>: <code>(traitFqcn, typeParamName, dictType =
+   Trait[typeParam])</code>.
+3. <strong>Body — resolve abstract-<code>T</code> <code>Trait[T]::m(args)</code>.</strong> When the type argument is a
+   method type parameter (not ground), type it to a new <code>TypedAST</code> term
+   <code>DictionaryCall(dictIndex, method, args)</code> instead of the ground <code>new
+   &lt;mangled&gt;().m(...)</code> lowering (which Rewriting still does for ground types). The
+   ground path is unchanged.
+4. <strong>Call site — one central spot.</strong> <code>MethodInvocationBuilderSupport.buildResolvedCall</code>
+   is the shared builder for <strong>every</strong> call path (unqualified / instance / super /
+   static / extension). After <code>methodSubst</code> pins each <code>T</code>, append one term per
+   <code>method.dictionaryParameters</code>: for a ground <code>T</code>, <code>new &lt;mangled instance&gt;()</code>
+   (reuse the Rewriting mangling); for a <code>T</code> that is itself a constrained type
+   parameter of the <em>caller</em>, forward the caller's dictionary slot. Missing
+   instance → <code>MISSING_INSTANCE</code>.
+5. <strong>Codegen.</strong> The method descriptor is <code>arguments ++ dictionaryParameters</code>
+   (dictionaries typed as the erased trait interface); <code>DictionaryCall</code> loads its
+   dict slot (after the real-arg slots) and <code>invokeinterface</code>s the trait method
+   (unbox the erased <code>Object</code> result to <code>T</code>'s wrapper where needed); <code>Call</code>/
+   <code>CallStatic</code> already receive the appended dict terms from step 4.</p>
+<p>Scope note: this spans typing (steps 1–4) and codegen (step 5); it is <strong>not</strong> a
+single bounded slot, but the central <code>buildResolvedCall</code> injection and the side-
+channel design keep it contained (no resolution/arity ripple). Ship it as one
+focused pass with <code>sum</code>/<code>product</code> as the acceptance test, then reframe
+<code>min</code>/<code>max</code>/<code>sort</code> on <code>Ord</code> (Stage 2).</p>
 
 
 
@@ -4109,44 +4218,6 @@
       
         <footer class="md-footer">
   
-    
-      
-      <nav class="md-footer__inner md-grid" aria-label="Footer" >
-        
-          
-          <a href="../java-interop/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Javaとの相互運用">
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
-            </div>
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Previous
-              </span>
-              <div class="md-ellipsis">
-                Javaとの相互運用
-              </div>
-            </div>
-          </a>
-        
-        
-          
-          <a href="../../examples/" class="md-footer__link md-footer__link--next" aria-label="Next: 概要">
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              <div class="md-ellipsis">
-                概要
-              </div>
-            </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
-            </div>
-          </a>
-        
-      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -4190,10 +4261,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

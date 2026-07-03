@@ -93,7 +93,11 @@ final class BlockElementLowering(
       context.openScope {
         val collection = typed(node.collection, context).getOrElse(null)
         val arg = node.arg
-        addForeachElement(arg, collection, context)
+        // A loop variable never reassigned in the body is effectively final, so
+        // (like an unassigned parameter) it may be smart-cast by a null/is check;
+        // otherwise it stays mutable and is not narrowed.
+        val loopVarReassigned = AssignedVariableScanner.scan(node.statement).contains(arg.name)
+        addForeachElement(arg, collection, context, isMutable = loopVarReassigned)
         var block = context.openLoop {
           translate(node.statement, context)
         }
@@ -397,13 +401,13 @@ final class BlockElementLowering(
    * getKey/getValue return the unsubstituted type variables. Recovering the
    * element type from the collection (`Set[Map.Entry[K, V]]`) restores K and V.
    */
-  private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext): Unit = {
+  private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext, isMutable: Boolean = true): Unit = {
     if (context.lookupOnlyCurrentScope(arg.name) != null) {
       bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
     } else typing.mapFrom(arg.typeRef) match { // raw-exempt: `foreach (k,v)` desugars to a raw Map$Entry placeholder that refineElementType restores
       case Some(annotated) =>
         val elementType = if (collection == null) annotated else refineElementType(annotated, collection.`type`)
-        context.add(arg.name, elementType)
+        context.add(arg.name, elementType, isMutable)
       case None => ()
     }
   }

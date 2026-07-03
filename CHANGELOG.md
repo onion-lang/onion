@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A `foreach` loop variable can be smart-cast.** A loop variable never reassigned in
+  the body is effectively final, so a null / `is` check narrows it (like an unassigned
+  parameter). Previously it was always mutable and never narrowed, so arithmetic on a
+  `List[Int?]` element after a null check silently string-concatenated or errored ([#253]).
+
 - **An untyped-parameter lambda works as an argument to an unqualified call.**
   `applyF((n) -> n * 3, 5)` for a top-level (or bare same-class) function now infers the
   lambda parameter type from the resolved functional-interface parameter, matching the
@@ -531,6 +536,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#249]: https://github.com/onion-lang/onion/issues/249
 [#233]: https://github.com/onion-lang/onion/issues/233
 [#232]: https://github.com/onion-lang/onion/issues/232
+[#253]: https://github.com/onion-lang/onion/issues/253
 [#230]: https://github.com/onion-lang/onion/issues/230
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235

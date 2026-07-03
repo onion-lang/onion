@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A lambda for a Java generic functional interface infers its parameter types.**
+  `xs.forEach((s) -> ...)` on a `List[String]` gives `s: String` (the interface's type
+  argument), instead of `Object` ([#232]).
+
 - **An `as` cast between erasure-compatible generic types is allowed.**
   `List[String] as List[Object]` (same raw type under erasure) casts through as Java's
   unchecked cast, instead of E0000 ([#231]).

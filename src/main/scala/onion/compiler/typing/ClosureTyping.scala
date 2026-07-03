@@ -82,7 +82,8 @@ final class ClosureTyping(
       val classSubst = TypeSubstitution.classSubstitution(typeRef)
 
       def substitutedArgs(method: Method): Array[Type] =
-        method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true))
+        method.arguments.map(tp => TypeCheckingHelpers.effectiveType(
+          TypeSubstitution.substituteType(tp, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)))
 
       // ラムダの期待戻り値型を計算する際、残った型変数（外側メソッドの型パラメータ等）は
       // rootClassに置換する。これにより Function1<String, Future<U>> の U が Object になっても
@@ -282,7 +283,8 @@ final class ClosureTyping(
     val methodOpt = target.methods.find(m => m.name == name && m.arguments.length == arity)
     methodOpt.map { method =>
       val classSubst = TypeSubstitution.classSubstitution(target)
-      method.arguments.map(tp => TypeSubstitution.substituteType(tp, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true))
+      method.arguments.map(tp => TypeCheckingHelpers.effectiveType(
+        TypeSubstitution.substituteType(tp, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)))
     }
   }
 

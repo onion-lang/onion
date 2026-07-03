@@ -517,6 +517,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#242]: https://github.com/onion-lang/onion/issues/242
 [#249]: https://github.com/onion-lang/onion/issues/249
 [#233]: https://github.com/onion-lang/onion/issues/233
+[#232]: https://github.com/onion-lang/onion/issues/232
 [#230]: https://github.com/onion-lang/onion/issues/230
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235

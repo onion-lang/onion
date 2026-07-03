@@ -12,6 +12,26 @@ final class ControlFlowEmitter(
   visitTerm: Term => Unit,
   visitStatement: ActionStatement => Unit
 ) {
+  // Finally blocks of enclosing try-finally regions, innermost first. A `return`
+  // inside a try/catch must run these before actually returning (the JVM does not
+  // do it for us); each is emitted inline on the return path.
+  private var finallyStack: List[() => Unit] = Nil
+
+  private def runPendingFinallies(): Unit =
+    val pending = finallyStack
+    var remaining = pending
+    // Emit each finally with only the outer ones pending, so a finally that itself
+    // returns does not recurse into itself.
+    while remaining.nonEmpty do
+      finallyStack = remaining.tail
+      remaining.head()
+      remaining = remaining.tail
+    finallyStack = pending
+
+  private def withFinally[A](emitFinally: () => Unit)(body: => A): A =
+    finallyStack = emitFinally :: finallyStack
+    try body finally finallyStack = finallyStack.tail
+
   def emitStatementBlock(node: StatementBlock): Unit =
     for stmt <- node.statements do
       visitStatement(stmt)
@@ -114,6 +134,11 @@ final class ControlFlowEmitter(
   def emitReturn(node: Return): Unit =
     if node.term != null then
       visitTerm(node.term)
+    if finallyStack.nonEmpty then
+      // Run enclosing finally blocks before returning; stash the result across them.
+      val slot = if node.term != null then storeResultIfNeeded(node.term.`type`) else None
+      runPendingFinallies()
+      slot.foreach(gen.loadLocal)
     gen.returnValue()
 
   private def storeResultIfNeeded(resultType: Type): Option[Int] =
@@ -237,7 +262,7 @@ final class ControlFlowEmitter(
       gen.visitLabel(endLabel)
     } else if (node.catchTypes.length == 0) {
       // Try-finally (with or without resources)
-      val (tryStart, tryEnd) = markTryRegion()
+      val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
 
       // Normal completion: execute finally and jump to end
       emitFinallyWithResources()
@@ -255,12 +280,16 @@ final class ControlFlowEmitter(
       gen.visitLabel(endLabel)
     } else {
       // Try-catch-finally (with or without resources)
-      val (tryStart, tryEnd) = markTryRegion()
+      val (tryStart, tryEnd) = withFinally(() => emitFinallyWithResources()) { markTryRegion() }
 
       // Normal completion: execute finally and jump to end
       emitFinallyWithResources()
       val endLabel = gen.newLabel()
       gen.goTo(endLabel)
+
+      // The user finally (resources are already closed before a catch runs).
+      def emitCatchFinally(): Unit =
+        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
 
       // Catch handlers for specific exceptions
       for i <- node.catchTypes.indices do
@@ -271,9 +300,10 @@ final class ControlFlowEmitter(
         gen.storeLocal(slot)
         // Close resources before catch block (Java try-with-resources spec)
         emitCloseResources()
-        visitStatement(catchStmt)
-        // Execute user finally after catch (but resources already closed)
-        if (node.finallyStatement != null) then visitStatement(node.finallyStatement)
+        // A return inside the catch must also run the user finally.
+        withFinally(() => emitCatchFinally()) { visitStatement(catchStmt) }
+        // Normal catch completion: execute user finally
+        emitCatchFinally()
         gen.goTo(endLabel)
 
       // Catch-all handler for uncaught exceptions (finally + rethrow)

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Miscompile fixed: `finally` skipped on `return`.** A `finally` block now
+  runs when the `try` or a `catch` exits via `return` (it was silently skipped,
+  losing cleanup and side effects) ([#237]).
+
 - **Miscompile fixed: self-referential typed local initializer.** `val x: T = x`
   loaded an uninitialized slot (VerifyError); it is now a clean "variable not
   found" error, like the type-inferred form ([#236]).
@@ -418,4 +422,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235
 [#236]: https://github.com/onion-lang/onion/issues/236
+[#237]: https://github.com/onion-lang/onion/issues/237
 [#220]: https://github.com/onion-lang/onion/issues/220

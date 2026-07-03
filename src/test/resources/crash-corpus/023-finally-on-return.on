@@ -1,0 +1,12 @@
+// finally must run on every exit path including return (from try or catch), with
+// or without resources. Guards the try/finally codegen.
+def f(): Int {
+  try { return 1 } finally { IO::println("f finally") }
+}
+def g(): Int {
+  try { throw new RuntimeException("x") } catch e: Exception { return 2 } finally { IO::println("g finally") }
+}
+def main(args: String[]): void {
+  IO::println(f())
+  IO::println(g())
+}

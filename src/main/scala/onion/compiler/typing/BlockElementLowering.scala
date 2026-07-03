@@ -233,23 +233,23 @@ final class BlockElementLowering(
         val lhsTypeOpt = mapFrom(node.typeRef)
         if (lhsTypeOpt.isEmpty) return new NOP(node.location)
         val lhsType = lhsTypeOpt.get
+        // Type the initializer BEFORE the variable is in scope, so `val x: T = x`
+        // is a clean "variable not found" error rather than loading an
+        // uninitialized slot (VerifyError). Matches the no-annotation branch.
+        val typedValue: Term =
+          if (node.init != null) {
+            typed(node.init, context, lhsType) match {
+              case None => return new NOP(node.location)
+              case Some(v) =>
+                val value = processAssignable(node.init, lhsType, v)
+                if (value == null) return new NOP(node.location)
+                value
+            }
+          } else defaultValue(lhsType)
         typing.checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
-        var local: SetLocal = null
-        if (node.init != null) {
-          val valueNode = typed(node.init, context, lhsType)
-          valueNode match {
-            case None => return new NOP(node.location)
-            case Some(v) =>
-              val value = processAssignable(node.init, lhsType, v)
-              if (value == null) return new NOP(node.location)
-              local = new SetLocal(node.location, 0, index, lhsType, value)
-          }
-        } else {
-          local = new SetLocal(node.location, 0, index, lhsType, defaultValue(lhsType))
-        }
-        new ExpressionActionStatement(local)
+        new ExpressionActionStatement(new SetLocal(node.location, 0, index, lhsType, typedValue))
       }
     case node: AST.DestructuringDeclaration =>
       translateDestructuring(node, context)

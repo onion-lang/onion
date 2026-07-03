@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Miscompile fixed: self-referential typed local initializer.** `val x: T = x`
+  loaded an uninitialized slot (VerifyError); it is now a clean "variable not
+  found" error, like the type-inferred form ([#236]).
+
 ## [0.4.0] - 2026-07-03
 
 The headline is **type classes**; also a batch of soundness and diagnostic fixes
@@ -413,4 +417,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#231]: https://github.com/onion-lang/onion/issues/231
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235
+[#236]: https://github.com/onion-lang/onion/issues/236
 [#220]: https://github.com/onion-lang/onion/issues/220

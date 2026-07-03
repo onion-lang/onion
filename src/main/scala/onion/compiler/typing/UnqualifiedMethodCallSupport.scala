@@ -8,7 +8,9 @@ import java.util.{TreeSet => JTreeSet}
 
 private[compiler] final class UnqualifiedMethodCallSupport(
   bodyContext: TypingBodyContext,
-  calls: MethodCallTyping
+  calls: MethodCallTyping,
+  fallback: MethodCallFallbackSupport,
+  staticCalls: StaticMethodCallSupport
 ) {
   private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
   private val callableValueCallSupport = new CallableValueCallSupport(bodyContext, calls)
@@ -43,6 +45,18 @@ private[compiler] final class UnqualifiedMethodCallSupport(
   ): Option[Term] = {
     if (ArgumentHelpers.hasNamedArguments(node.args)) {
       return typeUnqualifiedMethodCallWithNamedArgs(node, context, expected)
+    }
+
+    // A closure argument with untyped parameters cannot be typed before the
+    // target parameter type is known. Mirror the instance/static paths: resolve
+    // the overload first, then type each such closure against its resolved
+    // functional-interface parameter type (issue #232). The eager path below
+    // would otherwise fail with E0052 on the closure.
+    val untypedClosureIndices = node.args.zipWithIndex.collect {
+      case (expr, i) if isClosureWithUntypedParams(expr) => i
+    }.toSet
+    if (untypedClosureIndices.nonEmpty) {
+      return typeUnqualifiedCallWithClosures(node, context, expected, untypedClosureIndices)
     }
 
     val params0 = calls.typedTerms(node.args.toArray, context)
@@ -102,6 +116,97 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       )
     }
   }
+
+  private def hasNamedMethod(targetType: ClassType, name: String, filter: Method => Boolean): Boolean = {
+    val candidates = new JTreeSet[Method](new MethodComparator)
+    calls.collectMethodsMatching(targetType, name, candidates, filter)
+    !candidates.isEmpty
+  }
+
+  /**
+   * Bidirectional-inference entry for an unqualified call whose arguments include
+   * a closure with untyped parameters (issue #232). Preserves the eager path's
+   * resolution ORDER: the current class first, then the synthetic top-level class.
+   *
+   * A method on the current class is called unqualified as either an instance
+   * method (routed through the instance bidirectional core with a synthesized
+   * `this`/`OuterThis` receiver, mirroring `rawUnqualifiedCall`) or a static one
+   * (routed through the static bidirectional core with the class as the type).
+   * A top-level function is a static method on the top-level class. When no
+   * target class declares a method of this name, resolution falls through to the
+   * eager path so its remaining fallbacks (static-import, callable-value) and
+   * not-found diagnostics still apply.
+   */
+  private def typeUnqualifiedCallWithClosures(
+    node: AST.UnqualifiedMethodCall,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Term] = {
+    val targetType = bodyContext.definition
+    val name = node.name
+
+    if (hasNamedMethod(targetType, name, calls.isInstanceMethod)) {
+      // Instance method on the current class: needs a receiver, which is
+      // unavailable in a static context (same rule the eager path enforces).
+      val instanceCandidatesUsable = !context.isStatic
+      if (instanceCandidatesUsable) {
+        val receiver: Term =
+          if (context.isClosure) new OuterThis(targetType) else new This(targetType)
+        return fallback.typeCallWithBidirectionalInferenceCore(
+          node, name, node.args, node.typeArgs, receiver, targetType, context, expected, untypedClosureIndices
+        )
+      }
+      // In a static context, an instance-named method is not callable; fall
+      // through to the static / top-level resolution below.
+    }
+
+    if (hasNamedMethod(targetType, name, calls.isStaticMethod)) {
+      return staticCalls.typeStaticCallWithBidirectionalInferenceCore(
+        node, name, node.args, node.typeArgs, targetType, context, expected, untypedClosureIndices
+      )
+    }
+
+    bodyContext.topLevelClass match {
+      case Some(top) if !(top eq targetType) && hasNamedMethod(top, name, calls.isStaticMethod) =>
+        staticCalls.typeStaticCallWithBidirectionalInferenceCore(
+          node, name, node.args, node.typeArgs, top, context, expected, untypedClosureIndices
+        )
+      case _ =>
+        // No target class holds a method of this name. The remaining fallbacks
+        // (static-import, callable-value) and the not-found diagnostic cannot
+        // benefit from bidirectional inference on the closure, so report the
+        // closure's parameter type as usual by delegating to the eager path,
+        // which yields the standard not-found error for the arguments it can
+        // type (the untyped closure still surfaces E0052 there only if a
+        // callable value or static import is genuinely absent).
+        val params0 = calls.typedTerms(node.args.toArray, context)
+        if (params0 == null) return None
+        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected) match {
+          case MethodFallbackLookup.Found(term) =>
+            checkRegexLiteral(node, term)
+            Some(term)
+          case MethodFallbackLookup.Error =>
+            None
+          case MethodFallbackLookup.NotFound =>
+            callableValueCallSupport.resolveCallableValue(node, params0, context, expected) match {
+              case some @ Some(_) => some
+              case None =>
+                calls.reportMethodNotFound(node, targetType, name, calls.types(params0))
+                None
+            }
+        }
+    }
+  }
+
+  private def hasUntypedParams(closure: AST.ClosureExpression): Boolean =
+    closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure)
+
+  private def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
+    expr match {
+      case closure: AST.ClosureExpression => hasUntypedParams(closure)
+      case _ => false
+    }
 
   /**
    * An unqualified call to an instance method needs 'this'; in a static

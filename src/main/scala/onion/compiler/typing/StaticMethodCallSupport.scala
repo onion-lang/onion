@@ -130,9 +130,29 @@ private[compiler] final class StaticMethodCallSupport(
     context: LocalContext,
     expected: Type,
     untypedClosureIndices: Set[Int]
+  ): Option[Term] =
+    typeStaticCallWithBidirectionalInferenceCore(
+      node, node.name, node.args, node.typeArgs, typeRef, context, expected, untypedClosureIndices
+    )
+
+  /**
+   * Static bidirectional inference over the raw call fields, decoupled from the
+   * concrete AST node type. Shared by the qualified `C::m(...)` path
+   * (AST.StaticMethodCall) and the unqualified `m(...)` path when it resolves to
+   * a top-level function, which lives as a static method on the synthetic
+   * top-level class (AST.UnqualifiedMethodCall) — issue #232.
+   */
+  def typeStaticCallWithBidirectionalInferenceCore(
+    node: AST.Node,
+    name: String,
+    argList: List[AST.Expression],
+    typeArgs: List[AST.TypeNode],
+    typeRef: ClassType,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
   ): Option[Term] = {
-    val name = node.name
-    val args = node.args.toArray
+    val args = argList.toArray
 
     val preliminaryParams = new Array[Term](args.length)
     var hasNonClosureError = false
@@ -204,8 +224,8 @@ private[compiler] final class StaticMethodCallSupport(
     // closure body be typed against Function0[String] instead of being widened
     // to Function0[Object] (issue #233).
     val explicitMethodSubst: Option[scala.collection.immutable.Map[String, Type]] =
-      if (node.typeArgs.isEmpty) None
-      else GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
+      if (typeArgs.isEmpty) None
+      else GenericMethodTypeArguments.explicit(typing, node, method, typeArgs, classSubst) match {
         case some @ Some(_) => some
         // Explicit type arguments were supplied but are invalid (arity/bound
         // mismatch); `explicit` has already reported the error, so abort.
@@ -241,7 +261,7 @@ private[compiler] final class StaticMethodCallSupport(
     val finalExpectedArgs = TypeSubst.args(method, classSubst, finalMethodSubst)
 
     for {
-      finalProcessedParams <- calls.prepareCallParams(node, node.args, method, finalParams, finalExpectedArgs)
+      finalProcessedParams <- calls.prepareCallParams(node, argList, method, finalParams, finalExpectedArgs)
     } yield {
       val call = new CallStatic(typeRef, method, finalProcessedParams)
       val castType = TypeSubst.result(method.returnType, classSubst, finalMethodSubst)

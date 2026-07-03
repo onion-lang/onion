@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An untyped-parameter lambda works as an argument to an unqualified call.**
+  `applyF((n) -> n * 3, 5)` for a top-level (or bare same-class) function now infers the
+  lambda parameter type from the resolved functional-interface parameter, matching the
+  instance/static call paths; this completes the argument-position inference for #232.
+
 - **A generic call in a lambda body infers its type arguments from the expected type.**
   `result.flatMap((x) -> Result::ok(x * x))` infers `Result[Int, String]` (the error type
   E is pinned by the expected SAM return) instead of failing as `Result[Int, Object]`

@@ -31,9 +31,30 @@ private[compiler] final class MethodCallFallbackSupport(
     context: LocalContext,
     expected: Type,
     untypedClosureIndices: Set[Int]
+  ): Option[Term] =
+    typeCallWithBidirectionalInferenceCore(
+      node, node.name, node.args, node.typeArgs, target, targetType, context, expected, untypedClosureIndices
+    )
+
+  /**
+   * Instance-method bidirectional inference over the raw call fields, decoupled
+   * from the concrete AST node type. Shared by the qualified `obj.m(...)` path
+   * (AST.MethodCall) and the unqualified `m(...)` path when it resolves to an
+   * instance method on the current class (AST.UnqualifiedMethodCall), which
+   * synthesizes a `This`/`OuterThis` target (issue #232).
+   */
+  def typeCallWithBidirectionalInferenceCore(
+    node: AST.Node,
+    name: String,
+    argList: List[AST.Expression],
+    typeArgs: List[AST.TypeNode],
+    target: Term,
+    targetType: ObjectType,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
   ): Option[Term] = {
-    val name = node.name
-    val args = node.args.toArray
+    val args = argList.toArray
 
     val preliminaryParams = new Array[Term](args.length)
     var hasNonClosureError = false
@@ -53,18 +74,31 @@ private[compiler] final class MethodCallFallbackSupport(
 
     if (hasNonClosureError) return None
 
+    // Extension-method fallback only applies to an explicit `obj.m(...)` call
+    // (AST.MethodCall). A synthesized `this`/`OuterThis` target from the
+    // unqualified path must not attempt it; when no instance method matches, its
+    // caller resolves the remaining unqualified fallbacks (static-import,
+    // callable-value, top-level static) instead.
+    def extensionFallback(argTypes: Array[Type]): Option[Term] = node match {
+      case mc: AST.MethodCall =>
+        extensionMethodFallbackSupport.tryExtensionMethodCallBidirectional(
+          mc, target, targetType, context, expected, untypedClosureIndices
+        ) match {
+          case some @ Some(_) => some
+          case None =>
+            calls.reportMethodNotFound(node, targetType, name, argTypes)
+            None
+        }
+      case _ =>
+        calls.reportMethodNotFound(node, targetType, name, argTypes)
+        None
+    }
+
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(targetType, name, candidates, calls.isInstanceMethod)
 
     if (candidates.isEmpty) {
-      extensionMethodFallbackSupport.tryExtensionMethodCallBidirectional(
-        node, target, targetType, context, expected, untypedClosureIndices
-      ) match {
-        case some @ Some(_) => return some
-        case None =>
-          calls.reportMethodNotFound(node, targetType, name, Array[Type]())
-          return None
-      }
+      return extensionFallback(Array[Type]())
     }
 
     val nonClosureTypes = preliminaryParams.zipWithIndex.collect {
@@ -80,14 +114,7 @@ private[compiler] final class MethodCallFallbackSupport(
     )
 
     if (applicableMethods.isEmpty) {
-      extensionMethodFallbackSupport.tryExtensionMethodCallBidirectional(
-        node, target, targetType, context, expected, untypedClosureIndices
-      ) match {
-        case some @ Some(_) => return some
-        case None =>
-          calls.reportMethodNotFound(node, targetType, name, nonClosureTypes.values.toArray)
-          return None
-      }
+      return extensionFallback(nonClosureTypes.values.toArray)
     }
 
     val disambiguated = overloadSupport.disambiguateClosureOverloads(
@@ -149,7 +176,7 @@ private[compiler] final class MethodCallFallbackSupport(
     val finalExpectedArgs = TypeSubst.args(method, classSubst, finalMethodSubst)
 
     for {
-      finalProcessedParams <- calls.prepareCallParams(node, node.args, method, finalParams, finalExpectedArgs)
+      finalProcessedParams <- calls.prepareCallParams(node, argList, method, finalParams, finalExpectedArgs)
     } yield {
       val call = new Call(target, method, finalProcessedParams)
       val castType = TypeSubst.result(method.returnType, classSubst, finalMethodSubst)

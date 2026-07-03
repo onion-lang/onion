@@ -23,7 +23,7 @@ final class MethodCallTyping(
   private val instanceMethodCallSupport = new InstanceMethodCallSupport(bodyContext, this, methodCallFallbackSupport)
   private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this)
   private val staticMethodCallSupport = new StaticMethodCallSupport(typing, this)
-  private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(bodyContext, this)
+  private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(bodyContext, this, methodCallFallbackSupport, staticMethodCallSupport)
   private val superMethodCallSupport = new SuperMethodCallSupport(bodyContext, this)
   private val argumentRetyping = new ArgumentExpectedTypeRetyping(typing, this)
 

@@ -171,7 +171,10 @@ final class ControlFlowEmitter(
     gen.monitorEnter()
 
     val tryStart = gen.mark()
-    emitBody
+    // Release the monitor on a non-local exit too: a `return`/`break`/`continue`
+    // inside the body must run monitorExit, or the monitor leaks (and the codegen
+    // throws IllegalMonitorStateException). Same mechanism as try-finally.
+    withFinally(() => { gen.loadLocal(lockSlot); gen.monitorExit() }) { emitBody }
     val tryEnd = gen.mark()
 
     val resultSlot = storeResultIfNeeded(resultType)

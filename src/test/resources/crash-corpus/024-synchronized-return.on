@@ -1,0 +1,12 @@
+// A return/break out of a synchronized body must release the monitor (else
+// IllegalMonitorStateException at runtime). Guards the synchronized codegen.
+def f(): Int {
+  synchronized("lock") { return 7 }
+}
+def main(args: String[]): void {
+  IO::println(f())
+  foreach x: Int in [1, 2, 3] {
+    synchronized("lock") { if x == 2 { break } }
+  }
+  IO::println("done")
+}

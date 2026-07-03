@@ -56,6 +56,10 @@ private[compiler] final class MethodBodySupport(
     case t: Try =>
       (t.finallyStatement != null && definitelyReturns(t.finallyStatement)) ||
         (definitelyReturns(t.tryStatement) && t.catchStatements.forall(definitelyReturns))
+    case s: Synchronized =>
+      // A synchronized block returns exactly when its body does; without this a
+      // `synchronized(l) { return x }` was wrongly flagged as missing a return.
+      definitelyReturns(s.statement)
     case e: ExpressionActionStatement => e.term.`type`.isBottomType
     case _ => false
   }

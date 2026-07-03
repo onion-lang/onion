@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Miscompile fixed: `synchronized` + non-local exit.** A `return`/`break`/`continue`
+  out of a `synchronized` body now releases the monitor (it used to leak it and
+  throw `IllegalMonitorStateException`); a synchronized body that always returns is
+  recognized as terminal (no false E0067) ([#238]).
+
 - **Miscompile fixed: `finally` skipped on non-local exit.** A `finally` block now
   runs when the `try` or a `catch` exits via `return`, `break`, or `continue` (it
   was silently skipped, losing cleanup and side effects) ([#237]).
@@ -423,4 +428,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#235]: https://github.com/onion-lang/onion/issues/235
 [#236]: https://github.com/onion-lang/onion/issues/236
 [#237]: https://github.com/onion-lang/onion/issues/237
+[#238]: https://github.com/onion-lang/onion/issues/238
 [#220]: https://github.com/onion-lang/onion/issues/220

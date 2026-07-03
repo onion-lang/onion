@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A mutable local captured by a closure at script top level is shared.** Top-level
+  `var` captured by a lambda now sees mutations (a shared boxed cell), matching closures
+  inside methods ([#214]).
+
 - **Same-class constructor delegation.** `def this(x: Int) : this(x, 0) { ... }` delegates
   to another constructor of the same class (in addition to the `: (args)` super-init form);
   field initializers run once, via the ultimately-invoked constructor ([#212]).
@@ -502,4 +506,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#251]: https://github.com/onion-lang/onion/issues/251
 [#252]: https://github.com/onion-lang/onion/issues/252
 [#212]: https://github.com/onion-lang/onion/issues/212
+[#214]: https://github.com/onion-lang/onion/issues/214
 [#220]: https://github.com/onion-lang/onion/issues/220

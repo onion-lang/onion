@@ -35,6 +35,13 @@ private[compiler] final class TopLevelTypingSupport(
     val klass = typing.loadTopClass.collect { case cd: ClassDefinition => cd }.orNull
     val argsType = entryPointSupport.stringArgsType
     val startMethod = entryPointSupport.createStartMethod(unit, klass, argsType)
+    // A closure that captures a top-level `var`/`val` must share the same cell
+    // as the enclosing scope (like inside a function), otherwise it captures a
+    // disconnected copy and outer mutations are lost. Mark such variables as
+    // boxed before their bindings are added, mirroring markCapturedVariables in
+    // MethodBodySupport. `args` is a real parameter slot, so it is excluded.
+    val blockElements = unit.toplevels.collect { case be: AST.BlockElement => be }
+    context.markAsBoxed(CapturedVariableScanner.scanElements(blockElements, Set("args")))
     context.add("args", argsType)
     PreparedUnit(context, statements, klass, argsType, startMethod)
   }

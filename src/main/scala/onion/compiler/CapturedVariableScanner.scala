@@ -16,11 +16,19 @@ object CapturedVariableScanner {
    * @param parameterNames Names of method parameters (should not be boxed)
    * @return Set of variable names that are captured by closures
    */
-  def scan(block: AST.BlockExpression, parameterNames: Set[String] = Set.empty): Set[String] = {
+  def scan(block: AST.BlockExpression, parameterNames: Set[String] = Set.empty): Set[String] =
+    scanElements(block.elements, parameterNames)
+
+  /**
+   * Scans a sequence of block elements (e.g. the top-level statements of a
+   * compilation unit, which are not wrapped in a single BlockExpression) and
+   * returns the set of variable names captured by closures within them.
+   */
+  def scanElements(elements: Seq[AST.BlockElement], parameterNames: Set[String] = Set.empty): Set[String] = {
     val captured = mutable.Set[String]()
 
-    // Find all closures in the block
-    val closures = findClosures(block)
+    // Find all closures across the elements
+    val closures = elements.flatMap(findClosures)
 
     // For each closure, collect variables it references
     for (closure <- closures) {

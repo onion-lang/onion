@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A self-referential F-bound is accepted.** `class C[T extends C[T]]` (the CRTP /
+  recursive self-bound pattern) no longer fails with E0030 — a generic type's arity is
+  registered before its own bounds are resolved; the bound is still enforced ([#242]).
+
 - **A lambda for a Java generic functional interface infers its parameter types.**
   `xs.forEach((s) -> ...)` on a `List[String]` gives `s: String` (the interface's type
   argument), instead of `Object` ([#232]).
@@ -496,6 +500,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#228]: https://github.com/onion-lang/onion/issues/228
 [#229]: https://github.com/onion-lang/onion/issues/229
 [#231]: https://github.com/onion-lang/onion/issues/231
+[#242]: https://github.com/onion-lang/onion/issues/242
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235
 [#236]: https://github.com/onion-lang/onion/issues/236

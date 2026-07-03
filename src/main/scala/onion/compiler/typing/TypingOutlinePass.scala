@@ -57,6 +57,19 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   def run(): Unit = {
     find(topClass).foreach(unitContext.currentMapper = _)
+    // Phase A: register a placeholder type-parameter arity (Object bounds) for every
+    // generic type BEFORE any bounds are resolved, so a self-referential bound like
+    // `class C[T extends C[T]]` can resolve `C[T]` (C is already known to be generic)
+    // while its own bounds are resolved in the pre-pass below.
+    def placeholders(node: AST.Node, tps: List[AST.TypeParameter]): Unit =
+      if (tps.nonEmpty) typing.kernelNodeOf[ClassDefinition](node).foreach(
+        _.setTypeParameters(tps.map(tp => TypedAST.TypeParameter(tp.name, Some(rootClass))).toArray))
+    unit.toplevels.foreach {
+      case node: AST.ClassDeclaration => placeholders(node, node.typeParameters)
+      case node: AST.InterfaceDeclaration => placeholders(node, node.typeParameters)
+      case node: AST.RecordDeclaration => placeholders(node, node.typeParameters)
+      case _ =>
+    }
     // Pre-pass: register every declared type's type parameters before any
     // hierarchy resolution, so 'class A : B[String]' works even when B is
     // declared later in the file.

@@ -179,6 +179,17 @@ private[typing] object GenericMethodTypeArguments {
             case None =>
               inferred += tv.name -> bound
           }
+        case fn: TypedAST.NullableType =>
+          // A nullable formal such as `T?` (e.g. a `List[T?]` parameter) must
+          // still bind its type variable: unwrap the formal's nullability and
+          // unify the inner type against the actual's non-null view. Without
+          // this, `T?` matched no case and T was left unbound (defaulting to
+          // Object), so a generic call over `List[T?]` never inferred T.
+          val innerActual = actual match {
+            case an: TypedAST.NullableType => an.innerType
+            case _ => actual
+          }
+          unify(fn.innerType, innerActual, position)
         case af: TypedAST.ArrayType =>
           actual match {
             case aa: TypedAST.ArrayType => unify(af.base, aa.base, position)
@@ -374,6 +385,17 @@ private[typing] object GenericMethodTypeArguments {
             case None =>
               inferred += tv.name -> bound
           }
+        case fn: TypedAST.NullableType =>
+          // A nullable formal such as `T?` (e.g. a `List[T?]` parameter) must
+          // still bind its type variable: unwrap the formal's nullability and
+          // unify the inner type against the actual's non-null view. Without
+          // this, `T?` matched no case and T was left unbound (defaulting to
+          // Object), so a generic call over `List[T?]` never inferred T.
+          val innerActual = actual match {
+            case an: TypedAST.NullableType => an.innerType
+            case _ => actual
+          }
+          unify(fn.innerType, innerActual, position)
         case af: TypedAST.ArrayType =>
           actual match {
             case aa: TypedAST.ArrayType => unify(af.base, aa.base, position)

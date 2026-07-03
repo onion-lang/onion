@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic method infers its type parameter through a nullable container element.**
+  `firstNonNull[T](xs: List[T?])` now infers `T` from a `List[String?]` argument, instead
+  of leaving `T` unbound (`Object`) and rejecting the call ([#254]).
+
 ## [0.4.1] - 2026-07-04
 
 - **A `foreach` loop variable can be smart-cast.** A loop variable never reassigned in
@@ -480,6 +484,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#254]: https://github.com/onion-lang/onion/issues/254
 [0.4.1]: https://github.com/onion-lang/onion/releases/tag/v0.4.1
 [0.4.0]: https://github.com/onion-lang/onion/releases/tag/v0.4.0
 [0.3.8]: https://github.com/onion-lang/onion/releases/tag/v0.3.8

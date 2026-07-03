@@ -17,12 +17,17 @@ final class ControlFlowEmitter(
   // do it for us); each is emitted inline on the return path.
   private var finallyStack: List[() => Unit] = Nil
 
-  private def runPendingFinallies(): Unit =
+  private def runPendingFinallies(): Unit = runFinalliesDownTo(0)
+
+  /** Emit the finally blocks entered since the finally-stack was `depth` deep
+    * (innermost first), leaving deeper/outer ones pending. Used by return (depth 0)
+    * and by break/continue (down to the target loop's entry depth). Each finally is
+    * emitted with only the outer ones pending so a finally that itself exits does
+    * not recurse into itself. */
+  private def runFinalliesDownTo(depth: Int): Unit =
     val pending = finallyStack
     var remaining = pending
-    // Emit each finally with only the outer ones pending, so a finally that itself
-    // returns does not recurse into itself.
-    while remaining.nonEmpty do
+    while remaining.length > depth do
       finallyStack = remaining.tail
       remaining.head()
       remaining = remaining.tail
@@ -38,14 +43,21 @@ final class ControlFlowEmitter(
 
   def emitBreak(node: Break): Unit =
     val target = if (node.label != null) loops.endOf(node.label) else loops.currentEnd
+    val depth = if (node.label != null) loops.finallyDepthOf(node.label) else loops.currentFinallyDepth
     target match
-      case Some(label) => gen.goTo(label)
+      case Some(label) =>
+        // Run any finally blocks entered inside the loop before jumping out.
+        depth.foreach(runFinalliesDownTo)
+        gen.goTo(label)
       case None => throw new RuntimeException("Break statement outside of loop")
 
   def emitContinue(node: Continue): Unit =
     val target = if (node.label != null) loops.startOf(node.label) else loops.currentStart
+    val depth = if (node.label != null) loops.finallyDepthOf(node.label) else loops.currentFinallyDepth
     target match
-      case Some(label) => gen.goTo(label)
+      case Some(label) =>
+        depth.foreach(runFinalliesDownTo)
+        gen.goTo(label)
       case None => throw new RuntimeException("Continue statement outside of loop")
 
   def emitExpressionActionStatement(node: ExpressionActionStatement): Unit =
@@ -88,7 +100,7 @@ final class ControlFlowEmitter(
       val bodyLabel = gen.newLabel()
       val condLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, condLabel, endLabel)
+      loops.push(node.label, condLabel, endLabel, finallyStack.length)
       try
         gen.visitLabel(bodyLabel)
         visitStatement(node.stmt)
@@ -103,7 +115,7 @@ final class ControlFlowEmitter(
       val condLabel = gen.newLabel()
       val continueLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, continueLabel, endLabel)
+      loops.push(node.label, continueLabel, endLabel, finallyStack.length)
       try
         gen.visitLabel(condLabel)
         visitTerm(node.condition)
@@ -118,7 +130,7 @@ final class ControlFlowEmitter(
     else
       val startLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, startLabel, endLabel)
+      loops.push(node.label, startLabel, endLabel, finallyStack.length)
       try
         gen.visitLabel(startLabel)
         visitTerm(node.condition)

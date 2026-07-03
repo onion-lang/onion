@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **Miscompile fixed: `finally` skipped on `return`.** A `finally` block now
-  runs when the `try` or a `catch` exits via `return` (it was silently skipped,
-  losing cleanup and side effects) ([#237]).
+- **Miscompile fixed: `finally` skipped on non-local exit.** A `finally` block now
+  runs when the `try` or a `catch` exits via `return`, `break`, or `continue` (it
+  was silently skipped, losing cleanup and side effects) ([#237]).
 
 - **Miscompile fixed: self-referential typed local initializer.** `val x: T = x`
   loaded an uninitialized slot (VerifyError); it is now a clean "variable not

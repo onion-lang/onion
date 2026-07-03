@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A map literal target-types its keys and values.** `Map[String, String?]`,
+  `Map[String, Shape]` (mixed record subtypes) and other nullable/supertype map
+  annotations are honored instead of failing on the entries' widened join, matching
+  list literals ([#246]).
+
 - **A list literal of mixed subtypes target-types to the expected supertype.**
   `val es: List[Event] = [new Click(..), new Key(..)]` builds a `List[Event]`
   instead of failing as `List[Object]` (the check now considers each element, not
@@ -463,4 +468,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#243]: https://github.com/onion-lang/onion/issues/243
 [#244]: https://github.com/onion-lang/onion/issues/244
 [#245]: https://github.com/onion-lang/onion/issues/245
+[#246]: https://github.com/onion-lang/onion/issues/246
 [#220]: https://github.com/onion-lang/onion/issues/220

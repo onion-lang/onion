@@ -308,8 +308,18 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
     if (failed) None
     else {
-      val finalKeyType = if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass) else keyType
-      val finalValueType = if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass) else valueType
+      // Target-type the entries just like a list literal (see typeListLiteral): if
+      // every key/value fits the expected key/value type, adopt it, so a nullable or
+      // supertype map annotation (`Map[String, String?]`, `Map[String, Shape]`) is
+      // honored instead of failing on the elements' widened join.
+      val finalKeyType =
+        if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass)
+        else if (expectedKey != null && keys.forall(k => TypeRules.isAssignable(expectedKey, k.`type`))) expectedKey
+        else keyType
+      val finalValueType =
+        if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass)
+        else if (expectedValue != null && values.forall(v => TypeRules.isAssignable(expectedValue, v.`type`))) expectedValue
+        else valueType
       val mapType = AppliedClassType(bodyContext.load("java.util.Map"), scala.collection.immutable.List(finalKeyType, finalValueType))
       Some(new MapLiteral(keys, values, mapType))
     }

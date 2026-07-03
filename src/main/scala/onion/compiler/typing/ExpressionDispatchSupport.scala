@@ -113,7 +113,7 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
       case node: AST.ForExpression =>
         body.controlExpressionTyping.typeForExpression(node, context)
       case node: AST.IfExpression =>
-        body.controlExpressionTyping.typeIfExpression(node, context)
+        body.controlExpressionTyping.typeIfExpression(node, context, expected)
       case node: AST.ReturnExpression =>
         body.controlExpressionTyping.typeReturnExpression(node, context)
       case node: AST.SelectExpression =>

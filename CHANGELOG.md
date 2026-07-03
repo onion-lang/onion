@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An if-expression target-types to the expected type.**
+  `val e: Event = if b { new Click() } else { new Key() }` and
+  `val x: String? = if b { "a" } else { null }` adopt the expected type instead of
+  failing on the branches' widened join ([#247]).
+
 - **A map literal target-types its keys and values.** `Map[String, String?]`,
   `Map[String, Shape]` (mixed record subtypes) and other nullable/supertype map
   annotations are honored instead of failing on the entries' widened join, matching
@@ -469,4 +474,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#244]: https://github.com/onion-lang/onion/issues/244
 [#245]: https://github.com/onion-lang/onion/issues/245
 [#246]: https://github.com/onion-lang/onion/issues/246
+[#247]: https://github.com/onion-lang/onion/issues/247
 [#220]: https://github.com/onion-lang/onion/issues/220

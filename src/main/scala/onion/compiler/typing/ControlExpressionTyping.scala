@@ -75,7 +75,7 @@ final class ControlExpressionTyping(
       }
     }
 
-  def typeIfExpression(node: AST.IfExpression, context: LocalContext): Option[Term] = boundary {
+  def typeIfExpression(node: AST.IfExpression, context: LocalContext, expected: Type = null): Option[Term] = boundary {
     context.openScope {
       val conditionRaw = typed(node.condition, context).getOrElse(break(None))
       val condition = ensureBoolean(node.condition, conditionRaw)
@@ -106,8 +106,19 @@ final class ControlExpressionTyping(
         }
         context.restoreNarrowings(savedNarrowings)
 
-        val resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
+        var resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
         if (resultType == null) break(None)
+
+        // Target-type the branches: if their join is wider than the expected type
+        // (e.g. distinct subtypes join to Object) but each branch fits the expected
+        // type, adopt it, so `val e: Event = if b { new Click() } else { new Key() }`
+        // produces an Event rather than an unassignable Object.
+        if (expected != null && !expected.isBottomType && expected != BasicType.VOID
+            && !TypeRules.isAssignable(expected, resultType)
+            && TypeRules.isAssignable(expected, thenTerm.`type`)
+            && TypeRules.isAssignable(expected, elseTerm.`type`)) {
+          resultType = expected
+        }
 
         if (resultType.isBottomType || resultType == BasicType.VOID) {
           val thenStmt = termToStatement(node.thenBlock, thenTerm)

@@ -47,9 +47,10 @@ private[compiler] final class StaticMethodCallSupport(
     // parameter type is known: resolve the method from the other arguments
     // first, then type the closures against the selected parameter types.
     val untypedClosureIndices = node.args.zipWithIndex.collect {
-      case (closure: AST.ClosureExpression, i) if closure.args.exists(_.typeRef == null) => i
+      case (closure: AST.ClosureExpression, i)
+        if closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure) => i
     }.toSet
-    if (untypedClosureIndices.nonEmpty && node.typeArgs.isEmpty) {
+    if (untypedClosureIndices.nonEmpty) {
       return typeStaticCallWithBidirectionalInference(node, typeRef, context, expected, untypedClosureIndices)
     }
 
@@ -183,8 +184,23 @@ private[compiler] final class StaticMethodCallSupport(
 
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     val nonClosureParams = preliminaryParams.filter(_ != null)
-    val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(
-      typing, node, method, nonClosureParams, classSubst, expected
+    // With explicit type arguments (Future::async[String](...)), the closure's
+    // expected parameter type is pinned by those arguments rather than inferred
+    // from the other call arguments. Feeding them in here lets a throw-only
+    // closure body be typed against Function0[String] instead of being widened
+    // to Function0[Object] (issue #233).
+    val explicitMethodSubst: Option[scala.collection.immutable.Map[String, Type]] =
+      if (node.typeArgs.isEmpty) None
+      else GenericMethodTypeArguments.explicit(typing, node, method, node.typeArgs, classSubst) match {
+        case some @ Some(_) => some
+        // Explicit type arguments were supplied but are invalid (arity/bound
+        // mismatch); `explicit` has already reported the error, so abort.
+        case None => return None
+      }
+    val preliminaryMethodSubst = explicitMethodSubst.getOrElse(
+      GenericMethodTypeArguments.inferWithoutDefaults(
+        typing, node, method, nonClosureParams, classSubst, expected
+      )
     )
     val preliminaryExpectedArgs = method.arguments.map { argType =>
       TypeSubstitution.substituteType(argType, classSubst, preliminaryMethodSubst, defaultToBound = false)
@@ -206,7 +222,8 @@ private[compiler] final class StaticMethodCallSupport(
     }
     if (hasError) return None
 
-    val finalMethodSubst = GenericMethodTypeArguments.infer(typing, node, method, finalParams, classSubst, expected)
+    val finalMethodSubst = explicitMethodSubst.getOrElse(
+      GenericMethodTypeArguments.infer(typing, node, method, finalParams, classSubst, expected))
     val finalExpectedArgs = TypeSubst.args(method, classSubst, finalMethodSubst)
 
     for {

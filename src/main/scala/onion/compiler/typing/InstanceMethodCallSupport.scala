@@ -221,7 +221,7 @@ private[compiler] final class InstanceMethodCallSupport(
   }
 
   private def hasUntypedParams(closure: AST.ClosureExpression): Boolean =
-    closure.args.exists(_.typeRef == null)
+    closure.args.exists(_.typeRef == null) || ClosureBodyAnalysis.neverReturnsNormally(closure)
 
   private def isClosureWithUntypedParams(expr: AST.Expression): Boolean =
     expr match {

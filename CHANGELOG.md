@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A throw-only lambda no longer forces an Object element type.**
+  `val f: Future[String] = Future::async(() -> { throw ... })` infers `Future[String]`
+  (the closure is routed through bidirectional inference so the expected type pins the
+  type variable) instead of `Future[Object]` ([#233]).
+
 - **Compound assignment evaluates an indexed target's sub-expressions once.**
   `a[idx()] += v` now runs `idx()` (and the receiver) exactly once, instead of twice
   (read + write); the array/index are bound to temps ([#249]).
@@ -506,6 +511,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#231]: https://github.com/onion-lang/onion/issues/231
 [#242]: https://github.com/onion-lang/onion/issues/242
 [#249]: https://github.com/onion-lang/onion/issues/249
+[#233]: https://github.com/onion-lang/onion/issues/233
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235
 [#236]: https://github.com/onion-lang/onion/issues/236

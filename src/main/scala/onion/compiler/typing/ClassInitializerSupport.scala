@@ -33,6 +33,10 @@ private[compiler] final class ClassInitializerSupport(
   def injectInstanceInitializers(classDef: ClassDefinition, initializers: Seq[ActionStatement]): Unit = {
     if initializers.isEmpty then return
     classDef.constructors.foreach {
+      // A constructor that delegates to a sibling via `: this(...)` must NOT run
+      // instance field initializers itself; the ultimately-invoked constructor
+      // (the one calling super) runs them. Otherwise fields double-initialize.
+      case ctor: ConstructorDefinition if ctor.superInitializer != null && ctor.superInitializer.selfDelegation => ()
       case ctor: ConstructorDefinition =>
         val existing = Option(ctor.block).map(_.statements.toIndexedSeq).getOrElse(Seq.empty)
         val combined = (initializers ++ existing).toArray

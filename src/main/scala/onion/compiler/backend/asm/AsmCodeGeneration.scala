@@ -184,10 +184,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         emitExpressionWithContext(gen, arg, className, localVars)
         adaptValueOnStack(gen, arg.`type`, asmType(ctor.superInitializer.arguments(i)))
         i += 1
-      val superClass = if ctor.classType.superClass != null then AsmUtil.internalName(ctor.classType.superClass.name) else "java/lang/Object"
+      val targetClass =
+        if ctor.superInitializer.selfDelegation then AsmUtil.internalName(ctor.classType.name)
+        else if ctor.classType.superClass != null then AsmUtil.internalName(ctor.classType.superClass.name)
+        else "java/lang/Object"
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)
       gen.invokeConstructor(
-        AsmUtil.objectType(superClass),
+        AsmUtil.objectType(targetClass),
         AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, superArgTypes*))
       )
     else

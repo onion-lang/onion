@@ -1346,7 +1346,7 @@ AST.ClassDeclaration class_decl(int mset) : {
       List<AST.Expression> superInits = superArgs != null ? superArgs : (List<AST.Expression>)AST.NIL();
       append(members, new AST.ConstructorDeclaration(
         p(t1), 0, toList(ctorArgs), superInits,
-        new AST.BlockExpression(p(t1), toList(assigns))
+        new AST.BlockExpression(p(t1), toList(assigns)), false
       ));
       append(sec2s, new AST.AccessSection(p(t1), AST.M_PUBLIC(), toList(members)));
     }
@@ -1495,9 +1495,13 @@ AST.ConstructorDeclaration constructor_decl(int mset) : {
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   List<AST.Expression> params = (List<AST.Expression>)AST.NIL();
   AST.BlockExpression block;
+  boolean selfDelegation = false;
 }{
-  "def" t="this" ["(" args = args() ")"] [":" "(" params = terms() ")"] block = block() {
-    return new AST.ConstructorDeclaration(p(t), mset, args, params, block);
+  "def" t="this" ["(" args = args() ")"]
+  [":" ( "this" "(" params = terms() ")" { selfDelegation = true; }
+       | "(" params = terms() ")" )]
+  block = block() {
+    return new AST.ConstructorDeclaration(p(t), mset, args, params, block, selfDelegation);
   }
 }
 

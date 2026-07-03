@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Same-class constructor delegation.** `def this(x: Int) : this(x, 0) { ... }` delegates
+  to another constructor of the same class (in addition to the `: (args)` super-init form);
+  field initializers run once, via the ultimately-invoked constructor ([#212]).
+
 - **A class can implement a generic interface with itself as the type argument.**
   `class Ver <: Comparable[Ver]` (the natural-ordering pattern) no longer fails with
   E0000 — an unbounded type parameter accepts any reference-type argument without
@@ -497,4 +501,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#250]: https://github.com/onion-lang/onion/issues/250
 [#251]: https://github.com/onion-lang/onion/issues/251
 [#252]: https://github.com/onion-lang/onion/issues/252
+[#212]: https://github.com/onion-lang/onion/issues/212
 [#220]: https://github.com/onion-lang/onion/issues/220

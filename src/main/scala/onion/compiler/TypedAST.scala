@@ -919,7 +919,7 @@ object TypedAST {
     }
   }
 
-  class Super(val classType: TypedAST.ClassType, val arguments: Array[TypedAST.Type], val terms: Array[TypedAST.Term]) extends Node
+  class Super(val classType: TypedAST.ClassType, val arguments: Array[TypedAST.Type], val terms: Array[TypedAST.Term], val selfDelegation: Boolean = false) extends Node
 
   class Synchronized(location: Location, val term: TypedAST.Term, val statement: TypedAST.ActionStatement)  extends ActionStatement(location) {
     def this(term: TypedAST.Term, statement: TypedAST.ActionStatement) = {

@@ -77,14 +77,14 @@ private[compiler] final class MethodBodySupport(
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
       val params = typedTerms(node.superInits.toArray, context)
-      val superClass = bodyContext.definition.superClass
-      val matched = superClass.findConstructor(params)
+      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
+      val matched = targetClass.findConstructor(params)
       if matched.length == 0 then
-        bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, superClass, termTypes(params), superClass.constructors)
+        bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
       else if matched.length > 1 then
-        bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](superClass, termTypes(params)), Array[AnyRef](superClass, termTypes(params)))
+        bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
       else
-        val init = new Super(superClass, matched(0).getArgs, params)
+        val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
         finishConstructorBody(constructor, init, node.block, context)
       reportConstructorOnly(context)
     }

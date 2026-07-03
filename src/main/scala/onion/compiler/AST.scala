@@ -308,7 +308,7 @@ object AST {
   }
   case class FieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends MemberDeclaration
   case class DelegatedFieldDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression) extends MemberDeclaration
-  case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockExpression) extends MemberDeclaration {val name = "new" }
+  case class ConstructorDeclaration(location: Location, modifiers: Int, args: List[Argument], superInits: List[Expression], block: BlockExpression, selfDelegation: Boolean = false) extends MemberDeclaration {val name = "new" }
 
   case class AccessSection(location: Location, modifiers: Int, members: List[MemberDeclaration]) extends Node
   abstract sealed class TypeDeclaration extends Toplevel { def modifiers: Int; def name: String }

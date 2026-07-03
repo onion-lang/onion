@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `xs.forEach((s) -> ...)` on a `List[String]` gives `s: String` (the interface's type
   argument), instead of `Object` ([#232]).
 
+- **A generic call in argument position infers its type arguments from the parameter type.**
+  `take(Result::ok(7))` where `take` expects `Result[Integer, String]` now pins the
+  argument to `Result[Integer, String]` (the error type E is inferred from the expected
+  parameter type) instead of failing as `Result[Int, Object]`. When resolution finds no
+  applicable method, a malleable argument (a generic static/unqualified call, or a
+  collection literal) is re-typed against the single candidate's parameter types and
+  resolution is retried ([#232]).
+
 - **An `as` cast between erasure-compatible generic types is allowed.**
   `List[String] as List[Object]` (same raw type under erasure) casts through as Java's
   unchecked cast, instead of E0000 ([#231]).

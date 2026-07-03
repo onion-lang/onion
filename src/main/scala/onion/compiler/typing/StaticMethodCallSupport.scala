@@ -54,8 +54,8 @@ private[compiler] final class StaticMethodCallSupport(
       return typeStaticCallWithBidirectionalInference(node, typeRef, context, expected, untypedClosureIndices)
     }
 
-    val parameters = calls.typedTerms(node.args.toArray, context)
-    if (parameters == null) {
+    val parameters0 = calls.typedTerms(node.args.toArray, context)
+    if (parameters0 == null) {
       None
     } else {
       // Both the explicit-type-argument and the inferred cases go through the
@@ -65,17 +65,31 @@ private[compiler] final class StaticMethodCallSupport(
       val candidates = new JTreeSet[Method](new MethodComparator)
       calls.collectMethodsMatching(typeRef, node.name, candidates, calls.isStaticMethod)
       if (candidates.isEmpty) {
-        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters))
+        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters0))
         return None
       }
 
-      val applicable = overloadSupport.collectStaticApplicables(
+      val applicable0 = overloadSupport.collectStaticApplicables(
         typeRef,
         candidates.asScala,
         node,
-        parameters,
+        parameters0,
         expected
       )
+
+      // When no candidate applies, an argument that is a generic call may have
+      // left its type parameters unbound (-> Object). Re-type such arguments
+      // against the single candidate's parameter types so the expected type
+      // pins them, then retry the applicability check (issue #232).
+      val (parameters, applicable) =
+        if (applicable0.isEmpty)
+          calls.retypeArgumentsForExpected(typeRef, node.name, node.args, parameters0, context, calls.isStaticMethod, typeRef) match {
+            case Some(newParams) =>
+              val reapplicable = overloadSupport.collectStaticApplicables(typeRef, candidates.asScala, node, newParams, expected)
+              if (reapplicable.nonEmpty) (newParams, reapplicable) else (parameters0, applicable0)
+            case None => (parameters0, applicable0)
+          }
+        else (parameters0, applicable0)
 
       def finalizeSelection(selected: ApplicableMethod): Option[Term] = {
         if (!ensureStaticMethodAccessible(node, selected.method)) return None

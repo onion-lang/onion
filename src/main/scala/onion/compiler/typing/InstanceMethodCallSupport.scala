@@ -38,7 +38,7 @@ private[compiler] final class InstanceMethodCallSupport(
     node: AST.MethodCall,
     target: Term,
     targetType: ObjectType,
-    params: Array[Term],
+    params0: Array[Term],
     context: LocalContext,
     expected: Type = null
   ): Option[Term] = {
@@ -56,14 +56,29 @@ private[compiler] final class InstanceMethodCallSupport(
       }
     }
 
-    if (params == null) {
+    if (params0 == null) {
       val untypedClosureIndices = node.args.zipWithIndex.collect {
         case (expr, i) if isClosureWithUntypedParams(expr) => i
       }.toSet
       return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
     }
 
-    val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
+    val methods0 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+
+    // When no method applies, an argument that is a generic call (e.g.
+    // `Result::ok(11)`) may have left its type parameters unbound (-> Object).
+    // Re-type such arguments against the single candidate's parameter types so
+    // the expected type pins them, then retry resolution (issue #232).
+    val (params, methods) =
+      if (methods0.length == 0)
+        calls.retypeArgumentsForExpected(targetType, name, node.args, params0, context, calls.isInstanceMethod, target.`type`) match {
+          case Some(newParams) =>
+            val remethods = MethodResolution.findMethods(targetType, name, newParams, bodyContext.table)
+            if (remethods.length > 0) (newParams, remethods) else (params0, methods0)
+          case None => (params0, methods0)
+        }
+      else (params0, methods0)
+
     if (methods.length == 0) {
       val closureIndices = node.args.zipWithIndex.collect {
         case (expr, i) if expr.isInstanceOf[AST.ClosureExpression] => i

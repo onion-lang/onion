@@ -25,6 +25,24 @@ final class MethodCallTyping(
   private val staticMethodCallSupport = new StaticMethodCallSupport(typing, this)
   private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(bodyContext, this)
   private val superMethodCallSupport = new SuperMethodCallSupport(bodyContext, this)
+  private val argumentRetyping = new ArgumentExpectedTypeRetyping(typing, this)
+
+  /**
+   * Re-type "malleable" arguments (a generic static/unqualified call or a
+   * collection literal) against a uniquely-determined candidate's parameter
+   * types, so a generic call in argument position pins its type arguments from
+   * the expected type (issue #232). Returns updated params only on a change.
+   */
+  private[typing] def retypeArgumentsForExpected(
+    sourceType: ObjectType,
+    name: String,
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    context: LocalContext,
+    filter: Method => Boolean,
+    receiverType: Type = null
+  ): Option[Array[Term]] =
+    argumentRetyping.retypeArguments(sourceType, name, args, params, context, filter, receiverType)
 
   /** Select a single method, reporting errors if none found or ambiguous */
   private[typing] def selectSingleMethod(

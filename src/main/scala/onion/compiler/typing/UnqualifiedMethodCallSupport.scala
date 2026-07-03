@@ -45,10 +45,30 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       return typeUnqualifiedMethodCallWithNamedArgs(node, context, expected)
     }
 
-    val params = calls.typedTerms(node.args.toArray, context)
-    if (params == null) return None
+    val params0 = calls.typedTerms(node.args.toArray, context)
+    if (params0 == null) return None
     val targetType = bodyContext.definition
-    val methods = MethodResolution.findMethods(targetType, node.name, params, bodyContext.table)
+    val methods0 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
+
+    // When no method applies, an argument that is a generic call (e.g.
+    // `Result::ok(7)`) may have left its type parameters unbound (-> Object).
+    // Re-type such arguments against the single candidate's parameter types so
+    // the expected type pins them, then retry resolution (issue #232).
+    val (params, methods) =
+      if (methods0.length == 0) {
+        val topLevel = bodyContext.topLevelClass.filter(t => !(t eq targetType))
+        val retyped =
+          calls.retypeArgumentsForExpected(targetType, node.name, node.args, params0, context, _ => true)
+            .orElse(topLevel.flatMap(top =>
+              calls.retypeArgumentsForExpected(top, node.name, node.args, params0, context, m => (m.modifier & AST.M_STATIC) != 0)))
+        retyped match {
+          case Some(newParams) =>
+            val remethods = MethodResolution.findMethods(targetType, node.name, newParams, bodyContext.table)
+            if (remethods.length > 0) (newParams, remethods) else (newParams, methods0)
+          case None => (params0, methods0)
+        }
+      } else (params0, methods0)
+
     if (methods.length == 0) {
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
         case MethodFallbackLookup.Found(term) =>

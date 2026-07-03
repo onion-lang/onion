@@ -95,7 +95,27 @@ private[compiler] final class SimpleExpressionTypingSupport(
       case BIT_SHIFT_R3 => new AST.LogicalRightShift(node.location, lhs, rhs)
       case _ => throw new IllegalArgumentException(s"Invalid compound assignment operator: $binaryKind")
     }
-    typeAssignment(new AST.Assignment(node.location, lhs, binaryOp), context)
+    // Java compound-assignment narrowing: `E1 op= E2` is `E1 = (T)(E1 op E2)`. For a
+    // byte/short/char local target insert the implicit cast so `b += 5` type-checks
+    // (b + 5 widens to int, which would not fit the narrower target otherwise). The
+    // type is read from the binding directly, so no extra typing / duplicate errors;
+    // field/array/map targets are not covered here.
+    val narrowKind: AST.PrimitiveTypeKind = lhs match {
+      case id: AST.Id =>
+        val bind = context.lookup(id.name)
+        if (bind == null) null
+        else bind.tp match {
+          case BasicType.BYTE => AST.K_BYTE
+          case BasicType.SHORT => AST.K_SHORT
+          case BasicType.CHAR => AST.K_CHAR
+          case _ => null
+        }
+      case _ => null
+    }
+    val value: AST.Expression =
+      if (narrowKind != null) new AST.Cast(node.location, binaryOp, new AST.TypeNode(node.location, new AST.PrimitiveType(narrowKind), false))
+      else binaryOp
+    typeAssignment(new AST.Assignment(node.location, lhs, value), context)
   }
 
   /** The element type of an expected `List[E]`, or null if `expected` is not one. */

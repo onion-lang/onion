@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Compound assignment narrows for a byte/short/char local.** `b += 5` on a
+  `Byte`/`Short`/`Char` local now type-checks (Java's `E1 = (T)(E1 op E2)`); a plain
+  assignment still needs an explicit cast ([#250]).
+
 - **Compiler crash fixed: `++`/`--` on a Long/Double/Float lvalue.** The
   increment literal now matches the operand type instead of always being an `int`
   (which crashed codegen). `++`/`--` also work on array elements (`a[i]++`),
@@ -481,4 +485,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#246]: https://github.com/onion-lang/onion/issues/246
 [#247]: https://github.com/onion-lang/onion/issues/247
 [#248]: https://github.com/onion-lang/onion/issues/248
+[#250]: https://github.com/onion-lang/onion/issues/250
 [#220]: https://github.com/onion-lang/onion/issues/220

@@ -1376,9 +1376,16 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
-  ] "{"
-    (signature = interface_method_decl() {append(signatures, signature); })*
-  "}" [";"] {
+  ]
+  // Body optional, mirroring class_decl: `interface Marker`, `interface Marker;`,
+  // and `interface Marker { ... }` all parse (a bare marker interface used to be a
+  // syntax error even though a bare class was allowed).
+  ( "{"
+      (signature = interface_method_decl() {append(signatures, signature); })*
+    "}" [";"]
+  | ";"
+  | LOOKAHEAD({getToken(1).kind != LBRACE}) {}
+  ) {
     return new AST.InterfaceDeclaration(
       p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
     );

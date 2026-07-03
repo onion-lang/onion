@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A bodyless interface parses**, like a bodyless class already did:
+  `interface Marker`, `interface Marker;`, and `sealed interface Shape` (with the
+  subtypes declared separately) no longer require an empty `{}` ([#240]).
+
 - **A unary-minus right operand of `*`, `/`, `%` parses.** `7 * -3`, `7 / -3`,
   `7 % -3` were syntax errors (only `+`/`-` accepted one); left-associativity and
   precedence are unchanged ([#239]).
@@ -434,4 +438,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#237]: https://github.com/onion-lang/onion/issues/237
 [#238]: https://github.com/onion-lang/onion/issues/238
 [#239]: https://github.com/onion-lang/onion/issues/239
+[#240]: https://github.com/onion-lang/onion/issues/240
 [#220]: https://github.com/onion-lang/onion/issues/220

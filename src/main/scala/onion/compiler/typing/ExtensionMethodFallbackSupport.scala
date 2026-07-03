@@ -13,11 +13,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
-    expected: Type
+    expected: Type,
+    reportIfNotFound: Boolean = true
   ): Option[Term] = {
     selectApplicableExtensionMethod(targetType, node.name, params) match {
       case CandidateSelection.NoMatch =>
-        calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
+        // reportIfNotFound is false when the caller has a further fallback to try
+        // (e.g. a bean-property getter) and will report the error itself if that fails.
+        if (reportIfNotFound) calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
         None
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousSignature(

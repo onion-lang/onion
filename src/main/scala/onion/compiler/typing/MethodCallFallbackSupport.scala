@@ -19,9 +19,10 @@ private[compiler] final class MethodCallFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
-    expected: Type
+    expected: Type,
+    reportIfNotFound: Boolean = true
   ): Option[Term] =
-    extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected)
+    extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
   def typeMethodCallWithBidirectionalInference(
     node: AST.MethodCall,

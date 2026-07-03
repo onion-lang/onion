@@ -71,7 +71,32 @@ private[compiler] final class InstanceMethodCallSupport(
       if (closureIndices.nonEmpty) {
         return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, closureIndices)
       }
-      return fallback.tryExtensionMethodCall(node, target, targetType, params, expected)
+      // Resolution order for an unmatched call: extension methods first (a
+      // user-declared extension wins), then a bean-property getter as a last
+      // resort. The getter fallback lets `e.message()` resolve to getMessage() like
+      // `e.message` does, so parens are optional on property accessors too.
+      val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
+      if (ext.isDefined) return ext
+      if (params != null && params.length == 0) {
+        val getters = {
+          val g = MethodResolution.findMethods(targetType, calls.getter(name), params, bodyContext.table)
+          if (g.length > 0) g else MethodResolution.findMethods(targetType, calls.getterBoolean(name), params, bodyContext.table)
+        }
+        if (getters.length > 0) {
+          calls.selectSingleMethod(node, targetType, name, getters, calls.types(params)) match {
+            case Some(getter) if (getter.modifier & AST.M_STATIC) == 0 =>
+              val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, getter.affiliation)
+              return calls.buildResolvedCall(node, getter, params, node.typeArgs, classSubst, expected)(
+                expectedArgs => calls.prepareCallParams(node, node.args, getter, params, expectedArgs),
+                finalParams => new Call(target, getter, finalParams)
+              )
+            case _ => // no usable getter
+          }
+        }
+      }
+      // Nothing matched: report not-found (extension fallback was silent above).
+      calls.reportMethodNotFound(node, targetType, name, calls.types(params))
+      return None
     }
 
     calls.selectSingleMethod(node, targetType, name, methods, calls.types(params)) match {

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A bean-property accessor is callable with parens.** `e.message()` resolves to
+  `getMessage()` like `e.message` already did (parens optional on property
+  accessors, as on no-arg methods); a same-named user extension still wins
+  (method > extension > getter) ([#244]).
+
 - **Compiler crash fixed: `!!` inside a lambda.** A non-null assertion in a
   closure body crashed codegen (I0000); the closure's captured-variable collector
   now handles it. This also unblocks a type-class method used inside a lambda in a
@@ -451,4 +456,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#240]: https://github.com/onion-lang/onion/issues/240
 [#241]: https://github.com/onion-lang/onion/issues/241
 [#243]: https://github.com/onion-lang/onion/issues/243
+[#244]: https://github.com/onion-lang/onion/issues/244
 [#220]: https://github.com/onion-lang/onion/issues/220

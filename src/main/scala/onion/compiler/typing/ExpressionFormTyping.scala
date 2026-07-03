@@ -157,7 +157,20 @@ final class ExpressionFormTyping(
       case (ct: ClassType, bt: BasicType) =>
         (Boxing.boxedType(bodyContext.table, bt) eq ct) || (ct eq bodyContext.rootClass) || ct.isInstanceOf[TypeVariableType]
       case (ct: ClassType, dt: ClassType) =>
-        TypeRules.isSuperType(dt, ct) || TypeRules.isSuperType(ct, dt) || ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType]
+        // Generics are erasure-based, so a cast between two parameterizations of
+        // erasure-compatible raw classes (e.g. `List[String] as List[Object]`) is
+        // valid: at runtime both are the same raw type, and the checkcast targets
+        // the erased class. Comparing the raw erasures lets such casts through even
+        // though invariant type arguments make neither applied type a supertype of
+        // the other (Java allows this as an unchecked cast).
+        def erasure(t: ClassType): ClassType = t match {
+          case a: AppliedClassType => a.raw
+          case _ => t
+        }
+        TypeRules.isSuperType(dt, ct) || TypeRules.isSuperType(ct, dt) ||
+          TypeRules.isSuperType(erasure(dt), erasure(ct)) ||
+          TypeRules.isSuperType(erasure(ct), erasure(dt)) ||
+          ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType]
       case (bt1: BasicType, bt2: BasicType) =>
         (bt1 eq bt2) || (isNumericBasic(bt1) && isNumericBasic(bt2))
       case _ => true

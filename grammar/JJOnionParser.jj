@@ -2163,11 +2163,24 @@ AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
   e1=primary_suffix()
 ( LOOKAHEAD(2)
-  ( t="*" eols() e2=primary_suffix()  {e1 = new AST.Multiplication(p(t), e1, e2);}
-  | t="/" eols() e2=primary_suffix()  {e1 = new AST.Division(p(t), e1, e2);}
-  | t="%" eols() e2=primary_suffix()  {e1 = new AST.Modulo(p(t), e1, e2);}
+  ( t="*" eols() e2=mul_operand()  {e1 = new AST.Multiplication(p(t), e1, e2);}
+  | t="/" eols() e2=mul_operand()  {e1 = new AST.Division(p(t), e1, e2);}
+  | t="%" eols() e2=mul_operand()  {e1 = new AST.Modulo(p(t), e1, e2);}
   )
 )* {return e1;}
+}
+
+// The right operand of *, /, % — a primary_suffix optionally prefixed with a
+// unary operator, so `a * -b` / `7 % -3` parse (additive already allows this via
+// unary_prefix; the multiplicative operand previously did not). It bottoms out at
+// primary_suffix rather than recursing to multitive, keeping *, /, % left-associative.
+AST.Expression mul_operand() :{Token t; AST.Expression e;}{
+( t="+" e=mul_operand() {e = new AST.Posit(p(t), e);}
+| t="-" e=mul_operand() {e = new AST.Negate(p(t), e);}
+| t="!" e=mul_operand() {e = new AST.Not(p(t), e);}
+| t=<BN> e=mul_operand() {e = new AST.BitNot(p(t), e);}
+| e=primary_suffix()
+) {return e;}
 }
 
 AST.Expression primary_suffix() : {

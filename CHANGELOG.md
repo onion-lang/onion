@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A unary-minus right operand of `*`, `/`, `%` parses.** `7 * -3`, `7 / -3`,
+  `7 % -3` were syntax errors (only `+`/`-` accepted one); left-associativity and
+  precedence are unchanged ([#239]).
+
 - **Miscompile fixed: `synchronized` + non-local exit.** A `return`/`break`/`continue`
   out of a `synchronized` body now releases the monitor (it used to leak it and
   throw `IllegalMonitorStateException`); a synchronized body that always returns is
@@ -429,4 +433,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#236]: https://github.com/onion-lang/onion/issues/236
 [#237]: https://github.com/onion-lang/onion/issues/237
 [#238]: https://github.com/onion-lang/onion/issues/238
+[#239]: https://github.com/onion-lang/onion/issues/239
 [#220]: https://github.com/onion-lang/onion/issues/220

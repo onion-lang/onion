@@ -81,6 +81,70 @@ private[compiler] final class SimpleExpressionTypingSupport(
     binaryKind: BinaryKind,
     context: LocalContext
   ): Option[Term] = {
+    lhs match {
+      case indexing: AST.Indexing =>
+        // `a[i] op= v` lowers to `a[i] = a[i] op v`, which mentions the receiver
+        // and index expressions twice -- a side-effecting index (`a[next()] += 1`)
+        // or receiver must run exactly once. Evaluate both into fresh temps up
+        // front and rewrite the target to index those temps, so the read and the
+        // write both go through side-effect-free local reads. All the existing
+        // binary-op / assignment / narrowing logic is reused unchanged on the
+        // rewritten (temp-indexed) target.
+        typeBinaryAssignmentIndexing(node, indexing, rhs, binaryKind, context) match {
+          case Some(term) => return Some(term)
+          case None => // fall through to the plain lowering (e.g. typing failed)
+        }
+      case _ =>
+    }
+    typeBinaryAssignmentSimple(node, lhs, rhs, binaryKind, context)
+  }
+
+  /**
+   * Lower `a[i] op= v` without duplicating the receiver/index sub-expressions:
+   * bind `a` and `i` to temps (evaluated once), then reuse the normal lowering on
+   * `tmpArr[tmpIdx] op= v`. Returns None when typing the receiver or index fails,
+   * so the caller can fall back to the plain path (which will re-report).
+   */
+  private def typeBinaryAssignmentIndexing(
+    node: AST.Expression,
+    indexing: AST.Indexing,
+    rhs: AST.Expression,
+    binaryKind: BinaryKind,
+    context: LocalContext
+  ): Option[Term] = {
+    val target = typed(indexing.lhs, context, null).getOrElse(null)
+    if (target == null) return None
+    val index = typed(indexing.rhs, context, null).getOrElse(null)
+    if (index == null) return None
+
+    val arrName = context.newName
+    val arrVar = context.add(arrName, target.`type`)
+    val idxName = context.newName
+    val idxVar = context.add(idxName, index.`type`)
+
+    val loc = node.location
+    val tmpArr = AST.Id(loc, arrName)
+    val tmpIdx = AST.Id(loc, idxName)
+    val rewritten = AST.Indexing(indexing.location, tmpArr, tmpIdx)
+
+    typeBinaryAssignmentSimple(node, rewritten, rhs, binaryKind, context) match {
+      case Some(assign) =>
+        Some(new Begin(Array[Term](
+          new SetLocal(0, arrVar, target.`type`, target),
+          new SetLocal(0, idxVar, index.`type`, index),
+          assign
+        )))
+      case None => None
+    }
+  }
+
+  private def typeBinaryAssignmentSimple(
+    node: AST.Expression,
+    lhs: AST.Expression,
+    rhs: AST.Expression,
+    binaryKind: BinaryKind,
+    context: LocalContext
+  ): Option[Term] = {
     val binaryOp = binaryKind match {
       case ADD => new AST.Addition(node.location, lhs, rhs)
       case SUBTRACT => new AST.Subtraction(node.location, lhs, rhs)

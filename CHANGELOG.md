@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Compound assignment evaluates an indexed target's sub-expressions once.**
+  `a[idx()] += v` now runs `idx()` (and the receiver) exactly once, instead of twice
+  (read + write); the array/index are bound to temps ([#249]).
+
 - **A self-referential F-bound is accepted.** `class C[T extends C[T]]` (the CRTP /
   recursive self-bound pattern) no longer fails with E0030 — a generic type's arity is
   registered before its own bounds are resolved; the bound is still enforced ([#242]).
@@ -501,6 +505,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#229]: https://github.com/onion-lang/onion/issues/229
 [#231]: https://github.com/onion-lang/onion/issues/231
 [#242]: https://github.com/onion-lang/onion/issues/242
+[#249]: https://github.com/onion-lang/onion/issues/249
 [#234]: https://github.com/onion-lang/onion/issues/234
 [#235]: https://github.com/onion-lang/onion/issues/235
 [#236]: https://github.com/onion-lang/onion/issues/236

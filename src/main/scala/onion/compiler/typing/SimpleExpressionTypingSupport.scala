@@ -149,10 +149,13 @@ private[compiler] final class SimpleExpressionTypingSupport(
         if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
         // Target-type the literal: if every element fits the expected element type,
         // adopt it, so `val xs: List[String?] = ["a", null]` builds a List[String?]
-        // instead of a List[String] that then fails to assign. Sound because a
-        // literal creates a fresh list of that element type (unlike an `as` cast).
+        // and `val es: List[Event] = [new Click(..), new Key(..)]` builds a
+        // List[Event] rather than a List of the elements' widened join (which for
+        // distinct subtypes is Object and then fails to assign). Checking each
+        // element (not their join) is what makes the mixed-subtype case work; it is
+        // sound because a literal creates a fresh list of that element type.
         // (Nullable-primitive element types like List[Int?] are not covered here.)
-        else if (expectedElem != null && TypeRules.isAssignable(expectedElem, elementType)) expectedElem
+        else if (expectedElem != null && typedElements.forall(t => TypeRules.isAssignable(expectedElem, t.`type`))) expectedElem
         else elementType
       val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
       Some(new ListLiteral(typedElements, listType))

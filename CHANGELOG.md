@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A list literal of mixed subtypes target-types to the expected supertype.**
+  `val es: List[Event] = [new Click(..), new Key(..)]` builds a `List[Event]`
+  instead of failing as `List[Object]` (the check now considers each element, not
+  their widened join) ([#245]).
+
 - **A bean-property accessor is callable with parens.** `e.message()` resolves to
   `getMessage()` like `e.message` already did (parens optional on property
   accessors, as on no-arg methods); a same-named user extension still wins
@@ -457,4 +462,5 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [#241]: https://github.com/onion-lang/onion/issues/241
 [#243]: https://github.com/onion-lang/onion/issues/243
 [#244]: https://github.com/onion-lang/onion/issues/244
+[#245]: https://github.com/onion-lang/onion/issues/245
 [#220]: https://github.com/onion-lang/onion/issues/220

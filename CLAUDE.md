@@ -167,6 +167,8 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 
 **Base Class:** Tests extend `AbstractShellSpec` for integration testing
 
+**Locale-independence (IMPORTANT):** error messages are bilingual (`errorMessage.properties` / `errorMessage_ja.properties`), resolved from the JVM default locale. The release CI runs in an **English** locale while local dev is often `ja_JP`. Assert on error **codes** (`E0002`, `E0069`), `Shell.Failure(-1)`, or locale-agnostic substrings — never on localized message text like `"重複"` alone, or the test passes locally but fails only in CI. Run `sbt -Duser.language=en test` before release to catch this.
+
 **Test Suites:**
 - `HelloWorldSpec.scala` - Basic output
 - `FactorialSpec.scala` - Recursion

@@ -7,6 +7,8 @@ Onion provides `Option` and `Result` types for explicit, composable error handli
 `Option[T]` represents a value that may be absent.
 
 ```onion
+record User(id: Int, name: String)
+
 def findUser(id: Int): Option[User] {
   if id > 0 {
     return Option::some(new User(id, "Alice"))
@@ -79,6 +81,13 @@ def nonEmpty(value: String): Option[String] {
   return Option::none()
 }
 
+def optionToResult(opt: Option[String], error: String): Result[String, String] {
+  if opt.isEmpty() {
+    return Result::err(error)
+  }
+  return Result::ok(opt.get())
+}
+
 def parseAge(raw: String): Result[Int, String] {
   try {
     val age = JInteger::parseInt(raw)
@@ -108,8 +117,22 @@ def validateDo(input: UserInput): Result[UserInput, String] {
   }
 }
 
+def formatResult(r: Result[UserInput, String]): String {
+  if r.isOk() {
+    val u = r.get()
+    return "OK(" + u.name() + ", " + u.age() + ", " + u.email() + ")"
+  }
+  return "ERR(" + r.getError() + ")"
+}
+
 val good = new UserInput("Alice", "30", "alice@example.com")
+val noName = new UserInput("", "30", "alice@example.com")
+val badAge = new UserInput("Alice", "abc", "alice@example.com")
+val badEmail = new UserInput("Alice", "30", "not-an-email")
 println(formatResult(validateDo(good)))
+println(formatResult(validateDo(noName)))
+println(formatResult(validateDo(badAge)))
+println(formatResult(validateDo(badEmail)))
 ```
 
 Output:

@@ -67,12 +67,47 @@ private[compiler] final class SimpleExpressionTypingSupport(
       case node: AST.UnqualifiedFieldReference =>
         typeUnqualifiedFieldReference(node, context)
       case node@AST.StringLiteral(loc, value) =>
+        warnSuspiciousInterpolation(loc, value)
         Some(new StringValue(loc, value, bodyContext.load("java.lang.String")))
       case node: AST.NamedArgument =>
         typed(node.value, context, expected)
       case _ =>
         None
     }
+
+  /**
+   * Warn when a plain string literal contains what looks like shell/Kotlin-style
+   * interpolation (`${expr}` or `$identifier`), which Onion emits verbatim -- a
+   * silent footgun for migrators, who expect `#{expr}`. Only a `$` immediately
+   * followed by `{` or a Java identifier-start char triggers this; a lone `$`
+   * (e.g. a price string `"$5"` or a trailing `"cost: $"`) does not. At most one
+   * warning is emitted per literal.
+   */
+  private def warnSuspiciousInterpolation(loc: Location, value: String): Unit = {
+    if (value == null) return
+    val n = value.length
+    var i = 0
+    while (i < n - 1) {
+      if (value.charAt(i) == '$') {
+        val next = value.charAt(i + 1)
+        if (next == '{') {
+          // Show up to the closing brace (or a short prefix) as the snippet.
+          val close = value.indexOf('}', i + 2)
+          val end = if (close >= 0) close + 1 else math.min(i + 8, n)
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+          bodyContext.warningReporter.suspiciousInterpolation(loc, value.substring(i, end))
+          return
+        } else if (Character.isJavaIdentifierStart(next)) {
+          var end = i + 1
+          while (end < n && Character.isJavaIdentifierPart(value.charAt(end))) end += 1
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+          bodyContext.warningReporter.suspiciousInterpolation(loc, value.substring(i, end))
+          return
+        }
+      }
+      i += 1
+    }
+  }
 
   private def typeBinaryAssignment(
     node: AST.Expression,

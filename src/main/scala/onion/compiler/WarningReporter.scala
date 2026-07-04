@@ -89,6 +89,11 @@ class WarningReporter(
     report(WarningCategory.UncheckedCast, location, s"unchecked cast from '$fromType' to '$toType'")
   }
 
+  def suspiciousInterpolation(location: Location, snippet: String): Unit = {
+    report(WarningCategory.SuspiciousInterpolation, location,
+      s"'$snippet' looks like shell/Kotlin-style interpolation but is emitted literally; Onion interpolates with '#{expr}'")
+  }
+
   def getWarnings: Seq[CompileWarning] = warnings.toSeq
 
   def hasWarnings: Boolean = warnings.nonEmpty

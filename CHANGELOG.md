@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A `${expr}` / `$var` in a string literal now warns (W0013).** Shell/Kotlin-style
+  interpolation, which Onion emits verbatim, produces a warning suggesting the `#{}` form
+  instead of being a silent footgun ([#266]).
+
 - **`Int + Boolean` and similar report the offending operand, not a confusing `String`.** When
   `+` cannot add numerically and neither operand is a String, the error names the invalid
   operand type instead of silently concatenating and surfacing a misleading String mismatch ([#265]).
@@ -527,6 +531,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
 [#264]: https://github.com/onion-lang/onion/issues/264
 [#265]: https://github.com/onion-lang/onion/issues/265
+[#266]: https://github.com/onion-lang/onion/issues/266
 [#263]: https://github.com/onion-lang/onion/issues/263
 [#261]: https://github.com/onion-lang/onion/issues/261
 [#257]: https://github.com/onion-lang/onion/issues/257

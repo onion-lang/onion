@@ -201,6 +201,26 @@ final class ConstructionTyping(
     val (constructors, parameters) =
       if (constructors0.nonEmpty) (constructors0, parameters0)
       else findConstructorWithBoxing(typeRef, parameters0)
+    // Guard the substitution-blind exact match: for an applied generic type the
+    // matched constructor must accept the arguments under the type-argument
+    // substitution (T -> String), not merely under the erased bound (Object).
+    // Otherwise `new Box[String](aStringBuilder)` compiled and threw a runtime
+    // ClassCastException — a type-safety hole the instance-method path does not have.
+    val substitutionValid = typeRef match {
+      case applied: TypedAST.AppliedClassType if constructors.length == 1 =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        val formals = constructors(0).getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+        // Only reject on an arity-matched signature; differing arity is handled
+        // by the vararg/default-parameter paths below, so leave it to them.
+        formals.length != parameters.length ||
+          formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, bodyContext.table))
+      case _ => true
+    }
+    if (!substitutionValid) {
+      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
+      return None
+    }
     if (constructors.length == 0) {
       // Default-parameter fallback: a constructor with defaults accepts
       // fewer positional arguments than its signature lists

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic constructor rejects an argument incompatible with the type argument.**
+  `new Box[String](aStringBuilder)` is now a type error instead of compiling and throwing
+  a runtime ClassCastException — the constructor checks arguments under the type-argument
+  substitution, like instance methods do ([#263]).
+
 - **The elvis operator is shown as `?:` in diagnostics.** A type error on `a ?: b` now names
   the operator `?:` instead of the reversed `:?`.
 
@@ -512,6 +517,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#263]: https://github.com/onion-lang/onion/issues/263
 [#261]: https://github.com/onion-lang/onion/issues/261
 [#257]: https://github.com/onion-lang/onion/issues/257
 [#259]: https://github.com/onion-lang/onion/issues/259

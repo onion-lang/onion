@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An unknown declared type no longer cascades `E0002`** through later uses of the variable —
+  the binding is recovered at the initializer's type (error recovery, cf. #257) ([#290]).
+
 - **Nullable `var` smart-cast is flow-sensitive** — a `var` is narrowed in an `if v != null`
   branch even if it is reassigned *after* the branch, and `while ((v = e) != null) { ... }`
   narrows `v` in the loop body. A reassignment before/within the use still blocks it, and a
@@ -578,6 +581,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#290]: https://github.com/onion-lang/onion/issues/290
 [#289]: https://github.com/onion-lang/onion/issues/289
 [#288]: https://github.com/onion-lang/onion/issues/288
 [#286]: https://github.com/onion-lang/onion/issues/286

@@ -65,6 +65,27 @@ class TypeMismatchNoCascadeSpec extends AnyFunSpec {
         s"expected an undefined-variable error, got: $errors")
     }
 
+    it("does not cascade E0002 when the declared type is unknown (#290)") {
+      val errors = errorsOf(
+        """
+          |class Test {
+          |public:
+          |  static def compute(): Int = 42
+          |  static def main(args: String[]): Int {
+          |    val x: Bogus = compute()
+          |    IO::println(x)
+          |    val y: Int = x + 1
+          |    return 0
+          |  }
+          |}
+        """.stripMargin
+      )
+      // Exactly one error: the unknown type `Bogus`. No spurious "variable not
+      // found" (E0002) for x on the three later references.
+      assert(errors.length == 1,
+        s"expected exactly one error (unknown type), got ${errors.length}: $errors")
+    }
+
     it("still reports a duplicate declaration after a failed initializer") {
       val errors = errorsOf(
         """

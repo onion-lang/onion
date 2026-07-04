@@ -258,7 +258,22 @@ final class BlockElementLowering(
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
         val lhsTypeOpt = mapFrom(node.typeRef)
-        if (lhsTypeOpt.isEmpty) return new NOP(node.location)
+        if (lhsTypeOpt.isEmpty) {
+          // The declared type failed to resolve (E0003 already reported).
+          // Register the binding anyway — at the initializer's type when it can
+          // be typed, otherwise Object — so later references to this variable
+          // resolve instead of cascading a spurious E0002 through the rest of
+          // the block (error recovery, cf. issue #257).
+          val recoveryType =
+            (if (node.init != null) typed(node.init, context).map(_.`type`) else None)
+              .filter(t => t != null && t != BasicType.VOID && !t.isBottomType)
+              .getOrElse(bodyContext.rootClass)
+          typing.checkAndReportShadowing(node.name, node.location, context)
+          val mutable = !Modifier.isFinal(node.modifiers) && context.isReassigned(node.name)
+          context.add(node.name, recoveryType, isMutable = mutable)
+          context.recordDeclaration(node.name, node.location)
+          return new NOP(node.location)
+        }
         val lhsType = lhsTypeOpt.get
         // A local `val` without an initializer can never be usefully assigned
         // (reassignment of a val is E0036), so reading it would silently yield

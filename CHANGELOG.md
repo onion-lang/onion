@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An explicit \`this.field\` / \`self.field\` read is smart-cast** after a null check, like the
+  bare field name; only final (\`val\`) fields are narrowed ([#277]).
+
 - **A mutable (`var`) nullable local that is never reassigned is smart-cast** by a null check ([#273]).
 
 - **Generic inheritance with a primitive type argument resolves the super constructor** (`class IntBox(v: Int) : Box[Int](v)`) ([#272]).
@@ -551,6 +554,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#277]: https://github.com/onion-lang/onion/issues/277
 [#273]: https://github.com/onion-lang/onion/issues/273
 [#272]: https://github.com/onion-lang/onion/issues/272
 [#270]: https://github.com/onion-lang/onion/issues/270

@@ -60,16 +60,16 @@ private[typing] object TypeNarrowingAnalysis {
         NarrowingInfo.empty
 
       // x != null -> narrow x from T? to T in then-branch
-      case AST.NotEqual(_, AST.Id(_, name), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow)
-      case AST.NotEqual(_, AST.NullLiteral(_), AST.Id(_, name)) =>
-        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow)
+      case AST.NotEqual(_, NullCheckTarget(name, isField), AST.NullLiteral(_)) =>
+        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, isField)
+      case AST.NotEqual(_, AST.NullLiteral(_), NullCheckTarget(name, isField)) =>
+        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, isField)
 
       // x == null -> narrow x from T? to T in else-branch
-      case AST.Equal(_, AST.Id(_, name), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow)
-      case AST.Equal(_, AST.NullLiteral(_), AST.Id(_, name)) =>
-        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow)
+      case AST.Equal(_, NullCheckTarget(name, isField), AST.NullLiteral(_)) =>
+        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow, isField)
+      case AST.Equal(_, AST.NullLiteral(_), NullCheckTarget(name, isField)) =>
+        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow, isField)
 
       // cond1 && cond2 -> both narrowings apply in then-branch
       case AST.LogicalAnd(_, left, right) =>
@@ -87,12 +87,32 @@ private[typing] object TypeNarrowingAnalysis {
   }
 
   /**
+   * Matches the operand of a null-check that this analysis can narrow: either a
+   * bare identifier `x` or an explicit current-instance field access
+   * `this.field` / `self.field`. Returns the target name and whether the form
+   * was an explicit `this`-field selection (in which case only a field, never a
+   * local of the same name, is eligible for narrowing).
+   */
+  private object NullCheckTarget {
+    def unapply(expr: AST.Expression): Option[(String, Boolean)] = expr match {
+      case AST.Id(_, name) => Some((name, false))
+      case AST.MemberSelection(_, AST.CurrentInstance(_), name) => Some((name, true))
+      case _ => None
+    }
+  }
+
+  /**
    * Helper for null-check narrowing extraction.
+   *
+   * @param fieldOnly when true the operand was written as `this.field`, so a
+   *                  same-named local must NOT be considered -- only a `val`
+   *                  field of the current class.
    */
   private def extractNullCheckNarrowing(
-    name: String, context: LocalContext, positive: Boolean, fieldNarrow: String => Option[Type]
+    name: String, context: LocalContext, positive: Boolean, fieldNarrow: String => Option[Type],
+    fieldOnly: Boolean = false
   ): NarrowingInfo = {
-    val binding = context.lookup(name)
+    val binding = if (fieldOnly) null else context.lookup(name)
     val narrowed: Option[Type] =
       if (binding != null) {
         // Only immutable locals are smart-cast (a mutable one could be reassigned).

@@ -18,7 +18,20 @@ private[compiler] final class MemberSelectionTypingSupport(
           Some(new ArrayLength(resolved.term))
         case ResolvedFieldSelection(field) =>
           val ref = new RefField(resolved.term, field)
-          TypeSubst.withCastOpt(ref, TypeSubst.withClassOnly(ref.`type`, resolved.term.`type`))
+          // Smart-cast an explicit `this.field` / `self.field` read of a final
+          // (`val`) field narrowed by a preceding null check, mirroring the
+          // bare-name path in SimpleExpressionTypingSupport. Only final fields
+          // are eligible -- a `var` could change between the check and the use.
+          val narrowedRef: Term =
+            node.target match {
+              case _: AST.CurrentInstance if Modifier.isFinal(field.modifier) =>
+                context.getFieldNarrowing(node.name) match {
+                  case Some(nt) if nt != ref.`type` => new AsInstanceOf(ref, nt)
+                  case _ => ref
+                }
+              case _ => ref
+            }
+          TypeSubst.withCastOpt(narrowedRef, TypeSubst.withClassOnly(narrowedRef.`type`, resolved.term.`type`))
         case ResolvedGetterSelection(method) =>
           val call = new Call(resolved.term, method, Array.empty)
           TypeSubst.withCastOpt(call, TypeSubst.withClassOnly(method.returnType, resolved.term.`type`))

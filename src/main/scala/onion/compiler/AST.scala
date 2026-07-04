@@ -135,7 +135,7 @@ object AST {
   case class Division(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/")
   case class DivisionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/=")
   case class DoubleLiteral(location: Location, value: Double) extends Expression
-  case class Elvis(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(":?")
+  case class Elvis(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("?:")
   case class Equal(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("==")
   case class FloatLiteral(location: Location, value: Float) extends Expression
   case class GreaterOrEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression(">=")

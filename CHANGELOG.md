@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **The elvis operator is shown as `?:` in diagnostics.** A type error on `a ?: b` now names
+  the operator `?:` instead of the reversed `:?`.
+
 - **A lambda binds a Function type with an `Object` result, and JDK wildcard-result SAMs.**
   `Function1[String, Object] = (s) -> 42` is accepted, and a lambda passed directly to a
   `Function<? super T, ? extends U>` JDK method (`thenApply`, `Stream.map`, `Optional.map`)

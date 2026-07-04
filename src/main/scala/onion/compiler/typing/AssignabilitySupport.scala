@@ -119,9 +119,21 @@ private[compiler] final class AssignabilitySupport(
       case (tv: TypedAST.TypeVariableType, _) =>
         TypeRules.isSuperType(tv.upperBound, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
-        TypeRelations.sameClass(ae.raw, aa.raw) &&
-          ae.typeArguments.length == aa.typeArguments.length &&
-          ae.typeArguments.zip(aa.typeArguments).forall { case (e, a) => structurallyAssignable(e, a) }
+        def argsMatch(view: TypedAST.AppliedClassType): Boolean =
+          ae.typeArguments.length == view.typeArguments.length &&
+            ae.typeArguments.zip(view.typeArguments).forall { case (e, a) => structurallyAssignable(e, a) }
+        if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
+        else
+          // Different raw classes: find aa's applied view of ae.raw in its
+          // hierarchy (ArrayList[T] exposes List[T]) and compare the type
+          // arguments structurally, so a generic subtype is assignable to its
+          // generic supertype when the arguments match (#269). Without this, a
+          // type-variable-parameterized subtype (matched via this path because
+          // the expected type contains a type variable) was rejected even though
+          // the concrete-argument form is accepted by the normal hierarchy check.
+          AppliedTypeViews.collectAppliedViewsFrom(aa)
+            .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
+            .getOrElse(false)
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
         actual match {
           case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic subtype is assignable to its generic supertype.** `ArrayList[T]` is now
+  accepted where `List[T]` is expected (e.g. returning a built `ArrayList[T]` as `List[T]`
+  from a generic method); the type-variable assignability check consults the class
+  hierarchy, not just the raw class. Invariant generics are still enforced ([#269]).
+
 - **`override` is checked (E0068).** A method marked `override` that does not override any
   base-class or interface method is now a compile error instead of compiling silently ([#268]).
 
@@ -532,6 +537,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#269]: https://github.com/onion-lang/onion/issues/269
 [#268]: https://github.com/onion-lang/onion/issues/268
 [#264]: https://github.com/onion-lang/onion/issues/264
 [#265]: https://github.com/onion-lang/onion/issues/265

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Int + Boolean` and similar report the offending operand, not a confusing `String`.** When
+  `+` cannot add numerically and neither operand is a String, the error names the invalid
+  operand type instead of silently concatenating and surfacing a misleading String mismatch ([#265]).
+
 - **Operator overloading resolves `extension` methods.** `a + b` now finds a `plus` (or
   `minus`/`times`/...) defined in an `extension` block instead of silently falling back to
   string concatenation — the only way to overload operators for a `record` ([#264]).
@@ -522,6 +526,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
 [#264]: https://github.com/onion-lang/onion/issues/264
+[#265]: https://github.com/onion-lang/onion/issues/265
 [#263]: https://github.com/onion-lang/onion/issues/263
 [#261]: https://github.com/onion-lang/onion/issues/261
 [#257]: https://github.com/onion-lang/onion/issues/257

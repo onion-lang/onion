@@ -36,18 +36,38 @@ private[typing] class AdditionTyping(
     // and concatenation as the final fallback
     tryNumericAddition(node, left, right)
       .orElse(tryPlusOperator(node, left, right))
-      .orElse(typeStringConcatenation(node, left, right))
+      .orElse(tryStringConcatenationOrReport(node, left, right))
+  }
+
+  private def isString(t: Term): Boolean = t.`type` match {
+    case ct: ObjectType => ct.name == "java.lang.String"
+    case n: NullableType => n.innerType.name == "java.lang.String"
+    case _ => false
   }
 
   private def tryPlusOperator(node: AST.Addition, left: Term, right: Term): Option[Term] = {
-    def isString(t: Term): Boolean = t.`type` match {
-      case ct: ObjectType => ct.name == "java.lang.String"
-      case n: NullableType => n.innerType.name == "java.lang.String"
-      case _ => false
-    }
     if (left.`type`.isObjectType && !isString(left) && !isString(right))
       body.operatorTyping.tryOperatorMethod(node, "+", left, right)
     else None
+  }
+
+  /**
+   * Fall back to string concatenation, but only when the concat is plausibly
+   * intended: at least one operand IS a String. When numeric addition failed
+   * and NEITHER operand is a String (e.g. Int + Boolean), silently concatenating
+   * infers a surprising String and surfaces a confusing downstream mismatch, so
+   * instead report that the operand type is invalid for '+'.
+   */
+  private def tryStringConcatenationOrReport(node: AST.Addition, left: Term, right: Term): Option[Term] = {
+    if (isString(left) || isString(right)) {
+      typeStringConcatenation(node, left, right)
+    } else {
+      bodyContext.report(
+        SemanticError.INCOMPATIBLE_OPERAND_TYPE, node, node.symbol,
+        Array[Type](left.`type`, right.`type`)
+      )
+      None
+    }
   }
 
   /**

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **auto-CLI accepts `--name=value` and handles `--help`/`-h`** — the GNU equals form is parsed, and `--help` prints usage to stdout and exits 0 ([#286], [#287]).
+
 - **`Files::writeLines` accepts a `List`** (not only a `String[]`), matching `Strings::join` ([#285]).
 
 - **`do[Future]` (and other `do[M]`) infers the element type of a throw-only lambda bind**, so a bind like `b <- Future::async(() -> { throw ... })` no longer types `b` as `Object` ([#284]).
@@ -570,6 +572,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#286]: https://github.com/onion-lang/onion/issues/286
+[#287]: https://github.com/onion-lang/onion/issues/287
 [#285]: https://github.com/onion-lang/onion/issues/285
 [#284]: https://github.com/onion-lang/onion/issues/284
 [#283]: https://github.com/onion-lang/onion/issues/283

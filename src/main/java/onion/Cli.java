@@ -46,8 +46,19 @@ public final class Cli {
         int argCount = args == null ? 0 : args.length;
         while (i < argCount) {
             String a = args[i];
+            if (a.equals("--help") || a.equals("-h")) {
+                System.out.println(usageString(names, kinds));
+                System.exit(0);
+            }
             if (a.startsWith("--")) {
+                // Accept the GNU `--name=value` form in addition to `--name value`.
                 String name = a.substring(2);
+                String inlineValue = null;
+                int eq = name.indexOf('=');
+                if (eq >= 0) {
+                    inlineValue = name.substring(eq + 1);
+                    name = name.substring(0, eq);
+                }
                 int idx = -1;
                 for (int j = 0; j < names.length; j++) {
                     if (names[j].equals(name) && kinds[j] != 'p') {
@@ -57,7 +68,11 @@ public final class Cli {
                 }
                 if (idx < 0) die(names, kinds, "unknown option: " + a);
                 if (kinds[idx] == 's') {
-                    result[idx] = "true";
+                    // A switch is true when present; `--flag=false` may set it explicitly.
+                    result[idx] = inlineValue != null ? inlineValue : "true";
+                    i++;
+                } else if (inlineValue != null) {
+                    result[idx] = inlineValue;
                     i++;
                 } else {
                     if (i + 1 >= argCount) die(names, kinds, "missing value for " + a);
@@ -168,7 +183,7 @@ public final class Cli {
         System.exit(1);
     }
 
-    private static void die(String[] names, char[] kinds, String message) {
+    private static String usageString(String[] names, char[] kinds) {
         StringBuilder usage = new StringBuilder("usage: <script>");
         for (int j = 0; j < names.length; j++) {
             switch (kinds[j]) {
@@ -177,8 +192,13 @@ public final class Cli {
                 default:  usage.append(" [--").append(names[j]).append(']'); break;
             }
         }
+        usage.append(" [--help]");
+        return usage.toString();
+    }
+
+    private static void die(String[] names, char[] kinds, String message) {
         System.err.println("error: " + message);
-        System.err.println(usage);
+        System.err.println(usageString(names, kinds));
         System.exit(1);
     }
 }

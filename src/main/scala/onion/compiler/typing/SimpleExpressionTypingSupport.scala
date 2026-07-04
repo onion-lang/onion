@@ -229,6 +229,19 @@ private[compiler] final class SimpleExpressionTypingSupport(
       }
       None
     } else {
+      // For a nullable expected element (`List[Integer?]`), an element also fits
+      // when it is assignable to the non-null (boxed) inner type: a fresh literal
+      // whose elements are all `Integer` can be typed `List[Integer?]` since the
+      // nullable type is wider. This makes a nullable-wrapper annotation behave
+      // like the primitive `List[Int?]` form (#255); it only widens the adopt
+      // condition, so existing cases are unaffected.
+      val expectedNonNull = expectedElem match {
+        case n: NullableType => n.innerType
+        case _ => expectedElem
+      }
+      def fitsExpectedElement(t: Term): Boolean =
+        TypeRules.isAssignable(expectedElem, t.`type`) ||
+          (expectedNonNull != null && TypeRules.isAssignable(expectedNonNull, normalizeListElementType(t.`type`)))
       val finalElementType =
         if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
         // Target-type the literal: if every element fits the expected element type,
@@ -238,8 +251,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
         // distinct subtypes is Object and then fails to assign). Checking each
         // element (not their join) is what makes the mixed-subtype case work; it is
         // sound because a literal creates a fresh list of that element type.
-        // (Nullable-primitive element types like List[Int?] are not covered here.)
-        else if (expectedElem != null && typedElements.forall(t => TypeRules.isAssignable(expectedElem, t.`type`))) expectedElem
+        else if (expectedElem != null && typedElements.forall(fitsExpectedElement)) expectedElem
         else elementType
       val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
       Some(new ListLiteral(typedElements, listType))
@@ -395,14 +407,21 @@ private[compiler] final class SimpleExpressionTypingSupport(
       // Target-type the entries just like a list literal (see typeListLiteral): if
       // every key/value fits the expected key/value type, adopt it, so a nullable or
       // supertype map annotation (`Map[String, String?]`, `Map[String, Shape]`) is
-      // honored instead of failing on the elements' widened join.
+      // honored instead of failing on the elements' widened join. A nullable-wrapper
+      // expected (`Map[String, Integer?]`) also accepts an element that fits its
+      // non-null boxed inner, matching the primitive `Int?` form (#255).
+      def fitsExpected(expected: Type, actual: Term): Boolean = {
+        val nonNull = expected match { case n: NullableType => n.innerType; case _ => expected }
+        TypeRules.isAssignable(expected, actual.`type`) ||
+          (nonNull != null && TypeRules.isAssignable(nonNull, normalizeListElementType(actual.`type`)))
+      }
       val finalKeyType =
         if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass)
-        else if (expectedKey != null && keys.forall(k => TypeRules.isAssignable(expectedKey, k.`type`))) expectedKey
+        else if (expectedKey != null && keys.forall(k => fitsExpected(expectedKey, k))) expectedKey
         else keyType
       val finalValueType =
         if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass)
-        else if (expectedValue != null && values.forall(v => TypeRules.isAssignable(expectedValue, v.`type`))) expectedValue
+        else if (expectedValue != null && values.forall(v => fitsExpected(expectedValue, v))) expectedValue
         else valueType
       val mapType = AppliedClassType(bodyContext.load("java.util.Map"), scala.collection.immutable.List(finalKeyType, finalValueType))
       Some(new MapLiteral(keys, values, mapType))

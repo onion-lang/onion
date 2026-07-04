@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A collection literal is target-typed to a nullable-wrapper element type.**
+  `val xs: List[Integer?] = [1, null]` and `Map[String, Integer?]` are now honored
+  (they matched only the primitive `Int?` form before) ([#255]).
+
 - **A generic type variable is inferred from an argument even when a lambda comes first.**
   `apply2((s) -> s.length(), "hello")` for `apply2[A, B](f: Function1[A, B], x: A)` now
   infers `A` from `x` regardless of argument order, instead of failing with E0057 ([#256]).
@@ -488,6 +492,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#255]: https://github.com/onion-lang/onion/issues/255
 [#256]: https://github.com/onion-lang/onion/issues/256
 [#254]: https://github.com/onion-lang/onion/issues/254
 [0.4.1]: https://github.com/onion-lang/onion/releases/tag/v0.4.1

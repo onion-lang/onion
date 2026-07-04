@@ -97,6 +97,10 @@ println(Math::PI)
 ```onion
 record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
 
+def defaultConfig(): ServerConfig {
+  return new ServerConfig("localhost", 8080, false)
+}
+
 val parsed = Args::parse(args)
 val configPath: String = parsed.option("config", "")
 val portOverride: Int = parsed.intOption("port", -1)
@@ -129,6 +133,8 @@ onion ConfigApp.on --config server.yaml --port 9000 --debug
 **`ShellPipeline.on`** は `wc`、`sort`、`head` をパイプラインとして実行します。
 
 ```onion
+val inputPath = "words.txt"
+
 val countResult = Proc::capture("wc", "-l", inputPath)
 println("wc exit=" + countResult.status() + " out=" + countResult.stdout().trim())
 

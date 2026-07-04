@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Operator overloading resolves `extension` methods.** `a + b` now finds a `plus` (or
+  `minus`/`times`/...) defined in an `extension` block instead of silently falling back to
+  string concatenation — the only way to overload operators for a `record` ([#264]).
+
 - **A generic constructor rejects an argument incompatible with the type argument.**
   `new Box[String](aStringBuilder)` is now a type error instead of compiling and throwing
   a runtime ClassCastException — the constructor checks arguments under the type-argument
@@ -517,6 +521,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#264]: https://github.com/onion-lang/onion/issues/264
 [#263]: https://github.com/onion-lang/onion/issues/263
 [#261]: https://github.com/onion-lang/onion/issues/261
 [#257]: https://github.com/onion-lang/onion/issues/257

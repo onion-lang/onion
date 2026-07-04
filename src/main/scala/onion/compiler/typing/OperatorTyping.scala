@@ -285,7 +285,12 @@ final class OperatorTyping(
             val classSubst = TypeSubstitution.classSubstitution(targetType)
             val resultType = TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
             Some(TypeSubst.withCast(new Call(left, method, params), resultType))
-          case Left(_) => None
+          case Left(_) =>
+            // No member `plus`/`minus`/... — consult extension methods so an
+            // operator defined via an `extension` block resolves (records have no
+            // body block, so extensions are the only way to overload their
+            // operators). None here lets the caller fall back to string concat.
+            body.tryExtensionOperatorMethod(node, methodName, left, targetType, right, null)
         }
       case _ => None
     }

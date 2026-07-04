@@ -24,6 +24,17 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  /** Extension-method resolution for the operator-overloading path (`a + b`). */
+  def tryExtensionOperatorMethod(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    param: Term,
+    expected: Type
+  ): Option[Term] =
+    extensionMethodFallbackSupport.tryExtensionOperatorMethod(node, name, target, targetType, param, expected)
+
   def typeMethodCallWithBidirectionalInference(
     node: AST.MethodCall,
     target: Term,

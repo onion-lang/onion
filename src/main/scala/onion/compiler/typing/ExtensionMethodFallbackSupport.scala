@@ -38,6 +38,42 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
   }
 
+  /**
+   * Resolve an operator convention method (plus/minus/times/div/rem) defined via
+   * an `extension` block on the receiver type and build the backing static call.
+   * Used by the operator-overloading path (`a + b`) so extensions are consulted
+   * the same way an explicit `a.plus(b)` is. Reports nothing and returns None on
+   * any miss, so the caller falls back to string concatenation / the numeric path.
+   * The single argument is already a fully-typed term (no closures involved).
+   */
+  def tryExtensionOperatorMethod(
+    node: AST.Node,
+    name: String,
+    target: Term,
+    targetType: ObjectType,
+    param: Term,
+    expected: Type
+  ): Option[Term] = {
+    val params = Array(param)
+    selectApplicableExtensionMethod(targetType, name, params) match {
+      case CandidateSelection.Selected(extMethod) =>
+        val containerClass = extMethod.containerClass
+        val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
+        containerClass.findMethod(name, staticArgs) match {
+          case Array(staticMethod) =>
+            val classSubst = TypeSubstitution.classSubstitution(containerClass)
+            val methodSubst = scala.collection.immutable.Map.empty[String, Type]
+            val expectedArgs = TypeSubst.args(staticMethod, classSubst, methodSubst)
+            calls.processParamsWithExpected(node, staticArgs, expectedArgs).map { finalParams =>
+              val call = new CallStatic(containerClass, staticMethod, finalParams)
+              TypeSubst.withCast(call, TypeSubst.result(staticMethod.returnType, classSubst, methodSubst))
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
   private def selectApplicableExtensionMethod(
     targetType: ObjectType,
     name: String,

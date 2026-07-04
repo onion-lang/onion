@@ -363,6 +363,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     methodLookupSupport.typeNames(types)
   private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[typing.Continuable, Method] =
     methodLookupSupport.tryFindMethod(node, target, name, params)
+  private[typing] def tryExtensionOperatorMethod(node: AST.Node, name: String, target: Term, targetType: ObjectType, param: Term, expected: Type): Option[Term] =
+    methodCallTyping.tryExtensionOperatorMethod(node, name, target, targetType, param, expected)
 
   private def processNumericExpression(kind: BinaryKind, node: AST.BinaryExpression, lt: Term, rt: Term): Term =
     operatorTyping.processNumericExpression(kind, node, lt, rt)

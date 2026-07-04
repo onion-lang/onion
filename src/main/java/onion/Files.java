@@ -105,6 +105,14 @@ public final class Files {
         }
     }
 
+    public static void writeLines(String path, java.util.List<String> lines) throws IOException {
+        writeLines(new File(path), lines);
+    }
+
+    public static void writeLines(File file, java.util.List<String> lines) throws IOException {
+        writeLines(file, lines.toArray(new String[0]));
+    }
+
     public static void appendText(String path, String content) throws IOException {
         appendText(new File(path), content);
     }

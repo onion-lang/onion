@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Files::writeLines` accepts a `List`** (not only a `String[]`), matching `Strings::join` ([#285]).
+
 - **`do[Future]` (and other `do[M]`) infers the element type of a throw-only lambda bind**, so a bind like `b <- Future::async(() -> { throw ... })` no longer types `b` as `Object` ([#284]).
 
 - **Assigning `null` to a generic reference type parameterized by a type variable** (`Node[T]`) is now the same `W0012` warning as other null-to-non-null assignments, not a hard error ([#283]).
@@ -568,6 +570,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#285]: https://github.com/onion-lang/onion/issues/285
 [#284]: https://github.com/onion-lang/onion/issues/284
 [#283]: https://github.com/onion-lang/onion/issues/283
 [#282]: https://github.com/onion-lang/onion/issues/282

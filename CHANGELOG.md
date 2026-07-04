@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`override` is checked (E0068).** A method marked `override` that does not override any
+  base-class or interface method is now a compile error instead of compiling silently ([#268]).
+
 - **A `${expr}` / `$var` in a string literal now warns (W0013).** Shell/Kotlin-style
   interpolation, which Onion emits verbatim, produces a warning suggesting the `#{}` form
   instead of being a silent footgun ([#266]).
@@ -529,6 +532,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#268]: https://github.com/onion-lang/onion/issues/268
 [#264]: https://github.com/onion-lang/onion/issues/264
 [#265]: https://github.com/onion-lang/onion/issues/265
 [#266]: https://github.com/onion-lang/onion/issues/266

@@ -123,6 +123,57 @@ private[compiler] object DuplicationChecks {
     }
   }
 
+  /**
+   * Verify that every method marked `override` actually overrides (or implements)
+   * a method of the same name and an override-compatible signature declared by a
+   * base class or an implemented interface. If nothing is overridden, report
+   * OVERRIDE_TARGET_NOT_FOUND.
+   *
+   * Conservative by design: an implementation counts as overriding a base method
+   * when they share the same name and the same erased parameter descriptor
+   * (boxing-aware, matching the abstract-method-implementation check). Only when
+   * NO base method matches by name+arity+param-types is the override rejected.
+   */
+  def checkOverrideTargets(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
+    if clazz.isInterface then return
+
+    // Collect override-marked, non-static, non-private instance methods declared here.
+    val overrideMethods =
+      clazz.methods.filter(m =>
+        AST.hasModifier(m.modifier, AST.M_OVERRIDE) &&
+          !Modifier.isStatic(m.modifier) &&
+          !Modifier.isPrivate(m.modifier))
+    if overrideMethods.isEmpty then return
+
+    val allViews = AppliedTypeViews.collectAppliedViewsFrom(clazz)
+    // Exclude the target class itself: an override must target a *base* member.
+    val views = allViews - clazz
+
+    // Build the set of overridable base signatures: (name, erasedParamDescriptor).
+    // Include both the specialized (type-argument substituted) and the raw erased
+    // form, plus boxing variants, so that primitive/boxed parameter forms match.
+    val baseKeys = mutable.HashSet[(String, String)]()
+    for (view <- views.values) {
+      val viewSubst: scala.collection.immutable.Map[String, Type] =
+        view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
+      for (contract <- view.raw.methods) {
+        if !Modifier.isStatic(contract.modifier) && !Modifier.isPrivate(contract.modifier) then
+          val specializedArgs =
+            contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+          allErasedParamDescriptors(specializedArgs, typing).foreach(desc => baseKeys += ((contract.name, desc)))
+          allErasedParamDescriptors(contract.arguments, typing).foreach(desc => baseKeys += ((contract.name, desc)))
+      }
+    }
+
+    for (impl <- overrideMethods) {
+      val implKeys = allErasedParamDescriptors(impl.arguments, typing).map(desc => (impl.name, desc))
+      if !implKeys.exists(baseKeys.contains) then
+        val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+        val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
+        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name)
+    }
+  }
+
   def checkErasureSignatureCollisions(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     val seen = mutable.HashMap[(String, String), Method]()
     for m <- clazz.methods do

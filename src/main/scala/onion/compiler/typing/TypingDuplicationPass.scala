@@ -166,6 +166,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       for (section <- node.sections) processAccessSection(section)
       generateForwardedMethods()
       DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
+      DuplicationChecks.checkOverrideTargets(typing, clazz, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }

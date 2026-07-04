@@ -281,6 +281,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
     ),
+    SemanticError.OVERRIDE_TARGET_NOT_FOUND -> ErrorDef(
+      "error.semantic.overrideTargetNotFound",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
 
     // Generic type errors
     SemanticError.TYPE_NOT_GENERIC -> ErrorDef(

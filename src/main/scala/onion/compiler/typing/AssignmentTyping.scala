@@ -29,6 +29,10 @@ final class AssignmentTyping(
       return null
     }
 
+    // A reassignment invalidates any flow-sensitive narrowing of this var: from
+    // here on the path its type is the declared type again (issues #288/#289).
+    context.clearFlowNarrowing(id.name)
+
     if (value.`type`.isBottomType) return value
 
     val frame = bind.frameIndex

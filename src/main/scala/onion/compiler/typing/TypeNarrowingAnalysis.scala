@@ -22,10 +22,18 @@ private[typing] object TypeNarrowingAnalysis {
    *
    * @param positive Narrowings to apply in the then-branch (condition is true)
    * @param negative Narrowings to apply in the else-branch (condition is false)
+   * @param mutablePositive Like `positive` but for reassignable (`var`) locals
+   *                        (issues #288/#289). These are only safe to apply if
+   *                        the var is not reassigned in the condition or within
+   *                        the guarded region, so the caller must gate them
+   *                        (they are applied as flow-sensitive narrowings).
+   * @param mutableNegative Like `negative` but for reassignable (`var`) locals.
    */
   case class NarrowingInfo(
     positive: Map[String, Type],
-    negative: Map[String, Type]
+    negative: Map[String, Type],
+    mutablePositive: Map[String, Type] = Map.empty,
+    mutableNegative: Map[String, Type] = Map.empty
   )
 
   object NarrowingInfo {
@@ -75,12 +83,18 @@ private[typing] object TypeNarrowingAnalysis {
       case AST.LogicalAnd(_, left, right) =>
         val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow)
         val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow)
-        NarrowingInfo(leftNarrowing.positive ++ rightNarrowing.positive, Map.empty)
+        NarrowingInfo(
+          leftNarrowing.positive ++ rightNarrowing.positive, Map.empty,
+          leftNarrowing.mutablePositive ++ rightNarrowing.mutablePositive, Map.empty
+        )
 
       // !cond -> swap polarity: if !(o is String) narrows o in the else branch
       case AST.Not(_, inner) =>
         val innerNarrowing = extractNarrowing(inner, context, typeResolver, fieldNarrow)
-        NarrowingInfo(innerNarrowing.negative, innerNarrowing.positive)
+        NarrowingInfo(
+          innerNarrowing.negative, innerNarrowing.positive,
+          innerNarrowing.mutableNegative, innerNarrowing.mutablePositive
+        )
 
       case _ => NarrowingInfo.empty
     }
@@ -113,24 +127,36 @@ private[typing] object TypeNarrowingAnalysis {
     fieldOnly: Boolean = false
   ): NarrowingInfo = {
     val binding = if (fieldOnly) null else context.lookup(name)
-    val narrowed: Option[Type] =
-      if (binding != null) {
-        // Only immutable locals are smart-cast (a mutable one could be reassigned).
-        if (binding.isMutable) None
-        else binding.tp match {
-          case nullableType: NullableType => Some(nullableType.innerType)
-          // A nullable type variable narrows to its non-null view.
-          case tv: TypeVariableType if tv.nullability == Nullability.Nullable => Some(tv.nonNullView)
-          case _ => None
-        }
-      } else {
-        // No local of this name: it may be an implicitly-accessed `val` field,
-        // which is immutable and so safe to narrow.
-        fieldNarrow(name)
+    // The non-null view of a nullable local/field type, or None if not nullable.
+    def nonNull(tp: Type): Option[Type] = tp match {
+      case nullableType: NullableType => Some(nullableType.innerType)
+      // A nullable type variable narrows to its non-null view.
+      case tv: TypeVariableType if tv.nullability == Nullability.Nullable => Some(tv.nonNullView)
+      case _ => None
+    }
+    if (binding != null && binding.isMutable) {
+      // A reassignable `var`: not eligible for whole-scope smart cast, but it can
+      // be narrowed flow-sensitively (issues #288/#289) if the caller verifies it
+      // is not reassigned between the check and the guarded region. Surface it in
+      // the mutable* maps so the caller can gate it.
+      nonNull(binding.tp) match {
+        case Some(t) =>
+          if (positive) NarrowingInfo(Map.empty, Map.empty, Map(name -> t), Map.empty)
+          else NarrowingInfo(Map.empty, Map.empty, Map.empty, Map(name -> t))
+        case None => NarrowingInfo.empty
       }
-    narrowed match {
-      case Some(t) => if (positive) NarrowingInfo(Map(name -> t), Map.empty) else NarrowingInfo(Map.empty, Map(name -> t))
-      case None => NarrowingInfo.empty
+    } else {
+      val narrowed: Option[Type] =
+        if (binding != null) nonNull(binding.tp)
+        else {
+          // No local of this name: it may be an implicitly-accessed `val` field,
+          // which is immutable and so safe to narrow.
+          fieldNarrow(name)
+        }
+      narrowed match {
+        case Some(t) => if (positive) NarrowingInfo(Map(name -> t), Map.empty) else NarrowingInfo(Map.empty, Map(name -> t))
+        case None => NarrowingInfo.empty
+      }
     }
   }
 }

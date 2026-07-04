@@ -88,8 +88,23 @@ final class ControlExpressionTyping(
       val narrowing = extractNarrowing(node.condition, context)
       val savedNarrowings = context.saveNarrowings()
 
+      // Flow-sensitive narrowing for a reassignable `var` (issues #288/#289):
+      // safe inside a branch only when the var is not reassigned in the condition
+      // or within that branch.
+      val condReassigned = AssignedVariableScanner.scan(node.condition)
+      def safeMutableNarrowings(m: Map[String, Type], branch: AST.BlockExpression): Map[String, Type] = {
+        if (m.isEmpty) Map.empty
+        else {
+          val branchReassigned = AssignedVariableScanner.scan(branch)
+          m.filter { case (name, _) => !condReassigned.contains(name) && !branchReassigned.contains(name) }
+        }
+      }
+
       narrowing.positive.foreach { case (name, narrowedType) =>
         context.addNarrowing(name, narrowedType)
+      }
+      safeMutableNarrowings(narrowing.mutablePositive, node.thenBlock).foreach { case (name, narrowedType) =>
+        context.addFlowNarrowing(name, narrowedType)
       }
       val thenTerm = typeBlockExpression(node.thenBlock, context).getOrElse {
         context.restoreNarrowings(savedNarrowings)
@@ -103,6 +118,9 @@ final class ControlExpressionTyping(
       } else {
         narrowing.negative.foreach { case (name, narrowedType) =>
           context.addNarrowing(name, narrowedType)
+        }
+        safeMutableNarrowings(narrowing.mutableNegative, node.elseBlock).foreach { case (name, narrowedType) =>
+          context.addFlowNarrowing(name, narrowedType)
         }
         val elseTerm = typeBlockExpression(node.elseBlock, context).getOrElse {
           context.restoreNarrowings(savedNarrowings)

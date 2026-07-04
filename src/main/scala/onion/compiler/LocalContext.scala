@@ -46,6 +46,15 @@ class LocalContext {
   // Smart cast: type narrowing information
   // Maps variable names to their narrowed types (only for immutable variables)
   private var narrowings: Map[String, TypedAST.Type] = Map.empty
+
+  // Flow-sensitive smart cast for MUTABLE (`var`) locals. Unlike `narrowings`
+  // (which applies only to effectively-final bindings and is ignored for a
+  // mutable binding), a flow narrowing applies even to a reassignable var,
+  // because the caller has already verified that the var is not reassigned
+  // between the check and the guarded region (issues #288/#289). It must be
+  // dropped as soon as the var is reassigned on the path (see clearFlowNarrowing,
+  // called from assignment typing) and is bounded to a region by save/restore.
+  private var flowNarrowings: Map[String, TypedAST.Type] = Map.empty
   private var returnTypeCollectionDepth: Int = 0
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
@@ -318,7 +327,14 @@ class LocalContext {
   def getEffectiveType(name: String): TypedAST.Type = {
     val binding = lookup(name)
     if (binding == null) return null
-    // Mutable variables are not subject to smart cast (could be reassigned)
+    // A flow-sensitive narrowing applies even to a mutable var: the analysis
+    // that installed it proved the var is non-null (and not reassigned) at this
+    // point on the path (issues #288/#289).
+    flowNarrowings.get(name) match {
+      case Some(t) => return t
+      case None =>
+    }
+    // Mutable variables are otherwise not subject to smart cast (could be reassigned)
     if (binding.isMutable) return binding.tp
     narrowings.getOrElse(name, binding.tp)
   }
@@ -346,17 +362,56 @@ class LocalContext {
     narrowings = narrowings - name
 
   /**
+   * Adds a flow-sensitive narrowing for a mutable (`var`) local. The caller must
+   * have verified the var is non-null at the guarded point and is not reassigned
+   * between the check and the guarded region (issues #288/#289).
+   */
+  def addFlowNarrowing(name: String, tp: TypedAST.Type): Unit =
+    flowNarrowings = flowNarrowings + (name -> tp)
+
+  /**
+   * Drops any flow-sensitive narrowing for a name. Called when the var is
+   * reassigned on the path (a reassignment invalidates a flow narrowing).
+   */
+  def clearFlowNarrowing(name: String): Unit =
+    if (flowNarrowings.contains(name)) flowNarrowings = flowNarrowings - name
+
+  /**
+   * Runs `block` with all flow-sensitive narrowings suppressed, restoring them
+   * afterwards. Used when typing a closure body: a flow narrowing is only valid
+   * on a straight-line path with no intervening reassignment, but a closure can
+   * be stored and invoked at an arbitrary later time (after the captured var has
+   * been reassigned), so its body must see the var's declared type, not the
+   * flow-narrowed one. The whole-scope `narrowings` (effectively-final locals,
+   * `val`s, fields) stay in effect — those can never be reassigned.
+   */
+  def withoutFlowNarrowings[A](block: => A): A = {
+    val saved = flowNarrowings
+    flowNarrowings = Map.empty
+    try block
+    finally flowNarrowings = saved
+  }
+
+  /** Snapshot of both narrowing maps, used to bound narrowings to a region. */
+  final case class NarrowingSnapshot(
+    narrowings: Map[String, TypedAST.Type],
+    flowNarrowings: Map[String, TypedAST.Type]
+  )
+
+  /**
    * Saves the current narrowing state.
    * Used before entering a branch to allow restoration after.
    */
-  def saveNarrowings(): Map[String, TypedAST.Type] = narrowings
+  def saveNarrowings(): NarrowingSnapshot = NarrowingSnapshot(narrowings, flowNarrowings)
 
   /**
    * Restores a previously saved narrowing state.
    * Used after exiting a branch to restore the pre-branch state.
    */
-  def restoreNarrowings(saved: Map[String, TypedAST.Type]): Unit =
-    narrowings = saved
+  def restoreNarrowings(saved: NarrowingSnapshot): Unit = {
+    narrowings = saved.narrowings
+    flowNarrowings = saved.flowNarrowings
+  }
 
 }
 

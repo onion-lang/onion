@@ -182,9 +182,25 @@ final class BlockElementLowering(
         val narrowing = body.extractNarrowing(node.condition, context)
         val savedNarrowings = context.saveNarrowings()
 
+        // Flow-sensitive narrowing for a reassignable `var` (issues #288/#289):
+        // apply it inside a branch only when the var is not reassigned in the
+        // condition or within that branch. A reassignment AFTER the branch does
+        // not invalidate the narrowing inside it.
+        val condReassigned = AssignedVariableScanner.scan(node.condition)
+        def safeMutableNarrowings(m: Map[String, Type], branch: AST.BlockExpression): Map[String, Type] = {
+          if (m.isEmpty) Map.empty
+          else {
+            val branchReassigned = AssignedVariableScanner.scan(branch)
+            m.filter { case (name, _) => !condReassigned.contains(name) && !branchReassigned.contains(name) }
+          }
+        }
+
         // Apply positive narrowings for then-block
         narrowing.positive.foreach { case (name, tp) =>
           context.addNarrowing(name, tp)
+        }
+        safeMutableNarrowings(narrowing.mutablePositive, node.thenBlock).foreach { case (name, tp) =>
+          context.addFlowNarrowing(name, tp)
         }
         val thenBlock = translate(node.thenBlock, context)
         context.restoreNarrowings(savedNarrowings)
@@ -193,6 +209,9 @@ final class BlockElementLowering(
         val elseBlock = if (node.elseBlock == null) null else {
           narrowing.negative.foreach { case (name, tp) =>
             context.addNarrowing(name, tp)
+          }
+          safeMutableNarrowings(narrowing.mutableNegative, node.elseBlock).foreach { case (name, tp) =>
+            context.addFlowNarrowing(name, tp)
           }
           val result = translate(node.elseBlock, context)
           context.restoreNarrowings(savedNarrowings)
@@ -394,9 +413,18 @@ final class BlockElementLowering(
     case node: AST.WhileExpression =>
       context.openScope {
         val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
+        // #289: `while ((v = e) != null) { body }` assigns v then checks it is
+        // non-null, so v is non-null at the top of every iteration. Narrow v
+        // flow-sensitively at the start of the body (dropped if the body
+        // reassigns v). Bounded by this while's scope.
+        val savedNarrowings = context.saveNarrowings()
+        assignInConditionNonNullTarget(node.condition, context).foreach { case (name, tp) =>
+          context.addFlowNarrowing(name, tp)
+        }
         val thenBlock = context.openLoop {
           translate(node.block, context)
         }
+        context.restoreNarrowings(savedNarrowings)
         if (condition == null) new NOP(node.location)
         else new ConditionalLoop(node.location, condition, thenBlock)
       }
@@ -411,6 +439,35 @@ final class BlockElementLowering(
       }
     case node: AST.Expression =>
       typed(node, context).map(termToStatement(node, _)).getOrElse(new NOP(node.location))
+  }
+
+  /**
+   * Recognizes an assign-in-condition null test `(v = e) != null` (or the
+   * mirror `null != (v = e)`) whose target `v` is a mutable nullable local, and
+   * returns `(v, nonNullType)` so the loop body can narrow it (issue #289).
+   * Returns None for any other shape.
+   */
+  private def assignInConditionNonNullTarget(
+    condition: AST.Expression, context: LocalContext
+  ): Option[(String, Type)] = {
+    def targetOf(e: AST.Expression): Option[String] = e match {
+      case AST.Assignment(_, id: AST.Id, _) => Some(id.name)
+      case _ => None
+    }
+    val nameOpt = condition match {
+      case AST.NotEqual(_, lhs, AST.NullLiteral(_)) => targetOf(lhs)
+      case AST.NotEqual(_, AST.NullLiteral(_), rhs) => targetOf(rhs)
+      case _ => None
+    }
+    nameOpt.flatMap { name =>
+      val binding = context.lookup(name)
+      if (binding == null || !binding.isMutable) None
+      else binding.tp match {
+        case n: NullableType => Some((name, n.innerType))
+        case tv: TypeVariableType if tv.nullability == Nullability.Nullable => Some((name, tv.nonNullView))
+        case _ => None
+      }
+    }
   }
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =

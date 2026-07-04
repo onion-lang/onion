@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Nullable `var` smart-cast is flow-sensitive** — a `var` is narrowed in an `if v != null`
+  branch even if it is reassigned *after* the branch, and `while ((v = e) != null) { ... }`
+  narrows `v` in the loop body. A reassignment before/within the use still blocks it, and a
+  flow-narrowed `var` captured by a closure is conservatively not narrowed inside it (closing
+  an escaping-closure NPE) ([#288], [#289]).
+
 - **auto-CLI accepts `--name=value` and handles `--help`/`-h`** — the GNU equals form is parsed, and `--help` prints usage to stdout and exits 0 ([#286], [#287]).
 
 - **`Files::writeLines` accepts a `List`** (not only a `String[]`), matching `Strings::join` ([#285]).
@@ -572,6 +578,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#289]: https://github.com/onion-lang/onion/issues/289
+[#288]: https://github.com/onion-lang/onion/issues/288
 [#286]: https://github.com/onion-lang/onion/issues/286
 [#287]: https://github.com/onion-lang/onion/issues/287
 [#285]: https://github.com/onion-lang/onion/issues/285

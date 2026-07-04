@@ -153,7 +153,12 @@ final class ExpressionFormTyping(
       case (_: NullType, bt: BasicType) =>
         false
       case (bt: BasicType, ct: ClassType) =>
-        (Boxing.boxedType(bodyContext.table, bt) eq ct) || ct.isInstanceOf[TypeVariableType]
+        // The exact wrapper (`Int as JInteger`) and boxing supertypes
+        // (`Int as Object` / `as Number` / `as Comparable` / `as Serializable`)
+        // are all valid: codegen boxes the primitive and then checkcasts to the
+        // destination. Anything the boxed value is assignable to is accepted.
+        val boxed = Boxing.boxedType(bodyContext.table, bt)
+        (boxed eq ct) || TypeRules.isSuperType(ct, boxed) || ct.isInstanceOf[TypeVariableType]
       case (ct: ClassType, bt: BasicType) =>
         (Boxing.boxedType(bodyContext.table, bt) eq ct) || (ct eq bodyContext.rootClass) || ct.isInstanceOf[TypeVariableType]
       case (ct: ClassType, dt: ClassType) =>

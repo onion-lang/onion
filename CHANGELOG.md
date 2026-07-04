@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An explicit `as` cast of a primitive to a boxing supertype autoboxes.** `(x as Object)`
+  / `as Number` / `as Comparable` on an `Int` now boxes and casts (matching the implicit
+  assignment) instead of failing with E0000 ([#261]).
+
 - **A runtime exception in a local initializer reports the correct line.** An exception
   thrown while evaluating a `val`/`var` initializer (`val bad: String = n!!`) now maps to
   the declaration's line instead of the previous statement's ([#258]).
@@ -496,6 +500,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#261]: https://github.com/onion-lang/onion/issues/261
 [#258]: https://github.com/onion-lang/onion/issues/258
 [#255]: https://github.com/onion-lang/onion/issues/255
 [#256]: https://github.com/onion-lang/onion/issues/256

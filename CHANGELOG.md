@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic parent's type parameter is specialized in a child class** (`self.get()` on a `Box[String]` subclass returns `String`, not `T`) ([#271]).
+
 - **`ExecutorService.invokeAll` and similar wildcard-bounded generic methods infer their type variable** ([#274]).
 
 - **`Rand::choice` throws on an empty collection** instead of silently returning null ([#276]).
@@ -543,6 +545,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#271]: https://github.com/onion-lang/onion/issues/271
 [#274]: https://github.com/onion-lang/onion/issues/274
 [#276]: https://github.com/onion-lang/onion/issues/276
 [#275]: https://github.com/onion-lang/onion/issues/275

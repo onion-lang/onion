@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A runtime exception in a local initializer reports the correct line.** An exception
+  thrown while evaluating a `val`/`var` initializer (`val bad: String = n!!`) now maps to
+  the declaration's line instead of the previous statement's ([#258]).
+
 - **A collection literal is target-typed to a nullable-wrapper element type.**
   `val xs: List[Integer?] = [1, null]` and `Map[String, Integer?]` are now honored
   (they matched only the primitive `Int?` form before) ([#255]).
@@ -492,6 +496,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#258]: https://github.com/onion-lang/onion/issues/258
 [#255]: https://github.com/onion-lang/onion/issues/255
 [#256]: https://github.com/onion-lang/onion/issues/256
 [#254]: https://github.com/onion-lang/onion/issues/254

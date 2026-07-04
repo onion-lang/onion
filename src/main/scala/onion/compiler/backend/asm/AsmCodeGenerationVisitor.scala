@@ -351,6 +351,11 @@ class AsmCodeGenerationVisitor(
     asmCodeGen.emitRefLocal(gen, node, localVars)
   
   override def visitSetLocal(node: SetLocal): Unit =
+    // Emit the line number so a runtime exception thrown while evaluating a
+    // local's initializer (`val bad: String = n!!`) maps to the declaration's
+    // line rather than the previous statement's. Sibling statement visitors do
+    // this; SetLocal (which backs a local var/val declaration) was missing it.
+    emitLineNumber(node.location)
     asmCodeGen.emitSetLocal(gen, node, className, localVars)
   
   override def visitNewClosure(node: NewClosure): Unit =

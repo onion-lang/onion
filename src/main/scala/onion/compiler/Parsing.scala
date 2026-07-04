@@ -2,7 +2,7 @@ package onion.compiler
 
 import collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
-import java.io.{IOException, Reader}
+import java.io.{IOException, Reader, StringReader}
 import java.util.Arrays.ArrayList
 import java.util.Collections
 
@@ -46,13 +46,35 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * Uses error recovery mode to collect multiple syntax errors per file
    * when possible.
    */
+  /**
+   * A `#!` shebang is only meaningful on the very first line of a script. Drop
+   * the first line's content when it starts with `#!`, keeping the newline so
+   * every other line keeps its original line number. On any other line `#!` is
+   * left for the lexer to reject rather than being silently skipped (issue #262).
+   */
+  private def stripShebang(reader: Reader): Reader = {
+    val sb = new StringBuilder
+    val buf = new Array[Char](4096)
+    try {
+      var n = reader.read(buf)
+      while (n != -1) { sb.appendAll(buf, 0, n); n = reader.read(buf) }
+    } finally reader.close()
+    val text = sb.toString
+    val stripped =
+      if (text.startsWith("#!")) {
+        val nl = text.indexOf('\n')
+        if (nl < 0) "" else text.substring(nl)
+      } else text
+    new StringReader(stripped)
+  }
+
   private def parseFile(
     source: InputSource,
     units: ArrayBuffer[AST.CompilationUnit],
     problems: ArrayBuffer[CompileError]
   ): Unit = {
     try {
-      val reader = source.openReader()
+      val reader = stripShebang(source.openReader())
       val parser = new JJOnionParser(reader)
 
       // Enable error recovery mode to collect multiple errors

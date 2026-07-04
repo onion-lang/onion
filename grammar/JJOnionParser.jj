@@ -803,7 +803,6 @@ SPECIAL_TOKEN:
 {
   <MULTI_LINE_COMMENT: "/*" (~["*"])*  "*" ("*" | (~["*", "/"] (~["*"])* "*"))* "/">
 | <LINE_COMMENT:       "//" (~["\r", "\n"])*>
-| <SHELL_COMMENT:      "#!" (~["\r", "\n"])*>
 }
 
 /*

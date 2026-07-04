@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A `#!` shebang is only honored on the first line** — on any other line it is a syntax
+  error instead of being silently skipped, and a first-line shebang no longer shifts
+  reported line numbers ([#262]).
+
 - **W0014**: a script that defines a `main` and also has bare executable top-level
   statements now warns that those statements are ignored (they are not the entry point) ([#278]).
 
@@ -584,6 +588,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#262]: https://github.com/onion-lang/onion/issues/262
 [#278]: https://github.com/onion-lang/onion/issues/278
 [#290]: https://github.com/onion-lang/onion/issues/290
 [#289]: https://github.com/onion-lang/onion/issues/289

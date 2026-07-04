@@ -7,14 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **An uninitialized local \`val\` is a compile error (E0069)** instead of silently reading
+- **An uninitialized local `val` is a compile error (E0069)** instead of silently reading
   the JVM default (null/0) or NPEing ([#280]).
 
-- **\`do[Option]\` infers the element type of an \`Option::none()\` bind** from the block's
-  other binds, so arithmetic on the bound value no longer fails as \`Option[Object]\` ([#279]).
+- **`do[Option]` infers the element type of an `Option::none()` bind** from the block's
+  other binds, so arithmetic on the bound value no longer fails as `Option[Object]` ([#279]).
 
-- **An explicit \`this.field\` / \`self.field\` read is smart-cast** after a null check, like the
-  bare field name; only final (\`val\`) fields are narrowed ([#277]).
+- **An explicit `this.field` / `self.field` read is smart-cast** after a null check, like the
+  bare field name; only final (`val`) fields are narrowed ([#277]).
 
 - **A mutable (`var`) nullable local that is never reassigned is smart-cast** by a null check ([#273]).
 

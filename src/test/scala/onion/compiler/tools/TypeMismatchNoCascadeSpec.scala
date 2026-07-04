@@ -44,7 +44,7 @@ class TypeMismatchNoCascadeSpec extends AnyFunSpec {
       // "variable not found" (E0002) for x, y, or z.
       assert(errors.length == 1,
         s"expected exactly one error, got ${errors.length}: $errors")
-      assert(!errors.exists(_.contains("見つかりません")),
+      assert(!errors.exists(e => e.contains("見つかりません") || e.contains("not found")),
         s"expected no 'variable not found' cascade, got: $errors")
     }
 
@@ -79,7 +79,7 @@ class TypeMismatchNoCascadeSpec extends AnyFunSpec {
           |}
         """.stripMargin
       )
-      assert(errors.exists(_.contains("重複")),
+      assert(errors.exists(e => e.contains("重複") || e.contains("uplicat")),
         s"expected a duplicate-declaration error, got: $errors")
     }
 

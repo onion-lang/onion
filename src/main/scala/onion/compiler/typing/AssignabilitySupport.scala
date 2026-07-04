@@ -116,6 +116,14 @@ private[compiler] final class AssignabilitySupport(
       TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
     def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
+      case (_, nt) if nt.isNullType =>
+        // The null literal is assignable to any reference (non-basic) target,
+        // including a generic type parameterized by a type variable (Node[T]).
+        // The nullability concern is already handled by the W0012
+        // nullToNonNullable warning emitted above, so this must not become a
+        // hard INCOMPATIBLE_TYPE error — matching the non-type-variable path
+        // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
+        !expected.isBasicType
       case (tv: TypedAST.TypeVariableType, _) =>
         TypeRules.isSuperType(tv.upperBound, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>

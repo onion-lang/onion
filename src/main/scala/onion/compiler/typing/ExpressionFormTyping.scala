@@ -172,10 +172,29 @@ final class ExpressionFormTyping(
           case a: AppliedClassType => a.raw
           case _ => t
         }
+        // Per JLS 5.5.1, a reference cast where one operand is a non-final
+        // interface is permitted at compile time unless the OTHER operand is a
+        // final class that provably does not implement that interface. A cast
+        // between sibling interfaces (e.g. `Named as Aged`) is such a case: a
+        // single object may implement both, so the check is deferred to the
+        // runtime checkcast the codegen already emits. We still reject a cast
+        // from a final class to an interface it does not implement, and between
+        // two unrelated final classes.
+        def isNonFinal(t: ClassType): Boolean = !Modifier.isFinal(t.modifier)
+        def interfaceCastAllowed: Boolean = {
+          val srcIface = ct.isInterface && isNonFinal(ct)
+          val dstIface = dt.isInterface && isNonFinal(dt)
+          // The operand paired with a non-final interface must not be a final
+          // class that cannot possibly relate to it.
+          if (dstIface && !ct.isInterface && Modifier.isFinal(ct.modifier)) false
+          else if (srcIface && !dt.isInterface && Modifier.isFinal(dt.modifier)) false
+          else srcIface || dstIface
+        }
         TypeRules.isSuperType(dt, ct) || TypeRules.isSuperType(ct, dt) ||
           TypeRules.isSuperType(erasure(dt), erasure(ct)) ||
           TypeRules.isSuperType(erasure(ct), erasure(dt)) ||
-          ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType]
+          ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType] ||
+          interfaceCastAllowed
       case (bt1: BasicType, bt2: BasicType) =>
         (bt1 eq bt2) || (isNumericBasic(bt1) && isNumericBasic(bt2))
       case _ => true

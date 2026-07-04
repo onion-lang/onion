@@ -68,8 +68,13 @@ class GenericCastSpec extends AbstractShellSpec {
       assert(Shell.Success("a") == result)
     }
 
-    it("still rejects a cast between unrelated erasures (List -> Map)") {
-      val result = shell.run(
+    it("allows an interface-to-interface cast (List -> Map) at compile time (#282)") {
+      // Per JLS 5.5.1 (and matching javac), a cast between two non-final
+      // interfaces is legal at compile time — a single class could implement
+      // both List and Map — so the check is deferred to the runtime checkcast.
+      // It therefore compiles cleanly (and would throw a ClassCastException at
+      // runtime for a value that is not actually a Map).
+      val compiles = shell.compiles(
         """
           |class Test {
           |public:
@@ -80,10 +85,9 @@ class GenericCastSpec extends AbstractShellSpec {
           |  }
           |}
           |""".stripMargin,
-        "GenericCastUnrelated.on",
-        Array()
+        "GenericCastUnrelated.on"
       )
-      assert(Shell.Failure(-1) == result)
+      assert(compiles)
     }
 
     it("still rejects an unrelated primitive cast (String -> Int)") {

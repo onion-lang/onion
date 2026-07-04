@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A cast between sibling interfaces is allowed** (`someNamed as Aged`), matching JLS 5.5.1 / javac; the runtime `checkcast` still enforces it. A provably-impossible cast (to an unrelated final class) is still rejected ([#282]).
+
 ## [0.4.2] - 2026-07-04
 
 - **An uninitialized local `val` is a compile error (E0069)** instead of silently reading
@@ -562,6 +564,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#282]: https://github.com/onion-lang/onion/issues/282
 [0.4.2]: https://github.com/onion-lang/onion/releases/tag/v0.4.2
 [#277]: https://github.com/onion-lang/onion/issues/277
 [#279]: https://github.com/onion-lang/onion/issues/279

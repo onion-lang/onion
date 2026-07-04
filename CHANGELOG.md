@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **\`do[Option]\` infers the element type of an \`Option::none()\` bind** from the block's
+  other binds, so arithmetic on the bound value no longer fails as \`Option[Object]\` ([#279]).
+
 - **An explicit \`this.field\` / \`self.field\` read is smart-cast** after a null check, like the
   bare field name; only final (\`val\`) fields are narrowed ([#277]).
 
@@ -555,6 +558,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
 [#277]: https://github.com/onion-lang/onion/issues/277
+[#279]: https://github.com/onion-lang/onion/issues/279
 [#273]: https://github.com/onion-lang/onion/issues/273
 [#272]: https://github.com/onion-lang/onion/issues/272
 [#270]: https://github.com/onion-lang/onion/issues/270

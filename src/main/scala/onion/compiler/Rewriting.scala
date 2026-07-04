@@ -1016,7 +1016,97 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       ))
     }
 
-    desugarDoStatements(doExpr.location, monadType, statements)
+    desugarDoStatements(doExpr.location, monadType, pinEmptyBindElementTypes(statements))
+  }
+
+  /**
+   * A generative empty bind such as `x <- Option::none()` carries no argument to
+   * infer its element type from, so on its own it defaults to `Option[Object]`
+   * and any later arithmetic on `x` fails with E0001 (issue #279). Within a
+   * `do[M]` block the sibling binds tell us the intended element type: when a
+   * nullary, type-argument-less generative call (e.g. `M::none()` / `M::empty()`)
+   * appears as a bind RHS, pin its element type from a sibling non-empty bind
+   * (`M::some(e)` / `M::successful(e)`, using that sibling's explicit type
+   * argument if present, otherwise the structural type of its literal argument).
+   *
+   * The bound variable of an empty bind is dead — the monad short-circuits at the
+   * empty value — so pinning its static type only lets the block type-check and
+   * never changes runtime behaviour. When no element type is structurally
+   * derivable the statements are returned unchanged, preserving today's behaviour
+   * (and its E0001) rather than guessing.
+   */
+  private def pinEmptyBindElementTypes(statements: List[Any]): List[Any] = {
+    // Derive a candidate element type from the first non-empty generative bind.
+    val derived: Option[AST.TypeNode] = statements.iterator.collect {
+      case AST.DoBinding(_, _, expr) => expr
+    }.flatMap(elementTypeOfNonEmptyBind).nextOption()
+
+    derived match {
+      case None => statements
+      case Some(typeNode) =>
+        statements.map {
+          case b @ AST.DoBinding(loc, name, expr) if isEmptyGenerativeCall(expr) =>
+            AST.DoBinding(loc, name, withTypeArgument(expr, typeNode))
+          case other => other
+        }
+    }
+  }
+
+  /** The generative-empty factory method names that take no value argument. */
+  private def isEmptyGenerativeName(name: String): Boolean =
+    name == "none" || name == "empty" || name == "nothing"
+
+  /** True for a nullary, type-argument-less generative empty call like `M::none()`. */
+  private def isEmptyGenerativeCall(expr: AST.Expression): Boolean = expr match {
+    case c: AST.StaticMethodCall =>
+      isEmptyGenerativeName(c.name) && c.args.isEmpty && c.typeArgs.isEmpty
+    case c: AST.UnqualifiedMethodCall =>
+      isEmptyGenerativeName(c.name) && c.args.isEmpty && c.typeArgs.isEmpty
+    case _ => false
+  }
+
+  /** Attach `typeNode` as the sole explicit type argument of a generative call. */
+  private def withTypeArgument(expr: AST.Expression, typeNode: AST.TypeNode): AST.Expression = expr match {
+    case c: AST.StaticMethodCall => c.copy(typeArgs = List(typeNode))
+    case c: AST.UnqualifiedMethodCall => c.copy(typeArgs = List(typeNode))
+    case _ => expr
+  }
+
+  /**
+   * The element type of a non-empty generative bind (`M::some(e)` /
+   * `M::successful(e)` / `M::of(e)`), preferring an explicit type argument and
+   * otherwise the structural type of a literal argument. Returns None when the
+   * element type cannot be determined without full type inference.
+   */
+  private def elementTypeOfNonEmptyBind(expr: AST.Expression): Option[AST.TypeNode] = {
+    def fromCall(name: String, args: List[AST.Expression], typeArgs: List[AST.TypeNode]): Option[AST.TypeNode] =
+      if (!(name == "some" || name == "successful" || name == "of" || name == "pure")) None
+      else typeArgs.headOption.orElse(args.headOption.flatMap(literalTypeNode))
+    expr match {
+      case c: AST.StaticMethodCall => fromCall(c.name, c.args, c.typeArgs)
+      case c: AST.UnqualifiedMethodCall => fromCall(c.name, c.args, c.typeArgs)
+      case _ => None
+    }
+  }
+
+  /** The structural type of a literal expression, when it has one. */
+  private def literalTypeNode(expr: AST.Expression): Option[AST.TypeNode] = {
+    def prim(kind: AST.PrimitiveTypeKind): AST.TypeNode =
+      AST.TypeNode(expr.location, AST.PrimitiveType(kind), false)
+    def ref(name: String): AST.TypeNode =
+      AST.TypeNode(expr.location, AST.ReferenceType(name, false), false)
+    expr match {
+      case _: AST.IntegerLiteral   => Some(prim(AST.KInt))
+      case _: AST.LongLiteral      => Some(prim(AST.KLong))
+      case _: AST.DoubleLiteral    => Some(prim(AST.KDouble))
+      case _: AST.FloatLiteral     => Some(prim(AST.KFloat))
+      case _: AST.ShortLiteral     => Some(prim(AST.KShort))
+      case _: AST.ByteLiteral      => Some(prim(AST.KByte))
+      case _: AST.CharacterLiteral => Some(prim(AST.KChar))
+      case _: AST.BooleanLiteral   => Some(prim(AST.KBoolean))
+      case _: AST.StringLiteral    => Some(ref("String"))
+      case _ => None
+    }
   }
 
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {

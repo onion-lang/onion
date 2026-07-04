@@ -50,6 +50,71 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
     }
   }
 
+  describe("do-notation over Option with Option::none() (issue #279)") {
+    it("infers none()'s element type from a sibling some() bind so arithmetic type-checks") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r = do[Option] {
+          |      a <- Option::some(3)
+          |      b <- Option::none()
+          |      ret (a as Int) + (b as Int)
+          |    }
+          |    return r.isEmpty().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "DoNone.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
+
+    it("pins none() from a sibling some() regardless of bind order") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r = do[Option] {
+          |      b <- Option::none()
+          |      a <- Option::some(7)
+          |      ret (a as Int) + (b as Int)
+          |    }
+          |    return r.isEmpty().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "DoNoneFirst.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
+
+    it("leaves an explicitly annotated none() untouched") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r = do[Option] {
+          |      a <- Option::some(5)
+          |      b <- Option::none[Int]()
+          |      ret (a as Int) + (b as Int)
+          |    }
+          |    return r.isEmpty().toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "DoNoneAnnotated.on",
+        Array()
+      )
+      assert(Shell.Success("true") == result)
+    }
+  }
+
   describe("do-notation over Result") {
     it("chains ok values") {
       val result = shell.run(

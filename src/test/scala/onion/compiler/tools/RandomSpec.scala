@@ -149,22 +149,48 @@ class RandomSpec extends AbstractShellSpec {
         assert(Shell.Success("true") == result)
       }
 
-      it("returns null for empty array") {
+      it("throws for empty array instead of returning null") {
         val result = shell.run(
           """
             |class Test {
             |public:
             |  static def main(args: String[]): String {
             |    val items = new String[0];
-            |    val chosen = Rand::choice(items);
-            |    return "" + (chosen == null);
+            |    try {
+            |      val chosen = Rand::choice(items);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return "threw";
+            |    }
             |  }
             |}
             |""".stripMargin,
           "None",
           Array()
         )
-        assert(Shell.Success("true") == result)
+        assert(Shell.Success("threw") == result)
+      }
+
+      it("throws for empty list instead of returning null") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val items = new java.util.ArrayList[String]();
+            |    try {
+            |      val chosen = Rand::choice(items);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return "threw";
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("threw") == result)
       }
     }
 

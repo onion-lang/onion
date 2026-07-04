@@ -174,6 +174,13 @@ private[compiler] final class MethodResolutionSupport(
     case applied: AppliedClassType => applied.typeArguments.exists(containsMethodTypeParam(_, methodTypeParams))
     case at: ArrayType => containsMethodTypeParam(at.base, methodTypeParams)
     case n: NullableType => containsMethodTypeParam(n.innerType, methodTypeParams)
+    // A method type variable can hide inside a wildcard bound, e.g. the JDK's
+    // `invokeAll(Collection[? extends Callable[T]])`. Without descending into
+    // the wildcard bounds, T is treated as non-generic and the formal defaults
+    // to its erased `Object` bound, so the call fails to resolve (issue #274).
+    case w: WildcardType =>
+      containsMethodTypeParam(w.upperBound, methodTypeParams) ||
+        w.lowerBound.exists(containsMethodTypeParam(_, methodTypeParams))
     case _ => false
 
   private def sameClass(c1: ClassType, c2: ClassType): Boolean =
@@ -197,12 +204,36 @@ private[compiler] final class MethodResolutionSupport(
           TypeRules.isSuperType(tv.upperBound, boxedActual)
         else
           TypeRules.isSuperType(tv.upperBound, actual)
+      // A wildcard formal that carries a method type variable (e.g.
+      // `? extends Callable[T]`) matches by descending into its bound. The
+      // covariant `? extends E` case requires the actual argument to structurally
+      // match E (so T can bind); `? super E` matches E contravariantly. Bounds
+      // with no method type variable fall through to plain assignability so the
+      // existing wildcard rules in isAssignable keep applying (issue #274).
+      case (w: WildcardType, _) if containsMethodTypeParam(w, methodTypeParams) =>
+        w.lowerBound match
+          case Some(lb) => structuralMatch(lb, actual, methodTypeParams)
+          case None => structuralMatch(w.upperBound, actual, methodTypeParams)
       case (ae: AppliedClassType, aa: AppliedClassType) =>
-        sameClass(ae.raw, aa.raw) &&
-          ae.typeArguments.length == aa.typeArguments.length &&
+        if sameClass(ae.raw, aa.raw) && ae.typeArguments.length == aa.typeArguments.length then
           ae.typeArguments.zip(aa.typeArguments).forall { (e, a) =>
             structuralMatchWithBoxing(e, a, methodTypeParams)
           }
+        else
+          // Raw classes differ (e.g. formal Collection[...] vs actual
+          // ArrayList[...]): align via the actual's applied supertype views so a
+          // method type variable buried in a wildcard bound still gets a chance
+          // to match structurally (issue #274).
+          val actualViews = AppliedTypeViews.collectAppliedViewsFrom(aa)
+          actualViews.get(ae.raw)
+            .orElse(actualViews.find((k, _) => k.name == ae.raw.name).map(_._2)) match
+            case Some(view) =>
+              ae.typeArguments.length == view.typeArguments.length &&
+                ae.typeArguments.zip(view.typeArguments).forall { (e, a) =>
+                  structuralMatchWithBoxing(e, a, methodTypeParams)
+                }
+            case None =>
+              isAssignableWithBoxing(expected, actual)
       case (ae: AppliedClassType, aa: ClassType) if !aa.isInstanceOf[AppliedClassType] =>
         sameClass(ae.raw, aa) && ae.typeArguments.forall {
           case tv: TypeVariableType => methodTypeParams.contains(tv.name)

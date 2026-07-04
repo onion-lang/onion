@@ -23,6 +23,7 @@ private[compiler] final class TopLevelTypingSupport(
   final case class PreparedUnit(
     context: LocalContext,
     statements: Buffer[ActionStatement],
+    fieldInitStatements: Buffer[ActionStatement],
     klass: ClassDefinition,
     argsType: Type,
     startMethod: MethodDefinition
@@ -31,6 +32,7 @@ private[compiler] final class TopLevelTypingSupport(
   def prepareUnit(unit: AST.CompilationUnit): PreparedUnit = {
     val context = new LocalContext
     val statements = Buffer[ActionStatement]()
+    val fieldInitStatements = Buffer[ActionStatement]()
     typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
     val klass = typing.loadTopClass.collect { case cd: ClassDefinition => cd }.orNull
     val argsType = entryPointSupport.stringArgsType
@@ -42,8 +44,11 @@ private[compiler] final class TopLevelTypingSupport(
     // MethodBodySupport. `args` is a real parameter slot, so it is excluded.
     val blockElements = unit.toplevels.collect { case be: AST.BlockElement => be }
     context.markAsBoxed(CapturedVariableScanner.scanElements(blockElements, Set("args")))
+    // A top-level `var` never reassigned across the script body is effectively
+    // final and can be smart-cast like a `val` (issue #273).
+    context.setReassignedNames(blockElements.flatMap(AssignedVariableScanner.scan).toSet)
     context.add("args", argsType)
-    PreparedUnit(context, statements, klass, argsType, startMethod)
+    PreparedUnit(context, statements, fieldInitStatements, klass, argsType, startMethod)
   }
 
   def processToplevels(toplevels: Seq[AST.Toplevel], prepared: PreparedUnit): Unit = {
@@ -53,7 +58,13 @@ private[compiler] final class TopLevelTypingSupport(
         case node: AST.LocalVariableDeclaration if prepared.klass != null =>
           prepared.context.setMethod(prepared.startMethod)
           processTopLevelVarDeclaration(node, prepared.klass, prepared.context) match {
-            case Some(stmt) => prepared.statements += stmt
+            case Some(stmt) =>
+              // A top-level `val`/`var` field initializer. It goes into `start`
+              // (as before) but is also recorded so it can be run before the
+              // user's `def main` when one exists (otherwise `start` is never
+              // called and the field keeps its default — see #270).
+              prepared.statements += stmt
+              prepared.fieldInitStatements += stmt
             case None => prepared.statements += translate(node, prepared.context)
           }
         case node: AST.BlockElement =>
@@ -84,6 +95,7 @@ private[compiler] final class TopLevelTypingSupport(
         prepared.klass,
         prepared.startMethod,
         prepared.statements,
+        prepared.fieldInitStatements,
         prepared.context,
         prepared.argsType
       )

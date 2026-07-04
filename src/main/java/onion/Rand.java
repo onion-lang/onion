@@ -92,19 +92,23 @@ public class Rand {
 
     /**
      * Returns a random element from the array.
-     * Returns null if array is null or empty.
+     * Throws IllegalArgumentException if the array is null or empty.
      */
     public static <T> T choice(T[] array) {
-        if (array == null || array.length == 0) return null;
+        if (array == null || array.length == 0) {
+            throw new IllegalArgumentException("Rand::choice: cannot choose from an empty or null array");
+        }
         return array[nextInt(array.length)];
     }
 
     /**
      * Returns a random element from the list.
-     * Returns null if list is null or empty.
+     * Throws IllegalArgumentException if the list is null or empty.
      */
     public static <T> T choice(java.util.List<T> list) {
-        if (list == null || list.isEmpty()) return null;
+        if (list == null || list.isEmpty()) {
+            throw new IllegalArgumentException("Rand::choice: cannot choose from an empty or null list");
+        }
         return list.get(nextInt(list.size()));
     }
 

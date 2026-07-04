@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.{TypingBodyContext, TypingUnitContext}
 
 private[compiler] final class MethodBodySupport(
@@ -76,9 +77,18 @@ private[compiler] final class MethodBodySupport(
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
-      val params = typedTerms(node.superInits.toArray, context)
+      val params0 = typedTerms(node.superInits.toArray, context)
       val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
-      val matched = targetClass.findConstructor(params)
+      val matched0 = targetClass.findConstructor(params0)
+      // Exact matching is substitution-blind: an applied Box[Int] still exposes
+      // the constructor as Box(T) over the erased bound (Object), so a primitive
+      // argument (Int) does not match. Retry against the type-argument-
+      // substituted signatures with primitive boxing so that
+      // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
+      // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
+      val (matched, params) =
+        if matched0.nonEmpty || params0 == null then (matched0, params0)
+        else findSuperConstructorWithBoxing(targetClass, params0)
       if matched.length == 0 then
         bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
       else if matched.length > 1 then
@@ -88,6 +98,36 @@ private[compiler] final class MethodBodySupport(
         finishConstructorBody(constructor, init, node.block, context)
       reportConstructorOnly(context)
     }
+
+  /**
+   * Boxing-aware super-constructor fallback: substitutes the parent's class type
+   * arguments into each constructor signature, matches with primitive boxing,
+   * and (for the unique match) boxes the primitive argument terms so a primitive
+   * type argument (Box[Int]) resolves the erased-Object parent constructor.
+   * Mirrors ConstructionTyping.findConstructorWithBoxing for the super path.
+   */
+  private def findSuperConstructorWithBoxing(
+    targetClass: ClassType,
+    params: Array[Term]
+  ): (Array[ConstructorRef], Array[Term]) = {
+    val classSubst = TypeSubstitution.classSubstitution(targetClass)
+    def substitutedArgs(c: ConstructorRef): Array[Type] =
+      c.getArgs.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+    val candidates = targetClass.constructors.filter { c =>
+      val formals = substitutedArgs(c)
+      formals.length == params.length &&
+        formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), params(i).`type`, bodyContext.table))
+    }
+    if (candidates.length != 1) (candidates, params)
+    else {
+      val formals = substitutedArgs(candidates(0))
+      val adapted = params.zip(formals).map { (p, f) =>
+        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+        else p
+      }
+      (candidates, adapted)
+    }
+  }
 
   def finishConstructorBody(
     constructor: ConstructorDefinition,
@@ -166,6 +206,7 @@ private[compiler] final class MethodBodySupport(
 
     val arguments = staticMethod.arguments
     val assigned = if (node.block == null) node.args.map(_.name).toSet else AssignedVariableScanner.scan(node.block)
+    context.setReassignedNames(assigned)
     for ((arg, i) <- node.args.zipWithIndex) {
       context.add(arg.name, arguments(i + 1), isMutable = assigned.contains(arg.name))
     }
@@ -203,6 +244,9 @@ private[compiler] final class MethodBodySupport(
     val assigned =
       if (body == null) args.map(_.name).toSet
       else AssignedVariableScanner.scan(body)
+    // Share the reassigned-name set with local `var` declarations so a var
+    // never reassigned in this body can be smart-cast (issue #273).
+    context.setReassignedNames(assigned)
     var i = 0
     args.foreach { arg =>
       context.add(arg.name, types(i), isMutable = assigned.contains(arg.name))

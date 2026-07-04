@@ -8,6 +8,34 @@ import scala.math.max
 import scala.util.Using
 
 object DiagnosticRenderer {
+  /**
+   * Tab width used by the column model. JavaCC's SimpleCharStream advances the
+   * column to the next multiple of this width on a tab, so rendered source lines
+   * must expand tabs identically for the caret to align.
+   */
+  private val TabWidth = 8
+
+  /**
+   * Expands tab characters to spaces so the rendered column of every character
+   * matches the tab-expanded column model. A tab advances to the next multiple
+   * of `tabWidth` (mirroring JavaCC SimpleCharStream with tabSize=8).
+   */
+  private def expandTabs(line: String, tabWidth: Int): String = {
+    if (line.indexOf('\t') < 0) return line
+    val sb = new StringBuilder
+    var column = 0
+    line.foreach {
+      case '\t' =>
+        val spaces = tabWidth - (column % tabWidth)
+        sb.append(" " * spaces)
+        column += spaces
+      case ch =>
+        sb.append(ch)
+        column += 1
+    }
+    sb.toString
+  }
+
   def printErrors(errors: Seq[CompileError], out: PrintStream = Console.err): Unit = {
     if (errors.isEmpty) return
     formatErrors(errors).foreach(out.println)
@@ -44,7 +72,11 @@ object DiagnosticRenderer {
           case (l, _) if l > 0 => l.toString
           case _ => ""
         }
-        val lineText = locationOpt.flatMap(loc => readSourceLine(sourceFile, loc.line)).getOrElse("")
+        val rawLineText = locationOpt.flatMap(loc => readSourceLine(sourceFile, loc.line)).getOrElse("")
+        // The column model (JavaCC SimpleCharStream) counts tab-expanded columns
+        // with tabSize=8, so the rendered source line must expand tabs the same way
+        // for the caret (built from N spaces) to land under the offending token.
+        val lineText = expandTabs(rawLineText, DiagnosticRenderer.TabWidth)
         builder.append(s"$sourceFile:$locationText: $errorCodePrefix${error.message}")
         builder.append(Systems.lineSeparator)
         if (lineText.nonEmpty && lineNumber > 0) {

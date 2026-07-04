@@ -43,6 +43,7 @@ private[compiler] final class EntryPointSupport(
     klass: ClassDefinition,
     startMethod: MethodDefinition,
     statements: Buffer[ActionStatement],
+    fieldInitStatements: Buffer[ActionStatement],
     context: LocalContext,
     argsType: Type
   ): Unit = {
@@ -56,11 +57,61 @@ private[compiler] final class EntryPointSupport(
     // collide, so use the user's main instead (the entry-point rule prefers a
     // main on the top-level class; any bare top-level statements in `start` are
     // then not run).
-    val existingMain = klass.methods("main").exists { m =>
-      m.arguments.length == 1 && m.arguments(0) == argsType
+    val userMain = klass.methods("main").collectFirst {
+      case m: MethodDefinition if m.arguments.length == 1 && m.arguments(0) == argsType => m
     }
-    if (!existingMain) {
-      klass.add(createMain(klass, startMethod, "main", Array[Type](argsType), BasicType.VOID))
+    userMain match {
+      case Some(main) =>
+        // The user's `main` is the entry point, so `start` is never invoked and
+        // top-level `val`/`var` field initializers would never run, leaving the
+        // static fields at their default (null/0/false) — a silent miscompile
+        // (#270). Run just the field initializers (not bare executable top-level
+        // statements) before the user's `main` body. They reuse `start`'s frame,
+        // so we synthesize a field-init-only instance method mirroring `start`
+        // and prepend a call to it at the top of `main`.
+        if (fieldInitStatements.nonEmpty) {
+          prependFieldInitializers(klass, startMethod, main, fieldInitStatements, context, argsType)
+        }
+      case None =>
+        klass.add(createMain(klass, startMethod, "main", Array[Type](argsType), BasicType.VOID))
     }
+  }
+
+  /**
+   * Synthesize a field-initializer-only instance method (reusing `start`'s frame)
+   * and prepend a call to it at the top of the user-defined `main`, so top-level
+   * `val`/`var` initializers run before `main` executes (#270).
+   */
+  private def prependFieldInitializers(
+    klass: ClassDefinition,
+    startMethod: MethodDefinition,
+    main: MethodDefinition,
+    fieldInitStatements: Buffer[ActionStatement],
+    context: LocalContext,
+    argsType: Type
+  ): Unit = {
+    val initMethod = new MethodDefinition(
+      null, AST.M_PUBLIC, klass, "onion$fieldinit", Array[Type](argsType), BasicType.VOID, null
+    )
+    val initStatements = Buffer[ActionStatement]()
+    initStatements ++= fieldInitStatements
+    initStatements += new Return(null)
+    initMethod.setBlock(new StatementBlock(initStatements.asJava))
+    // The field initializers reference locals in `start`'s frame; share it.
+    initMethod.setFrame(context.getContextFrame)
+    klass.add(initMethod)
+
+    // `new TopClass().onion$fieldinit(args)` — `args` is the first parameter of
+    // the static `main`, so it lives at local slot 0.
+    val constructor = klass.findConstructor(new Array[Term](0))(0)
+    val argsRef = new RefLocal(0, 0, argsType)
+    val call = new Call(new NewObject(constructor, new Array[Term](0)), initMethod, Array[Term](argsRef))
+    val initCall = new ExpressionActionStatement(call)
+
+    val body = main.getBlock
+    val newBody =
+      if (body == null) new StatementBlock(initCall)
+      else new StatementBlock((initCall +: body.statements.toIndexedSeq)*)
+    main.setBlock(newBody)
   }
 }

@@ -109,7 +109,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     } else {
       val method = methods(0)
       if (!ensureInstanceAvailable(node, method, context)) return None
-      val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+      val classSubst = selfClassSubstitution(method)
       calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
         expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
         finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
@@ -220,6 +220,19 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     } else true
   }
 
+  /**
+   * Substitution for an inherited method called unqualified (self-receiver).
+   * The current class may extend a generic parent with concrete type arguments
+   * (e.g. `class StrBox : Box[String]`); an inherited `Box.get(): T` must then be
+   * seen as returning `String`. Build the substitution by composing the extends
+   * clause bindings from the current class up to the method's declaring class,
+   * exactly as the variable-receiver path does. When the method is declared on the
+   * current class (or the chain carries no type arguments) this yields an empty
+   * map, preserving prior behavior. (issue #271)
+   */
+  private def selfClassSubstitution(method: Method): scala.collection.immutable.Map[String, Type] =
+    TypeSubstitution.hierarchySubstitution(bodyContext.definition, method.affiliation)
+
   private def rawUnqualifiedCall(
     targetType: ClassType,
     method: Method,
@@ -282,7 +295,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         None
       case CandidateSelection.Selected(method) =>
         if (!ensureInstanceAvailable(node, method, context)) return None
-        val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
+        val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs),

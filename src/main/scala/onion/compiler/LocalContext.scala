@@ -55,6 +55,27 @@ class LocalContext {
   private var isMethod: Boolean = false
   private var loopDepth: Int = 0
 
+  // Names that are reassigned (`=`, compound-assign, `++`/`--`) somewhere in the
+  // enclosing body. Computed once from the whole method/closure/top-level body
+  // via AssignedVariableScanner. A `var` local whose name is NOT in this set is
+  // never reassigned and can therefore be treated as effectively-final for
+  // smart-cast purposes (issue #273), mirroring the parameter/foreach (#253)
+  // treatment. `null` means "unknown" — the conservative default that keeps
+  // every `var` mutable, preserving prior behavior.
+  private var reassignedNames: Set[String] = null
+
+  def setReassignedNames(names: Set[String]): Unit = {
+    reassignedNames = names
+  }
+
+  /**
+   * True when the local name may be reassigned, so smart casts must not narrow
+   * it. When the reassignment set has not been computed (null), every name is
+   * treated as reassignable — the safe, behavior-preserving default.
+   */
+  def isReassigned(name: String): Boolean =
+    reassignedNames == null || reassignedNames.contains(name)
+
   def setGlobal(isGlobal: Boolean): Unit = {
     this.isGlobal = isGlobal
   }

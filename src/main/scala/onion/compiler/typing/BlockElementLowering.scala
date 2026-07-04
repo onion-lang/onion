@@ -230,7 +230,11 @@ final class BlockElementLowering(
           return new NOP(node.location)
         }
         typing.checkAndReportShadowing(node.name, node.location, context)
-        val index = context.add(node.name, inferredType, isMutable = !Modifier.isFinal(node.modifiers))
+        // A `var` never reassigned in its enclosing body is effectively final,
+        // so it can be smart-cast like a `val` (issue #273). `val` (final) is
+        // always immutable regardless.
+        val mutable = !Modifier.isFinal(node.modifiers) && context.isReassigned(node.name)
+        val index = context.add(node.name, inferredType, isMutable = mutable)
         context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
@@ -257,7 +261,10 @@ final class BlockElementLowering(
             }
           } else (defaultValue(lhsType), false)
         typing.checkAndReportShadowing(node.name, node.location, context)
-        val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
+        // A `var` never reassigned in its enclosing body is effectively final,
+        // so it can be smart-cast like a `val` (issue #273).
+        val mutable = !Modifier.isFinal(node.modifiers) && context.isReassigned(node.name)
+        val index = context.add(node.name, lhsType, isMutable = mutable)
         context.recordDeclaration(node.name, node.location)
         if (failed) new NOP(node.location)
         else new ExpressionActionStatement(new SetLocal(node.location, 0, index, lhsType, typedValue))

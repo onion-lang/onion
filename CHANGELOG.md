@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-04
+
 - **An uninitialized local `val` is a compile error (E0069)** instead of silently reading
   the JVM default (null/0) or NPEing ([#280]).
 
@@ -559,7 +561,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[0.4.2]: https://github.com/onion-lang/onion/releases/tag/v0.4.2
 [#277]: https://github.com/onion-lang/onion/issues/277
 [#279]: https://github.com/onion-lang/onion/issues/279
 [#280]: https://github.com/onion-lang/onion/issues/280

@@ -240,20 +240,27 @@ final class BlockElementLowering(
         // Type the initializer BEFORE the variable is in scope, so `val x: T = x`
         // is a clean "variable not found" error rather than loading an
         // uninitialized slot (VerifyError). Matches the no-annotation branch.
-        val typedValue: Term =
+        //
+        // When the initializer itself is a type error (E0000) or otherwise fails
+        // to type, register the binding at its DECLARED type anyway, so later
+        // references to this variable resolve instead of cascading a spurious
+        // E0002 through the rest of the block (issue #257). A placeholder default
+        // value stands in for codegen, which never runs once an error is
+        // reported.
+        val (typedValue, failed): (Term, Boolean) =
           if (node.init != null) {
             typed(node.init, context, lhsType) match {
-              case None => return new NOP(node.location)
+              case None => (defaultValue(lhsType), true)
               case Some(v) =>
                 val value = processAssignable(node.init, lhsType, v)
-                if (value == null) return new NOP(node.location)
-                value
+                if (value == null) (defaultValue(lhsType), true) else (value, false)
             }
-          } else defaultValue(lhsType)
+          } else (defaultValue(lhsType), false)
         typing.checkAndReportShadowing(node.name, node.location, context)
         val index = context.add(node.name, lhsType, isMutable = !Modifier.isFinal(node.modifiers))
         context.recordDeclaration(node.name, node.location)
-        new ExpressionActionStatement(new SetLocal(node.location, 0, index, lhsType, typedValue))
+        if (failed) new NOP(node.location)
+        else new ExpressionActionStatement(new SetLocal(node.location, 0, index, lhsType, typedValue))
       }
     case node: AST.DestructuringDeclaration =>
       translateDestructuring(node, context)

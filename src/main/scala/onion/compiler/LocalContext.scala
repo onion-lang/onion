@@ -50,6 +50,12 @@ class LocalContext {
   var isClosure: Boolean                     = false
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
+  // Top-level `val`/`var` declarations become static fields (which get a
+  // constructor/JVM default), so an uninitialized top-level `val` is allowed.
+  // Inside a method/closure body a `val` with no initializer can never be
+  // usefully assigned (reassignment is E0036), so it is rejected (issue #280).
+  // The top-level typing context sets this to true.
+  var allowUninitializedLocal: Boolean       = false
   var method: TypedAST.Method                     = _
   var constructor: TypedAST.ConstructorDefinition = _
   private var isMethod: Boolean = false

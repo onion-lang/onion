@@ -167,6 +167,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.cannotAssignToVal",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.VAL_REQUIRES_INITIALIZER -> ErrorDef(
+      "error.semantic.valRequiresInitializer",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.CANNOT_RETURN_VALUE -> ErrorDef(
       "error.semantic.cannotReturnValue",
       Seq()

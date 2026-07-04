@@ -134,6 +134,7 @@ object SemanticError {
   case object RAW_TYPE_NOT_ALLOWED extends SemanticError(66)
   case object MISSING_RETURN extends SemanticError(67)
   case object OVERRIDE_TARGET_NOT_FOUND extends SemanticError(68)
+  case object VAL_REQUIRES_INITIALIZER extends SemanticError(69)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

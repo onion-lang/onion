@@ -241,6 +241,18 @@ final class BlockElementLowering(
         val lhsTypeOpt = mapFrom(node.typeRef)
         if (lhsTypeOpt.isEmpty) return new NOP(node.location)
         val lhsType = lhsTypeOpt.get
+        // A local `val` without an initializer can never be usefully assigned
+        // (reassignment of a val is E0036), so reading it would silently yield
+        // the JVM default (null/0) or an NPE. Reject it up front (issue #280).
+        // Top-level `val` declarations become static fields and set
+        // `allowUninitializedLocal`, so they keep their field-init behavior.
+        if (node.init == null && Modifier.isFinal(node.modifiers) && !context.allowUninitializedLocal) {
+          bodyContext.report(VAL_REQUIRES_INITIALIZER, node, node.name)
+          typing.checkAndReportShadowing(node.name, node.location, context)
+          context.add(node.name, lhsType, isMutable = false)
+          context.recordDeclaration(node.name, node.location)
+          return new NOP(node.location)
+        }
         // Type the initializer BEFORE the variable is in scope, so `val x: T = x`
         // is a clean "variable not found" error rather than loading an
         // uninitialized slot (VerifyError). Matches the no-annotation branch.

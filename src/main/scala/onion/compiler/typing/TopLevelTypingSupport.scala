@@ -31,6 +31,10 @@ private[compiler] final class TopLevelTypingSupport(
 
   def prepareUnit(unit: AST.CompilationUnit): PreparedUnit = {
     val context = new LocalContext
+    // Top-level `val`/`var` declarations are lowered to static fields, which get
+    // a default/constructor init, so an uninitialized top-level `val` is allowed
+    // here (issue #280 targets uninitialized *local* vals only).
+    context.allowUninitializedLocal = true
     val statements = Buffer[ActionStatement]()
     val fieldInitStatements = Buffer[ActionStatement]()
     typing.find(typing.topClass).foreach(unitContext.currentMapper = _)

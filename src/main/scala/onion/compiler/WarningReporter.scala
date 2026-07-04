@@ -94,6 +94,12 @@ class WarningReporter(
       s"'$snippet' looks like shell/Kotlin-style interpolation but is emitted literally; Onion interpolates with '#{expr}'")
   }
 
+  def discardedTopLevelStatements(location: Location, count: Int): Unit = {
+    val plural = if (count == 1) "statement is" else "statements are"
+    report(WarningCategory.DiscardedTopLevelStmts, location,
+      s"$count top-level $plural ignored because a main is defined; move the code into main to run it")
+  }
+
   def getWarnings: Seq[CompileWarning] = warnings.toSeq
 
   def hasWarnings: Boolean = warnings.nonEmpty

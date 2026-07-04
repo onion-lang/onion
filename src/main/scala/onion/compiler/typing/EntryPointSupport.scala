@@ -72,6 +72,16 @@ private[compiler] final class EntryPointSupport(
         if (fieldInitStatements.nonEmpty) {
           prependFieldInitializers(klass, startMethod, main, fieldInitStatements, context, argsType)
         }
+        // Bare executable top-level statements (not `val`/`var` field
+        // initializers, not the synthetic trailing return) are silently dropped
+        // because the user's `main` is the entry point. Warn so the code is not
+        // mistaken for something that runs (#278).
+        val bareExecs = statements.filterNot(s =>
+          s.isInstanceOf[Return] || fieldInitStatements.contains(s))
+        bareExecs.headOption.foreach { first =>
+          val loc = if (first.location != null) first.location else main.location
+          typing.warningReporter_.discardedTopLevelStatements(loc, bareExecs.size)
+        }
       case None =>
         klass.add(createMain(klass, startMethod, "main", Array[Type](argsType), BasicType.VOID))
     }

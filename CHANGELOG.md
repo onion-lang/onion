@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **W0014**: a script that defines a `main` and also has bare executable top-level
+  statements now warns that those statements are ignored (they are not the entry point) ([#278]).
+
 - **An unknown declared type no longer cascades `E0002`** through later uses of the variable —
   the binding is recovered at the initializer's type (error recovery, cf. #257) ([#290]).
 
@@ -581,6 +584,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#278]: https://github.com/onion-lang/onion/issues/278
 [#290]: https://github.com/onion-lang/onion/issues/290
 [#289]: https://github.com/onion-lang/onion/issues/289
 [#288]: https://github.com/onion-lang/onion/issues/288

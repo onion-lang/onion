@@ -34,6 +34,7 @@ enum WarningCategory(val code: String, val description: String):
   case UncheckedCast       extends WarningCategory("W0011", "Unchecked cast")
   case NullToNonNullable   extends WarningCategory("W0012", "Null assigned to non-nullable type")
   case SuspiciousInterpolation extends WarningCategory("W0013", "Suspicious string interpolation syntax")
+  case DiscardedTopLevelStmts extends WarningCategory("W0014", "Top-level statements ignored because a main is defined")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -51,7 +52,8 @@ object WarningCategory:
     "unnecessary-conversion" -> WarningCategory.UnnecessaryConversion,
     "unchecked-cast" -> WarningCategory.UncheckedCast,
     "null-to-non-nullable" -> WarningCategory.NullToNonNullable,
-    "suspicious-interpolation" -> WarningCategory.SuspiciousInterpolation
+    "suspicious-interpolation" -> WarningCategory.SuspiciousInterpolation,
+    "discarded-toplevel" -> WarningCategory.DiscardedTopLevelStmts
   )
 
   def fromString(value: String): Option[WarningCategory] =

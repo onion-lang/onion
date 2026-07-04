@@ -169,10 +169,17 @@ def main(name: String, count: Int = 3, loud: Boolean = false): void {
 ```console
 $ onion greet.on world --count 5 --loud
 HELLO WORLD X5
+$ onion greet.on world --count=5 --loud     # --name=value form works too
+HELLO WORLD X5
+$ onion greet.on --help                      # prints usage and exits 0
+usage: <script> <name> [--count VALUE] [--loud] [--help]
 $ onion greet.on
 error: missing argument: name
-usage: <script> <name> [--count VALUE] [--loud]
+usage: <script> <name> [--count VALUE] [--loud] [--help]
 ```
+
+Flags accept both `--name value` and `--name=value`; `--help` (or `-h`) prints
+the generated usage and exits.
 
 ## Putting It Together
 

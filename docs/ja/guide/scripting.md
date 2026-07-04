@@ -68,7 +68,10 @@ xs.map { x => x * 2 } |> println
 ```onion
 def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 // $ onion script.on world --count 5 --loud
+// $ onion script.on world --count=5 --loud   （--name=value 形式も可）
 ```
+
+フラグは `--name value` と `--name=value` の両形式を受け付けます。`--help`（または `-h`）で生成された usage を表示して終了します。
 
 ## 次のステップ
 

@@ -204,6 +204,30 @@ println(new Counter("hi").show())   // 2
 println(new Counter(null).show())   // -1
 ```
 
+A mutable (`var`) **local** is narrowed as well, as long as it is not reassigned
+between the check and the use — so a `var` you assign once, or only reassign
+elsewhere, still narrows where it matters:
+
+```onion
+def firstNonEmpty(lines: List[String]): String {
+  var found: String? = null
+  foreach line: String in lines {
+    if found == null && line.length() > 0 {
+      found = line
+    }
+  }
+  if found != null {
+    return found            // found (a var) narrowed to String here
+  }
+  return "(none)"
+}
+```
+
+This also covers the read-loop idiom `while (line = next()) != null { ... }`,
+where `line` is narrowed at the top of the loop body. A reassignment *after* the
+use does not undo the narrowing, but a `var` captured by a closure stays nullable
+inside the closure, since the closure may run after the variable has changed.
+
 ## Return Type of Safe Calls
 
 The return type of a safe call expression is always nullable (`T?`), since it can return `null` when the target is `null`:

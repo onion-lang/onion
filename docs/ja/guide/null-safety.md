@@ -134,6 +134,25 @@ println(new Counter("hi").show())   // 2
 println(new Counter(null).show())   // -1
 ```
 
+ミュータブル（`var`）な**ローカル変数**も、チェックと使用の間で再代入されない限り絞り込まれます。一度だけ代入する `var` や、別の場所でのみ再代入する `var` は、必要な箇所ではちゃんと絞り込まれます。
+
+```onion
+def firstNonEmpty(lines: List[String]): String {
+  var found: String? = null
+  foreach line: String in lines {
+    if found == null && line.length() > 0 {
+      found = line
+    }
+  }
+  if found != null {
+    return found            // found（var）はここで String に絞られる
+  }
+  return "(none)"
+}
+```
+
+定番の読み取りループ `while (line = next()) != null { ... }` も同様で、`line` はループ本体の先頭で絞り込まれます。使用の**後**の再代入は絞り込みを取り消しませんが、クロージャに捕捉された `var` はクロージャ内では nullable のままです（クロージャは変数が変わった後に実行されうるため）。
+
 ## nullableに対する `==` はnull安全な値等価
 
 `==` は静的に nullable なレシーバに対しても **値等価**（`java.util.Objects.equals` 相当）です。両方 null なら等しい、片方だけ null なら非等価、それ以外は `equals` で比較します。**事前の null チェックは不要です。**

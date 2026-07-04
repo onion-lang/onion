@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Rand::choice` throws on an empty collection** instead of silently returning null ([#276]).
+
 - **The diagnostic caret aligns on lines with leading tabs** ([#275]).
 
 - **A generic subtype is assignable to its generic supertype.** `ArrayList[T]` is now
@@ -539,6 +541,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
+[#276]: https://github.com/onion-lang/onion/issues/276
 [#275]: https://github.com/onion-lang/onion/issues/275
 [#269]: https://github.com/onion-lang/onion/issues/269
 [#268]: https://github.com/onion-lang/onion/issues/268

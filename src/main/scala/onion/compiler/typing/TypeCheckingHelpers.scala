@@ -25,6 +25,15 @@ private[typing] object TypeCheckingHelpers {
       containsTypeVariable(array.component)
     case nullable: NullableType =>
       containsTypeVariable(nullable.innerType)
+    case w: WildcardType =>
+      // A bounded wildcard such as `? extends U` / `? super U` carries a type
+      // variable through its bound. Without recursing here, a SAM whose return
+      // position is `? extends U` (java.util.function.Function<? super T,
+      // ? extends U>: thenApply / Stream.map / Optional.map) was reported as
+      // free of type variables, so the closure's expected return type was left
+      // as the raw wildcard rather than being inferred, leaking `? extends U`
+      // into later checks (issue #259).
+      containsTypeVariable(w.upperBound) || w.lowerBound.exists(containsTypeVariable)
     case _ => false
   }
 

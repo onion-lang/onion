@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A lambda binds a Function type with an `Object` result, and JDK wildcard-result SAMs.**
+  `Function1[String, Object] = (s) -> 42` is accepted, and a lambda passed directly to a
+  `Function<? super T, ? extends U>` JDK method (`thenApply`, `Stream.map`, `Optional.map`)
+  infers correctly instead of failing on the wildcard ([#260], [#259]).
+
 - **A type-mismatched local binding no longer cascades spurious errors.** When a `val`/`var`
   initializer fails to type, the binding is still registered at its declared type, so later
   references resolve instead of emitting a chain of spurious E0002 ([#257]).
@@ -506,6 +511,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.1...develop
 [#261]: https://github.com/onion-lang/onion/issues/261
 [#257]: https://github.com/onion-lang/onion/issues/257
+[#259]: https://github.com/onion-lang/onion/issues/259
+[#260]: https://github.com/onion-lang/onion/issues/260
 [#258]: https://github.com/onion-lang/onion/issues/258
 [#255]: https://github.com/onion-lang/onion/issues/255
 [#256]: https://github.com/onion-lang/onion/issues/256

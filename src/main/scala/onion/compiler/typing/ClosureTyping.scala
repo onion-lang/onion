@@ -61,9 +61,16 @@ final class ClosureTyping(
       // this template lets an inner generic call there (`Result::ok(x)`) unify
       // its already-known type arguments (E = String) from the expected type,
       // rather than leaving them unbound so they default to Object (issue #230).
-      val samReturnTemplate: Type = inferredTarget match {
+      // A SAM return position may itself be a bounded wildcard (`? extends U`,
+      // e.g. java.util.function.Function<? super T, ? extends U>). Collapse it to
+      // its bound so the body is typed against the bound (or its still-unbound
+      // type variable U) rather than the raw wildcard (issue #259).
+      val samReturnTemplate: Type = (inferredTarget match {
         case applied: AppliedClassType => applied.typeArguments.lastOption.orNull
         case _ => null
+      }) match {
+        case null => null
+        case t => TypeCheckingHelpers.effectiveType(t)
       }
 
       val inferredReturnType =
@@ -90,6 +97,24 @@ final class ClosureTyping(
         } else {
           rawTypeRef
         }
+
+      // When the expected function type's RESULT is exactly `Object`, return-type
+      // inference above re-specializes the closure's result (e.g. Object -> Int),
+      // producing `Function1[String, Int]`. Because generic type arguments are
+      // invariant, that no longer matches the declared `Function1[String, Object]`
+      // target and the assignment is rejected (issue #260). The impl method still
+      // uses the precise inferred return (codegen boxes at the erased interface
+      // boundary), but the closure's STATIC type must stay the declared target so
+      // the assignment type-checks. Every value is assignable to Object, so this is
+      // always sound; re-inference against a concrete result only ever fires when
+      // that result is exactly Object (a concrete non-Object target skips it).
+      val staticType: ClassType = inferredTarget match {
+        case applied: AppliedClassType
+          if inferredReturnType.isDefined &&
+             applied.typeArguments.lastOption.contains(bodyContext.rootClass) =>
+          applied
+        case _ => typeRef
+      }
       val classSubst = TypeSubstitution.classSubstitution(typeRef)
 
       def substitutedArgs(method: Method): Array[Type] =
@@ -99,8 +124,16 @@ final class ClosureTyping(
       // ラムダの期待戻り値型を計算する際、残った型変数（外側メソッドの型パラメータ等）は
       // rootClassに置換する。これにより Function1<String, Future<U>> の U が Object になっても
       // ラムダ本体が Future<String> を返すとき、戻り値型チェックが通るようになる。
+      //
+      // また、SAM の戻り型が上限境界ワイルドカード（`? extends U` / `? super U`、
+      // 例: java.util.function.Function<? super T, ? extends R> の R 位置）の場合、
+      // そのまま期待戻り型として使うとラムダ本体の値がワイルドカード型に代入できず
+      // E0000 になる（issue #259: thenApply / Stream.map / Optional.map 等）。
+      // effectiveType でワイルドカードをその境界（`? extends X` -> X）に畳んでから
+      // 期待戻り型として用いる。非ワイルドカード型に対しては恒等変換なので他の経路に影響しない。
       def substitutedReturn(method: Method): Type =
-        TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+        TypeCheckingHelpers.effectiveType(
+          TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
 
       val implName = implementedMethodName(typeRef, name, argTypes.length)
       val candidates = typeRef.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
@@ -173,7 +206,7 @@ final class ClosureTyping(
                   val finalBlock =
                     if (useExpressionBody) block
                     else body.addReturnNode(block, expectedRet)
-                  val result = new NewClosure(typeRef, typedMethod, finalBlock)
+                  val result = new NewClosure(staticType, typedMethod, finalBlock)
                   result.frame_=(context.getContextFrame)
                   Some(result)
                 }

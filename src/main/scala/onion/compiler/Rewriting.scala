@@ -823,7 +823,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   def rewriteBlockElement(element: AST.BlockElement): AST.BlockElement = element match {
     case AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, init) =>
-      AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, Option(init).map(rewriteExpression).orNull)
+      val rewrittenInit = init match {
+        // `val r: M[E] = do[M] { ... }` — thread the declared element type E into
+        // the do desugaring so a throw-only bind RHS (whose body infers to bottom
+        // and would otherwise default to Object) can be pinned (issue #284).
+        case doExpr: AST.DoExpression =>
+          desugarDoExpression(doExpr, elementTypeHintFor(doExpr.monadType, typeRef))
+        case other => Option(other).map(rewriteExpression).orNull
+      }
+      AST.LocalVariableDeclaration(loc, modifiers, name, typeRef, rewrittenInit)
     case AST.DestructuringDeclaration(loc, modifiers, names, init) =>
       AST.DestructuringDeclaration(loc, modifiers, names, rewriteExpression(init))
     case expr: AST.Expression =>
@@ -994,7 +1002,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * @return The desugared expression using explicit bind/successful calls
    * @throws CompilationException if the do expression is empty or malformed
    */
-  def desugarDoExpression(doExpr: AST.DoExpression): AST.Expression = {
+  def desugarDoExpression(doExpr: AST.DoExpression): AST.Expression =
+    desugarDoExpression(doExpr, None)
+
+  def desugarDoExpression(doExpr: AST.DoExpression, elementHint: Option[AST.TypeNode]): AST.Expression = {
     val monadType = doExpr.monadType
     val statements = doExpr.statements
 
@@ -1016,8 +1027,85 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       ))
     }
 
-    desugarDoStatements(doExpr.location, monadType, pinEmptyBindElementTypes(statements))
+    val pinned = pinThrowOnlyGenerativeBinds(pinEmptyBindElementTypes(statements), elementHint)
+    desugarDoStatements(doExpr.location, monadType, pinned)
   }
+
+  /**
+   * When the declared result type of `val r: M[E] = do[M] { ... }` gives us the
+   * element type `E`, a bind whose RHS is a generative call with a single
+   * throw-only lambda argument (e.g. `Future::async(() -> { throw ... })`) can be
+   * pinned with that element type. Without it, the throw-only lambda body infers
+   * to bottom, which is widened to Object, so the generative call's type argument
+   * defaults to Object and the bound variable is unusable (issue #284, same family
+   * as #230/#233 but surfaced through do-notation desugaring). Pinning
+   * `Future::async[E](...)` threads `E` into the call's type-argument inference.
+   *
+   * Only untyped generative calls (no explicit type arguments) whose sole argument
+   * is a throw-only lambda are pinned; every other bind is left untouched, so this
+   * never changes an already-typeable program.
+   */
+  private def pinThrowOnlyGenerativeBinds(
+    statements: List[Any],
+    elementHint: Option[AST.TypeNode]
+  ): List[Any] = elementHint match {
+    case None => statements
+    case Some(typeNode) =>
+      statements.map {
+        case AST.DoBinding(loc, name, expr) if isThrowOnlyGenerativeCall(expr) =>
+          AST.DoBinding(loc, name, withTypeArgument(expr, typeNode))
+        case other => other
+      }
+  }
+
+  /**
+   * The element type `E` of a declared monad result type `M[E]`, when `typeRef`
+   * is exactly `monadType[E]` (a single-argument application of the same monad
+   * constructor as the `do[M]` block). Returns None for a bare `M`, a differently
+   * named constructor, a multi-argument application, or a null/absent annotation,
+   * so the pinning below only fires when the element type is unambiguous.
+   */
+  private def elementTypeHintFor(monadType: AST.TypeNode, typeRef: AST.TypeNode): Option[AST.TypeNode] = {
+    def simpleName(desc: AST.TypeDescriptor): Option[String] = desc match {
+      case AST.ReferenceType(name, _) => Some(name.substring(name.lastIndexOf('.') + 1))
+      case _ => None
+    }
+    if (typeRef == null || monadType == null) None
+    else typeRef.desc match {
+      case AST.ParameterizedType(component, List(param)) =>
+        for {
+          declared <- simpleName(component)
+          monad <- simpleName(monadType.desc)
+          if declared == monad
+        } yield AST.TypeNode(typeRef.location, param, false)
+      case _ => None
+    }
+  }
+
+  /**
+   * True for a generative call (`C::name(lambda)` or `name(lambda)`) with no
+   * explicit type arguments whose sole argument is a throw-only lambda — a lambda
+   * whose body is (or ends in) a bare `throw`.
+   */
+  private def isThrowOnlyGenerativeCall(expr: AST.Expression): Boolean = {
+    def check(args: List[AST.Expression], typeArgs: List[AST.TypeNode]): Boolean =
+      typeArgs.isEmpty && (args match {
+        case List(c: AST.ClosureExpression) => isThrowOnlyClosure(c)
+        case _ => false
+      })
+    expr match {
+      case c: AST.StaticMethodCall      => check(c.args, c.typeArgs)
+      case c: AST.UnqualifiedMethodCall => check(c.args, c.typeArgs)
+      case _ => false
+    }
+  }
+
+  /** A lambda whose body is a throw-only block (its final element is a `throw`). */
+  private def isThrowOnlyClosure(c: AST.ClosureExpression): Boolean =
+    c.body.elements.lastOption.exists {
+      case _: AST.ThrowExpression => true
+      case _ => false
+    }
 
   /**
    * A generative empty bind such as `x <- Option::none()` carries no argument to

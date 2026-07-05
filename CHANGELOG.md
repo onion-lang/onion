@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **An undefined array member is a type error, not a miscompile** — \`arr.lengt\` (a typo for
-  \`length\`) reported no error and emitted invalid bytecode (a \`VerifyError\`); it now reports
+- **An undefined array member is a type error, not a miscompile** — `arr.lengt` (a typo for
+  `length`) reported no error and emitted invalid bytecode (a `VerifyError`); it now reports
   E0004 ([#292]).
 
 - **A `void` expression as a collection element is a type error, not a compiler crash** —

@@ -204,6 +204,14 @@ final class OperatorTyping(
       narrowing.positive.foreach { case (name, tp) =>
         context.addNarrowing(name, tp)
       }
+      // A reassignable `var` narrowed by the left operand is non-null in the
+      // right operand too — they are adjacent with no reassignment between — so
+      // apply the flow narrowing as well. This makes the common
+      // `while (p != null && p.method())` loop work for a reassignable `p`
+      // (#294); a reassignment inside the right operand clears it as usual.
+      narrowing.mutablePositive.foreach { case (name, tp) =>
+        context.addFlowNarrowing(name, tp)
+      }
     }
 
     val rightRaw = typed(node.rhs, context).getOrElse(null)

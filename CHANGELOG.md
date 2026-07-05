@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A reassignable `var` is smart-cast in the right operand of `&&`** — the common
+  `while (p != null && p.method())` loop now works for a `var` reassigned in the body ([#294]).
+
 - **LSP diagnostics land on the right token on tab-indented lines** — the tab-expanded
   compiler column is mapped back to a character position ([#293]).
 
@@ -603,6 +606,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#294]: https://github.com/onion-lang/onion/issues/294
 [#293]: https://github.com/onion-lang/onion/issues/293
 [#292]: https://github.com/onion-lang/onion/issues/292
 [#291]: https://github.com/onion-lang/onion/issues/291

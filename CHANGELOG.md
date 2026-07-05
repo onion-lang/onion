@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **LSP diagnostics land on the right token on tab-indented lines** — the tab-expanded
+  compiler column is mapped back to a character position ([#293]).
+
 - **The compiler reports an internal error instead of crashing if it ever emits invalid
   bytecode** — a `VerifyError`/`ClassFormatError` from a generated class is now surfaced as
   an I0000 diagnostic rather than an uncaught error.
@@ -600,6 +603,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#293]: https://github.com/onion-lang/onion/issues/293
 [#292]: https://github.com/onion-lang/onion/issues/292
 [#291]: https://github.com/onion-lang/onion/issues/291
 [#262]: https://github.com/onion-lang/onion/issues/262

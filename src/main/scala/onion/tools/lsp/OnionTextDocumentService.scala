@@ -620,10 +620,25 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   private def locationToRange(location: onion.compiler.Location, content: String): Range = {
     val line = if (location != null) Math.max(0, location.line - 1) else 0
-    val column = if (location != null) Math.max(0, location.column - 1) else 0
     val lineText = getLineAt(content, line)
+    // `location.column` is 1-based and TAB-EXPANDED (JavaCC SimpleCharStream,
+    // tabSize 8); convert it to a 0-based character index into `lineText` so
+    // diagnostics land on the right token on tab-indented lines (issue #293).
+    val column = if (location != null) charColumnFromExpanded(lineText, location.column) else 0
     val (start, end) = tokenRangeAt(lineText, column)
     new Range(new Position(line, start), new Position(line, end))
+  }
+
+  /** Maps a 1-based tab-expanded column (tabSize 8) to a 0-based character index. */
+  private def charColumnFromExpanded(lineText: String, expandedColumn1Based: Int): Int = {
+    val target = Math.max(0, expandedColumn1Based - 1)
+    var expanded = 0
+    var charIdx = 0
+    while (charIdx < lineText.length && expanded < target) {
+      if (lineText.charAt(charIdx) == '\t') expanded += 8 - (expanded % 8) else expanded += 1
+      charIdx += 1
+    }
+    charIdx
   }
 
   private def tokenRangeAt(line: String, column: Int): (Int, Int) = {

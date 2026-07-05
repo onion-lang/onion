@@ -313,11 +313,19 @@ private[typing] object GenericMethodTypeArguments {
     method: Method,
     args: Array[Term],
     classSubst: scala.collection.immutable.Map[String, Type],
-    expectedReturn: Type
+    expectedReturn: Type,
+    reportErrors: Boolean = true
   ): scala.collection.immutable.Map[String, Type] = {
     val rootClass = typing.rootClass
+    // During overload-applicability collection this inference is run over EVERY
+    // candidate, including ones a later arity/specificity check discards. Emitting
+    // bound-check errors here leaks a bounded overload's constraint onto the call
+    // even when an unbounded overload is the one actually selected (issue #298).
+    // Callers in the collection phase pass reportErrors = false; the final
+    // resolution of the SELECTED method keeps errors on so real bound violations
+    // are still rejected.
     def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
-      typing.report(error, node, items*)
+      if (reportErrors) typing.report(error, node, items*)
     def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
     if (typeParams.isEmpty) return scala.collection.immutable.Map.empty

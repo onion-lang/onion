@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Overload resolution no longer leaks a type-parameter bound between overloads** — a call
+  matching an unbounded `[T]` overload is no longer rejected by a sibling `[T extends ...]`
+  overload's constraint, so e.g. `Collections::sort(list, comparator)` works on non-`Comparable`
+  element types ([#298]).
+
 - **`select` in statement position accepts mixed value/void case branches** — like an
   `if`/`else` statement, a `select` whose value is unused no longer requires its branches to
   unify; expression-position `select` stays strict ([#297]).
@@ -618,6 +623,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#298]: https://github.com/onion-lang/onion/issues/298
 [#297]: https://github.com/onion-lang/onion/issues/297
 [#296]: https://github.com/onion-lang/onion/issues/296
 [#295]: https://github.com/onion-lang/onion/issues/295

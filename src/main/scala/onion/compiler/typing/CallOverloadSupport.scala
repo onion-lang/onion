@@ -59,7 +59,11 @@ private[compiler] final class CallOverloadSupport(
             reportErrors = reportExplicitTypeArgErrors
           )
         case None =>
-          Some(GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected))
+          // Applicability collection over all candidates: suppress bound-check
+          // errors so a discarded bounded overload cannot leak its constraint
+          // onto the call (issue #298). The selected method is re-inferred with
+          // errors on in buildResolvedCall/resolveMethodTypeArgs.
+          Some(GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected, reportErrors = false))
       }
       methodSubstOpt.flatMap { methodSubst =>
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
@@ -91,7 +95,9 @@ private[compiler] final class CallOverloadSupport(
       if (!countOk) None
       else {
         val classSubst = TypeSubstitution.classSubstitution(receiverType)
-        val methodSubst = GenericMethodTypeArguments.infer(typing, node, method, knownParams, classSubst, expected)
+        // Applicability collection: suppress bound errors so a discarded bounded
+        // overload cannot leak its constraint onto the call (issue #298).
+        val methodSubst = GenericMethodTypeArguments.infer(typing, node, method, knownParams, classSubst, expected, reportErrors = false)
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
         Option.when(
           knownParamIndices.forall { case (index, term) =>

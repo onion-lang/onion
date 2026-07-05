@@ -1,0 +1,8 @@
+// An undefined array member (anything but length/size) was accepted by the type
+// checker and miscompiled to bad bytecode (java.lang.VerifyError); it must be a
+// proper FIELD_NOT_FOUND error. (issue: unknown array member miscompile)
+def main(args: String[]): void {
+  val chars = "abc".toCharArray()
+  var j: Int = chars.lengt
+  IO::println(j)
+}

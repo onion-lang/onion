@@ -55,7 +55,14 @@ private[compiler] final class MemberSelectionResolutionSupport(
   ): Option[ResolvedMemberSelection] = {
     if (targetType.isArrayType) {
       if (name == MethodNames.LENGTH || name == MethodNames.SIZE) Some(ResolvedArrayLengthSelection)
-      else None
+      else {
+        // An array has only `length`/`size`; any other member is undefined. Report
+        // it (like the non-array branch below) instead of returning a silent None,
+        // which let the selection type-check as a bad term and miscompile into
+        // invalid bytecode (a VerifyError). (found by the mutation fuzzer)
+        bodyContext.report(FIELD_NOT_FOUND, node, targetType, name)
+        None
+      }
     } else {
       val field = MemberAccess.findField(targetType, name)
       if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {

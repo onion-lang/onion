@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An undefined array member is a type error, not a miscompile** — \`arr.lengt\` (a typo for
+  \`length\`) reported no error and emitted invalid bytecode (a \`VerifyError\`); it now reports
+  E0004 ([#292]).
+
 - **A `void` expression as a collection element is a type error, not a compiler crash** —
   `[IO::println("x")]` (or a `void` map key/value) reported an internal error (I0000) when
   boxing `void`; it now reports E0000 ([#291]).
@@ -592,6 +596,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#292]: https://github.com/onion-lang/onion/issues/292
 [#291]: https://github.com/onion-lang/onion/issues/291
 [#262]: https://github.com/onion-lang/onion/issues/262
 [#278]: https://github.com/onion-lang/onion/issues/278

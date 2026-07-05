@@ -18,6 +18,16 @@ private[typing] object TypeRelations {
       basicType != BasicType.VOID && TypeRules.isAssignable(Boxing.boxedType(table, basicType), actual)
     else
       (expected, actual) match
+        // Strip matching nullable wrappers so a nullable applied generic
+        // (e.g. `Node[T]?`) is matched by the invariant AppliedClassType rule
+        // below; without this a `Node[T]?` argument did not match a `Node[T]?`
+        // parameter, since TypeRules.isAssignable alone cannot relate a
+        // type-variable-parameterized applied type to itself (#295).
+        case (expNullable: NullableType, actNullable: NullableType) =>
+          isAssignableWithBoxing(expNullable.innerType, actNullable.innerType, table)
+        // `T? ← T`: a non-null value widens to the nullable parameter.
+        case (expNullable: NullableType, _) =>
+          isAssignableWithBoxing(expNullable.innerType, actual, table)
         case (expectedApplied: AppliedClassType, actualApplied: AppliedClassType) =>
           // Type arguments are INVARIANT (generics are erasure-based, no
           // declaration-site variance): Box[Dog] is NOT a Box[Animal], since a

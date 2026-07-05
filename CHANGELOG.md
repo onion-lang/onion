@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`select` in statement position accepts mixed value/void case branches** — like an
+  `if`/`else` statement, a `select` whose value is unused no longer requires its branches to
+  unify; expression-position `select` stays strict ([#297]).
+
 - **A block-expression may contain a control-flow statement before its trailing value** —
   `val y = { ...; if c { ... }; expr }` and `select` case bodies with an `if`/`while`/`foreach`
   before the result now parse ([#296]).
@@ -614,6 +618,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#297]: https://github.com/onion-lang/onion/issues/297
 [#296]: https://github.com/onion-lang/onion/issues/296
 [#295]: https://github.com/onion-lang/onion/issues/295
 [#294]: https://github.com/onion-lang/onion/issues/294

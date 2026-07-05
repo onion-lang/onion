@@ -349,8 +349,14 @@ final class BlockElementLowering(
         }
       }
     case node: AST.SelectExpression =>
-      // Delegate to ControlExpressionTyping which handles all pattern types
-      typed(node, context).map { e =>
+      // Delegate to ControlExpressionTyping which handles all pattern types.
+      // asStatement = true: the select's value is unused here, so branches need
+      // not unify (mixed value/void is fine), mirroring if/else in statement
+      // position (issue #297). Wrapping the whole select term (rather than
+      // unwrapping to its inner statement) preserves its BOTTOM type when every
+      // branch terminates, so definitelyReturns still recognizes it (E0067).
+      body.controlExpressionTyping.typeSelectExpression(node, context, asStatement = true).map { e =>
+        typing.put(node, e)
         new ExpressionActionStatement(node.location, e)
       }.getOrElse(new NOP(node.location))
     case node: AST.SynchronizedExpression =>

@@ -156,8 +156,8 @@ final class ControlExpressionTyping(
     }
   }
 
-  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext): Option[Term] =
-    selectTyping.typeSelectExpression(node, context)
+  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false): Option[Term] =
+    selectTyping.typeSelectExpression(node, context, asStatement)
 
   def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] =
     tryTyping.typeTryExpression(node, context)

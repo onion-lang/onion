@@ -22,7 +22,7 @@ final class SelectExpressionTyping(
 
   private val destructuringProcessor = new DestructuringPatternProcessor(typing)
 
-  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext): Option[Term] = boundary {
+  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false): Option[Term] = boundary {
     val condition = typed(node.condition, context).getOrElse(break(None))
 
     val name = context.newName
@@ -204,13 +204,24 @@ final class SelectExpressionTyping(
 
     val resultType =
       if (node.elseBlock == null && !isExhaustive) BasicType.VOID
-      else if (node.elseBlock == null && isExhaustive) {
-        // Exhaustive pattern match: use LUB of all case branches
-        val branchTypes = caseTerms.map(_.`type`).toSeq
-        foldLub(node, branchTypes).orNull
-      } else {
-        val branchTypes = caseTerms.map(_.`type`).toSeq :+ elseTerm.`type`
-        foldLub(node, branchTypes).orNull
+      else {
+        // Unify the branch value types via LUB. In EXPRESSION position a failure
+        // (e.g. a void branch where a value is required) is a real error and is
+        // reported. In STATEMENT position the value is discarded, so — like an
+        // if/else statement — the branches need not unify: a mix of value and
+        // void branches is fine and the whole select degrades to a void
+        // statement (issue #297). Each branch value is then dropped by
+        // termToStatement (the resultVar == null path). A silent LUB is tried
+        // first so an all-terminating (all-`return`) statement select still
+        // yields BOTTOM and is recognized as definitely-returning (E0067).
+        val branchTypes =
+          if (node.elseBlock == null) caseTerms.map(_.`type`).toSeq
+          else caseTerms.map(_.`type`).toSeq :+ elseTerm.`type`
+        foldLubSilent(branchTypes) match {
+          case Some(t) => t
+          case None if asStatement => BasicType.VOID
+          case None => foldLub(node, branchTypes).orNull // re-run to report the error
+        }
       }
     if (resultType == null) break(None)
 
@@ -554,4 +565,15 @@ final class SelectExpressionTyping(
 
   private def foldLub(node: AST.Node, types: Seq[Type]): Option[Type] =
     control.foldLub(node, types)
+
+  /** Like [[foldLub]] but reports nothing on failure — used to probe whether the
+    * branch types unify before deciding, in statement position, to discard them.
+    * Returns None if any pairwise LUB is undefined (e.g. a void/non-void mix). */
+  private def foldLubSilent(types: Seq[Type]): Option[Type] = boundary {
+    types.reduceOption { (acc, t) =>
+      val result = TypeCheckingHelpers.leastUpperBound(null, acc, t, bodyContext.rootClass, (_, _, _) => ())
+      if (result == null) break(None)
+      result
+    }
+  }
 }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **The compiler reports an internal error instead of crashing if it ever emits invalid
+  bytecode** — a `VerifyError`/`ClassFormatError` from a generated class is now surfaced as
+  an I0000 diagnostic rather than an uncaught error.
+
 - **An undefined array member is a type error, not a miscompile** — `arr.lengt` (a typo for
   `length`) reported no error and emitted invalid bytecode (a `VerifyError`); it now reports
   E0004 ([#292]).

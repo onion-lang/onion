@@ -1,0 +1,8 @@
+// A void-typed expression as a collection element used to crash the compiler
+// (I0000: "unknown boxed type") when Boxing tried to box `void`. It must now be
+// reported as an ordinary type error, not crash. (issue: void collection element)
+def main(args: String[]): void {
+  val xs = [IO::println("x")]
+  val m = ["k": IO::println("v")]
+  val m2 = [IO::println("k"): 1]
+}

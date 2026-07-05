@@ -238,6 +238,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
         val typedElement = typed(element, context, expectedElem).orNull
         if (typedElement == null) {
           failed = true
+        } else if (typedElement.`type` eq BasicType.VOID) {
+          // A void-typed expression (e.g. a call to a void method) cannot be a
+          // collection element; report it rather than trying to box `void`,
+          // which used to crash the compiler (I0000).
+          bodyContext.report(INCOMPATIBLE_TYPE, element, bodyContext.rootClass, BasicType.VOID)
+          failed = true
         } else {
           typedElements(index) = typedElement
           val normalizedType = normalizeListElementType(typedElement.`type`)
@@ -410,6 +416,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
         val typedValue = typed(valueExpr, context, expectedValue).orNull
         if (typedKey == null || typedValue == null) {
           failed = true
+        } else if (typedKey.`type` eq BasicType.VOID) {
+          bodyContext.report(INCOMPATIBLE_TYPE, keyExpr, bodyContext.rootClass, BasicType.VOID)
+          failed = true
+        } else if (typedValue.`type` eq BasicType.VOID) {
+          bodyContext.report(INCOMPATIBLE_TYPE, valueExpr, bodyContext.rootClass, BasicType.VOID)
+          failed = true
         } else {
           keys(index) = typedKey
           values(index) = typedValue
@@ -465,6 +477,11 @@ private[compiler] final class SimpleExpressionTypingSupport(
 
   private def normalizeListElementType(tp: Type): Type =
     tp match {
+      // `void` is not boxable (there is no wrapper in Boxing's table), so boxing
+      // it would crash the compiler (I0000). A collection element of type `void`
+      // only arises from a malformed program (e.g. a list holding a void-typed
+      // expression); leave it as-is so the type checker reports it normally.
+      case BasicType.VOID => tp
       case basicType: BasicType => Boxing.boxedType(bodyContext.table, basicType)
       case other => other
     }

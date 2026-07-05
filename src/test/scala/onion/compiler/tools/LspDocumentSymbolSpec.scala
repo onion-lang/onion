@@ -135,5 +135,27 @@ class LspDocumentSymbolSpec extends AnyFunSpec {
       assert(names.contains("count"))
       assert(!names.contains("local"))
     }
+
+    it("returns a generic class, a record, and extension methods") {
+      val client = new RecordingClient()
+      val server = newServer(client)
+      val service = server.getTextDocumentService.asInstanceOf[OnionTextDocumentService]
+
+      openDocument(service, "file:///test.on",
+        """record Point(x: Int, y: Int)
+          |class Box[T] {
+          |  def get(): T = null
+          |}
+          |extension String {
+          |  def shout(): String = this.toUpperCase()
+          |}
+          |""".stripMargin)
+
+      val names = documentSymbols(service, "file:///test.on").map(_.getName)
+      assert(names.contains("Point"), s"record missing: $names")
+      assert(names.contains("Box"), s"generic class missing: $names")
+      assert(names.contains("get"), s"generic method missing: $names")
+      assert(names.contains("shout"), s"extension method missing: $names")
+    }
   }
 }

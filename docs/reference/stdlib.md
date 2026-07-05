@@ -480,6 +480,11 @@ f.isSuccess()    // true if completed successfully
 f.isFailure()    // true if completed with error
 ```
 
+These are **non-blocking** — they report the future's *current* state, so a future
+that is still running reports both `isSuccess()` and `isFailure()` as `false`. To wait
+for the outcome, use `await()`/`getOrElse()` (or `onSuccess`/`onFailure`/`recover`)
+rather than polling `isFailure()`.
+
 ### Combining Futures
 
 ```onion

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A block-expression may contain a control-flow statement before its trailing value** —
+  `val y = { ...; if c { ... }; expr }` and `select` case bodies with an `if`/`while`/`foreach`
+  before the result now parse ([#296]).
+
 - **A nullable generic value matches a nullable generic parameter of the same type**
   (`Node[T]?` to a `Node[T]?` parameter) — generic containers with nullable links now work;
   invariant generics stay enforced ([#295]).
@@ -610,6 +614,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[#296]: https://github.com/onion-lang/onion/issues/296
 [#295]: https://github.com/onion-lang/onion/issues/295
 [#294]: https://github.com/onion-lang/onion/issues/294
 [#293]: https://github.com/onion-lang/onion/issues/293

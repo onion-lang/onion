@@ -1232,7 +1232,16 @@ AST.BlockExpression block():{Token t; List<AST.BlockElement> elements = (List<AS
 }
 
 List<AST.BlockElement> block_elements():{ AST.BlockElement element; ArrayBuffer<AST.BlockElement> elements = new ArrayBuffer<AST.BlockElement>(); }{
-  (element=block_element() { append(elements, element); })+ {return toList(elements);}
+  // Absorb any EOL tokens left behind between elements. Statement-form elements
+  // (local_var_declaration, throw, break, ...) consume their own terminator via
+  // eos_or_block_end, but control-flow elements used in statement position
+  // (if/while/foreach/select/nested block) do not. When a block runs in the
+  // IN_STATEMENT lexer state -- i.e. a block used as an EXPRESSION value, such as
+  // `val y = { ...; if c {..}; expr }` or a `select` case body -- the newline
+  // after such an element is tokenized as an EOL and would otherwise stall the
+  // next element. In the DEFAULT lexer state (ordinary statement blocks) EOLs are
+  // skipped, so this eols() is a harmless no-op there.
+  (element=block_element() { append(elements, element); } eols())+ {return toList(elements);}
 }
 
 int modifiers():{ mset = 0; Token t = null, last = null; }{

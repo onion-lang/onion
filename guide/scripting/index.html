@@ -4240,10 +4240,16 @@ generated on error:</p>
 </span></code></pre></div>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>world<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span><span class="w"> </span>--loud
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="go">HELLO WORLD X5</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="go">error: missing argument: name</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud]</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>world<span class="w"> </span>--count<span class="o">=</span><span class="m">5</span><span class="w"> </span>--loud<span class="w">     </span><span class="c1"># --name=value form works too</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="go">HELLO WORLD X5</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>--help<span class="w">                      </span><span class="c1"># prints usage and exits 0</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="go">error: missing argument: name</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
 </span></code></pre></div>
+<p>Flags accept both <code>--name value</code> and <code>--name=value</code>; <code>--help</code> (or <code>-h</code>) prints
+the generated usage and exits.</p>
 <h2 id="putting-it-together">Putting It Together<a class="headerlink" href="#putting-it-together" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>#!/usr/bin/env onion
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>record Hit(ip: String, method: String, path: String, status: Int)

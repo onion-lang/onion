@@ -4241,18 +4241,33 @@
 </span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>println(new Counter(&quot;hi&quot;).show())   // 2
 </span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>println(new Counter(null).show())   // -1
 </span></code></pre></div>
+<p>ミュータブル（<code>var</code>）な<strong>ローカル変数</strong>も、チェックと使用の間で再代入されない限り絞り込まれます。一度だけ代入する <code>var</code> や、別の場所でのみ再代入する <code>var</code> は、必要な箇所ではちゃんと絞り込まれます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>def firstNonEmpty(lines: List[String]): String {
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  var found: String? = null
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  foreach line: String in lines {
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    if found == null &amp;&amp; line.length() &gt; 0 {
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>      found = line
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    }
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>  }
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>  if found != null {
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    return found            // found（var）はここで String に絞られる
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>  }
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>  return &quot;(none)&quot;
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>}
+</span></code></pre></div>
+<p>定番の読み取りループ <code>while (line = next()) != null { ... }</code> も同様で、<code>line</code> はループ本体の先頭で絞り込まれます。使用の<strong>後</strong>の再代入は絞り込みを取り消しませんが、クロージャに捕捉された <code>var</code> はクロージャ内では nullable のままです（クロージャは変数が変わった後に実行されうるため）。</p>
 <h2 id="nullable-null">nullableに対する <code>==</code> はnull安全な値等価<a class="headerlink" href="#nullable-null" title="Permanent link">&para;</a></h2>
 <p><code>==</code> は静的に nullable なレシーバに対しても <strong>値等価</strong>（<code>java.util.Objects.equals</code> 相当）です。両方 null なら等しい、片方だけ null なら非等価、それ以外は <code>equals</code> で比較します。<strong>事前の null チェックは不要です。</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>val a: String? = compute()
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>if a == &quot;expected&quot; { println(&quot;match&quot;) }    // a が null でも安全
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>val a: String? = compute()
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>if a == &quot;expected&quot; { println(&quot;match&quot;) }    // a が null でも安全
 </span></code></pre></div>
 <p>参照同値が必要なときは <code>===</code> を使います。</p>
 <h2 id="null_2">非null表明 <code>!!</code> とセーフインデックス <code>?[]</code><a class="headerlink" href="#null_2" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>val s: String? = definitelyThere()
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>println(s!!.length())        // null なら NullPointerException
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>val xs: List[Int]? = loadOrNull()
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>val first = xs?[0]               // xs が null なら null
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>val s: String? = definitelyThere()
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>println(s!!.length())        // null なら NullPointerException
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>val xs: List[Int]? = loadOrNull()
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>val first = xs?[0]               // xs が null なら null
 </span></code></pre></div>
 <p><code>!!</code> は「型システムより自分が確実に分かっている」ときに使い、通常は <code>?.</code> / <code>?:</code> / null チェックを優先します。</p>
 <h2 id="nullable_2">Nullable対応ジェネリクス<a class="headerlink" href="#nullable_2" title="Permanent link">&para;</a></h2>

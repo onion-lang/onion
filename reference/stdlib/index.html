@@ -6706,6 +6706,10 @@
 </span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>f.isSuccess()    // true if completed successfully
 </span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>f.isFailure()    // true if completed with error
 </span></code></pre></div>
+<p>These are <strong>non-blocking</strong> — they report the future's <em>current</em> state, so a future
+that is still running reports both <code>isSuccess()</code> and <code>isFailure()</code> as <code>false</code>. To wait
+for the outcome, use <code>await()</code>/<code>getOrElse()</code> (or <code>onSuccess</code>/<code>onFailure</code>/<code>recover</code>)
+rather than polling <code>isFailure()</code>.</p>
 <h3 id="combining-futures">Combining Futures<a class="headerlink" href="#combining-futures" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>val f1: Future[Int] = Future::successful(1)
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>val f2: Future[Int] = Future::successful(2)

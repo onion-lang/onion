@@ -4073,7 +4073,9 @@
 <p>トップレベル <code>main</code> の型付き引数から、コマンドライン引数の解析が導出されます。必須引数は位置引数、デフォルト付きは <code>--name</code> フラグになります。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>// $ onion script.on world --count 5 --loud
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>// $ onion script.on world --count=5 --loud   （--name=value 形式も可）
 </span></code></pre></div>
+<p>フラグは <code>--name value</code> と <code>--name=value</code> の両形式を受け付けます。<code>--help</code>（または <code>-h</code>）で生成された usage を表示して終了します。</p>
 <h2 id="_4">次のステップ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../basic-syntax/">基本構文</a> - 言語構文の詳細</li>

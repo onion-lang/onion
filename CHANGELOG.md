@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`if`/`else` and `select` branches target-type an empty collection literal** — a `[]` / `[:]`
+  in a branch now infers its element type from the expected type (e.g. `def f(): List[Int] = if b { [] } else { [x] }`)
+  instead of erasing to `Object` and failing the branch merge ([#300]).
+
 - **`do[Option]` infers an empty bind's element type from the expected type** — a
   `do[Option] { x <- Option::none(); ret x + 1 }` in a `def f(): Option[Int]` / `val o: Option[Int]`
   context now types `x` as `Int` instead of `Object` (target typing) ([#279]).
@@ -629,6 +633,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[#300]: https://github.com/onion-lang/onion/issues/300
 [0.4.3]: https://github.com/onion-lang/onion/releases/tag/v0.4.3
 [#298]: https://github.com/onion-lang/onion/issues/298
 [#297]: https://github.com/onion-lang/onion/issues/297

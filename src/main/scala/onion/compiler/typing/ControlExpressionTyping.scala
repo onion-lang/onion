@@ -106,7 +106,7 @@ final class ControlExpressionTyping(
       safeMutableNarrowings(narrowing.mutablePositive, node.thenBlock).foreach { case (name, narrowedType) =>
         context.addFlowNarrowing(name, narrowedType)
       }
-      val thenTerm = typeBlockExpression(node.thenBlock, context).getOrElse {
+      val thenTerm = typeBlockExpression(node.thenBlock, context, expected).getOrElse {
         context.restoreNarrowings(savedNarrowings)
         break(None)
       }
@@ -122,7 +122,7 @@ final class ControlExpressionTyping(
         safeMutableNarrowings(narrowing.mutableNegative, node.elseBlock).foreach { case (name, narrowedType) =>
           context.addFlowNarrowing(name, narrowedType)
         }
-        val elseTerm = typeBlockExpression(node.elseBlock, context).getOrElse {
+        val elseTerm = typeBlockExpression(node.elseBlock, context, expected).getOrElse {
           context.restoreNarrowings(savedNarrowings)
           break(None)
         }
@@ -156,8 +156,8 @@ final class ControlExpressionTyping(
     }
   }
 
-  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false): Option[Term] =
-    selectTyping.typeSelectExpression(node, context, asStatement)
+  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false, expected: Type = null): Option[Term] =
+    selectTyping.typeSelectExpression(node, context, asStatement, expected)
 
   def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] =
     tryTyping.typeTryExpression(node, context)

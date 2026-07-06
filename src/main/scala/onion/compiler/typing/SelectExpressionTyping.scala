@@ -22,7 +22,15 @@ final class SelectExpressionTyping(
 
   private val destructuringProcessor = new DestructuringPatternProcessor(typing)
 
-  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false): Option[Term] = boundary {
+  def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false, expected: Type = null): Option[Term] = boundary {
+    // Thread the expected result type into each case/else branch so an
+    // under-determined empty collection literal there (`case 0: []`) target-types
+    // its element type from the expected type, mirroring if/else and argument/
+    // block-trailing positions (issue #300). Only meaningful in EXPRESSION
+    // position; in statement position the value is discarded, so passing it is
+    // harmless. A null expected leaves branch typing unchanged.
+    val branchExpected: Type =
+      if (expected != null && !expected.isBottomType && expected != BasicType.VOID) expected else null
     val condition = typed(node.condition, context).getOrElse(break(None))
 
     val name = context.newName
@@ -74,7 +82,7 @@ final class SelectExpressionTyping(
             if (typedGuardInfo.isEmpty && TypeRules.isSuperType(varType, condition.`type`)) {
               hasWildcardPattern = true
             }
-            typeBlockExpression(thenBlock, context) match {
+            typeBlockExpression(thenBlock, context, branchExpected) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
@@ -100,7 +108,7 @@ final class SelectExpressionTyping(
             if (typedGuardInfo.isEmpty && TypeRules.isSuperType(recordType, condition.`type`)) {
               hasWildcardPattern = true
             }
-            typeBlockExpression(thenBlock, context) match {
+            typeBlockExpression(thenBlock, context, branchExpected) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
@@ -121,7 +129,7 @@ final class SelectExpressionTyping(
               GuardInfo(guardAst, guardTerm)
             }
             caseBindingData += ((bindingInfo, varBinds, typedGuardInfo))
-            typeBlockExpression(thenBlock, context) match {
+            typeBlockExpression(thenBlock, context, branchExpected) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
@@ -137,7 +145,7 @@ final class SelectExpressionTyping(
             GuardInfo(guardAst, guardTerm)
           }
           caseBindingData += ((NoBindings, Nil, typedGuardInfo))
-          typeBlockExpression(thenBlock, context) match {
+          typeBlockExpression(thenBlock, context, branchExpected) match {
             case Some(term) =>
               caseTerms += term
               caseNodes += thenBlock
@@ -198,7 +206,7 @@ final class SelectExpressionTyping(
       }
     }
 
-    val elseTermOpt = Option(node.elseBlock).map(typeBlockExpression(_, context)).getOrElse(Some(statementTerm(new NOP(node.location), BasicType.VOID, node.location)))
+    val elseTermOpt = Option(node.elseBlock).map(typeBlockExpression(_, context, branchExpected)).getOrElse(Some(statementTerm(new NOP(node.location), BasicType.VOID, node.location)))
     val elseTerm = elseTermOpt.getOrElse(null)
     if (elseTerm == null) break(None)
 
@@ -548,8 +556,8 @@ final class SelectExpressionTyping(
   private def typed(node: AST.Expression, context: LocalContext): Option[Term] =
     body.typed(node, context)
 
-  private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
-    control.typeBlockExpression(node, context)
+  private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type = null): Option[Term] =
+    control.typeBlockExpression(node, context, expected)
 
   private def ensureBoolean(node: AST.Node, term: Term): Term =
     control.ensureBoolean(node, term)

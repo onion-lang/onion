@@ -33,10 +33,18 @@ final class ExpressionFormTyping(
   def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] =
     stringInterpolationTyping.typeStringInterpolation(node, context)
 
-  def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] =
+  def typeElvis(node: AST.Elvis, context: LocalContext, expected: Type = null): Option[Term] =
+    // Thread the expected result type into the RIGHT operand (the fallback) so an
+    // under-determined empty collection literal there (`o ?: []`) target-types its
+    // element type from the expected type, mirroring if/else, select, and
+    // argument/block-trailing positions (issue #301). Only the fallback benefits:
+    // the left operand keeps its own (nullable) type. A null expected leaves
+    // right-operand typing unchanged.
+    val rightExpected: Type =
+      if (expected != null && !expected.isBottomType && expected != BasicType.VOID) expected else null
     for {
       left <- typed(node.lhs, context)
-      right0 <- typed(node.rhs, context)
+      right0 <- typed(node.rhs, context, rightExpected)
       result <- {
         val leftT = left.`type`
         // A nullable primitive (Int?) stores a primitive inner in the type but a

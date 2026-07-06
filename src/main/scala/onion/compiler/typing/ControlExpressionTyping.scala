@@ -159,8 +159,8 @@ final class ControlExpressionTyping(
   def typeSelectExpression(node: AST.SelectExpression, context: LocalContext, asStatement: Boolean = false, expected: Type = null): Option[Term] =
     selectTyping.typeSelectExpression(node, context, asStatement, expected)
 
-  def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] =
-    tryTyping.typeTryExpression(node, context)
+  def typeTryExpression(node: AST.TryExpression, context: LocalContext, expected: Type = null): Option[Term] =
+    tryTyping.typeTryExpression(node, context, expected)
 
   def typeSynchronizedExpression(node: AST.SynchronizedExpression, context: LocalContext): Option[Term] =
     tryTyping.typeSynchronizedExpression(node, context)

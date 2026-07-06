@@ -18,7 +18,15 @@ final class TryExpressionTyping(
   private val control: ControlExpressionTyping
 ) {
 
-  def typeTryExpression(node: AST.TryExpression, context: LocalContext): Option[Term] = boundary {
+  def typeTryExpression(node: AST.TryExpression, context: LocalContext, expected: Type = null): Option[Term] = boundary {
+    // Thread the expected result type into the try body and each catch body so an
+    // under-determined empty collection literal there (`try { [] } catch e { [1] }`)
+    // target-types its element type from the expected type, mirroring if/else,
+    // select, and argument/block-trailing positions (issue #301). The finally block
+    // does NOT participate in the value (its result is discarded), so it is typed
+    // without an expected type. A null expected leaves branch typing unchanged.
+    val branchExpected: Type =
+      if (expected != null && !expected.isBottomType && expected != BasicType.VOID) expected else null
     // リソースを処理（try-with-resources）
     val resourceBindings = scala.collection.mutable.ArrayBuffer[(ClosureLocalBinding, Term)]()
     val autoCloseable = bodyContext.load("java.lang.AutoCloseable")
@@ -56,7 +64,7 @@ final class TryExpressionTyping(
 
       if (resourceFailed) break(None)
 
-      val tryTermOpt = typeBlockExpression(node.tryBlock, context)
+      val tryTermOpt = typeBlockExpression(node.tryBlock, context, branchExpected)
       val tryTerm = tryTermOpt.getOrElse(null)
       if (tryTerm == null) break(None)
 
@@ -72,7 +80,7 @@ final class TryExpressionTyping(
             bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
           }
           binds(i) = context.lookupOnlyCurrentScope(argument.name)
-          typeBlockExpression(catchBody, context) match {
+          typeBlockExpression(catchBody, context, branchExpected) match {
             case Some(term) => catchTerms(i) = term
             case None => failed = true
           }
@@ -149,6 +157,6 @@ final class TryExpressionTyping(
   private def typed(node: AST.Expression, context: LocalContext): Option[Term] =
     body.typed(node, context)
 
-  private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext): Option[Term] =
-    control.typeBlockExpression(node, context)
+  private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type = null): Option[Term] =
+    control.typeBlockExpression(node, context, expected)
 }

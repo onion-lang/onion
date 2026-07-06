@@ -299,8 +299,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeAssignment(node: AST.Assignment, context: LocalContext): Option[Term] =
     assignmentTyping.typeAssignment(node, context)
 
-  def typeElvis(node: AST.Elvis, context: LocalContext): Option[Term] =
-    expressionFormTyping.typeElvis(node, context)
+  def typeElvis(node: AST.Elvis, context: LocalContext, expected: Type = null): Option[Term] =
+    expressionFormTyping.typeElvis(node, context, expected)
 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     expressionFormTyping.typeCast(node, context)

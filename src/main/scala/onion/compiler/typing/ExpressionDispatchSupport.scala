@@ -53,7 +53,7 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
       case node@AST.ReferenceNotEqual(_, _, _) =>
         Option(body.processRefEquals(NOT_EQUAL, node, context))
       case node: AST.Elvis =>
-        body.typeElvis(node, context)
+        body.typeElvis(node, context, expected)
       case node: AST.Indexing =>
         body.typeIndexing(node, context)
       case node: AST.SafeIndexing =>
@@ -123,7 +123,7 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
       case node: AST.ThrowExpression =>
         body.controlExpressionTyping.typeThrowExpression(node, context)
       case node: AST.TryExpression =>
-        body.controlExpressionTyping.typeTryExpression(node, context)
+        body.controlExpressionTyping.typeTryExpression(node, context, expected)
       case node: AST.WhileExpression =>
         body.controlExpressionTyping.typeWhileExpression(node, context)
       case _: AST.RetStatement | _: AST.DoExpression =>

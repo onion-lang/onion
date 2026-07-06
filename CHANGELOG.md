@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`try`/`catch`/`finally` branches and the elvis `?:` fallback target-type an empty collection
+  literal** — a `[]` / `[:]` in a try/catch branch (e.g. `def f(): List[Int] = try { [] } catch e: Exception { [1] }`)
+  or as the right operand of `?:` (e.g. `def f(o: List[Int]?): List[Int] = o ?: []`) now infers its
+  element type from the expected type instead of erasing to `Object` and failing with E0000/E0001,
+  completing the target-typing set started by #300 ([#301]).
+
 - **`if`/`else` and `select` branches target-type an empty collection literal** — a `[]` / `[:]`
   in a branch now infers its element type from the expected type (e.g. `def f(): List[Int] = if b { [] } else { [x] }`)
   instead of erasing to `Object` and failing the branch merge ([#300]).
@@ -633,6 +639,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[#301]: https://github.com/onion-lang/onion/issues/301
 [#300]: https://github.com/onion-lang/onion/issues/300
 [0.4.3]: https://github.com/onion-lang/onion/releases/tag/v0.4.3
 [#298]: https://github.com/onion-lang/onion/issues/298

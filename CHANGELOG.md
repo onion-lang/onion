@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`do[Option]` infers an empty bind's element type from the expected type** — a
+  `do[Option] { x <- Option::none(); ret x + 1 }` in a `def f(): Option[Int]` / `val o: Option[Int]`
+  context now types `x` as `Int` instead of `Object` (target typing) ([#279]).
+
 ## [0.4.3] - 2026-07-06
 
 - **Overload resolution no longer leaks a type-parameter bound between overloads** — a call

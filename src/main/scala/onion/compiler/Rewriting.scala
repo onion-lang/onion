@@ -771,8 +771,27 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   def rewriteFunctionDeclaration(declaration: AST.FunctionDeclaration): AST.FunctionDeclaration = {
     val (dictParams, dicts) = dictionaryParametersFor(declaration.location, declaration.typeParameters)
-    val newBlock = withDictScope(declaration.typeParameters.map(_.name), dicts) { rewriteBlockExpression(declaration.block) }
+    val newBlock = withDictScope(declaration.typeParameters.map(_.name), dicts) {
+      rewriteBlockWithReturnHint(declaration.block, declaration.returnType)
+    }
     declaration.copy(args = declaration.args ++ dictParams, block = newBlock)
+  }
+
+  /**
+   * Like `rewriteBlockExpression`, but when the body is exactly `return do[M] {...}`
+   * (as produced by an expression-bodied `def f(): M[E] = do[M] {...}`), thread the
+   * declared element type `E` into the do desugaring so an under-determined bind
+   * (e.g. `Option::none()`) is pinned to `E` instead of defaulting to Object
+   * (issue #279). Every other body shape is rewritten exactly as before.
+   */
+  private def rewriteBlockWithReturnHint(block: AST.BlockExpression, returnType: AST.TypeNode): AST.BlockExpression = {
+    if (block == null) return null
+    block.elements match {
+      case List(AST.ReturnExpression(loc, doExpr: AST.DoExpression)) =>
+        val desugared = desugarDoExpression(doExpr, elementTypeHintFor(doExpr.monadType, returnType))
+        block.copy(elements = List(AST.ReturnExpression(loc, desugared)))
+      case _ => rewriteBlockExpression(block)
+    }
   }
 
   def rewriteGlobalVariableDeclaration(declaration: AST.GlobalVariableDeclaration): AST.GlobalVariableDeclaration = {
@@ -794,7 +813,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   def rewriteMethodDeclaration(method: AST.MethodDeclaration): AST.MethodDeclaration = {
     val (dictParams, dicts) = dictionaryParametersFor(method.location, method.typeParameters)
-    val newBlock = if (method.block != null) withDictScope(method.typeParameters.map(_.name), dicts) { rewriteBlockExpression(method.block) } else null
+    val newBlock = if (method.block != null) withDictScope(method.typeParameters.map(_.name), dicts) { rewriteBlockWithReturnHint(method.block, method.returnType) } else null
     method.copy(args = method.args ++ dictParams, block = newBlock)
   }
 
@@ -1027,7 +1046,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       ))
     }
 
-    val pinned = pinThrowOnlyGenerativeBinds(pinEmptyBindElementTypes(statements), elementHint)
+    val pinned = pinThrowOnlyGenerativeBinds(pinEmptyBindElementTypes(statements, elementHint), elementHint)
     desugarDoStatements(doExpr.location, monadType, pinned)
   }
 
@@ -1120,14 +1139,21 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * The bound variable of an empty bind is dead — the monad short-circuits at the
    * empty value — so pinning its static type only lets the block type-check and
    * never changes runtime behaviour. When no element type is structurally
-   * derivable the statements are returned unchanged, preserving today's behaviour
-   * (and its E0001) rather than guessing.
+   * derivable from a sibling, the caller-supplied `elementHint` (the do-block's
+   * expected element type `E`, e.g. from `val r: M[E] = ...` or a `def f(): M[E]`
+   * return; issue #279) is used as a fallback. When neither is available the
+   * statements are returned unchanged, preserving today's behaviour (and its
+   * E0001) rather than guessing.
    */
-  private def pinEmptyBindElementTypes(statements: List[Any]): List[Any] = {
-    // Derive a candidate element type from the first non-empty generative bind.
+  private def pinEmptyBindElementTypes(
+    statements: List[Any],
+    elementHint: Option[AST.TypeNode]
+  ): List[Any] = {
+    // Derive a candidate element type from the first non-empty generative bind,
+    // falling back to the expected element type hint when there is no sibling.
     val derived: Option[AST.TypeNode] = statements.iterator.collect {
       case AST.DoBinding(_, _, expr) => expr
-    }.flatMap(elementTypeOfNonEmptyBind).nextOption()
+    }.flatMap(elementTypeOfNonEmptyBind).nextOption().orElse(elementHint)
 
     derived match {
       case None => statements

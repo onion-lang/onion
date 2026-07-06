@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-07-06
+
 - **Overload resolution no longer leaks a type-parameter bound between overloads** — a call
   matching an unbounded `[T]` overload is no longer rejected by a sibling `[T extends ...]`
   overload's constraint, so e.g. `Collections::sort(list, comparator)` works on non-`Comparable`
@@ -622,7 +624,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.2...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[0.4.3]: https://github.com/onion-lang/onion/releases/tag/v0.4.3
 [#298]: https://github.com/onion-lang/onion/issues/298
 [#297]: https://github.com/onion-lang/onion/issues/297
 [#296]: https://github.com/onion-lang/onion/issues/296

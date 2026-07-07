@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A `for` body and a select `when` guard now narrow like `if`/`while`** — two more
+  condition/guard→body narrowing sites, mirroring #294/#302/#303. The for-body runs only
+  when the loop condition is true, so `for var i: Int = 0; x != null && i < n; i = i + 1 { x.length() }`
+  narrows `x` in the body (flow-sensitive: a var reassigned in the body clears the narrowing from
+  that point on; a var reassigned in the condition or update is not narrowed). A select case body
+  runs only when its `when` guard is true, so `case s when s != null: s.length()` narrows `s` (and
+  the scrutinee var the guard tests). Soundness preserved: no narrowing leaks past the loop or to
+  another case/else ([#304]).
+
 - **A `while` body is narrowed by its condition, like an `if`-then branch** — `while (x != null) { x.method() }`
   now type-checks, including the idiomatic pointer-advance loop `while (cur != null) { use(cur); cur = cur.next }`
   (flow-sensitive: a use before the reassignment is narrowed, a use after is not). Soundness preserved:
@@ -651,6 +660,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[#304]: https://github.com/onion-lang/onion/issues/304
 [#303]: https://github.com/onion-lang/onion/issues/303
 [#302]: https://github.com/onion-lang/onion/issues/302
 [#301]: https://github.com/onion-lang/onion/issues/301

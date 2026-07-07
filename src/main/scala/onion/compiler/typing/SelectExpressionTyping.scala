@@ -82,7 +82,7 @@ final class SelectExpressionTyping(
             if (typedGuardInfo.isEmpty && TypeRules.isSuperType(varType, condition.`type`)) {
               hasWildcardPattern = true
             }
-            typeBlockExpression(thenBlock, context, branchExpected) match {
+            typeCaseBodyWithGuardNarrowing(typedGuardInfo, thenBlock, context, branchExpected) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
@@ -108,7 +108,7 @@ final class SelectExpressionTyping(
             if (typedGuardInfo.isEmpty && TypeRules.isSuperType(recordType, condition.`type`)) {
               hasWildcardPattern = true
             }
-            typeBlockExpression(thenBlock, context, branchExpected) match {
+            typeCaseBodyWithGuardNarrowing(typedGuardInfo, thenBlock, context, branchExpected) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
@@ -129,7 +129,7 @@ final class SelectExpressionTyping(
               GuardInfo(guardAst, guardTerm)
             }
             caseBindingData += ((bindingInfo, varBinds, typedGuardInfo))
-            typeBlockExpression(thenBlock, context, branchExpected) match {
+            typeCaseBodyWithGuardNarrowing(typedGuardInfo, thenBlock, context, branchExpected) match {
               case Some(term) =>
                 caseTerms += term
                 caseNodes += thenBlock
@@ -145,7 +145,7 @@ final class SelectExpressionTyping(
             GuardInfo(guardAst, guardTerm)
           }
           caseBindingData += ((NoBindings, Nil, typedGuardInfo))
-          typeBlockExpression(thenBlock, context, branchExpected) match {
+          typeCaseBodyWithGuardNarrowing(typedGuardInfo, thenBlock, context, branchExpected) match {
             case Some(term) =>
               caseTerms += term
               caseNodes += thenBlock
@@ -558,6 +558,46 @@ final class SelectExpressionTyping(
 
   private def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type = null): Option[Term] =
     control.typeBlockExpression(node, context, expected)
+
+  /**
+   * Types a case body, first narrowing it by the positive facts of its `when`
+   * guard (issue #304). A case body runs only when its guard is true, so the
+   * guard narrows the body exactly like an `if`-then branch narrows its then
+   * block: `case s when s != null: s.length()` narrows `s` to non-null.
+   *
+   * A `val`/parameter narrows outright (addNarrowing); a `var` narrows
+   * flow-sensitively (addFlowNarrowing), which a reassignment in the body clears
+   * from that point on. We exclude a var reassigned in the GUARD itself or in the
+   * case BODY (matching the if-then handling of #288/#289/#294): such a var is not
+   * reliably non-null at body entry. The narrowing is bounded by the surrounding
+   * per-case scope (openScope) and this save/restore, so it never leaks to other
+   * cases or past the select. A guard-less case narrows nothing.
+   */
+  private def typeCaseBodyWithGuardNarrowing(
+    guardInfo: Option[GuardInfo],
+    thenBlock: AST.BlockExpression,
+    context: LocalContext,
+    expected: Type
+  ): Option[Term] = {
+    guardInfo match {
+      case Some(GuardInfo(guardAst, _)) =>
+        val savedNarrowings = context.saveNarrowings()
+        val narrowing = body.extractNarrowing(guardAst, context)
+        val guardReassigned = AssignedVariableScanner.scan(guardAst)
+        val bodyReassigned = AssignedVariableScanner.scan(thenBlock)
+        narrowing.positive.foreach { case (name, tp) =>
+          context.addNarrowing(name, tp)
+        }
+        narrowing.mutablePositive
+          .filter { case (name, _) => !guardReassigned.contains(name) && !bodyReassigned.contains(name) }
+          .foreach { case (name, tp) => context.addFlowNarrowing(name, tp) }
+        val result = typeBlockExpression(thenBlock, context, expected)
+        context.restoreNarrowings(savedNarrowings)
+        result
+      case None =>
+        typeBlockExpression(thenBlock, context, expected)
+    }
+  }
 
   private def ensureBoolean(node: AST.Node, term: Term): Term =
     control.ensureBoolean(node, term)

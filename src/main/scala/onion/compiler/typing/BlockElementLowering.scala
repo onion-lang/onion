@@ -166,7 +166,34 @@ final class BlockElementLowering(
         }.getOrElse(new BoolValue(node.location, true))
         val update = Option(node.update).flatMap(update => typed(update, context)).getOrElse(null)
         val loop = context.openLoop {
-          translate(node.block, context)
+          val savedNarrowings = context.saveNarrowings()
+
+          // #304: the for-body runs only when the condition is true, so narrow it
+          // in the body exactly like the while-body (#303) and the if-then branch.
+          // A `val`/parameter narrows outright (addNarrowing); a `var` narrows
+          // flow-sensitively (addFlowNarrowing) — a reassignment in the body clears
+          // it from that point on (AssignmentTyping calls clearFlowNarrowing). We
+          // exclude a var reassigned in the CONDITION or the UPDATE: both re-run
+          // each iteration and are not reliably non-null at body entry (the update
+          // is the continue target and runs before the re-test). The narrowing is
+          // bounded to the body by the save/restore, so it never leaks into the
+          // update expression (typed above) or past the loop.
+          if (node.condition != null) {
+            val narrowing = body.extractNarrowing(node.condition, context)
+            val condReassigned = AssignedVariableScanner.scan(node.condition)
+            val updateReassigned =
+              if (node.update != null) AssignedVariableScanner.scan(node.update) else Set.empty[String]
+            narrowing.positive.foreach { case (name, tp) =>
+              context.addNarrowing(name, tp)
+            }
+            narrowing.mutablePositive
+              .filter { case (name, _) => !condReassigned.contains(name) && !updateReassigned.contains(name) }
+              .foreach { case (name, tp) => context.addFlowNarrowing(name, tp) }
+          }
+
+          val result = translate(node.block, context)
+          context.restoreNarrowings(savedNarrowings)
+          result
         }
         // The update is the continue target, not part of the body: continue
         // must run it before re-testing the condition (otherwise a for-loop

@@ -76,9 +76,88 @@ private[typing] object TypeCheckingHelpers {
     }
     if (TypeRules.isSuperType(left, right)) return left
     if (TypeRules.isSuperType(right, left)) return right
-    if (!left.isBasicType && !right.isBasicType) return rootClass
+    if (!left.isBasicType && !right.isBasicType) {
+      // Neither reference type is a supertype of the other: walk the class
+      // hierarchy to the nearest common ancestor instead of collapsing straight
+      // to Object. This keeps `if b { new Dog() } else { new Cat() }` typed as
+      // their shared superclass `Animal` (and, for interface-only siblings, the
+      // single shared interface), so members declared there stay callable.
+      (left, right) match {
+        case (lc: ClassType, rc: ClassType) =>
+          return nearestCommonAncestor(lc, rc, rootClass)
+        case _ =>
+          return rootClass
+      }
+    }
     reportError(node, left, right)
     null
+  }
+
+  /**
+   * Nearest common ancestor of two class types when neither is a supertype of
+   * the other. Prefers a common SUPERCLASS (walking `left`'s superclass chain
+   * and returning the first ancestor that is also a supertype of `right`); if
+   * that only reaches Object but there is exactly one shared interface, returns
+   * that interface. When the choice is ambiguous (Onion has no intersection
+   * types), falls back to `rootClass` (Object) — the previous behaviour.
+   *
+   * Whatever is returned is a genuine supertype of BOTH operands: superclass
+   * candidates come from `left`'s own chain and are checked against `right`;
+   * interface candidates are implemented by `left` and checked against `right`.
+   */
+  private def nearestCommonAncestor(
+    left: ClassType,
+    right: ClassType,
+    rootClass: ClassType
+  ): Type = {
+    // Walk left's proper superclass chain (excluding Object) for the first
+    // ancestor that is also a supertype of right.
+    var superCandidate: ClassType = left.superClass
+    while (superCandidate != null) {
+      if ((superCandidate ne rootClass) &&
+          (superCandidate.name != "java.lang.Object") &&
+          TypeRules.isSuperType(superCandidate, right)) {
+        return superCandidate
+      }
+      superCandidate = superCandidate.superClass
+    }
+    // No common superclass below Object. Look for shared interfaces (transitive)
+    // implemented by left that are supertypes of right. A unique winner is the
+    // LUB; multiple unrelated ones have no unique LUB without intersection
+    // types, so fall back to Object.
+    val commonIfaces = collectInterfaces(left).filter { iface =>
+      (iface ne rootClass) && TypeRules.isSuperType(iface, right)
+    }
+    // Keep only the most specific interfaces (drop any that are a supertype of
+    // another candidate), so `Speaker` wins even if it also extends a broader
+    // interface both share.
+    val mostSpecific = commonIfaces.filter { c =>
+      !commonIfaces.exists(o => (o ne c) && TypeRules.isSuperType(c, o))
+    }
+    mostSpecific match {
+      case Seq(single) => single
+      case _           => rootClass
+    }
+  }
+
+  /**
+   * All interfaces (directly declared and transitively inherited, including
+   * super-interfaces reached via superclasses) implemented by a class type.
+   */
+  private def collectInterfaces(tp: ClassType): List[ClassType] = {
+    val seen = scala.collection.mutable.LinkedHashMap.empty[String, ClassType]
+    def visitClass(c: ClassType): Unit = {
+      if (c == null) return
+      c.interfaces.foreach(visitInterface)
+      visitClass(c.superClass)
+    }
+    def visitInterface(i: ClassType): Unit = {
+      if (i == null || seen.contains(i.name)) return
+      seen(i.name) = i
+      i.interfaces.foreach(visitInterface)
+    }
+    visitClass(tp)
+    seen.values.toList
   }
 
   /**

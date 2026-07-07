@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **The type of an `if`/`select`/`try` merged from two siblings is their common ancestor, not `Object`**
+  — `if b { new Dog() } else { new Cat() }` is now typed `Animal` (their shared superclass; or a
+  shared interface), so members declared there stay callable without an annotation ([#307]).
+
 - **A `for` body and a select `when` guard now narrow like `if`/`while`** — two more
   condition/guard→body narrowing sites, mirroring #294/#302/#303. The for-body runs only
   when the loop condition is true, so `for var i: Int = 0; x != null && i < n; i = i + 1 { x.length() }`
@@ -660,6 +664,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[#307]: https://github.com/onion-lang/onion/issues/307
 [#304]: https://github.com/onion-lang/onion/issues/304
 [#303]: https://github.com/onion-lang/onion/issues/303
 [#302]: https://github.com/onion-lang/onion/issues/302

@@ -227,8 +227,12 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 `onion.Option`で提供。
 
 - `Option::some(value)` / `Option::none()` / `Option::of(value)`
-- `opt.getOrElse(defaultValue)`
+- `opt.getOrElse(defaultValue)` / `opt.orElseGet(() -> default)` / `opt.orNull()`
+- `opt.orElse(otherOption)`
 - `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+- `opt.contains(value)` / `opt.exists(predicate)`
+- `opt.fold(() -> ifEmpty, v -> ifPresent)` — 単一の値へ畳み込む
+- `opt.toList()` — 0個または1個の要素のリスト
 
 ## Result モジュール
 
@@ -237,6 +241,10 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 - `Result::ok(value)` / `Result::err(error)`
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
+- `res.getOrElse(default)` / `res.orElseGet(() -> default)` / `res.orNull()`
+- `res.fold(e -> ifErr, v -> ifOk)` — 単一の値へ畳み込む
+- `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — `Err` を回復
+- `res.exists(predicate)` / `res.toList()`
 
 ## Future モジュール
 
@@ -331,6 +339,57 @@ val text = Yaml::stringify(obj)               // "name: ko\nage: 3\n"
 ```
 
 scalar の型推論は Json と一致します（`3`→Long、`3.5`→Double、`true`→Boolean、`null`→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、`record ... derive!(Yaml)` の土台になっています。
+
+## Strings モジュール
+
+文字列ユーティリティ（`onion.Strings`、自動 import）。分割・結合・大文字小文字変換・パディングに加え：
+
+```onion
+Strings::capitalize("hello")             // "Hello"
+Strings::capitalizeWords("a b c")        // "A B C"
+Strings::containsIgnoreCase(s, sub) / Strings::equalsIgnoreCase(a, b)
+Strings::count("banana", "a")            // 3
+Strings::removePrefix("unhappy", "un")   // "happy"
+Strings::removeSuffix("running", "ing")  // "runn"
+Strings::truncate("hello world", 8, "...")   // "hello..."
+Strings::center("hi", 6, '*')            // "**hi**"
+Strings::ifBlank("   ", "default")       // "default"
+Strings::words("  a  b  c ")             // String[] {"a","b","c"}
+Strings::chars("abc")                    // List ["a","b","c"]
+// null 安全なパース（例外を投げずに null/フォールバックを返す）
+Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
+Strings::toIntOr("nope", 0)              // 0
+```
+
+## Maps モジュール
+
+Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。
+
+```onion
+Maps::getOrElse(m, "x", () -> compute())      // 遅延デフォルト
+Maps::keys(m) / Maps::values(m)               // 順序を保ったリスト
+Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUpperCase())
+Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語
+Maps::invert(m)                               // キーと値を入れ替え
+Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
+Maps::groupBy(items, keyOf)                   // Map[K, List]
+Maps::countBy(items, keyOf)                   // 頻度 Map[K, Integer]
+Maps::mergeWith(a, b, (x: Int, y: Int) -> x + y)  // 衝突を結合
+Maps::update(m, "a", (v: Int) -> v + 1)       // 関数的更新
+```
+
+## Sets モジュール
+
+Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持し、集合演算は null 安全。
+
+```onion
+Sets::of(1, 2, 3) / Sets::fromList([1, 1, 2]) / Sets::toList(a)
+Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)
+Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
+Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
+Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
+Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
+```
 
 ## 次のステップ
 

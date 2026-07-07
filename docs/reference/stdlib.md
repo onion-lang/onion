@@ -380,8 +380,12 @@ Access iteration utilities for collections and arrays:
 Provided via `onion.Option`.
 
 - `Option::some(value)` / `Option::none()` / `Option::of(value)`
-- `opt.getOrElse(defaultValue)`
+- `opt.getOrElse(defaultValue)` / `opt.orElseGet(() -> default)` / `opt.orNull()`
+- `opt.orElse(otherOption)`
 - `opt.map(f)` / `opt.flatMap(f)` / `opt.filter(predicate)`
+- `opt.contains(value)` / `opt.exists(predicate)`
+- `opt.fold(() -> ifEmpty, v -> ifPresent)` — collapse to a single value
+- `opt.toList()` — zero- or one-element list
 
 ## Result Module
 
@@ -390,6 +394,10 @@ Provided via `onion.Result`.
 - `Result::ok(value)` / `Result::err(error)`
 - `Result::ofNullable(value, errorIfNull)` / `Result::trying(operation)`
 - `res.map(f)` / `res.mapError(f)` / `res.flatMap(f)` / `res.toOption()`
+- `res.getOrElse(default)` / `res.orElseGet(() -> default)` / `res.orNull()`
+- `res.fold(e -> ifErr, v -> ifOk)` — collapse to a single value
+- `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — rescue an `Err`
+- `res.exists(predicate)` / `res.toList()`
 
 ## Future Module
 
@@ -642,6 +650,36 @@ Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
 Strings::startsWith(s, p) / Strings::endsWith(s, p) / Strings::contains(s, sub)
+Strings::padLeft(s, 8, '0') / Strings::padRight(s, 8, ' ') / Strings::repeat(s, 3)
+```
+
+Case and inspection helpers:
+
+```onion
+Strings::capitalize("hello")             // "Hello"
+Strings::capitalizeWords("a b c")        // "A B C"
+Strings::equalsIgnoreCase(a, b) / Strings::containsIgnoreCase(s, sub)
+Strings::count("banana", "a")            // 3
+```
+
+Shaping and decomposition:
+
+```onion
+Strings::removePrefix("unhappy", "un")   // "happy"
+Strings::removeSuffix("running", "ing")  // "runn"
+Strings::truncate("hello world", 8, "...")   // "hello..."
+Strings::center("hi", 6, '*')            // "**hi**"
+Strings::ifBlank("   ", "default")       // "default"
+Strings::words("  a  b  c ")             // String[] {"a","b","c"}
+Strings::chars("abc")                    // List ["a","b","c"]
+```
+
+Null-safe parsing (return `null`/fallback instead of throwing):
+
+```onion
+Strings::toIntOrNull("42")               // 42, or null if not an int
+Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
+Strings::toIntOr("nope", 0)              // 0
 ```
 
 ## Files Module
@@ -992,40 +1030,91 @@ Maps::getOrDefault(m, "a", 0)     // 1
 Maps::getOrDefault(m, "x", 0)     // 0
 ```
 
+Result maps preserve insertion order (`LinkedHashMap`).
+
+### Access
+
+```onion
+Maps::getOrElse(m, "x", () -> compute())   // lazy default when absent
+Maps::keys(m)                              // List of keys, in order
+Maps::values(m)                            // List of values, in order
+```
+
 ### Transformation
 
 ```onion
 Maps::mapValues(m, (v: Int) -> v * 2)
+Maps::mapKeys(m, (k: String) -> k.toUpperCase())
 Maps::filterValues(m, (v: Int) -> v > 0)
 Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
+Maps::filter(m, (k: String, v: Int) -> v > 0)        // key+value predicate
+Maps::invert(m)                                       // swap keys and values
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List
+Maps::forEach(m, (k: String, v: Int) -> println(k))
+```
+
+### Querying
+
+```onion
+Maps::count(m, (k: String, v: Int) -> v > 0)
+Maps::anyEntry(m, (k: String, v: Int) -> v < 0)
+Maps::allEntries(m, (k: String, v: Int) -> v >= 0)
+```
+
+### Building from lists
+
+```onion
+Maps::groupBy(items, (x: Item) -> x.category())   // Map[K, List[Item]]
+Maps::countBy(items, (x: Item) -> x.category())   // Map[K, Integer] frequency
 ```
 
 ### Combination
 
 ```onion
-val merged = Maps::merge(a, b)   // b wins on key collisions
+val merged = Maps::merge(a, b)                          // b wins on collisions
+Maps::mergeWith(a, b, (x: Int, y: Int) -> x + y)        // combine on collision
+Maps::update(m, "a", (v: Int) -> v + 1)                 // functional update
 ```
 
 ---
 
 ## Sets Module
 
-Set utility functions.
+Set utility functions. Result sets preserve insertion order (`LinkedHashSet`),
+and the set-algebra operations are null-safe.
 
 ### Construction
 
 ```onion
 val a = Sets::of(1, 2, 3)
 val b = Sets::newSet[Int]()
+val c = Sets::fromList([1, 1, 2, 3])   // distinct, first-seen order
+Sets::toList(a)                        // back to a List
 ```
 
-### Set operations
+### Set algebra
 
 ```onion
 Sets::union(a, b)
 Sets::intersection(a, b)
 Sets::difference(a, b)
+Sets::symmetricDifference(a, b)        // in exactly one of the two
 Sets::containsAll(a, b)
+Sets::isSubsetOf(a, b)                 // every element of a is in b
+Sets::isSupersetOf(a, b)
+Sets::isDisjoint(a, b)                 // share no elements
+```
+
+### Functional operations
+
+```onion
+Sets::map(a, (x: Int) -> x * 2)
+Sets::filter(a, (x: Int) -> x > 1)
+Sets::forEach(a, (x: Int) -> println(x))
+Sets::count(a, (x: Int) -> x > 1)
+Sets::any(a, (x: Int) -> x > 2)
+Sets::all(a, (x: Int) -> x > 0)
+Sets::find(a, (x: Int) -> x > 2)       // matching element or null
 ```
 
 ---

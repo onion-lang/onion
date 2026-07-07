@@ -438,6 +438,21 @@ Format::duration(3661)            // "1h 1m 1s"
 Format::ordinal(21)               // "21st"
 ```
 
+## Text モジュール
+
+コンソールのテキストレイアウト（`onion.Text`）——折返し・インデント・整列テーブル。
+
+```onion
+Text::wrap("長い文章 ...", 40)          // 折り返した行のリスト
+Text::indent("a\nb", "> ")              // "> a\n> b"
+Text::dedent("    a\n    b")            // "a\nb"
+
+Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
+// Name   Dept
+// Alice  Eng
+// Bob    Sales
+```
+
 ## 次のステップ
 
 - [基本構文](../guide/basic-syntax.md) - 言語構文の詳細

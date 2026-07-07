@@ -855,6 +855,21 @@ Format::duration(3661)            // "1h 1m 1s"
 Format::ordinal(21)               // "21st"
 ```
 
+## Text Module
+
+Console text layout (`onion.Text`): word wrapping, indenting, and aligned tables.
+
+```onion
+Text::wrap("a long sentence ...", 40)   // List of wrapped lines
+Text::indent("a\nb", "> ")              // "> a\n> b"
+Text::dedent("    a\n    b")            // "a\nb"
+
+Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
+// Name   Dept
+// Alice  Eng
+// Bob    Sales
+```
+
 ## Proc Module
 
 Process execution for scripting (`onion.Proc`):

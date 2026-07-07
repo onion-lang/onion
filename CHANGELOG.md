@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers — `sum`/`sumInt`/`sumLong`, `average`, `min`/`max`, `median`, `variance`, `stddev` (the
   generic aggregates accept `List[Int]`/`List[Long]`/`List[Double]` alike via a `Number` bound); and
   `onion.Format` renders locale-independent human-readable output — `integer` (comma grouping),
-  `number`/`fixed`/`percent`, `bytes` (1.5 KB), `duration` (1h 1m 1s), and `ordinal` (21st).
+  `number`/`fixed`/`percent`, `bytes` (1.5 KB), `duration` (1h 1m 1s), and `ordinal` (21st); and
+  `onion.Text` lays out console text — `wrap` (word wrapping), `indent`/`dedent`, and `table`
+  (columns aligned to their widest cell).
 
 - **`Colls` gains `chunked`, `windowed`, and `slice`** — batching (`items.chunked(100)`),
   sliding windows (`items.windowed(3)`), and bounds-clamping sublists (`items.slice(from, to)`),

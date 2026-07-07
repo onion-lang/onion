@@ -75,6 +75,15 @@ The same helpers are available as plain static calls:
 Colls::map(xs, (x: Integer) -> (x as Int) * 2)
 ```
 
+Batching and windowing helpers chain the same way:
+
+```onion
+val nums = [1, 2, 3, 4, 5, 6, 7]
+nums.chunked(3)      // [[1,2,3], [4,5,6], [7]]  — fixed-size batches
+nums.windowed(3)     // [[1,2,3], [2,3,4], ...]  — sliding windows
+nums.slice(1, 4)     // [2, 3, 4]                — bounds-clamping sublist
+```
+
 ## Ranges
 
 `a..b` (inclusive) and `a..<b` (exclusive) create iterable integer ranges:

@@ -955,4 +955,43 @@ public final class Colls {
     public static <T> List<T> toList(Set<T> set) {
         return java.util.Collections.unmodifiableList(new ArrayList<>(set));
     }
+
+    /**
+     * Splits a list into consecutive chunks of at most {@code size} elements (the
+     * last chunk may be smaller). A non-positive size yields an empty list.
+     * Useful for batching: {@code items.chunked(100)}.
+     */
+    public static <T> List<List<T>> chunked(List<T> list, int size) {
+        List<List<T>> result = new ArrayList<>();
+        if (list == null || size <= 0) return result;
+        for (int i = 0; i < list.size(); i += size) {
+            result.add(new ArrayList<>(list.subList(i, Math.min(i + size, list.size()))));
+        }
+        return result;
+    }
+
+    /**
+     * Sliding windows of {@code size} consecutive elements, advancing one element
+     * at a time. Fewer than {@code size} elements yields an empty list.
+     */
+    public static <T> List<List<T>> windowed(List<T> list, int size) {
+        List<List<T>> result = new ArrayList<>();
+        if (list == null || size <= 0) return result;
+        for (int i = 0; i + size <= list.size(); i++) {
+            result.add(new ArrayList<>(list.subList(i, i + size)));
+        }
+        return result;
+    }
+
+    /**
+     * Safe sublist from {@code from} (inclusive) to {@code to} (exclusive),
+     * clamping both bounds into range; an empty list when the range is empty.
+     */
+    public static <T> List<T> slice(List<T> list, int from, int to) {
+        if (list == null) return new ArrayList<>();
+        int lo = Math.max(0, from);
+        int hi = Math.min(list.size(), to);
+        if (lo >= hi) return new ArrayList<>();
+        return new ArrayList<>(list.subList(lo, hi));
+    }
 }

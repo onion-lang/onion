@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `onion.Format` renders locale-independent human-readable output — `integer` (comma grouping),
   `number`/`fixed`/`percent`, `bytes` (1.5 KB), `duration` (1h 1m 1s), and `ordinal` (21st).
 
+- **`Colls` gains `chunked`, `windowed`, and `slice`** — batching (`items.chunked(100)`),
+  sliding windows (`items.windowed(3)`), and bounds-clamping sublists (`items.slice(from, to)`),
+  all chainable like the other list helpers.
+
 - **Richer practical standard library.** `onion.Maps` (6 → 20 methods) gains
   `keys`/`values`, `mapKeys`, key+value `filter`/`count`/`anyEntry`/`allEntries`, `forEach`,
   `toList`, `invert`, `groupBy`/`countBy`, `update`, `mergeWith`, and lazy `getOrElse`; `onion.Sets`

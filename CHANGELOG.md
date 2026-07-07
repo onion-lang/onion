@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A `while` body is narrowed by its condition, like an `if`-then branch** — `while (x != null) { x.method() }`
+  now type-checks, including the idiomatic pointer-advance loop `while (cur != null) { use(cur); cur = cur.next }`
+  (flow-sensitive: a use before the reassignment is narrowed, a use after is not). Soundness preserved:
+  no narrowing leaks past the loop ([#303]).
+
 - **Null narrowing flows through `||`, the De Morgan dual of the `&&` narrowing** — in `a || b`
   the right operand `b` is only reached when `a` is false, so a `x == null` left operand now
   narrows `x` to non-null while typing `b` (e.g. `x == null || x.length() == 0`). Likewise the
@@ -646,6 +651,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[#303]: https://github.com/onion-lang/onion/issues/303
 [#302]: https://github.com/onion-lang/onion/issues/302
 [#301]: https://github.com/onion-lang/onion/issues/301
 [#300]: https://github.com/onion-lang/onion/issues/300

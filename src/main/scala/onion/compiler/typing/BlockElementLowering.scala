@@ -434,11 +434,37 @@ final class BlockElementLowering(
     case node: AST.WhileExpression =>
       context.openScope {
         val condition = ensureBooleanCondition(node.condition, typed(node.condition, context))
+        val savedNarrowings = context.saveNarrowings()
+
+        // #303: the body runs only when the condition is true, so narrow it in
+        // the body exactly like the `if`-then branch does (same condition→body
+        // narrowing). A `val`/parameter narrows outright (addNarrowing); a `var`
+        // narrows flow-sensitively (addFlowNarrowing), which is FLOW-SENSITIVE:
+        //   while cur != null { use(cur); cur = cur.next() }
+        // the use before the reassignment sees the non-null narrowing and the
+        // reassignment clears it from that point on (AssignmentTyping calls
+        // clearFlowNarrowing), so a use AFTER the reassignment correctly fails.
+        // We deliberately do NOT pre-filter on "reassigned anywhere in the body"
+        // — that would wrongly drop the narrowing for the linked-list pattern,
+        // whose whole point is the `cur = cur.next()` advance. The #288
+        // closure-escape safety is preserved separately: typing a closure body
+        // runs under withoutFlowNarrowings, so a flow-narrowed var captured by a
+        // closure in the body is not narrowed inside the closure. We only exclude
+        // a var reassigned in the CONDITION itself (it is not reliably non-null
+        // at body entry), matching the if/&& handling of #288/#289/#294.
+        val narrowing = body.extractNarrowing(node.condition, context)
+        val condReassigned = AssignedVariableScanner.scan(node.condition)
+        narrowing.positive.foreach { case (name, tp) =>
+          context.addNarrowing(name, tp)
+        }
+        narrowing.mutablePositive
+          .filter { case (name, _) => !condReassigned.contains(name) }
+          .foreach { case (name, tp) => context.addFlowNarrowing(name, tp) }
+
         // #289: `while ((v = e) != null) { body }` assigns v then checks it is
         // non-null, so v is non-null at the top of every iteration. Narrow v
         // flow-sensitively at the start of the body (dropped if the body
         // reassigns v). Bounded by this while's scope.
-        val savedNarrowings = context.saveNarrowings()
         assignInConditionNonNullTarget(node.condition, context).foreach { case (name, tp) =>
           context.addFlowNarrowing(name, tp)
         }

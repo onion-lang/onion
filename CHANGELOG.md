@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`oniondoc` — a documentation generator.** A new javadoc/scaladoc-style tool
+  (`onion.tools.doc.OnionDoc`) that reads `.on` sources, extracts `/** ... */` doc comments attached
+  to types (class/interface/record) and their members, renders a markdown-like comment body to HTML
+  (headings, bold/italic, inline and fenced code, lists, links, with HTML escaping), and writes a
+  static site — an index plus one page per type with signatures and `@param`/`@return`/`@throws`
+  tags. Run: `oniondoc -d <outdir> <source.on...>`.
+
 - **`Hash`, `Codec`, `Text`, `Stats` and `Format` helpers are callable as method chains.** Registered
   as builtin extension methods on their receiver type, so `"pw".sha256()`,
   `"x".base64Encode().base64Decode()`, `text.wrap(40)`, `nums.sum()`/`nums.average()`/`nums.median()`,

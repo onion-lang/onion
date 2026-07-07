@@ -117,6 +117,63 @@ public final class Csv {
         return sb.toString();
     }
 
+    /**
+     * Serializes header-keyed records to CSV text (the inverse of
+     * {@link #parseWithHeader}). The header row is taken from the union of keys
+     * across all records, in first-seen order; a record missing a column emits
+     * an empty field. Returns "" for an empty list.
+     */
+    public static String stringifyWithHeader(List<Map<String, String>> records) {
+        if (records == null || records.isEmpty()) return "";
+        List<String> header = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (Map<String, String> rec : records) {
+            if (rec != null) {
+                for (String key : rec.keySet()) {
+                    if (seen.add(key)) header.add(key);
+                }
+            }
+        }
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(header);
+        for (Map<String, String> rec : records) {
+            List<String> row = new ArrayList<>();
+            for (String key : header) {
+                String v = rec == null ? null : rec.get(key);
+                row.add(v == null ? "" : v);
+            }
+            rows.add(row);
+        }
+        return stringify(rows);
+    }
+
+    /**
+     * Extracts a single column (by zero-based index) from parsed rows. A row
+     * shorter than {@code index} contributes "".
+     */
+    public static List<String> column(List<List<String>> rows, int index) {
+        List<String> result = new ArrayList<>();
+        if (rows == null) return result;
+        for (List<String> row : rows) {
+            result.add(index >= 0 && index < row.size() ? row.get(index) : "");
+        }
+        return result;
+    }
+
+    /**
+     * Extracts a named column from header-keyed records (see
+     * {@link #parseWithHeader}). A record without the column contributes "".
+     */
+    public static List<String> columnByName(List<Map<String, String>> records, String name) {
+        List<String> result = new ArrayList<>();
+        if (records == null) return result;
+        for (Map<String, String> rec : records) {
+            String v = rec == null ? null : rec.get(name);
+            result.add(v == null ? "" : v);
+        }
+        return result;
+    }
+
     private static String quoteIfNeeded(String field) {
         if (field == null) return "";
         boolean needs = field.indexOf(',') >= 0 || field.indexOf('"') >= 0

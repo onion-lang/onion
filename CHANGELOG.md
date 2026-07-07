@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   null-safe parsers (`toIntOrNull`/`toLongOrNull`/`toDoubleOrNull`/`toIntOr`). Result maps/sets
   preserve insertion order. `onion.Option` gains `orElseGet`/`orNull`/`orElse`/`contains`/`exists`/
   `fold`/`toList`, and `onion.Result` gains `fold`/`recover`/`recoverWith`/`orElseGet`/`orNull`/
-  `exists`/`toList`.
+  `exists`/`toList`. `onion.Csv` gains `stringifyWithHeader` (the inverse of `parseWithHeader`,
+  closing the record round-trip) and `column`/`columnByName` extractors.
 
 ## [0.4.4] - 2026-07-07
 

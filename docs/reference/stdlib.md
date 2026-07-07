@@ -787,6 +787,23 @@ val viaJson = User::fromJson(User::toJson(u))   // == u
 val viaYaml = User::fromYaml(User::toYaml(u))  // == u
 ```
 
+## Csv Module
+
+Self-contained RFC 4180 CSV parsing and serialization (`onion.Csv`,
+auto-imported) — quoted fields, embedded commas/newlines, and doubled quotes
+are handled.
+
+```onion
+val rows = Csv::parse(text)                  // List of List of String
+val recs = Csv::parseWithHeader(text)        // List of Map (header -> value)
+
+Csv::column(rows, 0)                          // one positional column
+Csv::columnByName(recs, "age")                // one header-named column
+
+val out  = Csv::stringify(rows)               // rows -> CSV text
+val out2 = Csv::stringifyWithHeader(recs)     // records -> CSV (inverse of parseWithHeader)
+```
+
 ## Proc Module
 
 Process execution for scripting (`onion.Proc`):

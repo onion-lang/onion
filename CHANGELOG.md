@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Hash`, `Codec`, `Text` and `Stats` helpers are callable as method chains.** Registered as
+  builtin extension methods on their receiver type, so `"pw".sha256()`, `"x".base64Encode().base64Decode()`,
+  `text.wrap(40)`, and `nums.sum()`/`nums.average()`/`nums.median()` work alongside the static
+  `Hash::` / `Codec::` / `Text::` / `Stats::` forms (`"secret".base64Encode().sha256()` composes).
+
 - **Separate compilation of generics.** `onionc` now emits JVM generic `Signature` attributes for
   generic classes, methods, fields and constructors, so a generic type compiled in one unit is seen
   as generic from another: compile `class Container[T]` to a `.class`, then `new Container[String](x)`

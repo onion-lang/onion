@@ -16,8 +16,10 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
 | **Testing & timing** | `Assert`, `Timing` |
 
-Most collection/string helpers are also usable as method chains
-(`list.filter { ... }.map { ... }`, `m.mapValues { ... }`, `"s".capitalize()`).
+Most helpers are also usable as method chains, not only as static `Module::` calls —
+collections (`list.filter { ... }.map { ... }`, `m.mapValues { ... }`), strings
+(`"s".capitalize()`), hashing/encoding (`"pw".sha256()`, `"x".base64Encode()`), text
+layout (`text.wrap(40)`), and numeric aggregation (`nums.sum()`, `nums.average()`).
 
 ## IO Module
 

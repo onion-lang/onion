@@ -16,8 +16,10 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
 | **テスト・計測** | `Assert`, `Timing` |
 
-コレクション・文字列のヘルパーはほとんどメソッドチェインでも書けます
-（`list.filter { ... }.map { ... }`, `m.mapValues { ... }`, `"s".capitalize()`）。
+ほとんどのヘルパーは静的な `Module::` 呼び出しだけでなくメソッドチェインでも書けます——
+コレクション（`list.filter { ... }.map { ... }`, `m.mapValues { ... }`）、文字列
+（`"s".capitalize()`）、ハッシュ・エンコード（`"pw".sha256()`, `"x".base64Encode()`）、
+テキスト整形（`text.wrap(40)`）、数値集計（`nums.sum()`, `nums.average()`）。
 
 ## IO モジュール
 

@@ -103,6 +103,7 @@ nav:
       - リファレンス:
           - 言語仕様: ja/reference/specification.md
           - 標準ライブラリ: ja/reference/stdlib.md
+          - APIドキュメント (oniondoc): api/index.html
           - コンパイラアーキテクチャ: ja/reference/compiler-architecture.md
           - エラーコード: ja/reference/error-codes.md
           - コンパイラ内部:
@@ -151,6 +152,7 @@ nav:
   - Reference:
       - Language Specification: reference/specification.md
       - Standard Library: reference/stdlib.md
+      - API Docs (oniondoc): api/index.html
       - Compiler Architecture: reference/compiler-architecture.md
       - Error Codes: reference/error-codes.md
       - Compiler Internals:

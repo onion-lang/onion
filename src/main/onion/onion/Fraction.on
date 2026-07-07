@@ -1,0 +1,67 @@
+/**
+ * # Fraction — exact rational arithmetic
+ *
+ * A `Fraction` is a rational number `num / den` kept in **lowest terms** with a
+ * positive denominator. Being exact, it sidesteps the rounding error of
+ * floating point:
+ *
+ * ```onion
+ * val third = Fraction::of(1, 3)
+ * val whole = third + third + third   // exactly 1/1, not 0.999...
+ * ```
+ *
+ * Operator methods (`plus`, `minus`, `times`, `div`) back `+ - * /` directly,
+ * and `toDouble` crosses over to floating point when you need it.
+ *
+ * - **immutable** — every operation returns a fresh `Fraction`
+ * - **normalized** — always reduced, denominator positive
+ */
+record Fraction(num: Int, den: Int) {
+public:
+  /**
+   * Builds a normalized fraction `n / d`, reduced with a positive denominator.
+   *
+   * @param n the numerator
+   * @param d the denominator; must be non-zero
+   * @return the reduced fraction
+   * @throws IllegalArgumentException if `d` is zero
+   */
+  static def of(n: Int, d: Int): Fraction {
+    if d == 0 { throw new IllegalArgumentException("denominator must not be zero") }
+    var nn = n
+    var dd = d
+    if dd < 0 { nn = -nn; dd = -dd }
+    val g = gcd(Math::abs(nn), dd)
+    if g == 0 { return new Fraction(0, 1) }
+    return new Fraction(nn / g, dd / g)
+  }
+
+  /** Adds `o` to this fraction. Backs the `+` operator. */
+  def plus(o: Fraction): Fraction =
+    Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+
+  /** Subtracts `o` from this fraction. Backs the `-` operator. */
+  def minus(o: Fraction): Fraction =
+    Fraction::of(num() * o.den() - o.num() * den(), den() * o.den())
+
+  /** Multiplies this fraction by `o`. Backs the `*` operator. */
+  def times(o: Fraction): Fraction =
+    Fraction::of(num() * o.num(), den() * o.den())
+
+  /** The closest `Double` to this exact value. */
+  def toDouble(): Double = (num() as Double) / (den() as Double)
+
+  /** Renders the fraction as `num/den`. */
+  def show(): String = "" + num() + "/" + den()
+private:
+  static def gcd(a: Int, b: Int): Int {
+    var x = a
+    var y = b
+    while y != 0 {
+      val t = y
+      y = x % y
+      x = t
+    }
+    return x
+  }
+}

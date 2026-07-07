@@ -1,0 +1,30 @@
+/**
+ * # Vec2 — a 2D vector
+ *
+ * An immutable point/vector in the plane. Supports vector addition and scaling,
+ * plus the **Euclidean** length. Because `Vec2` is a `record`, it also gets
+ * structural `equals`, `hashCode`, and `copy` for free.
+ *
+ * ```onion
+ * val v = Vec2::of(3.0, 4.0)
+ * v.length()          // 5.0
+ * (v + v).length()    // 10.0
+ * ```
+ */
+record Vec2(x: Double, y: Double) {
+public:
+  /** Convenience factory. */
+  static def of(x: Double, y: Double): Vec2 = new Vec2(x, y)
+
+  /** Vector sum. Backs the `+` operator. */
+  def plus(o: Vec2): Vec2 = new Vec2(x() + o.x(), y() + o.y())
+
+  /** Scales both components by `k`. */
+  def scale(k: Double): Vec2 = new Vec2(x() * k, y() * k)
+
+  /** The dot product with `o`. */
+  def dot(o: Vec2): Double = x() * o.x() + y() * o.y()
+
+  /** The Euclidean length `sqrt(x^2 + y^2)`. */
+  def length(): Double = Math::sqrt(x() * x() + y() * y())
+}

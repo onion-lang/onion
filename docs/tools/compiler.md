@@ -311,6 +311,63 @@ Error: Undefined variable at BadProgram.on:10
 Compilation failed with 2 errors
 ```
 
+## Separate Compilation and Linking
+
+Onion units can be compiled independently and linked at load time through the
+classpath — you do not need all sources in one `onionc` invocation. Compile a
+library, then compile clients against the emitted `.class` files.
+
+Compile the library first:
+
+```onion
+// greeter/Greeter.on
+class Greeter {
+public:
+  def this {}
+  def greet(name: String): String = "Hello, " + name
+}
+```
+
+```bash
+onionc -d out/lib greeter/Greeter.on
+```
+
+Then compile a client against it by putting the library output on the classpath:
+
+```onion
+// app/Main.on
+class Main {
+public:
+  static def main(args: String[]): void {
+    IO::println((new Greeter()).greet("Onion"))
+  }
+}
+```
+
+```bash
+onionc -d out/app -classpath out/lib app/Main.on
+```
+
+Linking is the JVM's job — run with every output directory (and `onion.jar` for
+the runtime) on the classpath:
+
+```bash
+java -cp onion.jar:out/lib:out/app Main   # prints: Hello, Onion
+```
+
+Classes, interfaces, records, enums, inheritance, static members **and generic
+types** all cross unit boundaries. A generic type keeps its type parameters,
+because `onionc` writes JVM generic signatures into the `.class` file:
+
+```bash
+onionc -d out/lib Container.on            # class Container[T]
+onionc -d out/app -classpath out/lib App.on   # new Container[String](x) resolves
+```
+
+Compile units in dependency order (a unit must be compiled after the units it
+references). There is no incremental build cache — recompile a unit's dependents
+when its public API changes.
+
 ## Next Steps
 
 - [Script Runner](script-runner.md) - Run Onion scripts directly

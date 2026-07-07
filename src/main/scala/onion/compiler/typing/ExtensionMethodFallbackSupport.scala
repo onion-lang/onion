@@ -159,11 +159,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
     candidates.iterator.flatMap { extMethod =>
       val container = extMethod.containerClass
+      val receiverType = staticReceiver(target, extMethod).`type`
       container.methods(name)
-        .find { m =>
+        .filter { m =>
           Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
-            receiverKindMatches(m.arguments(0), staticReceiver(target, extMethod).`type`)
+            receiverKindMatches(m.arguments(0), receiverType)
         }
+        // Pick the overload whose first (receiver) parameter is the most specific
+        // that still accepts the receiver — e.g. map(Set) over map(Iterable) for a
+        // Set — instead of the first declared, which could be a sibling like
+        // map(List) that does not actually accept it.
+        .sortWith((a, b) => TypeRules.isSuperType(b.arguments(0), a.arguments(0)))
+        .headOption
         .flatMap { method =>
           val classSubst = TypeSubstitution.classSubstitution(container)
           // Keep positions aligned with the backing static's formals (receiver at
@@ -205,15 +212,16 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }.nextOption()
   }
 
-  /** The backing static's first parameter must accept this receiver kind
-   *  (array-taking overloads must not be picked for List receivers and
-   *  vice versa). */
+  /** The backing static's first parameter must accept this receiver: array kinds
+   *  must agree (an array-taking overload must not be picked for a List receiver
+   *  and vice versa), and for reference receivers the receiver must be assignable
+   *  to the parameter type — so a `map(List)` overload is not chosen for a `Set`. */
   private def receiverKindMatches(firstParam: Type, receiver: Type): Boolean =
     (firstParam, receiver) match {
       case (_: ArrayType, _: ArrayType) => true
       case (_: ArrayType, _) => false
       case (_, _: ArrayType) => false
-      case _ => true
+      case _ => calls.isAssignableWithBoxing(firstParam, receiver)
     }
 
   private def collectExtensionMethods(
@@ -267,5 +275,5 @@ private[compiler] object ExtensionMethodFallbackSupport {
    *  (see Typing.registerBuiltinExtensions). A user-declared `extension` of the
    *  same name shadows these rather than colliding as an ambiguity. */
   val BuiltinExtensionContainers: Set[String] =
-    Set("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings")
+    Set("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets")
 }

@@ -22,11 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line-oriented helpers `readLines`/`eachLine`/`printLines`/`printAll`, plus `flush` and
   `tryReadLong`.
 
-- **`Maps` and `Strings` helpers are callable as method chains.** Like the `Colls`/`Iterables`
-  list pipelines, the `onion.Maps` and `onion.Strings` helpers are registered as builtin extension
-  methods on their receiver type, so you can write `m.filter { ... }.mapValues { ... }`,
-  `m.keys()`, or `"text".trim().truncate(20, "...")` instead of only the static `Maps::` / `Strings::`
-  forms. A user-declared `extension` of the same name still shadows the builtin.
+- **`Maps`, `Sets` and `Strings` helpers are callable as method chains.** Like the `Colls`/`Iterables`
+  list pipelines, the `onion.Maps`, `onion.Sets` and `onion.Strings` helpers are registered as builtin
+  extension methods on their receiver type, so you can write `m.filter { ... }.mapValues { ... }`,
+  `s.union(other).map { ... }`, or `"text".trim().truncate(20, "...")` instead of only the static
+  `Maps::` / `Sets::` / `Strings::` forms. A user-declared `extension` of the same name still shadows
+  the builtin.
+
+- **An overloaded builtin extension resolves to the overload that actually accepts the receiver.**
+  The bidirectional (trailing-closure) extension path now checks that a candidate overload's receiver
+  parameter is assignable from the receiver and picks the most specific such overload, so `set.map { ... }`
+  resolves to the `Set` overload (returning a `Set`) instead of erroring against a sibling `map(List)`.
+  Fixes a latent failure where `Set` values could not use the collection pipeline.
 
 ## [0.4.4] - 2026-07-07
 

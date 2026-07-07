@@ -50,6 +50,39 @@ class StdlibMethodChainSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Set method chaining (Sets extension)") {
+    it("chains filter and map on a set (returning a Set)") {
+      runInt(
+        "val s = onion.Sets::of(1, 2, 3, 4)\n" +
+        "return s.filter { x => (x as Int) > 1 }.map { x => (x as Int) * 2 }.size()",
+        Shell.Success(3))
+    }
+
+    it("set algebra reads as methods") {
+      runInt(
+        "val a = onion.Sets::of(1, 2, 3, 4)\n" +
+        "val b = onion.Sets::of(3, 4, 5)\n" +
+        "return a.union(b).size() + a.intersection(b).size() + a.symmetricDifference(b).size()",
+        Shell.Success(10))
+    }
+
+    it("set relations chain as booleans") {
+      runInt(
+        "val a = onion.Sets::of(1, 2, 3, 4)\n" +
+        "val sub = if onion.Sets::of(1, 2).isSubsetOf(a) { 1 } else { 0 }\n" +
+        "val dis = if a.isDisjoint(onion.Sets::of(9)) { 10 } else { 0 }\n" +
+        "return sub + dis",
+        Shell.Success(11))
+    }
+
+    it("a typed-lambda set.map resolves to the Set overload") {
+      runInt(
+        "val s = onion.Sets::of(1, 2, 3)\n" +
+        "return s.map((x: Int) -> x * 2).size()",
+        Shell.Success(3))
+    }
+  }
+
   describe("String method chaining (Strings extension)") {
     it("chains trim and truncate, with a Java method in between") {
       runStr(

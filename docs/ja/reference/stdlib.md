@@ -424,6 +424,20 @@ Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
 ```
 
+## Format モジュール
+
+locale 非依存の人間可読フォーマット（`onion.Format`）——桁区切り・小数・サイズ・時間。
+
+```onion
+Format::integer(1234567)          // "1,234,567"
+Format::number(1234.5678, 2)      // "1,234.57"
+Format::fixed(3.14159, 2)         // "3.14"
+Format::percent(0.756, 1)         // "75.6%"
+Format::bytes(1536)               // "1.5 KB"（1024基準）
+Format::duration(3661)            // "1h 1m 1s"
+Format::ordinal(21)               // "21st"
+```
+
 ## 次のステップ
 
 - [基本構文](../guide/basic-syntax.md) - 言語構文の詳細

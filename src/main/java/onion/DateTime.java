@@ -281,4 +281,31 @@ public final class DateTime {
         LocalDateTime ldt = toLocalDateTime(epochMillis).toLocalDate().atTime(23, 59, 59, 999_000_000);
         return ldt.atZone(LOCAL).toInstant().toEpochMilli();
     }
+
+    /** Whole hours between two timestamps ({@code time1 - time2}). */
+    public static long diffHours(long time1, long time2) {
+        return (time1 - time2) / (60L * 60 * 1000);
+    }
+
+    /** Whole minutes between two timestamps ({@code time1 - time2}). */
+    public static long diffMinutes(long time1, long time2) {
+        return (time1 - time2) / (60L * 1000);
+    }
+
+    /** Whole seconds between two timestamps ({@code time1 - time2}). */
+    public static long diffSeconds(long time1, long time2) {
+        return (time1 - time2) / 1000L;
+    }
+
+    /** English day-of-week name, e.g. "Monday". */
+    public static String dayName(long epochMillis) {
+        return toLocalDateTime(epochMillis).getDayOfWeek()
+            .getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH);
+    }
+
+    /** English month name, e.g. "January". */
+    public static String monthName(long epochMillis) {
+        return toLocalDateTime(epochMillis).getMonth()
+            .getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH);
+    }
 }

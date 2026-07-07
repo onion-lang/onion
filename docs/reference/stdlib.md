@@ -1007,10 +1007,15 @@ DateTime::addYears(epochMillis, years): Long
 ### Comparison
 
 ```
-DateTime::diff(time1, time2): Long       // Difference in milliseconds
+DateTime::diff(time1, time2): Long        // Difference in milliseconds
 DateTime::diffDays(time1, time2): Int
+DateTime::diffHours(time1, time2): Long   // whole hours / minutes / seconds
+DateTime::diffMinutes(time1, time2): Long
+DateTime::diffSeconds(time1, time2): Long
 DateTime::isBefore(time1, time2): Boolean
 DateTime::isAfter(time1, time2): Boolean
+DateTime::dayName(epochMillis): String    // "Friday"  (English, locale-independent)
+DateTime::monthName(epochMillis): String  // "March"
 ```
 
 ### Factory

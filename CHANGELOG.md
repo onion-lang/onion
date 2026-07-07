@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `onion.Text` lays out console text — `wrap` (word wrapping), `indent`/`dedent`, and `table`
   (columns aligned to their widest cell).
 
+- **`DateTime` gains `diffHours`/`diffMinutes`/`diffSeconds` and `dayName`/`monthName`** —
+  completing the `diffDays` duration set, and English (locale-independent) day/month names for
+  display.
+
 - **`Colls` gains `chunked`, `windowed`, `slice`, and selector aggregation** — batching
   (`items.chunked(100)`), sliding windows (`items.windowed(3)`), bounds-clamping sublists
   (`items.slice(from, to)`), and `sumBy`/`averageBy`/`maxBy`/`minBy` over a numeric selector

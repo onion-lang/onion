@@ -307,4 +307,44 @@ public final class Files {
         java.util.Collections.sort(result);
         return result;
     }
+
+    /**
+     * The file extension (without the dot), e.g. "txt" for "dir/file.txt", or ""
+     * when the name has no extension or starts with a dot (like ".gitignore").
+     * Named {@code ext} because {@code extension} is an Onion keyword.
+     */
+    public static String ext(String path) {
+        if (path == null) return "";
+        String name = new File(path).getName();
+        int dot = name.lastIndexOf('.');
+        return dot <= 0 ? "" : name.substring(dot + 1);
+    }
+
+    /**
+     * The file name without its directory or extension, e.g. "file" for
+     * "dir/file.txt". A leading-dot name like ".gitignore" is returned as-is.
+     */
+    public static String stem(String path) {
+        if (path == null) return "";
+        String name = new File(path).getName();
+        int dot = name.lastIndexOf('.');
+        return dot <= 0 ? name : name.substring(0, dot);
+    }
+
+    /**
+     * Replaces (or adds) the file extension: ("dir/file.txt", "md") ->
+     * "dir/file.md". A leading dot in {@code newExtension} is ignored.
+     */
+    public static String withExtension(String path, String newExtension) {
+        if (path == null) return "";
+        String ext = newExtension == null ? "" : newExtension;
+        if (ext.startsWith(".")) ext = ext.substring(1);
+        File file = new File(path);
+        String name = file.getName();
+        int dot = name.lastIndexOf('.');
+        String base = dot <= 0 ? name : name.substring(0, dot);
+        String newName = ext.isEmpty() ? base : base + "." + ext;
+        String parent = file.getParent();
+        return parent == null ? newName : parent + File.separator + newName;
+    }
 }

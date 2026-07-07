@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `onion.Text` lays out console text — `wrap` (word wrapping), `indent`/`dedent`, and `table`
   (columns aligned to their widest cell).
 
+- **`Files` gains `ext`, `stem`, and `withExtension`** — file-extension handling
+  (`Files::ext("a/b.txt")` -> `"txt"`, `Files::stem(...)` -> `"b"`, `Files::withExtension(p, "md")`),
+  common in file-processing scripts (`ext` rather than `extension`, which is a keyword).
+
 - **`DateTime` gains `diffHours`/`diffMinutes`/`diffSeconds` and `dayName`/`monthName`** —
   completing the `diffDays` duration set, and English (locale-independent) day/month names for
   display.

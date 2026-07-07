@@ -696,6 +696,17 @@ Files::glob("dir", "*.on")             // glob-matched names
 Files::delete(path) / Files::exists(path)
 ```
 
+Path helpers — file names, parents, joining, and extensions:
+
+```onion
+Files::getFileName("a/b/c.txt")        // "c.txt"
+Files::getParent("a/b/c.txt")          // "a/b"
+Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
+Files::ext("report.txt")               // "txt"   (extension, keyword-safe name)
+Files::stem("report.txt")              // "report"
+Files::withExtension("report.txt", "md")   // "report.md"
+```
+
 ## Json Module
 
 JSON parsing and serialization (`onion.Json`):

@@ -43,6 +43,32 @@ footer { margin-top: 3rem; color: #6a737d; font-size: .85rem; }
 v.length()          // 5.0
 (v + v).length()    // 10.0</code></pre>
 
+<h2>Methods</h2>
+<div class="member">
+<code class="sig">static def of(x: double, y: double): Vec2</code>
+<p>Convenience factory.</p>
+
+</div>
+<div class="member">
+<code class="sig">def plus(o: Vec2): Vec2</code>
+<p>Vector sum. Backs the <code>+</code> operator.</p>
+
+</div>
+<div class="member">
+<code class="sig">def scale(k: double): Vec2</code>
+<p>Scales both components by <code>k</code>.</p>
+
+</div>
+<div class="member">
+<code class="sig">def dot(o: Vec2): double</code>
+<p>The dot product with <code>o</code>.</p>
+
+</div>
+<div class="member">
+<code class="sig">def length(): double</code>
+<p>The Euclidean length <code>sqrt(x^2 + y^2)</code>.</p>
+
+</div>
 <h2>Fields</h2>
 <div class="member">
 <code class="sig">x: double</code>

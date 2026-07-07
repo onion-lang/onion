@@ -47,6 +47,48 @@ val whole = third + third + third   // exactly 1/1, not 0.999...</code></pre>
 <li><strong>normalized</strong> — always reduced, denominator positive</li>
 </ul>
 
+<h2>Methods</h2>
+<div class="member">
+<code class="sig">static def of(n: int, d: int): Fraction</code>
+<p>Builds a normalized fraction <code>n / d</code>, reduced with a positive denominator.</p>
+
+<dl class="tags">
+<dt>Parameters</dt>
+<dd><code>n</code> — the numerator</dd>
+<dd><code>d</code> — the denominator; must be non-zero</dd>
+<dt>Returns</dt><dd>the reduced fraction</dd>
+<dt>Throws</dt>
+<dd><code>IllegalArgumentException</code> — if `d` is zero</dd>
+</dl>
+</div>
+<div class="member">
+<code class="sig">def plus(o: Fraction): Fraction</code>
+<p>Adds <code>o</code> to this fraction. Backs the <code>+</code> operator.</p>
+
+</div>
+<div class="member">
+<code class="sig">def minus(o: Fraction): Fraction</code>
+<p>Subtracts <code>o</code> from this fraction. Backs the <code>-</code> operator.</p>
+
+</div>
+<div class="member">
+<code class="sig">def times(o: Fraction): Fraction</code>
+<p>Multiplies this fraction by <code>o</code>. Backs the <code>*</code> operator.</p>
+
+</div>
+<div class="member">
+<code class="sig">def toDouble(): double</code>
+<p>The closest <code>Double</code> to this exact value.</p>
+
+</div>
+<div class="member">
+<code class="sig">def show(): String</code>
+<p>Renders the fraction as <code>num/den</code>.</p>
+
+</div>
+<div class="member">
+<code class="sig">static def gcd(a: int, b: int): int</code>
+</div>
 <h2>Fields</h2>
 <div class="member">
 <code class="sig">num: int</code>

@@ -109,4 +109,12 @@ object SignatureRenderer {
       else s" <: ${r.superInterfaces.map(renderType).mkString(", ")}"
     s"record ${r.name}$tp($args)$ifaces"
   }
+
+  def renderEnum(e: AST.EnumDeclaration): String = {
+    val params =
+      if (e.params.isEmpty) ""
+      else s"(${e.params.map(renderArg).mkString(", ")})"
+    val constants = e.constants.map(_.name).mkString(", ")
+    s"enum ${e.name}$params { $constants }"
+  }
 }

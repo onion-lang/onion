@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to types (class/interface/record) and their members, renders a markdown-like comment body to HTML
   (headings, bold/italic, inline and fenced code, lists, links, with HTML escaping), and writes a
   static site — an index plus one page per type with signatures and `@param`/`@return`/`@throws`
-  tags. Run: `oniondoc -d <outdir> <source.on...>`.
+  tags. It documents classes, interfaces, enums (with their constants), and records — including a
+  record's or enum's user-declared method body. Run: `oniondoc -d <outdir> <source.on...>`.
 
 - **`Hash`, `Codec`, `Text`, `Stats` and `Format` helpers are callable as method chains.** Registered
   as builtin extension methods on their receiver type, so `"pw".sha256()`,

@@ -45,6 +45,7 @@ object DocModel {
       case c: AST.ClassDeclaration     => buildClass(c, comments)
       case i: AST.InterfaceDeclaration => buildInterface(i, comments)
       case r: AST.RecordDeclaration    => buildRecord(r, comments)
+      case e: AST.EnumDeclaration      => buildEnum(e, comments)
     }
     DocFile(sourceName, types)
   }
@@ -153,12 +154,26 @@ object DocModel {
 
   private def buildRecord(r: AST.RecordDeclaration, comments: Map[Int, DocComment]): DocType = {
     // Record components render as fields.
-    val fields = r.args.map(a =>
+    val componentFields = r.args.map(a =>
       DocMember("field", a.name, s"${a.name}: ${SignatureRenderer.renderType(a.typeRef)}", locLine(a.location), docFor(comments, a.location))
     )
+    // A record may carry a `{ access-section* }` body of user-declared methods.
+    val (ctors, methods, bodyFields) = partitionMembers(r.sections.flatMap(_.members), comments)
     DocType(
       "record", r.name, SignatureRenderer.renderRecord(r), locLine(r.location),
-      docFor(comments, r.location), Nil, Nil, fields
+      docFor(comments, r.location), ctors, methods, componentFields ++ bodyFields
+    )
+  }
+
+  private def buildEnum(e: AST.EnumDeclaration, comments: Map[Int, DocComment]): DocType = {
+    // Enum constants render as fields; the body's access sections contribute methods.
+    val constants = e.constants.map(k =>
+      DocMember("field", k.name, k.name, locLine(k.location), docFor(comments, k.location))
+    )
+    val (ctors, methods, bodyFields) = partitionMembers(e.sections.flatMap(_.members), comments)
+    DocType(
+      "enum", e.name, SignatureRenderer.renderEnum(e), locLine(e.location),
+      docFor(comments, e.location), ctors, methods, constants ++ bodyFields
     )
   }
 

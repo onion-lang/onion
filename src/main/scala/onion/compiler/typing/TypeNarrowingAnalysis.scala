@@ -88,6 +88,20 @@ private[typing] object TypeNarrowingAnalysis {
           leftNarrowing.mutablePositive ++ rightNarrowing.mutablePositive, Map.empty
         )
 
+      // cond1 || cond2 -> De Morgan dual of &&: the whole expression being FALSE
+      // implies !cond1 && !cond2, so both else-branch (negative) narrowings apply
+      // in the else/fall-through. Nothing is soundly known when it is TRUE (only
+      // one operand need hold), so the positive side stays empty. This makes
+      // `if x == null || x.isEmpty() { return } ; x.foo()` narrow x on the
+      // fall-through (#302), mirroring the && then-branch narrowing (#294).
+      case AST.LogicalOr(_, left, right) =>
+        val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow)
+        val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow)
+        NarrowingInfo(
+          Map.empty, leftNarrowing.negative ++ rightNarrowing.negative,
+          Map.empty, leftNarrowing.mutableNegative ++ rightNarrowing.mutableNegative
+        )
+
       // !cond -> swap polarity: if !(o is String) narrows o in the else branch
       case AST.Not(_, inner) =>
         val innerNarrowing = extractNarrowing(inner, context, typeResolver, fieldNarrow)

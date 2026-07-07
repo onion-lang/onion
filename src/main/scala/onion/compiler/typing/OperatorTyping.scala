@@ -199,6 +199,7 @@ final class OperatorTyping(
     // For &&, apply smart cast narrowing from left side when typing right side
     val savedNarrowings = context.saveNarrowings()
     val isAnd = node.isInstanceOf[AST.LogicalAnd]
+    val isOr = node.isInstanceOf[AST.LogicalOr]
     if (isAnd) {
       val narrowing = body.extractNarrowing(node.lhs, context)
       narrowing.positive.foreach { case (name, tp) =>
@@ -210,6 +211,20 @@ final class OperatorTyping(
       // `while (p != null && p.method())` loop work for a reassignable `p`
       // (#294); a reassignment inside the right operand clears it as usual.
       narrowing.mutablePositive.foreach { case (name, tp) =>
+        context.addFlowNarrowing(name, tp)
+      }
+    } else if (isOr) {
+      // De Morgan dual of &&: in `a || b`, the right operand `b` is only reached
+      // when `a` is FALSE, so the left operand's *negative* facts hold while
+      // typing `b`. Thus `x == null || x.length() == 0` narrows x to non-null in
+      // the right operand (#302). Only the left operand's narrowing is applied
+      // (the right operand cannot narrow itself). A reassignment inside the right
+      // operand clears the flow narrowing as usual.
+      val narrowing = body.extractNarrowing(node.lhs, context)
+      narrowing.negative.foreach { case (name, tp) =>
+        context.addNarrowing(name, tp)
+      }
+      narrowing.mutableNegative.foreach { case (name, tp) =>
         context.addFlowNarrowing(name, tp)
       }
     }

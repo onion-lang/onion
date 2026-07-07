@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Null narrowing flows through `||`, the De Morgan dual of the `&&` narrowing** — in `a || b`
+  the right operand `b` is only reached when `a` is false, so a `x == null` left operand now
+  narrows `x` to non-null while typing `b` (e.g. `x == null || x.length() == 0`). Likewise the
+  fall-through of a `if x == null || cond { return }` guard narrows `x` to non-null. Soundness is
+  preserved: `x != null || x.length()` still errors (there `x` may be null), mirroring the `&&`
+  narrowing from #294 ([#302]).
+
 - **`try`/`catch`/`finally` branches and the elvis `?:` fallback target-type an empty collection
   literal** — a `[]` / `[:]` in a try/catch branch (e.g. `def f(): List[Int] = try { [] } catch e: Exception { [1] }`)
   or as the right operand of `?:` (e.g. `def f(o: List[Int]?): List[Int] = o ?: []`) now infers its
@@ -639,6 +646,7 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[#302]: https://github.com/onion-lang/onion/issues/302
 [#301]: https://github.com/onion-lang/onion/issues/301
 [#300]: https://github.com/onion-lang/onion/issues/300
 [0.4.3]: https://github.com/onion-lang/onion/releases/tag/v0.4.3

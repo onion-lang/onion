@@ -28,10 +28,9 @@ foreach k: String in ages.keySet() { println(k) }
 ## Empty Literals
 
 `[]` and `[:]` have no element types of their own, so the compiler takes
-the type from the surrounding context. This already worked for `val`
-declarations, returns and field initializers; it now also works at
-**argument position**, where the expected parameter type supplies the
-element types:
+the type from the surrounding context — `val` declarations, returns, field
+initializers, and **argument position**, where the expected parameter type
+supplies the element types:
 
 ```onion
 import {
@@ -44,6 +43,16 @@ def count(m: Map[String, Integer]): Int = m.size()
 
 size([])      // 0  - [] takes the List[String] parameter type
 count([:])    // 0  - [:] takes the Map[String, Integer] parameter type
+```
+
+The expected type also reaches into **branch and operand positions**, so an
+empty literal in an `if`/`else` or `select` branch, a `try`/`catch` branch, the
+right operand of `?:`, or a `do` block's `ret` infers its element type instead
+of failing:
+
+```onion
+def pick(b: Boolean): List[Int] = if b { [] } else { [1] }   // [] is List[Int]
+def orEmpty(o: List[Int]?): List[Int] = o ?: []              // [] is List[Int]
 ```
 
 ## Pipelines

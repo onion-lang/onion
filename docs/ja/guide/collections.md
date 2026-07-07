@@ -41,6 +41,13 @@ size([])      // 0  - [] は List[String] のパラメータ型を受け取る
 count([:])    // 0  - [:] は Map[String, Integer] のパラメータ型を受け取る
 ```
 
+期待型は**分岐やオペランドの位置**にも伝わります。`if`/`else` や `select` の分岐、`try`/`catch` の分岐、`?:` の右オペランド、`do` ブロックの `ret` にある空リテラルも、エラーにならず要素型を推論します：
+
+```onion
+def pick(b: Boolean): List[Int] = if b { [] } else { [1] }   // [] は List[Int]
+def orEmpty(o: List[Int]?): List[Int] = o ?: []              // [] は List[Int]
+```
+
 ## パイプライン
 
 `java.util.List` と `java.lang.Iterable` には `onion.Colls` / `onion.Iterables` のヘルパーが追加されており、トレイリングラムダでチェインできます：

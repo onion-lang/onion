@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **New practical modules: `Hash`, `Codec`, and `Stats`.** `onion.Hash` computes `md5`/`sha1`/
+  `sha256`/`sha512` digests (hex); `onion.Codec` does `base64Encode`/`base64Decode`,
+  `hexEncode`/`hexDecode`, and `urlEncode`/`urlDecode`; and `onion.Stats` aggregates any `List` of
+  numbers — `sum`/`sumInt`/`sumLong`, `average`, `min`/`max`, `median`, `variance`, `stddev` (the
+  generic aggregates accept `List[Int]`/`List[Long]`/`List[Double]` alike via a `Number` bound).
+
 - **Richer practical standard library.** `onion.Maps` (6 → 20 methods) gains
   `keys`/`values`, `mapKeys`, key+value `filter`/`count`/`anyEntry`/`allEntries`, `forEach`,
   `toList`, `invert`, `groupBy`/`countBy`, `update`, `mergeWith`, and lazy `getOrElse`; `onion.Sets`

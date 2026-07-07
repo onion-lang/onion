@@ -391,6 +391,39 @@ Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
 Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
 ```
 
+## Hash モジュール
+
+暗号学的ハッシュ・チェックサム（`onion.Hash`）。文字列の UTF-8 バイトをハッシュ化し、小文字 hex のダイジェストを返します。
+
+```onion
+Hash::sha256("password")   // 64文字 hex
+Hash::sha512(text)         // 128文字 hex
+Hash::md5(text) / Hash::sha1(text)   // チェックサム・互換用（衝突耐性なし）
+```
+
+## Codec モジュール
+
+テキストのエンコード・デコード（`onion.Codec`）: Base64・hex・URL/パーセント形式。
+
+```onion
+val enc = Codec::base64Encode("Hello")    // "SGVsbG8="
+Codec::base64Decode(enc)                  // "Hello"
+Codec::hexEncode("Hi") / Codec::hexDecode("4869")
+Codec::urlEncode("a b&c") / Codec::urlDecode(s)
+```
+
+## Stats モジュール
+
+数値リストの集計（`onion.Stats`）。汎用集計は `List[Int]`/`List[Long]`/`List[Double]` を受け付け倍精度で計算。`sumInt`/`sumLong` は整数精度を保持。
+
+```onion
+val xs: List[Int] = [10, 20, 30, 40]
+Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
+Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
+Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
+Stats::variance(xs) / Stats::stddev(xs)
+```
+
 ## 次のステップ
 
 - [基本構文](../guide/basic-syntax.md) - 言語構文の詳細

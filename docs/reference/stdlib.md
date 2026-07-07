@@ -804,6 +804,42 @@ val out  = Csv::stringify(rows)               // rows -> CSV text
 val out2 = Csv::stringifyWithHeader(recs)     // records -> CSV (inverse of parseWithHeader)
 ```
 
+## Hash Module
+
+Cryptographic and checksum digests (`onion.Hash`). Each hashes a string's UTF-8
+bytes and returns a lowercase hex digest.
+
+```onion
+Hash::sha256("password")   // 64-char hex
+Hash::sha512(text)         // 128-char hex
+Hash::md5(text) / Hash::sha1(text)   // checksums / interop (not collision-safe)
+```
+
+## Codec Module
+
+Text encoding and decoding (`onion.Codec`): Base64, hex, and URL/percent form.
+
+```onion
+val enc = Codec::base64Encode("Hello")    // "SGVsbG8="
+Codec::base64Decode(enc)                  // "Hello"
+Codec::hexEncode("Hi") / Codec::hexDecode("4869")
+Codec::urlEncode("a b&c") / Codec::urlDecode(s)
+```
+
+## Stats Module
+
+Numeric aggregation over a list of numbers (`onion.Stats`). The generic
+aggregates accept `List[Int]`, `List[Long]` or `List[Double]` and work in double
+precision; `sumInt` / `sumLong` keep integer precision.
+
+```onion
+val xs: List[Int] = [10, 20, 30, 40]
+Stats::sum(xs)       // 100.0      Stats::sumInt(xs)   // 100
+Stats::average(xs)   // 25.0       Stats::median(xs)   // 25.0
+Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
+Stats::variance(xs) / Stats::stddev(xs)
+```
+
 ## Proc Module
 
 Process execution for scripting (`onion.Proc`):

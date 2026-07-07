@@ -139,4 +139,159 @@ public final class Strings {
         if (str == null) return "";
         return new StringBuilder(str).reverse().toString();
     }
+
+    // Case helpers
+    public static String capitalize(String str) {
+        if (str == null || str.isEmpty()) return str == null ? "" : str;
+        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+    }
+
+    public static String decapitalize(String str) {
+        if (str == null || str.isEmpty()) return str == null ? "" : str;
+        return Character.toLowerCase(str.charAt(0)) + str.substring(1);
+    }
+
+    /** Capitalizes the first letter of each whitespace-separated word. */
+    public static String capitalizeWords(String str) {
+        if (str == null || str.isEmpty()) return str == null ? "" : str;
+        StringBuilder sb = new StringBuilder(str.length());
+        boolean atStart = true;
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (Character.isWhitespace(c)) {
+                atStart = true;
+                sb.append(c);
+            } else if (atStart) {
+                sb.append(Character.toUpperCase(c));
+                atStart = false;
+            } else {
+                sb.append(Character.toLowerCase(c));
+            }
+        }
+        return sb.toString();
+    }
+
+    // Inspection extras
+    public static boolean equalsIgnoreCase(String a, String b) {
+        return a == null ? b == null : a.equalsIgnoreCase(b);
+    }
+
+    public static boolean containsIgnoreCase(String str, String substring) {
+        if (str == null || substring == null) return false;
+        return str.toLowerCase().contains(substring.toLowerCase());
+    }
+
+    /** Counts non-overlapping occurrences of {@code substring} in {@code str}. */
+    public static int count(String str, String substring) {
+        if (str == null || substring == null || substring.isEmpty()) return 0;
+        int n = 0;
+        int from = 0;
+        while (true) {
+            int idx = str.indexOf(substring, from);
+            if (idx < 0) break;
+            n++;
+            from = idx + substring.length();
+        }
+        return n;
+    }
+
+    // Trimming affixes
+    public static String removePrefix(String str, String prefix) {
+        if (str == null) return "";
+        if (prefix != null && str.startsWith(prefix)) return str.substring(prefix.length());
+        return str;
+    }
+
+    public static String removeSuffix(String str, String suffix) {
+        if (str == null) return "";
+        if (suffix != null && str.endsWith(suffix)) return str.substring(0, str.length() - suffix.length());
+        return str;
+    }
+
+    // Shaping
+    /** Truncates {@code str} to {@code maxLength} total characters, appending {@code suffix}. */
+    public static String truncate(String str, int maxLength, String suffix) {
+        if (str == null) return "";
+        if (maxLength < 0) maxLength = 0;
+        if (str.length() <= maxLength) return str;
+        String tail = suffix == null ? "" : suffix;
+        int keep = maxLength - tail.length();
+        if (keep <= 0) return tail.length() <= maxLength ? tail : tail.substring(0, maxLength);
+        return str.substring(0, keep) + tail;
+    }
+
+    /** Pads {@code str} on both sides to reach {@code length}. */
+    public static String center(String str, int length, char padChar) {
+        if (str == null) str = "";
+        if (str.length() >= length) return str;
+        int total = length - str.length();
+        int left = total / 2;
+        int right = total - left;
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < left; i++) sb.append(padChar);
+        sb.append(str);
+        for (int i = 0; i < right; i++) sb.append(padChar);
+        return sb.toString();
+    }
+
+    /** Returns {@code fallback} if {@code str} is null or blank, otherwise {@code str}. */
+    public static String ifBlank(String str, String fallback) {
+        return (str == null || str.trim().isEmpty()) ? fallback : str;
+    }
+
+    // Decomposition
+    /** Splits on runs of whitespace, dropping empty tokens. */
+    public static String[] words(String str) {
+        if (str == null) return new String[0];
+        String trimmed = str.trim();
+        if (trimmed.isEmpty()) return new String[0];
+        return trimmed.split("\\s+");
+    }
+
+    /** Returns each character as a single-character string. */
+    public static List<String> chars(String str) {
+        List<String> result = new ArrayList<>();
+        if (str == null) return result;
+        for (int i = 0; i < str.length(); i++) {
+            result.add(String.valueOf(str.charAt(i)));
+        }
+        return result;
+    }
+
+    // Null-safe parsing
+    /** Parses an int, or returns null if {@code str} is not a valid integer. */
+    public static Integer toIntOrNull(String str) {
+        if (str == null) return null;
+        try {
+            return Integer.valueOf(str.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Parses a long, or returns null if {@code str} is not a valid long. */
+    public static Long toLongOrNull(String str) {
+        if (str == null) return null;
+        try {
+            return Long.valueOf(str.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Parses a double, or returns null if {@code str} is not a valid number. */
+    public static Double toDoubleOrNull(String str) {
+        if (str == null) return null;
+        try {
+            return Double.valueOf(str.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Parses an int, or returns {@code fallback} if {@code str} is not a valid integer. */
+    public static int toIntOr(String str, int fallback) {
+        Integer v = toIntOrNull(str);
+        return v == null ? fallback : v;
+    }
 }

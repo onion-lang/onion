@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Richer practical standard library.** `onion.Maps` (6 → 20 methods) gains
+  `keys`/`values`, `mapKeys`, key+value `filter`/`count`/`anyEntry`/`allEntries`, `forEach`,
+  `toList`, `invert`, `groupBy`/`countBy`, `update`, `mergeWith`, and lazy `getOrElse`; `onion.Sets`
+  (6 → 19) gains `fromList`/`toList`, `symmetricDifference`, `isSubsetOf`/`isSupersetOf`/`isDisjoint`,
+  `map`/`filter`/`forEach`/`count`/`any`/`all`/`find`, with null-safe set algebra; and `onion.Strings`
+  gains case helpers (`capitalize`/`capitalizeWords`), `equalsIgnoreCase`/`containsIgnoreCase`,
+  `count`, `removePrefix`/`removeSuffix`, `truncate`, `center`, `ifBlank`, `words`, `chars`, and
+  null-safe parsers (`toIntOrNull`/`toLongOrNull`/`toDoubleOrNull`/`toIntOr`). Result maps/sets
+  preserve insertion order.
+
 ## [0.4.4] - 2026-07-07
 
 - **The type of an `if`/`select`/`try` merged from two siblings is their common ancestor, not `Object`**

@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gains case helpers (`capitalize`/`capitalizeWords`), `equalsIgnoreCase`/`containsIgnoreCase`,
   `count`, `removePrefix`/`removeSuffix`, `truncate`, `center`, `ifBlank`, `words`, `chars`, and
   null-safe parsers (`toIntOrNull`/`toLongOrNull`/`toDoubleOrNull`/`toIntOr`). Result maps/sets
-  preserve insertion order.
+  preserve insertion order. `onion.Option` gains `orElseGet`/`orNull`/`orElse`/`contains`/`exists`/
+  `fold`/`toList`, and `onion.Result` gains `fold`/`recover`/`recoverWith`/`orElseGet`/`orNull`/
+  `exists`/`toList`.
 
 ## [0.4.4] - 2026-07-07
 

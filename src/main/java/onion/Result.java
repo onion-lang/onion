@@ -271,4 +271,43 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
      * Executes the action if this is an Err result.
      */
     void forEachError(Function1<E, ?> action);
+
+    /** Collapses to a single value: {@code ifOk(value)} when Ok, else {@code ifErr(error)}. */
+    default <U> U fold(Function1<E, U> ifErr, Function1<T, U> ifOk) {
+        return isOk() ? ifOk.call(get()) : ifErr.call(getError());
+    }
+
+    /** If Err, recovers to an Ok using {@code f(error)}; an Ok is returned unchanged. */
+    default Result<T, E> recover(Function1<E, T> f) {
+        return isOk() ? this : ok(f.call(getError()));
+    }
+
+    /** If Err, recovers to a new Result using {@code f(error)}; an Ok is returned unchanged. */
+    default Result<T, E> recoverWith(Function1<E, Result<T, E>> f) {
+        return isOk() ? this : f.call(getError());
+    }
+
+    /** Returns the success value if Ok, otherwise the result of {@code supplier} (lazy). */
+    default T orElseGet(Function0<T> supplier) {
+        return isOk() ? get() : supplier.call();
+    }
+
+    /** Returns the success value if Ok, otherwise {@code null}. */
+    default T orNull() {
+        return isOk() ? get() : null;
+    }
+
+    /** True if this is Ok and the value satisfies {@code predicate}. */
+    default boolean exists(Function1<T, Boolean> predicate) {
+        if (!isOk()) return false;
+        Boolean hit = predicate.call(get());
+        return hit != null && hit;
+    }
+
+    /** Returns a list holding the success value when Ok, or an empty list. */
+    default java.util.List<T> toList() {
+        java.util.List<T> result = new java.util.ArrayList<>();
+        if (isOk()) result.add(get());
+        return result;
+    }
 }

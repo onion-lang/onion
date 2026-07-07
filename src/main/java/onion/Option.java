@@ -197,6 +197,45 @@ public sealed interface Option<T> permits Option.Some, Option.None {
      */
     <E extends Throwable> T orElseThrow(Function0<E> exceptionSupplier) throws E;
 
+    /** Returns the value if present, otherwise the result of {@code supplier} (lazy). */
+    default T orElseGet(Function0<T> supplier) {
+        return isDefined() ? get() : supplier.call();
+    }
+
+    /** Returns the value if present, otherwise {@code null}. */
+    default T orNull() {
+        return isDefined() ? get() : null;
+    }
+
+    /** Returns this option if present, otherwise {@code alternative}. */
+    default Option<T> orElse(Option<T> alternative) {
+        return isDefined() ? this : alternative;
+    }
+
+    /** True if a value is present and equals {@code value}. */
+    default boolean contains(T value) {
+        return isDefined() && java.util.Objects.equals(get(), value);
+    }
+
+    /** True if a value is present and satisfies {@code predicate}. */
+    default boolean exists(Function1<T, Boolean> predicate) {
+        if (!isDefined()) return false;
+        Boolean hit = predicate.call(get());
+        return hit != null && hit;
+    }
+
+    /** Collapses to a single value: {@code ifPresent(value)} when present, else {@code ifEmpty()}. */
+    default <U> U fold(Function0<U> ifEmpty, Function1<T, U> ifPresent) {
+        return isDefined() ? ifPresent.call(get()) : ifEmpty.call();
+    }
+
+    /** Returns a list holding the value when present, or an empty list. */
+    default java.util.List<T> toList() {
+        java.util.List<T> result = new java.util.ArrayList<>();
+        if (isDefined()) result.add(get());
+        return result;
+    }
+
     // Holder for singleton None instance
     class NoneHolder {
         static final None<?> INSTANCE = new None<>();

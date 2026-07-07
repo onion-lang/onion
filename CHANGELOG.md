@@ -18,7 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preserve insertion order. `onion.Option` gains `orElseGet`/`orNull`/`orElse`/`contains`/`exists`/
   `fold`/`toList`, and `onion.Result` gains `fold`/`recover`/`recoverWith`/`orElseGet`/`orNull`/
   `exists`/`toList`. `onion.Csv` gains `stringifyWithHeader` (the inverse of `parseWithHeader`,
-  closing the record round-trip) and `column`/`columnByName` extractors.
+  closing the record round-trip) and `column`/`columnByName` extractors. `onion.IO` gains
+  line-oriented helpers `readLines`/`eachLine`/`printLines`/`printAll`, plus `flush` and
+  `tryReadLong`.
+
+- **`Maps` and `Strings` helpers are callable as method chains.** Like the `Colls`/`Iterables`
+  list pipelines, the `onion.Maps` and `onion.Strings` helpers are registered as builtin extension
+  methods on their receiver type, so you can write `m.filter { ... }.mapValues { ... }`,
+  `m.keys()`, or `"text".trim().truncate(20, "...")` instead of only the static `Maps::` / `Strings::`
+  forms. A user-declared `extension` of the same name still shadows the builtin.
 
 ## [0.4.4] - 2026-07-07
 

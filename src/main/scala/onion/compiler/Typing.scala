@@ -155,7 +155,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // unaffected — this only deduplicates the extension registry.
     val registered = scala.collection.mutable.HashSet[String]()
     for {
-      containerName <- Seq("onion.Colls", "onion.Iterables")
+      containerName <- Seq("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings")
       container <- load(containerName)
       method <- container.methods
       if Modifier.isStatic(method.modifier) && Modifier.isPublic(method.modifier) && method.arguments.nonEmpty

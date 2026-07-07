@@ -243,13 +243,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     result.toSeq
   }
 
-  /** A builtin stdlib extension (onion.Colls / onion.Iterables), as opposed to
-   *  a user-declared `extension` block — used so a user extension can shadow a
-   *  builtin of the same name instead of colliding as an ambiguity. */
-  private def isBuiltinExtension(m: ExtensionMethodDefinition): Boolean = {
-    val n = m.containerClass.name
-    n == "onion.Colls" || n == "onion.Iterables"
-  }
+  /** A builtin stdlib extension (the bundled collection/string utilities), as
+   *  opposed to a user-declared `extension` block — used so a user extension can
+   *  shadow a builtin of the same name instead of colliding as an ambiguity.
+   *  Keep in sync with the container list in Typing.registerBuiltinExtensions. */
+  private def isBuiltinExtension(m: ExtensionMethodDefinition): Boolean =
+    ExtensionMethodFallbackSupport.BuiltinExtensionContainers.contains(m.containerClass.name)
 
   private def isExtensionMethodApplicable(
     extMethod: ExtensionMethodDefinition,
@@ -261,4 +260,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       calls.isAssignableWithBoxing(expectedArgs(i), params(i).`type`)
     }
   }
+}
+
+private[compiler] object ExtensionMethodFallbackSupport {
+  /** Containers whose static helpers are registered as builtin extension methods
+   *  (see Typing.registerBuiltinExtensions). A user-declared `extension` of the
+   *  same name shadows these rather than colliding as an ambiguity. */
+  val BuiltinExtensionContainers: Set[String] =
+    Set("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings")
 }

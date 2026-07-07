@@ -90,7 +90,9 @@ class TypingSessionSpec extends AnyFunSpec with Diagrams {
 
       typing.session.activate(unit2)
       assert(typing.typeAliases_.get("example.Alias").contains(aliasEntry))
-      assert(typing.lookupExtensionMethods("java.lang.String") == Seq(extensionMethod))
+      // The registry also holds builtin String extensions (onion.Strings); the
+      // user-registered method must remain visible across the unit switch.
+      assert(typing.lookupExtensionMethods("java.lang.String").contains(extensionMethod))
     }
   }
 }

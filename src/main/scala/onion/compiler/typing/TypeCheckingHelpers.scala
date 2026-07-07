@@ -52,6 +52,7 @@ private[typing] object TypeCheckingHelpers {
     left: Type,
     right: Type,
     rootClass: ClassType,
+    table: ClassTable,
     reportError: (AST.Node, Type, Type) => Unit
   ): Type = {
     if (left == null || right == null) return null
@@ -87,6 +88,26 @@ private[typing] object TypeCheckingHelpers {
           return nearestCommonAncestor(lc, rc, rootClass)
         case _ =>
           return rootClass
+      }
+    }
+    // Exactly one operand is a primitive and the other is a reference (neither is
+    // VOID, handled above; numeric+numeric was already resolved by the isSuperType
+    // widening checks). Box the primitive to its wrapper class and take the LUB of
+    // the two reference types, which bottoms out at Object. This mirrors Java's
+    // conditional-operator behaviour: `if b { 1 } else { "s" }` boxes Int to Integer
+    // and merges to Object (issue #308). The result is a genuine supertype of both:
+    // the boxed primitive IS-A its wrapper, and the LUB of two references is a
+    // supertype of each.
+    if (table != null) {
+      def boxIfBasic(t: Type): Type = t match {
+        case bt: BasicType if bt != BasicType.VOID => Boxing.boxedType(table, bt)
+        case other => other
+      }
+      val leftBasic = left.isBasicType && (left ne BasicType.VOID)
+      val rightBasic = right.isBasicType && (right ne BasicType.VOID)
+      if (leftBasic != rightBasic) {
+        // exactly one is a (non-void) primitive
+        return leastUpperBound(node, boxIfBasic(left), boxIfBasic(right), rootClass, table, reportError)
       }
     }
     reportError(node, left, right)

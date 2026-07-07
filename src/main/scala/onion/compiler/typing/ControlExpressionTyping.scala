@@ -225,7 +225,7 @@ final class ControlExpressionTyping(
     new StatementTerm(location, statement, termType)
 
   private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type =
-    TypeCheckingHelpers.leastUpperBound(node, left, right, bodyContext.rootClass,
+    TypeCheckingHelpers.leastUpperBound(node, left, right, bodyContext.rootClass, bodyContext.table,
       (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
   private[typing] def foldLub(node: AST.Node, types: Seq[Type]): Option[Type] = boundary {

@@ -456,7 +456,7 @@ final class ClosureTyping(
   }
 
   private def leastUpperBound(node: AST.Node, left: Type, right: Type): Type =
-    TypeCheckingHelpers.leastUpperBound(node, left, right, bodyContext.rootClass,
+    TypeCheckingHelpers.leastUpperBound(node, left, right, bodyContext.rootClass, bodyContext.table,
       (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
   private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {

@@ -133,6 +133,18 @@ public class Rand {
         return copy;
     }
 
+    /**
+     * Returns {@code n} distinct elements drawn at random without replacement.
+     * If {@code n} is at least the list size, returns a shuffled copy of all
+     * elements; a non-positive {@code n} yields an empty list.
+     */
+    public static <T> ArrayList<T> sample(java.util.List<T> list, int n) {
+        ArrayList<T> shuffled = shuffle(list);
+        if (n <= 0) return new ArrayList<>();
+        if (n >= shuffled.size()) return shuffled;
+        return new ArrayList<>(shuffled.subList(0, n));
+    }
+
     // ========== UUID ==========
 
     /**

@@ -994,4 +994,53 @@ public final class Colls {
         if (lo >= hi) return new ArrayList<>();
         return new ArrayList<>(list.subList(lo, hi));
     }
+
+    /** Sum of {@code selector} applied to each element, in double precision. */
+    public static <T, R extends Number> double sumBy(List<T> list, Function1<T, R> selector) {
+        double total = 0.0;
+        if (list == null) return total;
+        for (T item : list) {
+            R value = selector.call(item);
+            if (value != null) total += value.doubleValue();
+        }
+        return total;
+    }
+
+    /** Average of {@code selector} over the elements, or 0.0 for an empty list. */
+    public static <T, R extends Number> double averageBy(List<T> list, Function1<T, R> selector) {
+        if (list == null || list.isEmpty()) return 0.0;
+        return sumBy(list, selector) / list.size();
+    }
+
+    /** The element with the greatest {@code selector} value, or null if empty. */
+    public static <T, R extends Number> T maxBy(List<T> list, Function1<T, R> selector) {
+        if (list == null || list.isEmpty()) return null;
+        T best = null;
+        double bestValue = Double.NEGATIVE_INFINITY;
+        for (T item : list) {
+            R value = selector.call(item);
+            double d = value == null ? Double.NEGATIVE_INFINITY : value.doubleValue();
+            if (best == null || d > bestValue) {
+                best = item;
+                bestValue = d;
+            }
+        }
+        return best;
+    }
+
+    /** The element with the smallest {@code selector} value, or null if empty. */
+    public static <T, R extends Number> T minBy(List<T> list, Function1<T, R> selector) {
+        if (list == null || list.isEmpty()) return null;
+        T best = null;
+        double bestValue = Double.POSITIVE_INFINITY;
+        for (T item : list) {
+            R value = selector.call(item);
+            double d = value == null ? Double.POSITIVE_INFINITY : value.doubleValue();
+            if (best == null || d < bestValue) {
+                best = item;
+                bestValue = d;
+            }
+        }
+        return best;
+    }
 }

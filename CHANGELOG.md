@@ -17,9 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `onion.Text` lays out console text — `wrap` (word wrapping), `indent`/`dedent`, and `table`
   (columns aligned to their widest cell).
 
-- **`Colls` gains `chunked`, `windowed`, and `slice`** — batching (`items.chunked(100)`),
-  sliding windows (`items.windowed(3)`), and bounds-clamping sublists (`items.slice(from, to)`),
-  all chainable like the other list helpers.
+- **`Colls` gains `chunked`, `windowed`, `slice`, and selector aggregation** — batching
+  (`items.chunked(100)`), sliding windows (`items.windowed(3)`), bounds-clamping sublists
+  (`items.slice(from, to)`), and `sumBy`/`averageBy`/`maxBy`/`minBy` over a numeric selector
+  (`people.maxBy { p -> p.age() }`, `orders.sumBy { o -> o.total() }`) — all chainable. `onion.Rand`
+  gains `sample(list, n)` (n distinct elements drawn without replacement).
 
 - **Richer practical standard library.** `onion.Maps` (6 → 20 methods) gains
   `keys`/`values`, `mapKeys`, key+value `filter`/`count`/`anyEntry`/`allEntries`, `forEach`,

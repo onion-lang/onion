@@ -167,6 +167,66 @@ public class IO {
         }
     }
 
+    public static Long tryReadLong(String prompt) {
+        System.out.print(prompt);
+        try {
+            String line = STDIN.readLine();
+            if (line == null) return null;
+            return Long.parseLong(line.trim());
+        } catch (IOException | NumberFormatException e) {
+            return null;
+        }
+    }
+
+    // Line-oriented input
+    /** Reads all remaining lines from standard input into a list. */
+    public static java.util.List<String> readLines() {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        try {
+            String line;
+            while ((line = STDIN.readLine()) != null) {
+                lines.add(line);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return lines;
+    }
+
+    /** Applies {@code action} to each remaining line of standard input, in order. */
+    public static void eachLine(Function1<String, ?> action) {
+        try {
+            String line;
+            while ((line = STDIN.readLine()) != null) {
+                action.call(line);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    // Line-oriented output
+    /** Prints each element of {@code items} on its own line. */
+    public static void printLines(Iterable<?> items) {
+        if (items == null) return;
+        for (Object item : items) {
+            System.out.println(item);
+        }
+    }
+
+    /** Prints each argument on its own line. */
+    public static void printAll(Object... items) {
+        if (items == null) return;
+        for (Object item : items) {
+            System.out.println(item);
+        }
+    }
+
+    /** Flushes standard output. */
+    public static void flush() {
+        System.out.flush();
+    }
+
     // Utility methods
     public static void newline() {
         System.out.println();

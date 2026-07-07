@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-07-07
+
 - **The type of an `if`/`select`/`try` merged from two siblings is their common ancestor, not `Object`**
   — `if b { new Dog() } else { new Cat() }` is now typed `Animal` (their shared superclass; or a
   shared interface), so members declared there stay callable without an annotation ([#307]).
@@ -663,7 +665,8 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
+[Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.4...develop
+[0.4.4]: https://github.com/onion-lang/onion/releases/tag/v0.4.4
 [#307]: https://github.com/onion-lang/onion/issues/307
 [#304]: https://github.com/onion-lang/onion/issues/304
 [#303]: https://github.com/onion-lang/onion/issues/303

@@ -311,6 +311,30 @@ Error: Undefined variable at BadProgram.on:10
 Compilation failed with 2 errors
 ```
 
+## 分割コンパイルとリンク
+
+Onion のユニットは独立してコンパイルでき、クラスパスを介してロード時にリンクされます
+——すべてのソースを 1 回の `onionc` 呼び出しに含める必要はありません。ライブラリを先に
+コンパイルし、生成された `.class` に対してクライアントをコンパイルします。
+
+```bash
+# ライブラリを先にコンパイル
+onionc -d out/lib greeter/Greeter.on
+
+# ライブラリ出力をクラスパスに置いてクライアントをコンパイル
+onionc -d out/app -classpath out/lib app/Main.on
+
+# リンクは JVM の仕事——全出力ディレクトリ（と onion.jar）をクラスパスに
+java -cp onion.jar:out/lib:out/app Main   # => Hello, Onion
+```
+
+クラス・インターフェース・レコード・enum・継承・静的メンバ、**そしてジェネリック型**が
+ユニット境界を越えられます。`onionc` が `.class` に JVM ジェネリックシグネチャを書き込むため、
+ジェネリック型は型パラメータを保持します（別ユニットの `new Container[String](x)` が解決）。
+
+ユニットは依存順にコンパイルします（参照先を先にコンパイル）。インクリメンタルビルドの
+キャッシュは無いため、ユニットの公開 API が変わったら依存側を再コンパイルしてください。
+
 ## 次のステップ
 
 - [スクリプトランナー](script-runner.md) - Onionスクリプトを直接実行

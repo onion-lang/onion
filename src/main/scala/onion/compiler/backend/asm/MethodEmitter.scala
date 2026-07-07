@@ -10,10 +10,11 @@ object MethodEmitter {
     name: String,
     returnType: AsmType,
     argTypes: Array[AsmType],
-    exceptions: Array[String] = null
+    exceptions: Array[String] = null,
+    signature: String = null
   ): GeneratorAdapter = {
     val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
-    val mv = cw.visitMethod(access, name, desc, null, exceptions)
+    val mv = cw.visitMethod(access, name, desc, signature, exceptions)
     val asmMethod = AsmMethod(name, desc)
     val gen = new GeneratorAdapter(access, asmMethod, mv)
     gen.visitCode()

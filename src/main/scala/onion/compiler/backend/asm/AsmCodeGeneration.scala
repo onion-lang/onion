@@ -115,7 +115,15 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       "java/lang/Object"
     val interfaces: Array[String] = classDef.interfaces.map(i => AsmUtil.internalName(i.name)).toArray
 
-    cw.visit(Opcodes.V17, access, name, null, superName, interfaces)
+    val classSignature =
+      if classDef.isInterface then
+        // Interfaces have no superclass in a class signature; encode with an
+        // implicit java/lang/Object superclass.
+        GenericSignatureEncoder.classSignature(classDef.typeParameters, null, classDef.interfaces)
+      else
+        GenericSignatureEncoder.classSignature(classDef.typeParameters, classDef.superClass, classDef.interfaces)
+
+    cw.visit(Opcodes.V17, access, name, classSignature, superName, interfaces)
     cw.visitSource(sourceFileName(classDef), null)
 
     // Generate fields (enum constants carry ACC_ENUM)
@@ -125,7 +133,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       if classIsEnum && Modifier.isStatic(field.modifier) && field.`type`.name == classDef.name then
         fieldAccess |= Opcodes.ACC_ENUM
       val fieldType = asmType(field.`type`)
-      cw.visitField(fieldAccess, field.name, fieldType.getDescriptor, null, null)
+      val fieldSignature = GenericSignatureEncoder.fieldSignature(field.`type`)
+      cw.visitField(fieldAccess, field.name, fieldType.getDescriptor, fieldSignature, null)
     
     // Generate constructors (not for interfaces)
     if !classDef.isInterface then
@@ -167,7 +176,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
   private def codeConstructor(cw: ClassWriter, ctor: ConstructorDefinition, className: String): Unit =
     val argTypes = ctor.arguments.map(asmType)
-    val gen = MethodEmitter.newGenerator(cw, toAsmModifier(ctor.modifier), "<init>", AsmType.VOID_TYPE, argTypes)
+    val ctorSignature =
+      GenericSignatureEncoder.methodSignature(ctor.typeParameters, ctor.arguments, BasicType.VOID)
+    val gen = MethodEmitter.newGenerator(cw, toAsmModifier(ctor.modifier), "<init>", AsmType.VOID_TYPE, argTypes, signature = ctorSignature)
 
     // Emit line number for constructor declaration
     if ctor.location != null then
@@ -262,8 +273,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val exceptions = if (node.throwsTypes.isEmpty) null
                      else node.throwsTypes.map(t => AsmUtil.internalName(t.name))
 
+    val methodSignature =
+      GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
+
     // Just visit the method without any code (abstract method needs visitEnd but no code)
-    val mv = cw.visitMethod(access, node.name, desc, null, exceptions)
+    val mv = cw.visitMethod(access, node.name, desc, methodSignature, exceptions)
     mv.visitEnd()
 
   private def codeMethod(cw: ClassWriter, node: MethodDefinition, className: String): Unit =
@@ -273,7 +287,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val returnType = asmType(node.returnType)
     val exceptions = if (node.throwsTypes.isEmpty) null
                      else node.throwsTypes.map(t => AsmUtil.internalName(t.name))
-    val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions)
+    val methodSignature =
+      GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
+    val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions, methodSignature)
 
     // Emit line number for method declaration
     if node.location != null then

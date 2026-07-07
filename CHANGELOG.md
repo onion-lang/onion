@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Separate compilation of generics.** `onionc` now emits JVM generic `Signature` attributes for
+  generic classes, methods, fields and constructors, so a generic type compiled in one unit is seen
+  as generic from another: compile `class Container[T]` to a `.class`, then `new Container[String](x)`
+  in a separately-compiled unit (with that class on `-classpath`) resolves instead of failing with
+  E0030. Non-generic bytecode is unchanged (no `Signature` emitted). Non-generic separate compilation
+  (classes, interfaces, records, inheritance, statics) already worked; this closes the generics gap.
+
 - **New practical modules: `Hash`, `Codec`, `Stats`, and `Format`.** `onion.Hash` computes `md5`/
   `sha1`/`sha256`/`sha512` digests (hex); `onion.Codec` does `base64Encode`/`base64Decode`,
   `hexEncode`/`hexDecode`, and `urlEncode`/`urlDecode`; `onion.Stats` aggregates any `List` of

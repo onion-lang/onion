@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **A primitive and a reference branch merge to `Object` by boxing** — `if b { 1 } else { "s" }`
-  (typed `Object`) now boxes the `Int` and merges to `Object` instead of failing; numeric branches
-  (`if b { 1 } else { 2L }` -> `Long`) are unaffected ([#308]).
-
 - **The type of an `if`/`select`/`try` merged from two siblings is their common ancestor, not `Object`**
   — `if b { new Dog() } else { new Cat() }` is now typed `Animal` (their shared superclass; or a
   shared interface), so members declared there stay callable without an annotation ([#307]).
@@ -668,7 +664,6 @@ across the `0.2.0-M2`…`0.2.0-M14` milestones and the final stabilization work.
 - Initial release.
 
 [Unreleased]: https://github.com/onion-lang/onion/compare/v0.4.3...develop
-[#308]: https://github.com/onion-lang/onion/issues/308
 [#307]: https://github.com/onion-lang/onion/issues/307
 [#304]: https://github.com/onion-lang/onion/issues/304
 [#303]: https://github.com/onion-lang/onion/issues/303

@@ -619,7 +619,7 @@ final class SelectExpressionTyping(
     * Returns None if any pairwise LUB is undefined (e.g. a void/non-void mix). */
   private def foldLubSilent(types: Seq[Type]): Option[Type] = boundary {
     types.reduceOption { (acc, t) =>
-      val result = TypeCheckingHelpers.leastUpperBound(null, acc, t, bodyContext.rootClass, bodyContext.table, (_, _, _) => ())
+      val result = TypeCheckingHelpers.leastUpperBound(null, acc, t, bodyContext.rootClass, (_, _, _) => ())
       if (result == null) break(None)
       result
     }

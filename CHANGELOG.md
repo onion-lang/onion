@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolves to the `Set` overload (returning a `Set`) instead of erroring against a sibling `map(List)`.
   Fixes a latent failure where `Set` values could not use the collection pipeline.
 
+- **A no-closure extension call works on an array receiver**, so `Strings::split(...)` /
+  `Strings::words(...)` results flow into the collection pipeline with `arr.toList()` (previously only
+  the closure-taking array extensions like `arr.map { ... }` resolved; `arr.toList()` failed with E0005).
+
 ## [0.4.4] - 2026-07-07
 
 - **The type of an `if`/`select`/`try` merged from two siblings is their common ancestor, not `Object`**

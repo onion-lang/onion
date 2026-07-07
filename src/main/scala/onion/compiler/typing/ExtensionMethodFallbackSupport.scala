@@ -80,7 +80,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     params: Array[Term]
   ): CandidateSelection[ExtensionMethodDefinition] =
     targetType match {
-      case _: ClassType =>
+      // Class receivers and array receivers both resolve through the extension
+      // registry (collectExtensionMethods handles the <array> pseudo-receiver);
+      // without the ArrayType case a no-closure call like `arr.toList()` would
+      // never find its builtin array extension (the closure path already does).
+      case _: ClassType | _: ArrayType =>
         val applicable = collectExtensionMethods(targetType, name).filter { extMethod =>
           extMethod.name == name && isExtensionMethodApplicable(extMethod, params)
         }

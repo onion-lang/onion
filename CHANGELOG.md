@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Records can have method bodies.** A `record` may now carry a `{ access-section* }` body of
+  methods, just like an `enum` already could — `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...): Fraction ...; private: static def gcd(...) }`.
+  Methods see the generated accessors (`num()`), operator methods back `+ - * /`, and static factories
+  / private helpers work. Closes the product-type asymmetry with enums; all existing record features
+  (accessors, `from re"..."`, `derive!`, `law`/`example`, `<:` interfaces) are unchanged.
+
 - **`oniondoc` — a documentation generator.** A new javadoc/scaladoc-style tool
   (`onion.tools.doc.OnionDoc`) that reads `.on` sources, extracts `/** ... */` doc comments attached
   to types (class/interface/record) and their members, renders a markdown-like comment body to HTML

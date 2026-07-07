@@ -1367,6 +1367,7 @@ AST.ClassDeclaration class_decl(int mset) : {
 AST.RecordDeclaration record_decl(int mset) : {
   Token t1, t2, rt, mk, lt, enm, et; List<AST.Argument> args, largs;
   AST.TypeNode superType;
+  AST.AccessSection sec;
   AST.BlockExpression lb, eb;
   ArrayBuffer<AST.TypeNode> superTypes = new ArrayBuffer<AST.TypeNode>();
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
@@ -1374,6 +1375,7 @@ AST.RecordDeclaration record_decl(int mset) : {
   ArrayBuffer<String> deriveBuf = new ArrayBuffer<String>();
   ArrayBuffer<AST.LawClause> lawBuf = new ArrayBuffer<AST.LawClause>();
   ArrayBuffer<AST.ExampleClause> exBuf = new ArrayBuffer<AST.ExampleClause>();
+  ArrayBuffer<AST.AccessSection> sections = new ArrayBuffer<AST.AccessSection>();
 }{
   t1="record" t2=id() [tparams=type_params()] "(" args=args() ")"
   // Optional `from re"..."` clause (shape-first records). `from` is a soft keyword
@@ -1406,10 +1408,16 @@ AST.RecordDeclaration record_decl(int mset) : {
   [ "<:"
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
-  ] [";"] {
+  ]
+  // Optional brace body: `record R(...) { access-section* }`, mirroring enum bodies so
+  // records can carry behaviour (methods). A leading `{` with no preceding soft keyword
+  // is unambiguously the record body (the `law`/`example` clauses above are introduced
+  // by their own soft keywords before any block).
+  [ "{" (sec=access_section() {append(sections, sec);})* "}" ]
+  [";"] {
     return AST.recordDeclaration(
       p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf),
-      toList(lawBuf), toList(exBuf)
+      toList(lawBuf), toList(exBuf), toList(sections)
     );
   }
 }

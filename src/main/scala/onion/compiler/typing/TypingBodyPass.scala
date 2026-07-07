@@ -109,15 +109,24 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   }
   def processRecordDeclaration(node: AST.RecordDeclaration, context: LocalContext): Unit =
     // Pattern-attached records carry synthesized parse/parseAll methods (built in
-    // Rewriting); type their bodies like ordinary record methods. Plain records have
-    // no synthesizedMethods, so there is nothing to do.
-    if (node.synthesizedMethods.nonEmpty) {
+    // Rewriting); type their bodies like ordinary record methods. A record body
+    // (`{ access-section* }`) contributes user methods that must have their bodies
+    // typed too, mirroring enum bodies. Plain records with neither have nothing to do.
+    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition
         typing.find(definition.name).foreach(unitContext.currentMapper = _)
         val recordTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ recordTypeParams) {
           node.synthesizedMethods.foreach(processMethodDeclaration)
+          // Type the bodies of user-defined members from the record body,
+          // mirroring processEnumDeclaration.
+          for (section <- node.sections; member <- section.members) {
+            member match {
+              case m: AST.MethodDeclaration => processMethodDeclaration(m)
+              case _ => // record bodies currently support methods only
+            }
+          }
         }
       }
     }

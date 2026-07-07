@@ -280,6 +280,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         report(SemanticError.RECORD_DERIVE_UNKNOWN_MARKER, node, mk)
       }
     }
+    // User-defined members (access sections in the record body), mirroring enums.
+    // Added to the same ClassDefinition that carries the synthesized accessors, so
+    // section methods can call `x()` / bare fields and each other.
+    node.sections.foreach(processAccessSection)
     }
   }
 

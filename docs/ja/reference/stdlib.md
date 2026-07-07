@@ -19,7 +19,8 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 ほとんどのヘルパーは静的な `Module::` 呼び出しだけでなくメソッドチェインでも書けます——
 コレクション（`list.filter { ... }.map { ... }`, `m.mapValues { ... }`）、文字列
 （`"s".capitalize()`）、ハッシュ・エンコード（`"pw".sha256()`, `"x".base64Encode()`）、
-テキスト整形（`text.wrap(40)`）、数値集計（`nums.sum()`, `nums.average()`）。
+テキスト整形（`text.wrap(40)`）、数値集計（`nums.sum()`, `nums.average()`）、数値フォーマット
+（`(1536L).bytes()`, `(21L).ordinal()`）。
 
 ## IO モジュール
 

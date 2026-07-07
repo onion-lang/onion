@@ -57,6 +57,27 @@ class StdlibExtensionChainSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Format as a primitive extension (boxed receiver)") {
+    it("bytes/duration/ordinal chain off a Long") {
+      runStr(
+        "return (1536L).bytes() + \"|\" + (3661L).duration() + \"|\" + (21L).ordinal()",
+        Shell.Success("1.5 KB|1h 1m 1s|21st"))
+    }
+
+    it("percent/fixed chain off a Double") {
+      runStr(
+        "return (0.756).percent(1) + \"|\" + (3.14159).fixed(2)",
+        Shell.Success("75.6%|3.14"))
+    }
+
+    it("a Stats result formats itself (Stats then Format)") {
+      runStr(
+        "val nums: List[Int] = [500, 1000, 36]\n" +
+        "return nums.sum().fixed(1)",
+        Shell.Success("1536.0"))
+    }
+  }
+
   describe("Stats as a List extension") {
     it("sum, average and median chain off a numeric list") {
       runInt(

@@ -19,7 +19,8 @@ Onion's standard library consists of built-in modules and interfaces for common 
 Most helpers are also usable as method chains, not only as static `Module::` calls —
 collections (`list.filter { ... }.map { ... }`, `m.mapValues { ... }`), strings
 (`"s".capitalize()`), hashing/encoding (`"pw".sha256()`, `"x".base64Encode()`), text
-layout (`text.wrap(40)`), and numeric aggregation (`nums.sum()`, `nums.average()`).
+layout (`text.wrap(40)`), numeric aggregation (`nums.sum()`, `nums.average()`), and number
+formatting (`(1536L).bytes()`, `(21L).ordinal()`).
 
 ## IO Module
 

@@ -155,7 +155,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // unaffected — this only deduplicates the extension registry.
     val registered = scala.collection.mutable.HashSet[String]()
     for {
-      containerName <- Seq("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets", "onion.Hash", "onion.Codec", "onion.Text", "onion.Stats")
+      containerName <- Seq("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets", "onion.Hash", "onion.Codec", "onion.Text", "onion.Stats", "onion.Format")
       container <- load(containerName)
       method <- container.methods
       if Modifier.isStatic(method.modifier) && Modifier.isPublic(method.modifier) && method.arguments.nonEmpty
@@ -164,6 +164,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         case applied: AppliedClassType => applied.raw.name
         case ct: ClassType => ct.name
         case _: ArrayType => Typing.ArrayExtensionReceiver
+        // A primitive first parameter registers on its boxed class (like a user
+        // `extension Int { ... }` does), so e.g. Format::bytes(long) becomes
+        // (1536L).bytes() — the primitive receiver is boxed for lookup and
+        // unboxed again when the backing static call is built.
+        case bt: BasicType if bt != BasicType.VOID => boxedClass(bt).name
         case _ => null
       }
       val signature =

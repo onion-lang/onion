@@ -279,5 +279,5 @@ private[compiler] object ExtensionMethodFallbackSupport {
    *  (see Typing.registerBuiltinExtensions). A user-declared `extension` of the
    *  same name shadows these rather than colliding as an ambiguity. */
   val BuiltinExtensionContainers: Set[String] =
-    Set("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets", "onion.Hash", "onion.Codec", "onion.Text", "onion.Stats")
+    Set("onion.Colls", "onion.Iterables", "onion.Maps", "onion.Strings", "onion.Sets", "onion.Hash", "onion.Codec", "onion.Text", "onion.Stats", "onion.Format")
 }

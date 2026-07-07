@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **`Hash`, `Codec`, `Text` and `Stats` helpers are callable as method chains.** Registered as
-  builtin extension methods on their receiver type, so `"pw".sha256()`, `"x".base64Encode().base64Decode()`,
-  `text.wrap(40)`, and `nums.sum()`/`nums.average()`/`nums.median()` work alongside the static
-  `Hash::` / `Codec::` / `Text::` / `Stats::` forms (`"secret".base64Encode().sha256()` composes).
+- **`Hash`, `Codec`, `Text`, `Stats` and `Format` helpers are callable as method chains.** Registered
+  as builtin extension methods on their receiver type, so `"pw".sha256()`,
+  `"x".base64Encode().base64Decode()`, `text.wrap(40)`, `nums.sum()`/`nums.average()`/`nums.median()`,
+  and — via a boxed primitive receiver — `(1536L).bytes()`, `(21L).ordinal()`, `(0.756).percent(1)`
+  work alongside the static forms (`"secret".base64Encode().sha256()` and `nums.sum().fixed(1)`
+  compose). Builtin extensions on a primitive first parameter now register on the boxed class, the
+  same way a user `extension Int { ... }` does.
 
 - **Separate compilation of generics.** `onionc` now emits JVM generic `Signature` attributes for
   generic classes, methods, fields and constructors, so a generic type compiled in one unit is seen

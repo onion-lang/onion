@@ -153,6 +153,30 @@ def firstNonEmpty(lines: List[String]): String {
 
 定番の読み取りループ `while (line = next()) != null { ... }` も同様で、`line` はループ本体の先頭で絞り込まれます。使用の**後**の再代入は絞り込みを取り消しませんが、クロージャに捕捉された `var` はクロージャ内では nullable のままです（クロージャは変数が変わった後に実行されうるため）。
 
+### 絞り込みが効く場所
+
+nullチェックは、制御フロー上で値が非nullと保証される場所ならどこでも絞り込みます（`if` の `then` 節だけではありません）。以下はすべて `x` を絞り込みます:
+
+```onion
+if x != null && x.length() > 0 { ... }   // && の右オペランド（そこでは x は非null）
+val ok = x == null || x.length() == 0    // || の右オペランド（左が false のとき x は非null）
+while x != null { x.length() }           // while 本体（x != null のときだけ実行される）
+for var i: Int = 0; x != null; i = i + 1 { x.length() }   // for 本体、同じ理由
+select v { case s when s != null: s.length() ... }        // `when` でガードされた case 本体
+```
+
+`while`/`for` の絞り込みはフロー依存なので、定番のポインタ前進ループが動きます。前進の**前**の使用は絞り込まれ、再代入でその先の絞り込みが解除されます:
+
+```onion
+var cur: Node? = head
+while cur != null {
+  visit(cur.value)   // ここでは cur は Node に絞り込まれる
+  cur = cur.next     // 前進。この先は絞り込み解除
+}
+```
+
+`if x == null || cond { return }` でガードすると、フォールスルー側で `x` が絞り込まれるので、早期リターンのガードの後では `x` は非nullになります。
+
 ## nullableに対する `==` はnull安全な値等価
 
 `==` は静的に nullable なレシーバに対しても **値等価**（`java.util.Objects.equals` 相当）です。両方 null なら等しい、片方だけ null なら非等価、それ以外は `equals` で比較します。**事前の null チェックは不要です。**

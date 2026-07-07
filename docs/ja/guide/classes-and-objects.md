@@ -111,6 +111,27 @@ val (s, n) = p              // 分割代入
 p.copy(second = 42)         // 名前付き引数でコピー
 ```
 
+recordはクラスやenumと同じく、`{ ... }` のメソッド本体——インスタンスメソッド・静的
+ファクトリ・privateヘルパー・演算子メソッド——を持てます。メソッドは自動生成された
+コンポーネントアクセサを参照できます：
+
+```onion
+record Fraction(num: Int, den: Int) {
+public:
+  static def of(n: Int, d: Int): Fraction {
+    val g = gcd(Math::abs(n), d)
+    return new Fraction(n / g, d / g)
+  }
+  def plus(o: Fraction): Fraction =         // `+` 演算子を実装
+    Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+private:
+  static def gcd(a: Int, b: Int): Int { ... }
+}
+
+val third = Fraction::of(1, 3)
+val one = third + third + third            // ちょうど 1/1
+```
+
 ## 演算子オーバーロード
 
 二項演算子は左オペランドのメソッドにディスパッチされます（Kotlinスタイル）：`a + b` は `a.plus(b)` を呼び出します：

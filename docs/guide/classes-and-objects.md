@@ -310,6 +310,28 @@ val (s, n) = p                 // destructuring declaration
 p.copy(second = 42)            // named-argument copy
 ```
 
+A record can also carry a `{ ... }` body of methods — instance methods, static
+factories, private helpers, and operator methods — just like a class or enum.
+The methods see the generated component accessors:
+
+```onion
+record Fraction(num: Int, den: Int) {
+public:
+  static def of(n: Int, d: Int): Fraction {
+    val g = gcd(Math::abs(n), d)
+    return new Fraction(n / g, d / g)
+  }
+  def plus(o: Fraction): Fraction =         // backs the `+` operator
+    Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+  def toDouble(): Double = (num() as Double) / (den() as Double)
+private:
+  static def gcd(a: Int, b: Int): Int { ... }
+}
+
+val third = Fraction::of(1, 3)
+val one = third + third + third            // exactly 1/1
+```
+
 ## Generic Classes
 
 Classes can take type parameters in `[]`. A parameter is available

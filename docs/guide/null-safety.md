@@ -228,6 +228,34 @@ where `line` is narrowed at the top of the loop body. A reassignment *after* the
 use does not undo the narrowing, but a `var` captured by a closure stays nullable
 inside the closure, since the closure may run after the variable has changed.
 
+### Where a null check narrows
+
+A null check narrows wherever the checked value is guaranteed non-null by
+control flow — not just the `then` branch of an `if`. All of these narrow `x`:
+
+```onion
+if x != null && x.length() > 0 { ... }   // right operand of && (x is non-null there)
+val ok = x == null || x.length() == 0    // right operand of || (x is non-null when the left is false)
+while x != null { x.length() }           // while body (runs only when x != null)
+for var i: Int = 0; x != null; i = i + 1 { x.length() }   // for body, same reason
+select v { case s when s != null: s.length() ... }        // a case body, guarded by its `when`
+```
+
+The `while`/`for` narrowing is flow-sensitive, so the idiomatic pointer-advance
+loop works — a use *before* the advance is narrowed, and the reassignment clears
+it from that point:
+
+```onion
+var cur: Node? = head
+while cur != null {
+  visit(cur.value)   // cur narrowed to Node here
+  cur = cur.next     // advance; narrowing cleared past this point
+}
+```
+
+Guarding with `if x == null || cond { return }` narrows `x` on the fall-through,
+so an early-return guard leaves `x` non-null afterwards.
+
 ## Return Type of Safe Calls
 
 The return type of a safe call expression is always nullable (`T?`), since it can return `null` when the target is `null`:

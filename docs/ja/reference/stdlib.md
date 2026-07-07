@@ -2,6 +2,23 @@
 
 Onionの標準ライブラリは、一般的な機能のための組み込みモジュールとインターフェースで構成されています。
 
+## モジュール一覧
+
+| 領域 | モジュール |
+|------|-----------|
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
+| **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
+| **数値** | `Math`, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
+| **データ形式** | `Json`, `Yaml`, `Csv` |
+| **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
+| **関数型** | `Option`, `Result`, `Future` |
+| **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
+| **テスト・計測** | `Assert`, `Timing` |
+
+コレクション・文字列のヘルパーはほとんどメソッドチェインでも書けます
+（`list.filter { ... }.map { ... }`, `m.mapValues { ... }`, `"s".capitalize()`）。
+
 ## IO モジュール
 
 コンソール入出力操作。

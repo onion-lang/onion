@@ -2,6 +2,23 @@
 
 Onion's standard library consists of built-in modules and interfaces for common functionality.
 
+## Modules at a glance
+
+| Area | Modules |
+|------|---------|
+| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
+| **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
+| **Numbers** | `Math`, `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
+| **Data formats** | `Json`, `Yaml`, `Csv` |
+| **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
+| **Functional** | `Option`, `Result`, `Future` |
+| **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
+| **Testing & timing** | `Assert`, `Timing` |
+
+Most collection/string helpers are also usable as method chains
+(`list.filter { ... }.map { ... }`, `m.mapValues { ... }`, `"s".capitalize()`).
+
 ## IO Module
 
 Console input and output operations.

@@ -264,9 +264,15 @@ class AsmCodeGenerationVisitor(
     gen.dup()
     gen.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
-    // Non-null path: access the field
-    val ownerType = AsmUtil.objectType(node.field.affiliation.name)
-    gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
+    // Non-null path: access the field. The array `length` pseudo-field has no
+    // affiliation class and must be read with ARRAYLENGTH, not GETFIELD — a bare
+    // getField here dereferenced affiliation.name and crashed the compiler (I0000)
+    // on `arr?.length`.
+    if (node.field.affiliation == null)
+      gen.arrayLength()
+    else
+      val ownerType = AsmUtil.objectType(node.field.affiliation.name)
+      gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
 
     // Box primitive field type if needed (safe access always returns nullable)
     node.field.`type` match

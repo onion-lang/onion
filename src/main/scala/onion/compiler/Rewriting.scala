@@ -279,6 +279,24 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       f.args.length >= 2 && isStringArrayParam(f.args.last.typeRef) && f.args.last.defaultValue == null &&
         f.args.init.forall(a => cliKindOf(a.typeRef).isDefined && a.defaultValue == null)
 
+    // A top-level `main` with parameters must fit one of the supported shapes:
+    // a single `String[]` (raw argv), all scalars (auto-CLI parses each), or a
+    // scalar prefix + trailing `String[]` rest collector. Any other list — e.g.
+    // `main(args: String[], flag: Boolean)` with `String[]` first — cannot be
+    // wired to the entry point and used to compile to a SILENT no-op (the body
+    // landed on an unreachable overload). Reject it with a clear error instead.
+    val singleStringArray = (f: AST.FunctionDeclaration) =>
+      f.args.length == 1 && isStringArrayParam(f.args(0).typeRef)
+    toplevels.collectFirst {
+      case f: AST.FunctionDeclaration if f.name == "main" && f.args.nonEmpty &&
+        !singleStringArray(f) && !allScalar(f) && !restPattern(f) => f
+    }.foreach { f =>
+      throw new CompilationException(Seq(CompileError("", f.location,
+        "main has an unsupported parameter list: a String[] parameter must be either the only " +
+        "parameter (raw argv) or the last parameter (rest collector); every other parameter must " +
+        "be a scalar parsed from the command line.")))
+    }
+
     toplevels.collectFirst {
       case f: AST.FunctionDeclaration if f.name == "main" && !allScalar(f) && restPattern(f) => f
     }.foreach { f =>

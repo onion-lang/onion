@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`arr?.length` on a nullable array no longer crashes the compiler.** The array `length`
+  pseudo-field has no affiliation class, and the safe-field-access codegen dereferenced it
+  unconditionally (I0000 internal error). It now emits `ARRAYLENGTH`, so `val n: Int? = a?.length`
+  returns the length (or null).
+
+- **A `main` with an unsupported parameter list is now a clear error instead of a silent no-op.**
+  `def main(args: String[], flag: Boolean = false)` (a `String[]` that is neither the sole parameter
+  nor the trailing rest collector) previously compiled cleanly and then did nothing — the body landed
+  on an unreachable overload. It is now rejected: a `String[]` parameter must be the only parameter
+  (raw argv) or the last parameter (rest collector), and every other parameter must be a
+  command-line-parsed scalar.
+
 - **A generic record can implement a generic interface parameterized by its own type variable.**
   `record Foo[T](v: T) <: Bar[T]` used to fail with E0003 (`type Bar[T] not found`) because the record's
   supertype clause was resolved outside its type-parameter scope, so `T` was unknown; a generic class

@@ -1,0 +1,23 @@
+// LogSummary — shape-first log analysis. A record derives its parser straight
+// from a regex shape (from re"..."), so LogLine::parseAll turns raw log text into
+// typed records with no hand-written parsing. Then summarize with Maps::countBy
+// and rank error paths. Showcases Onion's shape-first scripting end to end.
+record LogLine(status: Int, method: String, path: String) from re"(\d+) (\w+) (\S+)"
+
+def main(args: String[]): void {
+  val text =
+    "200 GET /index\n404 GET /missing\n200 POST /submit\n500 GET /crash\n" +
+    "200 GET /index\n404 GET /gone\n200 GET /about"
+
+  val entries = LogLine::parseAll(text)
+  val byStatus = Maps::countBy(entries) { e => "" + (e as LogLine).status() }
+  IO::println("parsed=" + entries.size +
+    " ok=" + byStatus.get("200") + " notfound=" + byStatus.get("404") + " error=" + byStatus.get("500"))
+
+  // error requests (status >= 400), ranked by status descending
+  val errors = entries.filter { e => (e as LogLine).status() >= 400 }
+                      .sortedByDescending { e => (e as LogLine).status() }
+  foreach e: LogLine in errors {
+    IO::println("  " + e.status() + " " + e.method() + " " + e.path())
+  }
+}

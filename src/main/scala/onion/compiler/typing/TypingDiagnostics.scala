@@ -41,5 +41,8 @@ final class TypingDiagnostics(private val typing: Typing, private val session: T
 
   def problems: Array[CompileError] = reporter.getProblems
 
+  /** Error count so far; used to checkpoint speculative closure-body typing (issue #316). */
+  def problemCount: Int = reporter.problemCount
+
   def warnings: Seq[CompileWarning] = warningReporter.getWarnings
 }

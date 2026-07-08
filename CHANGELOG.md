@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A failed trailing-closure body no longer triggers a misleading "method not found".** `xs.map { x => x.noSuchMethod() }`
+  used to report both the real `Int.noSuchMethod()` error and a bogus `List[Int].map() not found` (`map`
+  exists — only the lambda body was broken). The trailing-lambda resolver now checkpoints the error
+  count around typing the closure body and suppresses the outer method-not-found when the body itself
+  reported an error. A genuinely absent method with a well-typed closure (`xs.nonExistentMethod { x => x + 1 }`)
+  still errors — the closure leaves the count unchanged, so only a broken body suppresses ([#316]).
+
 - **F-bounded self-inheritance (CRTP) works for user-defined generics.** `class Sub : Base[Sub]` where
   `class Base[T extends Base[T]]` (and the interface form `class Item <: Cmp[Item]` where
   `interface Cmp[T extends Cmp[T]]`) used to fail with E0000, because the generic type-argument bound

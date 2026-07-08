@@ -15,7 +15,8 @@ final class TypingBodyContext(
   private val loadClassOption: String => Option[ClassType],
   private val reportNode: (SemanticError, AST.Node, Seq[AnyRef]) => Unit,
   val warningReporter: WarningReporter,
-  private val topLevelClassProvider: () => Option[ClassType] = () => None
+  private val topLevelClassProvider: () => Option[ClassType] = () => None,
+  private val problemCountProvider: () => Int = () => 0
 ) {
   def definition: ClassDefinition = currentDefinitionProvider()
   def mapper: NameResolver = currentMapperProvider()
@@ -30,6 +31,12 @@ final class TypingBodyContext(
 
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
     reportNode(error, node, items.toSeq)
+
+  /** Number of errors reported so far. Callers checkpoint this around a
+   *  speculative closure-body typing attempt to tell "the closure body itself
+   *  errored" apart from "no overload matched", so a redundant outer
+   *  method-not-found can be suppressed (issue #316). */
+  def problemCount: Int = problemCountProvider()
 }
 
 object TypingBodyContext {
@@ -45,6 +52,7 @@ object TypingBodyContext {
       loadClassOption = typing.load,
       reportNode = (error, node, items) => typing.report(error, node, items*),
       warningReporter = typing.warningReporter_,
-      topLevelClassProvider = () => typing.loadTopClass
+      topLevelClassProvider = () => typing.loadTopClass,
+      problemCountProvider = () => typing.problemCount
     )
 }

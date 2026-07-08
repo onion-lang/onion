@@ -67,6 +67,16 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] = {
     val args = argList.toArray
 
+    // Checkpoint the error count before any (trailing-)closure body is typed.
+    // If resolution later fails to match a method but the closure body itself
+    // reported a fresh error, the method genuinely exists and only its closure
+    // argument is broken; the outer method-not-found would then be a misleading
+    // avalanche error, so suppress it and let the real body error stand (#316).
+    // A well-typed closure argument leaves the count unchanged, so a genuinely
+    // absent method (e.g. `xs.nonExistentMethod { x => x + 1 }`) still errors.
+    val problemsBeforeClosures = calls.problemCount
+    def closureBodyReportedError: Boolean = calls.problemCount > problemsBeforeClosures
+
     val preliminaryParams = new Array[Term](args.length)
     var hasNonClosureError = false
 
@@ -85,6 +95,11 @@ private[compiler] final class MethodCallFallbackSupport(
 
     if (hasNonClosureError) return None
 
+    // Report the outer method-not-found only if no closure body already errored
+    // (see #316): a broken closure body makes the outer report redundant.
+    def reportNotFound(argTypes: Array[Type]): Unit =
+      if (!closureBodyReportedError) calls.reportMethodNotFound(node, targetType, name, argTypes)
+
     // Extension-method fallback only applies to an explicit `obj.m(...)` call
     // (AST.MethodCall). A synthesized `this`/`OuterThis` target from the
     // unqualified path must not attempt it; when no instance method matches, its
@@ -97,11 +112,11 @@ private[compiler] final class MethodCallFallbackSupport(
         ) match {
           case some @ Some(_) => some
           case None =>
-            calls.reportMethodNotFound(node, targetType, name, argTypes)
+            reportNotFound(argTypes)
             None
         }
       case _ =>
-        calls.reportMethodNotFound(node, targetType, name, argTypes)
+        reportNotFound(argTypes)
         None
     }
 
@@ -147,7 +162,7 @@ private[compiler] final class MethodCallFallbackSupport(
         calls.reportAmbiguousMethod(node, first.method, second.method, name)
         return None
       case CandidateSelection.NoMatch =>
-        calls.reportMethodNotFound(node, targetType, name, nonClosureTypes.values.toArray)
+        reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
     val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)

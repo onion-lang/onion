@@ -614,6 +614,12 @@ class SemanticErrorReporter(threshold: Int) {
 
   def getProblems: Array[CompileError] = problems.toArray
 
+  /** Number of errors collected so far. Lets callers checkpoint before/after a
+   *  speculative typing attempt (e.g. a trailing-closure body) to detect whether
+   *  it reported a fresh error, so a redundant outer method-not-found can be
+   *  suppressed (issue #316). */
+  def problemCount: Int = problems.length
+
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile
   }

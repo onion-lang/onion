@@ -218,6 +218,11 @@ final class MethodCallTyping(
   ): Unit =
     methodCallReportingSupport.reportMethodNotFound(node, targetType, name, argTypes)
 
+  /** Error count so far; a checkpoint before typing a trailing-closure body and a
+   *  comparison after tells whether the body itself reported an error, so a
+   *  redundant outer method-not-found can be suppressed (issue #316). */
+  private[typing] def problemCount: Int = bodyContext.problemCount
+
   private[typing] def reportAmbiguousMethods(
     node: AST.Node,
     name: String,

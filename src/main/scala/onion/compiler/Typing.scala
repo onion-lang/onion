@@ -280,6 +280,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = diagnostics.problems
+  /** Error count so far; used to checkpoint speculative closure-body typing (issue #316). */
+  private[compiler] def problemCount: Int = diagnostics.problemCount
   def warnings: Seq[CompileWarning] = diagnostics.warnings
   def typedBindings: scala.collection.immutable.Map[AST.Node, TypedAST.Node] = session.global.bindings.allTypedBindings
   def sourceClasses: Array[ClassDefinition] = table_.classes.values.toArray

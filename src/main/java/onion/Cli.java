@@ -169,11 +169,16 @@ public final class Cli {
      * Fail with a usage message when fewer than {@code required} arguments were
      * given, for a main with required leading parameters plus a String[] rest.
      */
+    /** The running script's file name for usage messages, or a generic placeholder. */
+    private static String scriptName() {
+        return System.getProperty("onion.cli.script", "<script>");
+    }
+
     public static void requireArgs(String[] args, int required, String usage) {
         int n = args == null ? 0 : args.length;
         if (n < required) {
             System.err.println("error: expected at least " + required + " argument(s)");
-            System.err.println("usage: <script> " + usage);
+            System.err.println("usage: " + scriptName() + " " + usage);
             System.exit(1);
         }
     }
@@ -184,7 +189,7 @@ public final class Cli {
     }
 
     private static String usageString(String[] names, char[] kinds) {
-        StringBuilder usage = new StringBuilder("usage: <script>");
+        StringBuilder usage = new StringBuilder("usage: " + scriptName());
         for (int j = 0; j < names.length; j++) {
             switch (kinds[j]) {
                 case 'p': usage.append(" <").append(names[j]).append('>'); break;

@@ -197,6 +197,9 @@ class ScriptRunner {
             if (result.hasErrors) {
               -1
             } else {
+              // Expose the script's file name so auto-CLI usage messages read
+              // `usage: myscript.on <arg>` instead of the literal `<script>`.
+              System.setProperty("onion.cli.script", new java.io.File(params.head).getName)
               new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(result.classes, scriptArgs) match {
                 case Shell.Success(_) => 0
                 case Shell.Failure(code) => code

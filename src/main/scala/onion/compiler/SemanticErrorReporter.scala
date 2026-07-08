@@ -378,6 +378,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.typeParameterMayBeNull",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.NULLABLE_MEMBER_ACCESS -> ErrorDef(
+      "error.semantic.nullableMemberAccess",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.LABEL_NOT_FOUND -> ErrorDef(
       "error.semantic.labelNotFound",
       Seq(items => asString(items(0)))

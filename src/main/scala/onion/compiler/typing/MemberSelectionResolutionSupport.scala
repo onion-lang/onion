@@ -115,6 +115,13 @@ private[compiler] final class MemberSelectionResolutionSupport(
           Some(ResolvedMemberSelectionTarget(target, objectType))
         else
           None
+      case nullable: NullableType =>
+        // A nullable value (`String?`) cannot be dereferenced directly. Report a
+        // null-safety error pointing at `?.`/`?:`/`!!`/a null check, mirroring the
+        // method-call path — not the misleading INCOMPATIBLE_TYPE ("Object expected")
+        // the generic fallback below used to produce for field access.
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, targetNode, nullable.displayName)
+        None
       case _ =>
         bodyContext.report(INCOMPATIBLE_TYPE, targetNode, bodyContext.rootClass, targetType)
         None

@@ -1,0 +1,23 @@
+// WordStats — a small text-statistics tool built from the standard library:
+// tokenize with a string method chain, count word frequencies with Maps::countBy,
+// project the map to records with Maps::toList, and rank them with sortedBy. A
+// realistic data-processing pipeline exercising Strings, Maps, Colls, and records.
+record WordCount(word: String, count: Int)
+
+def main(args: String[]): void {
+  val text = "the quick brown fox the lazy dog the fox jumps the dog sleeps"
+
+  // Tokenize: lowercase, split on non-letters, drop empties.
+  val words = text.toLowerCase().split("[^a-z]+").toList().filter { w => (w as String).length() > 0 }
+
+  // Word -> count, then project entries to WordCount records.
+  val freq = Maps::countBy(words) { w => w }
+  val counts = Maps::toList(freq) { k, v => new WordCount(k as String, v as Int) }
+
+  // Rank by count, descending (negate the key), and print.
+  val ranked = counts.sortedBy { wc => 0 - (wc as WordCount).count() }
+  IO::println("total=" + words.size + " unique=" + freq.size)
+  foreach wc: WordCount in ranked {
+    IO::println(wc.word() + " -> " + wc.count())
+  }
+}

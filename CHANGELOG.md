@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Json` gains defaulted accessors** — `getStringOr`/`getIntOr`/`getLongOr`/`getDoubleOr`/`getFloatOr`/
+  `getBooleanOr(obj, key, default)` return a primitive with an explicit fallback when the key is missing
+  or wrong-typed, so a missing key no longer needs the boxed `getInt(...)` (which is null on a miss and
+  throws `NullPointerException` when assigned to a non-null primitive).
+
 - **`Rand::choice`/`shuffle`/`sample` accept primitive arrays.** A primitive array (`Int[]`, `Long[]`,
   `Double[]`, `Boolean[]`) is not assignment-compatible with the generic `T[]` (`Object[]`) on the JVM,
   so `Rand::shuffle(new Int[3])` used to fail with E0005. Explicit primitive-array overloads close the

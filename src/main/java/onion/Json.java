@@ -216,6 +216,37 @@ public final class Json {
         return (value instanceof Number) ? ((Number) value).byteValue() : null;
     }
 
+    // ========== Defaulted accessors (missing/wrong-typed key -> default) ==========
+    // The plain getInt/getDouble/... return a boxed value that is null when the key
+    // is absent or has the wrong type; assigning that to a non-null primitive throws
+    // NullPointerException. These *Or variants return a primitive with an explicit
+    // fallback, so a missing key is handled without a null dereference.
+
+    public static String getStringOr(Object obj, String key, String defaultValue) {
+        String v = getString(obj, key);
+        return v != null ? v : defaultValue;
+    }
+    public static int getIntOr(Object obj, String key, int defaultValue) {
+        Integer v = getInt(obj, key);
+        return v != null ? v : defaultValue;
+    }
+    public static long getLongOr(Object obj, String key, long defaultValue) {
+        Long v = getLong(obj, key);
+        return v != null ? v : defaultValue;
+    }
+    public static double getDoubleOr(Object obj, String key, double defaultValue) {
+        Double v = getDouble(obj, key);
+        return v != null ? v : defaultValue;
+    }
+    public static float getFloatOr(Object obj, String key, float defaultValue) {
+        Float v = getFloat(obj, key);
+        return v != null ? v : defaultValue;
+    }
+    public static boolean getBooleanOr(Object obj, String key, boolean defaultValue) {
+        Boolean v = getBoolean(obj, key);
+        return v != null ? v : defaultValue;
+    }
+
     // ========== Builder helpers ==========
 
     /**

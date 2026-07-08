@@ -1,0 +1,44 @@
+// AdtExpr — the same expression-tree evaluator as ExprEval.on, written as a
+// Scala 3-style ALGEBRAIC DATA TYPE enum. Each `case` carries its own fields
+// (heterogeneous), the shared eval()/show() methods dispatch with `select this`,
+// and exhaustiveness (E0042) is enforced automatically because the enum desugars
+// to a sealed interface + one record per case. Compare with ExprEval.on, where
+// every case is a full class with its own fields, constructor, and method bodies.
+enum Expr {
+  case Num(value: Int)
+  case Add(left: Expr, right: Expr)
+  case Sub(left: Expr, right: Expr)
+  case Mul(left: Expr, right: Expr)
+  case Neg(operand: Expr)
+public:
+  def eval(): Int = select this {
+    case n is Num: n.value()
+    case a is Add: a.left().eval() + a.right().eval()
+    case s is Sub: s.left().eval() - s.right().eval()
+    case m is Mul: m.left().eval() * m.right().eval()
+    case g is Neg: 0 - g.operand().eval()
+  }
+  def show(): String = select this {
+    case n is Num: "" + n.value()
+    case a is Add: "(" + a.left().show() + " + " + a.right().show() + ")"
+    case s is Sub: "(" + s.left().show() + " - " + s.right().show() + ")"
+    case m is Mul: "(" + m.left().show() + " * " + m.right().show() + ")"
+    case g is Neg: "-" + g.operand().show()
+  }
+}
+
+// A record with a method, pairing an expression's rendering with its value.
+record Evaluated(rendered: String, result: Int) {
+public:
+  def describe(): String = rendered + " = " + result
+}
+
+def main(args: String[]): void {
+  // (2 + 3) * -(4 - 1)  ==  5 * -3  ==  -15
+  val e: Expr = new Mul(
+    new Add(new Num(2), new Num(3)),
+    new Neg(new Sub(new Num(4), new Num(1)))
+  )
+  val ev = new Evaluated(e.show(), e.eval())
+  IO::println(ev.describe())
+}

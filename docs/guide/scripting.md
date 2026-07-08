@@ -85,22 +85,6 @@ val body = http"https://api.example.com".get() // also: getJson() / post() / pos
 The literal and the function form are equivalent, so dynamic values just
 use `file(path)`.
 
-The prefix is not limited to `re`/`file`/`http` — **any identifier** immediately
-followed by a raw string is a scheme literal that desugars to `prefix("...")`, so
-you can define your own by defining a function of that name (no new machinery):
-
-```onion
-def sql(query: String): String = "[SQL] " + query.trim()
-def money(raw: String): Double = Double::parseDouble(raw.substring(1))
-
-sql"SELECT * FROM users WHERE id = 5"   // -> sql("SELECT ...")
-money"$19.99"                            // -> money("$19.99") -> 19.99
-```
-
-The identifier must be immediately adjacent to the quote (`prefix"..."`); with a
-space (`prefix "..."`) it is an ordinary identifier followed by a string. An
-undefined prefix is a normal "method not found" error, not a lexer error.
-
 ## Pattern-Attached Records
 
 Attach a regex to a record and a typed parser is derived from the shape —

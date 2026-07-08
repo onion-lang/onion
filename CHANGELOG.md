@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Primitive-component arrays are now correctly invariant (soundness fix, #310).** `int[]` is not a
+  `long[]` on the JVM, but array assignability delegated to the general element check, which accepted
+  `val x: Long[] = new Int[2]` via numeric widening — then codegen inserted a checkcast to the wrong
+  array type and it failed at runtime with a `ClassCastException`. Array covariance now applies only to
+  reference components (`String[] <: Object[]` still holds); a primitive element must match exactly.
+  This also removes the wrong checkcast when merging incompatible primitive-array branches
+  (`if b { new Int[2] } else { new Long[2] }` types as `Object` and runs).
+
 - **The type merged from two array branches is the array of their component LUB, not `Object`** —
   `if b { new Dog[2] } else { new Cat[2] }` is now typed `Animal[]` (the array of the components'
   common ancestor), so `xs.length` and element member calls stay available after the merge; unrelated

@@ -1714,7 +1714,18 @@ object TypedAST {
 
     def isAssignable(left: TypedAST.Type, right: TypedAST.Type): Boolean = isSuperType(left, right)
 
-    private def isSuperTypeForArray(left: TypedAST.ArrayType, right: TypedAST.ArrayType): Boolean = isSuperType(left.base, right.base)
+    private def isSuperTypeForArray(left: TypedAST.ArrayType, right: TypedAST.ArrayType): Boolean = {
+      val lb = left.base
+      val rb = right.base
+      // Arrays are covariant only in a REFERENCE component (`String[] <: Object[]`).
+      // Primitive-component arrays are INVARIANT on the JVM — `int[]` is not a
+      // `long[]` — so a primitive element must match exactly. Delegating to the
+      // general `isSuperType` here wrongly accepted `int[] <: long[]` via numeric
+      // widening of the element type, which then made codegen insert a checkcast to
+      // the wrong array type and fail at runtime (#310).
+      if (lb.isBasicType || rb.isBasicType) lb == rb
+      else isSuperType(lb, rb)
+    }
 
     private def isSuperTypeForClass(left: TypedAST.ClassType, right: TypedAST.ClassType): Boolean = {
       if (right == null) return false

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Rand::choice`/`shuffle`/`sample` accept primitive arrays.** A primitive array (`Int[]`, `Long[]`,
+  `Double[]`, `Boolean[]`) is not assignment-compatible with the generic `T[]` (`Object[]`) on the JVM,
+  so `Rand::shuffle(new Int[3])` used to fail with E0005. Explicit primitive-array overloads close the
+  gap (`shuffle`/`sample` return a boxed list, matching the `T[]` forms).
+
 - **Direct field access on a nullable value gives a clean null-safety error (E0070).** `x.length` where
   `x: String?` reported a misleading `INCOMPATIBLE_TYPE` ("Object expected") — the member-selection
   path had no nullable branch and fell through to a generic fallback. It now reports E0070 pointing at

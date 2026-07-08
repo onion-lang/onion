@@ -12,6 +12,21 @@ val text = file"notes.txt".text()         // lines() / json() / csv() なども
 val body = http"https://api.example.com".get()
 ```
 
+プレフィックスは `re`/`file`/`http` に限りません。**任意の識別子**に直接続く RAW 文字列は
+`prefix("...")` に展開されるスキームリテラルなので、その名前の関数を定義するだけで
+自分のプレフィックスを作れます（新しい機構は不要）：
+
+```onion
+def sql(query: String): String = "[SQL] " + query.trim()
+def money(raw: String): Double = Double::parseDouble(raw.substring(1))
+
+sql"SELECT * FROM users WHERE id = 5"   // -> sql("SELECT ...")
+money"$19.99"                            // -> money("$19.99") -> 19.99
+```
+
+識別子は引用符に直接隣接している必要があります（`prefix"..."`）。空白があると
+（`prefix "..."`）通常の識別子＋文字列になります。未定義のプレフィックスは lexer
+エラーではなく通常の「メソッドが見つかりません」エラーになります。
 ## パターン付きレコード（from re"..."）
 
 レコードに正規表現を付けると、その形から型付きパーサが導出されます。キャプチャグループが各成分の型に変換されます。

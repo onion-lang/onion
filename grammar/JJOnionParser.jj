@@ -1019,6 +1019,14 @@ TOKEN:
 | <RE_STRING:   "re\""   ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
 | <FILE_STRING: "file\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
 | <HTTP_STRING: "http\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
+// General scheme-prefixed raw literal: any identifier IMMEDIATELY followed by a
+// raw string, e.g. sql"SELECT ...", date"2026-07-08". Desugars to prefix("raw")
+// just like re/file/http (which keep their own tokens above so their special
+// roles — select patterns, `from re"..."` — are unaffected). Because the three
+// specific tokens are declared first, `re"`/`file"`/`http"` still lex as those;
+// every other identifier-prefixed string lexes as SCHEME_STRING. A space between
+// the identifier and the quote (`foo "x"`) lexes as two tokens, as before.
+| <SCHEME_STRING: ["a"-"z","A"-"Z","_"] (["a"-"z","A"-"Z","_","0"-"9"])* "\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
 | <QUOTED_ID: "`" (~["`"])+ "`" >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
@@ -2628,6 +2636,7 @@ AST.Expression scheme_literal() :{Token t;}{
   t=<RE_STRING>   {return schemeCall(t, 2);}
 | t=<FILE_STRING> {return schemeCall(t, 4);}
 | t=<HTTP_STRING> {return schemeCall(t, 4);}
+| t=<SCHEME_STRING> {return schemeCall(t, t.image.indexOf('"'));}
 }
 
 AST.Expression string_literal() :{Token t; String str;}{

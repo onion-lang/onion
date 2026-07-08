@@ -40,6 +40,7 @@ private[typing] object TypeCheckingHelpers {
   /**
    * Compute the least upper bound (LUB) of two types.
    *
+   * @param table The class table (used to box a primitive branch to its wrapper)
    * @param node The AST node for error reporting
    * @param left First type
    * @param right Second type
@@ -48,6 +49,7 @@ private[typing] object TypeCheckingHelpers {
    * @return The LUB type, or null if types are incompatible
    */
   def leastUpperBound(
+    table: ClassTable,
     node: AST.Node,
     left: Type,
     right: Type,
@@ -94,7 +96,7 @@ private[typing] object TypeCheckingHelpers {
           // component arrays (`int[]` vs `long[]`) share no common array supertype,
           // so fall back to Object. A no-op reporter is used for the recursive
           // component LUB so a mismatch falls back silently instead of erroring.
-          val compLub = leastUpperBound(node, la.component, ra.component, rootClass, (_, _, _) => ())
+          val compLub = leastUpperBound(table, node, la.component, ra.component, rootClass, (_, _, _) => ())
           if (compLub != null && !compLub.isBasicType)
             return la.table.loadArray(compLub, la.dimension)
           else
@@ -102,6 +104,19 @@ private[typing] object TypeCheckingHelpers {
         case _ =>
           return rootClass
       }
+    }
+    // Exactly one side is a primitive and the other a reference (VOID already
+    // handled above). A primitive and a reference share no common type unless the
+    // primitive is boxed: box it to its wrapper and let the reference path compute
+    // the LUB, so `if b { 1 } else { "s" }` merges to Object (Integer|String) and
+    // `if b { 1 } else { someNumber }` merges to Number (Integer|Number), instead
+    // of erroring. (issue #308)
+    (left, right) match {
+      case (lb: BasicType, _) if !right.isBasicType =>
+        return leastUpperBound(table, node, Boxing.boxedType(table, lb), right, rootClass, reportError)
+      case (_, rb: BasicType) if !left.isBasicType =>
+        return leastUpperBound(table, node, left, Boxing.boxedType(table, rb), rootClass, reportError)
+      case _ =>
     }
     reportError(node, left, right)
     null

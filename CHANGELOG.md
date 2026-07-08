@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **The LUB of a primitive branch and a reference branch boxes to a common supertype (#308).** `if b { 1 }
+  else { "s" }` (declared or assigned to `Object`) reported `Int expected ... String used` — the merge
+  kept the first branch's `Int` and checked `String` against it. `leastUpperBound` now boxes the
+  primitive side (`Int`->`Integer`) and takes the reference LUB, so the branches merge to `Object`
+  (`Integer`|`String`) — and `Integer`|`Number` merges to `Number`. Completes the LUB work of #307
+  (reference siblings) and #309 (arrays) for the primitive+reference case.
+
 - **An `abstract` method with a body is now an error (E0072) instead of silently dropping the body.**
   `abstract def foo(): Int { return 99 }` compiled and then discarded the body at codegen (an abstract
   method has no bytecode), so the code was silently ignored. It is now rejected, matching Java/Kotlin.

@@ -2469,6 +2469,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algebraic-data-types-case-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Algebraic data types (case cases)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -3759,6 +3774,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algebraic-data-types-case-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Algebraic data types (case cases)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -4118,6 +4148,32 @@ instance methods see the constant's data, static methods see <code>values()</cod
 </span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>  }
 </span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>}
 </span></code></pre></div>
+<h3 id="algebraic-data-types-case-cases">Algebraic data types (<code>case</code> cases)<a class="headerlink" href="#algebraic-data-types-case-cases" title="Permanent link">&para;</a></h3>
+<p>When the cases use the <code>case</code> keyword, each case can carry its <strong>own</strong> fields —
+the enum becomes a full sum-of-products, so an algebraic data type no longer
+needs a hand-written <code>sealed interface</code> plus <code>record</code>s:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>enum Shape {
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>  case Circle(radius: Double)
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>  case Square(side: Double)
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>  case Origin
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>public:
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>  def area(): Double = select this {
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>    case c is Circle: c.radius() * c.radius() * 3.14
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>    case s is Square: s.side() * s.side()
+</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>    case o is Origin: 0.0
+</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>  }
+</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>}
+</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>
+</span><span id="__span-21-13"><a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>val c: Shape = new Circle(2.0)
+</span><span id="__span-21-14"><a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>c.area()                      // 12.56
+</span></code></pre></div>
+<p>Each product case (<code>case Circle(radius: Double)</code>) has typed fields with
+accessors; a singleton case (<code>case Origin</code>) is a zero-field case used as
+<code>new Origin()</code>. The enum desugars to a <code>sealed interface</code> with one <code>record</code> per
+case, so exhaustiveness (<code>E0042</code>) and <code>select</code> pattern matching come for free.</p>
+<p>A <code>case</code>-style enum is a sealed hierarchy rather than a <code>java.lang.Enum</code>, so it
+does not get <code>values()</code>/<code>valueOf()</code>/<code>ordinal()</code> — use the plain constant form
+above when you want those.</p>
 
 
 

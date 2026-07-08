@@ -225,6 +225,37 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   private[compiler] def reportingEnabled: Boolean = currentUnitContext.reportingSuppressed == 0
 
+  /**
+   * Runs `block` with generic type-argument bound checks deferred, then runs the
+   * collected checks (in order). While deferring is active, a bound check that
+   * would otherwise fire during type-node resolution is queued instead; flushing
+   * afterwards lets a self/forward F-bound (`class Sub : Base[Sub]`,
+   * `Base[T extends Base[T]]`) be validated only once Sub's supertype chain is in
+   * place. Bound violations that are genuinely wrong (`Base[String]`) still fail
+   * when flushed. Nested deferral is a no-op wrapper: only the outermost flushes.
+   */
+  private[compiler] def withDeferredBoundChecks[A](block: => A): A = {
+    val ctx = currentUnitContext
+    ctx.deferringBoundChecks += 1
+    val outermost = ctx.deferringBoundChecks == 1
+    try {
+      val result = block
+      if (outermost) {
+        val pending = ctx.deferredBoundChecks.toList
+        ctx.deferredBoundChecks.clear()
+        pending.foreach(_())
+      }
+      result
+    } finally ctx.deferringBoundChecks -= 1
+  }
+
+  /** True while inside [[withDeferredBoundChecks]]; bound checks queue instead of run. */
+  private[compiler] def boundChecksDeferred: Boolean = currentUnitContext.deferringBoundChecks > 0
+
+  /** Queues a bound check to run when the current [[withDeferredBoundChecks]] flushes. */
+  private[compiler] def deferBoundCheck(check: () => Unit): Unit =
+    currentUnitContext.deferredBoundChecks += check
+
   def report(error: SemanticError, node: AST.Node, items: AnyRef*): Unit = {
     report(error, node.location, items*)
   }

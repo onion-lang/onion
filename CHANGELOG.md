@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **F-bounded self-inheritance (CRTP) works for user-defined generics.** `class Sub : Base[Sub]` where
+  `class Base[T extends Base[T]]` (and the interface form `class Item <: Cmp[Item]` where
+  `interface Cmp[T extends Cmp[T]]`) used to fail with E0000, because the generic type-argument bound
+  check on a class's own supertype ran before its supertype chain was established, so the self subtype
+  test `Sub <: Base[Sub]` saw an empty chain. The bound checks over a type's supertype references are
+  now deferred until after `setSuperClass`/`setInterfaces`, then flushed. Bound soundness is preserved
+  — `class Bad : Base[String]` (a genuine bound violation) is still rejected ([#312]).
+
 - **`Json` gains defaulted accessors** — `getStringOr`/`getIntOr`/`getLongOr`/`getDoubleOr`/`getFloatOr`/
   `getBooleanOr(obj, key, default)` return a primitive with an explicit fallback when the key is missing
   or wrong-typed, so a missing key no longer needs the boxed `getInt(...)` (which is null on a miss and

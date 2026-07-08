@@ -665,7 +665,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // supertypes so that 'class Sub[T] : Super[T]' can mention T.
         def ownTypeParams(astNode: AST.Node, params: List[AST.TypeParameter]): Seq[TypeParam] =
           declaredTypeParams_.getOrElse(astNode, createTypeParams(params))
-        val superClass = (find(node.name), lookupAST(node)) match {
+        // Defer generic type-argument bound checks over the supertype references
+        // until AFTER this node's own supertype chain is set (setSuperClass /
+        // setInterfaces below). A self/forward F-bound like `class Sub : Base[Sub]`
+        // (Base[T extends Base[T]]) can only be validated once `Sub IS-A Base[Sub]`
+        // is established; the deferred checks flush at the end of this block, when
+        // it is. Non-self bound violations (`Base[String]`) still fail on flush.
+        val superClass = typing.withDeferredBoundChecks {
+        val resolvedSuperClass = (find(node.name), lookupAST(node)) match {
           case (Some(resolver), Some(ast: AST.InterfaceDeclaration)) =>
             openTypeParams(typing.emptyTypeParams ++ ownTypeParams(ast, ast.typeParameters)) {
               for (typeSpec <- ast.superInterfaces) {
@@ -686,10 +693,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           case _ => rootClass
         }
 
-        constructTypeHierarchy(superClass, visit)
+        constructTypeHierarchy(resolvedSuperClass, visit)
         interfaces.foreach(constructTypeHierarchy(_, visit))
-        node.setSuperClass(superClass)
+        node.setSuperClass(resolvedSuperClass)
         node.setInterfaces(interfaces.toArray)
+        // Bound checks flush here (block exit) — the chain above is now in place.
+        resolvedSuperClass
+        }
         // Register this class/interface as a subtype of any sealed parent so the
         // `select` exhaustiveness check sees it. (Record subtypes are registered
         // separately in processRecordDeclaration.)

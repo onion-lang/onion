@@ -156,32 +156,51 @@ final class TypingTypeSupport(private val typing: Typing) {
               )
               return
             }
-            val hasError = rawParams.indices.exists { i =>
+            // The per-argument bound check walks the argument's supertype chain,
+            // which is not yet established for a self/forward reference like
+            // `class Sub : Base[Sub]` (Base[T extends Base[T]]) at the moment its
+            // own supertypes are resolved. When bound checks are deferred (during
+            // hierarchy construction), queue this application's bound check to run
+            // once the chain is in place; otherwise run it now. Genuine violations
+            // (`Base[String]`) still fail — the deferred check reports on flush.
+            if (typing.boundChecksDeferred) {
+              typing.deferBoundCheck(() => checkTypeArgumentBounds(typeNode, applied, rawParams))
+            } else {
+              checkTypeArgumentBounds(typeNode, applied, rawParams)
+            }
+          case _ =>
+        }
+      case _ =>
+    }
+  }
+
+  private def checkTypeArgumentBounds(
+    typeNode: AST.TypeNode,
+    applied: TypedAST.AppliedClassType,
+    rawParams: Array[TypedAST.TypeParameter]
+  ): Unit = {
+            rawParams.indices.foreach { i =>
               val param = rawParams(i)
               val upper = param.upperBound.getOrElse(typing.rootClass)
               val arg = applied.typeArguments(i)
               if (arg eq BasicType.VOID) {
                 typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
-                true
               } else {
                 arg match {
                   case wildcard: TypedAST.WildcardType =>
                     val wildcardUpper = wildcard.upperBound
                     if (!TypeRules.isAssignable(upper, wildcardUpper)) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, wildcardUpper)
-                      true
-                    } else false
+                    }
                   // Nullability is checked apart from assignability: the
                   // Object top-type rule accepts T?, so a non-null Object
                   // bound can't reject String? through isAssignable alone
                   case n: TypedAST.NullableType =>
                     if (param.nullability == Nullability.NonNull) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
-                      true
                     } else if (!TypeRules.isAssignable(upper, typing.boxedTypeArgument(n.innerType))) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
-                      true
-                    } else false
+                    }
                   case _ =>
                     val checkedArg = typing.boxedTypeArgument(arg)
                     // Object is the top type, so any reference-type argument satisfies
@@ -192,15 +211,9 @@ final class TypingTypeSupport(private val typing: Typing) {
                     val satisfiesObjectBound = (upper eq typing.rootClass) && !checkedArg.isBasicType
                     if (!satisfiesObjectBound && !TypeRules.isAssignable(upper, checkedArg)) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
-                      true
-                    } else false
+                    }
                 }
               }
             }
-            if (hasError) return
-          case _ =>
-        }
-      case _ =>
-    }
   }
 }

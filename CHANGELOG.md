@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **User-definable scheme-prefixed literals.** A raw literal `prefix"..."` desugars to `prefix("...")`
+  for ANY identifier prefix, not just the built-in `re`/`file`/`http` — so you can define your own by
+  defining a function of that name, with no new machinery:
+
+  ```onion
+  def sql(query: String): String = "[SQL] " + query.trim()
+  sql"SELECT * FROM t"      // -> sql("SELECT * FROM t")
+  money"$19.99"             // -> money("$19.99")
+  ```
+
+  A general `SCHEME_STRING` lexer token routes any identifier-prefixed raw string through the same
+  desugaring; `re`/`file`/`http` keep their own tokens (so `re`'s select patterns and `from re"..."`
+  are unaffected). **Keyword-safe**: a reserved keyword immediately followed by a string (`return"x"`,
+  `throw"x"` — no space) is re-lexed as the keyword plus a string literal, never a scheme call. A space
+  (`prefix "..."`) is an identifier plus a string, and an undefined prefix is a normal method-not-found.
+
 - **`map` on a raw List works like `filter`.** `(x as List).map { e -> ... }` reported a
   self-contradictory `Function1[T, Int] expected ... Function1[T, Int] used` — the SAM return position
   (`R`, erased to boxed `Integer`) was compared against the closure's primitive `int` result with a

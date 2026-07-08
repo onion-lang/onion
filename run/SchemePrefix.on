@@ -1,0 +1,21 @@
+// User-definable scheme-prefixed raw literals.
+// prefix"..." desugars to the unqualified call prefix("...") for ANY identifier
+// prefix, with the body kept RAW (backslashes verbatim). Define a custom prefix
+// by simply defining a function of that name.
+
+def sql(query: String): String = "[SQL] " + query.trim()
+def money(amount: String): String = "money(" + amount + ")"
+def slug(text: String): String = text.replace(" ", "-").toLowerCase()
+
+IO::println(sql"  SELECT * FROM t  ")   // => sql("  SELECT * FROM t  ")
+IO::println(money"$19.99")               // => money("$19.99")
+IO::println(slug"Hello World Example")   // => slug("Hello World Example")
+
+// The body is raw: this backslash-d passes through unescaped (no \\ needed).
+def raw(s: String): Int = s.length()
+IO::println("raw length: " + Integer::toString(raw"a\d\"b"))  // 6
+
+// Keyword-safety: `return"..."` (no space) is the keyword return + a string,
+// NOT a scheme call. This function returns "done".
+def finish(): String { return"done" }
+IO::println(finish())

@@ -260,6 +260,101 @@ public class JJOnionParser implements Parser {
     return new AST.UnqualifiedMethodCall(p(t), name, toList(args));
   }
 
+  /**
+   * Desugars a user-defined scheme-prefixed raw literal (a SCHEME_STRING token,
+   * <id>"raw") into the unqualified call <id>("raw"), keeping the body verbatim.
+   * The identifier prefix runs up to the first double-quote; keywords never reach
+   * here because the token manager re-lexes a keyword prefix as the keyword
+   * followed by a separate string (see schemeKeywordKind / the lexical action).
+   */
+  private AST.Expression userSchemeCall(Token t) {
+    int q = t.image.indexOf('"');
+    return schemeCall(t, q);
+  }
+
+  /**
+   * Maps a keyword image to its token kind, or -1 if the image is not a reserved
+   * keyword. Used by the SCHEME_STRING lexical action to keep keyword-plus-string
+   * (e.g. {@code return"x"} with no space) lexing as the keyword followed by a
+   * string literal, rather than as a scheme call {@code return("x")}.
+   */
+  private static java.util.HashMap<String,Integer> SCHEME_KEYWORDS;
+  static {
+    java.util.HashMap<String,Integer> KW = new java.util.HashMap<String,Integer>();
+    KW.put("abstract", K_ABSTRACT);
+    KW.put("and", K_AND);
+    KW.put("Boolean", K_BOOLEAN);
+    KW.put("extends", K_EXTENDS);
+    KW.put("break", K_BREAK);
+    KW.put("Byte", K_BYTE);
+    KW.put("case", K_CASE);
+    KW.put("Char", K_CHAR);
+    KW.put("class", K_CLASS);
+    KW.put("record", K_RECORD);
+    KW.put("ret", K_RET);
+    KW.put("const", K_CONST);
+    KW.put("continue", K_CONTINUE);
+    KW.put("def", K_DEF);
+    KW.put("do", K_DO);
+    KW.put("Double", K_DOUBLE);
+    KW.put("else", K_ELSE);
+    KW.put("enum", K_ENUM);
+    KW.put("extension", K_EXTENSION);
+    KW.put("false", K_FALSE);
+    KW.put("finally", K_FINALLY);
+    KW.put("final", K_FINAL);
+    KW.put("Float", K_FLOAT);
+    KW.put("for", K_FOR);
+    KW.put("foreach", K_FOREACH);
+    KW.put("forward", K_FORWARD);
+    KW.put("goto", K_GOTO);
+    KW.put("if", K_IF);
+    KW.put("import", K_IMPORT);
+    KW.put("as", K_AS);
+    KW.put("Int", K_INT);
+    KW.put("interface", K_INTERFACE);
+    KW.put("trait", K_TRAIT);
+    KW.put("instance", K_INSTANCE);
+    KW.put("internal", K_INTERNAL);
+    KW.put("is", K_IS);
+    KW.put("Long", K_LONG);
+    KW.put("module", K_MODULE);
+    KW.put("new", K_NEW);
+    KW.put("this", K_THIS);
+    KW.put("null", K_NULL);
+    KW.put("or", K_OR);
+    KW.put("override", K_OVERRIDE);
+    KW.put("private", K_PRIVATE);
+    KW.put("protected", K_PROTECTED);
+    KW.put("public", K_PUBLIC);
+    KW.put("catch", K_CATCH);
+    KW.put("return", K_RETURN);
+    KW.put("select", K_SELECT);
+    KW.put("self", K_SELF);
+    KW.put("Short", K_SHORT);
+    KW.put("static", K_STATIC);
+    KW.put("super", K_SUPER);
+    KW.put("sealed", K_SEALED);
+    KW.put("synchronized", K_SYNCHRONIZED);
+    KW.put("throw", K_THROW);
+    KW.put("throws", K_THROWS);
+    KW.put("true", K_TRUE);
+    KW.put("try", K_TRY);
+    KW.put("type", K_TYPE);
+    KW.put("val", K_VAL);
+    KW.put("var", K_VAR);
+    KW.put("void", K_VOID);
+    KW.put("Unit", K_VOID);
+    KW.put("volatile", K_VOLATILE);
+    KW.put("when", K_WHEN);
+    KW.put("while", K_WHILE);
+    SCHEME_KEYWORDS = KW;
+  }
+  static int schemeKeywordKind(String prefix) {
+    Integer k = SCHEME_KEYWORDS.get(prefix);
+    return k == null ? -1 : k.intValue();
+  }
+
   private boolean isDeclarationStart(String img) {
     return "class".equals(img) || "interface".equals(img) || "record".equals(img)
         || "enum".equals(img) || "extension".equals(img) || "type".equals(img)
@@ -1019,6 +1114,29 @@ TOKEN:
 | <RE_STRING:   "re\""   ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
 | <FILE_STRING: "file\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
 | <HTTP_STRING: "http\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
+// User-definable scheme-prefixed raw literal: <id>"raw" desugars to <id>("raw").
+// A general prefix (any identifier) followed with NO gap by a raw string. This
+// is defined AFTER re/file/http so those keep their own tokens on a length tie.
+// Keyword-safety: because this token is maximal-munch it would also glom a
+// keyword+string (e.g. return"x" -> one token); the lexical action detects a
+// reserved-keyword prefix, pushes the string part back into the stream, and
+// re-emits the keyword token, so return"x"/throw"x"/... stay keyword + string.
+| <SCHEME_STRING:
+    ["a"-"z","A"-"Z","_"] (["a"-"z","A"-"Z","_","0"-"9"])*
+    "\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\""
+  > {
+    int q = matchedToken.image.indexOf('"');
+    String prefix = matchedToken.image.substring(0, q);
+    int kwKind = JJOnionParser.schemeKeywordKind(prefix);
+    if (kwKind != -1) {
+      // Keyword prefix: give back the "raw" tail and re-emit as the keyword.
+      input_stream.backup(matchedToken.image.length() - q);
+      matchedToken.image = prefix;
+      matchedToken.kind = kwKind;
+      matchedToken.endColumn = matchedToken.beginColumn + q - 1;
+      matchedToken.endLine = matchedToken.beginLine;
+    }
+  }
 | <ID:       ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* >
 | <QUOTED_ID: "`" (~["`"])+ "`" >
 | <FQCN:     "#" "<" <ID> ("." <ID>)* ">"                                >
@@ -2625,9 +2743,10 @@ AST.Expression boolean_literal() :{Token t;}{
 // Scheme-prefixed raw literal: X"raw" desugars to the unqualified call
 // X("raw") with the body kept verbatim (no escape processing).
 AST.Expression scheme_literal() :{Token t;}{
-  t=<RE_STRING>   {return schemeCall(t, 2);}
-| t=<FILE_STRING> {return schemeCall(t, 4);}
-| t=<HTTP_STRING> {return schemeCall(t, 4);}
+  t=<RE_STRING>     {return schemeCall(t, 2);}
+| t=<FILE_STRING>   {return schemeCall(t, 4);}
+| t=<HTTP_STRING>   {return schemeCall(t, 4);}
+| t=<SCHEME_STRING> {return userSchemeCall(t);}
 }
 
 AST.Expression string_literal() :{Token t; String str;}{

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic record can implement a generic interface parameterized by its own type variable.**
+  `record Foo[T](v: T) <: Bar[T]` used to fail with E0003 (`type Bar[T] not found`) because the record's
+  supertype clause was resolved outside its type-parameter scope, so `T` was unknown; a generic class
+  in the same shape already worked. The record's type parameters are now in scope while its supertypes
+  are resolved, so `val b: Bar[String] = new Foo[String]("hi")` dispatches correctly.
+
 - **Enums can be algebraic data types with heterogeneous `case` cases (Scala 3 style).** An `enum`
   whose cases use the `case` keyword may give each case its OWN fields, so a sum-of-products no longer
   needs a hand-written `sealed interface` + `record`s:

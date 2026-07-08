@@ -156,17 +156,23 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)
 
-    // Process super interfaces if any
+    // Process super interfaces if any — with the record's type parameters in
+    // scope, so a generic supertype like `Bar[T]` resolves (T is the record's
+    // own type parameter). Without this scope, `record Foo[T](v: T) <: Bar[T]`
+    // failed with E0003 while the equivalent generic class (which resolves its
+    // supertypes inside its type-parameter scope) worked.
     val interfaces = Buffer[ClassType]()
-    for (typeSpec <- node.superInterfaces) {
-      val superType = validateSuperType(typeSpec, mustBeInterface = true, mapper_)
-      if (superType != null) {
-        interfaces += superType
-        // Register this record as a subtype of sealed interfaces
-        superType match {
-          case classDef: ClassDefinition if classDef.isSealed =>
-            classDef.addSealedSubtype(definition_)
-          case _ =>
+    openTypeParams(emptyTypeParams ++ recordTypeParams) {
+      for (typeSpec <- node.superInterfaces) {
+        val superType = validateSuperType(typeSpec, mustBeInterface = true, mapper_)
+        if (superType != null) {
+          interfaces += superType
+          // Register this record as a subtype of sealed interfaces
+          superType match {
+            case classDef: ClassDefinition if classDef.isSealed =>
+              classDef.addSealedSubtype(definition_)
+            case _ =>
+          }
         }
       }
     }

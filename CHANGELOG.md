@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **The type merged from two array branches is the array of their component LUB, not `Object`** —
+  `if b { new Dog[2] } else { new Cat[2] }` is now typed `Animal[]` (the array of the components'
+  common ancestor), so `xs.length` and element member calls stay available after the merge; unrelated
+  reference-element arrays (`String[]`/`Integer[]`) merge to `Object[]`. Completes the LUB work of #307
+  (reference siblings) for array types. JVM array covariance makes the merge codegen-safe (no
+  conversion); primitive-component arrays with no common array supertype still fall back to `Object`
+  ([#309]).
+
 - **Records can have method bodies.** A `record` may now carry a `{ access-section* }` body of
   methods, just like an `enum` already could — `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...): Fraction ...; private: static def gcd(...) }`.
   Methods see the generated accessors (`num()`), operator methods back `+ - * /`, and static factories

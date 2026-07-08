@@ -85,6 +85,20 @@ private[typing] object TypeCheckingHelpers {
       (left, right) match {
         case (lc: ClassType, rc: ClassType) =>
           return nearestCommonAncestor(lc, rc, rootClass)
+        case (la: ArrayType, ra: ArrayType) if la.dimension == ra.dimension =>
+          // LUB of two array types is the array of their component LUB: JVM array
+          // covariance makes `Dog[]`/`Cat[]` both assignable to `Animal[]`, so the
+          // merged reference is already valid with no conversion (codegen-safe — the
+          // element type is only a compile-time refinement of an object reference).
+          // Only form it when the component LUB is a reference type; primitive-
+          // component arrays (`int[]` vs `long[]`) share no common array supertype,
+          // so fall back to Object. A no-op reporter is used for the recursive
+          // component LUB so a mismatch falls back silently instead of erroring.
+          val compLub = leastUpperBound(node, la.component, ra.component, rootClass, (_, _, _) => ())
+          if (compLub != null && !compLub.isBasicType)
+            return la.table.loadArray(compLub, la.dimension)
+          else
+            return rootClass
         case _ =>
           return rootClass
       }

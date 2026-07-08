@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A lambda whose explicit parameter type mismatches the expected function type gives a clean error.**
+  `val f: Function1[Int, Int] = (x: String) -> x` used to leak the SAM desugar internals — E0005
+  `Function1[Int, Int].call(String) not found, candidate call(A)` (the synthetic `call` method and the
+  raw interface's unsubstituted type variable). It now reports a clean E0000 ("Int expected ... String")
+  at the parameter, matching the return-type path. The check is boxing-aware and skips unbound type
+  variables, so exact matches like `(x: Int) -> x * 2` (primitive vs the boxed `Integer` slot) still
+  compile ([#317]).
+
 - **A failed trailing-closure body no longer triggers a misleading "method not found".** `xs.map { x => x.noSuchMethod() }`
   used to report both the real `Int.noSuchMethod()` error and a bogus `List[Int].map() not found` (`map`
   exists — only the lambda body was broken). The trailing-lambda resolver now checkpoints the error

@@ -240,6 +240,38 @@ final class ClosureTyping(
     }
 
     if (!hasMissing) {
+      // All parameter types are explicit. When the closure target function type
+      // is known (SAM/FunctionN inference), verify each declared parameter type
+      // against the expected one so a genuine mismatch reports a clean
+      // INCOMPATIBLE_TYPE instead of leaking the synthetic `.call` method and
+      // the raw interface's unsubstituted type variable via a later E0005.
+      if (inferredTarget != null) {
+        expectedMethodArgs(inferredTarget, implementedMethodName(inferredTarget, node.mname, args.length), args.length) match {
+          case Some(expectedArgs) if expectedArgs.length == argTypes.length =>
+            var j = 0
+            var reported = false
+            while (j < argTypes.length && !reported) {
+              val expected = TypeCheckingHelpers.effectiveType(expectedArgs(j))
+              val declared = argTypes(j)
+              // Skip when the expected parameter still carries an unbound type
+              // variable: there is nothing reliable to compare, and boxing may
+              // be involved for generic primitive arguments (e.g.
+              // `Function1[Int, Int]` stores `Integer`). Only flag a genuine
+              // incompatibility that survives primitive<->boxed matching and
+              // normal assignability in both directions.
+              if (!containsTypeVariable(expected) &&
+                  !TypeCheckingHelpers.sameOrBoxed(bodyContext.table, expected, TypeCheckingHelpers.effectiveType(declared)) &&
+                  !TypeRelations.isAssignableWithBoxing(expected, declared, bodyContext.table) &&
+                  !TypeRelations.isAssignableWithBoxing(declared, expected, bodyContext.table)) {
+                bodyContext.report(INCOMPATIBLE_TYPE, args(j), expected, declared)
+                reported = true
+              }
+              j += 1
+            }
+            if (reported) return None
+          case _ =>
+        }
+      }
       Some(argTypes)
     } else if (inferredTarget == null) {
       args.zipWithIndex.foreach { case (arg, idx) =>

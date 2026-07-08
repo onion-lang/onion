@@ -168,6 +168,38 @@ foreach p: Planet in Planet::values() {
 }
 ```
 
+### 代数的データ型（`case` case）
+
+case が `case` キーワードを使うと、各 case は**自分自身の**フィールドを持てます。
+enum が積の和（sum-of-products）になり、代数的データ型を書くのに `sealed
+interface` ＋ `record` を手書きする必要がなくなります：
+
+```onion
+enum Shape {
+  case Circle(radius: Double)
+  case Square(side: Double)
+  case Origin
+public:
+  def area(): Double = select this {
+    case c is Circle: c.radius() * c.radius() * 3.14
+    case s is Square: s.side() * s.side()
+    case o is Origin: 0.0
+  }
+}
+
+val c: Shape = new Circle(2.0)
+c.area()                      // 12.56
+```
+
+product case（`case Circle(radius: Double)`）はアクセサ付きの型付きフィールドを
+持ち、singleton case（`case Origin`）は `new Origin()` で使う 0 フィールド case です。
+enum は case ごとに `record` を持つ `sealed interface` に desugar されるので、
+網羅性チェック（`E0042`）と `select` パターンマッチが自動で効きます。
+
+`case` 形式の enum は `java.lang.Enum` ではなく sealed 階層なので、
+`values()`/`valueOf()`/`ordinal()` は付きません。それらが必要なときは上の定数形式を
+使ってください。
+
 ## ジェネリッククラス
 
 クラスは `[]` で型パラメータを取れます。型パラメータは本体で通常の型として使えます：

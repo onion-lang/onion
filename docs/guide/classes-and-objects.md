@@ -424,3 +424,35 @@ public:
   }
 }
 ```
+
+### Algebraic data types (`case` cases)
+
+When the cases use the `case` keyword, each case can carry its **own** fields —
+the enum becomes a full sum-of-products, so an algebraic data type no longer
+needs a hand-written `sealed interface` plus `record`s:
+
+```onion
+enum Shape {
+  case Circle(radius: Double)
+  case Square(side: Double)
+  case Origin
+public:
+  def area(): Double = select this {
+    case c is Circle: c.radius() * c.radius() * 3.14
+    case s is Square: s.side() * s.side()
+    case o is Origin: 0.0
+  }
+}
+
+val c: Shape = new Circle(2.0)
+c.area()                      // 12.56
+```
+
+Each product case (`case Circle(radius: Double)`) has typed fields with
+accessors; a singleton case (`case Origin`) is a zero-field case used as
+`new Origin()`. The enum desugars to a `sealed interface` with one `record` per
+case, so exhaustiveness (`E0042`) and `select` pattern matching come for free.
+
+A `case`-style enum is a sealed hierarchy rather than a `java.lang.Enum`, so it
+does not get `values()`/`valueOf()`/`ordinal()` — use the plain constant form
+above when you want those.

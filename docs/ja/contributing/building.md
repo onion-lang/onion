@@ -118,9 +118,18 @@ sbt assembly
 
 出力: `target/scala-3.3.7/onion.jar`
 
-実行:
+JAR のデフォルトメインクラスはコンパイラ（`onionc`）なので、`java -jar` はソースを
+`.class` に**コンパイル**します:
+
 ```bash
-java -jar target/scala-3.3.7/onion.jar Hello.on
+java -jar target/scala-3.3.7/onion.jar Hello.on   # Hello.on をコンパイル
+```
+
+スクリプトを**実行**するには `ScriptRunner` メインクラスを呼びます（`onion` ランチャが
+行っているのと同じです）:
+
+```bash
+java -cp target/scala-3.3.7/onion.jar onion.tools.ScriptRunner Hello.on
 ```
 
 ### ディストリビューションパッケージ
@@ -398,8 +407,11 @@ free -h
 
 PowerShellまたはGit Bashを使用します。パスはバックスラッシュを使います。
 ```powershell
-sbt compile
+sbt assembly
+# ソースをコンパイル:
 java -jar target\scala-3.3.7\onion.jar Hello.on
+# またはスクリプトを実行:
+java -cp target\scala-3.3.7\onion.jar onion.tools.ScriptRunner Hello.on
 ```
 
 ## 次のステップ

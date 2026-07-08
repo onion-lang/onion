@@ -118,9 +118,18 @@ sbt assembly
 
 Output: `target/scala-3.3.7/onion.jar`
 
-Run it:
+The JAR's default main class is the compiler (`onionc`), so `java -jar` **compiles**
+a source file to `.class` files:
+
 ```bash
-java -jar target/scala-3.3.7/onion.jar Hello.on
+java -jar target/scala-3.3.7/onion.jar Hello.on   # compiles Hello.on
+```
+
+To **run** a script instead, invoke the `ScriptRunner` main class (this is what the
+`onion` launcher does):
+
+```bash
+java -cp target/scala-3.3.7/onion.jar onion.tools.ScriptRunner Hello.on
 ```
 
 ### Distribution Package
@@ -398,8 +407,11 @@ free -h
 
 Use PowerShell or Git Bash. Paths use backslashes:
 ```powershell
-sbt compile
+sbt assembly
+# compile a source file:
 java -jar target\scala-3.3.7\onion.jar Hello.on
+# or run a script:
+java -cp target\scala-3.3.7\onion.jar onion.tools.ScriptRunner Hello.on
 ```
 
 ## Next Steps

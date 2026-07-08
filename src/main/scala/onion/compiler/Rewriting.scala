@@ -97,7 +97,18 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[AST.CompilationUnit] = {
     val rewritten = Buffer.empty[AST.CompilationUnit]
     for (unit <- source) {
-      rewritten += rewrite(unit)
+      try {
+        rewritten += rewrite(unit)
+      } catch {
+        // Rewriting-phase errors (desugar guards, do-notation, coherence, auto-CLI) are built with
+        // an empty sourceFile, so they render without the file:line:col + caret every other error
+        // shows. Fill in the unit's source file here (a single point covering all of them) so the
+        // location prints. The AST locations are already present on each CompileError.
+        case e: CompilationException if unit.sourceFile != null =>
+          throw new CompilationException(e.problems.map { p =>
+            if (p.sourceFile == null || p.sourceFile.isEmpty) p.copy(sourceFile = unit.sourceFile) else p
+          })
+      }
     }
     rewritten.toSeq
   }

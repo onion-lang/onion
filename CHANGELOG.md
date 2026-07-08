@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Rewriting-phase errors now show a `file:line:col` location.** Desugar-time diagnostics (an enum
+  mixing shared params with `case` cases, an unsupported `main` signature, empty/ill-formed `do`
+  notation, instance-coherence conflicts) were built with an empty source file, so they printed the
+  message alone — unlike parser/semantic errors. `processBody` now fills in the unit's source file, so
+  they render with a location and caret like every other diagnostic. Surfaced by the release gap-probe.
+
 - **A mutable top-level `var` shared between top-level statements and a `def` no longer silently
   desyncs (miscompilation fix).** `var calls = 0; def bump() { calls = calls + 1 }; bump(); bump();
   println(calls)` printed `0` instead of `2`: #165's local-first promotion gave a top-level `var` two

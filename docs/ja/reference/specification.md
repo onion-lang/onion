@@ -498,10 +498,17 @@ val rows = file"data.csv".csvRows()           // Map（ヘッダ -> 値）の Li
 val body = http"https://api.example.com".get() // HttpResource: get/getJson/post/postJson/put/delete
 ```
 
-`prefix"raw"` は、デフォルトの static import（`onion.Resources`）を通じて解決される
-修飾なし呼び出し `prefix("raw")` の糖衣です。したがって、リテラル形式と
-関数形式（動的値の場合の `file(path)`）は等価です。本体は raw です — バックスラッシュは
-そのまま通過します。`\"` はバックスラッシュを消費せずに引用符をエスケープします。
+`prefix"raw"` は、**任意の識別子接頭辞**に対する修飾なし呼び出し `prefix("raw")` の
+糖衣です。組み込みの `re`/`file`/`http`（デフォルト static import `onion.Resources` で解決）
+だけでなく、その名前の関数を定義すれば独自の接頭辞を作れます — `sql"SELECT ..."` は
+`sql("SELECT ...")` を呼び出します（新しい機構は不要）。リテラル形式と関数形式（動的値の
+場合の `file(path)`）は等価です。本体は raw です — バックスラッシュはそのまま通過し、
+`\"` はバックスラッシュを消費せずに引用符をエスケープします。
+
+識別子は引用符に直接隣接している必要があります。`prefix"..."` はスキームリテラルですが、
+`prefix "..."`（空白あり）は識別子＋文字列です。予約語に直接続く文字列はスキームリテラルに
+**なりません** — `return"x"` は `return("x")` ではなく `return "x"` として再字句解析されます。
+未定義の接頭辞は lexer エラーではなく通常の「メソッドが見つかりません」エラーです。
 
 ### パイプライン演算子
 

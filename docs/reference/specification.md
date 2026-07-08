@@ -513,11 +513,19 @@ val rows = file"data.csv".csvRows()           // List of Map (header -> value), 
 val body = http"https://api.example.com".get() // HttpResource: get/getJson/post/postJson/put/delete
 ```
 
-`prefix"raw"` is sugar for the unqualified call `prefix("raw")` resolved
-through the default static imports (`onion.Resources`), so the literal and
-the function form (`file(path)` for dynamic values) are equivalent. The
-body is raw — backslashes pass through verbatim; `\"` escapes a quote
-without consuming the backslash.
+`prefix"raw"` is sugar for the unqualified call `prefix("raw")` for **any
+identifier prefix**, not only the built-in `re`/`file`/`http` (which resolve
+through the default static imports `onion.Resources`). Defining a function of
+that name gives you a custom prefix — `sql"SELECT ..."` calls `sql("SELECT ...")`
+— with no new machinery. The literal and the function form (`file(path)` for
+dynamic values) are equivalent. The body is raw — backslashes pass through
+verbatim; `\"` escapes a quote without consuming the backslash.
+
+The identifier must be immediately adjacent to the quote: `prefix"..."` is a
+scheme literal, while `prefix "..."` (with a space) is an identifier followed by
+a string. A reserved keyword immediately followed by a string is **not** a
+scheme literal — `return"x"` re-lexes as `return "x"`, never `return("x")`. An
+undefined prefix is a normal "method not found" error, not a lexer error.
 
 ### Pipeline Operator
 

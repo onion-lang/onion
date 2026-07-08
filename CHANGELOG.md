@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-07-08
+
 - **A lambda whose explicit parameter type mismatches the expected function type gives a clean error.**
   `val f: Function1[Int, Int] = (x: String) -> x` used to leak the SAM desugar internals — E0005
   `Function1[Int, Int].call(String) not found, candidate call(A)` (the synthetic `call` method and the

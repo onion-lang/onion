@@ -343,8 +343,33 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   ): Option[ActionStatement] = {
     if (node.init == null) return None
     if (klass.field(node.name) != null) return None
-    // #165, local-first: translate the declaration as an ordinary local so its binding is a
-    // ClosureLocalBinding — smart-cast / null narrowing then works for it within `start`,
+    // A mutable top-level `var` must be single-storage: local-first promotion (below) gives a
+    // `var` two backing stores — later top-level statements write the local, defs write the
+    // field — which silently diverge. So for a `var` use FIELD-ONLY promotion (the pre-#165
+    // behaviour): create the public static field and initialize it directly, introducing no
+    // local binding, so both later top-level statements and defs resolve the name to the field.
+    // A `var` is distinguished from a `val` by the absence of M_FINAL. Mutable fields are not
+    // narrowed (that would be unsound), so no smart-cast is lost.
+    if (!AST.hasModifier(node.modifiers, AST.M_FINAL)) {
+      val explicitType = if (node.typeRef == null) None else typing.mapFrom(node.typeRef)
+      val valueOpt = explicitType match {
+        case Some(t) => typed(node.init, context, t)
+        case None => typed(node.init, context)
+      }
+      return valueOpt.flatMap { value =>
+        val fieldType = explicitType.getOrElse(value.`type`)
+        if (fieldType == BasicType.VOID) None
+        else {
+          val field = new FieldDefinition(node.location, AST.M_PUBLIC | AST.M_STATIC, klass, node.name, fieldType)
+          klass.add(field)
+          val adapted = processAssignable(node.init, fieldType, value)
+          if (adapted == null) None
+          else Some(new ExpressionActionStatement(new SetStaticField(node.location, klass, field, adapted)))
+        }
+      }
+    }
+    // #165, local-first (val only): translate the declaration as an ordinary local so its binding
+    // is a ClosureLocalBinding — smart-cast / null narrowing then works for it within `start`,
     // exactly like inside a function. Then mirror the value into a public field so later
     // top-level functions can still reference it (the reason #165 promoted it to a field).
     val localStmt = translate(node, context)

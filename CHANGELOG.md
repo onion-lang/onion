@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A mutable top-level `var` shared between top-level statements and a `def` no longer silently
+  desyncs (miscompilation fix).** `var calls = 0; def bump() { calls = calls + 1 }; bump(); bump();
+  println(calls)` printed `0` instead of `2`: #165's local-first promotion gave a top-level `var` two
+  backing stores — later top-level statements wrote a local, defs wrote the mirrored static field — and
+  they diverged. A `var` is now promoted field-only (single static field, no local binding), so
+  top-level statements and defs share one storage. `val` keeps local-first promotion (its one-time
+  mirror is sound), so top-level `val` smart-cast (#165) is unchanged.
+
 - **User-definable scheme-prefixed literals.** A raw literal `prefix"..."` desugars to `prefix("...")`
   for ANY identifier prefix, not just the built-in `re`/`file`/`http` — so you can define your own by
   defining a function of that name, with no new machinery:

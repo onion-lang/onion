@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Colls::sortedByDescending`** — sort a list by a key selector in descending order
+  (`people.sortedByDescending { p -> p.age() }`), the common "rank/top-N by field" operation that
+  otherwise needed a negated key. Registered as a builtin extension, so it chains off a list.
+
 ## [0.4.5] - 2026-07-08
 
 - **A lambda whose explicit parameter type mismatches the expected function type gives a clean error.**

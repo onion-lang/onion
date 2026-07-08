@@ -553,6 +553,17 @@ public final class Colls {
         return copy;
     }
 
+    /**
+     * Returns a new list sorted by the given key in DESCENDING order:
+     * people.sortedByDescending { p => p.age() }
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <T> List<T> sortedByDescending(List<T> list, Function1<T, ?> key) {
+        ArrayList<T> copy = new ArrayList<>(list != null ? list : java.util.Collections.emptyList());
+        copy.sort((a, b) -> ((Comparable) key.call(b)).compareTo(key.call(a)));
+        return copy;
+    }
+
     public static <T extends Comparable<T>> List<T> sorted(List<T> list) {
         List<T> result = new ArrayList<>(list);
         java.util.Collections.sort(result);

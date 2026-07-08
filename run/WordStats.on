@@ -14,8 +14,8 @@ def main(args: String[]): void {
   val freq = Maps::countBy(words) { w => w }
   val counts = Maps::toList(freq) { k, v => new WordCount(k as String, v as Int) }
 
-  // Rank by count, descending (negate the key), and print.
-  val ranked = counts.sortedBy { wc => 0 - (wc as WordCount).count() }
+  // Rank by count, descending, and print.
+  val ranked = counts.sortedByDescending { wc => (wc as WordCount).count() }
   IO::println("total=" + words.size + " unique=" + freq.size)
   foreach wc: WordCount in ranked {
     IO::println(wc.word() + " -> " + wc.count())

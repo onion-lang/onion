@@ -165,6 +165,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         newToplevels += rewriteFunctionDeclaration(declaration)
       case declaration: AST.GlobalVariableDeclaration =>
         newToplevels += rewriteGlobalVariableDeclaration(declaration)
+      case declaration: AST.EnumDeclaration if declaration.constants.exists(_.isCase) =>
+        // Scala-3-style ADT enum: replace it with the desugared sealed interface +
+        // one record per case (+ singleton statics). A homogeneous enum has no
+        // `case` constants and falls through to `otherwise`, untouched.
+        desugarAdtEnum(declaration).foreach { top => newToplevels += rewriteToplevelDeclaration(top) }
       case element: AST.BlockElement =>
         // Top-level statements need desugaring too (do-notation et al.);
         // they previously passed through untouched, so a DoExpression
@@ -175,6 +180,78 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
     appendAutoCliCall(newToplevels)
     unit.copy(toplevels = newToplevels.toList)
+  }
+
+  /** Runs the appropriate rewriter over a freshly-desugared top-level declaration
+    * (so its method/constructor bodies get the usual do-notation etc. treatment). */
+  private def rewriteToplevelDeclaration(top: AST.Toplevel): AST.Toplevel = top match {
+    case d: AST.InterfaceDeclaration => rewriteInterfaceDeclaration(d)
+    case d: AST.RecordDeclaration    => rewriteRecordDeclaration(d)
+    case d: AST.ClassDeclaration     => rewriteClassDeclaration(d)
+    case other                       => other
+  }
+
+  /**
+   * Desugars a Scala-3-style ADT (`case`) enum into already-working constructs —
+   * NO new codegen. Given
+   *
+   *   enum Shape {
+   *     case Circle(radius: Double)
+   *     case Square(side: Double)
+   *     case Origin
+   *   public:
+   *     def area(): Double = select this { ... }
+   *   }
+   *
+   * we generate:
+   *   - `sealed interface Shape { <the enum body-section methods, verbatim, as
+   *     default methods> }`
+   *   - `record Circle(radius: Double) <: Shape`  (one per product case)
+   *   - `record Square(side: Double) <: Shape`
+   *   - `record Origin() <: Shape`               (zero-field record per singleton)
+   *
+   * A `sealed interface` + `record X <: Shape` + a `select` over `case x is X:`
+   * gives exhaustiveness (E0042) for free. A singleton case is constructed as
+   * `new Origin()` (first-cut form; see the singleton note below).
+   */
+  private def desugarAdtEnum(enumDecl: AST.EnumDeclaration): List[AST.Toplevel] = {
+    val loc = enumDecl.location
+    val enumName = enumDecl.name
+    // Scope guard (first version): ADT enums have PER-CASE fields only; enum-level
+    // shared params mixed with `case` cases is a separate feature.
+    if (enumDecl.params.nonEmpty) {
+      throw new CompilationException(Seq(CompileError("", loc,
+        s"enum $enumName mixes shared parameters with `case` cases; ADT enums carry per-case fields only")))
+    }
+
+    val enumTypeNode = AST.TypeNode(loc, AST.ReferenceType(enumName, false), false)
+
+    // Interface methods: the enum body sections' methods become interface members
+    // verbatim (bodies preserved -> default methods; bodiless -> abstract).
+    val bodyMethods: List[AST.MethodDeclaration] = enumDecl.sections.flatMap(_.members).collect {
+      case m: AST.MethodDeclaration => m
+    }
+
+    // Singleton cases (`case Origin`) desugar to a ZERO-FIELD record `record Origin()`,
+    // constructed as `new Origin()` and matched via `case o is Origin:`. A dedicated
+    // `Name::Origin` static VALUE accessor is intentionally not synthesized: the
+    // singleton record type and any same-named accessor would collide under `::`
+    // resolution (the name `Origin` already denotes the record type), so `new Origin()`
+    // is the first-cut construction form (see the class notes / final report).
+    val interfaceDecl = AST.InterfaceDeclaration(
+      loc, enumDecl.modifiers | AST.M_SEALED, enumName, Nil, bodyMethods, Nil
+    )
+
+    // One record per case; singleton -> zero-field record. All implement the enum.
+    val recordDecls: List[AST.RecordDeclaration] = enumDecl.constants.filter(_.isCase).map { c =>
+      val fields = c.caseFields.getOrElse(Nil)
+      AST.recordDeclaration(
+        loc, AST.M_PUBLIC, c.name, Nil, fields, List(enumTypeNode),
+        null, Nil, Nil, Nil, Nil
+      )
+    }
+
+    interfaceDecl :: recordDecls
   }
 
   /**

@@ -334,8 +334,29 @@ object AST {
       this(location, modifiers, name, superInterfaces, methods, Nil)
   }
 
-  /** An enum constant in an enum declaration */
-  case class EnumConstant(location: Location, name: String, args: List[Expression]) extends Node
+  /**
+   * An enum constant in an enum declaration.
+   *
+   * `args` are the value-expression arguments of a homogeneous shared-param
+   * enum constant (`EARTH(5.97)`); empty for a bare constant (`RED`).
+   *
+   * `caseFields` distinguishes a Scala-3-style ADT `case` from a homogeneous
+   * constant: `None` = bare/homogeneous constant, `Some(fields)` = ADT case
+   * carrying its OWN typed fields (record-style `name: Type`). An empty
+   * `Some(Nil)` is a singleton ADT case (`case Origin`).
+   */
+  case class EnumConstant(location: Location, name: String, args: List[Expression], caseFields: Option[List[Argument]] = None) extends Node {
+    /** True iff this constant was introduced with the `case` keyword (ADT case). */
+    def isCase: Boolean = caseFields.isDefined
+  }
+
+  /** Java-callable factory for a bare/homogeneous enum constant. */
+  def enumConstant(location: Location, name: String, args: List[Expression]): EnumConstant =
+    EnumConstant(location, name, args, None)
+
+  /** Java-callable factory for an ADT `case` enum constant (product or singleton). */
+  def enumCaseConstant(location: Location, name: String, fields: List[Argument]): EnumConstant =
+    EnumConstant(location, name, Nil, Some(fields))
 
   /** An enum type declaration */
   case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant], sections: List[AccessSection] = Nil) extends TypeDeclaration

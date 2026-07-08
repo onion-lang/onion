@@ -1483,6 +1483,18 @@ AST.EnumDeclaration enum_decl(int mset) : {
   ArrayBuffer<AST.AccessSection> sections = new ArrayBuffer<AST.AccessSection>();
 }{
   start = "enum" name = id() ["(" params = args() ")"] "{"
+  (
+    // Scala-3-style HETEROGENEOUS (ADT) enum: one-or-more `case`-keyword cases,
+    // each carrying its OWN record-style fields (or none, for a singleton). No
+    // commas between cases. Recognized when the body opens with `case`; desugared
+    // in the Rewriting phase to a sealed interface + one record per case.
+    LOOKAHEAD({la("case")})
+    (
+      constant = enum_case_constant() {append(constants, constant);}
+    )+
+    (sec=access_section() {append(sections, sec);})*
+  |
+    // Homogeneous enum: comma-separated bare/shared-param constants (unchanged).
     constant = enum_constant() {append(constants, constant);}
     (
       LOOKAHEAD({la(",") && !la2("}")})
@@ -1490,10 +1502,23 @@ AST.EnumDeclaration enum_decl(int mset) : {
     )*
     [LOOKAHEAD({la(",") && la2("}")}) "," ] // trailing comma allowed when followed by }
     (sec=access_section() {append(sections, sec);})*
+  )
   "}" [";"] {
     return new AST.EnumDeclaration(
       p(start), mset, c(name), params, toList(constants), toList(sections)
     );
+  }
+}
+
+// An ADT `case` case: `case Circle(radius: Double)` (product) or `case Origin`
+// (singleton). The argument list is the RECORD-style typed args() production
+// (`name: Type`), NOT value terms, so each case declares its own fields.
+AST.EnumConstant enum_case_constant() : {
+  Token name;
+  List<AST.Argument> fields = (List<AST.Argument>)AST.NIL();
+}{
+  "case" name = id() ["(" fields = args() ")"] {
+    return AST.enumCaseConstant(p(name), c(name), fields);
   }
 }
 
@@ -1502,7 +1527,7 @@ AST.EnumConstant enum_constant() : {
   List<AST.Expression> args = (List<AST.Expression>)AST.NIL();
 }{
   name = id() ["(" args = terms() ")"] {
-    return new AST.EnumConstant(p(name), c(name), args);
+    return AST.enumConstant(p(name), c(name), args);
   }
 }
 

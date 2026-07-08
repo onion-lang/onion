@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Enums can be algebraic data types with heterogeneous `case` cases (Scala 3 style).** An `enum`
+  whose cases use the `case` keyword may give each case its OWN fields, so a sum-of-products no longer
+  needs a hand-written `sealed interface` + `record`s:
+
+  ```onion
+  enum Shape {
+    case Circle(radius: Double)
+    case Square(side: Double)
+    case Origin
+  public:
+    def area(): Double = select this {
+      case c is Circle: c.radius() * c.radius() * 3.14
+      case s is Square: s.side() * s.side()
+      case o is Origin: 0.0
+    }
+  }
+  ```
+
+  It desugars to a `sealed interface` + one `record` per case (the enum body methods become interface
+  default methods), so exhaustiveness (E0042) and pattern matching work for free. Product cases carry
+  typed fields with accessors; singleton cases (`case Origin`) are zero-field records used via
+  `new Origin()`. Homogeneous enums (bare constants / shared-param enums with
+  `values()`/`valueOf()`/`ordinal`) are unchanged; mixing enum-level shared params with `case` cases
+  is a clean error.
+
 - **Primitive-component arrays are now correctly invariant (soundness fix, #310).** `int[]` is not a
   `long[]` on the JVM, but array assignability delegated to the general element check, which accepted
   `val x: Long[] = new Int[2]` via numeric widening — then codegen inserted a checkcast to the wrong

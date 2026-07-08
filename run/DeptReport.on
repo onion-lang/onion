@@ -1,0 +1,20 @@
+// DeptReport — a CSV data-analysis pipeline: parse header-mapped rows, project
+// into records, group by a field, and aggregate. Exercises Csv, records,
+// Maps::groupBy, Stats, and Format together. (A grouped value from foreach is
+// erased, so cast it to the element-typed List before mapping.)
+record Employee(name: String, dept: String, salary: Int)
+
+def main(args: String[]): void {
+  val csv = "name,dept,salary\nAlice,Eng,100\nBob,Eng,120\nCarol,Sales,90\nDave,Sales,110\nEve,Eng,140"
+  val rows = Csv::parseWithHeader(csv)
+  val emps = rows.map { r =>
+    val m = r as Map[String, String]
+    new Employee(m.get("name") as String, m.get("dept") as String, Integer::parseInt(m.get("salary") as String))
+  }
+  val byDept = Maps::groupBy(emps) { e => (e as Employee).dept() }
+  foreach (dept, members) in byDept {
+    val team: List[Employee] = members as List[Employee]
+    val salaries: List[Int] = team.map { e => e.salary() }
+    IO::println(dept + ": avg=" + Format::fixed(Stats::average(salaries) as Double, 1) + " (" + team.size + " people)")
+  }
+}

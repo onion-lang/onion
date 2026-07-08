@@ -440,7 +440,9 @@ These are frequently confused with other languages. **Always check these:**
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
+| record with methods? | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - a record may carry a `{ access-section* }` body (instance/static/operator methods, private helpers); methods see the generated accessors. Also works on a generic record implementing a generic interface (`record Foo[T](v: T) <: Bar[T]`) |
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
+| ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `<:` |
 | serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
 | test a record in a separate suite | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
@@ -501,6 +503,7 @@ These are frequently confused with other languages. **Always check these:**
 - Generics are erasure-based (no reified type info; type arguments are invariant — no variance or wildcards); nullability of type parameters is tracked at compile time (bare `[T]` is nullable, `[T extends B]` is non-null, Java type variables are platform)
 - Diagnostics are still improving; some errors may be reported later in the pipeline than ideal
 - Tail call optimization covers direct and mutual self-recursion (not general continuation-passing style)
+- Inference is local (left-to-right, no deferred/global unification): a throw-only lambda used as a generic argument with no expected type infers the type parameter as `Object` — e.g. `val f = Future::async(() -> { throw ... })` gives `Future[Object]`. Annotate the target to fix it: `val f: Future[Int] = Future::async(() -> { throw ... })` ([#314])
 
 ## Entry Points for Execution
 

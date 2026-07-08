@@ -216,6 +216,19 @@ record Pair[A, B](first: A, second: B) <: SomeInterface
 （`p.copy(y = 9)`）。Records は `val (a, b) = p` と `select` パターンで
 分解できます。
 
+record はクラスや enum と同じく `{ access-section* }` のメソッド本体——インスタンス
+メソッド・静的ファクトリ・private ヘルパー・演算子メソッド——を持てます。メソッドは
+生成されたコンポーネントアクセサを参照できます：
+
+```onion
+record Fraction(num: Int, den: Int) {
+public:
+  static def of(n: Int, d: Int): Fraction { ... }
+  def plus(o: Fraction): Fraction =            // `+` 演算子を実装
+    Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+}
+```
+
 #### パターン付き records (`from re"..."`)
 
 record は、コンポーネントリストの直後（`<:` スーパータイプの前）に正規表現リテラルを
@@ -337,6 +350,32 @@ Enums は JVM enum にコンパイルされます: `name()`、`ordinal()`、`val
 `valueOf(String)` が動作します。record スタイルのパラメータは final フィールドになり、
 アクセサが生成されます。定数リストの後に `public:` などのセクションを書いてメソッドを
 宣言できます。enum に対する `select` は、`else` がない場合に網羅性をチェックします。
+
+#### 代数的データ型（`case` case）
+
+case が `case` キーワードを使うと、各 case は自分自身のフィールドを宣言でき、`enum` は
+同種の `java.lang.Enum` ではなく積の和（Scala 3 風の ADT）になります：
+
+```onion
+enum Shape {
+  case Circle(radius: Double)
+  case Square(side: Double)
+  case Origin
+public:
+  def area(): Double = select this {
+    case c is Circle: c.radius() * c.radius() * 3.14
+    case s is Square: s.side() * s.side()
+    case o is Origin: 0.0
+  }
+}
+```
+
+`case` 形式の enum は、case ごとに `record` を持つ `sealed interface` に desugar され
+（enum 本体のメソッドは interface のデフォルトメソッドになります）、網羅性（`E0042`）と
+`select` パターンマッチが効きます。product case はアクセサ付きの型付きフィールドを持ち、
+singleton case（`case Origin`）は `new Origin()` で使う 0 フィールド record です。この形式の
+enum は sealed 階層であり `java.lang.Enum` ではないので、`values()`/`valueOf()`/`ordinal()`
+はありません。enum レベルの共有パラメータと `case` case の混在はコンパイルエラーです。
 
 ### 拡張
 

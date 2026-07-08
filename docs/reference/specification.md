@@ -217,6 +217,19 @@ supports full clones, positional and named partial copies
 (`p.copy(y = 9)`). Records destructure in `val (a, b) = p` and in `select`
 patterns.
 
+A record may also carry a `{ access-section* }` body of methods — instance
+methods, static factories, private helpers, and operator methods — just like a
+class or enum. The methods see the generated component accessors:
+
+```onion
+record Fraction(num: Int, den: Int) {
+public:
+  static def of(n: Int, d: Int): Fraction { ... }
+  def plus(o: Fraction): Fraction =            // backs the `+` operator
+    Fraction::of(num() * o.den() + o.num() * den(), den() * o.den())
+}
+```
+
 #### Pattern-attached records (`from re"..."`)
 
 A record can derive a typed parser from its shape by attaching a regex
@@ -347,6 +360,34 @@ Enums compile to JVM enums: `name()`, `ordinal()`, `values()`,
 `valueOf(String)` work. Record-style parameters become final fields with
 accessors; access sections after the constant list declare methods.
 `select` over an enum checks exhaustiveness when no `else` is present.
+
+#### Algebraic data types (`case` cases)
+
+When the cases use the `case` keyword, each case declares its own fields, so an
+`enum` becomes a sum-of-products (a Scala 3-style ADT) instead of a homogeneous
+`java.lang.Enum`:
+
+```onion
+enum Shape {
+  case Circle(radius: Double)
+  case Square(side: Double)
+  case Origin
+public:
+  def area(): Double = select this {
+    case c is Circle: c.radius() * c.radius() * 3.14
+    case s is Square: s.side() * s.side()
+    case o is Origin: 0.0
+  }
+}
+```
+
+A `case`-style enum desugars to a `sealed interface` with one `record` per case
+(the enum body methods become interface default methods), so exhaustiveness
+(`E0042`) and `select` pattern matching apply. Product cases carry typed fields
+with accessors; a singleton case (`case Origin`) is a zero-field record used via
+`new Origin()`. Such an enum is a sealed hierarchy, not a `java.lang.Enum`, so it
+has no `values()`/`valueOf()`/`ordinal()`. Mixing enum-level shared parameters
+with `case` cases is a compile error.
 
 ### Extensions
 

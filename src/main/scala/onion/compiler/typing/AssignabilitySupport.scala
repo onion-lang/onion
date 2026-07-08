@@ -148,7 +148,14 @@ private[compiler] final class AssignabilitySupport(
           case _ => false
         }
       case _ =>
-        TypeRules.isAssignable(expected, actual)
+        // Boxing-aware terminal comparison: erased generic slots hold boxed
+        // types, so a closure whose result is a primitive `int` still fills a
+        // `Function1[T, Integer]`'s return position (issue #319). Plain
+        // isAssignable is not boxing-aware and false-negatives on Integer vs int,
+        // yielding the self-contradictory "Function1[T,Int] expected, ... used"
+        // when `map` is applied to a raw List. isAssignableWithBoxing keeps the
+        // same acceptance for reference types while adding primitive<->boxed.
+        TypeRelations.isAssignableWithBoxing(expected, actual, bodyContext.table)
     }
 
     val isCompatible =

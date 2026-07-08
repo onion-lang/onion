@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`map` on a raw List works like `filter`.** `(x as List).map { e -> ... }` reported a
+  self-contradictory `Function1[T, Int] expected ... Function1[T, Int] used` — the SAM return position
+  (`R`, erased to boxed `Integer`) was compared against the closure's primitive `int` result with a
+  non-boxing-aware terminal check in `structurallyAssignable`. It now uses `isAssignableWithBoxing`
+  (as the #317 fix did), so a raw-List map returns `[2, 3, 4]` (element `Object`), matching `filter`
+  ([#319]).
+
 - **`Colls::sortedByDescending`** — sort a list by a key selector in descending order
   (`people.sortedByDescending { p -> p.age() }`), the common "rank/top-N by field" operation that
   otherwise needed a negated key. Registered as a builtin extension, so it chains off a list.

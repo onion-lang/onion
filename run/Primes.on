@@ -1,0 +1,43 @@
+// Sieve of Eratosthenes + prime factorization — an algorithmic dogfood
+// exercising boolean arrays, C-style for loops, mutation, and while loops.
+class Primes {
+public:
+  def this {}
+
+  // primes up to n via the sieve
+  static def sieve(n: Int): List[Int] {
+    val isComposite = new Boolean[n + 1]
+    val result = new java.util.ArrayList[Int]()
+    for var p: Int = 2; p <= n; p = p + 1 {
+      if !isComposite[p] {
+        result.add(p)
+        for var m: Int = p * 2; m <= n; m = m + p {
+          isComposite[m] = true
+        }
+      }
+    }
+    return result
+  }
+
+  // prime factorization of n
+  static def factorize(n: Int): List[Int] {
+    val factors = new java.util.ArrayList[Int]()
+    var remaining = n
+    var d = 2
+    while d * d <= remaining {
+      while remaining % d == 0 {
+        factors.add(d)
+        remaining = remaining / d
+      }
+      d = d + 1
+    }
+    if remaining > 1 { factors.add(remaining) }
+    return factors
+  }
+}
+
+def main(args: String[]): void {
+  IO::println("primes < 30: " + Primes::sieve(30))
+  IO::println("360 = " + Primes::factorize(360))
+  IO::println("97 = " + Primes::factorize(97))
+}

@@ -299,6 +299,11 @@ do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }  // list comprehension: [
 val p    = re"\d+-\d+"                        // compiled java.util.regex.Pattern
 val rows = file"data.csv".csvRows()           // read + RFC4180 parse, header-mapped
 val body = http"https://api.example.com/x".get()
+// ANY identifier prefix works, not just re/file/http: `prefix"raw"` desugars to
+// `prefix("raw")`, so define a function of that name to make your own (sql"...",
+// money"..."). Keyword-safe: `return"x"` (no space) stays `return "x"`, not a call.
+def sql(q: String): String = "[SQL] " + q.trim()
+val query = sql"SELECT * FROM t"             // -> sql("SELECT * FROM t")
 
 // Regex literals are first-class select patterns (ANCHORED match, compile-time
 // checked: bad pattern = E0059, group/binding count mismatch = E0060):

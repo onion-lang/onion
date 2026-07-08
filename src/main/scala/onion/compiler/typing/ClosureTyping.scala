@@ -285,7 +285,14 @@ final class ClosureTyping(
         case Some(expectedArgs) =>
           i = 0
           while (i < argTypes.length) {
-            if (argTypes(i) == null) argTypes(i) = expectedArgs(i)
+            // Only the inferred (untyped) parameters are filled here from the
+            // SAM's PARAMETER slot. A generic SAM slot stores the boxed wrapper
+            // (Function1[Int, R] holds Integer); unbox it to the primitive so an
+            // inferred parameter binds exactly as the explicit `(n: Int)` form
+            // would — otherwise `n as Long` on a java.lang.Integer misfires as
+            // "Int used where Long expected" (issue #306). Genuine reference SAM
+            // parameters are left untouched.
+            if (argTypes(i) == null) argTypes(i) = unboxBoxedPrimitive(expectedArgs(i))
             i += 1
           }
           Some(argTypes)
@@ -359,6 +366,23 @@ final class ClosureTyping(
   private def inferBodyReturnType(node: AST.ClosureExpression, context: LocalContext, argTypes: Array[Type]): Option[Type] =
     if (containsReturn(node.body)) inferReturnTypeFromReturns(node, context, argTypes)
     else inferReturnTypeFromExpressionBody(node, context, argTypes)
+
+  /**
+   * If `tp` is exactly a boxed-primitive wrapper (java.lang.Integer, ...),
+   * return its primitive type; otherwise return `tp` unchanged. Used so an
+   * inferred closure parameter drawn from a generic SAM's (erased, boxed)
+   * parameter slot binds as the primitive the user would have written
+   * explicitly (issue #306). Uses Boxing.unboxedType, which matches only genuine
+   * wrapper classes — reference SAM parameters pass through untouched.
+   */
+  private def unboxBoxedPrimitive(tp: Type): Type = tp match {
+    case ct: ClassType =>
+      onion.compiler.toolbox.Boxing.unboxedType(bodyContext.table, ct) match {
+        case Some(bt) => bt
+        case None => tp
+      }
+    case _ => tp
+  }
 
   private def expectedMethodArgs(target: ClassType, name: String, arity: Int): Option[Array[Type]] = {
     val methodOpt = target.methods.find(m => m.name == name && m.arguments.length == arity)

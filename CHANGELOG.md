@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An inferred lambda parameter binds like an explicit one over a generic SAM (#306).** For
+  `apply(f: Function1[Int, Long], x: Int)`, `apply((n) -> (n as Long), 5)` failed with `Long expected ...
+  Int used` (caret on `n`) while the explicit `(n: Int) -> (n as Long)` worked. A generic SAM erases its
+  parameter to the boxed wrapper (`Integer`), and the inferred parameter bound as that `Integer` while the
+  explicit form binds primitive `Int`, so `n as Long` on an `Integer` was rejected. The inferred path now
+  unboxes a boxed-primitive SAM parameter slot to the primitive, so both forms bind identically; reference
+  parameters are untouched.
+
 - **The LUB of a primitive branch and a reference branch boxes to a common supertype (#308).** `if b { 1 }
   else { "s" }` (declared or assigned to `Object`) reported `Int expected ... String used` — the merge
   kept the first branch's `Int` and checked `String` against it. `leastUpperBound` now boxes the

@@ -136,6 +136,7 @@ object SemanticError {
   case object OVERRIDE_TARGET_NOT_FOUND extends SemanticError(68)
   case object VAL_REQUIRES_INITIALIZER extends SemanticError(69)
   case object NULLABLE_MEMBER_ACCESS extends SemanticError(70)
+  case object STATIC_CALL_ON_INSTANCE extends SemanticError(71)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

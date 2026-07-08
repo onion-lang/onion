@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`s::method()` on a local variable gets a targeted error (E0071).** Using the static-member
+  operator `::` on a local — the Java/Kotlin habit of `.` for everything — reported the generic
+  `type s not found` (E0003). It now says `s` is a variable, use `.` for instance calls (`s.method()`);
+  `::` is only for a type's static members. A genuine static call on a type name is unaffected.
+
 - **Rewriting-phase errors now show a `file:line:col` location.** Desugar-time diagnostics (an enum
   mixing shared params with `case` cases, an unsupported `main` signature, empty/ill-formed `do`
   notation, instance-coherence conflicts) were built with an empty source file, so they printed the

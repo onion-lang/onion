@@ -386,6 +386,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.staticCallOnInstance",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.ABSTRACT_METHOD_WITH_BODY -> ErrorDef(
+      "error.semantic.abstractMethodWithBody",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.LABEL_NOT_FOUND -> ErrorDef(
       "error.semantic.labelNotFound",
       Seq(items => asString(items(0)))

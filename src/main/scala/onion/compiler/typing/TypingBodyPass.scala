@@ -95,10 +95,18 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
 
   def processMethodDeclaration(node: AST.MethodDeclaration): Unit =
     if (node.block != null) {
-      typing.kernelNodeOf[MethodDefinition](node).foreach { method =>
-        val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
-        typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
-          methodBodySupport.processMethodLikeBody(method, node.args, node.block)
+      // An explicitly `abstract` method with a body: the body is dropped at codegen (an abstract
+      // method has no bytecode body), so it would be silently ignored. Reject it, matching Java/Kotlin.
+      // Only an explicit `abstract` in the source triggers this; an interface default method (a body
+      // with no `abstract` keyword) is unaffected.
+      if (AST.hasModifier(node.modifiers, AST.M_ABSTRACT)) {
+        typing.report(SemanticError.ABSTRACT_METHOD_WITH_BODY, node, node.name)
+      } else {
+        typing.kernelNodeOf[MethodDefinition](node).foreach { method =>
+          val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+          typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
+            methodBodySupport.processMethodLikeBody(method, node.args, node.block)
+          }
         }
       }
     }

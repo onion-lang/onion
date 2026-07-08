@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **An `abstract` method with a body is now an error (E0072) instead of silently dropping the body.**
+  `abstract def foo(): Int { return 99 }` compiled and then discarded the body at codegen (an abstract
+  method has no bytecode), so the code was silently ignored. It is now rejected, matching Java/Kotlin.
+  Only an explicit `abstract` triggers it — an interface default method (a body with no `abstract`
+  keyword) and a bodiless abstract method are unaffected.
+
 - **`s::method()` on a local variable gets a targeted error (E0071).** Using the static-member
   operator `::` on a local — the Java/Kotlin habit of `.` for everything — reported the generic
   `type s not found` (E0003). It now says `s` is a variable, use `.` for instance calls (`s.method()`);

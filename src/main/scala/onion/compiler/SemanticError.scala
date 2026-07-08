@@ -137,6 +137,7 @@ object SemanticError {
   case object VAL_REQUIRES_INITIALIZER extends SemanticError(69)
   case object NULLABLE_MEMBER_ACCESS extends SemanticError(70)
   case object STATIC_CALL_ON_INSTANCE extends SemanticError(71)
+  case object ABSTRACT_METHOD_WITH_BODY extends SemanticError(72)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

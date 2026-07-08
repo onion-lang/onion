@@ -37,11 +37,16 @@ private[compiler] final class StaticMethodCallSupport(
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     // `::` is for static members. `s::m()` where `s` is a local variable is almost always an
     // instance call written Java/Kotlin-style with the wrong operator; point at `.` instead of the
-    // generic "type s not found" (E0003).
+    // generic "type s not found" (E0003). But `::` explicitly means "static member of a TYPE", so a
+    // real type of that name must win even when a like-named local is in scope — probe type
+    // resolution with reporting suppressed and only emit E0071 when the name is NOT a type.
     node.typeRef.desc match {
       case AST.ReferenceType(name, false) if context.lookupOpt(name).isDefined =>
-        typing.report(STATIC_CALL_ON_INSTANCE, node.typeRef, name)
-        return None
+        val resolvesToType = typing.withSuppressedReporting(typing.mapFrom(node.typeRef).isDefined)
+        if (!resolvesToType) {
+          typing.report(STATIC_CALL_ON_INSTANCE, node.typeRef, name)
+          return None
+        }
       case _ =>
     }
     val typeRefOpt = classTypeOf(node.typeRef)

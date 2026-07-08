@@ -410,6 +410,24 @@ final class OperatorTyping(
             new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), incrementOne(operand.`type`))
           )
         )
+      case ref: RefStaticField =>
+        // Post-increment/decrement on a static field (`C::count++`, and a top-level
+        // `var` which is promoted to a static field). A static field has no receiver,
+        // so bind the old value to a temp, write old+1, and yield the old value.
+        if (Modifier.isFinal(ref.field.modifier)) {
+          bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
+          return None
+        }
+        val varIndex = context.add(context.newName, operand.`type`)
+        new Begin(
+          new SetLocal(0, varIndex, operand.`type`, operand),
+          new SetStaticField(
+            ref.target,
+            ref.field,
+            new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, varIndex, operand.`type`), incrementOne(operand.`type`))
+          ),
+          new RefLocal(0, varIndex, operand.`type`)
+        )
       case ref: RefArray =>
         // Post-increment/decrement on an array element (`a[i]++`). Bind the array
         // and index to temps so each is evaluated once (a side-effecting index like

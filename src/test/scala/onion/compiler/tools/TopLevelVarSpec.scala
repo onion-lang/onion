@@ -92,5 +92,17 @@ class TopLevelVarSpec extends AnyFunSpec {
         "c"
       ) == 15)
     }
+    it("supports ++ on a top-level var (post-increment through the field)") {
+      assert(runAndReadField(
+        """
+          |var n: Int = 0
+          |def bump(): void { n++ }
+          |bump()
+          |bump()
+          |""".stripMargin,
+        "n"
+      ) == 2)
+    }
+
   }
 }

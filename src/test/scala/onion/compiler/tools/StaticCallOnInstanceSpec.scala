@@ -29,4 +29,16 @@ class StaticCallOnInstanceSpec extends AbstractShellSpec {
       """.stripMargin, "None", Array())
     assert(Shell.Success("42") == result)
   }
+
+  it("a real type wins over a like-named local (no E0071 misfire)") {
+    val result = shell.run(
+      """
+        | class Helper { public: static def greet(): String = "hi" }
+        | class Main { public: static def main(args: String[]): String {
+        |   val Helper = "shadow"
+        |   return Helper::greet()
+        | }}
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("hi") == result)
+  }
 }

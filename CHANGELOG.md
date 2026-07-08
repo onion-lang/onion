@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`++`/`--` work on a static field and a top-level `var` (regression fix).** Post-increment/decrement
+  typing had no case for a static field, so `C::count++` — and, after the top-level-var single-storage
+  change, `var x = 0; x++` in a script — failed with E0028 "lvalue required". `typePostUpdate` now
+  handles a static field (reads the old value, writes old+1, yields old), so both work; a `final`
+  static field is still rejected.
+- **`Type::member()` wins over a like-named local before E0071.** The new E0071 (":: on a local")
+  fired whenever the `::` receiver was a name bound to a local, even if a real type of that name was in
+  scope — so `val Helper = ...; Helper::greet()` with a class `Helper` was wrongly rejected. E0071 now
+  fires only when the name does NOT also resolve to a type (probed with reporting suppressed), so a
+  genuine static call wins; the pure-typo case (`s::length()` with only a local `s`) still gets E0071.
+
 - **An inferred lambda parameter binds like an explicit one over a generic SAM (#306).** For
   `apply(f: Function1[Int, Long], x: Int)`, `apply((n) -> (n as Long), 5)` failed with `Long expected ...
   Int used` (caret on `n`) while the explicit `(n: Int) -> (n as Long)` worked. A generic SAM erases its

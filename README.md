@@ -156,6 +156,42 @@ future.map((data: String) -> { return parseJson(data); })
       .onFailure((error: Throwable) -> { println("Error: " + error); })
 ```
 
+### Shape-First Scripting
+
+Onion collapses the boilerplate layers a script usually needs. Scheme-prefixed
+raw literals turn a shape into a value; `prefix"raw"` desugars to `prefix("raw")`
+for **any** identifier, so `re`/`file`/`http` are built in and you can define your
+own prefix just by defining a function of that name:
+
+```onion
+val p    = re"\d+-\d+"                          // compiled Pattern (raw: no \\ escaping)
+val rows = file"data.csv".csvRows()             // read + RFC 4180 parse, header-mapped
+def sql(q: String): String = "[SQL] " + q      // a user-defined prefix...
+sql"SELECT * FROM t"                            // ...used as sql("SELECT * FROM t")
+```
+
+A record can derive a typed parser straight from a regex shape, and the pipeline
+operator `|>` threads a value through functions:
+
+```onion
+record Hit(ip: String, method: String, path: String, status: Int)
+  from re"(\S+) (\w+) (\S+) (\d+)"
+
+Hit::parseAll(file"access.log".text())          // List[Hit], bad lines skipped
+  .filter { h => h.status() >= 500 }
+  .groupBy { h => h.path() }
+  |> println
+```
+
+A top-level `main` with typed parameters derives its whole command-line interface
+(required params are positional, defaulted params become `--flags`, usage is
+generated on error):
+
+```onion
+def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
+// $ onion greet.on world --count 5 --loud
+```
+
 ## Architecture
 
 The post-parse compiler is now an explicit pipeline:

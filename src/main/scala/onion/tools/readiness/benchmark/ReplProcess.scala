@@ -18,29 +18,63 @@ final class ProcessReplClient private (
   stdout: ReplOutputPump,
   timeoutMillis: Long
 ) extends ReplClient:
+  private[benchmark] def awaitPrompt(): String =
+    stdout.readUntil("onion> ", timeoutMillis)
+
   override def submit(code: String): String =
     try
       input.write(code)
       input.newLine()
       input.flush()
-      stdout.readUntil("onion> ", timeoutMillis)
+      awaitPrompt()
     catch
       case interrupted: InterruptedException =>
         process.destroyForcibly()
+        try process.waitFor(1L, TimeUnit.SECONDS)
+        catch
+          case cleanupInterrupted: InterruptedException =>
+            interrupted.addSuppressed(cleanupInterrupted)
         Thread.currentThread().interrupt()
         throw interrupted
 
   override def close(): Unit =
-    if process.isAlive then
-      try
+    var failure: Throwable = null
+    try
+      if process.isAlive then
         input.write(":quit")
         input.newLine()
         input.flush()
         if !process.waitFor(1L, TimeUnit.SECONDS) then
           process.destroyForcibly()
+          if !process.waitFor(1L, TimeUnit.SECONDS) then
+            throw BenchmarkScenarioException(
+              "REPL process did not terminate after forced destruction"
+            )
+    catch
+      case interrupted: InterruptedException =>
+        process.destroyForcibly()
+        try process.waitFor(1L, TimeUnit.SECONDS)
+        catch
+          case cleanupInterrupted: InterruptedException =>
+            interrupted.addSuppressed(cleanupInterrupted)
+        Thread.currentThread().interrupt()
+        failure = interrupted
+      case error: Throwable =>
+        process.destroyForcibly()
+        try
+          if process.isAlive then process.waitFor(1L, TimeUnit.SECONDS)
+        catch
+          case interrupted: InterruptedException =>
+            Thread.currentThread().interrupt()
+            error.addSuppressed(interrupted)
+        failure = error
+    finally
+      try input.close()
       catch
-        case _: Exception => process.destroyForcibly()
-    input.close()
+        case error: Throwable =>
+          if failure == null then failure = error
+          else failure.addSuppressed(error)
+    if failure != null then throw failure
 
 object ProcessReplClient:
   def start(
@@ -58,6 +92,20 @@ object ProcessReplClient:
         .directory(workingDirectory.toFile)
     builder.environment().put("TERM", "dumb")
     val process = builder.start()
+    val client = attach(process, timeoutMillis)
+    try
+      client.awaitPrompt()
+      client
+    catch
+      case error: Throwable =>
+        try client.close()
+        catch case closeError: Throwable => error.addSuppressed(closeError)
+        throw error
+
+  private[benchmark] def attach(
+    process: Process,
+    timeoutMillis: Long
+  ): ProcessReplClient =
     val stderr = new StreamDrainer(process.getErrorStream, "repl-stderr")
     stderr.start()
     val stdout = new ReplOutputPump(process.getInputStream, "repl-stdout")
@@ -66,14 +114,7 @@ object ProcessReplClient:
       new BufferedWriter(
         new OutputStreamWriter(process.getOutputStream, StandardCharsets.UTF_8)
       )
-    val client = new ProcessReplClient(process, writer, stdout, timeoutMillis)
-    try
-      stdout.readUntil("onion> ", timeoutMillis)
-      client
-    catch
-      case error: Throwable =>
-        client.close()
-        throw error
+    new ProcessReplClient(process, writer, stdout, timeoutMillis)
 
 private final class ReplOutputPump(stream: InputStream, name: String):
   private val End = -1

@@ -39,8 +39,13 @@ final class ProcessColdScenario(
           workingDirectory,
           Map("TERM" -> "dumb")
         )
+        if outcome.exitCode != 0 then
+          throw BenchmarkScenarioException(
+            s"${workload.label} exited with exit code ${outcome.exitCode}; " +
+              s"stdout: ${bounded(outcome.stdout)}; " +
+              s"stderr: ${bounded(outcome.stderr)}"
+          )
         if
-          outcome.exitCode == 0 &&
           normalize(outcome.stdout) != normalize(expectedStdout)
         then
           throw BenchmarkScenarioException(
@@ -68,3 +73,9 @@ final class ProcessColdScenario(
 
   private def normalize(value: String): String =
     value.replace("\r\n", "\n")
+
+  private def bounded(value: String): String =
+    val limit = 2048
+    val normalized = normalize(value).trim
+    if normalized.length <= limit then normalized
+    else normalized.take(limit) + "…"

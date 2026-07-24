@@ -1,6 +1,7 @@
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 public final class Generate {
     private Generate() {}
@@ -11,14 +12,14 @@ public final class Generate {
             .normalize();
         Files.createDirectories(root);
         for (int stage = 1; stage <= 19; stage++) {
-            String className = String.format("Stage%02d", stage);
+            String className = String.format(Locale.ROOT, "Stage%02d", stage);
             StringBuilder source = new StringBuilder();
             source.append("module readiness.automation\n\n");
             source.append("class ").append(className).append(" {\n");
             source.append("public:\n");
             for (int method = 1; method <= 32; method++) {
                 source.append("  def step")
-                    .append(String.format("%02d", method))
+                    .append(String.format(Locale.ROOT, "%02d", method))
                     .append("(value: Int): Int {\n");
                 source.append("    return value + ")
                     .append(stage + method)
@@ -40,13 +41,13 @@ public final class Generate {
         pipeline.append("    var current = value\n");
         for (int stage = 1; stage <= 19; stage++) {
             pipeline.append("    current = new ")
-                .append(String.format("Stage%02d", stage))
+                .append(String.format(Locale.ROOT, "Stage%02d", stage))
                 .append("().step01(current)\n");
         }
         pipeline.append("    return current\n  }\n");
         for (int method = 1; method <= 24; method++) {
             pipeline.append("  def normalize")
-                .append(String.format("%02d", method))
+                .append(String.format(Locale.ROOT, "%02d", method))
                 .append("(value: Int): Int {\n");
             pipeline.append("    return value - ")
                 .append(method)

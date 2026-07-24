@@ -7,6 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.util.concurrent.Executors
+import scala.jdk.CollectionConverters.*
 
 class FreshCompileScenarioSpec extends AnyFunSpec with Matchers:
   private def config =
@@ -118,3 +119,47 @@ class FreshCompileScenarioSpec extends AnyFunSpec with Matchers:
       result.measurements should have size 1
       result.measurements.head.sourceMetrics.sourceCount shouldBe 20
       result.measurements.head.sourceMetrics.lineCount shouldBe 2019
+
+    it("removes a temporary REPL directory when process startup fails"):
+      var capturedDirectory: java.nio.file.Path = null
+      val factory = CompileScenarioCatalog.replFactory(
+        JvmRuntime.current(),
+        1000L,
+        (_, directory, _) =>
+          capturedDirectory = directory
+          throw BenchmarkScenarioException("startup failed")
+      )
+
+      intercept[BenchmarkScenarioException] {
+        factory.open()
+      }
+
+      capturedDirectory should not be null
+      Files.exists(capturedDirectory) shouldBe false
+
+    it("regenerates byte-identical fixture files under a non-English locale"):
+      val root = Paths.get(".").toAbsolutePath.normalize()
+      val generated = Files.createTempDirectory("onion-fixture-locale")
+      val process = new ProcessBuilder(
+        JvmRuntime.current().javaExecutable.toString,
+        "-Duser.language=ar",
+        "-Duser.country=EG",
+        root.resolve(
+          "benchmarks/fixtures/automation-project/Generate.java"
+        ).toString,
+        generated.toString
+      ).start()
+      process.waitFor() shouldBe 0
+
+      val expectedRoot =
+        root.resolve("benchmarks/fixtures/automation-project")
+      val expectedFiles =
+        Files.list(expectedRoot)
+      try
+        expectedFiles.iterator().asScala
+          .filter(path => path.toString.endsWith(".on"))
+          .foreach { expected =>
+            val actual = generated.resolve(expected.getFileName)
+            Files.readAllBytes(actual) shouldBe Files.readAllBytes(expected)
+          }
+      finally expectedFiles.close()

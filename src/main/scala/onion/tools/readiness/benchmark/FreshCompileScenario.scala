@@ -120,22 +120,30 @@ object CompileScenarioCatalog:
       )
     )
 
-  private def replFactory(
+  private[benchmark] def replFactory(
     runtime: JvmRuntime,
-    timeoutMillis: Long
+    timeoutMillis: Long,
+    startClient: (JvmRuntime, java.nio.file.Path, Long) => ReplClient =
+      ProcessReplClient.start
   ): ReplClientFactory =
     new ReplClientFactory:
       override def open(): ReplClient =
         val workingDirectory =
           Files.createTempDirectory("onion-repl-benchmark")
-        val delegate =
-          ProcessReplClient.start(runtime, workingDirectory, timeoutMillis)
-        new ReplClient:
-          override def submit(code: String): String = delegate.submit(code)
+        try
+          val delegate =
+            startClient(runtime, workingDirectory, timeoutMillis)
+          new ReplClient:
+            override def submit(code: String): String = delegate.submit(code)
 
-          override def close(): Unit =
-            try delegate.close()
-            finally deleteRecursively(workingDirectory)
+            override def close(): Unit =
+              try delegate.close()
+              finally deleteRecursively(workingDirectory)
+        catch
+          case error: Throwable =>
+            try deleteRecursively(workingDirectory)
+            catch case closeError: Throwable => error.addSuppressed(closeError)
+            throw error
 
   private def deleteRecursively(root: java.nio.file.Path): Unit =
     if Files.exists(root) then

@@ -2,7 +2,7 @@ package onion.tools.readiness.benchmark
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
-import java.util.concurrent.{Callable, Executors, Future}
+import java.util.concurrent.{Callable, Executors, Future, TimeUnit}
 import scala.jdk.CollectionConverters.*
 
 final case class ProcessOutcome(
@@ -44,7 +44,16 @@ object ProcessLauncher:
       catch
         case interrupted: InterruptedException =>
           process.destroyForcibly()
-          process.waitFor()
+          try
+            if !process.waitFor(5L, TimeUnit.SECONDS) then
+              interrupted.addSuppressed(
+                new IllegalStateException(
+                  "child process did not terminate after forced destruction"
+                )
+              )
+          catch
+            case cleanupInterrupted: InterruptedException =>
+              interrupted.addSuppressed(cleanupInterrupted)
           stdout.cancel(true)
           stderr.cancel(true)
           Thread.currentThread().interrupt()

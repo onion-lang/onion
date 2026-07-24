@@ -65,6 +65,35 @@ class ProcessColdScenarioSpec extends AnyFunSpec with Matchers:
       thrown.getMessage should include ("unexpected stdout")
       session.close()
 
+    it("retains bounded child output when the process exits nonzero"):
+      val root = Files.createTempDirectory("onion-process-failure")
+      Files.writeString(root.resolve("Hello.on"), """IO::println("Hello")""")
+      val workload =
+        CompileWorkload.fromFiles(root, "hello", "Hello.on", Vector("Hello.on"))
+      val launcher = new ProcessLauncher:
+        override def run(
+          command: Vector[String],
+          workingDirectory: java.nio.file.Path,
+          environment: Map[String, String]
+        ): ProcessOutcome =
+          ProcessOutcome(7, "partial output\n", "compiler exploded\n")
+      val scenario = new ProcessColdScenario(
+        workload,
+        JvmRuntime(root.resolve("java"), "cp"),
+        launcher,
+        "Hello\n"
+      )
+      val session = scenario.open()
+
+      val thrown = intercept[BenchmarkScenarioException] {
+        session.runIteration(0)
+      }
+
+      thrown.getMessage should include ("exit code 7")
+      thrown.getMessage should include ("partial output")
+      thrown.getMessage should include ("compiler exploded")
+      session.close()
+
     it("runs Hello through a real fresh child JVM"):
       val repoRoot = Paths.get(".").toAbsolutePath.normalize()
       val workload = CompileWorkload.fromFiles(

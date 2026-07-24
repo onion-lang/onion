@@ -1115,7 +1115,7 @@ sbt -Duser.language=en test
 sbt dist
 ```
 
-- [ ] **Step 8: Publish a draft PR to `develop`**
+- [x] **Step 8: Publish a draft PR to `develop`**
 
 Use `github:yeet` to inspect the final diff, push
 `codex/project-cli-v1`, and open a draft pull request targeting `develop`.

@@ -1097,14 +1097,14 @@ bin/onionc -d <temporary-output> <temporary-script.on>
 
 Expected: version output, script output, and class output all succeed.
 
-- [ ] **Step 6: Request code review**
+- [x] **Step 6: Request code review**
 
 Use the `superpowers:requesting-code-review` skill. Provide the design,
 implementation plan, commit range, and verification evidence. Fix every
 Critical or Important finding with a regression test, rerun the relevant
 targeted suite, and request follow-up review when a material fix was needed.
 
-- [ ] **Step 7: Re-run verification after review fixes**
+- [x] **Step 7: Re-run verification after review fixes**
 
 At minimum rerun:
 

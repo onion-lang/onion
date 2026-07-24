@@ -95,7 +95,7 @@ object CompiledClassWriter:
       while current != null && !Files.exists(current, NoFollow) do
         missing += current
         current = current.getParent
-      if current == null || !Files.isDirectory(current) then
+      if current == null || Files.isSymbolicLink(current) || !Files.isDirectory(current, NoFollow) then
         throw IOException(s"Output root has no existing directory ancestor: $root")
       missing.reverseIterator.foreach(path => createDirectory(path, createdDirectories))
 

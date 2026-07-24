@@ -37,6 +37,8 @@ object ProjectManifest:
       try Toml.parse(path)
       catch
         case error: IOException => return Left(ProjectError(s"Could not parse project manifest: ${error.getMessage}", Some(error)))
+        case error: StackOverflowError =>
+          return Left(ProjectError(s"Could not parse project manifest: too deeply nested", Some(error)))
 
     if result.hasErrors then
       Left(ProjectError(result.errors().toArray(Array.empty[TomlParseError]).sortBy(error =>

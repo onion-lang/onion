@@ -147,6 +147,17 @@ class CompiledClassWriterSpec extends AnyFunSuite with Matchers:
 
     Files.notExists(missingExternal) shouldBe true
 
+  test("rejects a not-yet-existing output root whose nearest real ancestor is a symlink"):
+    val base = Files.createTempDirectory("onion-compiled-classes")
+    val external = Files.createTempDirectory("onion-compiled-classes-external")
+    val link = base.resolve("linked-ancestor")
+    Files.createSymbolicLink(link, external)
+    val output = link.resolve("nested/classes")
+
+    CompiledClassWriter.writeAll(Seq(binary(output, "App", 1))).isLeft shouldBe true
+
+    Files.notExists(external.resolve("nested")) shouldBe true
+
   test("removes output and package directories created before a later write failure"):
     val parent = Files.createTempDirectory("onion-compiled-classes")
     val output = parent.resolve("new-output")

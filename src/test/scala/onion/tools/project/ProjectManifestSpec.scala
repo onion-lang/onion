@@ -84,3 +84,14 @@ class ProjectManifestSpec extends AnyFunSuite with Matchers:
 
   test("allows whitespace and comments around a package table header"):
     load("  [package] # metadata\nname = \"hello\"\nversion = \"1.2.3\"\n").toOption.value.name shouldBe "hello"
+
+  test("reports a clean error instead of crashing on a deeply nested value"):
+    // Deep enough to overflow even the project's enlarged -Xss16m test-JVM
+    // stack (unlike a bare `java` process, `sbt test` runs in-process and
+    // inherits that larger stack), so this stays a regression test across
+    // JVM/stack-size differences rather than only reproducing under a
+    // smaller default stack.
+    val nesting = "[" * 200000 + "1" + "]" * 200000
+    val contents = s"[package]\nname = \"hello\"\nversion = \"1.2.3\"\nx = $nesting\n"
+
+    error(contents) shouldBe "Could not parse project manifest: too deeply nested"

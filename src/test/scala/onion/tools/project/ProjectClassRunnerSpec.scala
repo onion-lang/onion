@@ -2,6 +2,7 @@ package onion.tools.project
 
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.Path
@@ -261,6 +262,46 @@ class ProjectClassRunnerSpec extends AnyFunSuite with Matchers:
       ProgramResult.Success(1)
     ProjectClassRunner.run(Vector(classes), "fixture.FreshMain", Array.empty) shouldBe
       ProgramResult.Success(1)
+
+  test("prefers test then project classes before a same-named parent class"):
+    def precedence(label: String): Path =
+      compileJava(
+        Map(
+          "precedence.Main" ->
+            s"""package precedence;
+              |public final class Main {
+              |  public static String main(String[] args) { return "$label"; }
+              |}
+              |""".stripMargin
+        ),
+        Map.empty
+      )
+
+    val testClasses = precedence("test")
+    val projectClasses = precedence("project")
+    val parentClasses = precedence("parent")
+    val parent = URLClassLoader(Array(parentClasses.toUri.toURL), getClass.getClassLoader)
+
+    try
+      ProjectClassRunner.run(
+        Vector(testClasses, projectClasses),
+        "precedence.Main",
+        Array.empty,
+        parent
+      ) shouldBe ProgramResult.Success("test")
+      ProjectClassRunner.run(
+        Vector(projectClasses),
+        "precedence.Main",
+        Array.empty,
+        parent
+      ) shouldBe ProgramResult.Success("project")
+      ProjectClassRunner.run(
+        Vector.empty,
+        "precedence.Main",
+        Array.empty,
+        parent
+      ) shouldBe ProgramResult.Success("parent")
+    finally parent.close()
 
   test("closes the URL class loader after execution"):
     ProjectClassRunnerLoaderProbe.reset()

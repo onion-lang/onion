@@ -2,15 +2,18 @@ package onion.tools.project
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.attribute.FileTime
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
+import javax.tools.ToolProvider
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
+import onion.tools.OnionCli
 import org.scalatest.OptionValues.convertOptionToValuable
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -49,6 +52,29 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
       "passing-err\n"
     )
     temporaryTestDirectories(project.paths) shouldBe empty
+
+  test("always renders successful compile warnings once on injected stderr"):
+    val project = fixture(
+      tests = Map(
+        "tests/warning_test.on" ->
+          """def main(args: String[]): Int {
+            |  return 0
+            |}
+            |""".stripMargin
+      )
+    )
+    val expectedOut =
+      """test tests/warning_test.on ... ok
+        |
+        |1 tests, 1 passed, 0 failed
+        |""".stripMargin
+    val expectedErr =
+      """[W0006] tests/warning_test.on:1:10: warning: unused parameter 'args'
+        |1 warning(s)
+        |""".stripMargin
+
+    invoke(project.root) shouldBe Invocation(0, expectedOut, expectedErr)
+    invoke(project.root, verbose = true) shouldBe Invocation(0, expectedOut, expectedErr)
 
   test("shows captured output and a concise assertion failure"):
     val project = fixture(
@@ -166,6 +192,52 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
       ""
     )
 
+  test("test compilation prefers target classes over a stale context-classloader API"):
+    val project = fixture(
+      production =
+        """class CompileApi {
+          |public:
+          |  static def fresh(): Int {
+          |    return 42
+          |  }
+          |}
+          |
+          |def main(): void {}
+          |""".stripMargin,
+      tests = Map(
+        "tests/classpath_test.on" ->
+          "Assert::equals(42, CompileApi::fresh())\n"
+      )
+    )
+    loadBuild(project)
+    val stale = compileJava(
+      "CompileApi",
+      """public final class CompileApi {
+        |  public static int stale() { return -1; }
+        |}
+        |""".stripMargin
+    )
+    val thread = Thread.currentThread()
+    val previous = thread.getContextClassLoader
+    val staleParent = URLClassLoader(Array(stale.toUri.toURL), previous)
+
+    val result =
+      try
+        thread.setContextClassLoader(staleParent)
+        invoke(project.root)
+      finally
+        thread.setContextClassLoader(previous)
+        staleParent.close()
+
+    result shouldBe Invocation(
+      0,
+      """test tests/classpath_test.on ... ok
+        |
+        |1 tests, 1 passed, 0 failed
+        |""".stripMargin,
+      ""
+    )
+
   test("compiles each test source alone instead of sharing earlier test classes"):
     val project = fixture(
       tests = Map(
@@ -207,6 +279,21 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
       ""
     )
 
+  test("the unified onion test command discovers a project from a nested cwd"):
+    val project = fixture(
+      tests = Map("tests/nested_test.on" -> "Assert::isTrue(true)\n")
+    )
+    val nested = Files.createDirectories(project.root.resolve("work/deep"))
+
+    invokeCli(nested) shouldBe Invocation(
+      0,
+      """test tests/nested_test.on ... ok
+        |
+        |1 tests, 1 passed, 0 failed
+        |""".stripMargin,
+      ""
+    )
+
   test("a cached production build still recompiles and executes changed tests"):
     val project = fixture(
       tests = Map("tests/cache_test.on" -> "println(\"first-test\")\n")
@@ -242,6 +329,40 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
     result.stderr should include("Project compilation failed")
     result.stderr should not include "must-not-run"
     temporaryTestDirectories(project.paths) shouldBe empty
+
+  test("rejects a symlinked target without touching or staging beneath its target"):
+    val project = fixture(
+      tests = Map("tests/safe_test.on" -> "Assert::isTrue(true)\n")
+    )
+    val external = Files.createTempDirectory("onion-project-test-external-target")
+    val sentinel = Files.writeString(external.resolve("keep.txt"), "keep", UTF_8)
+    Files.createSymbolicLink(project.paths.target, external)
+
+    val result = invoke(project.root)
+
+    result.exitCode shouldBe 1
+    result.stdout shouldBe empty
+    result.stderr should include("target")
+    Files.readString(sentinel, UTF_8) shouldBe "keep"
+    directoryNames(external) shouldBe Vector("keep.txt")
+
+  test("rejects a symlinked target/classes without touching its external target"):
+    val project = fixture(
+      tests = Map("tests/safe_test.on" -> "Assert::isTrue(true)\n")
+    )
+    Files.createDirectory(project.paths.target)
+    val external = Files.createTempDirectory("onion-project-test-external-classes")
+    val sentinel = Files.writeString(external.resolve("keep.txt"), "keep", UTF_8)
+    Files.createSymbolicLink(project.paths.classes, external)
+
+    val result = invoke(project.root)
+
+    result.exitCode shouldBe 1
+    result.stdout shouldBe empty
+    result.stderr should include("symbolic link")
+    Files.readString(sentinel, UTF_8) shouldBe "keep"
+    directoryNames(external) shouldBe Vector("keep.txt")
+    Files.notExists(project.paths.onionState, NOFOLLOW_LINKS) shouldBe true
 
   test("rejects a symlinked state topology without touching its external target"):
     val project = fixture(
@@ -314,6 +435,47 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
         out.close()
         err.close()
     Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+
+  private def invokeCli(cwd: Path, verbose: Boolean = false): Invocation =
+    val stdout = ByteArrayOutputStream()
+    val stderr = ByteArrayOutputStream()
+    val out = PrintStream(stdout, true, UTF_8)
+    val err = PrintStream(stderr, true, UTF_8)
+    val args = if verbose then Array("test", "--verbose") else Array("test")
+    val exitCode =
+      try OnionCli.run(args, cwd, out, err)
+      finally
+        out.close()
+        err.close()
+    Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+
+  private def compileJava(className: String, source: String): Path =
+    val root = Files.createTempDirectory("onion-project-test-stale-api")
+    val sourceRoot = Files.createDirectory(root.resolve("src"))
+    val classesRoot = Files.createDirectory(root.resolve("classes"))
+    val sourceFile = sourceRoot.resolve(className.replace('.', '/') + ".java")
+    Files.createDirectories(sourceFile.getParent)
+    Files.writeString(sourceFile, source, UTF_8)
+    val errors = ByteArrayOutputStream()
+    val compiler = Option(ToolProvider.getSystemJavaCompiler)
+      .getOrElse(fail("ProjectTestIntegrationSpec requires a JDK compiler"))
+    val exitCode = compiler.run(
+      null,
+      null,
+      errors,
+      "-d",
+      classesRoot.toString,
+      sourceFile.toString
+    )
+    withClue(errors.toString(UTF_8)) {
+      exitCode shouldBe 0
+    }
+    classesRoot
+
+  private def directoryNames(path: Path): Vector[String] =
+    Using.resource(Files.list(path)) { stream =>
+      stream.iterator.asScala.map(_.getFileName.toString).toVector.sorted
+    }
 
   private def temporaryTestDirectories(paths: ProjectPaths): Vector[Path] =
     if !Files.isDirectory(paths.onionState, NOFOLLOW_LINKS) then Vector.empty

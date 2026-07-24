@@ -2,10 +2,11 @@ package onion.tools.project
 
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Modifier
-import java.net.URLClassLoader
 import java.nio.file.Path
 
 import scala.util.control.NonFatal
+
+import onion.compiler.ExplicitClasspathClassLoader
 
 sealed trait ProgramResult
 
@@ -22,15 +23,28 @@ object ProjectClassRunner:
     className: String,
     args: Array[String]
   ): ProgramResult =
+    run(
+      classPath,
+      className,
+      args,
+      ProjectClassRunner.getClass.getClassLoader
+    )
+
+  private[project] def run(
+    classPath: Vector[Path],
+    className: String,
+    args: Array[String],
+    parent: ClassLoader
+  ): ProgramResult =
     val thread = Thread.currentThread()
     val previousLoader = thread.getContextClassLoader
-    var loader: URLClassLoader = null
+    var loader: ExplicitClasspathClassLoader = null
     var contextChanged = false
     var outcome: Option[ProgramResult] = None
 
     try
       val urls = classPath.map(_.toUri.toURL).toArray
-      loader = URLClassLoader(urls, ProjectClassRunner.getClass.getClassLoader)
+      loader = ExplicitClasspathClassLoader(urls, parent)
       thread.setContextClassLoader(loader)
       contextChanged = true
       outcome = Some(invoke(loader, className, args))

@@ -197,6 +197,11 @@ private object SystemProjectTestBackend extends ProjectTestBackend:
       throw IOException(s"$description is not canonical: $path")
 
 final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
+  private final case class CompletedTestCase(
+    result: TestCaseResult,
+    diagnostics: String
+  )
+
   def this() = this(ProjectTestBackend.system)
 
   def run(
@@ -209,9 +214,9 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
     val sources = build.layout.testSources.sortBy(_.relative)
 
     sources.foreach { source =>
-      val result = runCase(build, source)
-      results += result
-      renderCase(result, out, err, verbose)
+      val completed = runCase(build, source)
+      results += completed.result
+      renderCase(completed, out, err, verbose)
     }
 
     val completed = TestRunResult(results.result())
@@ -222,27 +227,33 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
   private def runCase(
     build: ProjectBuild,
     source: ProjectSource
-  ): TestCaseResult =
+  ): CompletedTestCase =
     var workspace: Option[ProjectTestWorkspace] = None
-    var result: TestCaseResult = null
+    var completed: CompletedTestCase = null
     var escaping: Throwable = null
     var cleanupFailure: Option[Throwable] = None
     try
-      result =
+      completed =
         val created = backend.createWorkspace(build, source)
         workspace = Some(created)
         backend.compile(build, source, created) match
           case Left(failure) =>
-            failed(source, "", failure.stderr, failure.message)
+            CompletedTestCase(
+              failed(source, "", "", failure.message),
+              failure.stderr
+            )
           case Right(prepared) =>
             invoke(build, source, created, prepared)
     catch
       case error: Throwable if NonFatal(error) =>
-        result = failed(
-          source,
-          "",
-          "",
-          s"Could not prepare test: ${describe(error)}"
+        completed = CompletedTestCase(
+          failed(
+            source,
+            "",
+            "",
+            s"Could not prepare test: ${describe(error)}"
+          ),
+          ""
         )
       case error: Throwable =>
         escaping = error
@@ -257,14 +268,16 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
       }
 
     cleanupFailure match
-      case None => result
+      case None => completed
       case Some(error) =>
         val cleanup = s"could not clean temporary test output: ${describeMessage(error)}"
-        result.copy(
-          passed = false,
-          failure = Some(result.failure match
-            case Some(primary) => s"$primary; additionally, $cleanup"
-            case None => cleanup.capitalize
+        completed.copy(
+          result = completed.result.copy(
+            passed = false,
+            failure = Some(completed.result.failure match
+              case Some(primary) => s"$primary; additionally, $cleanup"
+              case None => cleanup.capitalize
+            )
           )
         )
 
@@ -273,28 +286,27 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
     source: ProjectSource,
     workspace: ProjectTestWorkspace,
     prepared: PreparedProjectTest
-  ): TestCaseResult =
+  ): CompletedTestCase =
     val captured = RuntimeOutputCapture.capture {
       backend.invoke(build, workspace, prepared)
     }
-    val stderr = concatenate(prepared.diagnostics, captured.stderr)
     val result =
       captured.result match
         case Left(error) =>
           failed(
             source,
             captured.stdout,
-            stderr,
+            captured.stderr,
             s"Could not invoke test: ${describe(error)}"
           )
         case Right(ProgramResult.Failure(message, _)) =>
-          failed(source, captured.stdout, stderr, message)
+          failed(source, captured.stdout, captured.stderr, message)
         case Right(ProgramResult.Success(value))
             if ProjectCommands.programExitCode(value) != 0 =>
           failed(
             source,
             captured.stdout,
-            stderr,
+            captured.stderr,
             s"Test returned nonzero numeric result: ${String.valueOf(value)}"
           )
         case Right(ProgramResult.Success(_)) =>
@@ -302,19 +314,21 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
             source.relative,
             passed = true,
             captured.stdout,
-            stderr,
+            captured.stderr,
             None
           )
-    captured.lifecycleFailures.foldLeft(result) { (current, lifecycle) =>
-      val message = s"could not restore captured test streams: ${describe(lifecycle)}"
-      current.copy(
-        passed = false,
-        failure = Some(current.failure match
-          case Some(primary) => s"$primary; additionally, $message"
-          case None => message.capitalize
+    val withLifecycleFailures = captured.lifecycleFailures.foldLeft(result) {
+      (current, lifecycle) =>
+        val message = s"could not restore captured test streams: ${describe(lifecycle)}"
+        current.copy(
+          passed = false,
+          failure = Some(current.failure match
+            case Some(primary) => s"$primary; additionally, $message"
+            case None => message.capitalize
+          )
         )
-      )
     }
+    CompletedTestCase(withLifecycleFailures, prepared.diagnostics)
 
   private def failed(
     source: ProjectSource,
@@ -325,13 +339,15 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
     TestCaseResult(source.relative, passed = false, stdout, stderr, Some(message))
 
   private def renderCase(
-    result: TestCaseResult,
+    completed: CompletedTestCase,
     out: PrintStream,
     err: PrintStream,
     verbose: Boolean
   ): Unit =
+    val result = completed.result
     val status = if result.passed then "ok" else "FAILED"
     out.println(s"test ${result.source} ... $status")
+    printCaptured(err, completed.diagnostics)
     if verbose || !result.passed then
       printCaptured(out, result.stdout)
       printCaptured(err, result.stderr)
@@ -343,12 +359,6 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
     if value.nonEmpty then
       stream.print(value)
       if !value.endsWith("\n") && !value.endsWith("\r") then stream.println()
-
-  private def concatenate(left: String, right: String): String =
-    if left.isEmpty then right
-    else if right.isEmpty then left
-    else if left.endsWith("\n") || left.endsWith("\r") then left + right
-    else left + System.lineSeparator() + right
 
   private def describe(error: Throwable): String =
     val name =

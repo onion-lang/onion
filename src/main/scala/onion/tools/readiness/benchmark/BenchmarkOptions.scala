@@ -8,7 +8,7 @@ enum BenchmarkOutputFormat:
 
 final case class BenchmarkOptions(
   runConfig: BenchmarkRunConfig = BenchmarkRunConfig(),
-  output: Path = Paths.get("target/readiness/benchmark-v2.json"),
+  output: Path = Paths.get("target/readiness/benchmark-v3.json"),
   stdoutFormat: BenchmarkOutputFormat = BenchmarkOutputFormat.Text,
   warmupOverride: Option[Int] = None
 )

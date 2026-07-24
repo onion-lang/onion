@@ -6,11 +6,18 @@ import onion.tools.readiness.benchmark.{
   BenchmarkRunConfig,
   BenchmarkScenario,
   BenchmarkSession,
+  EnvironmentMetadata,
   FailureCategory,
+  GitMetadata,
   IterationPayload,
+  PerformanceBenchmarkReport,
   ScenarioKind,
   ScenarioMetadata,
   SourceMetrics
+}
+import onion.tools.readiness.policy.{
+  AbsolutePerformanceEvaluation,
+  PolicyOverallStatus
 }
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
@@ -18,6 +25,51 @@ import org.scalatest.matchers.should.Matchers
 import java.nio.file.Files
 
 class BenchmarkRunnerSpec extends AnyFunSpec with Matchers:
+  private def report(
+    policyStatus: PolicyOverallStatus,
+    referenceLane: Boolean
+  ): PerformanceBenchmarkReport =
+    PerformanceBenchmarkReport(
+      schemaVersion = PerformanceBenchmarkReport.CurrentSchemaVersion,
+      generatedAt = "2026-07-24T00:00:00Z",
+      git = GitMetadata("deadbeef", dirty = false),
+      environment = EnvironmentMetadata(
+        javaVendor = "test",
+        javaVersion = "21",
+        osName = "Linux",
+        osArch = "amd64",
+        processors = 2,
+        maxHeapBytes = 1L,
+        garbageCollectors = Vector("test"),
+        jvmArguments = Vector.empty
+      ),
+      runConfig = BenchmarkRunConfig(0, 1, 1000L),
+      scenarios = Vector.empty,
+      failures = Vector.empty,
+      policy = AbsolutePerformanceEvaluation(
+        referenceLane = referenceLane,
+        applicabilityReason = "test",
+        checks = Vector.empty,
+        overallStatus = policyStatus
+      )
+    )
+
+  describe("PerformanceBenchmarkReport policy outcome"):
+    it("keeps a successful non-reference report informational"):
+      val result = report(
+        PolicyOverallStatus.Informational,
+        referenceLane = false
+      )
+
+      result.policy.overallStatus shouldBe PolicyOverallStatus.Informational
+      result.succeeded shouldBe true
+
+    it("fails a report whose reference policy failed"):
+      val result = report(PolicyOverallStatus.Fail, referenceLane = true)
+
+      result.policy.overallStatus shouldBe PolicyOverallStatus.Fail
+      result.succeeded shouldBe false
+
   describe("BenchmarkRunner.buildReport"):
     it("returns a structured invalid-measurement report when workloads are missing"):
       val root = Files.createTempDirectory("onion-benchmark-missing-workloads")

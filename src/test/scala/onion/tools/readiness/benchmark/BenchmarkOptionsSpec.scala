@@ -12,7 +12,7 @@ class BenchmarkOptionsSpec extends AnyFunSpec with Matchers with OptionValues:
       BenchmarkOptions.parse(Array.empty) shouldBe Right(
         BenchmarkOptions(
           runConfig = BenchmarkRunConfig(8, 25, 30000L),
-          output = Paths.get("target/readiness/benchmark-v2.json"),
+          output = Paths.get("target/readiness/benchmark-v3.json"),
           stdoutFormat = BenchmarkOutputFormat.Text
         )
       )

@@ -36,10 +36,5 @@ if [ -n "$USER_CLASSPATH" ]; then
     CLASSPATH="$CLASSPATH:$USER_CLASSPATH"
 fi
 
-if [ "$1" = "repl" ]; then
-    shift
-    exec "$JAVA_CMD" -classpath "$CLASSPATH" onion.tools.Repl "$@"
-fi
-
-# Run the Onion script runner
-exec "$JAVA_CMD" -classpath "$CLASSPATH" onion.tools.ScriptRunner "$@"
+# Dispatch to project commands, the REPL, or the script runner
+exec "$JAVA_CMD" -classpath "$CLASSPATH" onion.tools.OnionCli "$@"

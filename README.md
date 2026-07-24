@@ -29,6 +29,18 @@ onion hello.on
 println("Hello, " + args[0] + "!")
 ```
 
+Or start a multi-file project instead of a single script:
+
+```sh
+onion new hello
+cd hello
+onion run
+onion test
+```
+
+See the [Project CLI guide](https://onion-lang.org/tools/project-cli/)
+for the manifest, source layout, build cache, and test conventions.
+
 ## Language Snapshot
 
 Local `val` / `var` declarations can omit types when an initializer is present, and control-flow constructs such as `if` are expressions.
@@ -257,6 +269,15 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 * --profile-output <target> Write the profile to stderr, stdout, or a file.
 * --warn <off|on|error> Set warning level.
 * --Wno <codes> Suppress warnings (e.g., W0001,unused-parameter).
+
+### Project CLI
+
+`onion new <name>` scaffolds a convention-over-configuration project with a
+manifest, `src/`, and `tests/`; `onion build`, `onion run [-- args...]`,
+`onion test`, and `onion clean` then work from the project root or any
+nested directory. See the
+[Project CLI guide](https://onion-lang.org/tools/project-cli/) for the full
+manifest, layout, cache, and test conventions.
 
 ### REPL
 

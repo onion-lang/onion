@@ -111,6 +111,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 
 - [Compiler (onionc)](tools/compiler.md) - Compile Onion source files to .class files
 - [Script Runner (onion)](tools/script-runner.md) - Run Onion scripts directly (compile and execute)
+- [Project CLI (onion new/build/run/test/clean)](tools/project-cli.md) - Convention-over-configuration multi-file projects
 - [REPL](tools/repl.md) - Interactive REPL for experimentation
 
 ## Reference

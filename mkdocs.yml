@@ -98,6 +98,7 @@ nav:
       - ツール:
           - コンパイラ（onionc）: ja/tools/compiler.md
           - スクリプトランナー（onion）: ja/tools/script-runner.md
+          - プロジェクトCLI: ja/tools/project-cli.md
           - REPL: ja/tools/repl.md
           - 言語サーバー: ja/tools/language-server.md
       - リファレンス:
@@ -147,6 +148,7 @@ nav:
   - Tools:
       - Compiler (onionc): tools/compiler.md
       - Script Runner (onion): tools/script-runner.md
+      - Project CLI: tools/project-cli.md
       - REPL: tools/repl.md
       - Language Server: tools/language-server.md
   - Reference:

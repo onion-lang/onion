@@ -117,6 +117,7 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 
 - [コンパイラ（onionc）](tools/compiler.md) - Onionソースファイルを.classファイルにコンパイル
 - [スクリプトランナー（onion）](tools/script-runner.md) - Onionスクリプトを直接実行（コンパイルして実行）
+- [プロジェクトCLI（onion new/build/run/test/clean）](tools/project-cli.md) - 設定より規約に基づく複数ファイルプロジェクト
 - [REPL](tools/repl.md) - 対話型REPL
 
 ## コントリビューション

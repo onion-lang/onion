@@ -975,7 +975,7 @@ git commit -m "Complete Onion project lifecycle"
 - Modify: `docs/ja/index.md`
 - Test: `src/test/scala/onion/tools/project/ProjectDistributionSpec.scala`
 
-- [ ] **Step 1: Write failing distribution test**
+- [x] **Step 1: Write failing distribution test**
 
 The test runs `sbt dist` only through the dedicated final verification command,
 not recursively from ScalaTest. Inside the suite, validate source launcher
@@ -994,7 +994,7 @@ cd hello
 
 Assert the greeting, passing summary, exit statuses, and removal of `target`.
 
-- [ ] **Step 2: Switch all `onion` launchers**
+- [x] **Step 2: Switch all `onion` launchers**
 
 Unix, batch, and installer-generated `onion` launchers invoke:
 
@@ -1005,7 +1005,7 @@ onion.tools.OnionCli
 Remove Unix-only REPL special casing. Preserve classpath assembly, user
 `CLASSPATH`, Java lookup, CDS flags, and quoting.
 
-- [ ] **Step 3: Document the project journey**
+- [x] **Step 3: Document the project journey**
 
 The English and Japanese project CLI pages document:
 
@@ -1024,12 +1024,12 @@ Add concise links from English/Japanese landing pages. Keep code examples
 compatible with the documentation-example directive policy already present in
 the repository.
 
-- [ ] **Step 4: Update README**
+- [x] **Step 4: Update README**
 
 Put the four-command project journey near the existing script quick start, not
 in place of it.
 
-- [ ] **Step 5: Run targeted tests and commit**
+- [x] **Step 5: Run targeted tests and commit**
 
 ```bash
 sbt -Duser.language=en 'testOnly onion.tools.project.* onion.tools.OnionCliSpec'

@@ -24,6 +24,7 @@ target/
 .ivy2/
 .home/
 .xdg/
+.worktrees/
 
 # MkDocs
 site/

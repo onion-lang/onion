@@ -217,14 +217,32 @@ The default suite reports six explicit protocols:
 
 Process-cold uses 3 warmups by default; the other protocols use 8. Every
 protocol uses 25 measured iterations and a 30-second iteration timeout.
-`--warmups N` overrides the scenario defaults. The schema-v2 JSON report stores
+`--warmups N` overrides the scenario defaults. The schema-v3 JSON report stores
 the effective configuration beside every scenario so unlike lifecycles are
 never presented as identical measurements. It also retains raw nanosecond
 observations, median and p95 latency, phase timings where available, source
-metrics, and JVM/OS metadata.
+metrics, JVM/OS metadata, assigned memory, and typed absolute-policy checks.
+
+The first practical milestone uses these inclusive latency ceilings:
+
+| Protocol | Median | p95 |
+|---|---:|---:|
+| Fresh `onion Hello.on` process | 1.5 s | 2.5 s |
+| Steady-state compile of `Hello.on` | 150 ms | 300 ms |
+| Steady-state compile of `StatsApp.on` | 750 ms | 1.2 s |
+| Subsequent REPL snippet | 100 ms | 250 ms |
+| 20-file/~2,000-line project | 2.0 s | 3.0 s |
+
+The absolute policy is enforced only when the captured environment exactly
+matches the reference lane: Ubuntu 24.04 x86-64, Eclipse Adoptium Temurin
+JDK 21, two assigned processors, 4 GiB assigned memory, a 2 GiB maximum heap,
+and G1. A breach on that lane fails the benchmark task. On every other
+machine, the checks are `not-applicable` and the overall policy status is
+`informational`; those measurements are useful for profiling but do not count
+as release evidence.
 
 The machine-readable report is written to
-`target/readiness/benchmark-v2.json`. For a quick protocol smoke test:
+`target/readiness/benchmark-v3.json`. For a quick protocol smoke test:
 
 ```bash
 sbt 'benchmark --warmups 0 --iterations 1'

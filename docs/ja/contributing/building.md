@@ -217,12 +217,31 @@ sbt benchmark
 
 process-cold のデフォルト warmup は3回、その他は8回です。全プロトコルを
 25回計測し、1 iteration の timeout は30秒です。`--warmups N` は各
-scenario のデフォルトを上書きします。schema-v2 JSON は有効な設定を
+scenario のデフォルトを上書きします。schema-v3 JSON は有効な設定を
 scenario ごとに保存するため、異なる lifecycle を同一条件の計測として
 扱いません。また、生のナノ秒計測値、中央値、p95、取得可能なフェーズ別
-時間、ソース規模、JVM/OS メタデータも保持します。
+時間、ソース規模、JVM/OS メタデータ、割り当てメモリ、型付けされた
+絶対性能 policy 判定も保持します。
 
-機械可読レポートは `target/readiness/benchmark-v2.json` に書き出されます。
+最初の実用化マイルストーンでは、次の上限値を境界値を含めて適用します:
+
+| プロトコル | 中央値 | p95 |
+|---|---:|---:|
+| 新規プロセスでの `onion Hello.on` | 1.5 s | 2.5 s |
+| `Hello.on` の steady-state compile | 150 ms | 300 ms |
+| `StatsApp.on` の steady-state compile | 750 ms | 1.2 s |
+| 2回目以降の REPL snippet | 100 ms | 250 ms |
+| 20ファイル・約2,000行のプロジェクト | 2.0 s | 3.0 s |
+
+絶対性能 policy は、取得した環境が reference lane（Ubuntu 24.04
+x86-64、Eclipse Adoptium Temurin JDK 21、割り当て processor 2個、
+割り当てメモリ 4 GiB、最大 heap 2 GiB、G1）と完全に一致する場合だけ
+強制されます。この lane で上限を超えると benchmark task は失敗します。
+それ以外の環境では各判定は `not-applicable`、全体 status は
+`informational` です。この計測は profile には利用できますが、
+release evidence にはなりません。
+
+機械可読レポートは `target/readiness/benchmark-v3.json` に書き出されます。
 プロトコルだけを短時間で確認するには次を実行します:
 
 ```bash

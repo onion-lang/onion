@@ -112,6 +112,48 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     diagnostics shouldBe empty
     Files.notExists(project.paths.target, NOFOLLOW_LINKS) shouldBe true
 
+  test("rejects existing and dangling classes symlinks before cache or staging"):
+    Vector(false, true).foreach { dangling =>
+      val project = fixture()
+      Files.createDirectory(project.paths.target)
+      val external = Files.createTempDirectory("onion-project-builder-external-classes")
+      val sentinel = Files.writeString(external.resolve("keep.txt"), "keep", UTF_8)
+      val target =
+        if dangling then external.resolve("missing")
+        else external
+      Files.createSymbolicLink(project.paths.classes, target)
+
+      val (result, diagnostics) = build(project)
+
+      withClue(s"dangling=$dangling") {
+        result.swap.toOption.value.message should include("symbolic link")
+        diagnostics shouldBe empty
+        Files.isSymbolicLink(project.paths.classes) shouldBe true
+        Files.readString(sentinel, UTF_8) shouldBe "keep"
+        temporaryDirectories(project.paths) shouldBe Vector.empty
+      }
+    }
+
+  test("rejects existing and dangling build-state symlinks before cache or staging"):
+    Vector(false, true).foreach { dangling =>
+      val project = fixture()
+      Files.createDirectories(project.paths.onionState)
+      val external = Files.createTempDirectory("onion-project-builder-external-state")
+      val externalState = external.resolve("state.json")
+      if !dangling then Files.writeString(externalState, "external-state", UTF_8)
+      Files.createSymbolicLink(project.paths.buildState, externalState)
+
+      val (result, diagnostics) = build(project)
+
+      withClue(s"dangling=$dangling") {
+        result.swap.toOption.value.message should include("symbolic link")
+        diagnostics shouldBe empty
+        Files.isSymbolicLink(project.paths.buildState) shouldBe true
+        if !dangling then Files.readString(externalState, UTF_8) shouldBe "external-state"
+        temporaryDirectories(project.paths) shouldBe Vector.empty
+      }
+    }
+
   test("compiles real sources to qualified class paths and creates deterministic state"):
     val project = fixture(
       sources = Map(
@@ -274,6 +316,15 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     errors should include("src/main.on")
     errors should include("errors are found")
     temporaryDirectories(errorProject.paths) shouldBe Vector.empty
+
+  test("requires successful compiler results to contain parsed source units"):
+    val missing = ProjectBuilder.requireParsedUnits(None).swap.toOption.value
+    val empty =
+      ProjectBuilder.requireParsedUnits(Some(Seq.empty)).swap.toOption.value
+
+    missing.message should include("Internal project error")
+    missing.message should include("parsed source units")
+    empty.message shouldBe missing.message
 
   test("a failed rebuild preserves the prior class and state pair byte for byte"):
     val project = fixture()

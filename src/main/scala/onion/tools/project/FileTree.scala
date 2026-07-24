@@ -8,6 +8,8 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
+import scala.util.control.NonFatal
+
 private[project] object FileTree:
   def delete(path: Path, trustedBoundary: Path): Unit =
     val boundary = canonicalBoundary(trustedBoundary)
@@ -62,3 +64,33 @@ private[project] object FileTree:
         !Files.isDirectory(current, NOFOLLOW_LINKS)
       then
         throw IOException(s"Deletion path has a non-directory or symbolic-link ancestor: $current")
+
+private[project] object ProjectTemporaryDirectory:
+  def create(
+    parent: Path,
+    prefix: String,
+    trustedBoundary: Path
+  ): Path =
+    create(parent, prefix, trustedBoundary, _.toRealPath())
+
+  private[project] def create(
+    parent: Path,
+    prefix: String,
+    trustedBoundary: Path,
+    canonicalize: Path => Path
+  ): Path =
+    val raw = Files.createTempDirectory(parent, prefix)
+    try
+      val canonical = canonicalize(raw)
+      val normalized = raw.toAbsolutePath.normalize
+      if canonical != normalized ||
+        Files.isSymbolicLink(canonical) ||
+        !Files.isDirectory(canonical, NOFOLLOW_LINKS)
+      then
+        throw IOException(s"Temporary directory is not canonical: $raw")
+      canonical
+    catch
+      case NonFatal(error) =>
+        try FileTree.delete(raw, trustedBoundary)
+        catch case NonFatal(cleanup) => error.addSuppressed(cleanup)
+        throw error

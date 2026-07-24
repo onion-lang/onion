@@ -27,6 +27,14 @@ final case class ProjectBuild(
   cached: Boolean
 )
 
+object ProjectBuilder:
+  private[project] def requireParsedUnits(
+    units: Option[Seq[onion.compiler.AST.CompilationUnit]]
+  ): Either[ProjectError, Seq[onion.compiler.AST.CompilationUnit]] =
+    units.filter(_.nonEmpty).toRight(ProjectError(
+      "Internal project error: successful compilation returned no parsed source units"
+    ))
+
 final class ProjectBuilder(
   compilerVersion: String = OnionVersion.value,
   javaFeature: Int = Runtime.version.feature,
@@ -127,31 +135,26 @@ final class ProjectBuilder(
     if compiled.hasErrors then
       Left(ProjectError("Project compilation failed"))
     else
-      compiled.debugArtifacts.parsedUnits match
-        case None =>
-          Left(ProjectError(
-            "Internal project error: successful compilation returned no parsed source units"
+      for
+        units <- ProjectBuilder.requireParsedUnits(compiled.debugArtifacts.parsedUnits)
+        entryPoints <- EntryPointDiscovery.discover(paths.root, units)
+        classNames <- writeClasses(compiled.classes)
+        _ <-
+          if classNames.nonEmpty then Right(())
+          else Left(ProjectError(
+            "Internal project error: successful compilation returned no classes"
           ))
-        case Some(units) =>
-          for
-            entryPoints <- EntryPointDiscovery.discover(paths.root, units)
-            classNames <- writeClasses(compiled.classes)
-            _ <-
-              if classNames.nonEmpty then Right(())
-              else Left(ProjectError(
-                "Internal project error: successful compilation returned no classes"
-              ))
-            state = BuildState(
-              BuildFingerprint.SchemaVersion,
-              fingerprint,
-              classNames,
-              entryPoints.distinct.sortBy(entryPoint =>
-                (entryPoint.source, entryPoint.line, entryPoint.column, entryPoint.className)
-              )
-            )
-            _ <- BuildState.write(staging.resolve("build-state.json"), state)
-            _ <- BuildOutputTransaction.promote(paths, staging, mover)
-          yield ProjectBuild(paths, manifest, layout, state, cached = false)
+        state = BuildState(
+          BuildFingerprint.SchemaVersion,
+          fingerprint,
+          classNames,
+          entryPoints.distinct.sortBy(entryPoint =>
+            (entryPoint.source, entryPoint.line, entryPoint.column, entryPoint.className)
+          )
+        )
+        _ <- BuildState.write(staging.resolve("build-state.json"), state)
+        _ <- BuildOutputTransaction.promote(paths, staging, mover)
+      yield ProjectBuild(paths, manifest, layout, state, cached = false)
 
   private def writeClasses(
     classes: Seq[onion.compiler.CompiledClass]
@@ -178,12 +181,14 @@ final class ProjectBuilder(
       val canonicalRoot = root.toRealPath()
       val target = paths.target.toAbsolutePath.normalize
       val onionState = paths.onionState.toAbsolutePath.normalize
+      val classes = paths.classes.toAbsolutePath.normalize
+      val buildState = paths.buildState.toAbsolutePath.normalize
       if canonicalRoot != root then
         Left(ProjectError(s"Project root is not canonical: $root"))
       else if target != root.resolve("target") ||
-        paths.classes.toAbsolutePath.normalize != target.resolve("classes") ||
+        classes != target.resolve("classes") ||
         onionState != target.resolve(".onion") ||
-        paths.buildState.toAbsolutePath.normalize != onionState.resolve("build-state.json")
+        buildState != onionState.resolve("build-state.json")
       then
         Left(ProjectError("Project output paths do not belong to the canonical project root"))
       else if Files.exists(target, NOFOLLOW_LINKS) &&
@@ -194,6 +199,10 @@ final class ProjectBuilder(
         (Files.isSymbolicLink(onionState) || !Files.isDirectory(onionState, NOFOLLOW_LINKS))
       then
         Left(ProjectError(s"Project state path is not a real directory: $onionState"))
+      else if Files.isSymbolicLink(classes) then
+        Left(ProjectError(s"Project classes path is a symbolic link: $classes"))
+      else if Files.isSymbolicLink(buildState) then
+        Left(ProjectError(s"Project build-state path is a symbolic link: $buildState"))
       else
         Right(())
     catch
@@ -208,7 +217,11 @@ final class ProjectBuilder(
     try
       createRealDirectory(paths.target, paths.root, "project target")
       createRealDirectory(paths.onionState, paths.target, "project state directory")
-      val created = Files.createTempDirectory(paths.onionState, "staging-").toRealPath()
+      val created = ProjectTemporaryDirectory.create(
+        paths.onionState,
+        "staging-",
+        paths.target
+      )
       staging = Some(created)
       Files.createDirectory(created.resolve("classes"))
       Right(created)

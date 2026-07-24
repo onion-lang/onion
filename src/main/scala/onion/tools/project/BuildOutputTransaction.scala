@@ -103,13 +103,17 @@ private[project] object BuildOutputTransaction:
 
     try
       val created =
-        Files.createTempDirectory(validated.onionState, "backup-").toRealPath()
+        ProjectTemporaryDirectory.create(
+          validated.onionState,
+          "backup-",
+          validated.target
+        )
       backupRoot = Some(created)
       val backupClasses = created.resolve("classes")
       val backupState = created.resolve("build-state.json")
 
-      if oldClassesExisted then mover.move(validated.classes, backupClasses)
       if oldStateExisted then mover.move(validated.buildState, backupState)
+      if oldClassesExisted then mover.move(validated.classes, backupClasses)
       mover.move(validated.stagedClasses, validated.classes)
       mover.move(validated.stagedState, validated.buildState)
     catch
@@ -157,22 +161,41 @@ private[project] object BuildOutputTransaction:
     mover: PathMover,
     primary: Throwable
   ): Unit =
-    restore(
-      validated.buildState,
-      backupRoot.resolve("build-state.json"),
-      oldStateExisted,
-      isTree = false,
-      validated.target,
-      mover
-    ).foreach(primary.addSuppressed)
-    restore(
-      validated.classes,
-      backupRoot.resolve("classes"),
-      oldClassesExisted,
-      isTree = true,
-      validated.target,
-      mover
-    ).foreach(primary.addSuppressed)
+    val backupState = backupRoot.resolve("build-state.json")
+    val stateHideFailure =
+      if Files.exists(backupState, NOFOLLOW_LINKS) || !oldStateExisted then
+        deleteFinalState(validated.buildState)
+      else None
+
+    stateHideFailure match
+      case Some(error) =>
+        primary.addSuppressed(error)
+      case None =>
+        val classesFailure = restore(
+          validated.classes,
+          backupRoot.resolve("classes"),
+          oldClassesExisted,
+          isTree = true,
+          validated.target,
+          mover
+        )
+        classesFailure.foreach(primary.addSuppressed)
+        if classesFailure.isEmpty then
+          restore(
+            validated.buildState,
+            backupState,
+            oldStateExisted,
+            isTree = false,
+            validated.target,
+            mover
+          ).foreach(primary.addSuppressed)
+
+  private def deleteFinalState(path: Path): Option[Throwable] =
+    try
+      Files.deleteIfExists(path)
+      None
+    catch
+      case NonFatal(error) => Some(error)
 
   private def restore(
     destination: Path,

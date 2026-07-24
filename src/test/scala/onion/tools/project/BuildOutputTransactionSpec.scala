@@ -6,6 +6,7 @@ import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
@@ -16,10 +17,24 @@ import org.scalatest.matchers.should.Matchers
 class BuildOutputTransactionSpec extends AnyFunSuite with Matchers:
   private final class FailingMover(failures: Set[Int] = Set.empty) extends PathMover:
     var calls = 0
+    val moves = ArrayBuffer.empty[(Path, Path)]
 
     override def move(source: Path, target: Path): Unit =
       calls += 1
+      moves += source -> target
       if failures.contains(calls) then throw IOException(s"injected move failure $calls")
+      Files.move(source, target)
+
+  private final class SelectiveMover(
+    failure: (Path, Path) => Option[String]
+  ) extends PathMover:
+    var calls = 0
+    val moves = ArrayBuffer.empty[(Path, Path)]
+
+    override def move(source: Path, target: Path): Unit =
+      calls += 1
+      moves += source -> target
+      failure(source, target).foreach(message => throw IOException(message))
       Files.move(source, target)
 
   private def paths(): ProjectPaths =
@@ -98,8 +113,8 @@ class BuildOutputTransactionSpec extends AnyFunSuite with Matchers:
     temporaryDirectories(project) shouldBe Vector.empty
 
   Vector(
-    1 -> "old classes",
-    2 -> "old state",
+    1 -> "old state",
+    2 -> "old classes",
     3 -> "new classes",
     4 -> "new state"
   ).foreach { case (failure, description) =>
@@ -120,20 +135,73 @@ class BuildOutputTransactionSpec extends AnyFunSuite with Matchers:
       temporaryDirectories(project) shouldBe Vector.empty
   }
 
-  test("keeps the primary move error and continues restoration after rollback fails"):
+  test("does not publish old state when restoring old classes fails"):
     val project = paths()
     installOldOutput(project)
     val staged = staging(project, "rollback-failure")
-    val mover = FailingMover(Set(4, 5))
+    val mover = SelectiveMover((source, target) =>
+      if source == staged.resolve("build-state.json") && target == project.buildState then
+        Some("primary new-state failure")
+      else if target == project.classes &&
+        source.getParent.getFileName.toString.startsWith("backup-")
+      then
+        Some("class rollback failure")
+      else None
+    )
 
     val error =
       BuildOutputTransaction.promote(project, staged, mover).swap.toOption.value
 
-    mover.calls shouldBe 6
-    error.cause.value.getMessage should include("failure 4")
+    mover.calls shouldBe 5
+    error.cause.value.getMessage shouldBe "primary new-state failure"
     error.cause.value.getSuppressed.toVector.map(_.getMessage) shouldBe
-      Vector("injected move failure 5")
+      Vector("class rollback failure")
+    Files.notExists(project.classes, NOFOLLOW_LINKS) shouldBe true
+    Files.notExists(project.buildState, NOFOLLOW_LINKS) shouldBe true
+    val backups = temporaryDirectories(project).filter(_.getFileName.toString.startsWith("backup-"))
+    backups should have size 1
+    classSnapshot(backups.head.resolve("classes")) should contain(
+      "demo/Old.class" -> "old-class"
+    )
+    Files.readString(backups.head.resolve("build-state.json"), UTF_8) shouldBe "old-state"
+
+  test("restores old classes before publishing old state"):
+    val project = paths()
+    installOldOutput(project)
+    val staged = staging(project, "pair-order")
+    val mover = FailingMover(Set(4))
+
+    BuildOutputTransaction.promote(project, staged, mover).isLeft shouldBe true
+
+    mover.moves.takeRight(2).map(_._2).toVector shouldBe
+      Vector(project.classes, project.buildState)
     classSnapshot(project.classes) should contain("demo/Old.class" -> "old-class")
+    Files.readString(project.buildState, UTF_8) shouldBe "old-state"
+
+  test("retains old state in backup when publishing it after class restoration fails"):
+    val project = paths()
+    installOldOutput(project)
+    val staged = staging(project, "state-rollback-failure")
+    val mover = SelectiveMover((source, target) =>
+      if source == staged.resolve("build-state.json") && target == project.buildState then
+        Some("primary new-state failure")
+      else if target == project.buildState &&
+        source.getParent.getFileName.toString.startsWith("backup-")
+      then
+        Some("state rollback failure")
+      else None
+    )
+
+    val error =
+      BuildOutputTransaction.promote(project, staged, mover).swap.toOption.value
+
+    mover.moves.takeRight(2).map(_._2).toVector shouldBe
+      Vector(project.classes, project.buildState)
+    error.cause.value.getMessage shouldBe "primary new-state failure"
+    error.cause.value.getSuppressed.toVector.map(_.getMessage) shouldBe
+      Vector("state rollback failure")
+    classSnapshot(project.classes) should contain("demo/Old.class" -> "old-class")
+    Files.notExists(project.buildState, NOFOLLOW_LINKS) shouldBe true
     val backups = temporaryDirectories(project).filter(_.getFileName.toString.startsWith("backup-"))
     backups should have size 1
     Files.readString(backups.head.resolve("build-state.json"), UTF_8) shouldBe "old-state"
@@ -159,3 +227,23 @@ class BuildOutputTransactionSpec extends AnyFunSuite with Matchers:
 
     Files.isDirectory(project.target, NOFOLLOW_LINKS) shouldBe true
     Files.isDirectory(outside, NOFOLLOW_LINKS) shouldBe true
+
+  test("canonical temporary directory cleanup retains the raw path before resolution"):
+    val project = paths()
+    var rawCreated: Option[Path] = None
+
+    val error = intercept[IOException] {
+      ProjectTemporaryDirectory.create(
+        project.onionState,
+        "staging-canonical-failure-",
+        project.target,
+        path =>
+          rawCreated = Some(path)
+          throw IOException("injected canonicalization failure")
+      )
+    }
+
+    error.getMessage shouldBe "injected canonicalization failure"
+    rawCreated should not be empty
+    Files.notExists(rawCreated.value, NOFOLLOW_LINKS) shouldBe true
+    temporaryDirectories(project) shouldBe Vector.empty

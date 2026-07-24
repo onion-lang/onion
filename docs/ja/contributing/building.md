@@ -205,14 +205,24 @@ readiness ベンチマークスイートを実行します:
 sbt benchmark
 ```
 
-デフォルトのスイートは、すでにウォームアップされた JVM 内で毎回新しい
-Onion コンパイラを作成し、`run/Hello.on`、`run/TodoManager.on`、
-`run/StatsApp.on` をコンパイルします。生のナノ秒計測値、中央値、p95
-レイテンシ、フェーズ別時間、ソース規模、JVM/OS メタデータを報告します。
-これは **steady-state fresh-compiler** 計測です。JVM プロセスの起動時間は
-含まず、永続コンパイラキャッシュがあることも意味しません。
+デフォルトスイートは、次の6つの明示的なプロトコルを報告します:
 
-機械可読レポートは `target/readiness/benchmark-v1.json` に書き出されます。
+- `run/Hello.on`、`run/TodoManager.on`、`run/StatsApp.on` に対する
+  steady-state fresh compiler 計測
+- 子 JVM の起動と終了を含む process-cold の
+  `onion run/Hello.on` 計測
+- 1つの永続的かつ状態が増加する Onion REPL セッションへの連続入力
+- `benchmarks/fixtures/automation-project/` にある決定的な20ファイル
+  automation fixture の一括コンパイル
+
+process-cold のデフォルト warmup は3回、その他は8回です。全プロトコルを
+25回計測し、1 iteration の timeout は30秒です。`--warmups N` は各
+scenario のデフォルトを上書きします。schema-v2 JSON は有効な設定を
+scenario ごとに保存するため、異なる lifecycle を同一条件の計測として
+扱いません。また、生のナノ秒計測値、中央値、p95、取得可能なフェーズ別
+時間、ソース規模、JVM/OS メタデータも保持します。
+
+機械可読レポートは `target/readiness/benchmark-v2.json` に書き出されます。
 プロトコルだけを短時間で確認するには次を実行します:
 
 ```bash

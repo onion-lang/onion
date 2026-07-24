@@ -7,8 +7,10 @@ import onion.tools.readiness.benchmark.{
   BenchmarkScenario,
   BenchmarkSession,
   FailureCategory,
+  IterationPayload,
   ScenarioKind,
-  ScenarioMetadata
+  ScenarioMetadata,
+  SourceMetrics
 }
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
@@ -55,3 +57,34 @@ class BenchmarkRunnerSpec extends AnyFunSpec with Matchers:
         processScenario,
         overrideOptions
       ).warmupIterations shouldBe 0
+
+    it("runs and records each scenario with its effective configuration"):
+      def scenario(
+        id: String,
+        kind: ScenarioKind,
+        warmups: Int
+      ): BenchmarkScenario =
+        new BenchmarkScenario:
+          override val metadata =
+            ScenarioMetadata(id, kind, "test", "hash")
+          override def defaultWarmupIterations: Int = warmups
+          override def open(): BenchmarkSession = new BenchmarkSession:
+            override def runIteration(index: Int): IterationPayload =
+              IterationPayload(
+                Vector.empty,
+                SourceMetrics(1, 1, 1L, 1),
+                0
+              )
+
+      val scenarios = Vector(
+        scenario("process", ScenarioKind.ProcessCold, 3),
+        scenario("steady", ScenarioKind.SteadyFresh, 8)
+      )
+      val options = BenchmarkOptions(
+        runConfig = BenchmarkRunConfig(8, 1, 1000L)
+      )
+
+      val results = BenchmarkRunner.runScenarios(scenarios, options)
+
+      results.map(_.runConfig.warmupIterations) shouldBe Vector(3, 8)
+      results.map(_.warmups.size) shouldBe Vector(3, 8)

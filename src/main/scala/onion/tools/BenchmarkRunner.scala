@@ -41,7 +41,16 @@ object BenchmarkRunner:
             )
           )
     val (scenarios, setupFailures) =
-      try (CompileScenarioCatalog.default(repoRoot), Vector.empty)
+      try
+        val runtime = JvmRuntime.current()
+        (
+          CompileScenarioCatalog.default(
+            repoRoot,
+            runtime,
+            options.runConfig.timeoutMillis
+          ),
+          Vector.empty
+        )
       catch
         case NonFatal(error) =>
           (
@@ -55,7 +64,20 @@ object BenchmarkRunner:
               )
             )
           )
-    val results = scenarios.map { scenario =>
+    val results = runScenarios(scenarios, options)
+    PerformanceBenchmarkReport.create(
+      git = git,
+      environment = EnvironmentMetadata.capture(),
+      runConfig = options.runConfig,
+      scenarios = results,
+      failures = metadataFailures ++ setupFailures
+    )
+
+  private[onion] def runScenarios(
+    scenarios: Vector[BenchmarkScenario],
+    options: BenchmarkOptions
+  ): Vector[ScenarioResult] =
+    scenarios.map { scenario =>
       val engine = new BenchmarkEngine(
         effectiveConfig(scenario, options),
         NanoClock.System,
@@ -64,13 +86,6 @@ object BenchmarkRunner:
       try engine.run(scenario)
       finally engine.close()
     }
-    PerformanceBenchmarkReport.create(
-      git = git,
-      environment = EnvironmentMetadata.capture(),
-      runConfig = options.runConfig,
-      scenarios = results,
-      failures = metadataFailures ++ setupFailures
-    )
 
   private[onion] def effectiveConfig(
     scenario: BenchmarkScenario,

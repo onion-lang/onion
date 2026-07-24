@@ -205,15 +205,26 @@ Run the readiness benchmark suite:
 sbt benchmark
 ```
 
-The default suite measures a fresh Onion compiler inside an already-warmed JVM
-against `run/Hello.on`, `run/TodoManager.on`, and `run/StatsApp.on`. It reports
-raw nanosecond observations, median and p95 latency, phase timings, source
-metrics, and JVM/OS metadata. This is a **steady-state fresh-compiler**
-measurement; it does not include JVM process startup and does not imply a
-persistent compiler cache.
+The default suite reports six explicit protocols:
+
+- steady-state fresh compiler measurements for `run/Hello.on`,
+  `run/TodoManager.on`, and `run/StatsApp.on`;
+- a process-cold `onion run/Hello.on` measurement that includes child-JVM
+  startup and shutdown;
+- submissions to one persistent, growing Onion REPL session; and
+- one compilation of the deterministic 20-file automation fixture under
+  `benchmarks/fixtures/automation-project/`.
+
+Process-cold uses 3 warmups by default; the other protocols use 8. Every
+protocol uses 25 measured iterations and a 30-second iteration timeout.
+`--warmups N` overrides the scenario defaults. The schema-v2 JSON report stores
+the effective configuration beside every scenario so unlike lifecycles are
+never presented as identical measurements. It also retains raw nanosecond
+observations, median and p95 latency, phase timings where available, source
+metrics, and JVM/OS metadata.
 
 The machine-readable report is written to
-`target/readiness/benchmark-v1.json`. For a quick protocol smoke test:
+`target/readiness/benchmark-v2.json`. For a quick protocol smoke test:
 
 ```bash
 sbt 'benchmark --warmups 0 --iterations 1'

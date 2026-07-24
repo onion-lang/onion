@@ -57,7 +57,7 @@ object BenchmarkRunner:
           )
     val results = scenarios.map { scenario =>
       val engine = new BenchmarkEngine(
-        options.runConfig,
+        effectiveConfig(scenario, options),
         NanoClock.System,
         BenchmarkExecutor.daemonSingleThread()
       )
@@ -70,6 +70,15 @@ object BenchmarkRunner:
       runConfig = options.runConfig,
       scenarios = results,
       failures = metadataFailures ++ setupFailures
+    )
+
+  private[onion] def effectiveConfig(
+    scenario: BenchmarkScenario,
+    options: BenchmarkOptions
+  ): BenchmarkRunConfig =
+    options.runConfig.copy(
+      warmupIterations =
+        options.warmupOverride.getOrElse(scenario.defaultWarmupIterations)
     )
 
   private def writeJson(path: Path, content: String): Unit =

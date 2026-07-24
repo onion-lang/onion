@@ -4,7 +4,11 @@ import onion.tools.readiness.benchmark.{
   BenchmarkOptions,
   BenchmarkOutputFormat,
   BenchmarkRunConfig,
-  FailureCategory
+  BenchmarkScenario,
+  BenchmarkSession,
+  FailureCategory,
+  ScenarioKind,
+  ScenarioMetadata
 }
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
@@ -31,3 +35,23 @@ class BenchmarkRunnerSpec extends AnyFunSpec with Matchers:
       report.failures.map(_.message).mkString(" ") should include (
         "workload source does not exist"
       )
+
+    it("uses scenario warmups unless the CLI overrides them"):
+      val processScenario = new BenchmarkScenario:
+        override val metadata =
+          ScenarioMetadata("process", ScenarioKind.ProcessCold, "test", "hash")
+        override def defaultWarmupIterations: Int = 3
+        override def open(): BenchmarkSession =
+          throw new UnsupportedOperationException()
+
+      BenchmarkRunner.effectiveConfig(
+        processScenario,
+        BenchmarkOptions()
+      ).warmupIterations shouldBe 3
+
+      val overrideOptions =
+        BenchmarkOptions.parse(Array("--warmups", "0")).toOption.get
+      BenchmarkRunner.effectiveConfig(
+        processScenario,
+        overrideOptions
+      ).warmupIterations shouldBe 0

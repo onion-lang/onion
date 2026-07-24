@@ -199,11 +199,27 @@ sbt 'runScript run/Hello.on'
 sbt repl
 ```
 
-ベンチマークスイートを実行:
+readiness ベンチマークスイートを実行します:
 
 ```bash
-sbt bench
+sbt benchmark
 ```
+
+デフォルトのスイートは、すでにウォームアップされた JVM 内で毎回新しい
+Onion コンパイラを作成し、`run/Hello.on`、`run/TodoManager.on`、
+`run/StatsApp.on` をコンパイルします。生のナノ秒計測値、中央値、p95
+レイテンシ、フェーズ別時間、ソース規模、JVM/OS メタデータを報告します。
+これは **steady-state fresh-compiler** 計測です。JVM プロセスの起動時間は
+含まず、永続コンパイラキャッシュがあることも意味しません。
+
+機械可読レポートは `target/readiness/benchmark-v1.json` に書き出されます。
+プロトコルだけを短時間で確認するには次を実行します:
+
+```bash
+sbt 'benchmark --warmups 0 --iterations 1'
+```
+
+`sbt bench` は互換エイリアスとして残り、同じオプションを受け付けます。
 
 コンパイルプロファイルを出力:
 

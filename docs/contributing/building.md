@@ -199,11 +199,27 @@ Run the promoted REPL:
 sbt repl
 ```
 
-Run the benchmark suite:
+Run the readiness benchmark suite:
 
 ```bash
-sbt bench
+sbt benchmark
 ```
+
+The default suite measures a fresh Onion compiler inside an already-warmed JVM
+against `run/Hello.on`, `run/TodoManager.on`, and `run/StatsApp.on`. It reports
+raw nanosecond observations, median and p95 latency, phase timings, source
+metrics, and JVM/OS metadata. This is a **steady-state fresh-compiler**
+measurement; it does not include JVM process startup and does not imply a
+persistent compiler cache.
+
+The machine-readable report is written to
+`target/readiness/benchmark-v1.json`. For a quick protocol smoke test:
+
+```bash
+sbt 'benchmark --warmups 0 --iterations 1'
+```
+
+`sbt bench` remains a compatibility alias and accepts the same options.
 
 Emit compile profiles:
 

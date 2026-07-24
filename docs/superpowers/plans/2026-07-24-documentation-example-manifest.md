@@ -479,6 +479,18 @@ Append these cases to the same `describe` block:
 
       assert(result.issues.map(_.location.line) == (1 to 12).toVector)
 
+    it("reports issues in source order across extraction phases"):
+      val markdown =
+        """```onion
+          |1
+          |```
+          |<!-- onion-example: execute -->
+          |""".stripMargin
+
+      val result = MarkdownExampleExtractor.extract(path, markdown)
+
+      assert(result.issues.map(_.location.line) == Vector(1, 4))
+
     it("does not attach output declarations to non-run examples"):
       val markdown =
         """<!-- onion-example: compile -->
@@ -562,7 +574,8 @@ Append these cases to the same `describe` block:
     it("rejects an unterminated Onion fence without scanning its content"):
       val result = MarkdownExampleExtractor.extract(
         path,
-        "```onion\n<!-- onion-example: execute -->\n"
+        "<!-- onion-example: compile -->\n" +
+          "```onion\n<!-- onion-example: execute -->\n"
       )
       assert(result.issues.map(_.message) == Vector(
         "unterminated Markdown fence"
@@ -603,7 +616,12 @@ object MarkdownExampleExtractor:
 
   def extract(path: Path, markdown: String): ExtractionResult =
     val lines = normalize(markdown).split("\n", -1).toVector
-    val (fences, fenceIssues, fencedLines) = scanFences(path, lines)
+    val (
+      fences,
+      fenceIssues,
+      fencedLines,
+      unterminatedOnionFenceLines
+    ) = scanFences(path, lines)
     val directives = scanDirectives(path, lines, fencedLines)
     val examples = Vector.newBuilder[DocumentationExample]
     val issues = Vector.newBuilder[DocumentationIssue]
@@ -618,7 +636,7 @@ object MarkdownExampleExtractor:
       classificationBefore(
         path,
         lines,
-        fence,
+        fence.openingLine,
         directives,
         consumedExamples,
         issues
@@ -645,6 +663,17 @@ object MarkdownExampleExtractor:
       }
     }
 
+    unterminatedOnionFenceLines.foreach { openingLine =>
+      classificationBefore(
+        path,
+        lines,
+        openingLine,
+        directives,
+        consumedExamples,
+        issues
+      )
+    }
+
     directives.foreach {
       case (line, Right(DocumentationDirective.Example(_)))
           if !consumedExamples.contains(line) =>
@@ -661,7 +690,10 @@ object MarkdownExampleExtractor:
       case _ => ()
     }
 
-    ExtractionResult(examples.result(), issues.result().distinct)
+    val orderedIssues = issues.result().distinct.sortBy { issue =>
+      (issue.location.path.toString, issue.location.line, issue.message)
+    }
+    ExtractionResult(examples.result(), orderedIssues)
 
   private def normalize(value: String): String =
     value.replace("\r\n", "\n").replace('\r', '\n')
@@ -669,10 +701,16 @@ object MarkdownExampleExtractor:
   private def scanFences(
     path: Path,
     lines: Vector[String]
-  ): (Vector[Fence], Vector[DocumentationIssue], Set[Int]) =
+  ): (
+    Vector[Fence],
+    Vector[DocumentationIssue],
+    Set[Int],
+    Vector[Int]
+  ) =
     val fences = Vector.newBuilder[Fence]
     val issues = Vector.newBuilder[DocumentationIssue]
     val fencedLines = mutable.Set.empty[Int]
+    val unterminatedOnionFenceLines = Vector.newBuilder[Int]
     var index = 0
     while index < lines.length do
       lines(index) match
@@ -704,6 +742,8 @@ object MarkdownExampleExtractor:
               index = close + 1
             case None =>
               fencedLines ++= index + 1 to lines.length
+              if language == "onion" then
+                unterminatedOnionFenceLines += index + 1
               issues += DocumentationIssue(
                 MarkdownLocation(path, index + 1),
                 "unterminated Markdown fence"
@@ -711,7 +751,12 @@ object MarkdownExampleExtractor:
               index = lines.length
         case _ =>
           index += 1
-    (fences.result(), issues.result(), fencedLines.toSet)
+    (
+      fences.result(),
+      issues.result(),
+      fencedLines.toSet,
+      unterminatedOnionFenceLines.result()
+    )
 
   private def scanDirectives(
     path: Path,
@@ -730,7 +775,7 @@ object MarkdownExampleExtractor:
   private def classificationBefore(
     path: Path,
     lines: Vector[String],
-    fence: Fence,
+    openingLine: Int,
     directives: Map[
       Int,
       Either[DocumentationIssue, DocumentationDirective]
@@ -738,10 +783,10 @@ object MarkdownExampleExtractor:
     consumed: mutable.Set[Int],
     issues: mutable.Builder[DocumentationIssue, Vector[DocumentationIssue]]
   ): Option[ExampleKind] =
-    previousNonBlank(lines, fence.openingLine - 1) match
+    previousNonBlank(lines, openingLine - 1) match
       case None =>
         issues += DocumentationIssue(
-          MarkdownLocation(path, fence.openingLine),
+          MarkdownLocation(path, openingLine),
           "unclassified Onion fence"
         )
         None
@@ -766,7 +811,7 @@ object MarkdownExampleExtractor:
                 Some(kind)
           case _ =>
             issues += DocumentationIssue(
-              MarkdownLocation(path, fence.openingLine),
+              MarkdownLocation(path, openingLine),
               "unclassified Onion fence"
             )
             None

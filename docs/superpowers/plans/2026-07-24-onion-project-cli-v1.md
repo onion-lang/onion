@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:executing-plans to implement this plan task-by-task. Follow
 > superpowers:test-driven-development for every behavior change. Steps use
-> checkbox (`- [ ]`) syntax for tracking.
+> checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a convention-over-configuration Onion project workflow whose
 complete first-use journey is `onion new → build/run → test → clean`, while
@@ -71,7 +71,7 @@ object ProjectManifest:
   private[project] def validVersion(value: String): Boolean
 ```
 
-- [ ] **Step 1: Write failing manifest tests**
+- [x] **Step 1: Write failing manifest tests**
 
 Cover:
 
@@ -87,7 +87,7 @@ Cover:
 Use a temporary directory and assert error message text, not exception classes.
 Ensure the loaded `bytes` equal the exact file bytes.
 
-- [ ] **Step 2: Run the test and observe dependency/implementation failure**
+- [x] **Step 2: Run the test and observe dependency/implementation failure**
 
 Run:
 
@@ -97,7 +97,7 @@ sbt -Duser.language=en 'testOnly onion.tools.project.ProjectManifestSpec'
 
 Expected: FAIL because the model does not exist.
 
-- [ ] **Step 3: Add TOML dependency**
+- [x] **Step 3: Add TOML dependency**
 
 Add to `libraryDependencies`:
 
@@ -107,7 +107,7 @@ Add to `libraryDependencies`:
 
 Do not mark it test-only; the distribution needs it at runtime.
 
-- [ ] **Step 4: Implement strict loading**
+- [x] **Step 4: Implement strict loading**
 
 Use `Toml.parse(path)`, collect all parse errors in stable position order, and
 inspect `keySet()` at the root and package table. Validate values only after
@@ -125,11 +125,11 @@ private val SemVer =
 
 Read manifest bytes before parsing and preserve them in the result.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run the targeted suite and `git diff --check`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add build.sbt src/main/scala/onion/tools/project \
@@ -174,7 +174,7 @@ object ProjectLayout:
   def discover(paths: ProjectPaths): Either[ProjectError, ProjectLayout]
 ```
 
-- [ ] **Step 1: Write failing locator tests**
+- [x] **Step 1: Write failing locator tests**
 
 Prove:
 
@@ -185,7 +185,7 @@ Prove:
 - the root is canonical; and
 - a missing manifest reports the absolute normalized starting path.
 
-- [ ] **Step 2: Write failing layout tests**
+- [x] **Step 2: Write failing layout tests**
 
 Prove:
 
@@ -197,14 +197,14 @@ Prove:
 - normalized relative paths use `/`; and
 - directory and file symbolic links are ignored.
 
-- [ ] **Step 3: Run and observe failure**
+- [x] **Step 3: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.ProjectLocatorSpec onion.tools.project.ProjectLayoutSpec'
 ```
 
-- [ ] **Step 4: Implement discovery**
+- [x] **Step 4: Implement discovery**
 
 Walk parent paths iteratively. Once found, call `toRealPath()` on the root and
 derive every generated path from that canonical root.
@@ -213,7 +213,7 @@ Use `Files.walk(root)` without `FOLLOW_LINKS`. Retain only
 `Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)` and explicitly reject
 `Files.isSymbolicLink(path)`. Close every walk stream with `Using.resource`.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project \
@@ -237,7 +237,7 @@ object ProjectScaffolder:
   def create(parent: Path, name: String): Either[ProjectError, ProjectPaths]
 ```
 
-- [ ] **Step 1: Write failing scaffold tests**
+- [x] **Step 1: Write failing scaffold tests**
 
 Assert exact UTF-8 content for:
 
@@ -249,14 +249,14 @@ Also prove invalid names fail without creating a path, existing files or
 directories are never overwritten, a partially failed creation is cleaned up,
 and no `.git` directory is created.
 
-- [ ] **Step 2: Run and observe failure**
+- [x] **Step 2: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.ProjectScaffolderSpec'
 ```
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create the project root with `Files.createDirectory`, then create fixed child
 directories and files. Track whether this invocation created the root. On any
@@ -274,7 +274,7 @@ def main(args: String[]): void {
 Assert::assertEquals(4, 2 + 2)
 ```
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project/ProjectScaffolder.scala \
@@ -322,7 +322,7 @@ private[tools] def run(
 not-yet-implemented project error for the other recognized commands. Those
 temporary errors are replaced before the branch is published.
 
-- [ ] **Step 1: Write failing routing tests**
+- [x] **Step 1: Write failing routing tests**
 
 Use fake `LegacyCommands` and a temporary cwd. Cover:
 
@@ -336,13 +336,13 @@ Use fake `LegacyCommands` and a temporary cwd. Cover:
 - stdout/stderr separation; and
 - exit `0`, `1`, and `2`.
 
-- [ ] **Step 2: Run and observe failure**
+- [x] **Step 2: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en 'testOnly onion.tools.OnionCliSpec'
 ```
 
-- [ ] **Step 3: Refactor script main without behavior change**
+- [x] **Step 3: Refactor script main without behavior change**
 
 Extract:
 
@@ -354,7 +354,7 @@ from `ScriptRunner.main`. It must retain `--help`, `--version`, `--watch`,
 verbose filtering, `ScriptException` unwrapping, and the existing runner exit
 code. `main` calls `runMain` and exits only when nonzero.
 
-- [ ] **Step 4: Implement dispatcher and command parser**
+- [x] **Step 4: Implement dispatcher and command parser**
 
 Do not use a general parser dependency. There are five commands and only
 `--verbose` plus the run separator. Centralize usage text and normalize all
@@ -362,7 +362,7 @@ project usage failures to exit `2`.
 
 `OnionCli.main` passes real process dependencies and exits only after `run`.
 
-- [ ] **Step 5: Run targeted compatibility suites**
+- [x] **Step 5: Run targeted compatibility suites**
 
 ```bash
 sbt -Duser.language=en \
@@ -372,7 +372,7 @@ sbt -Duser.language=en \
 Use `rg --files src/test/scala | rg 'ScriptRunner'` to substitute the exact
 existing suite names when necessary.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/scala/onion/tools/OnionCli.scala \
@@ -411,7 +411,7 @@ object CompiledClassWriter:
   ): Either[CompiledClassWriteError, Vector[Path]]
 ```
 
-- [ ] **Step 1: Write failing writer tests**
+- [x] **Step 1: Write failing writer tests**
 
 Cover:
 
@@ -424,13 +424,13 @@ Cover:
 
 Use `CompiledClass` values with temporary output paths and known bytes.
 
-- [ ] **Step 2: Run and observe failure**
+- [x] **Step 2: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en 'testOnly onion.tools.CompiledClassWriterSpec'
 ```
 
-- [ ] **Step 3: Implement and share**
+- [x] **Step 3: Implement and share**
 
 Validate every binary-name segment with Java identifier-compatible ASCII plus
 `$`, resolve segments below the normalized output root, and verify
@@ -442,7 +442,7 @@ simple-name-only path. Keep this general writer independent of
 `onion.tools.project`; `ProjectBuilder` translates a write error into its own
 `ProjectError` at the boundary.
 
-- [ ] **Step 4: Run writer and frontend tests, then commit**
+- [x] **Step 4: Run writer and frontend tests, then commit**
 
 ```bash
 git add src/main/scala/onion/tools/CompiledClassWriter.scala \
@@ -496,7 +496,7 @@ object BuildState:
   def validatesOutputs(state: BuildState, classesRoot: Path): Boolean
 ```
 
-- [ ] **Step 1: Write failing fingerprint tests**
+- [x] **Step 1: Write failing fingerprint tests**
 
 Use fake version/JDK inputs. Prove absolute roots and input enumeration order do
 not matter after caller sorting, while every declared field, source addition,
@@ -504,27 +504,27 @@ removal, rename, and byte change does.
 
 Include an ambiguity regression such as `("ab", "c")` versus `("a", "bc")`.
 
-- [ ] **Step 2: Write failing state tests**
+- [x] **Step 2: Write failing state tests**
 
 Cover deterministic pretty JSON, round trip, malformed JSON, unknown/missing
 fields, numeric range, wrong types, schema mismatch, duplicate/unsafe classes,
 unsorted input normalization or rejection, invalid source paths, entrypoint
 class membership, and missing class files.
 
-- [ ] **Step 3: Run and observe failure**
+- [x] **Step 3: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.BuildFingerprintSpec onion.tools.project.BuildStateSpec'
 ```
 
-- [ ] **Step 4: Implement fingerprint**
+- [x] **Step 4: Implement fingerprint**
 
 Use `MessageDigest.getInstance("SHA-256")` and a helper that feeds a four-byte
 big-endian length followed by UTF-8 or raw bytes. Sort sources by relative path
 inside `compute` defensively.
 
-- [ ] **Step 5: Implement state with `onion.Json`**
+- [x] **Step 5: Implement state with `onion.Json`**
 
 Construct `java.util.LinkedHashMap` and `java.util.ArrayList` values for stable
 encoding. Decode into the JSON intermediate types and explicitly validate every
@@ -534,7 +534,7 @@ exceptions separately.
 Class output validation calls the same binary-name path helper as
 `CompiledClassWriter`.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project/BuildFingerprint.scala \
@@ -568,7 +568,7 @@ object EntryPointDiscovery:
   ): Either[ProjectError, EntryPoint]
 ```
 
-- [ ] **Step 1: Write failing tests with real parser output**
+- [x] **Step 1: Write failing tests with real parser output**
 
 Compile or parse small temporary sources and prove:
 
@@ -582,14 +582,14 @@ Compile or parse small temporary sources and prove:
 - a module prefixes the top-level class; and
 - same-basename class collisions are rejected with both sources.
 
-- [ ] **Step 2: Run and observe failure**
+- [x] **Step 2: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.EntryPointDiscoverySpec'
 ```
 
-- [ ] **Step 3: Implement from parsed units**
+- [x] **Step 3: Implement from parsed units**
 
 Match original `AST.FunctionDeclaration` nodes named `main` and
 `AST.BlockElement` nodes. Reproduce the compiler top-class rule:
@@ -605,7 +605,7 @@ outside it.
 
 Do not inspect generated JVM methods to select an entrypoint.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project/EntryPointDiscovery.scala \
@@ -652,7 +652,7 @@ final class ProjectBuilder(
   ): Either[ProjectError, ProjectBuild]
 ```
 
-- [ ] **Step 1: Write failing transaction tests**
+- [x] **Step 1: Write failing transaction tests**
 
 Use a fake mover that fails on a configured move number. Prove:
 
@@ -663,7 +663,7 @@ Use a fake mover that fails on a configured move number. Prove:
 - backup/staging cleanup; and
 - deletion does not traverse directory symbolic links.
 
-- [ ] **Step 2: Write failing builder tests**
+- [x] **Step 2: Write failing builder tests**
 
 Use real tiny Onion projects. Cover:
 
@@ -678,14 +678,14 @@ Use real tiny Onion projects. Cover:
 - deterministic class and entrypoint order; and
 - staging cleanup on all failures.
 
-- [ ] **Step 3: Run and observe failure**
+- [x] **Step 3: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.BuildOutputTransactionSpec onion.tools.project.ProjectBuilderSpec'
 ```
 
-- [ ] **Step 4: Implement safe tree utilities and transaction**
+- [x] **Step 4: Implement safe tree utilities and transaction**
 
 `FileTree.delete(path)` checks that the requested path was derived below the
 validated project target, walks without link following, and deletes children
@@ -700,7 +700,7 @@ Files.move(source, target, StandardCopyOption.ATOMIC_MOVE)
 and retries without `ATOMIC_MOVE` only for
 `AtomicMoveNotSupportedException`.
 
-- [ ] **Step 5: Implement builder**
+- [x] **Step 5: Implement builder**
 
 Main compilation uses UTF-8, no external project dependency classpath, staging
 classes as `outputDirectory`, ten maximum errors, normal warnings, and law
@@ -717,7 +717,7 @@ After a successful compiler result:
 If parsed artifacts are unexpectedly absent after successful compilation,
 return an internal project error rather than emitting an empty state.
 
-- [ ] **Step 6: Wire `build` command**
+- [x] **Step 6: Wire `build` command**
 
 Replace the temporary `ProjectCommands.build` failure. It locates, loads,
 discovers, and builds, then prints:
@@ -727,7 +727,7 @@ Built <name> (<n> classes)
 Built <name> (cached)
 ```
 
-- [ ] **Step 7: Run tests and commit**
+- [x] **Step 7: Run tests and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project \
@@ -763,7 +763,7 @@ object ProjectClassRunner:
   ): ProgramResult
 ```
 
-- [ ] **Step 1: Write failing runner tests**
+- [x] **Step 1: Write failing runner tests**
 
 Compile fixture classes and cover:
 
@@ -776,7 +776,7 @@ Compile fixture classes and cover:
 - context-class-loader restoration; and
 - class-loader closure after execution.
 
-- [ ] **Step 2: Write failing run integration tests**
+- [x] **Step 2: Write failing run integration tests**
 
 Cover:
 
@@ -790,14 +790,14 @@ Cover:
 - verbose stack trace; and
 - normalized command exit codes.
 
-- [ ] **Step 3: Run and observe failure**
+- [x] **Step 3: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.ProjectClassRunnerSpec onion.tools.project.ProjectRunIntegrationSpec'
 ```
 
-- [ ] **Step 4: Implement runner**
+- [x] **Step 4: Implement runner**
 
 Construct a fresh `URLClassLoader` for every call. Load exactly `className`.
 Invoke with:
@@ -809,12 +809,12 @@ method.invoke(null, args.asInstanceOf[Object])
 so the array is one reflection argument. Unwrap `InvocationTargetException`.
 Use the returned method value for numeric exit semantics.
 
-- [ ] **Step 5: Wire `run`**
+- [x] **Step 5: Wire `run`**
 
 Build first, require exactly one `BuildState.entryPoints` item, and pass only
 post-`--` arguments. Print entrypoint ambiguity to stderr with locations.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project \
@@ -858,13 +858,13 @@ final class ProjectTestRunner:
   ): TestRunResult
 ```
 
-- [ ] **Step 1: Write failing unit tests**
+- [x] **Step 1: Write failing unit tests**
 
 Use injectable compile/run boundaries where useful. Prove sorted sequential
 execution, summary counts, continue-after-failure, capture restoration after a
 throw, failed-output rendering, verbose passed-output rendering, and cleanup.
 
-- [ ] **Step 2: Write failing real integration tests**
+- [x] **Step 2: Write failing real integration tests**
 
 Temporary projects cover:
 
@@ -880,14 +880,14 @@ Temporary projects cover:
 - missing/empty tests; and
 - cached main build with tests still rerun.
 
-- [ ] **Step 3: Run and observe failure**
+- [x] **Step 3: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.ProjectTestRunnerSpec onion.tools.project.ProjectTestIntegrationSpec'
 ```
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 For each test:
 
@@ -902,7 +902,7 @@ For each test:
 Compile diagnostics belong to the test's failure detail. They must not abort
 the rest of the suite.
 
-- [ ] **Step 5: Wire `test` and commit**
+- [x] **Step 5: Wire `test` and commit**
 
 ```bash
 git add src/main/scala/onion/tools/project \

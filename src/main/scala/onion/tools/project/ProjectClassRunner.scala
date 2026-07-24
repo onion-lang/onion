@@ -44,12 +44,12 @@ object ProjectClassRunner:
         try thread.setContextClassLoader(previousLoader)
         catch
           case NonFatal(error) =>
-            outcome = lifecycleFailure(outcome, "restore the context class loader", error)
+            outcome = withLifecycleFailure(outcome, "restore the context class loader", error)
       if loader != null then
         try loader.close()
         catch
           case NonFatal(error) =>
-            outcome = lifecycleFailure(outcome, "close the project class loader", error)
+            outcome = withLifecycleFailure(outcome, "close the project class loader", error)
 
     outcome.getOrElse(
       ProgramResult.Failure(
@@ -64,7 +64,7 @@ object ProjectClassRunner:
     args: Array[String]
   ): ProgramResult =
     try
-      val entryClass = Class.forName(className, true, loader)
+      val entryClass = Class.forName(className, false, loader)
       val main =
         try entryClass.getDeclaredMethod("main", classOf[Array[String]])
         catch
@@ -111,7 +111,7 @@ object ProjectClassRunner:
       Some(error)
     )
 
-  private def lifecycleFailure(
+  private[project] def withLifecycleFailure(
     current: Option[ProgramResult],
     action: String,
     error: Throwable
@@ -120,8 +120,8 @@ object ProjectClassRunner:
       case Some(ProgramResult.Failure(_, Some(primary))) =>
         primary.addSuppressed(error)
         current
-      case Some(failure: ProgramResult.Failure) =>
-        Some(failure)
+      case Some(ProgramResult.Failure(message, None)) =>
+        Some(ProgramResult.Failure(message, Some(error)))
       case _ =>
         Some(ProgramResult.Failure(
           s"Could not $action: ${describe(error)}",

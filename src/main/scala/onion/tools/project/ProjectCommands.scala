@@ -52,9 +52,7 @@ class ProjectCommands:
               args
             ) match
               case ProgramResult.Success(value) =>
-                value match
-                  case number: java.lang.Number if !numericZero(number) => 1
-                  case _ => 0
+                ProjectCommands.programExitCode(value)
               case ProgramResult.Failure(message, cause) =>
                 err.println(s"error: $message")
                 if verbose then cause.foreach(_.printStackTrace(err))
@@ -90,8 +88,18 @@ class ProjectCommands:
       build <- ProjectBuilder().build(paths, manifest, layout, err)
     yield build
 
+object ProjectCommands:
+  private[project] def programExitCode(value: Any): Int =
+    // Compiler-generated zero-argument/scalar auto-CLI wrappers return void.
+    // A numeric value reaches here only from a directly invokable raw-argv main.
+    value match
+      case number: java.lang.Number if !numericZero(number) => 1
+      case _ => 0
+
   private def numericZero(number: java.lang.Number): Boolean =
     number match
+      case value: scala.math.BigInt => value.signum == 0
+      case value: scala.math.BigDecimal => value.signum == 0
       case value: java.math.BigDecimal => value.signum() == 0
       case value: java.math.BigInteger => value.signum() == 0
       case value: java.lang.Byte => value.byteValue() == 0
@@ -100,4 +108,4 @@ class ProjectCommands:
       case value: java.lang.Long => value.longValue() == 0L
       case value: java.lang.Float => value.floatValue() == 0.0f
       case value: java.lang.Double => value.doubleValue() == 0.0d
-      case value => value.doubleValue() == 0.0d
+      case _ => false

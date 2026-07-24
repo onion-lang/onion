@@ -1,6 +1,7 @@
 package onion.tools.project
 
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.Path
@@ -58,6 +59,31 @@ class ProjectClassRunnerSpec extends AnyFunSuite with Matchers:
             |  public static long main(String[] args) { return 7L; }
             |}
             |""".stripMargin,
+        "fixture.TinyBigDecimalMain" ->
+          """package fixture;
+            |public final class TinyBigDecimalMain {
+            |  public static java.math.BigDecimal main(String[] args) {
+            |    return new java.math.BigDecimal("1e-10000");
+            |  }
+            |}
+            |""".stripMargin,
+        "fixture.UnderflowNumber" ->
+          """package fixture;
+            |public final class UnderflowNumber extends Number {
+            |  public int intValue() { return 1; }
+            |  public long longValue() { return 1L; }
+            |  public float floatValue() { return 0.0f; }
+            |  public double doubleValue() { return 0.0d; }
+            |}
+            |""".stripMargin,
+        "fixture.UnderflowNumberMain" ->
+          """package fixture;
+            |public final class UnderflowNumberMain {
+            |  public static Number main(String[] args) {
+            |    return new UnderflowNumber();
+            |  }
+            |}
+            |""".stripMargin,
         "fixture.OtherMain" ->
           """package fixture;
             |public final class OtherMain {
@@ -67,6 +93,16 @@ class ProjectClassRunnerSpec extends AnyFunSuite with Matchers:
         "fixture.NoMain" ->
           """package fixture;
             |public final class NoMain {}
+            |""".stripMargin,
+        "fixture.InitializerNoMain" ->
+          """package fixture;
+            |public final class InitializerNoMain {
+            |  static {
+            |    if (Boolean.parseBoolean("true")) {
+            |      throw new IllegalStateException("initializer ran");
+            |    }
+            |  }
+            |}
             |""".stripMargin,
         "fixture.PrivateMain" ->
           """package fixture;
@@ -142,6 +178,32 @@ class ProjectClassRunnerSpec extends AnyFunSuite with Matchers:
     ProjectClassRunner.run(Vector(classes), "fixture.NonzeroMain", Array.empty) shouldBe
       ProgramResult.Success(7L)
 
+  test("classifies exact standard Scala and Java numeric values conservatively"):
+    def exitCode(className: String): Int =
+      ProjectClassRunner.run(Vector(classes), className, Array.empty) match
+        case ProgramResult.Success(value) => ProjectCommands.programExitCode(value)
+        case failure => fail(s"expected success, got $failure")
+
+    exitCode("fixture.ZeroIntMain") shouldBe 0
+    exitCode("fixture.ZeroDoubleMain") shouldBe 0
+    exitCode("fixture.NonzeroMain") shouldBe 1
+    exitCode("fixture.TinyBigDecimalMain") shouldBe 1
+    exitCode("fixture.UnderflowNumberMain") shouldBe 1
+
+    ProjectCommands.programExitCode(java.lang.Double.valueOf(Double.NaN)) shouldBe 1
+    ProjectCommands.programExitCode(
+      java.lang.Double.valueOf(Double.PositiveInfinity)
+    ) shouldBe 1
+    ProjectCommands.programExitCode(
+      java.lang.Float.valueOf(Float.NegativeInfinity)
+    ) shouldBe 1
+    ProjectCommands.programExitCode(java.lang.Double.valueOf(-0.0d)) shouldBe 0
+    ProjectCommands.programExitCode(java.lang.Float.valueOf(-0.0f)) shouldBe 0
+    ProjectCommands.programExitCode(scala.math.BigInt(0)) shouldBe 0
+    ProjectCommands.programExitCode(scala.math.BigInt(1)) shouldBe 1
+    ProjectCommands.programExitCode(scala.math.BigDecimal(0)) shouldBe 0
+    ProjectCommands.programExitCode(scala.math.BigDecimal("1e-10000")) shouldBe 1
+
   test("reports a missing class and a missing main deterministically"):
     ProjectClassRunner.run(Vector(classes), "fixture.Missing", Array.empty) match
       case ProgramResult.Failure(message, cause) =>
@@ -166,6 +228,17 @@ class ProjectClassRunnerSpec extends AnyFunSuite with Matchers:
         "Entrypoint fixture.InstanceMain.main(String[]) is not static",
         None
       )
+
+  test("validates main before a class initializer can mask the diagnostic"):
+    ProjectClassRunner.run(
+      Vector(classes),
+      "fixture.InitializerNoMain",
+      Array.empty
+    ) match
+      case ProgramResult.Failure(message, cause) =>
+        message shouldBe "Entrypoint fixture.InitializerNoMain.main(String[]) was not found"
+        cause.value shouldBe a[NoSuchMethodException]
+      case result => fail(s"expected failure, got $result")
 
   test("unwraps an exception thrown by user code"):
     ProjectClassRunner.run(Vector(classes), "fixture.ThrowingMain", Array.empty) match
@@ -200,6 +273,31 @@ class ProjectClassRunnerSpec extends AnyFunSuite with Matchers:
 
     ProjectClassRunnerLoaderProbe.loader.value
       .getResource("loader-close-probe.txt") shouldBe null
+
+  test("retains lifecycle failures as a cause or a suppressed cause"):
+    val closeFailure = IOException("close failed")
+    val withoutCause = ProjectClassRunner.withLifecycleFailure(
+      Some(ProgramResult.Failure("invalid main", None)),
+      "close the project class loader",
+      closeFailure
+    )
+    withoutCause.value shouldBe ProgramResult.Failure(
+      "invalid main",
+      Some(closeFailure)
+    )
+
+    val primary = IllegalStateException("user failure")
+    val restoreFailure = SecurityException("restore failed")
+    val withCause = ProjectClassRunner.withLifecycleFailure(
+      Some(ProgramResult.Failure("IllegalStateException: user failure", Some(primary))),
+      "restore the context class loader",
+      restoreFailure
+    )
+    withCause.value shouldBe ProgramResult.Failure(
+      "IllegalStateException: user failure",
+      Some(primary)
+    )
+    primary.getSuppressed.toVector shouldBe Vector(restoreFailure)
 
   private def compileJava(
     sources: Map[String, String],

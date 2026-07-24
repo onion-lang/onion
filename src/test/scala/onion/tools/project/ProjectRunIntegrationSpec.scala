@@ -159,47 +159,64 @@ class ProjectRunIntegrationSpec extends AnyFunSuite with Matchers:
     result.stderr should include("main(")
 
   test("normalizes numeric program results to command exit zero or one"):
-    val zero = numericEntrypointFixture(0)
-    val nonzero = numericEntrypointFixture(23)
-    val tinyNonzero = cachedEntrypointFixture(
-      """class NumericEntrypoint {
-        |public:
-        |  static def main(args: String[]): java.math.BigDecimal {
-        |    return new java.math.BigDecimal("1e-10000")
-        |  }
-        |}
-        |def main(): void {}
-        |""".stripMargin
+    val zero = fixture(
+      Map(
+        "src/main.on" ->
+          """def main(args: String[]): Int {
+            |  return args.length - args.length
+            |}
+            |""".stripMargin
+      )
+    )
+    val nonzero = fixture(
+      Map(
+        "src/main.on" ->
+          """def main(args: String[]): Int {
+            |  return args.length + 23
+            |}
+            |""".stripMargin
+      )
+    )
+    val tinyNonzero = fixture(
+      Map(
+        "src/main.on" ->
+          """def main(args: String[]): java.math.BigDecimal {
+            |  return new java.math.BigDecimal(
+            |    (args.length + 1).toString() + "e-10000"
+            |  )
+            |}
+            |""".stripMargin
+      )
     )
 
     invoke(zero.root) shouldBe Invocation(0, "", "")
     invoke(nonzero.root) shouldBe Invocation(1, "", "")
     invoke(tinyNonzero.root) shouldBe Invocation(1, "", "")
 
-  private def numericEntrypointFixture(value: Int): Fixture =
-    cachedEntrypointFixture(
-      s"""class NumericEntrypoint {
-         |public:
-         |  static def main(args: String[]): Int {
-         |    return args.length * 0 + $value
-         |  }
-         |}
-         |def main(): void {}
-         |""".stripMargin
+  test("auto-CLI compatibility wrappers do not expose user return values as exit status"):
+    val cases = Vector(
+      fixture(Map(
+        "src/main.on" ->
+          """def main(): Int {
+            |  return 23
+            |}
+            |""".stripMargin
+      )) -> Array.empty[String],
+      fixture(Map(
+        "src/main.on" ->
+          """def main(value: Int): Int {
+            |  return value + 22
+            |}
+            |""".stripMargin
+      )) -> Array("1")
     )
 
-  private def cachedEntrypointFixture(source: String): Fixture =
-    val project = fixture(Map("src/main.on" -> source))
-    invoke(project.root).exitCode shouldBe 0
-    val state = BuildState.load(project.paths.buildState).toOption.value
-    state.classes should contain("NumericEntrypoint")
-    BuildState.write(
-      project.paths.buildState,
-      state.copy(entryPoints = Vector(
-        EntryPoint("NumericEntrypoint", "src/main.on", 3, 3)
-      ))
-    ).toOption.value
-    project
+    // v1 runs zero-argument and scalar mains through the compiler's generated
+    // void main(String[]) auto-CLI wrapper, so their user return value is not
+    // a process exit status. Only a raw String[] main exposes its return value.
+    cases.foreach { case (project, args) =>
+      invoke(project.root, args = args) shouldBe Invocation(0, "", "")
+    }
 
   private def throwingFixture(): Fixture =
     fixture(

@@ -13,6 +13,7 @@ class BenchmarkRenderSpec extends AnyFunSpec with Matchers:
         "run/Hello.on",
         "abc"
       ),
+      runConfig = BenchmarkRunConfig(0, 1, 30000L),
       warmups = Vector.empty,
       measurements = Vector(
         IterationObservation(
@@ -30,7 +31,7 @@ class BenchmarkRenderSpec extends AnyFunSpec with Matchers:
 
   private val report =
     PerformanceBenchmarkReport(
-      schemaVersion = 1,
+      schemaVersion = 2,
       generatedAt = "2026-07-24T00:00:00Z",
       git = GitMetadata("deadbeef", dirty = false),
       environment = EnvironmentMetadata(
@@ -52,9 +53,12 @@ class BenchmarkRenderSpec extends AnyFunSpec with Matchers:
     it("writes schema-versioned JSON with raw nanosecond observations"):
       val json = BenchmarkRender.json(report)
       Json.parseOrNull(json) should not be null
-      json should include ("\"schemaVersion\": 1")
+      PerformanceBenchmarkReport.CurrentSchemaVersion shouldBe 2
+      json should include ("\"schemaVersion\": 2")
       json should include ("\"elapsedNanos\": 1000000")
       json should include ("\"kind\": \"steady-fresh\"")
+      json should include ("\"runConfig\"")
+      json should include ("\"warmupIterations\": 0")
       json should not include "elapsedMillis"
 
     it("renders a concise human summary in milliseconds"):

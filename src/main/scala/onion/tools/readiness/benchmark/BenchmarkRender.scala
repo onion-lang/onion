@@ -44,11 +44,7 @@ object BenchmarkRender:
           report.environment.jvmArguments.map(value => value: Object)
         )
       ),
-      "runConfig" -> obj(
-        "warmupIterations" -> Int.box(report.runConfig.warmupIterations),
-        "measuredIterations" -> Int.box(report.runConfig.measuredIterations),
-        "timeoutMillis" -> Long.box(report.runConfig.timeoutMillis)
-      ),
+      "runConfig" -> runConfigObject(report.runConfig),
       "scenarios" -> arr(report.scenarios.map(scenarioObject)),
       "failures" -> arr(report.failures.map(failureObject))
     )
@@ -59,10 +55,18 @@ object BenchmarkRender:
       "kind" -> result.metadata.kind.wireName,
       "workload" -> result.metadata.workload,
       "workloadHash" -> result.metadata.workloadHash,
+      "runConfig" -> runConfigObject(result.runConfig),
       "warmups" -> arr(result.warmups.map(observationObject)),
       "measurements" -> arr(result.measurements.map(observationObject)),
       "summary" -> result.summary.map(summaryObject).orNull,
       "failure" -> result.failure.map(failureObject).orNull
+    )
+
+  private def runConfigObject(value: BenchmarkRunConfig): Object =
+    obj(
+      "warmupIterations" -> Int.box(value.warmupIterations),
+      "measuredIterations" -> Int.box(value.measuredIterations),
+      "timeoutMillis" -> Long.box(value.timeoutMillis)
     )
 
   private def observationObject(value: IterationObservation): Object =

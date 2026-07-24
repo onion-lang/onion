@@ -61,6 +61,7 @@ final case class ScenarioMetadata(
 
 final case class ScenarioResult(
   metadata: ScenarioMetadata,
+  runConfig: BenchmarkRunConfig,
   warmups: Vector[IterationObservation],
   measurements: Vector[IterationObservation],
   summary: Option[BenchmarkSummary],

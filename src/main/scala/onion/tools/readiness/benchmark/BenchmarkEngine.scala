@@ -54,6 +54,7 @@ trait BenchmarkSession extends AutoCloseable:
 
 trait BenchmarkScenario:
   def metadata: ScenarioMetadata
+  def defaultWarmupIterations: Int = 8
   def open(): BenchmarkSession
 
 final case class BenchmarkScenarioException(message: String)
@@ -155,6 +156,7 @@ final class BenchmarkEngine(
 
     ScenarioResult(
       metadata = scenario.metadata,
+      runConfig = config,
       warmups = keptWarmups,
       measurements = keptMeasurements,
       summary = summary,

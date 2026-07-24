@@ -14,7 +14,7 @@ final case class PerformanceBenchmarkReport(
   def succeeded: Boolean = failures.isEmpty && scenarios.forall(_.succeeded)
 
 object PerformanceBenchmarkReport:
-  val CurrentSchemaVersion = 1
+  val CurrentSchemaVersion = 2
 
   def create(
     git: GitMetadata,

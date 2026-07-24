@@ -12,10 +12,11 @@ class BenchmarkOptionsSpec extends AnyFunSpec with Matchers with OptionValues:
       BenchmarkOptions.parse(Array.empty) shouldBe Right(
         BenchmarkOptions(
           runConfig = BenchmarkRunConfig(8, 25, 30000L),
-          output = Paths.get("target/readiness/benchmark-v1.json"),
+          output = Paths.get("target/readiness/benchmark-v2.json"),
           stdoutFormat = BenchmarkOutputFormat.Text
         )
       )
+      BenchmarkOptions.parse(Array.empty).toOption.value.warmupOverride shouldBe None
 
     it("preserves --iterations and --json compatibility"):
       val parsed =
@@ -34,6 +35,7 @@ class BenchmarkOptionsSpec extends AnyFunSpec with Matchers with OptionValues:
       ).toOption.value
       parsed.runConfig shouldBe BenchmarkRunConfig(2, 25, 5000L)
       parsed.output shouldBe Paths.get("target/custom.json")
+      parsed.warmupOverride shouldBe Some(2)
 
     it("rejects unknown and invalid options"):
       BenchmarkOptions.parse(Array("--iterations", "0")).left.toOption.value should include ("positive")

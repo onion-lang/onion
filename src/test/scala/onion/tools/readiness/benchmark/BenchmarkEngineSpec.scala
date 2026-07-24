@@ -173,3 +173,20 @@ class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
 
       result.measurements shouldBe empty
       result.failure.value.category shouldBe FailureCategory.InvalidMeasurement
+
+    it("records the effective run configuration in the scenario result"):
+      val scenario = new BenchmarkScenario:
+        override val metadata: ScenarioMetadata = BenchmarkEngineSpec.this.metadata
+        override def open(): BenchmarkSession = new BenchmarkSession:
+          override def runIteration(index: Int): IterationPayload = payload
+
+      val config = BenchmarkRunConfig(0, 1, 1000L)
+      val executor = Executors.newSingleThreadExecutor()
+      val engine = new BenchmarkEngine(
+        config,
+        new SequenceClock(Seq(0L, 1L)),
+        executor
+      )
+      val result = try engine.run(scenario) finally engine.close()
+
+      result.runConfig shouldBe config

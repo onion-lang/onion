@@ -8,8 +8,9 @@ enum BenchmarkOutputFormat:
 
 final case class BenchmarkOptions(
   runConfig: BenchmarkRunConfig = BenchmarkRunConfig(),
-  output: Path = Paths.get("target/readiness/benchmark-v1.json"),
-  stdoutFormat: BenchmarkOutputFormat = BenchmarkOutputFormat.Text
+  output: Path = Paths.get("target/readiness/benchmark-v2.json"),
+  stdoutFormat: BenchmarkOutputFormat = BenchmarkOutputFormat.Text,
+  warmupOverride: Option[Int] = None
 )
 
 object BenchmarkOptions:
@@ -43,7 +44,8 @@ object BenchmarkOptions:
                 args,
                 index + 2,
                 options.copy(
-                  runConfig = options.runConfig.copy(warmupIterations = count)
+                  runConfig = options.runConfig.copy(warmupIterations = count),
+                  warmupOverride = Some(count)
                 )
               )
             }

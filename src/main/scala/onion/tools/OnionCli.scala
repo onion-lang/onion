@@ -52,8 +52,8 @@ object OnionCli:
   ): Int =
     args.headOption match
       case None =>
-        out.print(Usage)
-        0
+        err.print(Usage)
+        2
       case Some("new") =>
         args.drop(1) match
           case Array(name) if !name.startsWith("-") =>

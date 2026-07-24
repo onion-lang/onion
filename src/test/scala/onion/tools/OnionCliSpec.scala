@@ -93,14 +93,14 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
       projects
     )
 
-  test("no arguments print unified project help to stdout"):
+  test("no arguments report unified project usage on stderr"):
     val result = invoke(Seq.empty)
 
-    result.exitCode shouldBe 0
-    result.stdout should include("Usage:")
-    result.stdout should include("onion new <name>")
-    result.stdout should include("onion run [--verbose] [-- <arguments...>]")
-    result.stderr shouldBe empty
+    result.exitCode shouldBe 2
+    result.stdout shouldBe empty
+    result.stderr should include("Usage:")
+    result.stderr should include("onion new <name>")
+    result.stderr should include("onion run [--verbose] [-- <arguments...>]")
     result.legacy.scriptCalls shouldBe empty
     result.legacy.replCalls shouldBe empty
     result.projects.calls shouldBe empty

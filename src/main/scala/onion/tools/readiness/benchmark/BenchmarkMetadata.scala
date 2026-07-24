@@ -3,15 +3,24 @@ package onion.tools.readiness.benchmark
 import java.lang.management.ManagementFactory
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import scala.util.control.NonFatal
 
 final case class GitMetadata(commit: String, dirty: Boolean)
 
 object GitMetadata:
   def capture(repoRoot: Path): Either[String, GitMetadata] =
-    for
-      commit <- command(repoRoot, "git", "rev-parse", "HEAD")
-      status <- command(repoRoot, "git", "status", "--porcelain")
-    yield GitMetadata(commit.trim, status.trim.nonEmpty)
+    try
+      for
+        commit <- command(repoRoot, "git", "rev-parse", "HEAD")
+        status <- command(repoRoot, "git", "status", "--porcelain")
+      yield GitMetadata(commit.trim, status.trim.nonEmpty)
+    catch
+      case NonFatal(error) =>
+        Left(
+          Option(error.getMessage)
+            .filter(_.nonEmpty)
+            .getOrElse(error.getClass.getSimpleName)
+        )
 
   private def command(repoRoot: Path, args: String*): Either[String, String] =
     val process =

@@ -4,7 +4,8 @@ import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.OptionValues
 
-import java.util.concurrent.{CountDownLatch, Executors}
+import java.util.concurrent.{CountDownLatch, Executors, TimeUnit}
+import java.util.concurrent.atomic.AtomicBoolean
 
 class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
   private final class SequenceClock(values: Seq[Long]) extends NanoClock:
@@ -95,3 +96,80 @@ class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
       entered.getCount shouldBe 0L
       result.failure.value.message should include ("timed out")
       result.measurements shouldBe empty
+
+    it("defers session cleanup when a timed-out iteration ignores interruption"):
+      val entered = new CountDownLatch(1)
+      val release = new CountDownLatch(1)
+      val closed = new CountDownLatch(1)
+      val running = new AtomicBoolean(false)
+      val closeWhileRunning = new AtomicBoolean(false)
+      val scenario = new BenchmarkScenario:
+        override val metadata: ScenarioMetadata = BenchmarkEngineSpec.this.metadata
+        override def open(): BenchmarkSession = new BenchmarkSession:
+          override def runIteration(index: Int): IterationPayload =
+            running.set(true)
+            entered.countDown()
+            while release.getCount > 0L do
+              try release.await(10L, TimeUnit.MILLISECONDS)
+              catch case _: InterruptedException => ()
+            running.set(false)
+            payload
+
+          override def close(): Unit =
+            closeWhileRunning.set(running.get())
+            closed.countDown()
+
+      val executor = Executors.newSingleThreadExecutor()
+      val engine = new BenchmarkEngine(
+        BenchmarkRunConfig(0, 1, 25L),
+        NanoClock.System,
+        executor
+      )
+      val result =
+        try
+          val observed = engine.run(scenario)
+          entered.getCount shouldBe 0L
+          closeWhileRunning.get() shouldBe false
+          observed
+        finally
+          release.countDown()
+          engine.close()
+
+      closed.await(1L, TimeUnit.SECONDS) shouldBe true
+      result.failure.value.message should include ("timed out")
+
+    it("rejects nonzero scenario exit codes"):
+      val scenario = new BenchmarkScenario:
+        override val metadata: ScenarioMetadata = BenchmarkEngineSpec.this.metadata
+        override def open(): BenchmarkSession = new BenchmarkSession:
+          override def runIteration(index: Int): IterationPayload =
+            payload.copy(exitCode = 7)
+
+      val executor = Executors.newSingleThreadExecutor()
+      val engine = new BenchmarkEngine(
+        BenchmarkRunConfig(0, 1, 1000L),
+        new SequenceClock(Seq(0L, 1L)),
+        executor
+      )
+      val result = try engine.run(scenario) finally engine.close()
+
+      result.measurements shouldBe empty
+      result.failure.value.category shouldBe FailureCategory.ScenarioFailure
+      result.failure.value.message should include ("exit code 7")
+
+    it("classifies invalid timing data as an invalid measurement"):
+      val scenario = new BenchmarkScenario:
+        override val metadata: ScenarioMetadata = BenchmarkEngineSpec.this.metadata
+        override def open(): BenchmarkSession = new BenchmarkSession:
+          override def runIteration(index: Int): IterationPayload = payload
+
+      val executor = Executors.newSingleThreadExecutor()
+      val engine = new BenchmarkEngine(
+        BenchmarkRunConfig(0, 1, 1000L),
+        new SequenceClock(Seq(2L, 1L)),
+        executor
+      )
+      val result = try engine.run(scenario) finally engine.close()
+
+      result.measurements shouldBe empty
+      result.failure.value.category shouldBe FailureCategory.InvalidMeasurement

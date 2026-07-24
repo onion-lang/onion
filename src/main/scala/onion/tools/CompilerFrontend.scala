@@ -7,10 +7,6 @@
  * ************************************************************** */
 package onion.tools
 
-import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
 import java.io.UnsupportedEncodingException
 import onion.compiler.{CompiledClass, CompilerConfig, OnionCompiler, WarningCategory, WarningLevel}
 import onion.compiler.diagnostics.DiagnosticRenderer
@@ -19,8 +15,6 @@ import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, Compile
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
 import onion.tools.option._
-import scala.jdk.CollectionConverters.*
-import scala.util.boundary, boundary.break
 
 /**
  *
@@ -121,34 +115,8 @@ class CompilerFrontend {
     }
   }
 
-  private def simpleNameOf(fqcn: String): String = {
-    val index = fqcn.lastIndexOf(".")
-    if (fqcn.lastIndexOf(".") < 0)  fqcn else fqcn.substring(index + 1, fqcn.length)
-  }
-
-  private def outputPathOf(outDir: String, fqcn: String): String = outDir + Systems.fileSeparator + simpleNameOf(fqcn)+ ".class"
-
-  private def generateFiles(binaries: Seq[CompiledClass]): Boolean = boundary {
-    val generated: java.util.List[File] = new java.util.ArrayList[File]
-    for(binary <- binaries) {
-      val outDir: String = binary.outputPath
-      new File(outDir).mkdirs
-      val outPath: String = outputPathOf(outDir, binary.className)
-      val targetFile: File = new File(outPath)
-      try {
-        if (!targetFile.exists) targetFile.createNewFile
-        generated.add(targetFile)
-        using(new BufferedOutputStream(new FileOutputStream(targetFile))){out =>
-          out.write(binary.content)
-        }
-      } catch {
-        case e: IOException =>
-          generated.asScala.foreach(_.delete)
-          break(false)
-      }
-    }
-    true
-  }
+  private def generateFiles(binaries: Seq[CompiledClass]): Boolean =
+    CompiledClassWriter.writeAll(binaries).isRight
 
   protected def printUsage(): Unit = {
     println(

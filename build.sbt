@@ -122,6 +122,7 @@ lazy val onionSettings = Seq(
     "net.java.dev.javacc" % "javacc" % "5.0",
     "org.jline" % "jline" % "3.25.1",
     "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.21.1",
+    "org.tomlj" % "tomlj" % "1.1.1",
     "junit" % "junit" % "4.7" % "test",
     "org.scalatest" %% "scalatest" % "3.2.19" % "test"
   ),

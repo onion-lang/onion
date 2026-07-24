@@ -8,8 +8,9 @@
 package onion.compiler.environment
 
 import java.io.{File, IOException}
-import java.net.URLClassLoader
 import java.util.concurrent.ConcurrentHashMap
+
+import onion.compiler.ExplicitClasspathClassLoader
 
 /**
  * @author Kota Mizushima
@@ -20,11 +21,15 @@ class ClassFileTable(classPathString: String) {
   private val bytesCache = new ConcurrentHashMap[String, Option[Array[Byte]]]()
 
   private def createClassLoader(classPath: String): ClassLoader = {
-    val urls = classPath.split(File.pathSeparator).map { path =>
-      val file = new File(path)
-      file.toURI.toURL
-    }
-    new URLClassLoader(urls, Thread.currentThread().getContextClassLoader)
+    val urls =
+      classPath.split(File.pathSeparator, -1).iterator
+        .filter(_.nonEmpty)
+        .map(path => new File(path).toURI.toURL)
+        .toArray
+    ExplicitClasspathClassLoader(
+      urls,
+      Thread.currentThread().getContextClassLoader
+    )
   }
 
   /**

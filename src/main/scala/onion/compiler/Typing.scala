@@ -313,7 +313,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     session.global.extensions.methodsFor(receiverFqcn)
   }
   private def createName(moduleName: String, simpleName: String): String = (if (moduleName != null) moduleName + "." else "") + simpleName
-  private def classpath(paths: Seq[String]): String = paths.foldLeft(new StringBuilder){(builder, path) => builder.append(Systems.pathSeparator).append(path)}.toString()
+  private def classpath(paths: Seq[String]): String =
+    paths.mkString(Systems.pathSeparator)
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typeSupport.typesOf(arguments)
 

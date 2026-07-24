@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A convention-over-configuration project workflow: `onion new/build/run/test/clean`.**
+  `onion new hello` scaffolds a manifest (`onion.toml`), `src/`, and `tests/`; `onion build`
+  compiles and caches the result under `target/` (invalidated by a SHA-256 fingerprint over the
+  manifest, every source, the compiler version, and the Java version); `onion run` and `onion test`
+  build first and then execute the single discovered entry point or every `tests/*_test.on` file in
+  sorted, sequential order; and `onion clean` removes exactly the canonical `target/` directory. All
+  five commands discover the project by walking upward from the current directory, so they also work
+  from a nested subdirectory. A failed rebuild never destroys the previous successful output — new
+  output is staged and only promoted after every artifact is written. Existing
+  `onion [options] file.on [args...]` and `onion repl` behavior is unchanged; project commands are
+  reserved only when they are the exact first argument. See the
+  [Project CLI guide](https://onion-lang.org/tools/project-cli/) for the full manifest, layout, and
+  test conventions.
+
 ## [0.5.0] - 2026-07-24
 
 - **`++`/`--` work on a static field and a top-level `var` (regression fix).** Post-increment/decrement

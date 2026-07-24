@@ -35,5 +35,5 @@ if defined CLASSPATH (
     set "CP=%CP%;%CLASSPATH%"
 )
 
-rem Run the Onion script runner
-"%JAVA_CMD%" -classpath "%CP%" onion.tools.ScriptRunner %*
+rem Dispatch to project commands, the REPL, or the script runner
+"%JAVA_CMD%" -classpath "%CP%" onion.tools.OnionCli %*

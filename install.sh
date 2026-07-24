@@ -136,7 +136,7 @@ echo "Generating class-data-sharing archive (faster startup)..."
 CDS_TMP="$(mktemp /tmp/onion-cds-XXXXXX.on)"
 echo 'IO::println("")' > "$CDS_TMP"
 if java $JVM_FLAGS -XX:ArchiveClassesAtExit="$LIB_DIR/onion.jsa" \
-     -cp "$LIB_DIR/onion.jar" onion.tools.ScriptRunner "$CDS_TMP" >/dev/null 2>&1 \
+     -cp "$LIB_DIR/onion.jar" onion.tools.OnionCli "$CDS_TMP" >/dev/null 2>&1 \
    && [ -f "$LIB_DIR/onion.jsa" ]; then
   echo "  $LIB_DIR/onion.jsa"
 else
@@ -167,10 +167,7 @@ LAUNCHER
   echo "  $BIN_DIR/$name"
 }
 
-write_launcher onion onion.tools.ScriptRunner 'if [ "$1" = "repl" ]; then
-    shift
-    exec "$JAVA_CMD" '"$JVM_FLAGS"' $CDS_FLAGS -cp "$ONION_JAR${CLASSPATH:+:$CLASSPATH}" onion.tools.Repl "$@"
-fi'
+write_launcher onion onion.tools.OnionCli ""
 write_launcher onionc onion.tools.CompilerFrontend ""
 write_launcher onion-repl onion.tools.Repl ""
 

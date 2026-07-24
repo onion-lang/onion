@@ -44,16 +44,21 @@ object ScriptRunner {
   }
 
   def main(args: Array[String]): Unit = {
+    val exitCode = runMain(args)
+    if (exitCode != 0) System.exit(exitCode)
+  }
+
+  def runMain(args: Array[String]): Int = {
     // Only the runner-option prefix (before the script file) is inspected;
     // flags after the script path are the script's own arguments.
     val prefix = args.take(scriptIndex(args))
     if (prefix.exists(a => a == "-h" || a == "--help")) {
       new ScriptRunner().printUsage()
-      return
+      return 0
     }
     if (prefix.exists(a => a == "-v" || a == "--version")) {
       println(s"Onion Script Runner version $VERSION")
-      return
+      return 0
     }
     val verbose = prefix.exists(_ == "--verbose")
     val watch = prefix.exists(_ == "--watch")
@@ -61,11 +66,10 @@ object ScriptRunner {
     val filteredArgs = args.take(si).filterNot(a => a == "--verbose" || a == "--watch") ++ args.drop(si)
     if (watch) {
       runWatching(filteredArgs, verbose)
-      return
+      return 0
     }
     try {
-      val exitCode = new ScriptRunner().run(filteredArgs, verbose)
-      if (exitCode != 0) System.exit(exitCode)
+      new ScriptRunner().run(filteredArgs, verbose)
     }
     catch {
       case e: ScriptException => {
@@ -81,10 +85,12 @@ object ScriptRunner {
    */
   private def runWatching(args: Array[String], verbose: Boolean): Unit = {
     import java.nio.file.{FileSystems, Paths, StandardWatchEventKinds}
-    val scriptPath = args.find(a => !a.startsWith("-")).getOrElse {
+    val scriptPathOption = args.find(a => !a.startsWith("-"))
+    if (scriptPathOption.isEmpty) {
       new ScriptRunner().printUsage()
       return
     }
+    val scriptPath = scriptPathOption.get
     val path = Paths.get(scriptPath).toAbsolutePath
     val dir = path.getParent
     val watcher = FileSystems.getDefault.newWatchService()

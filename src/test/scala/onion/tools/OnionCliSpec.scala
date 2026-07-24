@@ -280,24 +280,20 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
       }
     }
 
-  test("remaining temporary project implementation failures use stderr and exit one"):
-    Seq("test", "clean").foreach { command =>
-      val stdout = ByteArrayOutputStream()
-      val stderr = ByteArrayOutputStream()
+  test("the remaining temporary clean implementation uses stderr and exits one"):
+    val stdout = ByteArrayOutputStream()
+    val stderr = ByteArrayOutputStream()
 
-      val exitCode = OnionCli.run(
-        Array(command),
-        Files.createTempDirectory(s"onion-cli-$command"),
-        PrintStream(stdout, true, StandardCharsets.UTF_8),
-        PrintStream(stderr, true, StandardCharsets.UTF_8)
-      )
+    val exitCode = OnionCli.run(
+      Array("clean"),
+      Files.createTempDirectory("onion-cli-clean"),
+      PrintStream(stdout, true, StandardCharsets.UTF_8),
+      PrintStream(stderr, true, StandardCharsets.UTF_8)
+    )
 
-      withClue(command) {
-        exitCode shouldBe 1
-        stdout.toString(StandardCharsets.UTF_8) shouldBe empty
-        stderr.toString(StandardCharsets.UTF_8) should include(s"onion $command is not implemented")
-      }
-    }
+    exitCode shouldBe 1
+    stdout.toString(StandardCharsets.UTF_8) shouldBe empty
+    stderr.toString(StandardCharsets.UTF_8) should include("onion clean is not implemented")
 
   test("ScriptRunner runMain preserves help, version, watch usage, and empty-invocation exit behavior"):
     val stdout = ByteArrayOutputStream()

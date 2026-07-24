@@ -68,7 +68,13 @@ class ProjectCommands:
             1
 
   def test(cwd: Path, verbose: Boolean, out: PrintStream, err: PrintStream): Int =
-    notImplemented("test", err)
+    buildProject(cwd, err) match
+      case Left(error) =>
+        err.println(s"error: ${error.message}")
+        1
+      case Right(build) =>
+        val result = ProjectTestRunner().run(build, out, err, verbose)
+        if result.successful then 0 else 1
 
   def clean(cwd: Path, out: PrintStream, err: PrintStream): Int =
     notImplemented("clean", err)

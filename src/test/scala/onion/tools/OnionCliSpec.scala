@@ -280,7 +280,7 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
       }
     }
 
-  test("the remaining temporary clean implementation uses stderr and exits one"):
+  test("clean outside a project reports project discovery failure on stderr"):
     val stdout = ByteArrayOutputStream()
     val stderr = ByteArrayOutputStream()
 
@@ -293,7 +293,7 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
 
     exitCode shouldBe 1
     stdout.toString(StandardCharsets.UTF_8) shouldBe empty
-    stderr.toString(StandardCharsets.UTF_8) should include("onion clean is not implemented")
+    stderr.toString(StandardCharsets.UTF_8) should include("Could not find onion.toml")
 
   test("ScriptRunner runMain preserves help, version, watch usage, and empty-invocation exit behavior"):
     val stdout = ByteArrayOutputStream()

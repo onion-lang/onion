@@ -14,9 +14,9 @@ object ProjectScaffolder:
     "[package]\nname = \"%s\"\nversion = \"0.1.0\"\n"
 
   private val MainContents =
-    "def main(args: String[]): void {\n  println(\"Hello, %s!\")\n}\n"
+    "def main(): void {\n  println(\"Hello, %s!\")\n}\n"
 
-  private val TestContents = "Assert::assertEquals(4, 2 + 2)\n"
+  private val TestContents = "Assert::equals(4, 2 + 2)\n"
 
   def create(parent: Path, name: String): Either[ProjectError, ProjectPaths] =
     create(parent, name, path => write(path, contents(path, name)))

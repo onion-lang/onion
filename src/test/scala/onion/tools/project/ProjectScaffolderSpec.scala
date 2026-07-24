@@ -22,9 +22,9 @@ class ProjectScaffolderSpec extends AnyFunSuite with Matchers:
     String(Files.readAllBytes(paths.manifest), StandardCharsets.UTF_8) shouldBe
       "[package]\nname = \"hello\"\nversion = \"0.1.0\"\n"
     String(Files.readAllBytes(paths.root.resolve("src/main.on")), StandardCharsets.UTF_8) shouldBe
-      "def main(args: String[]): void {\n  println(\"Hello, hello!\")\n}\n"
+      "def main(): void {\n  println(\"Hello, hello!\")\n}\n"
     String(Files.readAllBytes(paths.root.resolve("tests/main_test.on")), StandardCharsets.UTF_8) shouldBe
-      "Assert::assertEquals(4, 2 + 2)\n"
+      "Assert::equals(4, 2 + 2)\n"
 
   test("rejects an invalid name without creating a project path"):
     val parent = parentDirectory()

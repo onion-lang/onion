@@ -919,7 +919,7 @@ git commit -m "Add convention-based Onion tests"
 - Modify: `src/main/scala/onion/tools/project/ProjectCommands.scala`
 - Create: `src/test/scala/onion/tools/project/ProjectLifecycleSpec.scala`
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 Drive `OnionCli.run` with real services through:
 
@@ -935,14 +935,14 @@ Also prove:
 - a `target` symlink is rejected rather than followed; and
 - an unrelated neighboring target remains untouched.
 
-- [ ] **Step 2: Run and observe failure**
+- [x] **Step 2: Run and observe failure**
 
 ```bash
 sbt -Duser.language=en \
   'testOnly onion.tools.project.ProjectLifecycleSpec'
 ```
 
-- [ ] **Step 3: Implement clean and harden command composition**
+- [x] **Step 3: Implement clean and harden command composition**
 
 Require a valid located project and valid manifest before deletion. Reject a
 symbolic-link `target`. Print `Cleaned target` whether the directory existed or
@@ -950,7 +950,7 @@ not so output is stable.
 
 Remove all temporary not-yet-implemented paths from `ProjectCommands`.
 
-- [ ] **Step 4: Run all project suites and commit**
+- [x] **Step 4: Run all project suites and commit**
 
 ```bash
 sbt -Duser.language=en 'testOnly onion.tools.project.* onion.tools.OnionCliSpec'

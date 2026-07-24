@@ -1,7 +1,10 @@
 package onion.tools.project
 
 import java.io.PrintStream
+import java.nio.file.Files
 import java.nio.file.Path
+
+import scala.util.control.NonFatal
 
 class ProjectCommands:
   def create(name: String, cwd: Path, out: PrintStream, err: PrintStream): Int =
@@ -77,11 +80,28 @@ class ProjectCommands:
         if result.successful then 0 else 1
 
   def clean(cwd: Path, out: PrintStream, err: PrintStream): Int =
-    notImplemented("clean", err)
+    (for
+      paths <- ProjectLocator.locate(cwd)
+      _ <- ProjectManifest.load(paths.manifest)
+      _ <- cleanTarget(paths)
+    yield ()) match
+      case Right(_) =>
+        out.println("Cleaned target")
+        0
+      case Left(error) =>
+        err.println(s"error: ${error.message}")
+        1
 
-  private def notImplemented(command: String, err: PrintStream): Int =
-    err.println(s"error: onion $command is not implemented yet")
-    1
+  private def cleanTarget(paths: ProjectPaths): Either[ProjectError, Unit] =
+    if Files.isSymbolicLink(paths.target) then
+      Left(ProjectError(s"Project target path is a symbolic link: ${paths.target}"))
+    else
+      try
+        FileTree.delete(paths.target, paths.root)
+        Right(())
+      catch
+        case NonFatal(error) =>
+          Left(ProjectError(s"Could not clean target: ${error.getMessage}", Some(error)))
 
   private def buildProject(
     cwd: Path,

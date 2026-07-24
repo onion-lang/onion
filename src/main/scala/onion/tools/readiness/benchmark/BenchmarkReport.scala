@@ -1,5 +1,10 @@
 package onion.tools.readiness.benchmark
 
+import onion.tools.readiness.policy.{
+  AbsolutePerformanceEvaluation,
+  AbsolutePerformancePolicy,
+  PolicyOverallStatus
+}
 import java.time.Instant
 
 final case class PerformanceBenchmarkReport(
@@ -9,12 +14,16 @@ final case class PerformanceBenchmarkReport(
   environment: EnvironmentMetadata,
   runConfig: BenchmarkRunConfig,
   scenarios: Vector[ScenarioResult],
-  failures: Vector[BenchmarkFailure]
+  failures: Vector[BenchmarkFailure],
+  policy: AbsolutePerformanceEvaluation
 ):
-  def succeeded: Boolean = failures.isEmpty && scenarios.forall(_.succeeded)
+  def succeeded: Boolean =
+    failures.isEmpty &&
+      scenarios.forall(_.succeeded) &&
+      policy.overallStatus != PolicyOverallStatus.Fail
 
 object PerformanceBenchmarkReport:
-  val CurrentSchemaVersion = 2
+  val CurrentSchemaVersion = 3
 
   def create(
     git: GitMetadata,
@@ -30,5 +39,6 @@ object PerformanceBenchmarkReport:
       environment = environment,
       runConfig = runConfig,
       scenarios = scenarios,
-      failures = failures
+      failures = failures,
+      policy = AbsolutePerformancePolicy.evaluate(environment, scenarios)
     )

@@ -1,6 +1,11 @@
 package onion.tools.readiness.benchmark
 
 import onion.Json
+import onion.tools.readiness.policy.{
+  AbsolutePerformanceCheck,
+  AbsolutePerformanceEvaluation,
+  PolicyCheckStatus
+}
 
 import java.util.{ArrayList, LinkedHashMap, List as JList, Map as JMap}
 
@@ -11,6 +16,17 @@ object BenchmarkRender:
   def text(report: PerformanceBenchmarkReport): String =
     val lines = Vector.newBuilder[String]
     lines += s"benchmark schema=${report.schemaVersion} commit=${report.git.commit}"
+    lines +=
+      s"  absolute-policy=${report.policy.overallStatus.wireName} reference-lane=${report.policy.referenceLane}"
+    report.policy.checks
+      .filter { check =>
+        check.status == PolicyCheckStatus.Fail ||
+        check.status == PolicyCheckStatus.Unknown
+      }
+      .foreach { check =>
+        lines +=
+          s"    ${check.scenarioId} ${check.status.wireName}: ${check.message}"
+      }
     report.failures.foreach { failure =>
       lines += s"  FAILED [${failure.category.wireName}]: ${failure.message}"
     }
@@ -35,7 +51,10 @@ object BenchmarkRender:
         "javaVersion" -> report.environment.javaVersion,
         "osName" -> report.environment.osName,
         "osArch" -> report.environment.osArch,
+        "osReleaseId" -> report.environment.osReleaseId,
+        "osReleaseVersion" -> report.environment.osReleaseVersion,
         "processors" -> Int.box(report.environment.processors),
+        "totalMemoryBytes" -> Long.box(report.environment.totalMemoryBytes),
         "maxHeapBytes" -> Long.box(report.environment.maxHeapBytes),
         "garbageCollectors" -> arr(
           report.environment.garbageCollectors.map(value => value: Object)
@@ -46,7 +65,27 @@ object BenchmarkRender:
       ),
       "runConfig" -> runConfigObject(report.runConfig),
       "scenarios" -> arr(report.scenarios.map(scenarioObject)),
-      "failures" -> arr(report.failures.map(failureObject))
+      "failures" -> arr(report.failures.map(failureObject)),
+      "policy" -> policyObject(report.policy)
+    )
+
+  private def policyObject(value: AbsolutePerformanceEvaluation): Object =
+    obj(
+      "referenceLane" -> Boolean.box(value.referenceLane),
+      "applicabilityReason" -> value.applicabilityReason,
+      "overallStatus" -> value.overallStatus.wireName,
+      "checks" -> arr(value.checks.map(policyCheckObject))
+    )
+
+  private def policyCheckObject(value: AbsolutePerformanceCheck): Object =
+    obj(
+      "scenarioId" -> value.scenarioId,
+      "status" -> value.status.wireName,
+      "medianNanos" -> value.medianNanos.map(Long.box).orNull,
+      "p95Nanos" -> value.p95Nanos.map(Long.box).orNull,
+      "medianCeilingNanos" -> Long.box(value.medianCeilingNanos),
+      "p95CeilingNanos" -> Long.box(value.p95CeilingNanos),
+      "message" -> value.message
     )
 
   private def scenarioObject(result: ScenarioResult): Object =

@@ -14,7 +14,22 @@ class ProjectCommands:
         1
 
   def build(cwd: Path, verbose: Boolean, out: PrintStream, err: PrintStream): Int =
-    notImplemented("build", err)
+    val result =
+      for
+        paths <- ProjectLocator.locate(cwd)
+        manifest <- ProjectManifest.load(paths.manifest)
+        layout <- ProjectLayout.discover(paths)
+        build <- ProjectBuilder().build(paths, manifest, layout, err)
+      yield build
+
+    result match
+      case Right(build) =>
+        if build.cached then out.println(s"Built ${build.manifest.name} (cached)")
+        else out.println(s"Built ${build.manifest.name} (${build.state.classes.size} classes)")
+        0
+      case Left(error) =>
+        err.println(s"error: ${error.message}")
+        1
 
   def run(
     cwd: Path,

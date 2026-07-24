@@ -152,6 +152,21 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
       )
       assert(result.issues.exists(_.message.contains("orphaned")))
 
+    it("does not attach output declarations to non-run examples"):
+      val markdown =
+        """<!-- onion-example: compile -->
+          |```onion
+          |val x = 1
+          |```
+          |<!-- onion-output: stdout -->
+          |```text
+          |ignored
+          |```
+          |""".stripMargin
+      val result = MarkdownExampleExtractor.extract(path, markdown)
+      assert(result.examples.map(_.outputs) == Vector(Vector.empty))
+      assert(result.issues.exists(_.message.contains("orphaned")))
+
     it("requires stdout as the first run output"):
       val markdown =
         """<!-- onion-example: run -->

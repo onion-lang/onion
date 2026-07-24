@@ -160,7 +160,8 @@ object MarkdownExampleExtractor:
         None
       case Some(line) =>
         directives.get(line) match
-          case Some(Left(_)) =>
+          case Some(Left(_))
+              if lines(line - 1).trim.startsWith("<!-- onion-example:") =>
             None
           case Some(Right(DocumentationDirective.Example(kind))) =>
             previousNonBlank(lines, line - 1)
@@ -239,7 +240,8 @@ object MarkdownExampleExtractor:
                   }
                 Vector(stdout) ++ stderr
               case None => Vector.empty
-          case Some(Left(_)) =>
+          case Some(Left(_))
+              if lines(line - 1).trim.startsWith("<!-- onion-output:") =>
             Vector.empty
           case Some(Right(DocumentationDirective.Output(
                 OutputChannel.Stderr

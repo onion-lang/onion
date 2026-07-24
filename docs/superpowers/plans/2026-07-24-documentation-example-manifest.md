@@ -65,7 +65,7 @@ execution is the next independently reviewable PR.
   and `DocumentationDirective.parse`.
 - Consumes: Java NIO `Path` and one Markdown source line.
 
-- [ ] **Step 1: Write the failing directive tests**
+- [x] **Step 1: Write the failing directive tests**
 
 Create `DocumentationDirectiveSpec.scala`:
 
@@ -140,7 +140,7 @@ class DocumentationDirectiveSpec extends AnyFunSpec:
       }
 ```
 
-- [ ] **Step 2: Run the directive test and verify RED**
+- [x] **Step 2: Run the directive test and verify RED**
 
 Run:
 
@@ -151,7 +151,7 @@ sbt 'testOnly onion.tools.readiness.docs.DocumentationDirectiveSpec'
 Expected: compilation fails because the documentation model and parser do not
 exist.
 
-- [ ] **Step 3: Add the immutable documentation model**
+- [x] **Step 3: Add the immutable documentation model**
 
 Create `DocumentationExample.scala`:
 
@@ -198,7 +198,7 @@ final case class ExtractionResult(
   def isValid: Boolean = issues.isEmpty
 ```
 
-- [ ] **Step 4: Implement the strict directive parser**
+- [x] **Step 4: Implement the strict directive parser**
 
 Create `DocumentationDirective.scala`:
 
@@ -242,7 +242,7 @@ object DocumentationDirective:
       case _ => None
 ```
 
-- [ ] **Step 5: Run the directive test and verify GREEN**
+- [x] **Step 5: Run the directive test and verify GREEN**
 
 Run:
 
@@ -253,7 +253,7 @@ sbt 'testOnly onion.tools.readiness.docs.DocumentationDirectiveSpec'
 Expected: four example forms, two output forms, unrelated lines, and malformed
 forms all pass.
 
-- [ ] **Step 6: Commit the directive boundary**
+- [x] **Step 6: Commit the directive boundary**
 
 ```bash
 git add \
@@ -280,7 +280,7 @@ git commit -m "Add documentation example directives"
   `MarkdownExampleExtractor.extract(path: Path, markdown: String):
   ExtractionResult`.
 
-- [ ] **Step 1: Write the failing happy-path extraction tests**
+- [x] **Step 1: Write the failing happy-path extraction tests**
 
 Create `MarkdownExampleExtractorSpec.scala`:
 
@@ -397,7 +397,7 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
       ))
 ```
 
-- [ ] **Step 2: Write failing validation-path extraction tests**
+- [x] **Step 2: Write failing validation-path extraction tests**
 
 Append these cases to the same `describe` block:
 
@@ -443,6 +443,21 @@ Append these cases to the same `describe` block:
         path,
         "<!-- onion-example: compile -->\nordinary text\n"
       )
+      assert(result.issues.exists(_.message.contains("orphaned")))
+
+    it("does not attach output declarations to non-run examples"):
+      val markdown =
+        """<!-- onion-example: compile -->
+          |```onion
+          |val x = 1
+          |```
+          |<!-- onion-output: stdout -->
+          |```text
+          |ignored
+          |```
+          |""".stripMargin
+      val result = MarkdownExampleExtractor.extract(path, markdown)
+      assert(result.examples.map(_.outputs) == Vector(Vector.empty))
       assert(result.issues.exists(_.message.contains("orphaned")))
 
     it("requires stdout as the first run output"):
@@ -518,7 +533,7 @@ Append these cases to the same `describe` block:
       assert(result.issues.exists(_.message.contains("unterminated")))
 ```
 
-- [ ] **Step 3: Run the extractor test and verify RED**
+- [x] **Step 3: Run the extractor test and verify RED**
 
 Run:
 
@@ -528,7 +543,7 @@ sbt 'testOnly onion.tools.readiness.docs.MarkdownExampleExtractorSpec'
 
 Expected: compilation fails because `MarkdownExampleExtractor` does not exist.
 
-- [ ] **Step 4: Implement fence scanning and directive association**
+- [x] **Step 4: Implement fence scanning and directive association**
 
 Create `MarkdownExampleExtractor.scala`:
 
@@ -695,7 +710,8 @@ object MarkdownExampleExtractor:
         None
       case Some(line) =>
         directives.get(line) match
-          case Some(Left(_)) =>
+          case Some(Left(_))
+              if lines(line - 1).trim.startsWith("<!-- onion-example:") =>
             None
           case Some(Right(DocumentationDirective.Example(kind))) =>
             previousNonBlank(lines, line - 1)
@@ -774,7 +790,8 @@ object MarkdownExampleExtractor:
                   }
                 Vector(stdout) ++ stderr
               case None => Vector.empty
-          case Some(Left(_)) =>
+          case Some(Left(_))
+              if lines(line - 1).trim.startsWith("<!-- onion-output:") =>
             Vector.empty
           case Some(Right(DocumentationDirective.Output(
                 OutputChannel.Stderr
@@ -843,7 +860,7 @@ object MarkdownExampleExtractor:
       .map(_ + 1)
 ```
 
-- [ ] **Step 5: Run the extractor tests and verify GREEN**
+- [x] **Step 5: Run the extractor tests and verify GREEN**
 
 Run:
 
@@ -853,7 +870,7 @@ sbt 'testOnly onion.tools.readiness.docs.MarkdownExampleExtractorSpec'
 
 Expected: all happy-path and validation-path tests pass.
 
-- [ ] **Step 6: Run all docs readiness tests**
+- [x] **Step 6: Run all docs readiness tests**
 
 Run:
 
@@ -863,7 +880,7 @@ sbt 'testOnly onion.tools.readiness.docs.*'
 
 Expected: directive and extractor suites pass with no warnings.
 
-- [ ] **Step 7: Commit the extractor**
+- [x] **Step 7: Commit the extractor**
 
 ```bash
 git add \
@@ -891,7 +908,7 @@ git commit -m "Extract documentation example manifests"
 - Produces: stable synthetic Markdown fixtures for the next execution-verifier
   PR.
 
-- [ ] **Step 1: Add the valid fixture**
+- [x] **Step 1: Add the valid fixture**
 
 Create `extraction-valid.md`:
 
@@ -928,7 +945,7 @@ value.transform()
 ````
 `````
 
-- [ ] **Step 2: Add the invalid fixture**
+- [x] **Step 2: Add the invalid fixture**
 
 Create `extraction-invalid.md`:
 
@@ -955,7 +972,7 @@ unsupported
 ```
 ````
 
-- [ ] **Step 3: Write and run the fixture test**
+- [x] **Step 3: Write and run the fixture test**
 
 Create `DocumentationExampleFixturesSpec.scala`:
 
@@ -1014,7 +1031,7 @@ sbt 'testOnly onion.tools.readiness.docs.DocumentationExampleFixturesSpec'
 
 Expected: both fixture cases pass.
 
-- [ ] **Step 4: Run the full regression suite in the release locale**
+- [x] **Step 4: Run the full regression suite in the release locale**
 
 Run:
 
@@ -1025,7 +1042,7 @@ sbt -Duser.language=en test
 Expected: the full suite passes with zero failed, canceled, ignored, or pending
 tests.
 
-- [ ] **Step 5: Mark plan progress and commit the fixtures and plan**
+- [x] **Step 5: Mark plan progress and commit the fixtures and plan**
 
 Mark every completed checkbox in this plan, then:
 
@@ -1038,7 +1055,7 @@ git add \
 git commit -m "Cover documentation manifest fixtures"
 ```
 
-- [ ] **Step 6: Audit the PR boundary against the approved design**
+- [x] **Step 6: Audit the PR boundary against the approved design**
 
 Verify from the committed diff and fresh test output that:
 

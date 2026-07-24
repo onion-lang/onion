@@ -741,6 +741,18 @@ val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
 ```
 
+The plain `getString`/`getInt`/`getLong`/`getDouble`/`getFloat`/`getBoolean`/`getShort`/`getByte`
+return a boxed value that is `null` when the key is missing or has the wrong type — assigning
+that straight into a non-null primitive throws `NullPointerException`. `getStringOr`/`getIntOr`/
+`getLongOr`/`getDoubleOr`/`getFloatOr`/`getBooleanOr(obj, key, default)` return a primitive with
+an explicit fallback instead:
+
+```onion
+val obj = Json::parse("{}")
+Json::getIntOr(obj, "missing", 42)     // 42, no NPE
+Json::getStringOr(obj, "name", "anon") // "anon"
+```
+
 ## Yaml Module
 
 YAML serialization and parsing for flat block-mapping documents

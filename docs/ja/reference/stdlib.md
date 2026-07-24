@@ -347,6 +347,14 @@ val text = Json::stringify(m)                           // {"x":1}
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
 
+これらはボックス化された値を返すため、見つからない場合の null をそのまま非 null なプリミティブへ代入すると NullPointerException になります。`getStringOr` / `getIntOr` / `getLongOr` / `getDoubleOr` / `getFloatOr` / `getBooleanOr(obj, key, default)` はフォールバック値付きでプリミティブを返すので、キーが無くても NPE になりません:
+
+```onion
+val obj = Json::parse("{}")
+Json::getIntOr(obj, "missing", 42)      // 42（NPE にならない）
+Json::getStringOr(obj, "name", "anon")  // "anon"
+```
+
 ## Yaml モジュール
 
 YAML（flat block mapping のサブセット）のパースとシリアライズ。中間表現は Json と共通です。

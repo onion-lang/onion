@@ -1,0 +1,100 @@
+module readiness.automation
+
+class AutomationPipeline {
+public:
+  def run(value: Int): Int {
+    var current = value
+    current = new Stage01().step01(current)
+    current = new Stage02().step01(current)
+    current = new Stage03().step01(current)
+    current = new Stage04().step01(current)
+    current = new Stage05().step01(current)
+    current = new Stage06().step01(current)
+    current = new Stage07().step01(current)
+    current = new Stage08().step01(current)
+    current = new Stage09().step01(current)
+    current = new Stage10().step01(current)
+    current = new Stage11().step01(current)
+    current = new Stage12().step01(current)
+    current = new Stage13().step01(current)
+    current = new Stage14().step01(current)
+    current = new Stage15().step01(current)
+    current = new Stage16().step01(current)
+    current = new Stage17().step01(current)
+    current = new Stage18().step01(current)
+    current = new Stage19().step01(current)
+    return current
+  }
+  def normalize01(value: Int): Int {
+    return value - 1
+  }
+  def normalize02(value: Int): Int {
+    return value - 2
+  }
+  def normalize03(value: Int): Int {
+    return value - 3
+  }
+  def normalize04(value: Int): Int {
+    return value - 4
+  }
+  def normalize05(value: Int): Int {
+    return value - 5
+  }
+  def normalize06(value: Int): Int {
+    return value - 6
+  }
+  def normalize07(value: Int): Int {
+    return value - 7
+  }
+  def normalize08(value: Int): Int {
+    return value - 8
+  }
+  def normalize09(value: Int): Int {
+    return value - 9
+  }
+  def normalize10(value: Int): Int {
+    return value - 10
+  }
+  def normalize11(value: Int): Int {
+    return value - 11
+  }
+  def normalize12(value: Int): Int {
+    return value - 12
+  }
+  def normalize13(value: Int): Int {
+    return value - 13
+  }
+  def normalize14(value: Int): Int {
+    return value - 14
+  }
+  def normalize15(value: Int): Int {
+    return value - 15
+  }
+  def normalize16(value: Int): Int {
+    return value - 16
+  }
+  def normalize17(value: Int): Int {
+    return value - 17
+  }
+  def normalize18(value: Int): Int {
+    return value - 18
+  }
+  def normalize19(value: Int): Int {
+    return value - 19
+  }
+  def normalize20(value: Int): Int {
+    return value - 20
+  }
+  def normalize21(value: Int): Int {
+    return value - 21
+  }
+  def normalize22(value: Int): Int {
+    return value - 22
+  }
+  def normalize23(value: Int): Int {
+    return value - 23
+  }
+  def normalize24(value: Int): Int {
+    return value - 24
+  }
+}

@@ -69,12 +69,52 @@ class FreshCompileScenarioSpec extends AnyFunSpec with Matchers:
       result.measurements.head.sourceMetrics.generatedClasses should be > 0
 
   describe("CompileScenarioCatalog"):
-    it("uses the actual practical small, medium, and large scripts"):
-      val scenarios = CompileScenarioCatalog.default(Paths.get(".").toAbsolutePath.normalize())
+    it("contains every honest practical performance protocol"):
+      val root = Paths.get(".").toAbsolutePath.normalize()
+      val scenarios =
+        CompileScenarioCatalog.default(root, JvmRuntime.current(), 30000L)
       scenarios.map(_.metadata.id) shouldBe Vector(
         "steady-fresh:onionc:hello",
         "steady-fresh:onionc:todo-manager",
-        "steady-fresh:onionc:stats-app"
+        "steady-fresh:onionc:stats-app",
+        "process-cold:onion:hello",
+        "persistent-session:repl:growing-state",
+        "multi-file:onionc:automation-project"
       )
-      scenarios.last.metadata.kind shouldBe ScenarioKind.SteadyFresh
-      scenarios.last.metadata.workload shouldBe "run/StatsApp.on"
+      scenarios.last.metadata.kind shouldBe ScenarioKind.MultiFile
+      scenarios.last.metadata.workload shouldBe
+        "benchmarks/fixtures/automation-project"
+
+    it("uses a deterministic 20-file workload of approximately 2,000 lines"):
+      val root = Paths.get(".").toAbsolutePath.normalize()
+      val relativeFiles =
+        (1 to 19).map { index =>
+          f"benchmarks/fixtures/automation-project/Stage$index%02d.on"
+        }.toVector :+
+          "benchmarks/fixtures/automation-project/Pipeline.on"
+      val workload = CompileWorkload.fromFiles(
+        root,
+        "automation-project",
+        "benchmarks/fixtures/automation-project",
+        relativeFiles
+      )
+      workload.sourceCount shouldBe 20
+      workload.lineCount should (be >= 1900 and be <= 2200)
+
+    it("compiles the complete deterministic multi-file fixture"):
+      val root = Paths.get(".").toAbsolutePath.normalize()
+      val scenario =
+        CompileScenarioCatalog.default(root, JvmRuntime.current(), 30000L).last
+      val executor = Executors.newSingleThreadExecutor()
+      val engine = new BenchmarkEngine(
+        BenchmarkRunConfig(0, 1, 30000L),
+        NanoClock.System,
+        executor
+      )
+
+      val result = try engine.run(scenario) finally engine.close()
+
+      result.failure shouldBe None
+      result.measurements should have size 1
+      result.measurements.head.sourceMetrics.sourceCount shouldBe 20
+      result.measurements.head.sourceMetrics.lineCount shouldBe 2019

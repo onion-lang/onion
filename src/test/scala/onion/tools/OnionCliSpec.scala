@@ -280,8 +280,8 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
       }
     }
 
-  test("temporary project implementation failures use stderr and exit one"):
-    Seq("run", "test", "clean").foreach { command =>
+  test("remaining temporary project implementation failures use stderr and exit one"):
+    Seq("test", "clean").foreach { command =>
       val stdout = ByteArrayOutputStream()
       val stderr = ByteArrayOutputStream()
 

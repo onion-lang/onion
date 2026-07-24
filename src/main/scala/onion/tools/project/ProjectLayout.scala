@@ -19,7 +19,7 @@ object ProjectLayout:
   def discover(paths: ProjectPaths): Either[ProjectError, ProjectLayout] =
     try
       for
-        productionSources <- sourceFiles(paths.root.resolve("src"), paths.root, path => !isTest(path))
+        productionSources <- sourceFiles(paths.root.resolve("src"), paths.root, _ => true)
         testSources <- sourceFiles(paths.root.resolve("tests"), paths.root, isTest)
       yield ProjectLayout(productionSources, testSources)
     catch

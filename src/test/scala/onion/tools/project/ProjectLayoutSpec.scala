@@ -19,7 +19,7 @@ class ProjectLayoutSpec extends AnyFunSuite with Matchers:
     Files.writeString(path, "// fixture\n")
     path
 
-  test("discovers recursive sorted production Onion sources and ignores test and non-Onion files"):
+  test("discovers recursive sorted production Onion sources and ignores non-Onion files"):
     val root = Files.createTempDirectory("onion-project-layout")
     write(root, "src/zeta.on")
     write(root, "src/alpha.on")
@@ -29,9 +29,10 @@ class ProjectLayoutSpec extends AnyFunSuite with Matchers:
 
     val layout = ProjectLayout.discover(paths(root)).toOption.value
 
-    layout.productionSources.map(_.relative) shouldBe Vector("src/alpha.on", "src/nested/beta.on", "src/zeta.on")
+    layout.productionSources.map(_.relative) shouldBe Vector("src/alpha.on", "src/helper_test.on", "src/nested/beta.on", "src/zeta.on")
     layout.productionSources.map(_.path) shouldBe Vector(
       root.resolve("src/alpha.on"),
+      root.resolve("src/helper_test.on"),
       root.resolve("src/nested/beta.on"),
       root.resolve("src/zeta.on")
     )

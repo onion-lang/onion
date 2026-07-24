@@ -78,4 +78,13 @@ class ProjectDistributionSpec extends AnyFunSuite with Matchers:
     val stdout = String(process.getInputStream.readAllBytes(), UTF_8)
     val stderr = String(process.getErrorStream.readAllBytes(), UTF_8)
     val exitCode = process.waitFor()
-    Invocation(exitCode, stdout, stderr)
+    Invocation(exitCode, stdout, stripJvmWarnings(stderr))
+
+  // The bare `java` launch here (unlike the installer's generated launcher)
+  // passes no JVM flags, so a newer JDK's harmless sun.misc.Unsafe startup
+  // notice reaches stderr. Strip it so assertions reflect the program's own
+  // output instead of JDK-version-dependent JVM noise.
+  private def stripJvmWarnings(stderr: String): String =
+    stderr.linesIterator.filterNot(_.startsWith("WARNING:")).mkString("\n") match
+      case "" => ""
+      case remaining => remaining + "\n"

@@ -1046,7 +1046,7 @@ git commit -m "Ship the Onion project workflow"
 
 - Modify only files required by failures or review.
 
-- [ ] **Step 1: Inspect scope before verification**
+- [x] **Step 1: Inspect scope before verification**
 
 ```bash
 git status --short
@@ -1058,7 +1058,7 @@ git log --oneline develop..HEAD
 Confirm there are no unrelated workspace changes and no temporary project
 outputs tracked by Git.
 
-- [ ] **Step 2: Run focused project verification**
+- [x] **Step 2: Run focused project verification**
 
 ```bash
 sbt -Duser.language=en 'testOnly onion.tools.project.* onion.tools.OnionCliSpec'
@@ -1066,7 +1066,7 @@ sbt -Duser.language=en 'testOnly onion.tools.project.* onion.tools.OnionCliSpec'
 
 Expected: all targeted suites pass.
 
-- [ ] **Step 3: Run full regression suite**
+- [x] **Step 3: Run full regression suite**
 
 ```bash
 sbt -Duser.language=en test
@@ -1074,7 +1074,7 @@ sbt -Duser.language=en test
 
 Expected: all suites and tests pass with zero failures.
 
-- [ ] **Step 4: Build and smoke the distribution**
+- [x] **Step 4: Build and smoke the distribution**
 
 ```bash
 sbt dist
@@ -1085,7 +1085,7 @@ Unpack the newly produced ZIP into a `mktemp -d` directory, run the exact
 Also verify the archive contains `tomlj` and its runtime dependencies in
 `lib/`.
 
-- [ ] **Step 5: Check legacy launchers**
+- [x] **Step 5: Check legacy launchers**
 
 Using the unpacked distribution:
 

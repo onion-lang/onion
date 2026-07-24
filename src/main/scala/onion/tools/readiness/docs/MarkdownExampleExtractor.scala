@@ -1,6 +1,7 @@
 package onion.tools.readiness.docs
 
 import java.nio.file.Path
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 
 object MarkdownExampleExtractor:
@@ -16,8 +17,8 @@ object MarkdownExampleExtractor:
 
   def extract(path: Path, markdown: String): ExtractionResult =
     val lines = normalize(markdown).split("\n", -1).toVector
-    val (fences, fenceIssues) = scanFences(path, lines)
-    val directives = scanDirectives(path, lines, fences)
+    val (fences, fenceIssues, fencedLines) = scanFences(path, lines)
+    val directives = scanDirectives(path, lines, fencedLines)
     val examples = Vector.newBuilder[DocumentationExample]
     val issues = Vector.newBuilder[DocumentationIssue]
     val consumedExamples = mutable.Set.empty[Int]
@@ -82,9 +83,10 @@ object MarkdownExampleExtractor:
   private def scanFences(
     path: Path,
     lines: Vector[String]
-  ): (Vector[Fence], Vector[DocumentationIssue]) =
+  ): (Vector[Fence], Vector[DocumentationIssue], Set[Int]) =
     val fences = Vector.newBuilder[Fence]
     val issues = Vector.newBuilder[DocumentationIssue]
+    val fencedLines = mutable.Set.empty[Int]
     var index = 0
     while index < lines.length do
       lines(index) match
@@ -101,6 +103,7 @@ object MarkdownExampleExtractor:
           }
           closingIndex match
             case Some(close) =>
+              fencedLines ++= index + 1 to close + 1
               val contentLines = lines.slice(index + 1, close)
               val content =
                 if contentLines.isEmpty then ""
@@ -114,6 +117,7 @@ object MarkdownExampleExtractor:
               )
               index = close + 1
             case None =>
+              fencedLines ++= index + 1 to lines.length
               issues += DocumentationIssue(
                 MarkdownLocation(path, index + 1),
                 "unterminated Markdown fence"
@@ -121,24 +125,21 @@ object MarkdownExampleExtractor:
               index = lines.length
         case _ =>
           index += 1
-    (fences.result(), issues.result())
+    (fences.result(), issues.result(), fencedLines.toSet)
 
   private def scanDirectives(
     path: Path,
     lines: Vector[String],
-    fences: Vector[Fence]
+    fencedLines: Set[Int]
   ): Map[Int, Either[DocumentationIssue, DocumentationDirective]] =
-    val fencedLines = fences.flatMap { fence =>
-      fence.openingLine to fence.closingLine
-    }.toSet
-    lines.zipWithIndex.flatMap { case (line, index) =>
+    VectorMap.from(lines.zipWithIndex.flatMap { case (line, index) =>
       val oneOriginLine = index + 1
       if fencedLines.contains(oneOriginLine) then None
       else
         DocumentationDirective
           .parse(line, MarkdownLocation(path, oneOriginLine))
           .map(oneOriginLine -> _)
-    }.toMap
+    })
 
   private def classificationBefore(
     path: Path,
@@ -161,7 +162,7 @@ object MarkdownExampleExtractor:
       case Some(line) =>
         directives.get(line) match
           case Some(Left(_))
-              if lines(line - 1).trim.startsWith("<!-- onion-example:") =>
+              if DocumentationDirective.looksLikeExample(lines(line - 1)) =>
             None
           case Some(Right(DocumentationDirective.Example(kind))) =>
             previousNonBlank(lines, line - 1)
@@ -241,7 +242,7 @@ object MarkdownExampleExtractor:
                 Vector(stdout) ++ stderr
               case None => Vector.empty
           case Some(Left(_))
-              if lines(line - 1).trim.startsWith("<!-- onion-output:") =>
+              if DocumentationDirective.looksLikeOutput(lines(line - 1)) =>
             Vector.empty
           case Some(Right(DocumentationDirective.Output(
                 OutputChannel.Stderr
@@ -279,7 +280,11 @@ object MarkdownExampleExtractor:
       case Some(fenceLine) =>
         fenceByOpening.get(fenceLine) match
           case Some(fence) if fence.language == "text" =>
-            Some(ExpectedOutput(channel, fence.content) -> fence)
+            Some(ExpectedOutput(
+              MarkdownLocation(path, fence.openingLine),
+              channel,
+              fence.content
+            ) -> fence)
           case _ =>
             issues += DocumentationIssue(
               MarkdownLocation(path, directiveLine),

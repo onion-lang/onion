@@ -56,7 +56,10 @@ class DocumentationDirectiveSpec extends AnyFunSpec:
         "<!-- onion-example: reject code=E59 -->",
         """<!-- onion-example: fragment reason="" -->""",
         "<!-- onion-example: execute -->",
-        "<!-- onion-output: stdio -->"
+        "<!--  onion-example: execute -->",
+        "<!-- onion-output: stdio -->",
+        "<!-- onion-example: compile",
+        "<!-- onion-output: stdout --> trailing text"
       )
 
       malformed.foreach { line =>

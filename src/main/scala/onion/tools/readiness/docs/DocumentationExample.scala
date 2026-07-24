@@ -16,6 +16,7 @@ enum OutputChannel:
   case Stderr
 
 final case class ExpectedOutput(
+  location: MarkdownLocation,
   channel: OutputChannel,
   text: String
 )

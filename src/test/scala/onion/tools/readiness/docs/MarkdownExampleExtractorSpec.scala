@@ -48,8 +48,13 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
       assert(result.examples.map(_.location.line) == Vector(3, 8, 17, 22))
       assert(result.examples.map(_.codeLine) == Vector(4, 9, 18, 23))
       assert(result.examples(1).outputs == Vector(
-        ExpectedOutput(OutputChannel.Stdout, "ok\n")
+        ExpectedOutput(
+          MarkdownLocation(path, 12),
+          OutputChannel.Stdout,
+          "ok\n"
+        )
       ))
+      assert(result.examples(1).outputs.map(_.location.line) == Vector(12))
 
     it("accepts blank lines between a directive and its fence"):
       val result = MarkdownExampleExtractor.extract(
@@ -105,8 +110,16 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
 
       assert(result.issues.isEmpty)
       assert(result.examples.head.outputs == Vector(
-        ExpectedOutput(OutputChannel.Stdout, "ok\n"),
-        ExpectedOutput(OutputChannel.Stderr, "warn\n")
+        ExpectedOutput(
+          MarkdownLocation(path, 7),
+          OutputChannel.Stdout,
+          "ok\n"
+        ),
+        ExpectedOutput(
+          MarkdownLocation(path, 11),
+          OutputChannel.Stderr,
+          "warn\n"
+        )
       ))
 
     it("rejects an unclassified Onion fence"):
@@ -135,7 +148,7 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
 
     it("reports a malformed directive without a duplicate unclassified issue"):
       val markdown =
-        """<!-- onion-example: execute -->
+        """<!--  onion-example: execute -->
           |```onion
           |1
           |```
@@ -151,6 +164,15 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
         "<!-- onion-example: compile -->\nordinary text\n"
       )
       assert(result.issues.exists(_.message.contains("orphaned")))
+
+    it("reports directive issues in source order"):
+      val markdown = (1 to 12)
+        .map(index => s"<!-- onion-example: unknown-$index -->")
+        .mkString("\n")
+
+      val result = MarkdownExampleExtractor.extract(path, markdown)
+
+      assert(result.issues.map(_.location.line) == (1 to 12).toVector)
 
     it("does not attach output declarations to non-run examples"):
       val markdown =
@@ -232,9 +254,11 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
         issue.location.line == 5 && issue.message.contains("malformed")
       ))
 
-    it("rejects an unterminated Onion fence"):
+    it("rejects an unterminated Onion fence without scanning its content"):
       val result = MarkdownExampleExtractor.extract(
         path,
-        "<!-- onion-example: compile -->\n```onion\n1\n"
+        "```onion\n<!-- onion-example: execute -->\n"
       )
-      assert(result.issues.exists(_.message.contains("unterminated")))
+      assert(result.issues.map(_.message) == Vector(
+        "unterminated Markdown fence"
+      ))

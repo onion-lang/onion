@@ -128,7 +128,10 @@ class DocumentationDirectiveSpec extends AnyFunSpec:
         "<!-- onion-example: reject code=E59 -->",
         """<!-- onion-example: fragment reason="" -->""",
         "<!-- onion-example: execute -->",
-        "<!-- onion-output: stdio -->"
+        "<!--  onion-example: execute -->",
+        "<!-- onion-output: stdio -->",
+        "<!-- onion-example: compile",
+        "<!-- onion-output: stdout --> trailing text"
       )
 
       malformed.foreach { line =>
@@ -174,6 +177,7 @@ enum OutputChannel:
   case Stderr
 
 final case class ExpectedOutput(
+  location: MarkdownLocation,
   channel: OutputChannel,
   text: String
 )
@@ -210,6 +214,10 @@ enum DocumentationDirective:
   case Output(channel: OutputChannel)
 
 object DocumentationDirective:
+  private val ExampleDirective =
+    """<!--\s*onion-example:.*""".r
+  private val OutputDirective =
+    """<!--\s*onion-output:.*""".r
   private val Reject =
     """<!--\s+onion-example:\s+reject\s+code=(E\d{4})\s+-->""".r
   private val Fragment =
@@ -232,14 +240,18 @@ object DocumentationDirective:
         Some(Right(Output(OutputChannel.Stdout)))
       case "<!-- onion-output: stderr -->" =>
         Some(Right(Output(OutputChannel.Stderr)))
-      case value
-          if value.startsWith("<!-- onion-example:") ||
-            value.startsWith("<!-- onion-output:") =>
+      case value if looksLikeExample(line) || looksLikeOutput(line) =>
         Some(Left(DocumentationIssue(
           location,
           s"unsupported or malformed Onion documentation directive: $value"
         )))
       case _ => None
+
+  private[docs] def looksLikeExample(line: String): Boolean =
+    ExampleDirective.matches(line.trim)
+
+  private[docs] def looksLikeOutput(line: String): Boolean =
+    OutputDirective.matches(line.trim)
 ```
 
 - [x] **Step 5: Run the directive test and verify GREEN**
@@ -335,8 +347,13 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
       assert(result.examples.map(_.location.line) == Vector(3, 8, 17, 22))
       assert(result.examples.map(_.codeLine) == Vector(4, 9, 18, 23))
       assert(result.examples(1).outputs == Vector(
-        ExpectedOutput(OutputChannel.Stdout, "ok\n")
+        ExpectedOutput(
+          MarkdownLocation(path, 12),
+          OutputChannel.Stdout,
+          "ok\n"
+        )
       ))
+      assert(result.examples(1).outputs.map(_.location.line) == Vector(12))
 
     it("accepts blank lines between a directive and its fence"):
       val result = MarkdownExampleExtractor.extract(
@@ -392,8 +409,16 @@ class MarkdownExampleExtractorSpec extends AnyFunSpec:
 
       assert(result.issues.isEmpty)
       assert(result.examples.head.outputs == Vector(
-        ExpectedOutput(OutputChannel.Stdout, "ok\n"),
-        ExpectedOutput(OutputChannel.Stderr, "warn\n")
+        ExpectedOutput(
+          MarkdownLocation(path, 7),
+          OutputChannel.Stdout,
+          "ok\n"
+        ),
+        ExpectedOutput(
+          MarkdownLocation(path, 11),
+          OutputChannel.Stderr,
+          "warn\n"
+        )
       ))
 ```
 
@@ -428,7 +453,7 @@ Append these cases to the same `describe` block:
 
     it("reports a malformed directive without a duplicate unclassified issue"):
       val markdown =
-        """<!-- onion-example: execute -->
+        """<!--  onion-example: execute -->
           |```onion
           |1
           |```
@@ -444,6 +469,15 @@ Append these cases to the same `describe` block:
         "<!-- onion-example: compile -->\nordinary text\n"
       )
       assert(result.issues.exists(_.message.contains("orphaned")))
+
+    it("reports directive issues in source order"):
+      val markdown = (1 to 12)
+        .map(index => s"<!-- onion-example: unknown-$index -->")
+        .mkString("\n")
+
+      val result = MarkdownExampleExtractor.extract(path, markdown)
+
+      assert(result.issues.map(_.location.line) == (1 to 12).toVector)
 
     it("does not attach output declarations to non-run examples"):
       val markdown =
@@ -525,12 +559,14 @@ Append these cases to the same `describe` block:
         issue.location.line == 5 && issue.message.contains("malformed")
       ))
 
-    it("rejects an unterminated Onion fence"):
+    it("rejects an unterminated Onion fence without scanning its content"):
       val result = MarkdownExampleExtractor.extract(
         path,
-        "<!-- onion-example: compile -->\n```onion\n1\n"
+        "```onion\n<!-- onion-example: execute -->\n"
       )
-      assert(result.issues.exists(_.message.contains("unterminated")))
+      assert(result.issues.map(_.message) == Vector(
+        "unterminated Markdown fence"
+      ))
 ```
 
 - [x] **Step 3: Run the extractor test and verify RED**
@@ -551,6 +587,7 @@ Create `MarkdownExampleExtractor.scala`:
 package onion.tools.readiness.docs
 
 import java.nio.file.Path
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 
 object MarkdownExampleExtractor:
@@ -566,8 +603,8 @@ object MarkdownExampleExtractor:
 
   def extract(path: Path, markdown: String): ExtractionResult =
     val lines = normalize(markdown).split("\n", -1).toVector
-    val (fences, fenceIssues) = scanFences(path, lines)
-    val directives = scanDirectives(path, lines, fences)
+    val (fences, fenceIssues, fencedLines) = scanFences(path, lines)
+    val directives = scanDirectives(path, lines, fencedLines)
     val examples = Vector.newBuilder[DocumentationExample]
     val issues = Vector.newBuilder[DocumentationIssue]
     val consumedExamples = mutable.Set.empty[Int]
@@ -632,9 +669,10 @@ object MarkdownExampleExtractor:
   private def scanFences(
     path: Path,
     lines: Vector[String]
-  ): (Vector[Fence], Vector[DocumentationIssue]) =
+  ): (Vector[Fence], Vector[DocumentationIssue], Set[Int]) =
     val fences = Vector.newBuilder[Fence]
     val issues = Vector.newBuilder[DocumentationIssue]
+    val fencedLines = mutable.Set.empty[Int]
     var index = 0
     while index < lines.length do
       lines(index) match
@@ -651,6 +689,7 @@ object MarkdownExampleExtractor:
           }
           closingIndex match
             case Some(close) =>
+              fencedLines ++= index + 1 to close + 1
               val contentLines = lines.slice(index + 1, close)
               val content =
                 if contentLines.isEmpty then ""
@@ -664,6 +703,7 @@ object MarkdownExampleExtractor:
               )
               index = close + 1
             case None =>
+              fencedLines ++= index + 1 to lines.length
               issues += DocumentationIssue(
                 MarkdownLocation(path, index + 1),
                 "unterminated Markdown fence"
@@ -671,24 +711,21 @@ object MarkdownExampleExtractor:
               index = lines.length
         case _ =>
           index += 1
-    (fences.result(), issues.result())
+    (fences.result(), issues.result(), fencedLines.toSet)
 
   private def scanDirectives(
     path: Path,
     lines: Vector[String],
-    fences: Vector[Fence]
+    fencedLines: Set[Int]
   ): Map[Int, Either[DocumentationIssue, DocumentationDirective]] =
-    val fencedLines = fences.flatMap { fence =>
-      fence.openingLine to fence.closingLine
-    }.toSet
-    lines.zipWithIndex.flatMap { case (line, index) =>
+    VectorMap.from(lines.zipWithIndex.flatMap { case (line, index) =>
       val oneOriginLine = index + 1
       if fencedLines.contains(oneOriginLine) then None
       else
         DocumentationDirective
           .parse(line, MarkdownLocation(path, oneOriginLine))
           .map(oneOriginLine -> _)
-    }.toMap
+    })
 
   private def classificationBefore(
     path: Path,
@@ -711,7 +748,7 @@ object MarkdownExampleExtractor:
       case Some(line) =>
         directives.get(line) match
           case Some(Left(_))
-              if lines(line - 1).trim.startsWith("<!-- onion-example:") =>
+              if DocumentationDirective.looksLikeExample(lines(line - 1)) =>
             None
           case Some(Right(DocumentationDirective.Example(kind))) =>
             previousNonBlank(lines, line - 1)
@@ -791,7 +828,7 @@ object MarkdownExampleExtractor:
                 Vector(stdout) ++ stderr
               case None => Vector.empty
           case Some(Left(_))
-              if lines(line - 1).trim.startsWith("<!-- onion-output:") =>
+              if DocumentationDirective.looksLikeOutput(lines(line - 1)) =>
             Vector.empty
           case Some(Right(DocumentationDirective.Output(
                 OutputChannel.Stderr
@@ -829,7 +866,11 @@ object MarkdownExampleExtractor:
       case Some(fenceLine) =>
         fenceByOpening.get(fenceLine) match
           case Some(fence) if fence.language == "text" =>
-            Some(ExpectedOutput(channel, fence.content) -> fence)
+            Some(ExpectedOutput(
+              MarkdownLocation(path, fence.openingLine),
+              channel,
+              fence.content
+            ) -> fence)
           case _ =>
             issues += DocumentationIssue(
               MarkdownLocation(path, directiveLine),

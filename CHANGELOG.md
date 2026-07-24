@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-07-24
-
 - **A convention-over-configuration project workflow: `onion new/build/run/test/clean`.**
   `onion new hello` scaffolds a manifest (`onion.toml`), `src/`, and `tests/`; `onion build`
   compiles and caches the result under `target/` (invalidated by a SHA-256 fingerprint over the
@@ -22,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reserved only when they are the exact first argument. See the
   [Project CLI guide](https://onion-lang.org/tools/project-cli/) for the full manifest, layout, and
   test conventions.
+
+## [0.5.0] - 2026-07-24
 
 - **`++`/`--` work on a static field and a top-level `var` (regression fix).** Post-increment/decrement
   typing had no case for a static field, so `C::count++` — and, after the top-level-var single-storage

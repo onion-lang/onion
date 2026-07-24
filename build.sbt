@@ -12,7 +12,8 @@ lazy val dist = taskKey[Unit]("Builds a runnable distribution under target/dist"
 lazy val distPath = settingKey[File]("Output directory used by the dist task")
 
 lazy val runScript = inputKey[Unit]("Runs the ScriptRunner with arguments")
-lazy val bench = inputKey[Unit]("Runs the benchmark suite")
+lazy val bench = inputKey[Unit]("Runs the benchmark suite (compatibility alias)")
+lazy val benchmark = inputKey[Unit]("Runs the versioned readiness benchmark suite")
 
 fullRunInputTask(
   runScript,
@@ -22,6 +23,12 @@ fullRunInputTask(
 
 fullRunInputTask(
   bench,
+  Compile,
+  "onion.tools.BenchmarkRunner"
+)
+
+fullRunInputTask(
+  benchmark,
   Compile,
   "onion.tools.BenchmarkRunner"
 )

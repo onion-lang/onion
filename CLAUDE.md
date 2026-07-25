@@ -511,7 +511,7 @@ These are frequently confused with other languages. **Always check these:**
 - Generics are erasure-based (no reified type info; type arguments are invariant — no variance or wildcards); nullability of type parameters is tracked at compile time (bare `[T]` is nullable, `[T extends B]` is non-null, Java type variables are platform)
 - Diagnostics are still improving; some errors may be reported later in the pipeline than ideal
 - Tail call optimization covers direct and mutual self-recursion (not general continuation-passing style)
-- Inference is local (left-to-right, no deferred/global unification): a throw-only lambda used as a generic argument with no expected type infers the type parameter as `Object` — e.g. `val f = Future::async(() -> { throw ... })` gives `Future[Object]`. Annotate the target to fix it: `val f: Future[Int] = Future::async(() -> { throw ... })` ([#314])
+- Inference is local (left-to-right, no deferred/global unification), so a type argument is pinned by what is written to its left; annotate the target when a later expression should determine it
 
 ## Entry Points for Execution
 

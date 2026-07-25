@@ -78,12 +78,19 @@ final class ClosureTyping(
           val inferred =
             if (useExpressionBody) inferReturnTypeFromExpressionBody(node, context, argTypes, samReturnTemplate)
             else inferReturnTypeFromReturns(node, context, argTypes, samReturnTemplate)
-          // A closure whose only produced value is `null` (NullType) or that
-          // never returns normally (BottomType, e.g. a throw-only body) infers
-          // to a bottom type, which is not a valid method return type: codegen's
-          // default value for it is absent, yielding a value-less `areturn`
-          // (VerifyError: operand stack underflow). Widen it to Object.
-          inferred.map(t => if (t.isNullType || t.isBottomType) bodyContext.rootClass else t)
+          // A closure whose only produced value is `null` widens to Object: a
+          // null-typed slot carries no information and Object is the honest
+          // static type.
+          //
+          // A closure that never returns normally (`() -> { throw ... }`) keeps
+          // its BOTTOM return here, so the closure's static type is
+          // `FunctionN[..., Nothing]` and generic inference sees that it
+          // produces nothing -- `Future::async(() -> { throw ... })` infers
+          // `Future[Nothing]`, not `Future[Object]` (issue #314). Bottom is not
+          // a usable JVM return type (its default value is absent, so codegen
+          // emits a value-less `areturn` -> VerifyError), so the *synthesized
+          // method's* return type is widened separately, at `expectedRet` below.
+          inferred.map(t => if (t.isNullType) bodyContext.rootClass else t)
         } else None
 
       val typeRef =
@@ -143,7 +150,15 @@ final class ClosureTyping(
           None
         case Some(method) =>
           val expectedArgs = substitutedArgs(method)
-          val expectedRet = substitutedReturn(method)
+          // The closure's STATIC type may carry a bottom return (a throw-only
+          // body, see above), which inference needs but the JVM cannot express
+          // as a method return type. Widen it here, and only here: this feeds
+          // the synthesized method's signature, its `return` insertion and its
+          // body's expected type, while the closure term keeps the precise type.
+          val expectedRet = substitutedReturn(method) match {
+            case t if t.isBottomType => bodyContext.rootClass
+            case t => t
+          }
 
           // Use the lambda's declared argument types as the implementation method
           // signature so primitive parameters stay primitive. The generated bridge

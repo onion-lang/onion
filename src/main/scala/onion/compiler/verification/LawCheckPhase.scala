@@ -3,6 +3,7 @@ package onion.compiler.verification
 import onion.compiler.{CompiledClass, CompileError, CompilerConfig, OnionClassLoader, SemanticError}
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
+import onion.compiler.toolbox.Message
 
 import java.lang.reflect.{InvocationTargetException, Method, Modifier}
 import scala.collection.mutable.ArrayBuffer
@@ -66,10 +67,10 @@ final class LawCheckPhase(config: CompilerConfig)
     val label = m.getName.substring(ExamplePrefix.length)
     try {
       if (m.invoke(null) != java.lang.Boolean.TRUE)
-        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, s"example '$label' in ${simpleName(cc)} failed: evaluated to false")
+        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, Message("error.semantic.exampleFailedFalse", Array[Any](label, simpleName(cc))))
     } catch {
       case e: Throwable =>
-        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, s"example '$label' in ${simpleName(cc)} failed: threw ${describe(rootCause(e))}")
+        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, Message("error.semantic.exampleFailedThrew", Array[Any](label, simpleName(cc), describe(rootCause(e)))))
     }
   }
 
@@ -87,12 +88,12 @@ final class LawCheckPhase(config: CompilerConfig)
       val shown = if (args.isEmpty) "(no args)" else args.map(String.valueOf).mkString(", ")
       try {
         if (m.invoke(null, args*) != java.lang.Boolean.TRUE) {
-          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, s"law '$label' in ${simpleName(cc)} falsified by counterexample: ($shown)")
+          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, Message("error.semantic.lawFalsified", Array[Any](label, simpleName(cc), shown)))
           done = true
         }
       } catch {
         case e: Throwable =>
-          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, s"law '$label' in ${simpleName(cc)} threw on ($shown): ${describe(rootCause(e))}")
+          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, Message("error.semantic.lawThrew", Array[Any](label, simpleName(cc), shown, describe(rootCause(e)))))
           done = true
       }
     }

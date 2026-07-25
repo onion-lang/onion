@@ -270,13 +270,15 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
           else Nil
         unsupportedFrom.foreach { case (arg, argType) =>
-          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName)
+          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
+            ScalarConversions.supportedNames)
         }
         val unsupportedData =
           if (hasData) node.args.zip(argTypes).filterNot { case (_, argType) => isDataDerivableType(argType) }
           else Nil
         unsupportedData.foreach { case (arg, argType) =>
-          report(SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName)
+          report(SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
+            ScalarConversions.supportedNames)
         }
         if (unsupportedFrom.isEmpty && unsupportedData.isEmpty)
           derivedMethods.foreach(processMethodDeclaration)
@@ -294,12 +296,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   /** Component types a `from re"..."` clause can produce from a captured String. */
-  private def isFromDerivableType(tp: Type): Boolean = tp match {
-    case BasicType.INT | BasicType.LONG | BasicType.DOUBLE | BasicType.FLOAT |
-         BasicType.BOOLEAN | BasicType.SHORT | BasicType.BYTE => true
-    case ct: ClassType => ct.name == "java.lang.String"
-    case _ => false
-  }
+  private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)
 
   /** Component types `derive!` (Json/Yaml) can serialize — the same scalar set as `from`. */
   private def isDataDerivableType(tp: Type): Boolean = isFromDerivableType(tp)

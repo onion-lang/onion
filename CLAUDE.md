@@ -359,6 +359,7 @@ These are frequently confused with other languages. **Always check these:**
 | `(expr as Type).method()` requires parentheses | ✓ correct for method chaining |
 | `Box<T>` | `Box[T]` - square brackets for generics |
 | `new Box<String>()` | `new Box[String]()` - square brackets |
+| `new Box("hi")` rejected as raw? | ✓ correct - type args are inferred from the constructor arguments (or the expected type); only a bare generic that nothing pins (`new Empty()`) is E0066 |
 | `String \| null` | `String?` - nullable type syntax |
 | `Box[String?]` rejected? | ✓ correct - bare `[T]` accepts nullable type args (Kotlin-style) |
 | `t.method()` on bare-T value | E0057 - use `t?.method()`, `t ?: default`, `if t != null`, or `[T extends B]` |

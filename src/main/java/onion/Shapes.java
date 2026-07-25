@@ -37,6 +37,50 @@ public final class Shapes {
         return new RegexShape<>(pattern, names, tags, build, printer);
     }
 
+    /**
+     * A shape over a JSON document: one key per component, looked up by name.
+     *
+     * @param names   component names, used both as document keys and as defect paths
+     * @param tags    component scalar kinds
+     * @param build   assembles the read components into a value
+     * @param explode the component values of a value, in declaration order, or
+     *                {@code null} for a read-only shape
+     */
+    public static <T> Shape<T> json(
+        List<String> names, List<String> tags,
+        Function1<List<Object>, T> build, Function1<T, List<Object>> explode
+    ) {
+        return new MappedShape<>(JSON, names, tags, build, explode);
+    }
+
+    /** A shape over a flat YAML document. */
+    public static <T> Shape<T> yaml(
+        List<String> names, List<String> tags,
+        Function1<List<Object>, T> build, Function1<T, List<Object>> explode
+    ) {
+        return new MappedShape<>(YAML, names, tags, build, explode);
+    }
+
+    private static final MappedShape.Codec JSON = new MappedShape.Codec() {
+        public Object read(String text) throws Exception { return Json.parse(text); }
+        public String write(java.util.Map<String, Object> fields) { return Json.stringify(fields); }
+        public int offsetOf(Exception e) {
+            return (e instanceof Json.JsonParseException) ? ((Json.JsonParseException) e).getPosition() : -1;
+        }
+        public String name() { return "JSON"; }
+    };
+
+    private static final MappedShape.Codec YAML = new MappedShape.Codec() {
+        public Object read(String text) throws Exception { return Yaml.parse(text); }
+        public String write(java.util.Map<String, Object> fields) { return Yaml.stringify(fields); }
+        public int offsetOf(Exception e) {
+            // Yaml reports a line rather than an offset; MappedShape only understands
+            // offsets, so let it fall back to the caller's origin instead of guessing.
+            return -1;
+        }
+        public String name() { return "YAML"; }
+    };
+
     private static final class RegexShape<T> implements Shape<T> {
         private final String pattern;
         private final List<String> names;

@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `canPrint()` answers whether the pattern is invertible rather than the printing method
   silently not existing. `from re"..."` is unchanged and still works.
 
+- **`shape name = json` / `yaml`.** The same named boundary over a structured document,
+  with the component names as document keys. This is what `derive!(Json, Yaml)` was
+  reaching for: that form bolts fixed-name statics on, so a record gets one shape per
+  format and no name for it, and it reports failure as `null` — including the case where a
+  missing `String` key produced a *successfully constructed* record with a `null`
+  non-nullable field. A shape reports the missing key, reports every missing key at once,
+  reports a wrongly-typed value rather than coercing it, and gives a malformed document the
+  line it failed on (the position `Json.JsonParseException` carries and the `derive!` path
+  discarded). An unrecognised format name is **E0076**. `derive!` is unchanged.
+
 - **New: `onion.Shape` — the data boundary as a value.** A partial, potentially bidirectional
   correspondence between external text and a typed value, with the two laws kept apart: `parse ∘
   print == id` is guaranteed wherever `print` exists, while `print ∘ parse == id` is false in

@@ -269,9 +269,24 @@ record Access(time: String, method: String, path: String, status: Int)
 val rows = Access::v1().eachLine(logText)
 ```
 
-1つのレコードが**複数の** shape を持てます。`from re"..."` は1パターンと固定名の
-静的メソッドしか許さないため構造的にできなかったことです。成分型、グループ数検査
-（**E0060**）、正規表現の妥当性検査（**E0059**）は `from` と同じです。
+パターンの代わりにフォーマット名を書くと、1行のテキストではなく構造化文書を読めます。
+
+```onion
+record Person(name: String, age: Int)
+  shape doc = json
+  shape cfg = yaml
+```
+
+この場合、成分名が文書のキーになります。キーの欠落は defect です
+（`derive!(Json)` は非null フィールドに `null` が入ったレコードを構築してしまいます）。
+型の不一致も defect で、文書が壊れている場合は失敗した行を報告します——
+`Json.JsonParseException` が持っていて `derive!` の経路が捨てていた位置情報です。
+未知のフォーマット名は **E0076** です。
+
+1つのレコードが**複数の** shape を、形式を混ぜて持てます。`from re"..."` も `derive!` も
+1パターン・フォーマットごとに固定名の静的メソッド1つしか許さないため、構造的にできなかった
+ことです。正規表現形式の成分型、グループ数検査（**E0060**）、妥当性検査（**E0059**）は
+`from` と同じです。
 
 `from` にはない点:
 

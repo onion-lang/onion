@@ -64,6 +64,59 @@ public final class Scalars {
         }
     }
 
+    /**
+     * Coerces an already-parsed document value (from JSON, YAML, …) to the scalar kind
+     * named by {@code tag}, reporting a positioned defect rather than throwing.
+     *
+     * <p>Unlike {@link #read}, the value arrives typed: a JSON number is already a
+     * {@code Number}, so this is a narrowing rather than a parse. A value of the wrong
+     * shape entirely — a string where an {@code Int} was required — is a defect, not a
+     * silent {@code null}.
+     */
+    public static Outcome<Object> coerce(String tag, Object value, Origin origin, String path) {
+        if (value == null) return Outcome.bad(Defect.at(origin, path, tag, "absent"));
+        try {
+            switch (tag) {
+                case "String":
+                    if (value instanceof String) return Outcome.ok(value);
+                    break;
+                case "Boolean":
+                    if (value instanceof Boolean) return Outcome.ok(value);
+                    if (value instanceof String && isBoolean((String) value))
+                        return Outcome.ok((Object) Boolean.valueOf(toBoolean((String) value)));
+                    break;
+                case "Int": case "Long": case "Double": case "Float": case "Short": case "Byte":
+                    if (value instanceof Number) return Outcome.ok(narrow(tag, (Number) value));
+                    if (value instanceof String) return read(tag, (String) value, origin, path);
+                    break;
+                default:
+                    return Outcome.bad(Defect.at(origin, path, "a supported scalar type", tag));
+            }
+        } catch (IllegalArgumentException e) {
+            return Outcome.bad(Defect.at(origin, path, tag, describe(value)));
+        }
+        return Outcome.bad(Defect.at(origin, path, tag, describe(value)));
+    }
+
+    private static Object narrow(String tag, Number n) {
+        switch (tag) {
+            case "Int":    return Integer.valueOf(n.intValue());
+            case "Long":   return Long.valueOf(n.longValue());
+            case "Double": return Double.valueOf(n.doubleValue());
+            case "Float":  return Float.valueOf(n.floatValue());
+            case "Short":  return Short.valueOf(n.shortValue());
+            default:       return Byte.valueOf(n.byteValue());
+        }
+    }
+
+    /** What was found, for a defect's `actual` -- the value's shape, not a dump of it. */
+    private static String describe(Object value) {
+        if (value instanceof String) return "\"" + value + "\"";
+        if (value instanceof java.util.Map) return "an object";
+        if (value instanceof java.util.List) return "an array";
+        return String.valueOf(value);
+    }
+
     /** Whether {@code value} is a boolean spelling {@link #toBoolean} accepts. */
     public static boolean isBoolean(String value) {
         return value != null && (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false"));

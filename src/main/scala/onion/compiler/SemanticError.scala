@@ -141,6 +141,7 @@ object SemanticError {
   case object MAP_NOT_DIRECTLY_ITERABLE extends SemanticError(73)
   case object LAW_PARAMETER_NOT_GENERATABLE extends SemanticError(74)
   case object LAW_CLASS_NOT_LOADABLE extends SemanticError(75)
+  case object SHAPE_FORMAT_UNKNOWN extends SemanticError(76)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

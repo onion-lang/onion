@@ -418,6 +418,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.recordDeriveUnknownMarker",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.SHAPE_FORMAT_UNKNOWN -> ErrorDef(
+      "error.semantic.shapeFormatUnknown",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

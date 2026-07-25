@@ -1535,8 +1535,12 @@ AST.RecordDeclaration record_decl(int mset) : {
     // `example`, `shape` is a soft keyword recognized only here, so it stays usable as
     // an ordinary identifier. A record may carry several.
     LOOKAHEAD({getToken(1).image.equals("shape") && getToken(2).kind == ID})
-      <ID> st=<ID> "=" srt=<RE_STRING>
-      { append(shapeBuf, new AST.ShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length() - 1))); }
+      <ID> st=<ID> "="
+      ( srt=<RE_STRING>
+          { append(shapeBuf, AST.regexShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length() - 1))); }
+      | srt=<ID>
+          { append(shapeBuf, AST.formatShapeClause(p(st), c(st), c(srt))); }
+      )
   )*
   [ "<:"
     superType = type() {append(superTypes, superType);}

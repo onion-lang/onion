@@ -274,10 +274,26 @@ record Access(time: String, method: String, path: String, status: Int)
 val rows = Access::v1().eachLine(logText)
 ```
 
-A record may carry **several** shapes — the thing `from re"..."` structurally
-cannot do, since it allows one pattern and fixed-name statics. The component
-types, the group-count check (**E0060**) and the regex validity check
-(**E0059**) are the same as for `from`.
+A shape may also read a structured document instead of a line, by naming a
+format rather than a pattern:
+
+```onion
+record Person(name: String, age: Int)
+  shape doc = json
+  shape cfg = yaml
+```
+
+Here the component names are the document keys. A missing key is a defect
+(`derive!(Json)` builds a record with a `null` non-nullable field instead), a
+wrongly-typed value is a defect, and a malformed document reports the line it
+failed on — the position `Json.JsonParseException` carries and the `derive!`
+path discards. An unrecognised format name is **E0076**.
+
+A record may carry **several** shapes, in any mix of forms — the thing
+`from re"..."` and `derive!` structurally cannot do, since each allows one
+pattern or one static per format. For the regex form, the component types,
+the group-count check (**E0060**) and the regex validity check (**E0059**) are
+the same as for `from`.
 
 What a shape gives that `from` does not:
 

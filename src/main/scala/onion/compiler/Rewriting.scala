@@ -575,37 +575,86 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeShapeMethod(declaration: AST.RecordDeclaration, clause: AST.ShapeClause): Option[AST.MethodDeclaration] = {
     if (declaration.args.isEmpty) return None
+    clause.source match {
+      case AST.RegexSource(pattern) => synthesizeRegexShape(declaration, clause, pattern)
+      case AST.FormatSource(format) => synthesizeFormatShape(declaration, clause, format)
+    }
+  }
+
+  /**
+   * `shape name = json` (or `yaml`) -> `static def name(): Shape[R]` over a document whose
+   * keys are the component names.
+   *
+   * The difference from the regex form is what printing means: a regex drops values into
+   * the gaps between literals, a document pairs each name with its value. So this passes
+   * an *explode* function -- the component values in declaration order -- and lets the
+   * format render the map.
+   */
+  private def synthesizeFormatShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause, format: String): Option[AST.MethodDeclaration] = {
+    val loc = clause.location
+    val recordName = declaration.name
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
+      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
+    val kinds = declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
+    if (kinds.exists(_.isEmpty)) return None
+    val tags = kinds.map(_.get)
+    val factory = ShapeFormats.factoryFor(format) match {
+      case Some(f) => f
+      case None    => return None // typing reports the unknown format
+    }
+    // explode: { __v => [__v.c0(), __v.c1(), ...] }  (boxing is automatic into the list)
+    val exploded = AST.ListLiteral(loc, declaration.args.map(a => AST.MethodCall(loc, AST.Id(loc, "__v"), a.name, Nil)))
+    val explodeLambda = AST.ClosureExpression(loc,
+      AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
+      List(AST.Argument(loc, "__v", recordType)), null,
+      AST.BlockExpression(loc, List(AST.ReturnExpression(loc, exploded))))
+    val call = AST.StaticMethodCall(loc,
+      AST.TypeNode(loc, AST.ReferenceType("onion.Shapes", true), false), factory,
+      List(
+        shapeStringList(loc, declaration.args.map(_.name)),
+        shapeStringList(loc, tags),
+        shapeBuildLambda(loc, declaration, recordType, tags),
+        explodeLambda
+      ))
+    Some(AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, clause.name, Nil, shapeType,
+      AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call)))))
+  }
+
+  private def shapeStringList(loc: Location, values: List[String]): AST.Expression =
+    AST.ListLiteral(loc, values.map(v => AST.StringLiteral(loc, v)))
+
+  /** `{ __p => new R(__p[0] as K0, ...) }` — shared by every shape source. */
+  private def shapeBuildLambda(loc: Location, declaration: AST.RecordDeclaration, recordType: AST.TypeNode, tags: List[String]): AST.Expression = {
+    val partsName = "__p"
+    val ctorArgs = declaration.args.zipWithIndex.map { case (_, i) =>
+      AST.Cast(loc, AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i)), boxedTypeNodeFor(loc, tags(i)))
+    }
+    AST.ClosureExpression(loc,
+      AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
+      List(AST.Argument(loc, partsName,
+        AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("java.util.List", true),
+          List(AST.ReferenceType("java.lang.Object", true))), false))),
+      null,
+      AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NewObject(loc, recordType, ctorArgs)))))
+  }
+
+  private def synthesizeRegexShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause, pattern: String): Option[AST.MethodDeclaration] = {
     val loc = clause.location
     val recordName = declaration.name
     val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
       AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
 
-    def strList(values: List[String]): AST.Expression =
-      AST.ListLiteral(loc, values.map(v => AST.StringLiteral(loc, v)))
-
     // Every component must be a known scalar; typing reports the ones that are not, the
     // same way it does for `from` (E0061).
     val kinds = declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
     if (kinds.exists(_.isEmpty)) return None
     val tags = kinds.map(_.get)
-
-    // build: { __p => new R(__p[0] as K0, __p[1] as K1, ...) }
-    val partsName = "__p"
-    val ctorArgs = declaration.args.zipWithIndex.map { case (arg, i) =>
-      val element = AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i))
-      AST.Cast(loc, element, boxedTypeNodeFor(loc, tags(i)))
-    }
-    val buildBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NewObject(loc, recordType, ctorArgs))))
-    val buildLambda = AST.ClosureExpression(loc,
-      AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
-      List(AST.Argument(loc, partsName,
-        AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("java.util.List", true),
-          List(AST.ReferenceType("java.lang.Object", true))), false))),
-      null, buildBody)
+    val buildLambda = shapeBuildLambda(loc, declaration, recordType, tags)
 
     // printer: { __v => "" + lit + __v.c0() + lit + ... }, only when invertible.
-    val printerExpr: AST.Expression = formatSegments(clause.pattern) match {
+    val printerExpr: AST.Expression = formatSegments(pattern) match {
       case Some(segs) if segs.count(_.isEmpty) == declaration.args.length =>
         var slot = 0
         val parts: List[AST.Expression] = segs.map {
@@ -625,9 +674,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val call = AST.StaticMethodCall(loc,
       AST.TypeNode(loc, AST.ReferenceType("onion.Shapes", true), false), "regex",
       List(
-        AST.StringLiteral(loc, clause.pattern),
-        strList(declaration.args.map(_.name)),
-        strList(tags),
+        AST.StringLiteral(loc, pattern),
+        shapeStringList(loc, declaration.args.map(_.name)),
+        shapeStringList(loc, tags),
         buildLambda,
         printerExpr
       ))

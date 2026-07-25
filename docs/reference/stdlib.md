@@ -13,6 +13,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future` |
+| **Positions** | `Origin` (where a value came from, in the text it was read out of) |
 | **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
 | **Testing & timing** | `Assert`, `Timing` |
 
@@ -182,6 +183,46 @@ val tangent: Double = Math::tan(Math::PI / 4) // 1.0
 val pi: Double = Math::PI       // 3.14159...
 val e: Double = Math::E         // 2.71828...
 ```
+
+## Origin
+
+Where a value came from, in the text it was read out of — the runtime counterpart to the
+compiler's own source locations. A parser that knows it failed on line 12 can say so,
+instead of returning a bare `null`.
+
+`source` is free-form: a file path, a URL, `"<stdin>"`, `"<literal>"`. Line and column are
+1-based. A column of `0` means the position is known only to the line, which is what a
+line-oriented parser can honestly report.
+
+```onion
+import { onion.Origin; }
+
+val o = Origin::at("access.log", 12, 5)
+println(o.describe())          // access.log:12:5
+
+val lineOnly = Origin::atLine("data.json", 4)
+println(lineOnly.describe())   // data.json:4
+println(lineOnly.hasColumn())  // false
+```
+
+### Origin::at / Origin::atLine / Origin::spanning
+
+`at(source, line, column)` spans a single character; `atLine(source, line)` records a line
+with no column; `spanning(source, line, column, span)` covers `span` characters.
+
+### origin.onLine / origin.inSource
+
+Parsing a document line by line means each sub-parse reports positions relative to its own
+line. `onLine` lifts one back into the whole document; `inSource` retargets it.
+
+```onion
+Origin::at("log.txt", 1, 3).onLine(40).describe()   // log.txt:40:3
+```
+
+### origin.describe
+
+`file:line:column`, or `file:line` when only the line is known — the form every compiler
+and editor already knows how to parse. `toString` returns the same.
 
 ## Function Interfaces
 

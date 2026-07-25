@@ -13,6 +13,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **データ形式** | `Json`, `Yaml`, `Csv`, `Config`（ドット記法での設定値アクセス） |
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
 | **関数型** | `Option`, `Result`, `Future` |
+| **位置情報** | `Origin`（値がどのテキストのどこから来たか） |
 | **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
 | **テスト・計測** | `Assert`, `Timing` |
 
@@ -99,6 +100,45 @@ val abs2: Double = Math::abs(-3.14)  // 3.14
 val max: Int = Math::max(10, 20)    // 20
 val min: Int = Math::min(10, 20)    // 10
 ```
+
+## Origin
+
+値がどのテキストのどこから来たかを表します。コンパイラが持つソース位置の、実行時版です。
+12行目で失敗したと分かっているパーサが、`null` を返す代わりにそう言えるようになります。
+
+`source` は自由形式です——ファイルパス、URL、`"<stdin>"`、`"<literal>"` など。行と列は
+1始まりです。列が `0` の場合は「行までしか分からない」ことを意味します。行単位のパーサが
+正直に報告できるのはそこまでだからです。
+
+```onion
+import { onion.Origin; }
+
+val o = Origin::at("access.log", 12, 5)
+println(o.describe())          // access.log:12:5
+
+val lineOnly = Origin::atLine("data.json", 4)
+println(lineOnly.describe())   // data.json:4
+println(lineOnly.hasColumn())  // false
+```
+
+### Origin::at / Origin::atLine / Origin::spanning
+
+`at(source, line, column)` は1文字分、`atLine(source, line)` は列なしの行、
+`spanning(source, line, column, span)` は `span` 文字分を表します。
+
+### origin.onLine / origin.inSource
+
+文書を行単位でパースすると、各行のパース結果はその行を基準にした位置を報告します。
+`onLine` はそれを文書全体の位置に持ち上げ、`inSource` は別のソースに付け替えます。
+
+```onion
+Origin::at("log.txt", 1, 3).onLine(40).describe()   // log.txt:40:3
+```
+
+### origin.describe
+
+`file:line:column`、行しか分からない場合は `file:line` を返します。コンパイラもエディタも
+既に解釈できる形式です。`toString` も同じ結果を返します。
 
 ## 関数インターフェース
 

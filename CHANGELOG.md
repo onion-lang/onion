@@ -18,7 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pinned by an argument and all matching constructors agree on the result; a bare generic that
   nothing determines (`new Empty()`) is still an E0066 raw type, and an inferred argument is a real
   type — `val wrong: Box[Int] = new Box("str")` is still rejected.
-
+- **Documented nine more stdlib modules in Japanese (`docs/ja/reference/stdlib.md`).**
+  The Japanese "モジュール一覧" (modules at a glance) summary table already listed
+  `System`, `Files`, `Proc`, `Args`, `Iterables`, `Colls`, `Csv`, `DateTime`, and
+  `Regex`, but the detailed sections for all nine were missing from the body of the
+  document — present in the English `docs/reference/stdlib.md` but absent from its
+  Japanese counterpart, so a Japanese reader following the table's promises hit a
+  dead end. Added the same worked examples the English doc carries for each module.
 - **Documented the `Config` stdlib module (en/ja).** `onion.Config` (`loadJson`/`parseJson`,
   dot-notation `get`/`getString`/`getInt`/`getLong`/`getDouble`/`getBoolean` with array
   indexing and defaults, `getEnv`/`getWithEnvOverride`, `hasPath`) has been fully implemented

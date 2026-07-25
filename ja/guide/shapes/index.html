@@ -12,31 +12,31 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.org/guide/type-classes/">
+        <link rel="canonical" href="https://onion-lang.org/ja/guide/shapes/">
       
       
-        <link rel="prev" href="../collections/">
+        <link rel="prev" href="../java-interop/">
       
       
-        <link rel="next" href="../shapes/">
+        <link rel="next" href="../scripting/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Type Classes - Onion Programming Language</title>
+        <title>Shape - Onion Programming Language</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,7 +55,7 @@
       
     
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#type-classes" class="md-skip">
+        <a href="#shape" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +94,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Type Classes
+              Shape
             
           </span>
         </div>
@@ -227,7 +227,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href="../../.." class="md-tabs__link">
         
   
   
@@ -244,11 +244,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../ja/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
           
   
   
@@ -268,7 +270,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../getting-started/installation/" class="md-tabs__link">
+        <a href="../../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -284,13 +286,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../../guide/overview/" class="md-tabs__link">
           
   
   
@@ -310,7 +310,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../examples/overview/" class="md-tabs__link">
+        <a href="../../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -330,7 +330,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tools/compiler/" class="md-tabs__link">
+        <a href="../../../tools/compiler/" class="md-tabs__link">
           
   
   
@@ -350,7 +350,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/specification/" class="md-tabs__link">
+        <a href="../../../reference/specification/" class="md-tabs__link">
           
   
   
@@ -370,7 +370,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../contributing/development/" class="md-tabs__link">
+        <a href="../../../contributing/development/" class="md-tabs__link">
           
   
   
@@ -390,7 +390,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../design/typed-boundaries/" class="md-tabs__link">
+        <a href="../../../design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -424,7 +424,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+    <a href="../../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -454,7 +454,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -478,28 +478,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -517,7 +520,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -535,7 +538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/" class="md-nav__link">
+      <a href="../../" class="md-nav__link">
         
   
   
@@ -569,10 +572,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -581,7 +587,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_2" >
         
           
-          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="">
             
   
   
@@ -617,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -645,7 +651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/getting-started/hello-world/" class="md-nav__link">
+      <a href="../../getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -673,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/getting-started/quick-start/" class="md-nav__link">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -706,28 +712,31 @@
                 
   
   
+    
   
   
+  
     
     
     
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
         
           
+          
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="">
             
   
   
@@ -745,7 +754,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -763,7 +772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/overview/" class="md-nav__link">
+      <a href="../overview/" class="md-nav__link">
         
   
   
@@ -791,7 +800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/basic-syntax/" class="md-nav__link">
+      <a href="../basic-syntax/" class="md-nav__link">
         
   
   
@@ -819,7 +828,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/variables-and-types/" class="md-nav__link">
+      <a href="../variables-and-types/" class="md-nav__link">
         
   
   
@@ -847,7 +856,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/null-safety/" class="md-nav__link">
+      <a href="../null-safety/" class="md-nav__link">
         
   
   
@@ -875,7 +884,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/control-flow/" class="md-nav__link">
+      <a href="../control-flow/" class="md-nav__link">
         
   
   
@@ -903,7 +912,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/functions/" class="md-nav__link">
+      <a href="../functions/" class="md-nav__link">
         
   
   
@@ -931,7 +940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/lambda-expressions/" class="md-nav__link">
+      <a href="../lambda-expressions/" class="md-nav__link">
         
   
   
@@ -959,7 +968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/classes-and-objects/" class="md-nav__link">
+      <a href="../classes-and-objects/" class="md-nav__link">
         
   
   
@@ -987,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/inheritance/" class="md-nav__link">
+      <a href="../inheritance/" class="md-nav__link">
         
   
   
@@ -1015,7 +1024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/collections/" class="md-nav__link">
+      <a href="../collections/" class="md-nav__link">
         
   
   
@@ -1043,7 +1052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/type-classes/" class="md-nav__link">
+      <a href="../type-classes/" class="md-nav__link">
         
   
   
@@ -1071,7 +1080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/java-interop/" class="md-nav__link">
+      <a href="../java-interop/" class="md-nav__link">
         
   
   
@@ -1096,10 +1105,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../ja/guide/shapes/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shape
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1115,6 +1151,136 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        何を解決するのか
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shape_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shape を宣言する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        読む
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        複数行を読む
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        書き戻す
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文書を読む
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#url" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ファイルと URL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shape_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ビルド時に shape を検査する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shapes を直接使うとき
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連項目
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1127,7 +1293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/guide/scripting/" class="md-nav__link">
+      <a href="../scripting/" class="md-nav__link">
         
   
   
@@ -1169,10 +1335,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -1181,7 +1350,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
         
           
-          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
             
   
   
@@ -1217,7 +1386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/" class="md-nav__link">
+      <a href="../../examples/" class="md-nav__link">
         
   
   
@@ -1245,7 +1414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -1273,7 +1442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -1301,7 +1470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -1329,7 +1498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -1357,7 +1526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -1385,7 +1554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/async/" class="md-nav__link">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -1413,7 +1582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/examples/error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -1455,10 +1624,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -1467,7 +1639,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_5" >
         
           
-          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="">
             
   
   
@@ -1503,7 +1675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/tools/compiler/" class="md-nav__link">
+      <a href="../../tools/compiler/" class="md-nav__link">
         
   
   
@@ -1531,7 +1703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/tools/script-runner/" class="md-nav__link">
+      <a href="../../tools/script-runner/" class="md-nav__link">
         
   
   
@@ -1559,7 +1731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/tools/project-cli/" class="md-nav__link">
+      <a href="../../tools/project-cli/" class="md-nav__link">
         
   
   
@@ -1587,7 +1759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/tools/repl/" class="md-nav__link">
+      <a href="../../tools/repl/" class="md-nav__link">
         
   
   
@@ -1615,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/tools/language-server/" class="md-nav__link">
+      <a href="../../tools/language-server/" class="md-nav__link">
         
   
   
@@ -1657,10 +1829,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -1669,7 +1844,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6" >
         
           
-          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="">
             
   
   
@@ -1705,7 +1880,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/reference/specification/" class="md-nav__link">
+      <a href="../../reference/specification/" class="md-nav__link">
         
   
   
@@ -1733,7 +1908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/reference/stdlib/" class="md-nav__link">
+      <a href="../../reference/stdlib/" class="md-nav__link">
         
   
   
@@ -1761,7 +1936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/" class="md-nav__link">
+      <a href="../../../api/" class="md-nav__link">
         
   
   
@@ -1789,7 +1964,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -1817,7 +1992,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/reference/error-codes/" class="md-nav__link">
+      <a href="../../reference/error-codes/" class="md-nav__link">
         
   
   
@@ -1899,7 +2074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/compiler/tail-call-optimization/" class="md-nav__link">
+      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
         
   
   
@@ -1949,10 +2124,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -1961,7 +2139,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
         
           
-          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="">
             
   
   
@@ -1997,7 +2175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/contributing/development/" class="md-nav__link">
+      <a href="../../contributing/development/" class="md-nav__link">
         
   
   
@@ -2025,7 +2203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/contributing/building/" class="md-nav__link">
+      <a href="../../contributing/building/" class="md-nav__link">
         
   
   
@@ -2053,7 +2231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/RELEASING/" class="md-nav__link">
+      <a href="../../RELEASING/" class="md-nav__link">
         
   
   
@@ -2081,7 +2259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/CLAUDE_ja/" class="md-nav__link">
+      <a href="../../CLAUDE_ja/" class="md-nav__link">
         
   
   
@@ -2123,10 +2301,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -2135,7 +2316,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="">
             
   
   
@@ -2171,7 +2352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/GENERICS_DESIGN/" class="md-nav__link">
+      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
         
   
   
@@ -2199,7 +2380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/parser-refactoring/" class="md-nav__link">
+      <a href="../../parser-refactoring/" class="md-nav__link">
         
   
   
@@ -2227,7 +2408,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ja/quality-bar/" class="md-nav__link">
+      <a href="../../quality-bar/" class="md-nav__link">
         
   
   
@@ -2324,7 +2505,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -2352,7 +2533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/hello-world/" class="md-nav__link">
+      <a href="../../../getting-started/hello-world/" class="md-nav__link">
         
   
   
@@ -2380,7 +2561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/quick-start/" class="md-nav__link">
+      <a href="../../../getting-started/quick-start/" class="md-nav__link">
         
   
   
@@ -2412,31 +2593,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
@@ -2454,7 +2632,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2472,7 +2650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../../guide/overview/" class="md-nav__link">
         
   
   
@@ -2500,7 +2678,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic-syntax/" class="md-nav__link">
+      <a href="../../../guide/basic-syntax/" class="md-nav__link">
         
   
   
@@ -2528,7 +2706,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../variables-and-types/" class="md-nav__link">
+      <a href="../../../guide/variables-and-types/" class="md-nav__link">
         
   
   
@@ -2556,7 +2734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control-flow/" class="md-nav__link">
+      <a href="../../../guide/control-flow/" class="md-nav__link">
         
   
   
@@ -2584,7 +2762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functions/" class="md-nav__link">
+      <a href="../../../guide/functions/" class="md-nav__link">
         
   
   
@@ -2612,7 +2790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../classes-and-objects/" class="md-nav__link">
+      <a href="../../../guide/classes-and-objects/" class="md-nav__link">
         
   
   
@@ -2640,7 +2818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../inheritance/" class="md-nav__link">
+      <a href="../../../guide/inheritance/" class="md-nav__link">
         
   
   
@@ -2668,7 +2846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../null-safety/" class="md-nav__link">
+      <a href="../../../guide/null-safety/" class="md-nav__link">
         
   
   
@@ -2696,7 +2874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lambda-expressions/" class="md-nav__link">
+      <a href="../../../guide/lambda-expressions/" class="md-nav__link">
         
   
   
@@ -2724,7 +2902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../collections/" class="md-nav__link">
+      <a href="../../../guide/collections/" class="md-nav__link">
         
   
   
@@ -2749,37 +2927,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Type Classes
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../guide/type-classes/" class="md-nav__link">
         
   
   
@@ -2795,103 +2946,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#declaring-a-trait" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Declaring a trait
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#providing-instances" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Providing instances
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#constrained-generics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Constrained generics
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#ground-dictionary-access" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Ground dictionary access
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#constrained-functions-calling-constrained-functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Constrained functions calling constrained functions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#your-own-traits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your own traits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#current-limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current limitations
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2904,7 +2958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../shapes/" class="md-nav__link">
+      <a href="../../../guide/shapes/" class="md-nav__link">
         
   
   
@@ -2932,7 +2986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scripting/" class="md-nav__link">
+      <a href="../../../guide/scripting/" class="md-nav__link">
         
   
   
@@ -2960,7 +3014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../java-interop/" class="md-nav__link">
+      <a href="../../../guide/java-interop/" class="md-nav__link">
         
   
   
@@ -3049,7 +3103,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/overview/" class="md-nav__link">
+      <a href="../../../examples/overview/" class="md-nav__link">
         
   
   
@@ -3077,7 +3131,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/basic/" class="md-nav__link">
+      <a href="../../../examples/basic/" class="md-nav__link">
         
   
   
@@ -3105,7 +3159,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/oop/" class="md-nav__link">
+      <a href="../../../examples/oop/" class="md-nav__link">
         
   
   
@@ -3133,7 +3187,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/functional/" class="md-nav__link">
+      <a href="../../../examples/functional/" class="md-nav__link">
         
   
   
@@ -3161,7 +3215,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/scripting/" class="md-nav__link">
+      <a href="../../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3189,7 +3243,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/json-http/" class="md-nav__link">
+      <a href="../../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3217,7 +3271,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/async/" class="md-nav__link">
+      <a href="../../../examples/async/" class="md-nav__link">
         
   
   
@@ -3245,7 +3299,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/error-handling/" class="md-nav__link">
+      <a href="../../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3334,7 +3388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/compiler/" class="md-nav__link">
+      <a href="../../../tools/compiler/" class="md-nav__link">
         
   
   
@@ -3362,7 +3416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/script-runner/" class="md-nav__link">
+      <a href="../../../tools/script-runner/" class="md-nav__link">
         
   
   
@@ -3390,7 +3444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/project-cli/" class="md-nav__link">
+      <a href="../../../tools/project-cli/" class="md-nav__link">
         
   
   
@@ -3418,7 +3472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/repl/" class="md-nav__link">
+      <a href="../../../tools/repl/" class="md-nav__link">
         
   
   
@@ -3446,7 +3500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tools/language-server/" class="md-nav__link">
+      <a href="../../../tools/language-server/" class="md-nav__link">
         
   
   
@@ -3535,7 +3589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/specification/" class="md-nav__link">
+      <a href="../../../reference/specification/" class="md-nav__link">
         
   
   
@@ -3563,7 +3617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/stdlib/" class="md-nav__link">
+      <a href="../../../reference/stdlib/" class="md-nav__link">
         
   
   
@@ -3591,7 +3645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/" class="md-nav__link">
+      <a href="../../../api/" class="md-nav__link">
         
   
   
@@ -3619,7 +3673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/compiler-architecture/" class="md-nav__link">
+      <a href="../../../reference/compiler-architecture/" class="md-nav__link">
         
   
   
@@ -3647,7 +3701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/error-codes/" class="md-nav__link">
+      <a href="../../../reference/error-codes/" class="md-nav__link">
         
   
   
@@ -3729,7 +3783,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
+      <a href="../../../compiler/tail-call-optimization/" class="md-nav__link">
         
   
   
@@ -3826,7 +3880,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/development/" class="md-nav__link">
+      <a href="../../../contributing/development/" class="md-nav__link">
         
   
   
@@ -3854,7 +3908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/building/" class="md-nav__link">
+      <a href="../../../contributing/building/" class="md-nav__link">
         
   
   
@@ -3882,7 +3936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../RELEASING/" class="md-nav__link">
+      <a href="../../../RELEASING/" class="md-nav__link">
         
   
   
@@ -3971,7 +4025,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/typed-boundaries/" class="md-nav__link">
+      <a href="../../../design/typed-boundaries/" class="md-nav__link">
         
   
   
@@ -3999,7 +4053,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+      <a href="../../../design/onion-v0.5-audit/" class="md-nav__link">
         
   
   
@@ -4027,7 +4081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/roadmap/" class="md-nav__link">
+      <a href="../../../design/roadmap/" class="md-nav__link">
         
   
   
@@ -4055,7 +4109,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+      <a href="../../../design/readme-rewrite-proposal/" class="md-nav__link">
         
   
   
@@ -4083,7 +4137,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/type-classes/" class="md-nav__link">
+      <a href="../../../design/type-classes/" class="md-nav__link">
         
   
   
@@ -4111,7 +4165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
+      <a href="../../../GENERICS_DESIGN/" class="md-nav__link">
         
   
   
@@ -4139,7 +4193,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../parser-refactoring/" class="md-nav__link">
+      <a href="../../../parser-refactoring/" class="md-nav__link">
         
   
   
@@ -4167,7 +4221,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../quality-bar/" class="md-nav__link">
+      <a href="../../../quality-bar/" class="md-nav__link">
         
   
   
@@ -4222,10 +4276,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#declaring-a-trait" class="md-nav__link">
+  <a href="#_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Declaring a trait
+        何を解決するのか
       
     </span>
   </a>
@@ -4233,10 +4287,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#providing-instances" class="md-nav__link">
+  <a href="#shape_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Providing instances
+        shape を宣言する
       
     </span>
   </a>
@@ -4244,10 +4298,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#constrained-generics" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Constrained generics
+        読む
       
     </span>
   </a>
@@ -4255,10 +4309,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ground-dictionary-access" class="md-nav__link">
+  <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ground dictionary access
+        複数行を読む
       
     </span>
   </a>
@@ -4266,10 +4320,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#constrained-functions-calling-constrained-functions" class="md-nav__link">
+  <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Constrained functions calling constrained functions
+        書き戻す
       
     </span>
   </a>
@@ -4277,10 +4331,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#your-own-traits" class="md-nav__link">
+  <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your own traits
+        文書を読む
       
     </span>
   </a>
@@ -4288,10 +4342,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-limitations" class="md-nav__link">
+  <a href="#url" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current limitations
+        ファイルと URL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shape_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ビルド時に shape を検査する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shapes を直接使うとき
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連項目
       
     </span>
   </a>
@@ -4318,144 +4405,105 @@
   
 
 
-<h1 id="type-classes">Type Classes<a class="headerlink" href="#type-classes" title="Permanent link">&para;</a></h1>
-<p>Type classes give Onion <em>ad-hoc polymorphism</em>: you can constrain a generic on the
-operations a type must support, and the compiler supplies the right implementation
-at each call. They are declared Rust-trait style, with <code>trait</code>, <code>instance</code>, and a
-<code>[T: Trait]</code> context bound.</p>
-<h2 id="declaring-a-trait">Declaring a trait<a class="headerlink" href="#declaring-a-trait" title="Permanent link">&para;</a></h2>
-<p>A <code>trait</code> describes operations over a type parameter:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>trait Numeric[T] {
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  def zero(): T
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  def plus(a: T, b: T): T
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>}
+<h1 id="shape">Shape<a class="headerlink" href="#shape" title="Permanent link">&para;</a></h1>
+<p><strong>shape</strong> は、テキストと型付き値の対応を記述します。一度宣言すれば、パース・書き戻し・
+失敗の伝え方が、そのひとつの記述から出てきます。</p>
+<h2 id="_1">何を解決するのか<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>ログ行をレコードに読むこと自体は前からできました。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>record Access(ip: String, method: String, path: String, status: Int)
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>val rows = Access::parseAll(logText)
 </span></code></pre></div>
-<p>A trait may have default methods, just like an interface:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>trait Greeter {
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  def name(): String
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  def greet(): String = &quot;Hi &quot; + name()
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>}
+<p>1000行のうち5行が壊れている状態でこれを走らせると、995行が返ってきます。残り5行は
+<strong>消えます</strong>——数えられず、報告されず、「最初から995行しかなかったファイル」と区別が
+つきません。壊れた行に <code>Access::parse</code> を呼ぶと <code>null</code> が返りますが、これはそもそも
+アクセスログでない行に対する戻り値と同じです。</p>
+<h2 id="shape_1">shape を宣言する<a class="headerlink" href="#shape_1" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>record Access(ip: String, method: String, path: String, status: Int)
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  shape common = re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
 </span></code></pre></div>
-<h2 id="providing-instances">Providing instances<a class="headerlink" href="#providing-instances" title="Permanent link">&para;</a></h2>
-<p>An <code>instance</code> implements a trait for a concrete type:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>trait Numeric[T] {
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  def zero(): T
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  def plus(a: T, b: T): T
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>}
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>instance Numeric[Integer] {
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  def zero(): Integer = 0
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>}
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>instance Numeric[Long] {
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  def zero(): Long = 0L
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>  def plus(a: Long, b: Long): Long = a + b
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>}
+<p><code>shape name = ...</code> は境界に名前を与えるので、1つのレコードが必要なだけ持てます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>record Access(ip: String, method: String, path: String, status: Int)
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  shape common = re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  shape tabbed = re&quot;(\S+)\t(\w+)\t(\S+)\t(\d+)&quot;
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  shape doc    = json
 </span></code></pre></div>
-<p>There is at most <strong>one instance per <code>(trait, type)</code></strong> (coherence). Primitive and
-boxed forms are the same type, so <code>Numeric[Int]</code> and <code>Numeric[Integer]</code> are one
-instance — declaring both is an error.</p>
-<h2 id="constrained-generics">Constrained generics<a class="headerlink" href="#constrained-generics" title="Permanent link">&para;</a></h2>
-<p>Write <code>[T: Numeric]</code> to require that <code>T</code> has a <code>Numeric</code> instance. Inside the body,
-call the trait's methods through <code>Numeric[T]::method(...)</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>trait Numeric[T] {
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  def zero(): T
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  def plus(a: T, b: T): T
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>}
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>instance Numeric[Integer] {
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  def zero(): Integer = 0
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>}
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>instance Numeric[Double] {
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  def zero(): Double = 0.0
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  def plus(a: Double, b: Double): Double = a + b
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>}
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>def sum[T: Numeric](xs: List[T]): T {
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  var acc: T = Numeric[T]::zero()
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  return acc
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>}
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>def main(args: String[]): void {
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>  println(sum([1, 2, 3, 4]))     // =&gt; 10
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>  println(sum([1.5, 2.5, 3.0]))  // =&gt; 7.0
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>}
+<p><code>shape</code> はソフトキーワードなので、通常の識別子としても使えます。</p>
+<h2 id="_2">読む<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p><code>parse</code> は <code>Outcome</code> を返します。値か、値でない理由<strong>すべて</strong>です。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val o = Access::common().parse(line)
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>if o.isOk() { println(o.get().path()) }
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>else        { println(o.describe()) }
 </span></code></pre></div>
-<p>The compiler resolves the instance for the inferred <code>T</code> at each call and passes it
-in for you — you never mention it. Calling a constrained function for a type with
-no instance is a compile error, not a runtime failure.</p>
-<p>You can combine a context bound with an <code>extends</code> upper bound and use several,
-<code>[T extends Comparable[T]: Numeric]</code> or <code>[T: Numeric, U: Numeric]</code>.</p>
-<h2 id="ground-dictionary-access">Ground dictionary access<a class="headerlink" href="#ground-dictionary-access" title="Permanent link">&para;</a></h2>
-<p><code>Trait[ConcreteType]::method(...)</code> works directly, outside any generic:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>trait Numeric[T] {
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  def plus(a: T, b: T): T
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>}
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>instance Numeric[Integer] {
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  def plus(a: Integer, b: Integer): Integer = a + b
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>def main(args: String[]): void {
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  println(Numeric[Integer]::plus(3, 4))  // =&gt; 7
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>}
+<p>defect は「どこから来たか」と「何を期待したか」を知っています。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Access::common().parse(&quot;10.0.0.1 GET&quot;)
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>// 行全体が一致しない:
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>//   expected &quot;match of /(\S+) (\w+) (\S+) (\d+)/&quot;, found &quot;10.0.0.1 GET&quot;
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Access::common().parse(&quot;10.0.0.1 GET /x abc&quot;)
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>//   status: expected Int, found abc      &lt;- 不一致ではなく、壊れたフィールド
 </span></code></pre></div>
-<h2 id="constrained-functions-calling-constrained-functions">Constrained functions calling constrained functions<a class="headerlink" href="#constrained-functions-calling-constrained-functions" title="Permanent link">&para;</a></h2>
-<p>A constrained function can call another with the same abstract type parameter; the
-instance is forwarded automatically:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>trait Numeric[T] {
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  def zero(): T
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  def plus(a: T, b: T): T
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>}
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>instance Numeric[Integer] {
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  def zero(): Integer = 0
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  def plus(a: Integer, b: Integer): Integer = a + b
+<p>この区別こそ <code>from re"..."</code> が表現できないものです。どちらにも <code>null</code> を返します。</p>
+<h2 id="_3">複数行を読む<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val each = Access::common().eachLine(logText)
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>val rows    = Outcome::values(each)     // 読めた995行
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>val defects = Outcome::defects(each)    // 読めなかった5行、行番号つき
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>foreach d: Defect in defects {
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  println(&quot;line &quot; + d.origin().line() + &quot;: &quot; + d.expected())
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>}
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>def sum[T: Numeric](xs: List[T]): T {
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  var acc: T = Numeric[T]::zero()
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  return acc
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>}
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>def sumTwice[T: Numeric](xs: List[T]): T = Numeric[T]::plus(sum(xs), sum(xs))
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>def main(args: String[]): void {
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  println(sumTwice([1, 2, 3]))  // =&gt; 12
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>}
 </span></code></pre></div>
-<h2 id="your-own-traits">Your own traits<a class="headerlink" href="#your-own-traits" title="Permanent link">&para;</a></h2>
-<p>Type classes are not limited to numbers — define any trait you need:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>trait Eq[T] {
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  def eq(a: T, b: T): Boolean
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>}
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>instance Eq[Integer] {
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  def eq(a: Integer, b: Integer): Boolean = a == b
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>}
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>def allSame[T: Eq](xs: List[T]): Boolean {
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  if xs.size() &lt; 2 { return true }
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  val head: T = xs.get(0)
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  foreach x: T in xs {
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    if !Eq[T]::eq(head, x) { return false }
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>  }
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>  return true
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>}
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>def main(args: String[]): void {
-</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>  println(allSame([7, 7, 7]))  // =&gt; true
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>  println(allSame([7, 8, 7]))  // =&gt; false
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>}
+<p>部分的な結果に意味がない場合は <code>lines()</code> を使ってください。all-or-nothing で、壊れた行の
+defect をすべてまとめて報告します。</p>
+<h2 id="_4">書き戻す<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>shape はパースと書き戻しの両方をこなし、両者は一致します。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>val s = Access::common()
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>s.parse(s.print(row)).get() == row     // true
 </span></code></pre></div>
-<h2 id="current-limitations">Current limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
-<p>The first release focuses on the common cases:</p>
+<p>ただし、すべてのパターンが書き戻せるわけではありません。<code>\s+</code> を区切りに使うと一意な
+書き戻し方がない（空白は何個？）ので、その shape は read-only になり、そう答えます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  shape loose = re&quot;(-?\d+)\s+(-?\d+)&quot;
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>Pt::loose().canPrint()     // false
+</span></code></pre></div>
+<p>「メソッドが黙って存在しない」ではなく、<strong>問い合わせられる</strong>という点が違います。</p>
+<h2 id="_5">文書を読む<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>パターンの代わりにフォーマット名を書くと、成分名をキーとして構造化文書を読みます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>record Person(name: String, age: Int)
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  shape doc = json
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>Person::doc().parse(&quot;{\&quot;age\&quot;: 30}&quot;)
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>//   name: expected String, found absent
+</span></code></pre></div>
+<p>サポートしているのは <code>json</code> と <code>yaml</code> です。未知の名前はコンパイルエラー（E0076）です。</p>
+<h2 id="url">ファイルと URL<a class="headerlink" href="#url" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>val one  = file&quot;person.json&quot;.read(Person::doc())
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>val many = file&quot;access.log&quot;.eachLine(Access::common())
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>val api  = http&quot;https://example.com/p&quot;.read(Person::doc())
+</span></code></pre></div>
+<p>すべての defect がパスまたは URL を持つので、失敗が<em>どの</em>リソースのものか分かります。
+読めないファイルも例外ではなく defect です。存在しないかもしれないものを読むのは、
+境界では普通のことだからです。</p>
+<p>メソッド名が <code>as</code> ではなく <code>read</code> なのは、<code>as</code> がキャスト用のキーワードだからです。</p>
+<h2 id="shape_2">ビルド時に shape を検査する<a class="headerlink" href="#shape_2" title="Permanent link">&para;</a></h2>
+<p><code>law</code> はコンパイル時に実行されるので、往復の性質を機械検査できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  shape text = re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+</span></code></pre></div>
+<p>引数の型からサンプルを生成できない law はエラー（E0074）になります。読み飛ばしません。
+実行されない検査が「通った検査」に見えてはいけないからです。</p>
+<h2 id="shapes"><code>Shapes</code> を直接使うとき<a class="headerlink" href="#shapes" title="Permanent link">&para;</a></h2>
+<p><code>onion.Shapes::regex</code> と <code>::json</code> は同じ構築を通常の API として公開しています。自分で
+宣言していない型に対する shape はこちらで書けます。</p>
+<h2 id="_6">関連項目<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Single-parameter traits (<code>trait C[T]</code>).</li>
-<li>Context bounds on functions and methods (<code>def f[T: C]</code>); a bound on a generic
-  <em>class</em> (<code>class Box[T: C]</code>) parses but is not enforced yet.</li>
-<li>Trait methods are called explicitly via <code>Trait[T]::method(...)</code>; UFCS
-  <code>value.method(...)</code> is not yet available.</li>
-<li>Instances are for ground types (<code>instance Numeric[Integer]</code>), not parameterized
-  (<code>instance Numeric[List[T]]</code>).</li>
-<li>There is no built-in <code>Numeric</code>/<code>Eq</code>/<code>Ord</code> yet — define the traits you need.</li>
+<li><a href="../scripting/">スクリプティング</a> — scheme リテラル、<code>|&gt;</code>、auto-CLI</li>
+<li><a href="../../reference/specification/#records">言語仕様</a></li>
+<li><code>run/LogReport.on</code> — 全体を1つのプログラムにしたもの</li>
 </ul>
 
 
@@ -4492,7 +4540,7 @@ instance is forwarded automatically:</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../collections/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Collections">
+          <a href="../java-interop/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Javaとの相互運用">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4502,20 +4550,20 @@ instance is forwarded automatically:</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Collections
+                Javaとの相互運用
               </div>
             </div>
           </a>
         
         
           
-          <a href="../shapes/" class="md-footer__link md-footer__link--next" aria-label="Next: Shapes">
+          <a href="../scripting/" class="md-footer__link md-footer__link--next" aria-label="Next: スクリプティング">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Shapes
+                スクリプティング
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -4568,10 +4616,10 @@ instance is forwarded automatically:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

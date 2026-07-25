@@ -1099,6 +1099,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/guide/shapes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/guide/scripting/" class="md-nav__link">
         
   
@@ -2749,6 +2777,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/shapes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shapes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/scripting/" class="md-nav__link">
         
   
@@ -3125,6 +3181,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-log-and-reporting-the-lines-that-would-not-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a log, and reporting the lines that would not read
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -4262,6 +4335,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Next Steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-log-and-reporting-the-lines-that-would-not-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a log, and reporting the lines that would not read
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -4411,6 +4501,29 @@
 <li><a href="../error-handling/">Error Handling Examples</a> - Validate inputs and handle failures</li>
 <li><a href="../../tools/script-runner/">Tools: Script Runner</a> - Run scripts directly</li>
 </ul>
+<h3 id="reading-a-log-and-reporting-the-lines-that-would-not-read">Reading a log, and reporting the lines that would not read<a class="headerlink" href="#reading-a-log-and-reporting-the-lines-that-would-not-read" title="Permanent link">&para;</a></h3>
+<p><code>parseAll</code> drops a malformed line without trace. A shape returns one <code>Outcome</code> per
+line, so the rows and the reasons the rest failed are both in hand, with line numbers.</p>
+<p><strong><code>LogLines.on</code></strong></p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>record Access(ip: String, method: String, path: String, status: Int)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  shape common = re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>def main(): void {
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>  val log = &quot;10.0.0.1 GET /a 200\nbroken line\n10.0.0.2 GET /b 404&quot;
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  val each = Access::common().eachLine(log, Origin::atLine(&quot;access.log&quot;, 1))
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>  val rows = Outcome::values(each)
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>  val bad = Outcome::defects(each)
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>  println(rows.size + &quot; read, &quot; + bad.size + &quot; not read&quot;)
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>  foreach d: Defect in bad {
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    println(&quot;  line &quot; + d.origin().line() + &quot;: &quot; + d.expected())
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>  }
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>  val first = rows[0] as Access
+</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>  println(Access::common().print(first))
+</span><span id="__span-12-18"><a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>}
+</span></code></pre></div>
 
 
 

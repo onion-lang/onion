@@ -1108,6 +1108,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/shapes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/scripting/" class="md-nav__link">
         
   
@@ -1967,6 +1995,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shape — レコードに名前付きの境界を与える
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#derive-record-serde" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2145,6 +2184,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="スキーム接頭辞リテラル">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shape_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shape でリソースを読む
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3304,6 +3360,34 @@
     
   
     Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/shapes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shapes
   
 
     
@@ -4826,6 +4910,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shape — レコードに名前付きの境界を与える
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#derive-record-serde" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5004,6 +5099,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="スキーム接頭辞リテラル">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shape_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shape でリソースを読む
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -5348,14 +5460,54 @@
 キャプチャグループ数はコンポーネント数と等しく、正規表現は有効である必要があります —
 両方ともコンパイル時にチェックされます（グループ/数の不一致は <strong>E0060</strong>、
 不正な正規表現は <strong>E0059</strong>）。サポートされていないコンポーネント型は <strong>E0061</strong> です。</p>
+<h4 id="shape"><code>shape</code> — レコードに名前付きの境界を与える<a class="headerlink" href="#shape" title="Permanent link">&para;</a></h4>
+<p><code>shape name = re"..."</code> 句は、<code>Shape[R]</code> を返す静的メソッドを合成します。テキストと
+レコードの、双方向になりうる第一級の対応です。<code>shape</code> はこの位置でのみ認識される
+ソフトキーワードなので、通常の識別子としても使えます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>record Access(time: String, method: String, path: String, status: Int)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  shape v1 = re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  shape v2 = re&quot;(\S+)\t(\w+)\t(\S+)\t(\d+)&quot;
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>val rows = Access::v1().eachLine(logText)
+</span></code></pre></div>
+<p>パターンの代わりにフォーマット名を書くと、1行のテキストではなく構造化文書を読めます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>record Person(name: String, age: Int)
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  shape doc = json
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  shape cfg = yaml
+</span></code></pre></div>
+<p>この場合、成分名が文書のキーになります。キーの欠落は defect です
+（<code>derive!(Json)</code> は非null フィールドに <code>null</code> が入ったレコードを構築してしまいます）。
+型の不一致も defect で、文書が壊れている場合は失敗した行を報告します——
+<code>Json.JsonParseException</code> が持っていて <code>derive!</code> の経路が捨てていた位置情報です。
+未知のフォーマット名は <strong>E0076</strong> です。</p>
+<p>1つのレコードが<strong>複数の</strong> shape を、形式を混ぜて持てます。<code>from re"..."</code> も <code>derive!</code> も
+1パターン・フォーマットごとに固定名の静的メソッド1つしか許さないため、構造的にできなかった
+ことです。正規表現形式の成分型、グループ数検査（<strong>E0060</strong>）、妥当性検査（<strong>E0059</strong>）は
+<code>from</code> と同じです。</p>
+<p><code>from</code> にはない点:</p>
+<ul>
+<li><strong>失敗が位置を持つ値になる。</strong> <code>parse</code> は <code>Outcome[R]</code> を返すので、不一致と
+  壊れたフィールドを区別できます（前者は文書全体に属するので <code>path</code> が空）。
+  <code>from</code> の <code>parse</code> はどちらも <code>null</code> です。</li>
+<li><strong>壊れたフィールドを一度に全部報告する。</strong> <code>"abc,def"</code> を <code>Int</code> 2つとして読むと
+  defect は2件です。1件目だけではありません。</li>
+<li><strong>行が黙って消えない。</strong> <code>eachLine</code> は行ごとに <code>Outcome</code> を返し、
+  <code>Outcome::values</code> と <code>Outcome::defects</code> で読めた行と失敗した行（行番号つき）の
+  両方が取れます。<code>parseAll</code> は痕跡なく捨てます。</li>
+<li><strong>書き戻せるかを正直に答える。</strong> パターンに一意な書き戻し方が無い場合
+  （<code>\s+</code> 区切りなど）<code>canPrint()</code> が <code>false</code> になります。メソッドが単に存在しない、
+  という形にはしません。</li>
+</ul>
+<p>shape は呼び出しごとに再構築されるので、多くの入力を読むときは <code>val</code> に束ねてください。
+自分で宣言していない型に対する shape は、同じ構築を <code>onion.Shapes::regex</code> で書けます。</p>
 <h4 id="derive-record-serde"><code>derive!</code> — record serde 導出<a class="headerlink" href="#derive-record-serde" title="Permanent link">&para;</a></h4>
 <p>record のコンポーネントリストの後（または <code>from re"..."</code> 節の後、<code>&lt;:</code> スーパータイプの前）に
 <code>derive!(Format, ...)</code> を追加すると、コンパイラは record の形状からシリアライズメソッドを
 合成します。<code>!</code> 接尾辞は、型クラス制約ではなくマクロスタイルの展開を示します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>record User(name: String, age: Int) derive!(Json)
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>record Config(host: String, port: Int, debug: Boolean) derive!(Json, Yaml)
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot; derive!(Json, Yaml)
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  &lt;: Printable
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>record User(name: String, age: Int) derive!(Json)
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>record Config(host: String, port: Int, debug: Boolean) derive!(Json, Yaml)
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot; derive!(Json, Yaml)
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  &lt;: Printable
 </span></code></pre></div>
 <p>サポートされるマーカーは <strong><code>Json</code></strong> と <strong><code>Yaml</code></strong> です。認識できないマーカーは <strong>E0063</strong> です。
 各マーカーについて、コンパイラは record に2つの static メソッドを合成します。</p>
@@ -5396,13 +5548,13 @@
 <p>record 宣言の後に <code>law</code> 節と <code>example</code> 節を続けることができます。コンパイラは
 これらをビルド時に実行します（型チェック後に実行される <code>LawCheckPhase</code>）。
 失敗したチェックは<strong>コンパイルエラー</strong>であり、実行時エラーではありません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>record User(name: String, age: Int) derive!(Json)
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>  example { new User(&quot;ko&quot;, 3).name() == &quot;ko&quot; }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>record User(name: String, age: Int) derive!(Json)
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>  law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>  example { new User(&quot;ko&quot;, 3).name() == &quot;ko&quot; }
 </span></code></pre></div>
 <p><strong><code>example { boolExpr }</code></strong> — 具体的なアサーション。コンパイラは <code>boolExpr</code> を評価し、
 <code>true</code> を要求します。<code>false</code> の場合、<strong>E0065</strong> でコンパイルが失敗し、<code>false</code> を返した
@@ -5415,24 +5567,24 @@
  record 型そのものにできます。</p>
 <p>複数の <code>law</code> と <code>example</code> 節を1つの record に任意の順序で記述できます。これらは
 <code>from re"..."</code> や <code>derive!(...)</code> と自由に共存します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>record R(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot; derive!(Json)
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  example { R::parse(&quot;0,0&quot;) == new R(0, 0) }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>record R(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot; derive!(Json)
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>  example { R::parse(&quot;0,0&quot;) == new R(0, 0) }
 </span></code></pre></div>
 <p><code>law</code> / <code>example</code> の目的は、仕様 — 単なるドキュメントではなく、機械検証された
 契約 — を言語そのものの中に持ち込むことです。上記の <code>parse∘format == id</code> という
 不変条件は、すべてのコンパイル時にチェックされるため、ラウンドトリップを破壊する
 文法変更は即座にビルドを失敗させます。</p>
 <h3 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>enum Color { RED, GREEN, BLUE }
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>enum Planet(mass: Double) {
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>  MERCURY(3.3e23),
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>  EARTH(5.97e24)
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>public:
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>  def heavierThan(other: Planet): Boolean = this.mass() &gt; other.mass()
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>enum Color { RED, GREEN, BLUE }
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>enum Planet(mass: Double) {
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>  MERCURY(3.3e23),
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  EARTH(5.97e24)
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>public:
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  def heavierThan(other: Planet): Boolean = this.mass() &gt; other.mass()
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>}
 </span></code></pre></div>
 <p>Enums は JVM enum にコンパイルされます: <code>name()</code>、<code>ordinal()</code>、<code>values()</code>、
 <code>valueOf(String)</code> が動作します。record スタイルのパラメータは final フィールドになり、
@@ -5441,17 +5593,17 @@
 <h4 id="case-case">代数的データ型（<code>case</code> case）<a class="headerlink" href="#case-case" title="Permanent link">&para;</a></h4>
 <p>case が <code>case</code> キーワードを使うと、各 case は自分自身のフィールドを宣言でき、<code>enum</code> は
 同種の <code>java.lang.Enum</code> ではなく積の和（Scala 3 風の ADT）になります：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>enum Shape {
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  case Circle(radius: Double)
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  case Square(side: Double)
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>  case Origin
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>public:
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  def area(): Double = select this {
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    case c is Circle: c.radius() * c.radius() * 3.14
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>    case s is Square: s.side() * s.side()
-</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    case o is Origin: 0.0
-</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>  }
-</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>enum Shape {
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>  case Circle(radius: Double)
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>  case Square(side: Double)
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>  case Origin
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>public:
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>  def area(): Double = select this {
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    case c is Circle: c.radius() * c.radius() * 3.14
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    case s is Square: s.side() * s.side()
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>    case o is Origin: 0.0
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>  }
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>}
 </span></code></pre></div>
 <p><code>case</code> 形式の enum は、case ごとに <code>record</code> を持つ <code>sealed interface</code> に desugar され
 （enum 本体のメソッドは interface のデフォルトメソッドになります）、網羅性（<code>E0042</code>）と
@@ -5460,48 +5612,48 @@ singleton case（<code>case Origin</code>）は <code>new Origin()</code> で使
 enum は sealed 階層であり <code>java.lang.Enum</code> ではないので、<code>values()</code>/<code>valueOf()</code>/<code>ordinal()</code>
 はありません。enum レベルの共有パラメータと <code>case</code> case の混在はコンパイルエラーです。</p>
 <h3 id="_17">拡張<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>extension String {
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>  def shout(): String { return this.toUpperCase() + &quot;!&quot; }
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>extension String {
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>  def shout(): String { return this.toUpperCase() + &quot;!&quot; }
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>}
 </span></code></pre></div>
 <h3 id="_18">型エイリアス<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>type Names = List[String]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>type Names = List[String]
 </span></code></pre></div>
 <h3 id="_19">委譲<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>class MyClass &lt;: Interface {
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>  forward val member: Interface
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>  ...
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>class MyClass &lt;: Interface {
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>  forward val member: Interface
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>  ...
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>}
 </span></code></pre></div>
 <p><code>forward</code> は、インターフェースのメソッドをメンバーに自動的に委譲します。</p>
 <h2 id="_20">文と式<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
 <p>制御フロー構造は式です。ブロックは最後の式を評価し、<code>if</code>/<code>select</code>/<code>try</code> は値を生成し、
 ループは <code>void</code> を評価し、<code>return</code>/<code>throw</code>/<code>break</code>/<code>continue</code> はボトム型です。</p>
 <h3 id="_21">条件分岐<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>if cond { ... } else if cond2 { ... } else { ... }
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>val label = if ok { &quot;yes&quot; } else { &quot;no&quot; }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>if cond { ... } else if cond2 { ... } else { ... }
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>val label = if ok { &quot;yes&quot; } else { &quot;no&quot; }
 </span></code></pre></div>
 <p>括弧付き条件内の代入が許可されます:
 <code>while (line = reader.readLine()) != null { ... }</code>。</p>
 <h3 id="_22">ループ<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>while cond { ... }
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>do { ... } while cond                  // 本体優先
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>for var i = 0; i &lt; n; i += 1 { ... }
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>foreach x: Type in collection { ... }
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>foreach i: Int in 0..&lt;n { ... }
-</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>foreach (k, v) in map { ... }
-</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>break / continue
+<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>while cond { ... }
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>do { ... } while cond                  // 本体優先
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>for var i = 0; i &lt; n; i += 1 { ... }
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>foreach x: Type in collection { ... }
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>foreach i: Int in 0..&lt;n { ... }
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>foreach (k, v) in map { ... }
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>break / continue
 </span></code></pre></div>
 <h3 id="select">Select（パターンマッチング）<a class="headerlink" href="#select" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>select expr {
-</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>case 1, 2:                ...    // 値ケース（任意の式）
-</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>case Color::RED:          ...    // enum 定数（網羅性チェック）
-</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>case s is String:         ...    // 型パターン、s を狭めて束縛
-</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>case Circle(r) when r &gt; 9: ...   // record 分解 + ガード
-</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>case Rect(w, _):          ...    // _ はコンポーネントを無視
-</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>case re&quot;(\w+)@(\w+)&quot; (u, h): ... // 正規表現パターン: キャプチャグループを束縛
-</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>else:                     ...
-</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>select expr {
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>case 1, 2:                ...    // 値ケース（任意の式）
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>case Color::RED:          ...    // enum 定数（網羅性チェック）
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>case s is String:         ...    // 型パターン、s を狭めて束縛
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>case Circle(r) when r &gt; 9: ...   // record 分解 + ガード
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>case Rect(w, _):          ...    // _ はコンポーネントを無視
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>case re&quot;(\w+)@(\w+)&quot; (u, h): ... // 正規表現パターン: キャプチャグループを束縛
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>else:                     ...
+</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>}
 </span></code></pre></div>
 <p><code>sealed</code> インターフェースと enum に対するマッチングは、<code>else</code> がない場合に
 網羅性をチェックします（E0042）。網羅的なマッチは式として使えます。</p>
@@ -5511,36 +5663,36 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 コンパイル時に検証されます。不正な正規表現は E0059、キャプチャグループ/束縛数の
 不一致は E0060 です。</p>
 <h3 id="_23">例外<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>try { ... }
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>catch e: IllegalArgumentException | IllegalStateException { ... }  // 複数キャッチ
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>catch e: Exception { ... }
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>finally { ... }
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>try (val r = open(); val w = openOther()) { ... }   // try-with-resources
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>throw new IllegalStateException(&quot;message&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>try { ... }
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>catch e: IllegalArgumentException | IllegalStateException { ... }  // 複数キャッチ
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>catch e: Exception { ... }
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>finally { ... }
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>try (val r = open(); val w = openOther()) { ... }   // try-with-resources
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>throw new IllegalStateException(&quot;message&quot;)
 </span></code></pre></div>
 <p>リソースは宣言の逆順で自動的にクローズされます。</p>
 <h3 id="_24">ラムダと関数値<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>val f: Int -&gt; Int = x -&gt; x * 2          // 裸パラメータ、式本体
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>val g = (a: Int, b: Int) -&gt; a + b
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>list.map { x =&gt; x * 2 }                 // 末尾ラムダ
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>Future::async(() -&gt; { return compute() })
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>val r: Runnable = () -&gt; println(&quot;hi&quot;)   // SAM 変換
+<div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>val f: Int -&gt; Int = x -&gt; x * 2          // 裸パラメータ、式本体
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>val g = (a: Int, b: Int) -&gt; a + b
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>list.map { x =&gt; x * 2 }                 // 末尾ラムダ
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>Future::async(() -&gt; { return compute() })
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>val r: Runnable = () -&gt; println(&quot;hi&quot;)   // SAM 変換
 </span></code></pre></div>
 <h3 id="do">Do 記法<a class="headerlink" href="#do" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>do[Option] { a &lt;- getA(); b &lt;- getB(); ret a + b }
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>do[Future] { x &lt;- fetch(); ret x.size() }
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>do[List]   { x &lt;- [1, 2]; y &lt;- [&quot;a&quot;, &quot;b&quot;]; ret x + y }   // 内包表記
+<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>do[Option] { a &lt;- getA(); b &lt;- getB(); ret a + b }
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>do[Future] { x &lt;- fetch(); ret x.size() }
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>do[List]   { x &lt;- [1, 2]; y &lt;- [&quot;a&quot;, &quot;b&quot;]; ret x + y }   // 内包表記
 </span></code></pre></div>
 <p><code>x &lt;- e; rest</code> は <code>e.bind((x) -&gt; rest)</code> に脱糖されます。<code>ret e2</code> の直前の束縛は
 <code>e.map((x) -&gt; e2)</code> になります。<code>bind</code>/<code>map</code> を持つ（インスタンスまたは拡張メソッド）
 任意の型が do 記法で使えます: <code>Option</code>、<code>Result</code>、<code>Future</code>、<code>List</code>（内包表記）、
 およびユーザー型。スクリプトのトップレベルでも動作します。</p>
 <h3 id="_25">スキーム接頭辞リテラル<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>val p    = re&quot;\d+-\d+&quot;                        // コンパイル済み Pattern（RAW: \\ エスケープなし）
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>val text = file&quot;notes.txt&quot;.text()             // FileResource: text/lines/csv/csvRows/json/write/append
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>val rows = file&quot;data.csv&quot;.csvRows()           // Map（ヘッダ -&gt; 値）の List、RFC 4180
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>val body = http&quot;https://api.example.com&quot;.get() // HttpResource: get/getJson/post/postJson/put/delete
+<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>val p    = re&quot;\d+-\d+&quot;                        // コンパイル済み Pattern（RAW: \\ エスケープなし）
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>val text = file&quot;notes.txt&quot;.text()             // FileResource: text/lines/csv/csvRows/json/write/append
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>val rows = file&quot;data.csv&quot;.csvRows()           // Map（ヘッダ -&gt; 値）の List、RFC 4180
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>val body = http&quot;https://api.example.com&quot;.get() // HttpResource: get/getJson/post/postJson/put/delete
 </span></code></pre></div>
 <p><code>prefix"raw"</code> は、<strong>任意の識別子接頭辞</strong>に対する修飾なし呼び出し <code>prefix("raw")</code> の
 糖衣です。組み込みの <code>re</code>/<code>file</code>/<code>http</code>（デフォルト static import <code>onion.Resources</code> で解決）
@@ -5552,11 +5704,27 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <code>prefix "..."</code>（空白あり）は識別子＋文字列です。予約語に直接続く文字列はスキームリテラルに
 <strong>なりません</strong> — <code>return"x"</code> は <code>return("x")</code> ではなく <code>return "x"</code> として再字句解析されます。
 未定義の接頭辞は lexer エラーではなく通常の「メソッドが見つかりません」エラーです。</p>
+<h4 id="shape_1">shape でリソースを読む<a class="headerlink" href="#shape_1" title="Permanent link">&para;</a></h4>
+<p><code>file"…"</code> と <code>http"…"</code> は <code>text</code>、<code>lines</code>、<code>json</code>、<code>csv</code>、<code>csvRows</code> という固定の
+メニューを持ち、どのゲッタを呼ぶかでパース方法が決まるため、読み方の集合が閉じています。
+<code>read(shape)</code> はこれを開きます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>  shape doc = json
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>  shape line = re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>
+</span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>val one  = file&quot;point.json&quot;.read(Pt::doc())        // Outcome[Pt]
+</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>val many = file&quot;points.txt&quot;.eachLine(Pt::line())   // List[Outcome[Pt]]
+</span><span id="__span-29-7"><a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>val api  = http&quot;https://example.com/p&quot;.read(Pt::doc())
+</span></code></pre></div>
+<p>すべての defect がファイルパスまたは URL を持つので、失敗が<em>どの</em>リソースのものか
+分かります。ファイルが読めない、リクエストが失敗した場合も例外ではなく defect です。
+存在しないかもしれないものを読むのは、境界では普通のことだからです。</p>
+<p>メソッド名が <code>as</code> ではなく <code>read</code> なのは、<code>as</code> がキャスト用のキーワードだからです。</p>
 <h3 id="_26">パイプライン演算子<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>5 |&gt; double               // double(5)
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>5 |&gt; add(3)               // add(5, 3) — 第1引数注入
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>xs.map { x =&gt; x * 2 }
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>  |&gt; println              // |&gt; の前の改行でパイプラインを継続
+<div class="language-text highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>5 |&gt; double               // double(5)
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>5 |&gt; add(3)               // add(5, 3) — 第1引数注入
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>xs.map { x =&gt; x * 2 }
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>  |&gt; println              // |&gt; の前の改行でパイプラインを継続
 </span></code></pre></div>
 <p><code>e |&gt; f(args...)</code> は <code>e</code> を第1引数として注入します。右辺は裸の関数名、
 修飾なし呼び出し、またはメソッド/static 呼び出しにできます。優先順位は
@@ -5580,12 +5748,12 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <p>オブジェクトの <code>==</code> は値の等価性（<code>equals</code>）。<code>===</code> は参照を比較します。
 オペランドのいずれかが <code>String</code> の場合、<code>+</code> は文字列連結を行います。</p>
 <h2 id="_28">インポートとモジュール<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>module my.pkg
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>import {
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>  java.util.*
-</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>  java.lang.Long as JLong;
-</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>module my.pkg
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>import {
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>  java.util.*
+</span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>  java.lang.Long as JLong;
+</span><span id="__span-31-6"><a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>}
 </span></code></pre></div>
 <p><code>onion.*</code>、<code>java.lang.*</code>、<code>java.io.*</code>、<code>java.util.*</code> はデフォルトでインポートされます
 （<code>onion.*</code> が優先）。存在しないクラスの単一クラスインポートはコンパイルエラーです。</p>
@@ -5598,8 +5766,8 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <p>パラメータが CLI 変換可能な型（<code>String</code>、<code>Int</code>、<code>Long</code>、<code>Double</code>、<code>Float</code>、
 <code>Boolean</code>、<code>Short</code>、<code>Byte</code>）であるトップレベル <code>main</code> は、コマンドラインから
 パースされた引数で自動的に呼び出されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>// $ onion greet.on world --count 5 --loud
+<div class="language-text highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>// $ onion greet.on world --count 5 --loud
 </span></code></pre></div>
 <p>必須パラメータは位置引数です。デフォルト付きパラメータは <code>--name</code> フラグになります
 （<code>Boolean</code> のデフォルトはプレゼンススイッチになります）。値は宣言型に変換され、

@@ -136,7 +136,7 @@ means updating that spec deliberately rather than by accident. That is a feature
 `Origin`, `Defect` and `Outcome[T]` are ordinary classes in `src/main/java/onion/`. The
 `zip`/`bind` law split is a library concern. A first `Shape[T]` with `parse`/`print` is
 likewise a library type. **The compiler is not involved until the `shape` declaration form
-and `E0074`**, which means the risky, high-blast-radius work (grammar, `Rewriting.scala`'s
+and the non-invertible-`print` diagnostic**, which means the risky, high-blast-radius work (grammar, `Rewriting.scala`'s
 already-overloaded 1,416 lines, `TypingOutlinePass`) can be deferred until the runtime
 design has been validated against real programs.
 
@@ -162,7 +162,7 @@ For #346, in a file that does not exist yet
 
 > A record carrying `law l(xs: List) { true }` compiles today and reports nothing,
 > because `LawCheckPhase.scala:80-81` returns silently when a parameter type has no
-> generator. The test asserts the compilation fails with **`E0078`**.
+> generator. The test asserts the compilation fails with **`E0074`**.
 
 It fails today for the right reason — the compile succeeds — and it pins the single
 behaviour that makes the rest of the roadmap honest.

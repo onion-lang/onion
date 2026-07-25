@@ -280,7 +280,7 @@ Print derivability is a *judgement about the shape*, not a silent fork:
 ```
 
 When the premise fails, `S` is parse-only and `S.print` is a **compile error naming the
-construct that made it non-invertible** — `E0074` below. Today `formatSegments`
+construct that made it non-invertible** — see the error model below. Today `formatSegments`
 (`Rewriting.scala:862-900`) just returns `None` and no `format` appears, so the user gets
 "method not found" for a method they were never told would be missing.
 
@@ -396,7 +396,7 @@ Effects ride alongside the type as `τ ! ε`:
   Γ ⊢ tool f(x̄:τ̄) requires δ { body }   ok
 ```
 
-`ε ⊄ δ` is `E0076`, and the message names both the missing capability *and* the call site
+An effect the `requires` clause does not admit is an error, and the message names both the missing capability *and* the call site
 that introduced it — the diagnostic is useless otherwise.
 
 Effects propagate through ordinary functions by inference (no annotation burden), and are
@@ -423,28 +423,29 @@ under which the feature is buildable at all without first introducing an IR.
 
 ## 7. Error model
 
-New codes continue from the current maximum, `E0073` (`SemanticError.scala:141`):
+Codes are allocated **sequentially as features land**, not reserved in advance — a
+reserved block leaves permanent gaps whenever a planned feature changes shape. The
+numbers below are therefore indicative of order, not commitments.
 
-| Code | Meaning |
-|---|---|
-| `E0074` | `print` used on a shape that is not invertible — message names the construct responsible |
-| `E0075` | no scalar-registry entry for a component type (replaces `E0061`/`E0062`'s role) |
-| `E0076` | a tool's body performs an effect its `requires` clause does not admit |
-| `E0077` | a `requires` clause admits a capability the body cannot perform (dead capability) |
-| `E0078` | a law's parameter type has no generator — **an error, not a silent skip** |
+| Code | Meaning | Status |
+|---|---|---|
+| `E0074` | a law's parameter type has no generator — **an error, not a silent skip** | **shipped** ([#346](https://github.com/onion-lang/onion/issues/346)) |
+| next | `print` used on a shape that is not invertible — message names the construct responsible | v0.6 |
+| next | no scalar-registry entry for a component type (replaces `E0061`/`E0062`'s role) | v0.6 |
+| next | a tool's body performs an effect its `requires` clause does not admit | v0.7 |
+| next | a `requires` clause admits a capability the body cannot perform (dead capability) | v0.7 |
 
 Every one gets an entry in **both** `errorMessage.properties` and
 `errorMessage_ja.properties`. That is worth stating because `E0064`/`E0065` are today the
 only codes that bypass the i18n table entirely, with English hard-coded at
 `LawCheckPhase.scala:69,72,90,95` (audit §4).
 
-`E0078` deserves emphasis. Onion's headline claim is that `parse ∘ print == id` is
-machine-checked at build time. Today a law whose parameter type has no generator is
-skipped with `return` and no diagnostic (`LawCheckPhase.scala:80-81`), and there is no
-test covering it. **A verification that can silently not run is worse than no
+`E0074` deserves emphasis, and is the reason it shipped first. Onion's headline claim is
+that `parse ∘ print == id` is machine-checked at build time. Before #346 a law whose
+parameter type had no generator was skipped with a bare `return` and no diagnostic, with
+no test covering it. **A verification that can silently not run is worse than no
 verification**, because it produces unearned confidence. Turning that skip into an error
-is a prerequisite for the whole Shape story, not a nicety — which is why it lands in v0.6
-*before* `Shape` (see roadmap).
+is a prerequisite for the whole Shape story, not a nicety.
 
 ---
 

@@ -12,6 +12,10 @@ import java.util.{TreeSet => JTreeSet}
 final class TypingDuplicationPass(private val typing: Typing, private val unitContext: TypingUnitContext) {
   private val unit = unitContext.unit
 
+  // Kept in sync with Rewriting.scala's synthesizeLawMethod/synthesizeExampleMethod.
+  private val LawMethodPrefix = "onion$$law$$"
+  private val ExampleMethodPrefix = "onion$$example$$"
+
   private val seenMethods = new JTreeSet[Method](new MethodComparator)
   private val seenFields = new JTreeSet[FieldRef](new FieldComparator)
   private val seenConstructors = new JTreeSet[ConstructorRef](new ConstructorComparator)
@@ -174,11 +178,34 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   // A record can declare `<: Interface`, but its only methods are the synthesized
   // accessors; an interface method with no matching accessor was previously
   // unchecked, so the record compiled and threw AbstractMethodError at runtime.
+  //
+  // A record's user-written body (`sections`) and compiler-synthesized methods
+  // (`synthesizedMethods`: from/data/json/yaml/law/example) went unchecked for
+  // duplicates entirely — two `law roundtrip(p: Point) { ... }` clauses on the same
+  // record both mangle to `onion$$law$$roundtrip(Point): Boolean` and only blew up
+  // later as a JVM ClassFormatError ("Duplicate method name ... in class file ..."),
+  // surfaced as an internal compiler error (I0000) instead of a normal diagnostic.
   private def processRecordDeclaration(node: AST.RecordDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
+      for (section <- node.sections) processAccessSection(section)
+      node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
+
+  private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
+    withKernel[MethodDefinition](node) { method =>
+      if (seenMethods.contains(method))
+        typing.report(SemanticError.DUPLICATE_GENERATED_METHOD, node, method.affiliation, generatedMethodLabel(method.name), method.arguments)
+      else seenMethods.add(method)
+    }
+
+  /** Undo the `onion$$law$$`/`onion$$example$$` mangling (Rewriting.scala) so a
+    * duplicate-generated-method diagnostic names the clause the user actually wrote. */
+  private def generatedMethodLabel(mangledName: String): String =
+    if (mangledName.startsWith(LawMethodPrefix)) s"law '${mangledName.stripPrefix(LawMethodPrefix)}'"
+    else if (mangledName.startsWith(ExampleMethodPrefix)) s"example '${mangledName.stripPrefix(ExampleMethodPrefix)}'"
+    else mangledName
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>

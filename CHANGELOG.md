@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A duplicate `law`/`example` clause name on a record crashed the compiler instead of
+  being rejected (internal-error fix, found by the mutation fuzzer).** Two clauses that
+  mangle to the same synthesized method — e.g. two `law roundtrip(p: Point) { ... }` on the
+  same record — compiled all the way to bytecode and only then blew up as a JVM
+  `ClassFormatError` ("Duplicate method name ... in class file ..."), surfaced as an
+  internal compiler error (`I0000`). `TypingDuplicationPass` checked a class's methods for
+  duplicates but never walked a record's user-written body or its synthesized
+  `from`/`derive!`/`law`/`example` methods the same way. Both are now checked, and a
+  collision reports the existing `E0026` (duplicated generated method) diagnostic naming
+  the actual `law`/`example` clause instead of its mangled internal name.
 - **A boxed platform value unboxed to a non-null primitive now warns (W0015, #318).**
   `Json::getInt(obj, key)` (and the other `Json::get*` accessors) return a boxed Java value
   (`Integer`, `Long`, ...) that is `null` when the key is missing. Assigning or passing it where a

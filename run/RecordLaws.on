@@ -1,0 +1,19 @@
+// Record Laws Sample
+// Demonstrates `law` / `example` clauses on a record: the compiler checks them at
+// build time (LawCheckPhase). A false `example` or a falsified `law` fails compilation
+// before the program ever runs, so a passing build is a machine-checked guarantee.
+
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
+  example { Point::parse("3,4") == new Point(3, 4) }
+
+class RecordLaws {
+public:
+  static def main(args: String[]): String {
+    val p = new Point(3, 4)
+    IO::println("p = " + p.toString())
+    IO::println("formatted = " + Point::format(p))
+    IO::println("roundtrip holds = " + (Point::parse(Point::format(p)) == p))
+    return "ok"
+  }
+}

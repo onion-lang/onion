@@ -126,6 +126,12 @@ record Pt(x: Int, y: Int)
   law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
 ```
 
+### `E0075` — A class declaring laws could not be loaded
+
+Laws run against the compiled classes. If a class that declares `law` / `example`
+clauses cannot be loaded, none of its checks ran — reported rather than passed over,
+for the same reason as `E0074`.
+
 ## Null-safety errors
 
 ### `E0057` — Type parameter may be null

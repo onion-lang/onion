@@ -1,6 +1,6 @@
 package onion.compiler.verification
 
-import onion.compiler.{CompiledClass, CompileError, CompilerConfig, OnionClassLoader, SemanticError}
+import onion.compiler.{CompiledClass, CompileError, CompilerConfig, Location, OnionClassLoader, SemanticError}
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
 import onion.compiler.toolbox.Message
@@ -18,7 +18,8 @@ import scala.collection.mutable.ArrayBuffer
  *
  * A false result or a thrown exception becomes a CompileError (E0065 example / E0064 law),
  * collected and raised as a CompilationException (PipelineRunner turns it into diagnostics).
- * A law whose parameter types aren't generatable is reported as E0074 rather than skipped:
+ * A law whose parameter types aren't generatable is reported as E0074, and a class that
+ * declares checks but fails to load as E0075, rather than either being skipped:
  * a check that silently does not run is indistinguishable from one that passed, and so is
  * worse than no check at all. The whole phase is gated on CompilerConfig.checkLaws.
  */
@@ -43,13 +44,20 @@ final class LawCheckPhase(config: CompilerConfig)
       for (cc <- classes) {
         // initialize=false: don't run static initializers (top-level side effects) just to
         // scan for check methods; invoking a check lazily initializes only that record class.
+        val index = CheckMethodIndex.read(cc.content)
         val clazz = try Class.forName(cc.className, false, loader) catch { case _: Throwable => null }
         if (clazz != null) {
           for (m <- clazz.getDeclaredMethods if isBooleanStatic(m)) {
             val nm = m.getName
-            if (nm.startsWith(ExamplePrefix)) runExample(cc, m, errors)
-            else if (nm.startsWith(LawPrefix)) runLaw(cc, m, loader, errors)
+            if (nm.startsWith(ExamplePrefix)) runExample(cc, index, m, errors)
+            else if (nm.startsWith(LawPrefix)) runLaw(cc, index, m, loader, errors)
           }
+        } else if (index.hasChecks) {
+          // Swallowing this used to take every law in the class with it, silently.
+          // Reading the bytes tells us the class was carrying checks, so the failure
+          // is worth reporting rather than treating as "nothing to do".
+          errors += err(SemanticError.LAW_CLASS_NOT_LOADABLE.errorCode, cc, index, None,
+            Message("error.semantic.lawClassNotLoadable", simpleName(cc)))
         }
       }
     } finally {
@@ -62,22 +70,22 @@ final class LawCheckPhase(config: CompilerConfig)
   private def isBooleanStatic(m: Method): Boolean =
     Modifier.isStatic(m.getModifiers) && m.getReturnType == java.lang.Boolean.TYPE
 
-  private def runExample(cc: CompiledClass, m: Method, errors: ArrayBuffer[CompileError]): Unit = {
+  private def runExample(cc: CompiledClass, index: CheckMethodIndex, m: Method, errors: ArrayBuffer[CompileError]): Unit = {
     if (m.getParameterCount != 0) return
     m.setAccessible(true)
     val label = m.getName.substring(ExamplePrefix.length)
     try {
       if (m.invoke(null) != java.lang.Boolean.TRUE)
-        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc,
+        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, index, Some(m.getName),
           Message("error.semantic.exampleFailed", label, simpleName(cc)))
     } catch {
       case e: Throwable =>
-        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc,
+        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, index, Some(m.getName),
           Message("error.semantic.exampleThrew", Array[Any](label, simpleName(cc), describe(rootCause(e)))))
     }
   }
 
-  private def runLaw(cc: CompiledClass, m: Method, loader: ClassLoader, errors: ArrayBuffer[CompileError]): Unit = {
+  private def runLaw(cc: CompiledClass, index: CheckMethodIndex, m: Method, loader: ClassLoader, errors: ArrayBuffer[CompileError]): Unit = {
     m.setAccessible(true)
     val label = m.getName.substring(LawPrefix.length)
     val paramTypes = m.getParameterTypes
@@ -88,7 +96,7 @@ final class LawCheckPhase(config: CompilerConfig)
     // all because it produces unearned confidence (issue #346).
     val ungeneratable = perParam.indexWhere(_ == null)
     if (ungeneratable >= 0) {
-      errors += err(SemanticError.LAW_PARAMETER_NOT_GENERATABLE.errorCode, cc,
+      errors += err(SemanticError.LAW_PARAMETER_NOT_GENERATABLE.errorCode, cc, index, Some(m.getName),
         Message("error.semantic.lawParameterNotGeneratable",
           Array[Any](label, simpleName(cc), typeName(paramTypes(ungeneratable)))))
       return
@@ -101,13 +109,13 @@ final class LawCheckPhase(config: CompilerConfig)
       val shown = if (args.isEmpty) "(no args)" else args.map(String.valueOf).mkString(", ")
       try {
         if (m.invoke(null, args*) != java.lang.Boolean.TRUE) {
-          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc,
+          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, index, Some(m.getName),
             Message("error.semantic.lawViolation", Array[Any](label, simpleName(cc), shown, seedNote)))
           done = true
         }
       } catch {
         case e: Throwable =>
-          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc,
+          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, index, Some(m.getName),
             Message("error.semantic.lawThrew", Array[Any](label, simpleName(cc), shown, describe(rootCause(e)), seedNote)))
           done = true
       }
@@ -140,8 +148,19 @@ final class LawCheckPhase(config: CompilerConfig)
     (diag ++ sweep).take(N)
   }
 
-  private def err(code: String, cc: CompiledClass, msg: String): CompileError =
-    CompileError(cc.className, null, msg, Some(code))
+  /**
+   * The clause's position, recovered from the class file. Before this the sourceFile slot
+   * held the *class* name and the location was null, so a law failure rendered with no
+   * file, no line and no caret, and landed at line 0 in the editor.
+   */
+  private def err(
+    code: String, cc: CompiledClass, index: CheckMethodIndex,
+    methodName: Option[String], msg: String
+  ): CompileError = {
+    val file = index.sourceFile.getOrElse(cc.className)
+    val location = methodName.flatMap(index.lineOf).map(new Location(_, 1)).orNull
+    CompileError(file, location, msg, Some(code))
+  }
 
   private def simpleName(cc: CompiledClass): String = {
     val n = cc.className

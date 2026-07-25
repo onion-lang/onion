@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-25
+
 - **A throw-only lambda no longer pins a type argument to `Object` (#314).**
   `val f = Future::async(() -> { throw ... })` inferred `Future[Object]`, so `val b: Int = f.await()`
   was rejected and the target had to be annotated. A closure that never completes normally now keeps

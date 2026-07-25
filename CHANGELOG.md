@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-25
+
 - **New: `run/BrokenLogDemo.on` — the "broken log" story, runnable (partial #355).** A
   concrete demo exercising `onion.Shape`, `onion.Shapes::regex` and `onion.Outcome`
   end to end: an access-log shape reads six lines, two of them malformed, and

@@ -255,6 +255,41 @@ record Access(time: String, method: String, path: String, status: Int)
 両方ともコンパイル時にチェックされます（グループ/数の不一致は **E0060**、
 不正な正規表現は **E0059**）。サポートされていないコンポーネント型は **E0061** です。
 
+#### `shape` — レコードに名前付きの境界を与える
+
+`shape name = re"..."` 句は、`Shape[R]` を返す静的メソッドを合成します。テキストと
+レコードの、双方向になりうる第一級の対応です。`shape` はこの位置でのみ認識される
+ソフトキーワードなので、通常の識別子としても使えます。
+
+```onion
+record Access(time: String, method: String, path: String, status: Int)
+  shape v1 = re"(\S+) (\w+) (\S+) (\d+)"
+  shape v2 = re"(\S+)\t(\w+)\t(\S+)\t(\d+)"
+
+val rows = Access::v1().eachLine(logText)
+```
+
+1つのレコードが**複数の** shape を持てます。`from re"..."` は1パターンと固定名の
+静的メソッドしか許さないため構造的にできなかったことです。成分型、グループ数検査
+（**E0060**）、正規表現の妥当性検査（**E0059**）は `from` と同じです。
+
+`from` にはない点:
+
+- **失敗が位置を持つ値になる。** `parse` は `Outcome[R]` を返すので、不一致と
+  壊れたフィールドを区別できます（前者は文書全体に属するので `path` が空）。
+  `from` の `parse` はどちらも `null` です。
+- **壊れたフィールドを一度に全部報告する。** `"abc,def"` を `Int` 2つとして読むと
+  defect は2件です。1件目だけではありません。
+- **行が黙って消えない。** `eachLine` は行ごとに `Outcome` を返し、
+  `Outcome::values` と `Outcome::defects` で読めた行と失敗した行（行番号つき）の
+  両方が取れます。`parseAll` は痕跡なく捨てます。
+- **書き戻せるかを正直に答える。** パターンに一意な書き戻し方が無い場合
+  （`\s+` 区切りなど）`canPrint()` が `false` になります。メソッドが単に存在しない、
+  という形にはしません。
+
+shape は呼び出しごとに再構築されるので、多くの入力を読むときは `val` に束ねてください。
+自分で宣言していない型に対する shape は、同じ構築を `onion.Shapes::regex` で書けます。
+
 #### `derive!` — record serde 導出
 
 record のコンポーネントリストの後（または `from re"..."` 節の後、`<:` スーパータイプの前）に

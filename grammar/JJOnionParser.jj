@@ -1499,7 +1499,9 @@ AST.RecordDeclaration record_decl(int mset) : {
   ArrayBuffer<String> deriveBuf = new ArrayBuffer<String>();
   ArrayBuffer<AST.LawClause> lawBuf = new ArrayBuffer<AST.LawClause>();
   ArrayBuffer<AST.ExampleClause> exBuf = new ArrayBuffer<AST.ExampleClause>();
+  ArrayBuffer<AST.ShapeClause> shapeBuf = new ArrayBuffer<AST.ShapeClause>();
   ArrayBuffer<AST.AccessSection> sections = new ArrayBuffer<AST.AccessSection>();
+  Token st, srt;
 }{
   t1="record" t2=id() [tparams=type_params()] "(" args=args() ")"
   // Optional `from re"..."` clause (shape-first records). `from` is a soft keyword
@@ -1528,6 +1530,13 @@ AST.RecordDeclaration record_decl(int mset) : {
     LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || getToken(2).kind == ID)})
       et=<ID> { enm = null; } [ LOOKAHEAD({getToken(1).kind == ID}) enm=<ID> ] eb=block()
       { append(exBuf, AST.exampleClause(p(et), enm == null ? null : c(enm), eb)); }
+  |
+    // `shape name = re"..."` — a named boundary for this record. Like `law` and
+    // `example`, `shape` is a soft keyword recognized only here, so it stays usable as
+    // an ordinary identifier. A record may carry several.
+    LOOKAHEAD({getToken(1).image.equals("shape") && getToken(2).kind == ID})
+      <ID> st=<ID> "=" srt=<RE_STRING>
+      { append(shapeBuf, new AST.ShapeClause(p(st), c(st), srt.image.substring(3, srt.image.length() - 1))); }
   )*
   [ "<:"
     superType = type() {append(superTypes, superType);}
@@ -1541,7 +1550,7 @@ AST.RecordDeclaration record_decl(int mset) : {
   [";"] {
     return AST.recordDeclaration(
       p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf),
-      toList(lawBuf), toList(exBuf), toList(sections)
+      toList(lawBuf), toList(exBuf), toList(sections), toList(shapeBuf)
     );
   }
 }

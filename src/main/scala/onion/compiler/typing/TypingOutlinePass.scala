@@ -259,13 +259,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // whose zero bindings would also dodge the E0060 group-count check.
       val hasFrom = node.fromPattern.isDefined
       val hasData = node.derives.exists(m => m == "Json" || m == "Yaml")
+      val hasShapes = node.shapes.nonEmpty
       // law/example methods (B3) register unconditionally — independent of from/derive and of
       // args.nonEmpty (a componentless record can still carry laws/examples; the law's own
       // params drive the check). from/data methods stay gated on the component-type check.
       val (checkMethods, derivedMethods) = node.synthesizedMethods.partition(m =>
         m.name.startsWith("onion$$law$$") || m.name.startsWith("onion$$example$$"))
       checkMethods.foreach(processMethodDeclaration)
-      if ((hasFrom || hasData) && node.args.nonEmpty) {
+      if ((hasFrom || hasData || hasShapes) && node.args.nonEmpty) {
         val unsupportedFrom =
           if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
           else Nil
@@ -280,7 +281,19 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           report(SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
             ScalarConversions.supportedNames)
         }
-        if (unsupportedFrom.isEmpty && unsupportedData.isEmpty)
+        // A shape reads its components out of captured text, so it needs the same
+        // component types `from` does.
+        val unsupportedShape =
+          if (hasShapes) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
+          else Nil
+        if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType) =>
+          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
+            ScalarConversions.supportedNames)
+        }
+        // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;
+        // a shape lowers to a Shapes.regex call, so the same two checks are made here.
+        val badShapes = if (hasShapes) node.shapes.filterNot(sc => checkShapePattern(sc, node.args.length)) else Nil
+        if (unsupportedFrom.isEmpty && unsupportedData.isEmpty && unsupportedShape.isEmpty && badShapes.isEmpty)
           derivedMethods.foreach(processMethodDeclaration)
       }
       // Unknown derive! markers — Json and Yaml are supported at present.
@@ -297,6 +310,25 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   /** Component types a `from re"..."` clause can produce from a captured String. */
   private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)
+
+  /**
+   * A shape's pattern must compile (E0059) and expose exactly one capture group per
+   * component (E0060) -- the same two checks the `from` clause gets by lowering through a
+   * regex select pattern. Returns false when it reported a problem.
+   */
+  private def checkShapePattern(clause: AST.ShapeClause, componentCount: Int): Boolean =
+    try {
+      val compiled = java.util.regex.Pattern.compile(clause.pattern)
+      val groups = compiled.matcher("").groupCount()
+      if (groups != componentCount) {
+        report(SemanticError.REGEX_GROUP_MISMATCH, clause, groups.toString, componentCount.toString)
+        false
+      } else true
+    } catch {
+      case e: java.util.regex.PatternSyntaxException =>
+        report(SemanticError.REGEX_PATTERN_INVALID, clause, e.getDescription + " (at index " + e.getIndex + ")")
+        false
+    }
 
   /** Component types `derive!` (Json/Yaml) can serialize — the same scalar set as `from`. */
   private def isDataDerivableType(tp: Type): Boolean = isFromDerivableType(tp)

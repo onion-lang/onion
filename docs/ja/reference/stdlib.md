@@ -488,6 +488,19 @@ Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
 ```
 
+メソッド呼び出しの形でも使えます（実際のコードではこちらが自然です）。ただし
+**メソッド形式も同じく倍精度**なので、`Int` のリストでも合計は `Double` になります。
+`Int` で受け取りたい場合は `Stats::sumInt` を使ってください。
+
+```onion
+val xs: List[Int] = [10, 20, 30, 40]
+xs.sum()             // 100.0  （Double: 汎用集計）
+Stats::sumInt(xs)    // 100    （Int）
+```
+
+`Int` を返す `sum()` のオーバーロードが無いのは型消去のためです。実行時には要素型が
+消えるので、`sum(List[Int])` と `sum(List[Double])` は同じ JVM シグネチャになります。
+
 ## Format モジュール
 
 locale 非依存の人間可読フォーマット（`onion.Format`）——桁区切り・小数・サイズ・時間。

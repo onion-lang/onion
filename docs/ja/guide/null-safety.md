@@ -7,12 +7,30 @@ OnionはKotlin風のnull安全機能を持ち、`NullPointerException` をコン
 デフォルトでは型は `null` を保持できません。`?` 接尾辞で `null` を許可します。
 
 ```onion
-val name: String = "Alice"       // 非null（null を代入するとコンパイルエラー）
+val name: String = "Alice"       // 非null（null を代入すると W0012 警告）
 val maybeName: String? = null    // nullable: OK
 ```
 
 - `T` → `T?` は許可されます（widening）
 - `T?` → `T` は許可されません（明示的な処理が必要）
+
+### null リテラルの代入は警告（W0012）
+
+非null型に `null` リテラルを代入するのは**エラーではなく警告**です。静的に
+`null` と分かっている以上エラーのほうが厳しくて良さそうに見えますが、同じ検査が
+かかる場所には `null` が**正当な値**であるケースが含まれるためです。
+
+- null を受け付けて正しく処理する Java API（`Http::encodeUrl(null)` は `""` を返します）
+- `val anything: Object = null`（ごく普通の JVM コード）
+- 型変数 `T` の値。インスタンスなしに得られる値が `null` だけの場合があります（issue #283）
+
+実際にエラーへ格上げする変更を試したところ、12 スイート 23 テストが失敗し、その
+ほとんどが潜在的な NPE ではなく上記のような正当な用途でした。自分のコードにこう
+した事情が無いなら、`--warn error` でビルド単位で厳格にできます（`--Wno
+null-to-non-nullable` で抑制も可能）。
+
+厳しくするなら、まず**宣言**（`val s: String = null`）で `null` を避けるのが
+効果的です。後から NPE として表面化するのはこの形だからです。
 
 ## セーフコール演算子 `?.`
 

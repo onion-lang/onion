@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Fixed wrong `Http` method names in the stdlib docs (en/ja).** `docs/reference/stdlib.md`
+  documented `Http::urlEncode`/`Http::urlDecode`, but the implemented (and tested) names are
+  `encodeUrl`/`decodeUrl` — following the doc raised a "method not found" error. Corrected both
+  names, documented the previously-missing `Http::buildUrl`, added `Http` to the "Modules at a
+  glance" summary table (English and Japanese), and added the Japanese `Http` module section that
+  was missing entirely. Also corrected the header-argument example: `headers: ["Key1", "Value1"]`
+  is a `List` in Onion, but `Http::get`/`Http::post`'s header overloads take a `String[]` only —
+  the doc now uses `new String[]{"Key1", "Value1"}`, matching what actually compiles.
+
 ## [0.5.0] - 2026-07-25
 
 - **A throw-only lambda no longer pins a type argument to `Object` (#314).**

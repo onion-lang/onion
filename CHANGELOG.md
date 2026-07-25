@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-07-24
-
 - **A convention-over-configuration project workflow: `onion new/build/run/test/clean`.**
   `onion new hello` scaffolds a manifest (`onion.toml`), `src/`, and `tests/`; `onion build`
   compiles and caches the result under `target/` (invalidated by a SHA-256 fingerprint over the
@@ -28,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build" right after a successful build. The lookup now picks the most recently built
   `onion-*.jar` under `target/scala-*/`, which also avoids picking up a stale jar from an earlier
   local build.
+
+## [0.5.0] - 2026-07-24
 
 - **`++`/`--` work on a static field and a top-level `var` (regression fix).** Post-increment/decrement
   typing had no case for a static field, so `C::count++` — and, after the top-level-var single-storage

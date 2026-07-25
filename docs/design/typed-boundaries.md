@@ -229,19 +229,30 @@ Shapes compose, which is what makes them an abstraction rather than a fourth mac
 
 | Combinator | Type | Meaning |
 |---|---|---|
-| `S.lines` | `Shape[T] -> Shape[List[T]]` | one `T` per line; **every failed line is a `Defect`**, none dropped |
-| `S.sepBy(sep)` | `Shape[T] -> Shape[List[T]]` | repetition |
+| `S.eachLine` | `Shape[T] -> (Text, Origin) -> List[Outcome[T]]` | one outcome per line, each positioned on its line |
+| `S.lines` | `Shape[T] -> Shape[List[T]]` | all-or-nothing; **every failed line is a `Defect`**, none dropped |
+| `S.sepBy(sep)` | `Shape[T] -> Shape[List[T]]` | repetition with a **literal** separator |
 | `S.xmap(f, g)` | `Shape[T] -> (T->U, U->T) -> Shape[U]` | isomorphism; preserves L1 |
-| `S.zip(R)` | `Shape[A] -> Shape[B] -> Shape[(A,B)]` | accumulating product (§4.1) |
 | `S.orElse(R)` | `Shape[T] -> Shape[T] -> Shape[T]` | first success; on total failure, defects from both |
+
+`eachLine` and `lines` answer different questions, and an earlier draft of this document
+conflated them by claiming `lines` returns "995 values *and* 5 defects". It cannot: an
+`Outcome` is a value **or** defects. A log file is exactly the case where a partial result
+is worth having, so `eachLine` returns one outcome per line and `Outcome.values` /
+`Outcome.defects` (§4) recover both; `lines` is for when a partial result is meaningless.
+
+`sepBy` takes a literal separator rather than a pattern because a regex separator has no
+unique rendering — the shape would silently become read-only. A general `zip` over two
+*text* shapes is deliberately absent: a product needs a rule for where one component's
+text ends and the next begins, and without a delimiter there is none. `sepBy` is that rule.
 
 `xmap` takes a *pair* of functions rather than a single `map` precisely because a shape is
 bidirectional: a one-way `map` would silently destroy `print`. That asymmetry is the type
 telling the truth.
 
-`S.lines` is where audit §3.1 dies. Its result is `Outcome[List[T]]`, and a run over 1,000
-lines with 5 malformed ones yields the 995 values *and* 5 defects with line numbers —
-today's `parseAll` returns 995 values and no evidence the other 5 existed.
+`eachLine` is where audit §3.1 dies. A run over 1,000 lines with 5 malformed ones yields
+the 995 values *and* 5 defects carrying their line numbers — today's `parseAll` returns
+995 values and no evidence the other 5 existed.
 
 ### 5.4 One conversion registry
 

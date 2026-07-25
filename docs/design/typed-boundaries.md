@@ -430,6 +430,7 @@ numbers below are therefore indicative of order, not commitments.
 | Code | Meaning | Status |
 |---|---|---|
 | `E0074` | a law's parameter type has no generator — **an error, not a silent skip** | **shipped** ([#346](https://github.com/onion-lang/onion/issues/346)) |
+| `E0075` | a class declaring laws could not be loaded, so none of its checks ran | **shipped** ([#346](https://github.com/onion-lang/onion/issues/346)) |
 | next | `print` used on a shape that is not invertible — message names the construct responsible | v0.6 |
 | next | no scalar-registry entry for a component type (replaces `E0061`/`E0062`'s role) | v0.6 |
 | next | a tool's body performs an effect its `requires` clause does not admit | v0.7 |

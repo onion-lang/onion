@@ -12,7 +12,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Numbers** | `Math`, `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
 | **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
-| **Functional** | `Option`, `Result`, `Future` |
+| **Functional** | `Option`, `Result`, `Future`, `Outcome` + `Defect` (reading external data) |
 | **Positions** | `Origin` (where a value came from, in the text it was read out of) |
 | **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
 | **Testing & timing** | `Assert`, `Timing` |
@@ -223,6 +223,70 @@ Origin::at("log.txt", 1, 3).onLine(40).describe()   // log.txt:40:3
 
 `file:line:column`, or `file:line` when only the line is known — the form every compiler
 and editor already knows how to parse. `toString` returns the same.
+
+## Outcome and Defect
+
+The result of reading external data: either a value, or **every** reason it could not be
+read. `Defect` is one thing that was wrong; `Outcome[T]` is a value or a list of them.
+
+A `Defect` answers three questions a caller actually has — where in the text (`origin`,
+which may be absent), where in the value (`path`), and what was expected against what was
+found.
+
+```onion
+import { onion.Outcome; onion.Defect; onion.Origin; }
+
+val d = Defect::at(Origin::atLine("config.json", 4), "port", "Int", "\"http\"")
+println(d.describe())     // config.json:4: port: expected Int, found "http"
+
+val missing = Defect::of("name", "String", "absent")
+println(missing.describe())   // name: expected String, found absent
+```
+
+### Why not Result?
+
+Because of `zip`. `Result` is monadic: `bind` short-circuits, so the first bad field hides
+the rest. A record with three malformed fields should report three defects in one pass.
+
+```
+Ok(f)   zip Ok(x)   = Ok(f(x))
+Bad(d1) zip Ok(_)   = Bad(d1)
+Ok(_)   zip Bad(d2) = Bad(d2)
+Bad(d1) zip Bad(d2) = Bad(d1 ++ d2)     <- the reason this type exists
+```
+
+```onion
+val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
+val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
+println(a.zip(b) { p, q => p + q }.defects().size)   // 2, not 1
+```
+
+`bind` still short-circuits, because it must — the second computation may depend on the
+first's value. Both are available, and `do[Outcome]` uses `bind`.
+
+### Reading many values
+
+`all` is all-or-nothing and accumulates every defect. When a partial result is still worth
+having — a log file where the good lines matter — `values` and `defects` keep both.
+
+```onion
+val os: List[Outcome[JInteger]] =
+  [Outcome::ok(1), Outcome::bad(Defect::of("a", "Int", "x")), Outcome::ok(3)]
+
+println(Outcome::values(os).size)    // 2
+println(Outcome::defects(os).size)   // 1
+println(Outcome::all(os).isOk())     // false
+```
+
+### Positioning a nested or per-line read
+
+`under` prefixes every defect's path; `onLine` lifts positions reported relative to one
+line back into the whole document.
+
+```onion
+o.under("address")     // "city" becomes "address.city"
+o.onLine(40)           // a defect at line 1 of a fragment becomes line 40 of the file
+```
 
 ## Function Interfaces
 

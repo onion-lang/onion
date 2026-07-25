@@ -12,7 +12,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **数値** | `Math`, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
 | **データ形式** | `Json`, `Yaml`, `Csv`, `Config`（ドット記法での設定値アクセス） |
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
-| **関数型** | `Option`, `Result`, `Future` |
+| **関数型** | `Option`, `Result`, `Future`, `Outcome`・`Defect`（外部データの読み取り） |
 | **位置情報** | `Origin`（値がどのテキストのどこから来たか） |
 | **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
 | **テスト・計測** | `Assert`, `Timing` |
@@ -139,6 +139,69 @@ Origin::at("log.txt", 1, 3).onLine(40).describe()   // log.txt:40:3
 
 `file:line:column`、行しか分からない場合は `file:line` を返します。コンパイラもエディタも
 既に解釈できる形式です。`toString` も同じ結果を返します。
+
+## Outcome と Defect
+
+外部データを読んだ結果です。値か、あるいは**読めなかった理由すべて**を表します。
+`Defect` は「1つの不具合」、`Outcome[T]` は「値、またはその一覧」です。
+
+`Defect` は呼び出し側が実際に知りたい3点に答えます——テキストのどこか（`origin`、無い場合
+もある）、値のどこか（`path`）、そして何を期待して何があったか。
+
+```onion
+import { onion.Outcome; onion.Defect; onion.Origin; }
+
+val d = Defect::at(Origin::atLine("config.json", 4), "port", "Int", "\"http\"")
+println(d.describe())     // config.json:4: port: expected Int, found "http"
+
+val missing = Defect::of("name", "String", "absent")
+println(missing.describe())   // name: expected String, found absent
+```
+
+### なぜ Result ではないのか
+
+`zip` のためです。`Result` はモナドで `bind` は短絡するため、最初の不正フィールドが残りを
+隠してしまいます。3つのフィールドが同時に壊れているなら、1回で3件報告すべきです。
+
+```
+Ok(f)   zip Ok(x)   = Ok(f(x))
+Bad(d1) zip Ok(_)   = Bad(d1)
+Ok(_)   zip Bad(d2) = Bad(d2)
+Bad(d1) zip Bad(d2) = Bad(d1 ++ d2)     <- この型が存在する理由
+```
+
+```onion
+val a: Outcome[JInteger] = Outcome::bad(Defect::of("x", "Int", "p"))
+val b: Outcome[JInteger] = Outcome::bad(Defect::of("y", "Int", "q"))
+println(a.zip(b) { p, q => p + q }.defects().size)   // 1 ではなく 2
+```
+
+`bind` は短絡したままです——後続の計算が前の値に依存しうる以上、そうでなければなりません。
+両方使えます。`do[Outcome]` は `bind` を使います。
+
+### まとめて読む
+
+`all` は全部か無かで、全 defect を集約します。部分的な結果に価値がある場合——良い行が
+意味を持つログファイルなど——は `values` と `defects` で両方を取れます。
+
+```onion
+val os: List[Outcome[JInteger]] =
+  [Outcome::ok(1), Outcome::bad(Defect::of("a", "Int", "x")), Outcome::ok(3)]
+
+println(Outcome::values(os).size)    // 2
+println(Outcome::defects(os).size)   // 1
+println(Outcome::all(os).isOk())     // false
+```
+
+### ネストや行単位の読み取り
+
+`under` は各 defect の path に接頭辞を付け、`onLine` はある行を基準に報告された位置を
+文書全体の位置に持ち上げます。
+
+```onion
+o.under("address")     // "city" が "address.city" になる
+o.onLine(40)           // 断片の1行目の defect が、ファイルの40行目になる
+```
 
 ## 関数インターフェース
 

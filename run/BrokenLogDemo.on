@@ -1,0 +1,91 @@
+// BrokenLogDemo — onion.Shape, onion.Outcome and the "broken log" story.
+//
+// A log file is never perfectly clean. `eachLine` reads the lines it can and reports
+// the ones it can't, together, instead of the two failure modes every ad-hoc parser
+// picks between: crash on the first bad line, or silently drop it. `Outcome::values`
+// and `Outcome::defects` split the two apart; both are worth having.
+//
+//   onion BrokenLogDemo.on
+
+record AccessLine(time: String, method: String, path: String, status: Int)
+
+// A record for a value produced by `xmap`: a distance that happens to be spelled
+// as a bare integer on the wire.
+record Meters(value: Int)
+
+// Two spellings of the same date, joined with `orElse`.
+record Stamp(year: Int, month: Int, day: Int)
+
+class BrokenLogDemo {
+public:
+  static def main(args: String[]): Int {
+    val accessShape: Shape[AccessLine] = Shapes::regex(
+      "(\\S+) (\\w+) (\\S+) (\\d+)",
+      ["time", "method", "path", "status"],
+      ["String", "String", "String", "Int"],
+      (parts: List[Object]) -> new AccessLine(
+        (parts.get(0) as String), (parts.get(1) as String), (parts.get(2) as String), (parts.get(3) as Int)),
+      (a: AccessLine) -> a.time() + " " + a.method() + " " + a.path() + " " + a.status()
+    )
+
+    // Six lines, two broken: one that is not a log line at all, one whose status
+    // is not a number. Both are still worth reporting, not just discarding.
+    val log =
+      "127.0.0.1 GET /index 200\n" +
+      "127.0.0.1 POST /login 303\n" +
+      "not a valid line at all\n" +
+      "127.0.0.1 GET /about 200\n" +
+      "127.0.0.1 GET /missing abc\n" +
+      "127.0.0.1 DELETE /item 204\n"
+
+    val origin = Origin::atLine("access.log", 1)
+    val outcomes: List[Outcome[AccessLine]] = accessShape.eachLine(log, origin)
+    val goodRows: List[AccessLine] = Outcome::values(outcomes)
+    val badLines: List[Defect] = Outcome::defects(outcomes)
+
+    IO::println("read " + goodRows.size + " of " + outcomes.size + " lines")
+    foreach row: AccessLine in goodRows {
+      IO::println("  ok:  " + row.method() + " " + row.path() + " -> " + row.status())
+    }
+    foreach d: Defect in badLines {
+      IO::println("  bad: " + d.describe())
+    }
+
+    // sepBy — a shape repeated with a literal separator, all or nothing.
+    val intShape: Shape[Int] = Shapes::regex(
+      "(-?\\d+)", ["n"], ["Int"],
+      (parts: List[Object]) -> (parts.get(0) as Int),
+      (n: Int) -> n.toString()
+    )
+    val intListShape: Shape[List[Int]] = intShape.sepBy(",")
+    val ints = intListShape.parse("1,2,3,4,5", origin)
+    IO::println("sepBy: " + intListShape.print(ints.get()) + " = " + ints.get().size + " values")
+
+    // xmap — the same boundary, carried along an isomorphism so `print` still works.
+    val metersShape: Shape[Meters] = intShape.xmap(
+      (n: Int) -> new Meters(n),
+      (m: Meters) -> m.value()
+    )
+    val distance = metersShape.parse("42", origin)
+    IO::println("xmap: " + distance.get().value() + "m, prints back as " + metersShape.print(distance.get()))
+
+    // orElse — two spellings of the same value; both sets of defects when neither reads.
+    val isoStamp: Shape[Stamp] = Shapes::regex(
+      "(\\d{4})-(\\d{2})-(\\d{2})", ["year", "month", "day"], ["Int", "Int", "Int"],
+      (parts: List[Object]) -> new Stamp((parts.get(0) as Int), (parts.get(1) as Int), (parts.get(2) as Int)),
+      (s: Stamp) -> s.year() + "-" + s.month() + "-" + s.day()
+    )
+    val usStamp: Shape[Stamp] = Shapes::regex(
+      "(\\d{2})/(\\d{2})/(\\d{4})", ["month", "day", "year"], ["Int", "Int", "Int"],
+      (parts: List[Object]) -> new Stamp((parts.get(2) as Int), (parts.get(0) as Int), (parts.get(1) as Int)),
+      (s: Stamp) -> s.month() + "/" + s.day() + "/" + s.year()
+    )
+    val stamp: Shape[Stamp] = isoStamp.orElse(usStamp)
+    val fromIso = stamp.parse("2026-07-25", origin)
+    val fromUs = stamp.parse("07/25/2026", origin)
+    val fromNeither = stamp.parse("not a date", origin)
+    IO::println("orElse: iso=" + fromIso.isOk() + " us=" + fromUs.isOk() + " neither ok=" + fromNeither.isOk() + " defects=" + fromNeither.defects().size)
+
+    return goodRows.size
+  }
+}

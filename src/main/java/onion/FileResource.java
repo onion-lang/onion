@@ -37,10 +37,7 @@ public final class FileResource {
 
     /** File contents split into lines. */
     public List<String> lines() throws IOException {
-        String[] arr = Files.readLines(path);
-        List<String> list = new ArrayList<>(arr.length);
-        for (String s : arr) list.add(s);
-        return list;
+        return Files.readLines(path);
     }
 
     /** File parsed as JSON (see {@link Json#parse}). */

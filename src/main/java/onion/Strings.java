@@ -1,6 +1,7 @@
 package onion;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -12,19 +13,14 @@ public final class Strings {
     private Strings() {} // Prevent instantiation
 
     // Splitting and joining
-    public static String[] split(String str, String delimiter) {
-        if (str == null) return new String[0];
-        return str.split(Pattern.quote(delimiter));
+    public static List<String> split(String str, String delimiter) {
+        if (str == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(str.split(Pattern.quote(delimiter))));
     }
 
-    public static String[] splitRegex(String str, String regex) {
-        if (str == null) return new String[0];
-        return str.split(regex);
-    }
-
-    public static String join(String[] parts, String delimiter) {
-        if (parts == null) return "";
-        return String.join(delimiter, parts);
+    public static List<String> splitRegex(String str, String regex) {
+        if (str == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(str.split(regex)));
     }
 
     public static String join(List<?> parts, String delimiter) {
@@ -130,9 +126,9 @@ public final class Strings {
     }
 
     // Conversion
-    public static String[] lines(String str) {
-        if (str == null) return new String[0];
-        return str.split("\\r?\\n");
+    public static List<String> lines(String str) {
+        if (str == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(str.split("\\r?\\n")));
     }
 
     public static String reverse(String str) {
@@ -241,11 +237,11 @@ public final class Strings {
 
     // Decomposition
     /** Splits on runs of whitespace, dropping empty tokens. */
-    public static String[] words(String str) {
-        if (str == null) return new String[0];
+    public static List<String> words(String str) {
+        if (str == null) return new ArrayList<String>();
         String trimmed = str.trim();
-        if (trimmed.isEmpty()) return new String[0];
-        return trimmed.split("\\s+");
+        if (trimmed.isEmpty()) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(trimmed.split("\\s+")));
     }
 
     /** Returns each character as a single-character string. */

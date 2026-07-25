@@ -12,9 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `encodeUrl`/`decodeUrl` — following the doc raised a "method not found" error. Corrected both
   names, documented the previously-missing `Http::buildUrl`, added `Http` to the "Modules at a
   glance" summary table (English and Japanese), and added the Japanese `Http` module section that
-  was missing entirely. Also corrected the header-argument example: `headers: ["Key1", "Value1"]`
-  is a `List` in Onion, but `Http::get`/`Http::post`'s header overloads take a `String[]` only —
-  the doc now uses `new String[]{"Key1", "Value1"}`, matching what actually compiles.
+  was missing entirely. The header-argument example was also wrong — it showed a
+  list literal against an overload that only took a `String[]` — which is what prompted the
+  List-over-arrays change below; the header parameter now genuinely takes the documented list form.
+
+- **The standard library takes and returns `List`, not arrays (breaking).** A user following the docs
+  had to know, per method, whether a result was a `List` (use `.size`, index with `[]`) or an array
+  (use `.length`) — and had to build `new String[]{...}` to pass HTTP headers or query parameters,
+  because those overloads did not accept the `["a", "b"]` literal that looks like it should work.
+  Converted: `Strings::split`/`splitRegex`/`lines`/`words`/`join`, all of `Regex`'s
+  `matchGroups`/`findAll`/`groups`/`groupsAll`/`split` (both String- and Pattern-pattern forms),
+  `Files::readLines`/`writeLines`/`listFiles`/`joinPath`, `Http`'s header and query-parameter
+  arguments plus `Response.headers`, every `Rand::choice`/`shuffle`/`sample` (the per-primitive
+  array overloads are gone — one generic `List` signature covers them, since a primitive boxes into
+  the element type), and `Future::all`, which now completes with a `List[Object]`.
+  Arrays remain exactly where the JVM requires them: `main(args: String[])`, `byte[]` binary I/O
+  (`Files::readBytes`/`writeBytes`), argv-consuming `Args`/`Cli`, and varargs constructors like
+  `Colls::listOf(...)` — the cases the language calls Java, not the cases a user writes.
+  `Colls::toList(args)` crosses from an array into list-land.
 
 ## [0.5.0] - 2026-07-25
 

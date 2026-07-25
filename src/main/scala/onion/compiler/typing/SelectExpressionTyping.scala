@@ -313,9 +313,16 @@ final class SelectExpressionTyping(
 
           case RegexBindings(groupsVar, _) =>
             // The condition already stored the capture groups in groupsVar;
-            // each binding reads its group from the array.
+            // each binding reads its group out of that list. matchGroups returns
+            // a List (the stdlib exposes lists, not arrays), so the element is
+            // Object at the erased boundary and is cast back to String.
+            val stringType = bodyContext.load("java.lang.String")
+            val listType = bodyContext.load("java.util.List")
+            val getMethod = listType.methods("get").find(_.arguments.length == 1).getOrElse(
+              throw new RuntimeException("java.util.List.get(int) not found"))
             val bindingStmts = varBinds.zipWithIndex.map { case (varBind, i) =>
-              new ExpressionActionStatement(new SetLocal(varBind, new RefArray(new RefLocal(groupsVar), new IntValue(i))))
+              val element = new Call(new RefLocal(groupsVar), getMethod, Array[Term](new IntValue(i)))
+              new ExpressionActionStatement(new SetLocal(varBind, new AsInstanceOf(element, stringType)))
             }
             new StatementBlock(caseNodes(caseIndex).location, (bindingStmts :+ innerBody)*)
 
@@ -478,8 +485,8 @@ final class SelectExpressionTyping(
         //   (__g = Regex::matchGroups(subject, pattern)) != null
         // matchGroups is ANCHORED (the whole subject must match) and returns
         // null on no-match; the bindings then read __g[i] in the case body.
-        val arrayType = groupsMethod.returnType
-        val gVar = new ClosureLocalBinding(0, context.add(context.newName, arrayType, isMutable = true), arrayType, isMutable = true)
+        val groupsType = groupsMethod.returnType
+        val gVar = new ClosureLocalBinding(0, context.add(context.newName, groupsType, isMutable = true), groupsType, isMutable = true)
         val groupsCall = new CallStatic(regexType, groupsMethod,
           Array[Term](new RefLocal(bind), new StringValue(loc, pattern, stringType)))
         bindingInfo = RegexBindings(gVar, names)

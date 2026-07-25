@@ -27,10 +27,10 @@ val f1 = fetchPage("a", 50L)
 val f2 = fetchPage("b", 30L)
 val f3 = fetchPage("c", 40L)
 
-Future::all(f1, f2, f3).onSuccess((results: Object[]) -> {
-  println("Downloaded " + results.length + " pages")
-  for var i: Int = 0; i < results.length; i = i + 1 {
-    println("  " + (results[i] as String))
+Future::all(f1, f2, f3).onSuccess((results: List[Object]) -> {
+  println("Downloaded " + results.size + " pages")
+  foreach r: Object in results {
+    println("  " + (r as String))
   }
 })
 ```
@@ -90,8 +90,8 @@ val f1 = fetchPage(urls[0] as String, 50L)
 val f2 = fetchPage(urls[1] as String, 30L)
 val f3 = fetchPage(urls[2] as String, 40L)
 
-Future::all(f1, f2, f3).onSuccess((results: Object[]) -> {
-  println("Downloaded " + results.length + " pages")
+Future::all(f1, f2, f3).onSuccess((results: List[Object]) -> {
+  println("Downloaded " + results.size + " pages")
 })
 
 val combined: Future[String] = do[Future] {

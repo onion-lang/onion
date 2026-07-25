@@ -42,7 +42,7 @@ public final class Http {
      * Performs a GET request with custom headers.
      * Headers are provided as alternating key-value pairs: ["Header1", "Value1", "Header2", "Value2"]
      */
-    public static String get(String url, String[] headers) throws Exception {
+    public static String get(String url, List headers) throws Exception {
         if (url == null) return "";
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -89,7 +89,7 @@ public final class Http {
     /**
      * Performs a POST request with custom headers.
      */
-    public static String post(String url, String body, String[] headers) throws Exception {
+    public static String post(String url, String body, List headers) throws Exception {
         if (url == null) return "";
         if (body == null) body = "";
         HttpRequest.Builder builder = HttpRequest.newBuilder()
@@ -109,9 +109,9 @@ public final class Http {
     public static class Response {
         public final int status;
         public final String body;
-        public final String[] headers;
+        public final List<String> headers;
 
-        public Response(int status, String body, String[] headers) {
+        public Response(int status, String body, List<String> headers) {
             this.status = status;
             this.body = body;
             this.headers = headers;
@@ -130,7 +130,7 @@ public final class Http {
      * Performs a GET request and returns a Response object.
      */
     public static Response getResponse(String url) throws Exception {
-        if (url == null) return new Response(0, "", new String[0]);
+        if (url == null) return new Response(0, "", new ArrayList<String>());
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .GET()
@@ -144,7 +144,7 @@ public final class Http {
      * Performs a POST request and returns a Response object.
      */
     public static Response postResponse(String url, String body) throws Exception {
-        if (url == null) return new Response(0, "", new String[0]);
+        if (url == null) return new Response(0, "", new ArrayList<String>());
         if (body == null) body = "";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -208,7 +208,7 @@ public final class Http {
      * Builds a query string from alternating key-value pairs.
      * Example: buildQuery(["name", "John", "age", "30"]) returns "name=John&age=30"
      */
-    public static String buildQuery(String[] params) {
+    private static String buildQueryArray(String[] params) {
         if (params == null || params.length == 0) return "";
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i + 1 < params.length; i += 2) {
@@ -226,27 +226,11 @@ public final class Http {
     @SuppressWarnings("unchecked")
     public static String buildQuery(List params) {
         if (params == null || params.isEmpty()) return "";
-        String[] arr = new String[params.size()];
-        for (int i = 0; i < params.size(); i++) {
-            Object o = params.get(i);
-            arr[i] = o != null ? o.toString() : "";
-        }
-        return buildQuery(arr);
+        return buildQueryArray(toStringArray(params));
     }
 
     /**
      * Builds a full URL with query parameters.
-     */
-    public static String buildUrl(String baseUrl, String[] params) {
-        if (baseUrl == null) return "";
-        String query = buildQuery(params);
-        if (query.isEmpty()) return baseUrl;
-        String separator = baseUrl.contains("?") ? "&" : "?";
-        return baseUrl + separator + query;
-    }
-
-    /**
-     * Builds a full URL with query parameters from a list.
      */
     @SuppressWarnings("unchecked")
     public static String buildUrl(String baseUrl, List params) {
@@ -259,13 +243,25 @@ public final class Http {
 
     // ========== Helpers ==========
 
-    private static void addHeaders(HttpRequest.Builder builder, String[] headers) {
+    private static void addHeaders(HttpRequest.Builder builder, List headers) {
         if (headers == null) return;
-        for (int i = 0; i + 1 < headers.length; i += 2) {
-            if (headers[i] != null && headers[i + 1] != null) {
-                builder.header(headers[i], headers[i + 1]);
+        for (int i = 0; i + 1 < headers.size(); i += 2) {
+            Object name = headers.get(i);
+            Object value = headers.get(i + 1);
+            if (name != null && value != null) {
+                builder.header(name.toString(), value.toString());
             }
         }
+    }
+
+    /** Flattens a list of alternating keys and values for the array-based helpers. */
+    private static String[] toStringArray(List params) {
+        String[] arr = new String[params.size()];
+        for (int i = 0; i < params.size(); i++) {
+            Object o = params.get(i);
+            arr[i] = o != null ? o.toString() : "";
+        }
+        return arr;
     }
 
     private static Response toResponse(java.net.http.HttpResponse<String> response) {
@@ -279,7 +275,7 @@ public final class Http {
         return new Response(
                 response.statusCode(),
                 response.body(),
-                headerList.toArray(new String[0])
+                headerList
         );
     }
 }

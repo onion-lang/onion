@@ -418,7 +418,7 @@ Strings::removeSuffix("running", "ing")  // "runn"
 Strings::truncate("hello world", 8, "...")   // "hello..."
 Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
-Strings::words("  a  b  c ")             // String[] {"a","b","c"}
+Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
@@ -606,7 +606,7 @@ System::exit(1)  // エラー
 
 ```onion
 Files::readText("path.txt")            // ファイル全体を String として
-Files::readLines("path.txt")           // String[]
+Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
@@ -684,15 +684,7 @@ HTTPクライアントユーティリティ（Java 11+ の HttpClient を使用�
 
 ```
 Http::get(url): String
-Http::get(url, headers): String
-```
-
-`headers` は名前と値を交互に並べたフラットな `String[]` です。**配列である必要があり**、
-リストリテラル（`["Key1", "Value1"]`）は `List` になるためこのオーバーロードには
-一致しません。
-
-```onion
-val headers: String[] = new String[]{"Accept", "application/json"}
+Http::get(url, headers): String    // headers: ["Name1", "Value1", ...]
 ```
 
 ### POST リクエスト
@@ -700,7 +692,7 @@ val headers: String[] = new String[]{"Accept", "application/json"}
 ```
 Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Content-Type: application/json を設定
-Http::post(url, body, headers): String   // headers は get と同じく String[]
+Http::post(url, body, headers): String   // headers は get と同じ
 ```
 
 ### その他のメソッド
@@ -717,14 +709,6 @@ Http::encodeUrl(str): String
 Http::decodeUrl(str): String
 Http::buildQuery(params): String        // params: キーと値を交互に並べる
 Http::buildUrl(baseUrl, params): String // "?"/"&" + buildQuery(params) を付加
-```
-
-上のヘッダー引数とは異なり、`buildQuery` と `buildUrl` は `String[]` と `List` の
-**どちらも**受け付けるので、リストリテラルも使えます。
-
-```onion
-Http::buildQuery(new String[]{"q", "hello world"})
-Http::buildQuery(["q", "hello world"])
 ```
 
 ### 例
@@ -843,10 +827,10 @@ Regex::find(input, pattern): Boolean      // どこかにパターンが見つ�
 ### 抽出
 
 ```
-Regex::findAll(input, pattern): String[]
+Regex::findAll(input, pattern): List[String]
 Regex::findFirst(input, pattern): String
-Regex::groups(input, pattern): String[]       // 最初のマッチのグループ
-Regex::groupsAll(input, pattern): String[][]  // 全マッチのグループ
+Regex::groups(input, pattern): List[String]   // 最初のマッチのグループ
+Regex::groupsAll(input, pattern): List[List[String]]  // 全マッチのグループ
 ```
 
 ### 置換
@@ -859,8 +843,8 @@ Regex::replaceFirst(input, pattern, replacement): String
 ### 分割
 
 ```
-Regex::split(input, pattern): String[]
-Regex::split(input, pattern, limit): String[]
+Regex::split(input, pattern): List[String]
+Regex::split(input, pattern, limit): List[String]
 ```
 
 ### ユーティリティ
@@ -874,7 +858,7 @@ Regex::isValid(pattern): Boolean
 
 ```
 val text: String = "Email: alice@example.com, bob@test.org";
-val emails: String[] = Regex::findAll(text, "[\\w.]+@[\\w.]+");
+val emails: List[String] = Regex::findAll(text, "[\\w.]+@[\\w.]+");
 // ["alice@example.com", "bob@test.org"]
 
 val masked: String = Regex::replace(text, "@[\\w.]+", "@***");

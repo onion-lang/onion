@@ -15,7 +15,7 @@ class FilesWriteLinesListSpec extends AbstractShellSpec {
         |def main(args: String[]): Int {
         |  val p = "$path"
         |  Files::writeLines(p, ["alpha", "beta", "gamma"])
-        |  return Files::readLines(p).length
+        |  return Files::readLines(p).size
         |}
         |""".stripMargin,
       "None",

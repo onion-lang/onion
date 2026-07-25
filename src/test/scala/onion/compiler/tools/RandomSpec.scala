@@ -128,16 +128,13 @@ class RandomSpec extends AbstractShellSpec {
     }
 
     describe("choice") {
-      it("chooses element from array") {
+      it("chooses element from a list") {
         val result = shell.run(
           """
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val items = new String[3];
-            |    items[0] = "a";
-            |    items[1] = "b";
-            |    items[2] = "c";
+            |    val items = ["a", "b", "c"];
             |    val chosen = Rand::choice(items);
             |    return "" + (chosen.equals("a") || chosen.equals("b") || chosen.equals("c"));
             |  }
@@ -149,13 +146,13 @@ class RandomSpec extends AbstractShellSpec {
         assert(Shell.Success("true") == result)
       }
 
-      it("throws for empty array instead of returning null") {
+      it("throws for an empty list instead of returning null") {
         val result = shell.run(
           """
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val items = new String[0];
+            |    val items: List[String] = [];
             |    try {
             |      val chosen = Rand::choice(items);
             |      return "no-throw";
@@ -195,16 +192,13 @@ class RandomSpec extends AbstractShellSpec {
     }
 
     describe("shuffle") {
-      it("shuffles array preserving all elements") {
+      it("shuffles a list preserving all elements") {
         val result = shell.run(
           """
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val items = new String[3];
-            |    items[0] = "a";
-            |    items[1] = "b";
-            |    items[2] = "c";
+            |    val items = ["a", "b", "c"];
             |    val shuffled = Rand::shuffle(items);
             |    if (shuffled.size() != 3) {
             |      return "wrong size";

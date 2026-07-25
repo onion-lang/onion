@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A throw-only lambda no longer pins a type argument to `Object` (#314).**
+  `val f = Future::async(() -> { throw ... })` inferred `Future[Object]`, so `val b: Int = f.await()`
+  was rejected and the target had to be annotated. A closure that never completes normally now keeps
+  a bottom return in its static type, so the call infers `Future[Nothing]` and its result is
+  assignable anywhere. Bottom is still not a usable JVM return type — the synthesized closure method
+  continues to return `Object` — so the widening moved to exactly that one place instead of leaking
+  into inference. Two codegen paths needed to follow: assigning a bottom-typed (erased) result to a
+  primitive now inserts the unboxing the verifier expects, and discarding such a value as a statement
+  pops the reference the call actually leaves on the stack, which a bottom type previously skipped
+  because it only ever came from `throw`/`return`/`break`/`continue`.
+
 - **One broken declaration now reports one error (#333).** `val bad = xs.noSuchMethod()` reported the
   real error *plus* "local variable bad is not found" for every later use of `bad` — misleading,
   because `bad` is declared and only its type is unknown, and loud enough to bury the root cause in a

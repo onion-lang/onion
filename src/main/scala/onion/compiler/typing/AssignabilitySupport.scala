@@ -64,7 +64,21 @@ private[compiler] final class AssignabilitySupport(
     // parameter's element type instead of the default Object).
     val retyped = retypeEmptyCollectionLiteral(expected, actual)
     if (retyped ne actual) return processAssignable(node, expected, retyped)
-    if (actual.`type`.isBottomType) return actual
+    if (actual.`type`.isBottomType) {
+      // A bottom-typed value never actually materializes (the expression throws
+      // or otherwise never completes), but the bytecode path still has to
+      // verify. When it came from an erased generic call -- `f.await()` on a
+      // `Future[Nothing]` -- the JVM sees a reference on the stack, so storing
+      // it into a primitive slot needs the same unboxing any reference would
+      // (issue #314). Without this, codegen produced a frame the verifier
+      // rejected.
+      expected match {
+        case bt: BasicType if bt != BasicType.VOID && !actual.isBasicType =>
+          val boxedType = Boxing.boxedType(bodyContext.table, bt)
+          return Boxing.unboxing(bodyContext.table, new AsInstanceOf(node.location, actual, boxedType), bt)
+        case _ => return actual
+      }
+    }
     if (expected == actual.`type`) return actual
 
     // Constant narrowing: an integer literal (or its negation) that fits the

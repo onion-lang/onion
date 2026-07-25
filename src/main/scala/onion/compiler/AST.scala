@@ -37,9 +37,9 @@ object AST {
     typeParameters: List[TypeParameter], args: List[Argument],
     superInterfaces: List[TypeNode], fromRaw: String, derives: List[String],
     laws: List[LawClause], examples: List[ExampleClause],
-    sections: List[AccessSection]
+    sections: List[AccessSection], shapes: List[ShapeClause]
   ): RecordDeclaration =
-    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections)
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes)
 
   /** Java-callable factory for an `example` clause; `name` may be null (unnamed example). */
   def exampleClause(location: Location, name: String, body: BlockExpression): ExampleClause =
@@ -318,7 +318,15 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil) extends TypeDeclaration
+  /**
+   * A `shape name = re"..."` clause on a record — a named, first-class boundary.
+   *
+   * Unlike `from re"..."`, which allows one pattern per record and bolts fixed-name
+   * statics onto it, a record may carry as many shape clauses as it needs: a v1 and a v2
+   * log format can coexist, each reached by its own name.
+   */
+  case class ShapeClause(location: Location, name: String, pattern: String) extends Node
   /** A `law name(p: T) { boolean-expr }` clause on a record — a compile-time property check. */
   case class LawClause(location: Location, name: String, params: List[Argument], body: BlockExpression) extends Node
   /** An `example { boolean-expr }` clause on a record — a compile-time concrete check. */

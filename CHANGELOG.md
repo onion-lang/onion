@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `endColumn` since it was written and the renderer has known how to draw a range, but no production
   code ever set them, so every caret was a single `^` at the first character.
 
+- **`shape name = re"..."` on a record.** A named, first-class boundary, synthesized as a
+  static method returning a `Shape[R]`. A record may carry **several** — a v1 and a v2 log
+  format can coexist — which `from re"..."` structurally cannot do, since it allows one
+  pattern and bolts fixed-name statics on. The regex checks are the same ones `from` gets
+  (**E0059** malformed, **E0060** group/component mismatch). What it adds: `parse` returns
+  an `Outcome`, so a non-match and a broken field are distinguishable (`from` returns
+  `null` for both) and every defect carries a position; every bad field is reported at
+  once; `eachLine` keeps the lines it could not read instead of dropping them; and
+  `canPrint()` answers whether the pattern is invertible rather than the printing method
+  silently not existing. `from re"..."` is unchanged and still works.
+
 - **New: `onion.Shape` — the data boundary as a value.** A partial, potentially bidirectional
   correspondence between external text and a typed value, with the two laws kept apart: `parse ∘
   print == id` is guaranteed wherever `print` exists, while `print ∘ parse == id` is false in

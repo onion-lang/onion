@@ -282,7 +282,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       val fields = c.caseFields.getOrElse(Nil)
       AST.recordDeclaration(
         loc, AST.M_PUBLIC, c.name, typeParams, fields, List(enumTypeNode),
-        null, Nil, Nil, Nil, Nil
+        null, Nil, Nil, Nil, Nil, Nil
       )
     }
 
@@ -546,11 +546,108 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // law/example clauses (B3): each becomes a boolean static method the compiler runs at
     // build time (LawCheckPhase). No `derivable` guard — a componentless record can still
     // carry laws/examples (the law's own params drive generation).
+    val shapeMethods = declaration.shapes.flatMap(sc => synthesizeShapeMethod(declaration, sc))
     val lawMethods = declaration.laws.map(synthesizeLawMethod)
     val exampleMethods = declaration.examples.zipWithIndex.map { case (ex, i) => synthesizeExampleMethod(ex, i) }
-    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ lawMethods ++ exampleMethods
+    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ lawMethods ++ exampleMethods
     if (all.isEmpty) declaration
+    // `shapes` is deliberately kept: typing validates each pattern (E0059) and its
+    // capture-group count against the components (E0060), which the `from` synthesis gets
+    // for free by routing through a regex select pattern and this one does not.
     else declaration.copy(synthesizedMethods = all, laws = Nil, examples = Nil)
+  }
+
+  /**
+   * `shape name = re"..."` -> `static def name(): Shape[R]`, returning a Shapes.regex
+   * built from the record's own components.
+   *
+   * Unlike the `from re"..."` synthesis this replaces, the result is an ordinary value
+   * rather than a fixed set of statics, so a record can carry several shapes and the
+   * failure it reports is an `Outcome` carrying positioned defects instead of a bare
+   * `null` that cannot distinguish a non-match from a broken field (issue #350).
+   *
+   * The printer is supplied only when the pattern is invertible -- the same
+   * `formatSegments` analysis `format` already used. A read-only shape says so through
+   * `canPrint()`, rather than the method silently not existing.
+   *
+   * A method rather than a field: it needs no static-initializer ordering, at the cost of
+   * rebuilding the shape per call. Bind it to a val when reading many inputs.
+   */
+  private def synthesizeShapeMethod(declaration: AST.RecordDeclaration, clause: AST.ShapeClause): Option[AST.MethodDeclaration] = {
+    if (declaration.args.isEmpty) return None
+    val loc = clause.location
+    val recordName = declaration.name
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
+      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
+
+    def strList(values: List[String]): AST.Expression =
+      AST.ListLiteral(loc, values.map(v => AST.StringLiteral(loc, v)))
+
+    // Every component must be a known scalar; typing reports the ones that are not, the
+    // same way it does for `from` (E0061).
+    val kinds = declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
+    if (kinds.exists(_.isEmpty)) return None
+    val tags = kinds.map(_.get)
+
+    // build: { __p => new R(__p[0] as K0, __p[1] as K1, ...) }
+    val partsName = "__p"
+    val ctorArgs = declaration.args.zipWithIndex.map { case (arg, i) =>
+      val element = AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i))
+      AST.Cast(loc, element, boxedTypeNodeFor(loc, tags(i)))
+    }
+    val buildBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NewObject(loc, recordType, ctorArgs))))
+    val buildLambda = AST.ClosureExpression(loc,
+      AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
+      List(AST.Argument(loc, partsName,
+        AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("java.util.List", true),
+          List(AST.ReferenceType("java.lang.Object", true))), false))),
+      null, buildBody)
+
+    // printer: { __v => "" + lit + __v.c0() + lit + ... }, only when invertible.
+    val printerExpr: AST.Expression = formatSegments(clause.pattern) match {
+      case Some(segs) if segs.count(_.isEmpty) == declaration.args.length =>
+        var slot = 0
+        val parts: List[AST.Expression] = segs.map {
+          case Some(literal) => AST.StringLiteral(loc, literal)
+          case None =>
+            val comp = declaration.args(slot); slot += 1
+            AST.MethodCall(loc, AST.Id(loc, "__v"), comp.name, Nil)
+        }
+        val chain = (AST.StringLiteral(loc, "") :: parts).reduceLeft((a, b) => AST.Addition(loc, a, b))
+        val body = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, chain)))
+        AST.ClosureExpression(loc,
+          AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
+          List(AST.Argument(loc, "__v", recordType)), null, body)
+      case _ => AST.NullLiteral(loc)
+    }
+
+    val call = AST.StaticMethodCall(loc,
+      AST.TypeNode(loc, AST.ReferenceType("onion.Shapes", true), false), "regex",
+      List(
+        AST.StringLiteral(loc, clause.pattern),
+        strList(declaration.args.map(_.name)),
+        strList(tags),
+        buildLambda,
+        printerExpr
+      ))
+    Some(AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, clause.name, Nil, shapeType,
+      AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call)))))
+  }
+
+  /** The boxed type a component of `tag` arrives as inside the erased parts list. */
+  private def boxedTypeNodeFor(loc: Location, tag: String): AST.TypeNode = {
+    val name = tag match {
+      case "Int"     => "java.lang.Integer"
+      case "Long"    => "java.lang.Long"
+      case "Double"  => "java.lang.Double"
+      case "Float"   => "java.lang.Float"
+      case "Boolean" => "java.lang.Boolean"
+      case "Short"   => "java.lang.Short"
+      case "Byte"    => "java.lang.Byte"
+      case _         => "java.lang.String"
+    }
+    AST.TypeNode(loc, AST.ReferenceType(name, true), false)
   }
 
   /** `law name(p: T) { expr }` -> `static def onion$$law$$name(p: T): boolean { return expr }`. */

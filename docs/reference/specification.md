@@ -259,6 +259,46 @@ valid — both are checked at compile time (group/count mismatch is **E0060**,
 a malformed regex is **E0059**), and an unsupported component type is
 **E0061**.
 
+#### `shape` — a named boundary for a record
+
+A `shape name = re"..."` clause synthesizes a static method returning a
+`Shape[R]` — a first-class, potentially bidirectional correspondence between
+text and the record. `shape` is a soft keyword, recognized only in this
+position, so it stays usable as an ordinary identifier.
+
+```onion
+record Access(time: String, method: String, path: String, status: Int)
+  shape v1 = re"(\S+) (\w+) (\S+) (\d+)"
+  shape v2 = re"(\S+)\t(\w+)\t(\S+)\t(\d+)"
+
+val rows = Access::v1().eachLine(logText)
+```
+
+A record may carry **several** shapes — the thing `from re"..."` structurally
+cannot do, since it allows one pattern and fixed-name statics. The component
+types, the group-count check (**E0060**) and the regex validity check
+(**E0059**) are the same as for `from`.
+
+What a shape gives that `from` does not:
+
+- **Failure is a value with a position.** `parse` returns
+  `Outcome[R]`, so a non-match and a broken field are distinguishable — the
+  first carries an empty `path` because it belongs to the whole text — and
+  every defect knows where it came from. `from`'s `parse` returns `null` for
+  both.
+- **Every bad field at once.** Reading `"abc,def"` as two `Int`s reports two
+  defects, not the first.
+- **No silently dropped lines.** `eachLine` returns one `Outcome` per line;
+  `Outcome::values` and `Outcome::defects` recover the rows *and* the lines
+  that failed, with their line numbers. `parseAll` drops them without trace.
+- **An honest answer about printing.** `canPrint()` is `false` when the
+  pattern has no unique rendering (a `\s+` separator, say), instead of the
+  printing method simply not existing.
+
+The shape is rebuilt on each call, so bind it to a `val` when reading many
+inputs. `onion.Shapes::regex` is the same construction as ordinary API, for a
+shape over a type you did not declare.
+
 #### `derive!` — record serde derivation
 
 Adding `derive!(Format, ...)` after a record's component list (or after a

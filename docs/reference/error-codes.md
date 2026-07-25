@@ -105,6 +105,27 @@ foreach (k, v) in m { println(k + "=" + v) }
 foreach k: String in m.keySet() { println(k) }
 ```
 
+### `E0074` — A law's parameter type cannot be generated
+
+`law` is checked at build time over generated sample values, so every parameter type
+needs a generator. Generatable types are `String`, `Int`, `Long`, `Double`, `Float`,
+`Boolean`, `Short`, `Byte`, and records whose components are all generatable.
+
+```onion
+record Dummy(v: Int)
+  law overArray(xs: Int[]) { xs != null }   // E0074: no generator for Int[]
+```
+
+Anything else — arrays, `Map`, enums, interfaces, or a class with more than one
+constructor — has no generator. Such a law used to be skipped silently, which made it
+indistinguishable from a law that held; a check that cannot run must not look like one
+that passed. Change the parameter type, or remove the law.
+
+```onion
+record Pt(x: Int, y: Int)
+  law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
+```
+
 ## Null-safety errors
 
 ### `E0057` — Type parameter may be null

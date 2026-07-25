@@ -3,6 +3,7 @@ package onion.compiler.verification
 import onion.compiler.{CompiledClass, CompileError, CompilerConfig, OnionClassLoader, SemanticError}
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
+import onion.compiler.toolbox.Message
 
 import java.lang.reflect.{InvocationTargetException, Method, Modifier}
 import scala.collection.mutable.ArrayBuffer
@@ -17,8 +18,9 @@ import scala.collection.mutable.ArrayBuffer
  *
  * A false result or a thrown exception becomes a CompileError (E0065 example / E0064 law),
  * collected and raised as a CompilationException (PipelineRunner turns it into diagnostics).
- * Laws whose parameter types aren't generatable are skipped (MVP). The whole phase is gated
- * on CompilerConfig.checkLaws.
+ * A law whose parameter types aren't generatable is reported as E0074 rather than skipped:
+ * a check that silently does not run is indistinguishable from one that passed, and so is
+ * worse than no check at all. The whole phase is gated on CompilerConfig.checkLaws.
  */
 final class LawCheckPhase(config: CompilerConfig)
     extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
@@ -66,10 +68,12 @@ final class LawCheckPhase(config: CompilerConfig)
     val label = m.getName.substring(ExamplePrefix.length)
     try {
       if (m.invoke(null) != java.lang.Boolean.TRUE)
-        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, s"example '$label' in ${simpleName(cc)} failed: evaluated to false")
+        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc,
+          Message("error.semantic.exampleFailed", label, simpleName(cc)))
     } catch {
       case e: Throwable =>
-        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, s"example '$label' in ${simpleName(cc)} failed: threw ${describe(rootCause(e))}")
+        errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc,
+          Message("error.semantic.exampleThrew", Array[Any](label, simpleName(cc), describe(rootCause(e)))))
     }
   }
 
@@ -78,7 +82,16 @@ final class LawCheckPhase(config: CompilerConfig)
     val label = m.getName.substring(LawPrefix.length)
     val paramTypes = m.getParameterTypes
     val perParam: Array[List[AnyRef]] = paramTypes.map(t => ArgGenerator.generateValues(t, loader).orNull)
-    if (perParam.exists(_ == null)) return // a parameter type isn't generatable — skip this law (MVP)
+    // A law we cannot generate arguments for must not pass silently: skipping it made an
+    // unrunnable law indistinguishable from one that held, which is worse than no law at
+    // all because it produces unearned confidence (issue #346).
+    val ungeneratable = perParam.indexWhere(_ == null)
+    if (ungeneratable >= 0) {
+      errors += err(SemanticError.LAW_PARAMETER_NOT_GENERATABLE.errorCode, cc,
+        Message("error.semantic.lawParameterNotGeneratable",
+          Array[Any](label, simpleName(cc), typeName(paramTypes(ungeneratable)))))
+      return
+    }
     val combos: List[Array[AnyRef]] = if (paramTypes.isEmpty) List(Array.empty[AnyRef]) else argCombos(perParam)
     var done = false
     val it = combos.iterator
@@ -87,15 +100,23 @@ final class LawCheckPhase(config: CompilerConfig)
       val shown = if (args.isEmpty) "(no args)" else args.map(String.valueOf).mkString(", ")
       try {
         if (m.invoke(null, args*) != java.lang.Boolean.TRUE) {
-          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, s"law '$label' in ${simpleName(cc)} falsified by counterexample: ($shown)")
+          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc,
+            Message("error.semantic.lawViolation", Array[Any](label, simpleName(cc), shown)))
           done = true
         }
       } catch {
         case e: Throwable =>
-          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, s"law '$label' in ${simpleName(cc)} threw on ($shown): ${describe(rootCause(e))}")
+          errors += err(SemanticError.LAW_VIOLATION.errorCode, cc,
+            Message("error.semantic.lawThrew", Array[Any](label, simpleName(cc), shown, describe(rootCause(e)))))
           done = true
       }
     }
+  }
+
+  /** A reader-facing name for a parameter type (`int[]`, `Multi`, `Shape`). */
+  private def typeName(t: Class[?]): String = {
+    val n = t.getSimpleName
+    if (n.nonEmpty) n else t.getName
   }
 
   /** Diagonal zip (up to the shortest list) plus a one-at-a-time boundary sweep, capped at N. */

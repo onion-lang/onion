@@ -583,6 +583,28 @@ a string. A reserved keyword immediately followed by a string is **not** a
 scheme literal — `return"x"` re-lexes as `return "x"`, never `return("x")`. An
 undefined prefix is a normal "method not found" error, not a lexer error.
 
+#### Reading a resource through a shape
+
+`file"…"` and `http"…"` expose a fixed menu — `text`, `lines`, `json`, `csv`,
+`csvRows` — so the parse step is chosen by which getter you call and the set of
+things a resource can be read as is closed. `read(shape)` opens it:
+
+```onion
+record Pt(x: Int, y: Int)
+  shape doc = json
+  shape line = re"(-?\d+),(-?\d+)"
+
+val one  = file"point.json".read(Pt::doc())        // Outcome[Pt]
+val many = file"points.txt".eachLine(Pt::line())   // List[Outcome[Pt]]
+val api  = http"https://example.com/p".read(Pt::doc())
+```
+
+Every defect carries the file path or URL, so a failure says *which* resource.
+An unreadable file or a failed request is a defect too, not an exception —
+reading something that might not be there is the ordinary case at a boundary.
+
+The method is `read`, not `as`: `as` is the cast keyword.
+
 ### Pipeline Operator
 
 ```onion

@@ -96,6 +96,7 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 - [コレクション](guide/collections.md) - リスト、マップ、組み込みパイプライン
 - [型クラス](guide/type-classes.md) - `trait`、`instance`、制約付きジェネリクス
 - [Javaとの相互運用](guide/java-interop.md) - Javaライブラリの利用
+- [Shape](guide/shapes.md) - 名前付きの境界: パース・書き戻し・失敗した理由すべて
 - [スクリプティング](guide/scripting.md) - リテラル、derive!、law/example、パイプライン
 
 ## リファレンス

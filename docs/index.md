@@ -96,6 +96,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 - [Collections](guide/collections.md) - Lists, maps, and built-in pipelines
 - [Type Classes](guide/type-classes.md) - `trait`, `instance`, and constrained generics
 - [Java Interoperability](guide/java-interop.md) - Using Java libraries
+- [Shapes](guide/shapes.md) - Named boundaries: parse, print, and every reason a read failed
 - [Scripting](guide/scripting.md) - re""/file"" literals, derive!, law/example, pipelines, auto-CLI
 
 ## Examples

@@ -23,6 +23,75 @@ public final class Cli {
     private Cli() {
     }
 
+    /**
+     * The same parse as {@link #parse}, reporting problems instead of exiting.
+     *
+     * <p>Every failure path in this class used to call {@link System#exit}, which made a
+     * CLI error uncatchable, unrecoverable and untestable in-process -- the specs for this
+     * file say so out loud, and route around it by testing only the happy paths or by
+     * spawning a process. The decision to exit belongs to the entry point, not to argument
+     * parsing, so the logic lives here and {@link #parse} is the thin exiting wrapper the
+     * generated code still uses (issue #353).
+     */
+    public static Outcome<String[]> tryParse(String[] args, String specString) {
+        String[] specs = specString.isEmpty() ? new String[0] : specString.split(",");
+        String[] names = new String[specs.length];
+        char[] kinds = new char[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            String sp = specs[i];
+            if (sp.endsWith("=")) { names[i] = sp.substring(0, sp.length() - 1); kinds[i] = 'v'; }
+            else if (sp.endsWith("?")) { names[i] = sp.substring(0, sp.length() - 1); kinds[i] = 's'; }
+            else { names[i] = sp; kinds[i] = 'p'; }
+        }
+        String[] result = new String[specs.length];
+        List<String> positionals = new ArrayList<>();
+        int i = 0;
+        int argCount = args == null ? 0 : args.length;
+        while (i < argCount) {
+            String a = args[i];
+            if (a.equals("--help") || a.equals("-h")) {
+                return Outcome.bad(Defect.of("--help", "arguments", usageString(names, kinds)));
+            }
+            if (a.startsWith("--")) {
+                String name = a.substring(2);
+                String inlineValue = null;
+                int eq = name.indexOf('=');
+                if (eq >= 0) { inlineValue = name.substring(eq + 1); name = name.substring(0, eq); }
+                int idx = -1;
+                for (int j = 0; j < names.length; j++) {
+                    if (names[j].equals(name) && kinds[j] != 'p') { idx = j; break; }
+                }
+                if (idx < 0) return Outcome.bad(Defect.of(a, "a known option", "unknown"));
+                if (kinds[idx] == 's') {
+                    result[idx] = inlineValue != null ? inlineValue : "true";
+                    i++;
+                } else if (inlineValue != null) {
+                    result[idx] = inlineValue;
+                    i++;
+                } else {
+                    if (i + 1 >= argCount) return Outcome.bad(Defect.of(a, "a value", "nothing"));
+                    result[idx] = args[i + 1];
+                    i += 2;
+                }
+            } else {
+                positionals.add(a);
+                i++;
+            }
+        }
+        int p = 0;
+        List<Defect> problems = new ArrayList<>();
+        for (int j = 0; j < names.length; j++) {
+            if (kinds[j] == 'p') {
+                if (p >= positionals.size()) problems.add(Defect.of(names[j], "an argument", "absent"));
+                else { result[j] = positionals.get(p); p++; }
+            }
+        }
+        if (p < positionals.size()) {
+            problems.add(Defect.of(positionals.get(p), "no further arguments", "an extra argument"));
+        }
+        return problems.isEmpty() ? Outcome.ok(result) : Outcome.bad(problems);
+    }
+
     public static String[] parse(String[] args, String specString) {
         String[] specs = specString.isEmpty() ? new String[0] : specString.split(",");
         String[] names = new String[specs.length];

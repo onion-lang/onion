@@ -10,12 +10,12 @@
 | # | 次元 | 測定方法 | 現在値（2026-07-26） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2445 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 59 / 59 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 5（OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager） | ≥ 5 |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 60 / 60 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 6（LogReport、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 1（[#374](https://github.com/onion-lang/onion/issues/374)） | 0 |
-| 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 13 / 13 | 対等性 + すべてのブロックを検証 |
-| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 74 | よくあるエラーごとに専用コード |
+| 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 14 / 14 | 対等性 + すべてのブロックを検証 |
+| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 77 | よくあるエラーごとに専用コード |
 
 **`SBT_OPTS` は設定しないでください。** 以前のこのファイルは `SBT_OPTS="-Xmx2g"` を薦めて
 いましたが、これは現在プロジェクト既定の 4g を*下げて*しまい、スイートの途中で

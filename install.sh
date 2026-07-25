@@ -77,7 +77,11 @@ if [ "$FROM_SOURCE" = "1" ]; then
   echo ""
   echo "Building onion.jar from source ($SRC_DIR)..."
   (cd "$SRC_DIR" && sbt assembly)
-  JAR_PATH=$(find "$SRC_DIR/target" -name "onion.jar" -path "*scala-*" -not -path "*/dist/*" 2>/dev/null | sort | head -1)
+  # assemblyJarName is "onion-<dynver>.jar" (e.g. onion-0.5.0+3-abcdef12.jar), never
+  # the literal "onion.jar", and old builds from earlier versions can linger in the
+  # same directory, so pick the most recently built match rather than globbing for
+  # a fixed name or trusting alphabetical sort.
+  JAR_PATH=$(ls -t "$SRC_DIR"/target/scala-*/onion-*.jar 2>/dev/null | head -1)
   if [ ! -f "$JAR_PATH" ]; then
     echo "Error: onion.jar not found after build" >&2
     exit 1

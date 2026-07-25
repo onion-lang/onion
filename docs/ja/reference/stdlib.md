@@ -10,7 +10,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
 | **数値** | `Math`, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
-| **データ形式** | `Json`, `Yaml`, `Csv` |
+| **データ形式** | `Json`, `Yaml`, `Csv`, `Config`（ドット記法での設定値アクセス） |
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
 | **関数型** | `Option`, `Result`, `Future` |
 | **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
@@ -367,6 +367,42 @@ val text = Yaml::stringify(obj)               // "name: ko\nage: 3\n"
 ```
 
 scalar の型推論は Json と一致します（`3`→Long、`3.5`→Double、`true`→Boolean、`null`→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、`record ... derive!(Yaml)` の土台になっています。
+
+## Config モジュール
+
+パース済み JSON に対するドット記法アクセスと設定読み込み（`onion.Config`）。内部では `Json::parse` をそのまま使うので、object / array / scalar の形は Json と同じです。YAML や `.env` 形式には対応せず、あくまで JSON とドット区切りパス、環境変数によるオーバーライドを提供します。
+
+```onion
+val config = Config::loadJson("config.json")          // ファイルを読んでパース
+val config2 = Config::parseJson("{\"port\": 8080}")   // JSON 文字列を直接パース
+
+Config::get(config, "database.host")                   // 生の値、見つからなければ null
+Config::getString(config, "database.host", "localhost")
+Config::getInt(config, "database.port", 5432)
+Config::getLong(config, "database.maxConnections", 10L)
+Config::getDouble(config, "database.timeout", 30.0)
+Config::getBoolean(config, "database.ssl", false)
+```
+
+パスはドット区切りで、object と array の両方をたどれます。数字のセグメントは array のインデックスとして扱われます:
+
+```onion
+val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \"Bob\"}]}")
+Config::getString(config, "users.0.name", "unknown")   // "Alice"
+```
+
+キーが見つからない場合・array の添字が範囲外の場合・値を要求された型へ変換できない場合は、例外を投げず指定したデフォルト値にフォールバックします。数値系のゲッターは JSON の数値だけでなく数値文字列も受け付けます。`hasPath` はデフォルト値なしで存在確認だけ行います:
+
+```onion
+Config::hasPath(config, "database.host")   // true / false
+```
+
+環境変数へのアクセスも用意されています。`getEnv` はそのまま環境変数を読み、`getWithEnvOverride` は設定パスを読みつつ、対応する環境変数がセットされていればそちらを優先します（デプロイ時に設定ファイルの値を上書きするのに便利です）:
+
+```onion
+Config::getEnv("PORT", "3000")
+Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
+```
 
 ## Strings モジュール
 

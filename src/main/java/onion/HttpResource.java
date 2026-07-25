@@ -38,6 +38,24 @@ public final class HttpResource {
         return Json.parse(Http.get(url));
     }
 
+    /**
+     * The response body read through {@code shape}.
+     *
+     * <p>Carries the URL into every defect, so a failure says which endpoint returned
+     * something unexpected (issue #353). Named `read` rather than `as`, which is Onion's cast keyword. A transport failure is a defect too.
+     */
+    public <T> Outcome<T> read(Shape<T> shape) {
+        String body;
+        try {
+            body = get();
+        } catch (Exception e) {
+            String m = e.getMessage();
+            return Outcome.bad(Defect.at(Origin.atLine(url, 1), "", "a successful response",
+                m == null || m.isEmpty() ? e.getClass().getSimpleName() : m));
+        }
+        return shape.parse(body, Origin.atLine(url, 1));
+    }
+
     /** POST a body, returning the response body. */
     public String post(String body) throws Exception {
         return Http.post(url, body);

@@ -55,6 +55,48 @@ public final class FileResource {
         return Csv.parseWithHeader(text());
     }
 
+    /**
+     * The file read through {@code shape}.
+     *
+     * <p>The fixed getters above close the set of things a file can be read as -- the
+     * parse step is chosen by which one you call, and a user cannot add to it. A shape
+     * opens that set, and carries this file's path into every defect, so a failure says
+     * *which file* rather than only what was wrong (issue #353). Named `read` rather than `as`, which is Onion's cast keyword.
+     *
+     * <p>An unreadable file is a defect too, not an exception: reading a file that might
+     * not be there is the ordinary case at a boundary.
+     */
+    public <T> Outcome<T> read(Shape<T> shape) {
+        String content;
+        try {
+            content = text();
+        } catch (IOException e) {
+            return Outcome.bad(Defect.at(Origin.atLine(path, 1), "", "a readable file", describe(e)));
+        }
+        return shape.parse(content, Origin.atLine(path, 1));
+    }
+
+    /**
+     * One value per line, keeping both the lines that read and the reasons the rest did
+     * not -- see {@link Shape#eachLine}. Each defect is positioned on its line of this file.
+     */
+    public <T> List<Outcome<T>> eachLine(Shape<T> shape) {
+        String content;
+        try {
+            content = text();
+        } catch (IOException e) {
+            List<Outcome<T>> failed = new java.util.ArrayList<>();
+            failed.add(Outcome.bad(Defect.at(Origin.atLine(path, 1), "", "a readable file", describe(e))));
+            return failed;
+        }
+        return shape.eachLine(content, Origin.atLine(path, 1));
+    }
+
+    private static String describe(Exception e) {
+        String m = e.getMessage();
+        return m == null || m.isEmpty() ? e.getClass().getSimpleName() : m;
+    }
+
     /** Whether the file exists. */
     public boolean exists() {
         return Files.exists(path);

@@ -58,6 +58,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line it failed on (the position `Json.JsonParseException` carries and the `derive!` path
   discarded). An unrecognised format name is **E0076**. `derive!` is unchanged.
 
+- **`file"…".read(shape)` / `.eachLine(shape)`, and the same on `http"…"`.** The resource
+  literals exposed a fixed menu (`text`, `lines`, `json`, `csv`, `csvRows`) where the parse
+  step was chosen by which getter you called, so the set of things a resource could be read
+  as was closed to users. Applying a shape opens it, and carries the path or URL into every
+  defect so a failure says which resource. An unreadable file or a failed request is a
+  defect rather than an exception. (`read`, not `as`: `as` is the cast keyword.)
+
+- **`onion.Cli.tryParse` reports argument errors instead of exiting.** Every failure path in
+  `Cli` called `System.exit`, so a CLI error was uncatchable, unrecoverable and untestable
+  in-process — the specs for that file say so and route around it, covering only the paths
+  that succeed. `tryParse` is the same parse returning an `Outcome`, so the error paths are
+  finally reachable; `parse` remains as the thin exiting wrapper the generated entry point
+  uses, with the exit now in one place rather than seven.
+
 - **New: `onion.Shape` — the data boundary as a value.** A partial, potentially bidirectional
   correspondence between external text and a typed value, with the two laws kept apart: `parse ∘
   print == id` is guaranteed wherever `print` exists, while `print ∘ parse == id` is false in

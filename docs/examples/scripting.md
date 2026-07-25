@@ -169,3 +169,31 @@ println(celsius + "C = " + celsius.celsiusToFahrenheit().rounded(2) + "F")
 - [JSON & HTTP Examples](json-http.md) - Network and data format scripting
 - [Error Handling Examples](error-handling.md) - Validate inputs and handle failures
 - [Tools: Script Runner](../tools/script-runner.md) - Run scripts directly
+
+### Reading a log, and reporting the lines that would not read
+
+`parseAll` drops a malformed line without trace. A shape returns one `Outcome` per
+line, so the rows and the reasons the rest failed are both in hand, with line numbers.
+
+**`LogLines.on`**
+
+```onion
+record Access(ip: String, method: String, path: String, status: Int)
+  shape common = re"(\S+) (\w+) (\S+) (\d+)"
+
+def main(): void {
+  val log = "10.0.0.1 GET /a 200\nbroken line\n10.0.0.2 GET /b 404"
+  val each = Access::common().eachLine(log, Origin::atLine("access.log", 1))
+
+  val rows = Outcome::values(each)
+  val bad = Outcome::defects(each)
+
+  println(rows.size + " read, " + bad.size + " not read")
+  foreach d: Defect in bad {
+    println("  line " + d.origin().line() + ": " + d.expected())
+  }
+
+  val first = rows[0] as Access
+  println(Access::common().print(first))
+}
+```

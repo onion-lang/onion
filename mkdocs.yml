@@ -85,6 +85,7 @@ nav:
           - コレクション: ja/guide/collections.md
           - 型クラス: ja/guide/type-classes.md
           - Javaとの相互運用: ja/guide/java-interop.md
+          - Shape: ja/guide/shapes.md
           - スクリプティング: ja/guide/scripting.md
       - サンプル集:
           - 概要: ja/examples/index.md
@@ -134,6 +135,7 @@ nav:
       - Lambda Expressions: guide/lambda-expressions.md
       - Collections: guide/collections.md
       - Type Classes: guide/type-classes.md
+      - Shapes: guide/shapes.md
       - Scripting: guide/scripting.md
       - Java Interoperability: guide/java-interop.md
   - Examples:

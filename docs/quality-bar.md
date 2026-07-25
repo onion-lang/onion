@@ -12,12 +12,12 @@ had drifted badly enough to be misleading: it recorded 1193 tests against an act
 | # | Dimension | How to measure | Current (2026-07-26) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | Test suite | `sbt -batch -Duser.language=en test` | 2445 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 59 / 59 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 5 (OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager) | ≥ 5 |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 60 / 60 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 6 (LogReport, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 1 ([#374](https://github.com/onion-lang/onion/issues/374)) | 0 |
-| 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 13 / 13 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 74 | every common error has a dedicated code |
+| 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 14 / 14 | parity + all blocks verified |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 77 | every common error has a dedicated code |
 
 **Do not set `SBT_OPTS`.** The previous version of this file recommended
 `SBT_OPTS="-Xmx2g"`, which now *lowers* the heap below the project's own default of 4g and

@@ -169,3 +169,31 @@ println(celsius + "C = " + celsius.celsiusToFahrenheit().rounded(2) + "F")
 - [JSONとHTTPの例](json-http.md) - ネットワークとデータ形式のスクリプト
 - [エラーハンドリングの例](error-handling.md) - 入力の検証と失敗の処理
 - [ツール: スクリプトランナー](../tools/script-runner.md) - スクリプトを直接実行
+
+### ログを読んで、読めなかった行も報告する
+
+`parseAll` は壊れた行を痕跡なく捨てます。shape は行ごとに `Outcome` を返すので、
+読めた行と読めなかった行の両方が、行番号つきで手に入ります。
+
+**`LogLines.on`**
+
+```onion
+record Access(ip: String, method: String, path: String, status: Int)
+  shape common = re"(\S+) (\w+) (\S+) (\d+)"
+
+def main(): void {
+  val log = "10.0.0.1 GET /a 200\nbroken line\n10.0.0.2 GET /b 404"
+  val each = Access::common().eachLine(log, Origin::atLine("access.log", 1))
+
+  val rows = Outcome::values(each)
+  val bad = Outcome::defects(each)
+
+  println(rows.size + " read, " + bad.size + " not read")
+  foreach d: Defect in bad {
+    println("  line " + d.origin().line() + ": " + d.expected())
+  }
+
+  val first = rows[0] as Access
+  println(Access::common().print(first))
+}
+```

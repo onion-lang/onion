@@ -560,6 +560,28 @@ val body = http"https://api.example.com".get() // HttpResource: get/getJson/post
 **なりません** — `return"x"` は `return("x")` ではなく `return "x"` として再字句解析されます。
 未定義の接頭辞は lexer エラーではなく通常の「メソッドが見つかりません」エラーです。
 
+#### shape でリソースを読む
+
+`file"…"` と `http"…"` は `text`、`lines`、`json`、`csv`、`csvRows` という固定の
+メニューを持ち、どのゲッタを呼ぶかでパース方法が決まるため、読み方の集合が閉じています。
+`read(shape)` はこれを開きます。
+
+```onion
+record Pt(x: Int, y: Int)
+  shape doc = json
+  shape line = re"(-?\d+),(-?\d+)"
+
+val one  = file"point.json".read(Pt::doc())        // Outcome[Pt]
+val many = file"points.txt".eachLine(Pt::line())   // List[Outcome[Pt]]
+val api  = http"https://example.com/p".read(Pt::doc())
+```
+
+すべての defect がファイルパスまたは URL を持つので、失敗が*どの*リソースのものか
+分かります。ファイルが読めない、リクエストが失敗した場合も例外ではなく defect です。
+存在しないかもしれないものを読むのは、境界では普通のことだからです。
+
+メソッド名が `as` ではなく `read` なのは、`as` がキャスト用のキーワードだからです。
+
 ### パイプライン演算子
 
 ```onion

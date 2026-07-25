@@ -63,4 +63,87 @@ public interface Shape<T> {
 
     /** A description of what this shape reads, for diagnostics. */
     String describe();
+
+    // ------------------------------------------------------------- combinators
+
+    /**
+     * Reads one value per line, keeping <strong>both</strong> the values and the reasons
+     * the other lines could not be read.
+     *
+     * <p>Each line's defects are positioned on that line, so a failure says which line of
+     * which file. Pair with {@link Outcome#values} and {@link Outcome#defects} to get the
+     * rows and the problems separately:
+     *
+     * <pre>
+     *   List&lt;Outcome&lt;Row&gt;&gt; each = rowShape.eachLine(text, origin);
+     *   List&lt;Row&gt;    rows    = Outcome.values(each);    // the 995 that read
+     *   List&lt;Defect&gt; bad     = Outcome.defects(each);   // the 5 that did not
+     * </pre>
+     *
+     * <p>This is deliberately not an {@code Outcome<List<T>>}: a log file where 995 of
+     * 1000 lines parsed is exactly the case where a partial result is worth having, and
+     * where today's {@code parseAll} returns those 995 rows with no trace that the other
+     * five existed. Use {@link #lines()} when a partial result is meaningless instead.
+     */
+    default java.util.List<Outcome<T>> eachLine(String text, Origin origin) {
+        java.util.List<Outcome<T>> results = new java.util.ArrayList<>();
+        if (text == null) return results;
+        String[] split = text.split("\\r?\\n", -1);
+        // A trailing newline is a line terminator, not an empty final record.
+        int count = (split.length > 0 && split[split.length - 1].isEmpty()) ? split.length - 1 : split.length;
+        String source = origin == null ? "<input>" : origin.source();
+        for (int i = 0; i < count; i++) {
+            results.add(parse(split[i], Origin.atLine(source, i + 1)).onLine(i + 1));
+        }
+        return results;
+    }
+
+    /** {@link #eachLine} against text with no known provenance. */
+    default java.util.List<Outcome<T>> eachLine(String text) {
+        return eachLine(text, Origin.atLine("<input>", 1));
+    }
+
+    /**
+     * One value per line, all or nothing — every bad line's defect is reported together.
+     *
+     * <p>Prints one value per line, so L1 holds for the list as long as it holds for the
+     * element and no printed element contains a newline.
+     */
+    default Shape<java.util.List<T>> lines() {
+        return new LineShape<>(this);
+    }
+
+    /**
+     * Repetition with a literal separator, all or nothing.
+     *
+     * <p>The separator is literal text, not a pattern: a shape describes a correspondence
+     * and a regex separator would have no unique rendering, so {@link #print} could not
+     * exist. Defects are positioned on the element they came from by index rather than by
+     * line, since a separated list need not be laid out one per line.
+     */
+    default Shape<java.util.List<T>> sepBy(String separator) {
+        return new SepByShape<>(this, separator);
+    }
+
+    /**
+     * Transports this shape along an isomorphism.
+     *
+     * <p>Both directions are required: a one-way {@code map} would silently destroy
+     * {@link #print}, which is the asymmetry a bidirectional description has to respect.
+     */
+    default <U> Shape<U> xmap(Function1<T, U> forward, Function1<U, T> backward) {
+        return new XmapShape<>(this, forward, backward);
+    }
+
+    /**
+     * This shape, or {@code other} when it does not read.
+     *
+     * <p>When neither reads, the defects of both are reported: the user is being told
+     * which spellings were tried, and hiding one of them helps nobody. Prints with this
+     * shape.
+     */
+    default Shape<T> orElse(Shape<T> other) {
+        return new OrElseShape<>(this, other);
+    }
 }
+

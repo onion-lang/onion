@@ -7,14 +7,20 @@ Onion provides null safety features inspired by Kotlin, helping you avoid `NullP
 By default, types in Onion cannot hold `null`. To allow `null`, use the `?` suffix:
 
 ```onion
-// Non-nullable: cannot be null
+// Non-nullable: not meant to hold null
 val name: String = "Alice"
-// val name: String = null  // Compile error!
+// val name: String = null  // W0012 warning — see "Null Literal Checking" below
 
 // Nullable: can be null
 val maybeName: String? = null  // OK
 val anotherName: String? = "Bob"  // Also OK
 ```
+
+Assigning the `null` literal to a non-nullable type is a **warning**, not an
+error, so that `null` stays usable where a Java API genuinely accepts it
+(`encodeUrl(null)`) and for `val anything: Object = null`. The trade-off, and
+how to turn it into an error for your own build, is described under
+[Null Literal Checking](#null-literal-checking-w0012).
 
 ### Type Compatibility
 
@@ -347,6 +353,28 @@ The warning covers declarations, assignments, arguments and returns.
 Promote it to an error with `--warn error`, or suppress it with
 `--Wno null-to-non-nullable`. Values coming from Java APIs are not
 checked (their nullness is unknown to the compiler).
+
+### Why a warning and not an error
+
+The value written here is statically known to be `null`, so a later
+dereference is a guaranteed `NullPointerException` — an error would seem
+strictly better. It is a warning because `null` is also a *legitimate* value in
+several places the same check covers:
+
+- Java APIs that accept and handle null (`Http::encodeUrl(null)` returns `""`).
+- `val anything: Object = null`, which is ordinary JVM code.
+- A field or local whose type is a bare type variable `T`, where `null` is the
+  only value available without an instance (see issue #283).
+
+Making it an error was tried and rejected: it broke 23 tests across 12 suites,
+essentially all of them legitimate uses like the above, rather than latent
+NPEs. If your own code has no such cases, `--warn error` gives you the strict
+behavior for your build without imposing it on Java interop.
+
+If you want the strictness only where it matters most, keep `null` out of
+non-nullable *declarations* (`val s: String = null`) — that is the shape that
+turns into a surprise NPE later — and reserve it for arguments to APIs
+documented to accept it.
 
 ## Safe Indexing (`?[]`) and Non-Null Assertion (`!!`)
 

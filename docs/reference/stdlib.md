@@ -927,6 +927,20 @@ Stats::min(xs) / Stats::max(xs)    // 10.0 / 40.0
 Stats::variance(xs) / Stats::stddev(xs)
 ```
 
+These are also reachable as method calls, which is the form most code reaches
+for. **The method form has the same double precision**, so a list of `Int`
+sums to a `Double` — use `Stats::sumInt` when you want an `Int` back:
+
+```onion
+val xs: List[Int] = [10, 20, 30, 40]
+xs.sum()             // 100.0  (Double — the generic aggregate)
+Stats::sumInt(xs)    // 100    (Int)
+```
+
+Type erasure is the reason there is no `Int`-returning `sum()` overload: the
+element type is gone at runtime, so `sum(List[Int])` and `sum(List[Double])`
+would be the same JVM signature.
+
 ## Format Module
 
 Locale-independent human-readable formatting (`onion.Format`) — commas, decimals,

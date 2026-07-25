@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **One broken declaration now reports one error (#333).** `val bad = xs.noSuchMethod()` reported the
+  real error *plus* "local variable bad is not found" for every later use of `bad` — misleading,
+  because `bad` is declared and only its type is unknown, and loud enough to bury the root cause in a
+  real file. A declaration whose initializer fails to type is remembered, and later references to it
+  stay silent. Binding the name at a placeholder type was tried and rejected: it traded this noise
+  for wrong-type noise on the placeholder (`Object.map() is not found`, suggesting `wait`), which is
+  worse for the common case of using the variable as a receiver. A genuinely undeclared name still
+  errors, and each distinct one is still reported.
+
 - **Generic ADT enums (#311).** `enum Opt[T] { case Some(value: T); case Nothing }` was a syntax
   error — `enum` accepted no type parameters — which kept the natural killer app for ADT enums
   (`Option[T]`, `Result[T, E]`) out of reach. Type parameters now flow onto the generated sealed

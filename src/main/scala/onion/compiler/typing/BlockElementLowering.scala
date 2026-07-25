@@ -277,10 +277,18 @@ final class BlockElementLowering(
       }
       if (node.typeRef == null) {
         val inferred = typed(node.init, context).getOrElse(null)
-        if (inferred == null) return new NOP(node.location)
+        if (inferred == null) {
+          // The initializer failed to type (already reported) and there is no
+          // declared type to fall back on, so the name cannot be bound. Remember
+          // it so later references stay silent instead of repeating a misleading
+          // "variable is not found" once per use (issue #333).
+          context.recordFailedDeclaration(node.name)
+          return new NOP(node.location)
+        }
         val inferredType = inferred.`type`
         if (inferredType == BasicType.VOID) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.init, bodyContext.rootClass, inferredType)
+          context.recordFailedDeclaration(node.name)
           return new NOP(node.location)
         }
         typing.checkAndReportShadowing(node.name, node.location, context)

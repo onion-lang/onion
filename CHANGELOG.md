@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A duplicate top-level function definition reported the wrong diagnostic (E0012 fix).**
+  Two top-level `def foo(...)` functions with the same name and parameter types reported
+  "duplicated global variable definition foo." (`error.semantic.duplicatedGlobalVariable`,
+  which only takes one placeholder) instead of the dedicated `duplicatedFunction` message,
+  silently dropping the parameter types from the diagnostic. `SemanticErrorReporter` now maps
+  `SemanticError.DUPLICATE_FUNCTION` (E0012) to `error.semantic.duplicatedFunction`, and both
+  the English and Japanese message templates were fixed to show the parameter types (the
+  Japanese template referenced a nonexistent `{2}` placeholder).
 - **A duplicate `law`/`example` clause name on a record crashed the compiler instead of
   being rejected (internal-error fix, found by the mutation fuzzer).** Two clauses that
   mangle to the same synthesized method — e.g. two `law roundtrip(p: Point) { ... }` on the

@@ -14,6 +14,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future`, `Outcome` + `Defect` (reading external data) |
 | **Positions** | `Origin` (where a value came from, in the text it was read out of) |
+| **Boundaries** | `Shape` + `Shapes` (text <-> typed value), `Scalars` |
 | **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
 | **Testing & timing** | `Assert`, `Timing` |
 
@@ -287,6 +288,43 @@ line back into the whole document.
 o.under("address")     // "city" becomes "address.city"
 o.onLine(40)           // a defect at line 1 of a fragment becomes line 40 of the file
 ```
+
+## Shape
+
+A partial, potentially bidirectional correspondence between external text and a typed
+value. `Shape[T]` reads text into a `T` and — when the correspondence is invertible —
+renders one back.
+
+```onion
+import { onion.Shape; onion.Shapes; onion.Outcome; }
+
+val r = pointShape.parse("3,4")
+if r.isOk() { println(r.get()) }
+println(pointShape.print(pt))
+```
+
+### Two laws, deliberately kept apart
+
+```
+L1  round-trip      parse(print(v)) == Ok(v)     guaranteed wherever print exists
+L2  normalization   print(parse(t)) == t         false in general
+```
+
+L2 fails for ordinary reasons — `"007"` is a perfectly good `Int` that prints back as
+`"7"`. A shape satisfying L2 as well is *lossless*, which is rare and is what a lens
+needs. Most shapes are L1-only, and saying which is the difference between a reversible
+language and one that claims to be.
+
+### canPrint
+
+Not every shape can render. A regex with a `\s+` separator has no unique rendering, so
+the shape is read-only and `canPrint()` says so before `print` is called — rather than
+the method silently not existing.
+
+### Component failures accumulate
+
+Reading two `Int` components out of `"abc,def"` reports **two** defects, not the first
+one. That is what `Outcome`'s accumulating `zip` is for.
 
 ## Function Interfaces
 

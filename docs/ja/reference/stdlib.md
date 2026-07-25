@@ -14,6 +14,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
 | **関数型** | `Option`, `Result`, `Future`, `Outcome`・`Defect`（外部データの読み取り） |
 | **位置情報** | `Origin`（値がどのテキストのどこから来たか） |
+| **境界** | `Shape`・`Shapes`（テキスト↔型付き値）, `Scalars` |
 | **日時・乱数** | `DateTime`, `Rand`（choice/shuffle/sample/uuid） |
 | **テスト・計測** | `Assert`, `Timing` |
 
@@ -202,6 +203,41 @@ println(Outcome::all(os).isOk())     // false
 o.under("address")     // "city" が "address.city" になる
 o.onLine(40)           // 断片の1行目の defect が、ファイルの40行目になる
 ```
+
+## Shape
+
+外部テキストと型付き値の、部分的かつ（可能なら）双方向の対応です。`Shape[T]` はテキストを
+`T` として読み、対応が可逆なら書き戻せます。
+
+```onion
+import { onion.Shape; onion.Shapes; onion.Outcome; }
+
+val r = pointShape.parse("3,4")
+if r.isOk() { println(r.get()) }
+println(pointShape.print(pt))
+```
+
+### 意図的に区別している2つの法則
+
+```
+L1  往復    parse(print(v)) == Ok(v)     print がある限り保証される
+L2  正規化  print(parse(t)) == t         一般には成り立たない
+```
+
+L2 が破れるのはごく普通の理由です——`"007"` は正しい `Int` ですが、書き戻すと `"7"` になります。
+L2 も満たす shape を *lossless* と呼び、これは稀で、lens が必要とするものです。多くの shape は
+L1 のみで、どちらなのかを明言することが「可逆な言語」と「可逆だと主張する言語」の差です。
+
+### canPrint
+
+すべての shape が書き戻せるわけではありません。`\s+` を区切りに使う正規表現には一意な
+書き戻し方が無いため read-only になり、`canPrint()` が `print` を呼ぶ前にそう伝えます——
+メソッドが黙って存在しない、という形にはしません。
+
+### 成分の失敗は蓄積する
+
+`"abc,def"` から `Int` を2つ読むと defect は**2件**報告されます。最初の1件ではありません。
+`Outcome` の蓄積する `zip` はそのためにあります。
 
 ## 関数インターフェース
 

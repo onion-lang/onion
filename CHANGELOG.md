@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reserved only when they are the exact first argument. See the
   [Project CLI guide](https://onion-lang.org/tools/project-cli/) for the full manifest, layout, and
   test conventions.
+- **`install.sh --from-source` now finds the built jar (regression fix).** `assembly /
+  assemblyJarName` has produced `onion-<version>.jar` for a while, never the literal `onion.jar`
+  the installer globbed for, so `--from-source` always failed with "onion.jar not found after
+  build" right after a successful build. The lookup now picks the most recently built
+  `onion-*.jar` under `target/scala-*/`, which also avoids picking up a stale jar from an earlier
+  local build.
 
 ## [0.5.0] - 2026-07-24
 

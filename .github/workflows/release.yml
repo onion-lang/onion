@@ -1,9 +1,25 @@
 name: release
 
+# A release can be started two ways:
+#
+#   * pushing a `v*` tag (the original path), or
+#   * running this workflow manually / via the API with a `version` input.
+#
+# The second path exists because pushing a `v*` tag from a client is rejected
+# with HTTP 403 by the repository's tag protection, which left releases
+# permanently stuck (issue #334). Here the tag is created by the workflow
+# itself, using the Actions token that already holds `contents: write`, so no
+# client-side tag push is involved.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to create, including the leading v (e.g. v0.5.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,16 +28,53 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.version }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          case "$TAG" in
+            v[0-9]*) ;;
+            *) echo "Release tag must start with 'v' followed by a digit: $TAG" >&2; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release tag: $TAG"
       - name: Install sbt
         uses: sbt/setup-sbt@v1
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # sbt-dynver derives the version from the tag history, so the full
+          # history (and existing tags) must be present.
+          fetch-depth: 0
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
           cache: 'sbt'
+      - name: Create the tag for a manual run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists locally; nothing to create."
+          else
+            # Create the tag through the API rather than `git push`, so this
+            # path does not depend on the client being allowed to push refs.
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/$TAG" \
+              -f "sha=${GITHUB_SHA}"
+            git fetch --tags --force
+          fi
+          # sbt-dynver reads the checked-out commit's tags, so point HEAD at
+          # the tag we just created before resolving the version.
+          git checkout -q "$TAG"
       - name: Resolve version
         id: version
         run: |
@@ -34,7 +87,7 @@ jobs:
           echo "resolved version: $VERSION"
       - name: Verify tag matches version
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.tag.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           # Strip leading 'v' from tag for comparison
           TAG_VERSION="${TAG#v}"
@@ -67,13 +120,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          TAG="${{ steps.tag.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           PRERELEASE=""
-          case "${GITHUB_REF_NAME}" in
+          case "$TAG" in
             *-M*|*-RC*|*-rc*|*-alpha*|*-beta*) PRERELEASE="--prerelease" ;;
           esac
-          gh release create "${GITHUB_REF_NAME}" $PRERELEASE \
-            --title "Onion ${GITHUB_REF_NAME}" \
+          gh release create "$TAG" $PRERELEASE \
+            --title "Onion ${TAG}" \
             --generate-notes \
             release-artifacts/onion-${VERSION}.jar \
             release-artifacts/onion-dist-${VERSION}.zip \

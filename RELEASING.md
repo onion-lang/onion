@@ -23,13 +23,32 @@ is no manual `version := ...` line to update in `build.sbt`.
    Add a new section for the release with the date and a summary of user-facing
    changes, bug fixes, and internal improvements.
 
-4. **Create and push a tag.**
+4. **Start the release.**
+
+   Preferred — let the release workflow create the tag. Pushing a `v*` tag from
+   a client is rejected by the repository's tag protection (HTTP 403), which is
+   what left releases stuck for months (issue #334), so the workflow creates the
+   tag itself with the Actions token:
+
+   ```bash
+   gh workflow run release.yml -f version=v0.2.0 --ref develop
+   gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+   ```
+
+   The tag-push path still works for anyone whose credentials are allowed to
+   create `v*` refs:
+
    ```bash
    git checkout develop
    git pull
    git tag -a v0.2.0 -m "Release v0.2.0"
    git push origin v0.2.0
    ```
+
+   Do **not** commit a `## [X.Y.Z]` CHANGELOG heading before the tag exists: if
+   the release then fails, the heading has to be reverted, which is exactly the
+   release-and-revert loop #334 describes. Confirm the release first, then
+   finalize the heading.
 
 5. **Let CI do the rest.**
    The [release workflow](.github/workflows/release.yml) will:

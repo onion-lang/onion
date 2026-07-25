@@ -181,6 +181,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         // one record per case (+ singleton statics). A homogeneous enum has no
         // `case` constants and falls through to `otherwise`, untouched.
         desugarAdtEnum(declaration).foreach { top => newToplevels += rewriteToplevelDeclaration(top) }
+      case declaration: AST.EnumDeclaration if declaration.typeParameters.nonEmpty =>
+        // A homogeneous enum compiles to a java.lang.Enum, which the JVM does
+        // not allow to be generic. The grammar accepts the type parameters so
+        // this can say why instead of failing as a bare syntax error (#311).
+        throw new CompilationException(Seq(CompileError("", declaration.location,
+          s"enum ${declaration.name} cannot take type parameters; only an ADT enum (one with `case` cases) is generic, " +
+            "because a plain enum becomes a java.lang.Enum and the JVM forbids a generic enum")))
       case element: AST.BlockElement =>
         // Top-level statements need desugaring too (do-notation et al.);
         // they previously passed through untouched, so a DoExpression
@@ -235,7 +242,24 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         s"enum $enumName mixes shared parameters with `case` cases; ADT enums carry per-case fields only")))
     }
 
-    val enumTypeNode = AST.TypeNode(loc, AST.ReferenceType(enumName, false), false)
+    // A generic ADT enum (`enum Opt[T] { case Some(value: T); case Nothing }`)
+    // carries its parameters onto every generated declaration: the sealed
+    // interface becomes `Opt[T]`, each case record becomes `Some[T]`, and each
+    // case's implemented supertype becomes `Opt[T]` rather than a raw `Opt`
+    // (#311). Without the applied supertype the record would implement the raw
+    // type, which E0066 forbids.
+    val typeParams = enumDecl.typeParameters
+    val enumTypeNode =
+      if (typeParams.isEmpty) AST.TypeNode(loc, AST.ReferenceType(enumName, false), false)
+      else
+        AST.TypeNode(
+          loc,
+          AST.ParameterizedType(
+            AST.ReferenceType(enumName, false),
+            typeParams.map(tp => AST.ReferenceType(tp.name, false))
+          ),
+          false
+        )
 
     // Interface methods: the enum body sections' methods become interface members
     // verbatim (bodies preserved -> default methods; bodiless -> abstract).
@@ -250,14 +274,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // resolution (the name `Origin` already denotes the record type), so `new Origin()`
     // is the first-cut construction form (see the class notes / final report).
     val interfaceDecl = AST.InterfaceDeclaration(
-      loc, enumDecl.modifiers | AST.M_SEALED, enumName, Nil, bodyMethods, Nil
+      loc, enumDecl.modifiers | AST.M_SEALED, enumName, Nil, bodyMethods, typeParams
     )
 
     // One record per case; singleton -> zero-field record. All implement the enum.
     val recordDecls: List[AST.RecordDeclaration] = enumDecl.constants.filter(_.isCase).map { c =>
       val fields = c.caseFields.getOrElse(Nil)
       AST.recordDeclaration(
-        loc, AST.M_PUBLIC, c.name, Nil, fields, List(enumTypeNode),
+        loc, AST.M_PUBLIC, c.name, typeParams, fields, List(enumTypeNode),
         null, Nil, Nil, Nil, Nil
       )
     }

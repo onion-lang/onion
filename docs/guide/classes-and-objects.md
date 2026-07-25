@@ -463,3 +463,24 @@ case, so exhaustiveness (`E0042`) and `select` pattern matching come for free.
 A `case`-style enum is a sealed hierarchy rather than a `java.lang.Enum`, so it
 does not get `values()`/`valueOf()`/`ordinal()` — use the plain constant form
 above when you want those.
+
+Because it is a sealed hierarchy, a `case`-style enum can take type parameters,
+which is what makes `Option`-shaped types expressible:
+
+```onion
+enum Opt[T] {
+  case Some(value: T)
+  case Nothing
+}
+
+def describe(o: Opt[String]): String = select o {
+  case s is Some:    "some: " + s.value()   // s is a Some[String] here
+  case n is Nothing: "none"
+}
+```
+
+The parameters flow onto the generated interface and every case record, and a
+type pattern recovers the scrutinee's type argument — matching `Some` out of an
+`Opt[String]` binds `Some[String]`, so `s.value()` is a `String` rather than the
+bare `T`. The plain constant form cannot take type parameters: it compiles to a
+`java.lang.Enum`, which the JVM does not allow to be generic.

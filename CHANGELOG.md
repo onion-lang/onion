@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Generic ADT enums (#311).** `enum Opt[T] { case Some(value: T); case Nothing }` was a syntax
+  error — `enum` accepted no type parameters — which kept the natural killer app for ADT enums
+  (`Option[T]`, `Result[T, E]`) out of reach. Type parameters now flow onto the generated sealed
+  interface and every case record, including each case's implemented supertype (`Opt[T]`, not a raw
+  `Opt`). A *homogeneous* enum still cannot take them, and says why: it compiles to a
+  `java.lang.Enum`, which the JVM forbids from being generic.
+- **A type pattern recovers the scrutinee's type argument.** Matching `Some` out of an `Opt[String]`
+  now binds `Some[String]`, so `s.value()` is a `String` rather than the bare type variable `T`. This
+  applies to any parameterized sealed hierarchy, not just enums, so the hand-written `sealed
+  interface Box[T]` + `record Full[T](..) <: Box[T]` form gets it too. Exhaustiveness checking works
+  over generic hierarchies as well — a parameterized scrutinee previously skipped the sealed check
+  entirely, so a `select` missing a case compiled and returned null at runtime.
+
 - **A type pattern nests inside a destructuring pattern (#299).** `case Add(l, n is Num)` was a
   syntax error, even though a type pattern worked at the top level of a `case` and record patterns
   already nested — so `is` was the one pattern form that could not nest. It now can, and the nested

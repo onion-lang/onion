@@ -390,6 +390,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.abstractMethodWithBody",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.MAP_NOT_DIRECTLY_ITERABLE -> ErrorDef(
+      "error.semantic.mapNotDirectlyIterable",
+      Seq(items => typeName(items(0)))
+    ),
     SemanticError.LABEL_NOT_FOUND -> ErrorDef(
       "error.semantic.labelNotFound",
       Seq(items => asString(items(0)))
@@ -460,21 +464,39 @@ class SemanticErrorReporter(threshold: Int) {
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+      } else if (fieldNamed(targetType, name)) {
+        // `p.name()` where `name` is a field, not a method -- a common mix-up
+        // with record component accessors (which really are methods). A
+        // name-similarity hint would uselessly suggest the same spelling, so
+        // point at the parentheses instead.
+        Some(format(message("suggestion.fieldNotMethod"), Seq(name)))
       } else {
         val candidates = targetType match
-          case obj: TypedAST.ObjectType => obj.methods.map(_.name).distinct.toSeq
+          case obj: TypedAST.ObjectType =>
+            (obj.methods.map(_.name) ++ obj.fields.map(_.name)).distinct.toSeq
           case _ => Seq.empty
         toolbox.Suggestions.formatSuggestion(name, candidates)
       }
     problem(position, appendSuggestion(baseMessage, suggestion))
   }
 
+  private def fieldNamed(targetType: TypedAST.Type, name: String): Boolean =
+    targetType match
+      case obj: TypedAST.ObjectType => obj.fields.exists(_.name == name)
+      case _ => false
+
   private def reportFieldNotFound(position: Location, items: Array[AnyRef]): Unit = {
     val targetType = items(0).asInstanceOf[TypedAST.Type]
     val name = asString(items(1))
     val baseMessage = format(message("error.semantic.fieldNotFound"), Seq(typeName(targetType), name))
+    // A no-argument method is reachable with the same paren-less syntax as a
+    // field (`xs.size`), so it is a valid fix for a misremembered field name --
+    // `xs.length` on a List should suggest `size` even though List has no
+    // fields at all. Without the methods here the candidate list was often
+    // empty and the user got no guidance.
     val candidates = targetType match
-      case obj: TypedAST.ObjectType => obj.fields.map(_.name).distinct.toSeq
+      case obj: TypedAST.ObjectType =>
+        (obj.fields.map(_.name) ++ obj.methods.filter(_.arguments.isEmpty).map(_.name)).distinct.toSeq
       case _ => Seq.empty
     val suggestion = toolbox.Suggestions.formatSuggestion(name, candidates)
     problem(position, appendSuggestion(baseMessage, suggestion))

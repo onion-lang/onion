@@ -89,6 +89,22 @@ No method matches the call.  If a method with the same name exists but the argum
 
 No constructor matches the arguments.  The compiler lists available constructors.
 
+### `E0073` — Map cannot be iterated directly
+
+`foreach` walks an array or something with an `iterator()`; a `Map` has neither.
+
+```onion
+val m = ["a": 1]
+foreach k: String in m { println(k) }   // E0073
+```
+
+Iterate the entries with the destructuring form, or pick a view:
+
+```onion
+foreach (k, v) in m { println(k + "=" + v) }
+foreach k: String in m.keySet() { println(k) }
+```
+
 ## Null-safety errors
 
 ### `E0057` — Type parameter may be null

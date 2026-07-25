@@ -132,6 +132,14 @@ final class BlockElementLowering(
                 )
               )
             new StatementBlock(init, block)
+          } else if (isMapType(collection.`type`)) {
+            // `foreach x: T in aMap` otherwise failed with "method
+            // Map[K, V].iterator() is not found", which leaks the desugaring and
+            // names a method the user never wrote. The `(k, v)` form is
+            // desugared to an entrySet() walk by the parser, so only the bare
+            // form reaches here -- exactly the case worth guiding.
+            bodyContext.report(MAP_NOT_DIRECTLY_ITERABLE, node.collection, collection.`type`)
+            new NOP(node.location)
           } else {
             val iteratorType = bodyContext.load("java.util.Iterator")
             val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
@@ -610,6 +618,13 @@ final class BlockElementLowering(
 
   private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
     body.findMethod(node, target, name)
+
+  /** True when the value is a java.util.Map (which has no iterator()). */
+  private def isMapType(tp: Type): Boolean =
+    bodyContext.load("java.util.Map") match {
+      case mapType: ObjectType => TypeRules.isSuperType(mapType, tp)
+      case _ => false
+    }
 
   private def indexref(bind: ClosureLocalBinding, value: Term): Term =
     new RefArray(new RefLocal(bind), value)

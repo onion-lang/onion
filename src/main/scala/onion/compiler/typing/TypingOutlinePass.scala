@@ -167,12 +167,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         val superType = validateSuperType(typeSpec, mustBeInterface = true, mapper_)
         if (superType != null) {
           interfaces += superType
-          // Register this record as a subtype of sealed interfaces
-          superType match {
-            case classDef: ClassDefinition if classDef.isSealed =>
-              classDef.addSealedSubtype(definition_)
-            case _ =>
-          }
+          // Register this record as a subtype of sealed interfaces. A generic
+          // record implements a *parameterization* of the interface
+          // (`record Some[T](..) <: Opt[T]`), which is an AppliedClassType, so
+          // the raw class has to be unwrapped or the subtype goes unregistered
+          // and exhaustiveness silently passes any select over it (#311).
+          sealedOwnerOf(superType).foreach(_.addSealedSubtype(definition_))
         }
       }
     }
@@ -631,6 +631,22 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     loop(start, Set.empty)
   }
 
+  /**
+   * The sealed class a supertype reference names, if any. A generic supertype
+   * is an `AppliedClassType` (`Opt[T]`) whose sealedness lives on the raw
+   * class, so it has to be unwrapped before the check.
+   */
+  private def sealedOwnerOf(parent: ClassType): Option[ClassDefinition] = {
+    val raw = parent match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
+    raw match {
+      case parentDef: ClassDefinition if parentDef.isSealed => Some(parentDef)
+      case _ => None
+    }
+  }
+
   private def validateSuperType(node: AST.TypeNode, mustBeInterface: Boolean, mapper: NameResolver): ClassType = {
     if (node == null) {
       return if (mustBeInterface) null else table_.rootClass
@@ -703,10 +719,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // Register this class/interface as a subtype of any sealed parent so the
         // `select` exhaustiveness check sees it. (Record subtypes are registered
         // separately in processRecordDeclaration.)
-        def registerSealedParent(parent: ClassType): Unit = parent match {
-          case parentDef: ClassDefinition if parentDef.isSealed => parentDef.addSealedSubtype(node)
-          case _ =>
-        }
+        def registerSealedParent(parent: ClassType): Unit =
+          sealedOwnerOf(parent).foreach(_.addSealedSubtype(node))
         registerSealedParent(superClass)
         interfaces.foreach(registerSealedParent)
         node.setResolutionComplete(true)

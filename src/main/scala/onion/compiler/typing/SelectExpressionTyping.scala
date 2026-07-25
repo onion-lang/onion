@@ -157,7 +157,16 @@ final class SelectExpressionTyping(
     // Exhaustiveness check for sealed types
     var isExhaustive = hasWildcardPattern // Wildcard pattern makes the match exhaustive
     if (node.elseBlock == null && !hasWildcardPattern) {
-      condition.`type` match {
+      // A parameterized scrutinee (`Opt[String]`) is an AppliedClassType, not a
+      // ClassDefinition, so without unwrapping it here a generic sealed
+      // hierarchy silently skipped the exhaustiveness check -- and a select
+      // that covered every case was then not treated as exhaustive, which
+      // surfaced as E0020 "this method cannot return value" (#311).
+      val conditionClass: Type = condition.`type` match {
+        case applied: AppliedClassType => applied.raw
+        case other => other
+      }
+      conditionClass match {
         case classDef: ClassDefinition if classDef.isSealed =>
           // Extract matched types from caseBindingData, excluding guarded patterns
           // (guarded patterns can fail at runtime, so they don't guarantee exhaustiveness)
@@ -420,11 +429,16 @@ final class SelectExpressionTyping(
           break((null, NoBindings, false, None))
         }
 
-        // Create instanceof check
+        // Create instanceof check. The check itself is on the erased class:
+        // the JVM has no type arguments at runtime, so `x is Some` can only
+        // test membership of `Some`.
         val instanceOfCheck = new InstanceOf(new RefLocal(bind), mappedType.asInstanceOf[ObjectType])
 
-        // Store type pattern info (name and type) - variable will be registered later
-        bindingInfo = SingleBinding(name, mappedType)
+        // Store type pattern info (name and type) - variable will be registered later.
+        // The *binding* can be more precise than the check: matching a
+        // `Some` out of an `Opt[String]` binds `Some[String]`, recovered from
+        // the scrutinee's type arguments (#311).
+        bindingInfo = SingleBinding(name, specializeFromScrutinee(mappedType, conditionType))
 
         instanceOfCheck
 
@@ -545,7 +559,14 @@ final class SelectExpressionTyping(
    * Used for exhaustiveness checking of sealed types.
    */
   private def isSubtypeMatch(matched: Type, sealedSubtype: ClassType): Boolean = {
-    matched match {
+    // A type pattern over a generic hierarchy binds a parameterization
+    // (`Some[String]`), while the sealed subtype list holds raw classes -- so
+    // compare on the raw class (#311).
+    val matchedRaw = matched match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
+    matchedRaw match {
       case matchedClassType: ClassType =>
         // Match by name (most common case) or check subtype relationship
         matchedClassType.name == sealedSubtype.name || TypeRules.isSuperType(matchedClassType, sealedSubtype)
@@ -597,6 +618,50 @@ final class SelectExpressionTyping(
       case None =>
         typeBlockExpression(thenBlock, context, expected)
     }
+  }
+
+  /**
+   * Recover the matched case's type arguments from the scrutinee's.
+   *
+   * `case x is Some` names a class, not a parameterization, so the pattern
+   * alone binds the raw `Some` and its components come back as bare type
+   * variables. When the scrutinee is a parameterization the arguments are
+   * already known: matching `Some` out of an `Opt[String]` must bind
+   * `Some[String]`, so `x.value()` is a `String` rather than `T` (#311).
+   *
+   * The case's own view of the scrutinee's class (`Some[T] <: Opt[T]`) is
+   * unified against the scrutinee (`Opt[String]`), which solves the case's
+   * parameters. Anything not solved that way -- no generics involved, an
+   * unparameterized scrutinee, a variable left free -- keeps the raw type, so
+   * this only ever adds precision.
+   */
+  private def specializeFromScrutinee(matched: Type, scrutinee: Type): Type = (matched, scrutinee) match {
+    case (raw: ClassType, applied: AppliedClassType)
+      if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty =>
+      val solved = scala.collection.mutable.HashMap[String, Type]()
+      val paramNames = raw.typeParameters.map(_.name).toSet
+
+      def unify(formal: Type, actual: Type): Unit = formal match {
+        case tv: TypeVariableType if paramNames.contains(tv.name) =>
+          if (!solved.contains(tv.name)) solved += tv.name -> actual
+        case fa: AppliedClassType =>
+          actual match {
+            case aa: AppliedClassType
+              if TypeRelations.sameClass(fa.raw, aa.raw) && fa.typeArguments.length == aa.typeArguments.length =>
+              fa.typeArguments.zip(aa.typeArguments).foreach((f, a) => unify(f, a))
+            case _ =>
+          }
+        case _ =>
+      }
+
+      AppliedTypeViews.collectAppliedViewsFrom(raw)
+        .collectFirst { case (viewRaw, view) if TypeRelations.sameClass(viewRaw, applied.raw) => view }
+        .foreach(view => unify(view, applied))
+
+      if (raw.typeParameters.forall(tp => solved.contains(tp.name)))
+        AppliedClassType(raw, raw.typeParameters.map(tp => solved(tp.name)).toList)
+      else matched
+    case _ => matched
   }
 
   private def ensureBoolean(node: AST.Node, term: Term): Term =

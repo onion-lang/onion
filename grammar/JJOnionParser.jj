@@ -1597,10 +1597,15 @@ AST.EnumDeclaration enum_decl(int mset) : {
   AST.EnumConstant constant;
   AST.AccessSection sec;
   List<AST.Argument> params = (List<AST.Argument>)AST.NIL();
+  List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   ArrayBuffer<AST.EnumConstant> constants = new ArrayBuffer<AST.EnumConstant>();
   ArrayBuffer<AST.AccessSection> sections = new ArrayBuffer<AST.AccessSection>();
 }{
-  start = "enum" name = id() ["(" params = args() ")"] "{"
+  // Type parameters make sense only for an ADT (`case`) enum, which desugars to
+  // a sealed interface + records; a homogeneous enum becomes a java.lang.Enum,
+  // which cannot be generic. Accepted here and rejected in Rewriting so the
+  // message can say why rather than being a bare syntax error.
+  start = "enum" name = id() [tparams=type_params()] ["(" params = args() ")"] "{"
   (
     // Scala-3-style HETEROGENEOUS (ADT) enum: one-or-more `case`-keyword cases,
     // each carrying its OWN record-style fields (or none, for a singleton). No
@@ -1623,7 +1628,7 @@ AST.EnumDeclaration enum_decl(int mset) : {
   )
   "}" [";"] {
     return new AST.EnumDeclaration(
-      p(start), mset, c(name), params, toList(constants), toList(sections)
+      p(start), mset, c(name), params, toList(constants), toList(sections), tparams
     );
   }
 }

@@ -359,5 +359,5 @@ object AST {
     EnumConstant(location, name, Nil, Some(fields))
 
   /** An enum type declaration */
-  case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant], sections: List[AccessSection] = Nil) extends TypeDeclaration
+  case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant], sections: List[AccessSection] = Nil, typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration
 }

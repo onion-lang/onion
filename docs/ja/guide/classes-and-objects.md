@@ -200,6 +200,27 @@ enum は case ごとに `record` を持つ `sealed interface` に desugar され
 `values()`/`valueOf()`/`ordinal()` は付きません。それらが必要なときは上の定数形式を
 使ってください。
 
+sealed 階層であるがゆえに、`case` 形式の enum は型パラメータを取れます。
+`Option` 相当の型が書けるのはこのためです。
+
+```onion
+enum Opt[T] {
+  case Some(value: T)
+  case Nothing
+}
+
+def describe(o: Opt[String]): String = select o {
+  case s is Some:    "some: " + s.value()   // ここでの s は Some[String]
+  case n is Nothing: "none"
+}
+```
+
+型パラメータは生成される interface と各 case の record に引き継がれます。また型
+パターンはスクルーティニーの型引数を復元するので、`Opt[String]` から `Some` を
+マッチすると `Some[String]` に束縛され、`s.value()` は裸の `T` ではなく `String` に
+なります。定数形式の enum は型パラメータを取れません（`java.lang.Enum` になり、
+JVM がジェネリックな enum を許さないためです）。
+
 ## ジェネリッククラス
 
 クラスは `[]` で型パラメータを取れます。型パラメータは本体で通常の型として使えます：

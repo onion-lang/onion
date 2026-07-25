@@ -6772,7 +6772,7 @@
 <tbody>
 <tr>
 <td><strong>I/O &amp; system</strong></td>
-<td><code>IO</code> (console), <code>Files</code> (files + paths), <code>System</code>, <code>Proc</code> (subprocesses), <code>Args</code> (CLI)</td>
+<td><code>IO</code> (console), <code>Files</code> (files + paths), <code>System</code>, <code>Proc</code> (subprocesses), <code>Args</code> (CLI), <code>Http</code> (HTTP client)</td>
 </tr>
 <tr>
 <td><strong>Collections</strong></td>
@@ -7151,13 +7151,13 @@ rather than polling <code>isFailure()</code>.</p>
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>val f2: Future[Int] = Future::successful(2)
 </span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>
 </span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>// Zip into tuple-like array
-</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>f1.zip(f2)  // Future[Object[]] = [1, 2]
+</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>f1.zip(f2)  // Future[List[Object]] = [1, 2]
 </span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>
 </span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a>// Race: first to complete wins
 </span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a>f1.race(f2)
 </span><span id="__span-36-9"><a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a>
 </span><span id="__span-36-10"><a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a>// Wait for all
-</span><span id="__span-36-11"><a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a>Future::all(f1, f2, f3)  // Future[Object[]] = [1, 2, 3]
+</span><span id="__span-36-11"><a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a>Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
 </span><span id="__span-36-12"><a id="__codelineno-36-12" name="__codelineno-36-12" href="#__codelineno-36-12"></a>
 </span><span id="__span-36-13"><a id="__codelineno-36-13" name="__codelineno-36-13" href="#__codelineno-36-13"></a>// First to complete
 </span><span id="__span-36-14"><a id="__codelineno-36-14" name="__codelineno-36-14" href="#__codelineno-36-14"></a>Future::first(f1, f2, f3)
@@ -7193,7 +7193,7 @@ rather than polling <code>isFailure()</code>.</p>
 </span></code></pre></div>
 <h3 id="randshuffle">Rand::shuffle<a class="headerlink" href="#randshuffle" title="Permanent link">&para;</a></h3>
 <p>Shuffle an array, returning a shuffled list:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>val cards: String[] = new String[]{&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>val cards: List[String] = [&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;]
 </span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>val shuffled: List[String] = Rand::shuffle(cards)
 </span></code></pre></div>
 <h2 id="assert-module">Assert Module<a class="headerlink" href="#assert-module" title="Permanent link">&para;</a></h2>
@@ -7243,7 +7243,7 @@ rather than polling <code>isFailure()</code>.</p>
 </span></code></pre></div>
 <h2 id="strings-module">Strings Module<a class="headerlink" href="#strings-module" title="Permanent link">&para;</a></h2>
 <p>String utilities (<code>onion.Strings</code>, auto-imported):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>Strings::split(&quot;a,b,c&quot;, &quot;,&quot;)          // String[] {&quot;a&quot;,&quot;b&quot;,&quot;c&quot;}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>Strings::split(&quot;a,b,c&quot;, &quot;,&quot;)          // List[String] [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
 </span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>Strings::join(parts, &quot;-&quot;)             // arrays or Lists
 </span><span id="__span-50-3"><a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 </span><span id="__span-50-4"><a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>Strings::replace(s, &quot;a&quot;, &quot;b&quot;) / Strings::replaceRegex(s, &quot;[0-9]+&quot;, &quot;#&quot;)
@@ -7262,7 +7262,7 @@ rather than polling <code>isFailure()</code>.</p>
 </span><span id="__span-52-3"><a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>Strings::truncate(&quot;hello world&quot;, 8, &quot;...&quot;)   // &quot;hello...&quot;
 </span><span id="__span-52-4"><a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>Strings::center(&quot;hi&quot;, 6, &#39;*&#39;)            // &quot;**hi**&quot;
 </span><span id="__span-52-5"><a id="__codelineno-52-5" name="__codelineno-52-5" href="#__codelineno-52-5"></a>Strings::ifBlank(&quot;   &quot;, &quot;default&quot;)       // &quot;default&quot;
-</span><span id="__span-52-6"><a id="__codelineno-52-6" name="__codelineno-52-6" href="#__codelineno-52-6"></a>Strings::words(&quot;  a  b  c &quot;)             // String[] {&quot;a&quot;,&quot;b&quot;,&quot;c&quot;}
+</span><span id="__span-52-6"><a id="__codelineno-52-6" name="__codelineno-52-6" href="#__codelineno-52-6"></a>Strings::words(&quot;  a  b  c &quot;)             // List[String] [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
 </span><span id="__span-52-7"><a id="__codelineno-52-7" name="__codelineno-52-7" href="#__codelineno-52-7"></a>Strings::chars(&quot;abc&quot;)                    // List [&quot;a&quot;,&quot;b&quot;,&quot;c&quot;]
 </span></code></pre></div>
 <p>Null-safe parsing (return <code>null</code>/fallback instead of throwing):</p>
@@ -7273,7 +7273,7 @@ rather than polling <code>isFailure()</code>.</p>
 <h2 id="files-module">Files Module<a class="headerlink" href="#files-module" title="Permanent link">&para;</a></h2>
 <p>File I/O (<code>onion.Files</code>):</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>Files::readText(&quot;path.txt&quot;)            // whole file as String
-</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>Files::readLines(&quot;path.txt&quot;)           // String[]
+</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>Files::readLines(&quot;path.txt&quot;)           // List[String]
 </span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>Files::writeText(&quot;out.txt&quot;, content)
 </span><span id="__span-54-4"><a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>Files::readBytes(path) / Files::writeBytes(path, bytes)
 </span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a>Files::list(&quot;dir&quot;)                     // List of entry names
@@ -7489,21 +7489,22 @@ sizes and durations.</p>
 <p>HTTP client utilities (uses Java 11+ HttpClient).</p>
 <h3 id="get-requests">GET Requests<a class="headerlink" href="#get-requests" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-76-1"><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>Http::get(url): String
-</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>Http::get(url, headers): String    // headers: [&quot;Key1&quot;, &quot;Value1&quot;, ...]
+</span><span id="__span-76-2"><a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>Http::get(url, headers): String    // headers: [&quot;Name1&quot;, &quot;Value1&quot;, ...]
 </span></code></pre></div>
 <h3 id="post-requests">POST Requests<a class="headerlink" href="#post-requests" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-77-1"><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a>Http::post(url, body): String
 </span><span id="__span-77-2"><a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
-</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>Http::post(url, body, headers): String
+</span><span id="__span-77-3"><a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>Http::post(url, body, headers): String   // headers: as for get
 </span></code></pre></div>
 <h3 id="other-methods">Other Methods<a class="headerlink" href="#other-methods" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-78-1"><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a>Http::put(url, body): String
 </span><span id="__span-78-2"><a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>Http::delete(url): String
 </span></code></pre></div>
 <h3 id="url-utilities">URL Utilities<a class="headerlink" href="#url-utilities" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>Http::urlEncode(str): String
-</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>Http::urlDecode(str): String
-</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>Http::buildQuery(params): String    // params: [&quot;key1&quot;, &quot;val1&quot;, ...]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-79-1"><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a>Http::encodeUrl(str): String
+</span><span id="__span-79-2"><a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>Http::decodeUrl(str): String
+</span><span id="__span-79-3"><a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>Http::buildQuery(params): String        // params: alternating keys and values
+</span><span id="__span-79-4"><a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>Http::buildUrl(baseUrl, params): String // appends &quot;?&quot;/&quot;&amp;&quot; + buildQuery(params)
 </span></code></pre></div>
 <h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-80-1"><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a>val response: String = Http::get(&quot;https://api.example.com/data&quot;);
@@ -7583,18 +7584,18 @@ sizes and durations.</p>
 </span><span id="__span-89-2"><a id="__codelineno-89-2" name="__codelineno-89-2" href="#__codelineno-89-2"></a>Regex::find(input, pattern): Boolean      // Pattern found anywhere
 </span></code></pre></div>
 <h3 id="extraction">Extraction<a class="headerlink" href="#extraction" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-90-1"><a id="__codelineno-90-1" name="__codelineno-90-1" href="#__codelineno-90-1"></a>Regex::findAll(input, pattern): String[]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-90-1"><a id="__codelineno-90-1" name="__codelineno-90-1" href="#__codelineno-90-1"></a>Regex::findAll(input, pattern): List[String]
 </span><span id="__span-90-2"><a id="__codelineno-90-2" name="__codelineno-90-2" href="#__codelineno-90-2"></a>Regex::findFirst(input, pattern): String
-</span><span id="__span-90-3"><a id="__codelineno-90-3" name="__codelineno-90-3" href="#__codelineno-90-3"></a>Regex::groups(input, pattern): String[]       // First match groups
-</span><span id="__span-90-4"><a id="__codelineno-90-4" name="__codelineno-90-4" href="#__codelineno-90-4"></a>Regex::groupsAll(input, pattern): String[][]  // All matches groups
+</span><span id="__span-90-3"><a id="__codelineno-90-3" name="__codelineno-90-3" href="#__codelineno-90-3"></a>Regex::groups(input, pattern): List[String]   // First match groups
+</span><span id="__span-90-4"><a id="__codelineno-90-4" name="__codelineno-90-4" href="#__codelineno-90-4"></a>Regex::groupsAll(input, pattern): List[List[String]]  // All matches groups
 </span></code></pre></div>
 <h3 id="replacement">Replacement<a class="headerlink" href="#replacement" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-91-1"><a id="__codelineno-91-1" name="__codelineno-91-1" href="#__codelineno-91-1"></a>Regex::replace(input, pattern, replacement): String
 </span><span id="__span-91-2"><a id="__codelineno-91-2" name="__codelineno-91-2" href="#__codelineno-91-2"></a>Regex::replaceFirst(input, pattern, replacement): String
 </span></code></pre></div>
 <h3 id="splitting">Splitting<a class="headerlink" href="#splitting" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-92-1"><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a>Regex::split(input, pattern): String[]
-</span><span id="__span-92-2"><a id="__codelineno-92-2" name="__codelineno-92-2" href="#__codelineno-92-2"></a>Regex::split(input, pattern, limit): String[]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-92-1"><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a>Regex::split(input, pattern): List[String]
+</span><span id="__span-92-2"><a id="__codelineno-92-2" name="__codelineno-92-2" href="#__codelineno-92-2"></a>Regex::split(input, pattern, limit): List[String]
 </span></code></pre></div>
 <h3 id="utility">Utility<a class="headerlink" href="#utility" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-93-1"><a id="__codelineno-93-1" name="__codelineno-93-1" href="#__codelineno-93-1"></a>Regex::quote(literal): String    // Escape special characters
@@ -7602,7 +7603,7 @@ sizes and durations.</p>
 </span></code></pre></div>
 <h3 id="example_2">Example<a class="headerlink" href="#example_2" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-94-1"><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a>val text: String = &quot;Email: alice@example.com, bob@test.org&quot;;
-</span><span id="__span-94-2"><a id="__codelineno-94-2" name="__codelineno-94-2" href="#__codelineno-94-2"></a>val emails: String[] = Regex::findAll(text, &quot;[\\w.]+@[\\w.]+&quot;);
+</span><span id="__span-94-2"><a id="__codelineno-94-2" name="__codelineno-94-2" href="#__codelineno-94-2"></a>val emails: List[String] = Regex::findAll(text, &quot;[\\w.]+@[\\w.]+&quot;);
 </span><span id="__span-94-3"><a id="__codelineno-94-3" name="__codelineno-94-3" href="#__codelineno-94-3"></a>// [&quot;alice@example.com&quot;, &quot;bob@test.org&quot;]
 </span><span id="__span-94-4"><a id="__codelineno-94-4" name="__codelineno-94-4" href="#__codelineno-94-4"></a>
 </span><span id="__span-94-5"><a id="__codelineno-94-5" name="__codelineno-94-5" href="#__codelineno-94-5"></a>val masked: String = Regex::replace(text, &quot;@[\\w.]+&quot;, &quot;@***&quot;);

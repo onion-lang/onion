@@ -6,7 +6,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 | 領域 | モジュール |
 |------|-----------|
-| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI） |
+| **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI）, `Http`（HTTPクライアント） |
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
 | **数値** | `Math`, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
@@ -675,6 +675,71 @@ Colls::sortedBy(people) { p => p.age() }
 // map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
 // xs.map { x => x * 2 }.filter { x => x > 0 }
 ```
+
+## Http
+
+HTTPクライアントユーティリティ（Java 11+ の HttpClient を使用）。
+
+### GET リクエスト
+
+```
+Http::get(url): String
+Http::get(url, headers): String
+```
+
+`headers` は名前と値を交互に並べたフラットな `String[]` です。**配列である必要があり**、
+リストリテラル（`["Key1", "Value1"]`）は `List` になるためこのオーバーロードには
+一致しません。
+
+```onion
+val headers: String[] = new String[]{"Accept", "application/json"}
+```
+
+### POST リクエスト
+
+```
+Http::post(url, body): String
+Http::postJson(url, jsonBody): String    // Content-Type: application/json を設定
+Http::post(url, body, headers): String   // headers は get と同じく String[]
+```
+
+### その他のメソッド
+
+```
+Http::put(url, body): String
+Http::delete(url): String
+```
+
+### URL ユーティリティ
+
+```
+Http::encodeUrl(str): String
+Http::decodeUrl(str): String
+Http::buildQuery(params): String        // params: キーと値を交互に並べる
+Http::buildUrl(baseUrl, params): String // "?"/"&" + buildQuery(params) を付加
+```
+
+上のヘッダー引数とは異なり、`buildQuery` と `buildUrl` は `String[]` と `List` の
+**どちらも**受け付けるので、リストリテラルも使えます。
+
+```onion
+Http::buildQuery(new String[]{"q", "hello world"})
+Http::buildQuery(["q", "hello world"])
+```
+
+### 例
+
+```
+val response: String = Http::get("https://api.example.com/data");
+val data: Object = Json::parse(response);
+
+val postResponse: String = Http::postJson(
+  "https://api.example.com/users",
+  "{\"name\": \"Bob\"}"
+);
+```
+
+---
 
 ## DateTime
 

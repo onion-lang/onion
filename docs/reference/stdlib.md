@@ -6,7 +6,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 
 | Area | Modules |
 |------|---------|
-| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI), `Http` (HTTP client) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
 | **Numbers** | `Math`, `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
@@ -1015,7 +1015,15 @@ HTTP client utilities (uses Java 11+ HttpClient).
 
 ```
 Http::get(url): String
-Http::get(url, headers): String    // headers: ["Key1", "Value1", ...]
+Http::get(url, headers): String
+```
+
+`headers` is a flat `String[]` of alternating names and values. It must be an
+array, not a list literal — `["Key1", "Value1"]` builds a `List` and does not
+match this overload:
+
+```onion
+val headers: String[] = new String[]{"Accept", "application/json"}
 ```
 
 ### POST Requests
@@ -1023,7 +1031,7 @@ Http::get(url, headers): String    // headers: ["Key1", "Value1", ...]
 ```
 Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
-Http::post(url, body, headers): String
+Http::post(url, body, headers): String   // headers: String[], as for get
 ```
 
 ### Other Methods
@@ -1036,9 +1044,18 @@ Http::delete(url): String
 ### URL Utilities
 
 ```
-Http::urlEncode(str): String
-Http::urlDecode(str): String
-Http::buildQuery(params): String    // params: ["key1", "val1", ...]
+Http::encodeUrl(str): String
+Http::decodeUrl(str): String
+Http::buildQuery(params): String        // params: alternating keys and values
+Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
+```
+
+Unlike the header parameters above, `buildQuery` and `buildUrl` accept **either**
+a `String[]` or a `List`, so a list literal works here:
+
+```onion
+Http::buildQuery(new String[]{"q", "hello world"})
+Http::buildQuery(["q", "hello world"])
 ```
 
 ### Example

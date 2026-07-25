@@ -116,6 +116,17 @@ invariants like `parse ∘ format == id` stop being checked.
 onionc --no-check-laws MyProgram.on
 ```
 
+### `--law-seed <n>` / `--law-samples <n>`
+
+Control how `law` clauses are sampled. A falsified law reports the settings that
+produced its counterexample, so the run can be repeated exactly; raising the sample
+count widens the search for others.
+
+```bash
+onionc --law-samples 500 MyProgram.on
+onionc --law-seed 7 MyProgram.on
+```
+
 ## Examples
 
 ### Basic Compilation

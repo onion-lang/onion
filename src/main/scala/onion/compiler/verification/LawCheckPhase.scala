@@ -25,7 +25,7 @@ import scala.collection.mutable.ArrayBuffer
 final class LawCheckPhase(config: CompilerConfig)
     extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
 
-  private val N = 40
+  private val N = config.lawSamples
   private val ExamplePrefix = "onion$$example$$"
   private val LawPrefix = "onion$$law$$"
 
@@ -81,7 +81,8 @@ final class LawCheckPhase(config: CompilerConfig)
     m.setAccessible(true)
     val label = m.getName.substring(LawPrefix.length)
     val paramTypes = m.getParameterTypes
-    val perParam: Array[List[AnyRef]] = paramTypes.map(t => ArgGenerator.generateValues(t, loader).orNull)
+    val perParam: Array[List[AnyRef]] =
+      paramTypes.map(t => ArgGenerator.generateValues(t, loader, config.lawSamples, config.lawSeed).orNull)
     // A law we cannot generate arguments for must not pass silently: skipping it made an
     // unrunnable law indistinguishable from one that held, which is worse than no law at
     // all because it produces unearned confidence (issue #346).
@@ -101,17 +102,24 @@ final class LawCheckPhase(config: CompilerConfig)
       try {
         if (m.invoke(null, args*) != java.lang.Boolean.TRUE) {
           errors += err(SemanticError.LAW_VIOLATION.errorCode, cc,
-            Message("error.semantic.lawViolation", Array[Any](label, simpleName(cc), shown)))
+            Message("error.semantic.lawViolation", Array[Any](label, simpleName(cc), shown, seedNote)))
           done = true
         }
       } catch {
         case e: Throwable =>
           errors += err(SemanticError.LAW_VIOLATION.errorCode, cc,
-            Message("error.semantic.lawThrew", Array[Any](label, simpleName(cc), shown, describe(rootCause(e)))))
+            Message("error.semantic.lawThrew", Array[Any](label, simpleName(cc), shown, describe(rootCause(e)), seedNote)))
           done = true
       }
     }
   }
+
+  /**
+   * How to reproduce -- and how to widen -- the run that produced a counterexample.
+   * Without it the sample set is an unnamed constant and a failure cannot be re-derived.
+   */
+  private def seedNote: String =
+    s"--law-seed ${config.lawSeed} --law-samples ${config.lawSamples}"
 
   /** A reader-facing name for a parameter type (`int[]`, `Multi`, `Shape`). */
   private def typeName(t: Class[?]): String = {

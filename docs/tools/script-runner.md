@@ -100,6 +100,15 @@ Do not execute a record's `law` / `example` clauses.
 onion --no-check-laws MyScript.on
 ```
 
+### `--law-seed <n>` / `--law-samples <n>`
+
+Control how `law` clauses are sampled; a falsified law reports the settings that
+produced its counterexample.
+
+```bash
+onion --law-samples 500 MyScript.on
+```
+
 ## Program Arguments
 
 Arguments after the source file(s) are passed to your program:

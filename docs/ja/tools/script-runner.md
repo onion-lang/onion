@@ -100,6 +100,14 @@ onion --Wno W0001,unused-parameter MyScript.on
 onion --no-check-laws MyScript.on
 ```
 
+### `--law-seed <n>` / `--law-samples <n>`
+
+`law` のサンプル生成を制御します。反例が出たときは、それを生んだ設定がメッセージに出ます。
+
+```bash
+onion --law-samples 500 MyScript.on
+```
+
 ## プログラム引数
 
 ソースファイルの後ろに指定した引数は、プログラムに渡されます。

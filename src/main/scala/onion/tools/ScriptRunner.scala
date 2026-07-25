@@ -15,6 +15,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
+import onion.compiler.verification.ArgGenerator
 import onion.tools.option._
 
 /**
@@ -144,13 +145,16 @@ object ScriptRunner {
   private final val WARN_LEVEL: String = "--warn"
   private final val SUPPRESS_WARNINGS: String = "--Wno"
   private final val NO_CHECK_LAWS: String = "--no-check-laws"
+  private final val LAW_SEED: String = "--law-seed"
+  private final val LAW_SAMPLES: String = "--law-samples"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_MAX_ERROR: Int = 10
   /** Runner options that take a value (their value is skipped when locating the script file). */
   private final val VALUE_OPTIONS: Set[String] = Set(
     CLASSPATH, SCRIPT_SUPER_CLASS, ENCODING, MAX_ERROR,
-    PROFILE_FORMAT, PROFILE_OUTPUT, WARN_LEVEL, SUPPRESS_WARNINGS
+    PROFILE_FORMAT, PROFILE_OUTPUT, WARN_LEVEL, SUPPRESS_WARNINGS,
+    LAW_SEED, LAW_SAMPLES
   )
 }
 
@@ -168,7 +172,9 @@ class ScriptRunner {
     conf(PROFILE_OUTPUT, true),
     conf(WARN_LEVEL, true),
     conf(SUPPRESS_WARNINGS, true),
-    conf(NO_CHECK_LAWS, false)
+    conf(NO_CHECK_LAWS, false),
+    conf(LAW_SEED, true),
+    conf(LAW_SAMPLES, true)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -238,6 +244,8 @@ class ScriptRunner {
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
          |  --no-check-laws             Do not execute record `law`/`example` clauses
+         |  --law-seed <n>              RNG seed for law sample generation
+         |  --law-samples <n>           Number of samples generated per law parameter
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -278,9 +286,22 @@ class ScriptRunner {
       dumpAst = dumpAst,
       dumpTypedAst = dumpTypedAst,
       compileProfile = profile,
-      checkLaws = !option.get(NO_CHECK_LAWS).contains(NoValuedParam)
+      checkLaws = !option.get(NO_CHECK_LAWS).contains(NoValuedParam),
+      lawSeed = longParam(option, LAW_SEED, ArgGenerator.DefaultSeed),
+      lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples)
     ))
   }
+
+
+  /** A positive integer option, falling back to `default` when absent or unparsable. */
+  private def intParam(option: Map[String, CommandLineParam], name: String, default: Int): Int =
+    option.get(name).collect { case ValuedParam(v) => v }
+      .flatMap(v => v.toIntOption).filter(_ > 0).getOrElse(default)
+
+  /** A long option, falling back to `default` when absent or unparsable. */
+  private def longParam(option: Map[String, CommandLineParam], name: String, default: Long): Long =
+    option.get(name).collect { case ValuedParam(v) => v }
+      .flatMap(v => v.toLongOption).getOrElse(default)
 
   private def parseCompileProfile(option: Map[String, CommandLineParam]): Option[CompileProfileSettings] = {
     val enabled = option.get(PROFILE_COMPILE).contains(NoValuedParam)

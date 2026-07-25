@@ -116,6 +116,16 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 onionc --no-check-laws MyProgram.on
 ```
 
+### `--law-seed <n>` / `--law-samples <n>`
+
+`law` のサンプル生成を制御します。law が反例で否定されたときは、その反例を生んだ設定が
+メッセージに出るので、同じ実行を再現できます。サンプル数を増やせば別の反例を探せます。
+
+```bash
+onionc --law-samples 500 MyProgram.on
+onionc --law-seed 7 MyProgram.on
+```
+
 ## 例
 
 ### 基本的なコンパイル

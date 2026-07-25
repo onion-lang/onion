@@ -2129,14 +2129,19 @@ AST.Pattern simple_pattern() :{
 | e=term() { return new AST.ExpressionPattern(e); }
 }
 
-// Patterns allowed inside destructuring: binding name, wildcard, or nested destructuring
+// Patterns allowed inside destructuring: binding name, wildcard, a nested
+// destructuring, or a nested type pattern (`Add(l, n is Num)`). The type-pattern
+// alternative mirrors simple_pattern()'s, so `is` nests the same way a
+// constructor pattern already does.
 AST.Pattern destructuring_field_pattern() :{
-  Token t; List<AST.Pattern> bindings;
+  Token t; List<AST.Pattern> bindings; AST.TypeNode ty;
 }{
   LOOKAHEAD({getToken(1).kind == ID && getToken(1).image.equals("_")})
   t=<ID> { return new AST.WildcardPattern(p(t)); }
 | LOOKAHEAD(2, id() "(")
   t=id() "(" bindings=destructuring_bindings() ")" { return new AST.DestructuringPattern(p(t), c(t), bindings); }
+| LOOKAHEAD(2, id() "is")
+  t=id() "is" ty=type() { return new AST.TypePattern(p(t), c(t), ty); }
 | t=<ID> { return new AST.BindingPattern(p(t), c(t)); }
 }
 

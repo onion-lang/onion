@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A type pattern nests inside a destructuring pattern (#299).** `case Add(l, n is Num)` was a
+  syntax error, even though a type pattern worked at the top level of a `case` and record patterns
+  already nested — so `is` was the one pattern form that could not nest. It now can, and the nested
+  binding is usable at the *narrowed* type (`n.v()` resolves because `n` is a `Num`, not the declared
+  `E`). This also covers the case that had no clean workaround: narrowing a component whose declared
+  type is not a record (`case Wrap(s is String)`), which a nested constructor pattern cannot express.
+
 - **A not-found member now points at the member that exists.** Three everyday mistakes produced
   errors the compiler already had the answer to. `xs.length` on a `List` reported "field
   List[Int].length is not found" with no suggestion at all, because only *fields* were considered as

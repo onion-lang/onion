@@ -375,6 +375,7 @@ These are frequently confused with other languages. **Always check these:**
 | `else if condition { }` | ✓ correct - `else if` chains are supported (also as expressions) |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `case s: String:` (Java/Scala pattern) | `case s is String:` - type patterns use `is`; sealed exhaustiveness (E0042) applies |
+| `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
 | `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |

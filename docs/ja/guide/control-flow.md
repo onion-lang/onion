@@ -40,6 +40,29 @@ else: handleOther()
 }
 ```
 
+パターンは入れ子にできます。型パターンも同様で、成分をその場で絞り込んで
+絞り込んだ型のまま使えます。
+
+```onion
+sealed interface E {}
+record Num(v: Int) <: E
+record Add(l: E, r: E) <: E
+record Wrap(x: Object)
+
+select e {
+  case Add(l, n is Num): println("added " + n.v())  // ここでの n は Num
+  case Add(l, r):        println("added something else")
+  case n is Num:         println("just " + n.v())
+}
+
+// 成分の宣言型がレコードでない場合にも使えます
+// （入れ子のコンストラクタパターンでは表現できないケース）
+select w {
+  case Wrap(s is String): println(s.toUpperCase())
+  case Wrap(o):           println("not a string")
+}
+```
+
 sealed な階層に対しては網羅性が検査されます（漏れは E0042）。
 
 ## break / continue

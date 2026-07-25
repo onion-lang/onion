@@ -266,6 +266,29 @@ select shape {
 }
 ```
 
+Patterns nest, including type patterns, so a component can be narrowed in
+place and used at the narrowed type:
+
+```onion
+sealed interface E {}
+record Num(v: Int) <: E
+record Add(l: E, r: E) <: E
+record Wrap(x: Object)
+
+select e {
+  case Add(l, n is Num): println("added " + n.v())  // n is a Num here
+  case Add(l, r):        println("added something else")
+  case n is Num:         println("just " + n.v())
+}
+
+// Works for a component whose declared type is not a record, which a
+// nested constructor pattern cannot express:
+select w {
+  case Wrap(s is String): println(s.toUpperCase())
+  case Wrap(o):           println("not a string")
+}
+```
+
 When the matched value's type is a `sealed` interface, the compiler
 checks exhaustiveness (E0042) and lists any uncovered subtypes — an
 `else` branch is unnecessary once every case is handled.

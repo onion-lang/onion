@@ -516,9 +516,15 @@ public class JJOnionParser implements Parser {
 
   /*
    * convenience method to create a Location
+   *
+   * The token's extent becomes the location's span, so a diagnostic anchored here
+   * underlines the whole token instead of its first character. Location has carried
+   * endLine/endColumn from the start and DiagnosticRenderer has known how to draw a
+   * range, but nothing ever set them -- every caret in every real diagnostic was a
+   * single '^' (issue #347).
    */
   private static Location p(Token t) {
-    return new Location(t.beginLine, t.beginColumn);
+    return new Location(t.beginLine, t.beginColumn).withSpan(t.endLine, t.endColumn);
   }
 
   /*

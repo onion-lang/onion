@@ -618,16 +618,33 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     diagnostic
   }
 
-  private def locationToRange(location: onion.compiler.Location, content: String): Range = {
+  private[lsp] def locationToRange(location: onion.compiler.Location, content: String): Range = {
     val line = if (location != null) Math.max(0, location.line - 1) else 0
     val lineText = getLineAt(content, line)
     // `location.column` is 1-based and TAB-EXPANDED (JavaCC SimpleCharStream,
     // tabSize 8); convert it to a 0-based character index into `lineText` so
     // diagnostics land on the right token on tab-indented lines (issue #293).
     val column = if (location != null) charColumnFromExpanded(lineText, location.column) else 0
-    val (start, end) = tokenRangeAt(lineText, column)
+    // Prefer the extent the parser recorded. Scanning outward for identifier characters
+    // is right for an identifier and wrong for a literal, an operator or a keyword, and
+    // it cannot know where a multi-character construct ends -- it was only ever a
+    // stand-in for a span the compiler did not supply (issue #347).
+    val (start, end) = spanRange(location, lineText) match {
+      case Some(range) => range
+      case None        => tokenRangeAt(lineText, column)
+    }
     new Range(new Position(line, start), new Position(line, end))
   }
+
+  /** The parser-recorded extent as 0-based character indices, when it has one on this line. */
+  private def spanRange(location: onion.compiler.Location, lineText: String): Option[(Int, Int)] =
+    if (location == null || !location.hasSpan || !location.endLine.contains(location.line)) None
+    else {
+      val start = charColumnFromExpanded(lineText, location.column)
+      // endColumn is inclusive; an LSP range end is exclusive.
+      val end = charColumnFromExpanded(lineText, location.endColumn.get + 1)
+      if (end > start) Some((start, end)) else None
+    }
 
   /** Maps a 1-based tab-expanded column (tabSize 8) to a 0-based character index. */
   private def charColumnFromExpanded(lineText: String, expandedColumn1Based: Int): Int = {

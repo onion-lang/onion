@@ -77,11 +77,11 @@ final class LawCheckPhase(config: CompilerConfig)
     try {
       if (m.invoke(null) != java.lang.Boolean.TRUE)
         errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, index, Some(m.getName),
-          Message("error.semantic.exampleFailed", label, simpleName(cc)))
+          Message("error.semantic.exampleFailedFalse", Array[Any](label, simpleName(cc))))
     } catch {
       case e: Throwable =>
         errors += err(SemanticError.EXAMPLE_FAILED.errorCode, cc, index, Some(m.getName),
-          Message("error.semantic.exampleThrew", Array[Any](label, simpleName(cc), describe(rootCause(e)))))
+          Message("error.semantic.exampleFailedThrew", Array[Any](label, simpleName(cc), describe(rootCause(e)))))
     }
   }
 
@@ -110,7 +110,7 @@ final class LawCheckPhase(config: CompilerConfig)
       try {
         if (m.invoke(null, args*) != java.lang.Boolean.TRUE) {
           errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, index, Some(m.getName),
-            Message("error.semantic.lawViolation", Array[Any](label, simpleName(cc), shown, seedNote)))
+            Message("error.semantic.lawFalsified", Array[Any](label, simpleName(cc), shown, seedNote)))
           done = true
         }
       } catch {

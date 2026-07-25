@@ -41,7 +41,11 @@ private[compiler] final class MethodResolutionSupport(
         structuralMatch(argsWithTypeParams(idx), params(idx).`type`, methodTypeParams)
       else
         isAssignableWithBoxing(expected(idx), params(idx).`type`) ||
-          TypeRules.emptyCollectionLiteralAccepts(expected(idx), params(idx))
+          TypeRules.emptyCollectionLiteralAccepts(expected(idx), params(idx)) ||
+          (expected(idx) match {
+            case bt: BasicType => ConstantNarrowing.constantIntOf(params(idx)).exists(v => ConstantNarrowing.fits(bt, v))
+            case _ => false
+          })
 
     if method.isVararg && expected.nonEmpty then
       val fixedArgCount = expected.length - 1

@@ -15,7 +15,7 @@ had drifted badly enough to be misleading: it recorded 1193 tests against an act
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 60 / 60 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 6 (LogReport, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
-| 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 1 ([#374](https://github.com/onion-lang/onion/issues/374)) | 0 |
+| 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 14 / 14 | parity + all blocks verified |
 | 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 77 | every common error has a dedicated code |
 
@@ -56,13 +56,16 @@ A feature counts as covered once it runs inside at least one large sample
 
 ## Row 5 — currently open usability bugs (tracked)
 
-1. **Constant narrowing does not reach constructor arguments.** `val b: Byte = 100`
-   narrows, but `new R(..., -3)` against a `Short` component is `E0021`
-   ("constructor applicable for R(..., Int) is not found") and needs `(-3 as Short)`.
-   Found while writing `ScalarConversionSpec`; it will be hit again by anything that
-   builds a record out of parsed components. ([#374](https://github.com/onion-lang/onion/issues/374))
+None open.
 
 Previously tracked and resolved:
 
 1. **Primitive-type extensions** — fixed. `extension Int { def double(): Int = self * 2 }` and `(5).double()` now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.
 2. **Top-level function called from a class method** — fixed. Top-level `val`/`var` and functions are emitted as static members of the synthetic top-level class, and bare identifiers / unqualified calls in class methods fall back to these static members.
+3. **Constant narrowing does not reach constructor arguments.** `val b: Byte = 100`
+   narrows, but `new R(..., -3)` against a `Short` component was `E0021`
+   ("constructor applicable for R(..., Int) is not found") and needed `(-3 as Short)`.
+   Fixed for constructors ([#374](https://github.com/onion-lang/onion/issues/374)); the same
+   gap in ordinary method/function overload resolution (`takesShort(-3)` against a
+   `Short` parameter, reported as `E0005`) was found and fixed alongside it — both now
+   share the `ConstantNarrowing` helper.

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Constant narrowing now reaches ordinary method/function call arguments.** `val b: Byte = 100`
+  and, since v0.7.0, `new R(..., -3)` against a `Short`/`Byte` component both narrow an
+  in-range integer literal — but `takesShort(-3)` against a plain `def takesShort(x: Short)`
+  still reported `E0005` ("method applicable ... is not found") and needed an explicit
+  `(-3 as Short)` cast. Method overload resolution (`MethodResolutionSupport.applicable`)
+  checked only boxing-aware assignability, never the `ConstantNarrowing` helper that
+  constructor resolution and plain assignment already use. Added the same fallback check
+  there, so a literal that fits a narrow integral parameter's range is accepted at any call
+  site, not just constructors. `docs/quality-bar.md` row 5 ("known usability bugs") is
+  updated to reflect that #374's underlying gap is now fully closed.
+
 ## [0.8.0] - 2026-07-25
 
 - **README rewritten around what Onion is for.** It opened with "an object-oriented and

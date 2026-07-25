@@ -34,5 +34,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs PrimitivePrint.on") {
       assert(Shell.Success(0) == runSample("run/PrimitivePrint.on"))
     }
+
+    it("runs RecordLaws.on") {
+      assert(Shell.Success("ok") == runSample("run/RecordLaws.on"))
+    }
   }
 }

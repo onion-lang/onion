@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`law`/`example` compile-time check failures (E0064/E0065) are now bilingual.** `LawCheckPhase`
+  built these two diagnostics as hardcoded English string interpolation instead of going through
+  the `errorMessage`/`errorMessage_ja` resource bundles like every other error, so a Japanese
+  locale never got a translated message for a falsified law or a failed example. Added the message
+  keys to both bundles and switched the phase to format through `toolbox.Message`.
+
 ## [0.6.0] - 2026-07-25
 
 - **Fixed wrong `Http` method names in the stdlib docs (en/ja).** `docs/reference/stdlib.md`

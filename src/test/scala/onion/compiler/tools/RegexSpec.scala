@@ -77,8 +77,8 @@ class RegexSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val matches: String[] = Regex::findAll("a1b2c3", "[0-9]");
-            |    return matches.length.toString();
+            |    val matches: List[String] = Regex::findAll("a1b2c3", "[0-9]");
+            |    return matches.size.toString();
             |  }
             |}
             |""".stripMargin,
@@ -134,7 +134,7 @@ class RegexSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val groups: String[] = Regex::groups("John:25", "([a-zA-Z]+):([0-9]+)");
+            |    val groups: List[String] = Regex::groups("John:25", "([a-zA-Z]+):([0-9]+)");
             |    return groups[1] + "-" + groups[2];
             |  }
             |}
@@ -208,8 +208,8 @@ class RegexSpec extends AbstractShellSpec {
             |public:
             |  static def main(args: String[]): String {
             |    // "a1b2c3" split by "[0-9]" gives ["a", "b", "c"] (trailing empty dropped)
-            |    val parts: String[] = Regex::split("a1b2c3d", "[0-9]");
-            |    return parts.length.toString();
+            |    val parts: List[String] = Regex::split("a1b2c3d", "[0-9]");
+            |    return parts.size.toString();
             |  }
             |}
             |""".stripMargin,
@@ -226,7 +226,7 @@ class RegexSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val parts: String[] = Regex::split("a-b-c-d", "-");
+            |    val parts: List[String] = Regex::split("a-b-c-d", "-");
             |    return parts[0] + "," + parts[1] + "," + parts[2] + "," + parts[3];
             |  }
             |}

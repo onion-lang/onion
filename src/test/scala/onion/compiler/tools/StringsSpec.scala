@@ -12,8 +12,8 @@ class StringsSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val parts: String[] = Strings::split("a,b,c", ",");
-            |    return parts.length.toString();
+            |    val parts: List[String] = Strings::split("a,b,c", ",");
+            |    return parts.size.toString();
             |  }
             |}
             |""".stripMargin,
@@ -30,7 +30,7 @@ class StringsSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val parts: String[] = new String[]{"x", "y", "z"};
+            |    val parts: List[String] = ["x", "y", "z"];
             |    return Strings::join(parts, "-");
             |  }
             |}

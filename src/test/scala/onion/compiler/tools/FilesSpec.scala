@@ -41,8 +41,8 @@ class FilesSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val lines: String[] = Files::readLines("$path");
-            |    return lines.length.toString();
+            |    val lines: List[String] = Files::readLines("$path");
+            |    return lines.size.toString();
             |  }
             |}
             |""".stripMargin,
@@ -160,7 +160,7 @@ class FilesSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val parts: String[] = new String[]{"dir1", "dir2", "file.txt"};
+            |    val parts: List[String] = ["dir1", "dir2", "file.txt"];
             |    val joined: String = Files::joinPath(parts);
             |    // Check that it contains the file name
             |    if (joined.endsWith("file.txt")) {

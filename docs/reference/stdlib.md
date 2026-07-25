@@ -520,13 +520,13 @@ val f1: Future[Int] = Future::successful(1)
 val f2: Future[Int] = Future::successful(2)
 
 // Zip into tuple-like array
-f1.zip(f2)  // Future[Object[]] = [1, 2]
+f1.zip(f2)  // Future[List[Object]] = [1, 2]
 
 // Race: first to complete wins
 f1.race(f2)
 
 // Wait for all
-Future::all(f1, f2, f3)  // Future[Object[]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
 
 // First to complete
 Future::first(f1, f2, f3)
@@ -583,7 +583,7 @@ val percent: Int = Rand::nextInt(100)     // 0 to 99
 Shuffle an array, returning a shuffled list:
 
 ```onion
-val cards: String[] = new String[]{"A", "B", "C", "D"}
+val cards: List[String] = ["A", "B", "C", "D"]
 val shuffled: List[String] = Rand::shuffle(cards)
 ```
 
@@ -665,7 +665,7 @@ val timeNanos: Long = Timing::time(() -> { return expensiveOperation(); })
 String utilities (`onion.Strings`, auto-imported):
 
 ```onion
-Strings::split("a,b,c", ",")          // String[] {"a","b","c"}
+Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -690,7 +690,7 @@ Strings::removeSuffix("running", "ing")  // "runn"
 Strings::truncate("hello world", 8, "...")   // "hello..."
 Strings::center("hi", 6, '*')            // "**hi**"
 Strings::ifBlank("   ", "default")       // "default"
-Strings::words("  a  b  c ")             // String[] {"a","b","c"}
+Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
 ```
 
@@ -708,7 +708,7 @@ File I/O (`onion.Files`):
 
 ```onion
 Files::readText("path.txt")            // whole file as String
-Files::readLines("path.txt")           // String[]
+Files::readLines("path.txt")           // List[String]
 Files::writeText("out.txt", content)
 Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
@@ -1015,15 +1015,7 @@ HTTP client utilities (uses Java 11+ HttpClient).
 
 ```
 Http::get(url): String
-Http::get(url, headers): String
-```
-
-`headers` is a flat `String[]` of alternating names and values. It must be an
-array, not a list literal — `["Key1", "Value1"]` builds a `List` and does not
-match this overload:
-
-```onion
-val headers: String[] = new String[]{"Accept", "application/json"}
+Http::get(url, headers): String    // headers: ["Name1", "Value1", ...]
 ```
 
 ### POST Requests
@@ -1031,7 +1023,7 @@ val headers: String[] = new String[]{"Accept", "application/json"}
 ```
 Http::post(url, body): String
 Http::postJson(url, jsonBody): String    // Sets Content-Type: application/json
-Http::post(url, body, headers): String   // headers: String[], as for get
+Http::post(url, body, headers): String   // headers: as for get
 ```
 
 ### Other Methods
@@ -1048,14 +1040,6 @@ Http::encodeUrl(str): String
 Http::decodeUrl(str): String
 Http::buildQuery(params): String        // params: alternating keys and values
 Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
-```
-
-Unlike the header parameters above, `buildQuery` and `buildUrl` accept **either**
-a `String[]` or a `List`, so a list literal works here:
-
-```onion
-Http::buildQuery(new String[]{"q", "hello world"})
-Http::buildQuery(["q", "hello world"])
 ```
 
 ### Example
@@ -1174,10 +1158,10 @@ Regex::find(input, pattern): Boolean      // Pattern found anywhere
 ### Extraction
 
 ```
-Regex::findAll(input, pattern): String[]
+Regex::findAll(input, pattern): List[String]
 Regex::findFirst(input, pattern): String
-Regex::groups(input, pattern): String[]       // First match groups
-Regex::groupsAll(input, pattern): String[][]  // All matches groups
+Regex::groups(input, pattern): List[String]   // First match groups
+Regex::groupsAll(input, pattern): List[List[String]]  // All matches groups
 ```
 
 ### Replacement
@@ -1190,8 +1174,8 @@ Regex::replaceFirst(input, pattern, replacement): String
 ### Splitting
 
 ```
-Regex::split(input, pattern): String[]
-Regex::split(input, pattern, limit): String[]
+Regex::split(input, pattern): List[String]
+Regex::split(input, pattern, limit): List[String]
 ```
 
 ### Utility
@@ -1205,7 +1189,7 @@ Regex::isValid(pattern): Boolean
 
 ```
 val text: String = "Email: alice@example.com, bob@test.org";
-val emails: String[] = Regex::findAll(text, "[\\w.]+@[\\w.]+");
+val emails: List[String] = Regex::findAll(text, "[\\w.]+@[\\w.]+");
 // ["alice@example.com", "bob@test.org"]
 
 val masked: String = Regex::replace(text, "@[\\w.]+", "@***");

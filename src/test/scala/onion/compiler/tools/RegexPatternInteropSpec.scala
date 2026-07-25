@@ -21,7 +21,7 @@ class RegexPatternInteropSpec extends AbstractShellSpec {
       assert(Shell.Success("a#b#") == shell.run(
         "def main(args: String[]): String { return Regex::replace(\"a1b2\", re\"\\d\", \"#\") }", "None", Array()))
       assert(Shell.Success(3) == shell.run(
-        "def main(args: String[]): Int { return Regex::split(\"a,b,c\", re\",\").length }", "None", Array()))
+        "def main(args: String[]): Int { return Regex::split(\"a,b,c\", re\",\").size }", "None", Array()))
     }
     it("still accepts String patterns") {
       assert(Shell.Success(true) == shell.run(

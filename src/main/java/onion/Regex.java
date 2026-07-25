@@ -1,6 +1,7 @@
 package onion;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,14 +23,14 @@ public final class Regex {
      * group 1); otherwise returns null. A group that did not participate in
      * the match yields "".
      */
-    public static String[] matchGroups(String input, String pattern) {
+    public static List<String> matchGroups(String input, String pattern) {
         if (input == null || pattern == null) return null;
         Matcher m = MATCH_CACHE.computeIfAbsent(pattern, Pattern::compile).matcher(input);
         if (!m.matches()) return null;
-        String[] result = new String[m.groupCount()];
+        List<String> result = new ArrayList<String>();
         for (int i = 1; i <= m.groupCount(); i++) {
             String g = m.group(i);
-            result[i - 1] = g != null ? g : "";
+            result.add(g != null ? g : "");
         }
         return result;
     }
@@ -57,14 +58,14 @@ public final class Regex {
     /**
      * Returns all matches of the pattern in the input.
      */
-    public static String[] findAll(String input, String pattern) {
-        if (input == null || pattern == null) return new String[0];
+    public static List<String> findAll(String input, String pattern) {
+        if (input == null || pattern == null) return new ArrayList<String>();
         List<String> matches = new ArrayList<>();
         Matcher matcher = Pattern.compile(pattern).matcher(input);
         while (matcher.find()) {
             matches.add(matcher.group());
         }
-        return matches.toArray(new String[0]);
+        return matches;
     }
 
     /**
@@ -83,37 +84,37 @@ public final class Regex {
      * Returns all capturing groups from the first match.
      * Index 0 is the entire match, index 1+ are the groups.
      */
-    public static String[] groups(String input, String pattern) {
-        if (input == null || pattern == null) return new String[0];
+    public static List<String> groups(String input, String pattern) {
+        if (input == null || pattern == null) return new ArrayList<String>();
         Matcher matcher = Pattern.compile(pattern).matcher(input);
         if (matcher.find()) {
-            String[] result = new String[matcher.groupCount() + 1];
+            List<String> result = new ArrayList<String>();
             for (int i = 0; i <= matcher.groupCount(); i++) {
                 String group = matcher.group(i);
-                result[i] = group != null ? group : "";
+                result.add(group != null ? group : "");
             }
             return result;
         }
-        return new String[0];
+        return new ArrayList<String>();
     }
 
     /**
      * Returns all capturing groups from all matches.
      * Each element is an array where index 0 is the entire match.
      */
-    public static String[][] groupsAll(String input, String pattern) {
-        if (input == null || pattern == null) return new String[0][];
-        List<String[]> allGroups = new ArrayList<>();
+    public static List<List<String>> groupsAll(String input, String pattern) {
+        List<List<String>> allGroups = new ArrayList<List<String>>();
+        if (input == null || pattern == null) return allGroups;
         Matcher matcher = Pattern.compile(pattern).matcher(input);
         while (matcher.find()) {
-            String[] groups = new String[matcher.groupCount() + 1];
+            List<String> groups = new ArrayList<String>();
             for (int i = 0; i <= matcher.groupCount(); i++) {
                 String group = matcher.group(i);
-                groups[i] = group != null ? group : "";
+                groups.add(group != null ? group : "");
             }
             allGroups.add(groups);
         }
-        return allGroups.toArray(new String[0][]);
+        return allGroups;
     }
 
     // ========== Replacement ==========
@@ -141,17 +142,17 @@ public final class Regex {
     /**
      * Splits the input by the pattern.
      */
-    public static String[] split(String input, String pattern) {
-        if (input == null || pattern == null) return new String[0];
-        return input.split(pattern);
+    public static List<String> split(String input, String pattern) {
+        if (input == null || pattern == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(input.split(pattern)));
     }
 
     /**
      * Splits the input by the pattern with a limit on the number of parts.
      */
-    public static String[] split(String input, String pattern, int limit) {
-        if (input == null || pattern == null) return new String[0];
-        return input.split(pattern, limit);
+    public static List<String> split(String input, String pattern, int limit) {
+        if (input == null || pattern == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(input.split(pattern, limit)));
     }
 
     // ========== Pattern overloads (interop with re"..." literals) ==========
@@ -168,12 +169,12 @@ public final class Regex {
         return pattern.matcher(input).find();
     }
 
-    public static String[] findAll(String input, Pattern pattern) {
-        if (input == null || pattern == null) return new String[0];
+    public static List<String> findAll(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new ArrayList<String>();
         List<String> matches = new ArrayList<>();
         Matcher matcher = pattern.matcher(input);
         while (matcher.find()) matches.add(matcher.group());
-        return matches.toArray(new String[0]);
+        return matches;
     }
 
     public static String findFirst(String input, Pattern pattern) {
@@ -182,33 +183,33 @@ public final class Regex {
         return matcher.find() ? matcher.group() : "";
     }
 
-    public static String[] groups(String input, Pattern pattern) {
-        if (input == null || pattern == null) return new String[0];
+    public static List<String> groups(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new ArrayList<String>();
         Matcher matcher = pattern.matcher(input);
         if (matcher.find()) {
-            String[] result = new String[matcher.groupCount() + 1];
+            List<String> result = new ArrayList<String>();
             for (int i = 0; i <= matcher.groupCount(); i++) {
                 String group = matcher.group(i);
-                result[i] = group != null ? group : "";
+                result.add(group != null ? group : "");
             }
             return result;
         }
-        return new String[0];
+        return new ArrayList<String>();
     }
 
-    public static String[][] groupsAll(String input, Pattern pattern) {
-        if (input == null || pattern == null) return new String[0][];
-        List<String[]> allGroups = new ArrayList<>();
+    public static List<List<String>> groupsAll(String input, Pattern pattern) {
+        List<List<String>> allGroups = new ArrayList<List<String>>();
+        if (input == null || pattern == null) return allGroups;
         Matcher matcher = pattern.matcher(input);
         while (matcher.find()) {
-            String[] groups = new String[matcher.groupCount() + 1];
+            List<String> groups = new ArrayList<String>();
             for (int i = 0; i <= matcher.groupCount(); i++) {
                 String group = matcher.group(i);
-                groups[i] = group != null ? group : "";
+                groups.add(group != null ? group : "");
             }
             allGroups.add(groups);
         }
-        return allGroups.toArray(new String[0][]);
+        return allGroups;
     }
 
     public static String replace(String input, Pattern pattern, String replacement) {
@@ -223,14 +224,14 @@ public final class Regex {
         return pattern.matcher(input).replaceFirst(replacement);
     }
 
-    public static String[] split(String input, Pattern pattern) {
-        if (input == null || pattern == null) return new String[0];
-        return pattern.split(input);
+    public static List<String> split(String input, Pattern pattern) {
+        if (input == null || pattern == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(pattern.split(input)));
     }
 
-    public static String[] split(String input, Pattern pattern, int limit) {
-        if (input == null || pattern == null) return new String[0];
-        return pattern.split(input, limit);
+    public static List<String> split(String input, Pattern pattern, int limit) {
+        if (input == null || pattern == null) return new ArrayList<String>();
+        return new ArrayList<String>(Arrays.asList(pattern.split(input, limit)));
     }
 
     // ========== Utility ==========

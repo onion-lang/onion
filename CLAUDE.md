@@ -418,6 +418,7 @@ These are frequently confused with other languages. **Always check these:**
 | `list.set(i, v)` | `list[i] = v` - assignment also uses `[]` |
 | `arr.length()` | `arr.length` - array length is property, not method |
 | `list.size()` | `list.size` - also a property |
+| stdlib returning an array? | No - the standard library takes and returns `List`, never arrays (`Strings::split`, `Regex::findAll`, `Files::readLines`, `Rand::shuffle`, `Http` headers/params, `Future::all`). Arrays appear only at the Java boundary: `main(args: String[])`, `byte[]` binary I/O, and varargs. Use `Colls::toList(args)` to cross over |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
 | `for (k, v) in map` | `foreach (k, v) in map { }` - map entry destructuring |
 | `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry); `var (x, y) = ...` for mutable |

@@ -330,18 +330,18 @@ public final class Future<T> {
 
     /**
      * Creates a Future that completes when all given Futures complete.
-     * Returns an array of results in order.
+     * Returns the results as a list, in order.
      */
     @SafeVarargs
-    public static <T> Future<Object[]> all(Future<T>... futures) {
+    public static <T> Future<java.util.List<Object>> all(Future<T>... futures) {
         CompletableFuture<?>[] cfs = new CompletableFuture<?>[futures.length];
         for (int i = 0; i < futures.length; i++) {
             cfs[i] = futures[i].delegate;
         }
         return new Future<>(CompletableFuture.allOf(cfs).thenApply(v -> {
-            Object[] results = new Object[futures.length];
+            java.util.List<Object> results = new java.util.ArrayList<Object>();
             for (int i = 0; i < futures.length; i++) {
-                results[i] = futures[i].delegate.join();
+                results.add(futures[i].delegate.join());
             }
             return results;
         }));

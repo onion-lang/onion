@@ -28,8 +28,8 @@ public final class HttpResource {
         return Http.get(url);
     }
 
-    /** GET with headers ("Name: value" entries). */
-    public String get(String[] headers) throws Exception {
+    /** GET with headers (alternating names and values). */
+    public String get(java.util.List headers) throws Exception {
         return Http.get(url, headers);
     }
 

@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -41,11 +42,11 @@ public final class Files {
         }
     }
 
-    public static String[] readLines(String path) throws IOException {
+    public static List<String> readLines(String path) throws IOException {
         return readLines(new File(path));
     }
 
-    public static String[] readLines(File file) throws IOException {
+    public static List<String> readLines(File file) throws IOException {
         List<String> lines = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
@@ -53,7 +54,7 @@ public final class Files {
                 lines.add(line);
             }
         }
-        return lines.toArray(new String[0]);
+        return lines;
     }
 
     public static byte[] readBytes(String path) throws IOException {
@@ -92,25 +93,17 @@ public final class Files {
         }
     }
 
-    public static void writeLines(String path, String[] lines) throws IOException {
+    public static void writeLines(String path, java.util.List<String> lines) throws IOException {
         writeLines(new File(path), lines);
     }
 
-    public static void writeLines(File file, String[] lines) throws IOException {
+    public static void writeLines(File file, java.util.List<String> lines) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             for (String line : lines) {
                 writer.write(line);
                 writer.newLine();
             }
         }
-    }
-
-    public static void writeLines(String path, java.util.List<String> lines) throws IOException {
-        writeLines(new File(path), lines);
-    }
-
-    public static void writeLines(File file, java.util.List<String> lines) throws IOException {
-        writeLines(file, lines.toArray(new String[0]));
     }
 
     public static void appendText(String path, String content) throws IOException {
@@ -163,8 +156,10 @@ public final class Files {
         return new File(path).mkdirs();
     }
 
-    public static File[] listFiles(String path) {
-        return new File(path).listFiles();
+    public static List<File> listFiles(String path) {
+        File[] entries = new File(path).listFiles();
+        if (entries == null) return new ArrayList<File>();
+        return new ArrayList<File>(Arrays.asList(entries));
     }
 
     public static long size(String path) {
@@ -176,6 +171,13 @@ public final class Files {
     }
 
     // Path operations
+
+    /** Joins path segments given as a list. */
+    public static String joinPath(java.util.List<String> parts) {
+        if (parts == null || parts.isEmpty()) return "";
+        return joinPath(parts.toArray(new String[0]));
+    }
+
     public static String joinPath(String... parts) {
         if (parts.length == 0) return "";
         Path path = Paths.get(parts[0]);

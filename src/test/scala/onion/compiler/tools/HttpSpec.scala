@@ -65,7 +65,7 @@ class HttpSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val params: String[] = new String[]{"name", "John", "age", "30"};
+            |    val params: List[String] = ["name", "John", "age", "30"];
             |    return Http::buildQuery(params);
             |  }
             |}
@@ -83,7 +83,7 @@ class HttpSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val params: String[] = new String[]{};
+            |    val params: List[String] = [];
             |    return Http::buildQuery(params);
             |  }
             |}
@@ -101,7 +101,7 @@ class HttpSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val params: String[] = new String[]{"q", "hello world"};
+            |    val params: List[String] = ["q", "hello world"];
             |    return Http::buildQuery(params);
             |  }
             |}
@@ -121,7 +121,7 @@ class HttpSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val params: String[] = new String[]{"id", "123"};
+            |    val params: List[String] = ["id", "123"];
             |    return Http::buildUrl("https://example.com/api", params);
             |  }
             |}
@@ -139,7 +139,7 @@ class HttpSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val params: String[] = new String[]{"extra", "value"};
+            |    val params: List[String] = ["extra", "value"];
             |    return Http::buildUrl("https://example.com/api?existing=1", params);
             |  }
             |}
@@ -157,7 +157,7 @@ class HttpSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val params: String[] = new String[]{};
+            |    val params: List[String] = [];
             |    return Http::buildUrl("https://example.com", params);
             |  }
             |}

@@ -58,7 +58,7 @@ class StringsEnrichedSpec extends AbstractShellSpec {
         "val c = Strings::count(\"banana\", \"a\")\n" +
         "val ci = if Strings::containsIgnoreCase(\"Hello\", \"ELL\") { 10 } else { 0 }\n" +
         "val ei = if Strings::equalsIgnoreCase(\"ABC\", \"abc\") { 100 } else { 0 }\n" +
-        "val w = Strings::words(\"  a  b   c \").length\n" +
+        "val w = Strings::words(\"  a  b   c \").size\n" +
         "val ch = Strings::chars(\"abc\").size()\n" +
         "return c + ci + ei + w + ch",
         Shell.Success(119))

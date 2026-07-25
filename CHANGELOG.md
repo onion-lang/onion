@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Documented the `Config` stdlib module (en/ja).** `onion.Config` (`loadJson`/`parseJson`,
+  dot-notation `get`/`getString`/`getInt`/`getLong`/`getDouble`/`getBoolean` with array
+  indexing and defaults, `getEnv`/`getWithEnvOverride`, `hasPath`) has been fully implemented
+  and tested since its introduction but was missing from `docs/reference/stdlib.md` and
+  `docs/ja/reference/stdlib.md` entirely, including the "Modules at a glance" summary table.
+  Added a `Config Module` section to both, with the same worked examples the module's own
+  tests cover.
 - **A duplicate top-level function definition reported the wrong diagnostic (E0012 fix).**
   Two top-level `def foo(...)` functions with the same name and parameter types reported
   "duplicated global variable definition foo." (`error.semantic.duplicatedGlobalVariable`,

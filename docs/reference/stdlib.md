@@ -10,7 +10,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
 | **Numbers** | `Math`, `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
-| **Data formats** | `Json`, `Yaml`, `Csv` |
+| **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future` |
 | **Date & random** | `DateTime`, `Rand` (choice/shuffle/sample/uuid) |
@@ -828,6 +828,50 @@ record User(name: String, age: Int) derive!(Json, Yaml)
 val u = new User("ko", 3)
 val viaJson = User::fromJson(User::toJson(u))   // == u
 val viaYaml = User::fromYaml(User::toYaml(u))  // == u
+```
+
+## Config Module
+
+Configuration loading and dot-notation access over parsed JSON (`onion.Config`). Builds on
+`Json::parse`, so the same object/array/scalar shape applies; nothing here is YAML- or
+`.env`-aware — it's JSON plus dotted-path lookups and environment-variable overrides.
+
+```onion
+val config = Config::loadJson("config.json")          // reads + parses a JSON file
+val config2 = Config::parseJson("{\"port\": 8080}")   // parses a JSON string directly
+
+Config::get(config, "database.host")                   // raw value, or null if not found
+Config::getString(config, "database.host", "localhost")
+Config::getInt(config, "database.port", 5432)
+Config::getLong(config, "database.maxConnections", 10L)
+Config::getDouble(config, "database.timeout", 30.0)
+Config::getBoolean(config, "database.ssl", false)
+```
+
+Paths are dot-separated and walk both objects and arrays — a numeric segment indexes into
+an array:
+
+```onion
+val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \"Bob\"}]}")
+Config::getString(config, "users.0.name", "unknown")   // "Alice"
+```
+
+A missing key, an out-of-range array index, or a value that can't convert to the requested
+type all fall back to the supplied default instead of throwing; the numeric getters accept
+the stored value as either a JSON number or a numeric string. `hasPath` checks presence
+without needing a default:
+
+```onion
+Config::hasPath(config, "database.host")   // true / false
+```
+
+Environment variables round out configuration — `getEnv` reads one directly, and
+`getWithEnvOverride` reads a config path but lets an environment variable take precedence
+when set, which is useful for overriding a checked-in config value at deploy time:
+
+```onion
+Config::getEnv("PORT", "3000")
+Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 ```
 
 ## Csv Module

@@ -73,7 +73,16 @@ final class ControlFlowEmitter(
       case term =>
         visitTerm(term)
         term.`type` match
-          case t if t.isBottomType => ()
+          // A bottom type reaches here two ways. A wrapped statement
+          // (`throw`/`return`/`break`/`continue`) transfers control and leaves
+          // nothing on the stack. But a bottom-typed *value* -- an erased
+          // generic call whose type argument was inferred as bottom, e.g.
+          // `f.call()` on a throw-only closure -- does leave a reference, and
+          // skipping the pop there desynchronizes the stackmap (issue #314).
+          case t if t.isBottomType =>
+            term match
+              case _: StatementTerm => ()
+              case _ => gen.pop()
           case BasicType.VOID => ()
           case BasicType.LONG | BasicType.DOUBLE => gen.pop2()
           case _ => gen.pop()

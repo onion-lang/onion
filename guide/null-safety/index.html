@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1531,6 +1531,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ja/tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトCLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ja/tools/repl/" class="md-nav__link">
         
   
@@ -2891,6 +2919,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Null Literal Checking (W0012)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-warning-and-not-an-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a warning and not an error
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3514,6 +3559,34 @@
     
   
     Script Runner (onion)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project CLI
   
 
     
@@ -4417,6 +4490,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Null Literal Checking (W0012)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-warning-and-not-an-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a warning and not an error
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4526,14 +4616,19 @@
 <p>Onion provides null safety features inspired by Kotlin, helping you avoid <code>NullPointerException</code> at compile time.</p>
 <h2 id="nullable-types">Nullable Types<a class="headerlink" href="#nullable-types" title="Permanent link">&para;</a></h2>
 <p>By default, types in Onion cannot hold <code>null</code>. To allow <code>null</code>, use the <code>?</code> suffix:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>// Non-nullable: cannot be null
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>// Non-nullable: not meant to hold null
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>val name: String = &quot;Alice&quot;
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>// val name: String = null  // Compile error!
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>// val name: String = null  // W0012 warning — see &quot;Null Literal Checking&quot; below
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>// Nullable: can be null
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>val maybeName: String? = null  // OK
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>val anotherName: String? = &quot;Bob&quot;  // Also OK
 </span></code></pre></div>
+<p>Assigning the <code>null</code> literal to a non-nullable type is a <strong>warning</strong>, not an
+error, so that <code>null</code> stays usable where a Java API genuinely accepts it
+(<code>encodeUrl(null)</code>) and for <code>val anything: Object = null</code>. The trade-off, and
+how to turn it into an error for your own build, is described under
+<a href="#null-literal-checking-w0012">Null Literal Checking</a>.</p>
 <h3 id="type-compatibility">Type Compatibility<a class="headerlink" href="#type-compatibility" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>T</code> to <code>T?</code> is allowed (widening)</li>
@@ -4826,6 +4921,25 @@ so an early-return guard leaves <code>x</code> non-null afterwards.</p>
 Promote it to an error with <code>--warn error</code>, or suppress it with
 <code>--Wno null-to-non-nullable</code>. Values coming from Java APIs are not
 checked (their nullness is unknown to the compiler).</p>
+<h3 id="why-a-warning-and-not-an-error">Why a warning and not an error<a class="headerlink" href="#why-a-warning-and-not-an-error" title="Permanent link">&para;</a></h3>
+<p>The value written here is statically known to be <code>null</code>, so a later
+dereference is a guaranteed <code>NullPointerException</code> — an error would seem
+strictly better. It is a warning because <code>null</code> is also a <em>legitimate</em> value in
+several places the same check covers:</p>
+<ul>
+<li>Java APIs that accept and handle null (<code>Http::encodeUrl(null)</code> returns <code>""</code>).</li>
+<li><code>val anything: Object = null</code>, which is ordinary JVM code.</li>
+<li>A field or local whose type is a bare type variable <code>T</code>, where <code>null</code> is the
+  only value available without an instance (see issue #283).</li>
+</ul>
+<p>Making it an error was tried and rejected: it broke 23 tests across 12 suites,
+essentially all of them legitimate uses like the above, rather than latent
+NPEs. If your own code has no such cases, <code>--warn error</code> gives you the strict
+behavior for your build without imposing it on Java interop.</p>
+<p>If you want the strictness only where it matters most, keep <code>null</code> out of
+non-nullable <em>declarations</em> (<code>val s: String = null</code>) — that is the shape that
+turns into a surprise NPE later — and reserve it for arguments to APIs
+documented to accept it.</p>
 <h2 id="safe-indexing-and-non-null-assertion">Safe Indexing (<code>?[]</code>) and Non-Null Assertion (<code>!!</code>)<a class="headerlink" href="#safe-indexing-and-non-null-assertion" title="Permanent link">&para;</a></h2>
 <p><code>xs?[i]</code> indexes a nullable receiver: null when <code>xs</code> is null, the element
 (widened to nullable) otherwise. Works for arrays, <code>List</code> and maps, and
@@ -5022,7 +5136,7 @@ elsewhere).</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1526,6 +1526,34 @@
     
   
     スクリプトランナー（onion）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトCLI
   
 
     
@@ -3754,6 +3782,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../tools/repl/" class="md-nav__link">
         
   
@@ -5346,10 +5402,16 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 </span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>val rows = file&quot;data.csv&quot;.csvRows()           // Map（ヘッダ -&gt; 値）の List、RFC 4180
 </span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>val body = http&quot;https://api.example.com&quot;.get() // HttpResource: get/getJson/post/postJson/put/delete
 </span></code></pre></div>
-<p><code>prefix"raw"</code> は、デフォルトの static import（<code>onion.Resources</code>）を通じて解決される
-修飾なし呼び出し <code>prefix("raw")</code> の糖衣です。したがって、リテラル形式と
-関数形式（動的値の場合の <code>file(path)</code>）は等価です。本体は raw です — バックスラッシュは
-そのまま通過します。<code>\"</code> はバックスラッシュを消費せずに引用符をエスケープします。</p>
+<p><code>prefix"raw"</code> は、<strong>任意の識別子接頭辞</strong>に対する修飾なし呼び出し <code>prefix("raw")</code> の
+糖衣です。組み込みの <code>re</code>/<code>file</code>/<code>http</code>（デフォルト static import <code>onion.Resources</code> で解決）
+だけでなく、その名前の関数を定義すれば独自の接頭辞を作れます — <code>sql"SELECT ..."</code> は
+<code>sql("SELECT ...")</code> を呼び出します（新しい機構は不要）。リテラル形式と関数形式（動的値の
+場合の <code>file(path)</code>）は等価です。本体は raw です — バックスラッシュはそのまま通過し、
+<code>\"</code> はバックスラッシュを消費せずに引用符をエスケープします。</p>
+<p>識別子は引用符に直接隣接している必要があります。<code>prefix"..."</code> はスキームリテラルですが、
+<code>prefix "..."</code>（空白あり）は識別子＋文字列です。予約語に直接続く文字列はスキームリテラルに
+<strong>なりません</strong> — <code>return"x"</code> は <code>return("x")</code> ではなく <code>return "x"</code> として再字句解析されます。
+未定義の接頭辞は lexer エラーではなく通常の「メソッドが見つかりません」エラーです。</p>
 <h3 id="_26">パイプライン演算子<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>5 |&gt; double               // double(5)
 </span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>5 |&gt; add(3)               // add(5, 3) — 第1引数注入
@@ -5539,7 +5601,7 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

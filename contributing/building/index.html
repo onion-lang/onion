@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1511,6 +1511,34 @@
     
   
     スクリプトランナー（onion）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトCLI
   
 
     
@@ -3159,6 +3187,34 @@
     
   
     Script Runner (onion)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project CLI
   
 
     
@@ -5051,34 +5107,100 @@ a source file to <code>.class</code> files:</p>
 <p>Run the promoted REPL:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sbt<span class="w"> </span>repl
 </span></code></pre></div>
-<p>Run the benchmark suite:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sbt<span class="w"> </span>bench
+<p>Run the readiness benchmark suite:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sbt<span class="w"> </span>benchmark
 </span></code></pre></div>
+<p>The default suite reports six explicit protocols:</p>
+<ul>
+<li>steady-state fresh compiler measurements for <code>run/Hello.on</code>,
+  <code>run/TodoManager.on</code>, and <code>run/StatsApp.on</code>;</li>
+<li>a process-cold <code>onion run/Hello.on</code> measurement that includes child-JVM
+  startup and shutdown;</li>
+<li>submissions to one persistent, growing Onion REPL session; and</li>
+<li>one compilation of the deterministic 20-file automation fixture under
+  <code>benchmarks/fixtures/automation-project/</code>.</li>
+</ul>
+<p>Process-cold uses 3 warmups by default; the other protocols use 8. Every
+protocol uses 25 measured iterations and a 30-second iteration timeout.
+<code>--warmups N</code> overrides the scenario defaults. The schema-v3 JSON report stores
+the effective configuration beside every scenario so unlike lifecycles are
+never presented as identical measurements. It also retains raw nanosecond
+observations, median and p95 latency, phase timings where available, source
+metrics, JVM/OS metadata, assigned memory, and typed absolute-policy checks.</p>
+<p>The first practical milestone uses these inclusive latency ceilings:</p>
+<table>
+<thead>
+<tr>
+<th>Protocol</th>
+<th style="text-align: right;">Median</th>
+<th style="text-align: right;">p95</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fresh <code>onion Hello.on</code> process</td>
+<td style="text-align: right;">1.5 s</td>
+<td style="text-align: right;">2.5 s</td>
+</tr>
+<tr>
+<td>Steady-state compile of <code>Hello.on</code></td>
+<td style="text-align: right;">150 ms</td>
+<td style="text-align: right;">300 ms</td>
+</tr>
+<tr>
+<td>Steady-state compile of <code>StatsApp.on</code></td>
+<td style="text-align: right;">750 ms</td>
+<td style="text-align: right;">1.2 s</td>
+</tr>
+<tr>
+<td>Subsequent REPL snippet</td>
+<td style="text-align: right;">100 ms</td>
+<td style="text-align: right;">250 ms</td>
+</tr>
+<tr>
+<td>20-file/~2,000-line project</td>
+<td style="text-align: right;">2.0 s</td>
+<td style="text-align: right;">3.0 s</td>
+</tr>
+</tbody>
+</table>
+<p>The absolute policy is enforced only when the captured environment exactly
+matches the reference lane: Ubuntu 24.04 x86-64, Eclipse Adoptium Temurin
+JDK 21, two assigned processors, 4 GiB assigned memory, a 2 GiB maximum heap,
+and G1. A breach on that lane fails the benchmark task. On every other
+machine, the checks are <code>not-applicable</code> and the overall policy status is
+<code>informational</code>; those measurements are useful for profiling but do not count
+as release evidence.</p>
+<p>The machine-readable report is written to
+<code>target/readiness/benchmark-v3.json</code>. For a quick protocol smoke test:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sbt<span class="w"> </span><span class="s1">&#39;benchmark --warmups 0 --iterations 1&#39;</span>
+</span></code></pre></div>
+<p><code>sbt bench</code> remains a compatibility alias and accepts the same options.</p>
 <p>Emit compile profiles:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sbt<span class="w"> </span><span class="s1">&#39;runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sbt<span class="w"> </span><span class="s1">&#39;runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on&#39;</span>
 </span></code></pre></div>
 <h3 id="interactive-sbt">Interactive SBT<a class="headerlink" href="#interactive-sbt" title="Permanent link">&para;</a></h3>
 <p>Start SBT shell:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sbt
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>sbt
 </span></code></pre></div>
 <p>Then run commands:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>&gt; compile
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>&gt; test
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>&gt; run Hello.on
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>&gt; ~compile  # Continuous compilation
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>&gt; exit
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>&gt; compile
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>&gt; test
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>&gt; run Hello.on
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>&gt; ~compile  # Continuous compilation
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>&gt; exit
 </span></code></pre></div></p>
 <h2 id="parser-development">Parser Development<a class="headerlink" href="#parser-development" title="Permanent link">&para;</a></h2>
 <h3 id="modifying-the-grammar">Modifying the Grammar<a class="headerlink" href="#modifying-the-grammar" title="Permanent link">&para;</a></h3>
 <ol>
 <li>
 <p>Edit the JavaCC grammar:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>vim<span class="w"> </span>grammar/JJOnionParser.jj
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>vim<span class="w"> </span>grammar/JJOnionParser.jj
 </span></code></pre></div></p>
 </li>
 <li>
 <p>Regenerate parser:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>sbt<span class="w"> </span>clean<span class="w"> </span>compile
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>sbt<span class="w"> </span>clean<span class="w"> </span>compile
 </span></code></pre></div></p>
 </li>
 </ol>
@@ -5087,11 +5209,11 @@ a source file to <code>.class</code> files:</p>
 - Running <code>sbt clean</code></p>
 <h3 id="parser-location">Parser Location<a class="headerlink" href="#parser-location" title="Permanent link">&para;</a></h3>
 <p>Generated parser:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>├── JJOnionParser.java
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>├── Token.java
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>├── TokenManager.java
-</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>└── ...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>├── JJOnionParser.java
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>├── Token.java
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>├── TokenManager.java
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>└── ...
 </span></code></pre></div></p>
 <h2 id="ide-setup">IDE Setup<a class="headerlink" href="#ide-setup" title="Permanent link">&para;</a></h2>
 <h3 id="intellij-idea">IntelliJ IDEA<a class="headerlink" href="#intellij-idea" title="Permanent link">&para;</a></h3>
@@ -5114,30 +5236,30 @@ a source file to <code>.class</code> files:</p>
 </ol>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="parser-generation-fails">Parser Generation Fails<a class="headerlink" href="#parser-generation-fails" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Clean and rebuild</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>sbt<span class="w"> </span>clean
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>rm<span class="w"> </span>-rf<span class="w"> </span>target
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>sbt<span class="w"> </span>compile
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Clean and rebuild</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>sbt<span class="w"> </span>clean
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>rm<span class="w"> </span>-rf<span class="w"> </span>target
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>sbt<span class="w"> </span>compile
 </span></code></pre></div>
 <h3 id="out-of-memory">Out of Memory<a class="headerlink" href="#out-of-memory" title="Permanent link">&para;</a></h3>
 <p>Increase SBT memory:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SBT_OPTS</span><span class="o">=</span><span class="s2">&quot;-Xmx2G&quot;</span>
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>sbt<span class="w"> </span>compile
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SBT_OPTS</span><span class="o">=</span><span class="s2">&quot;-Xmx2G&quot;</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>sbt<span class="w"> </span>compile
 </span></code></pre></div></p>
 <p>Or edit <code>.sbtopts</code>:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>-Xmx2G
-</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>-Xss2M
+<div class="language-text highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>-Xmx2G
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>-Xss2M
 </span></code></pre></div></p>
 <h3 id="dependency-issues">Dependency Issues<a class="headerlink" href="#dependency-issues" title="Permanent link">&para;</a></h3>
 <p>Clear Ivy cache:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.ivy2/cache
-</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>sbt<span class="w"> </span>update
-</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>sbt<span class="w"> </span>compile
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.ivy2/cache
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>sbt<span class="w"> </span>update
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>sbt<span class="w"> </span>compile
 </span></code></pre></div></p>
 <h3 id="compilation-errors">Compilation Errors<a class="headerlink" href="#compilation-errors" title="Permanent link">&para;</a></h3>
 <p>Check Scala and Java versions:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>sbt<span class="w"> </span>scalaVersion
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>java<span class="w"> </span>-version
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>sbt<span class="w"> </span>scalaVersion
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>java<span class="w"> </span>-version
 </span></code></pre></div></p>
 <p>Ensure they match requirements:
 - Scala 3.3.7
@@ -5145,35 +5267,35 @@ a source file to <code>.class</code> files:</p>
 <h2 id="build-configuration">Build Configuration<a class="headerlink" href="#build-configuration" title="Permanent link">&para;</a></h2>
 <h3 id="buildsbt">build.sbt<a class="headerlink" href="#buildsbt" title="Permanent link">&para;</a></h3>
 <p>Key settings:</p>
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1">// Version is derived from git tags via sbt-dynver</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">scalaVersion</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;3.3.7&quot;</span>
-</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="n">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;onion&quot;</span>
-</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="n">organization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;org.onion_lang&quot;</span>
-</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>
-</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="c1">// Dependencies</span>
-</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="n">libraryDependencies</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">  </span><span class="s">&quot;org.ow2.asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;9.8&quot;</span><span class="p">,</span>
-</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">  </span><span class="s">&quot;net.java.dev.javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;5.0&quot;</span><span class="p">,</span>
-</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="w">  </span><span class="s">&quot;org.scalatest&quot;</span><span class="w"> </span><span class="o">%%</span><span class="w"> </span><span class="s">&quot;scalatest&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;3.2.19&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
-</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a><span class="p">)</span>
-</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>
-</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a><span class="c1">// Main class</span>
-</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a><span class="n">mainClass</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="s">&quot;onion.tools.CompilerFrontend&quot;</span><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1">// Version is derived from git tags via sbt-dynver</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="n">scalaVersion</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;3.3.7&quot;</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="n">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;onion&quot;</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="n">organization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;org.onion_lang&quot;</span>
+</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>
+</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="c1">// Dependencies</span>
+</span><span id="__span-34-7"><a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="n">libraryDependencies</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-34-8"><a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a><span class="w">  </span><span class="s">&quot;org.ow2.asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;9.8&quot;</span><span class="p">,</span>
+</span><span id="__span-34-9"><a id="__codelineno-34-9" name="__codelineno-34-9" href="#__codelineno-34-9"></a><span class="w">  </span><span class="s">&quot;net.java.dev.javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;5.0&quot;</span><span class="p">,</span>
+</span><span id="__span-34-10"><a id="__codelineno-34-10" name="__codelineno-34-10" href="#__codelineno-34-10"></a><span class="w">  </span><span class="s">&quot;org.scalatest&quot;</span><span class="w"> </span><span class="o">%%</span><span class="w"> </span><span class="s">&quot;scalatest&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;3.2.19&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
+</span><span id="__span-34-11"><a id="__codelineno-34-11" name="__codelineno-34-11" href="#__codelineno-34-11"></a><span class="p">)</span>
+</span><span id="__span-34-12"><a id="__codelineno-34-12" name="__codelineno-34-12" href="#__codelineno-34-12"></a>
+</span><span id="__span-34-13"><a id="__codelineno-34-13" name="__codelineno-34-13" href="#__codelineno-34-13"></a><span class="c1">// Main class</span>
+</span><span id="__span-34-14"><a id="__codelineno-34-14" name="__codelineno-34-14" href="#__codelineno-34-14"></a><span class="n">mainClass</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="s">&quot;onion.tools.CompilerFrontend&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="compiler-options">Compiler Options<a class="headerlink" href="#compiler-options" title="Permanent link">&para;</a></h3>
 <p>Scala compiler options:
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">scalacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span><span class="s">&quot;-encoding&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;utf8&quot;</span><span class="p">,</span>
-</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span><span class="s">&quot;-unchecked&quot;</span><span class="p">,</span>
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span><span class="s">&quot;-deprecation&quot;</span><span class="p">,</span>
-</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">  </span><span class="s">&quot;-feature&quot;</span>
-</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">scalacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="s">&quot;-encoding&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;utf8&quot;</span><span class="p">,</span>
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">  </span><span class="s">&quot;-unchecked&quot;</span><span class="p">,</span>
+</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">  </span><span class="s">&quot;-deprecation&quot;</span><span class="p">,</span>
+</span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">  </span><span class="s">&quot;-feature&quot;</span>
+</span><span id="__span-35-6"><a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="p">)</span>
 </span></code></pre></div></p>
 <p>Java compiler options:
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">javacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="s">&quot;-source&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;17&quot;</span><span class="p">,</span>
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">  </span><span class="s">&quot;-Xlint:unchecked&quot;</span>
-</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="n">javacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span><span class="s">&quot;-source&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;17&quot;</span><span class="p">,</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">  </span><span class="s">&quot;-Xlint:unchecked&quot;</span>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="p">)</span>
 </span></code></pre></div></p>
 <h2 id="performance-tips">Performance Tips<a class="headerlink" href="#performance-tips" title="Permanent link">&para;</a></h2>
 <h3 id="faster-builds">Faster Builds<a class="headerlink" href="#faster-builds" title="Permanent link">&para;</a></h3>
@@ -5185,27 +5307,27 @@ a source file to <code>.class</code> files:</p>
 </ol>
 <h3 id="parallel-compilation">Parallel Compilation<a class="headerlink" href="#parallel-compilation" title="Permanent link">&para;</a></h3>
 <p>SBT compiles in parallel by default. Adjust thread count:</p>
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="nc">Global</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">concurrentRestrictions</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span><span class="nc">Tags</span><span class="p">.</span><span class="n">limitAll</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nc">Global</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">concurrentRestrictions</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">  </span><span class="nc">Tags</span><span class="p">.</span><span class="n">limitAll</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="platform-specific-notes">Platform-Specific Notes<a class="headerlink" href="#platform-specific-notes" title="Permanent link">&para;</a></h2>
 <h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
 <p>May need to set JAVA_HOME:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span><span class="k">$(</span>/usr/libexec/java_home<span class="w"> </span>-v<span class="w"> </span><span class="m">17</span><span class="k">)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span><span class="k">$(</span>/usr/libexec/java_home<span class="w"> </span>-v<span class="w"> </span><span class="m">17</span><span class="k">)</span>
 </span></code></pre></div></p>
 <h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
 <p>Ensure sufficient memory:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>free<span class="w"> </span>-h
-</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="c1"># Increase swap if needed</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>free<span class="w"> </span>-h
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="c1"># Increase swap if needed</span>
 </span></code></pre></div></p>
 <h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
 <p>Use PowerShell or Git Bash. Paths use backslashes:
-<div class="language-powershell highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">sbt</span> <span class="n">assembly</span>
-</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="c"># compile a source file:</span>
-</span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="n">java</span> <span class="n">-jar</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
-</span><span id="__span-39-4"><a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="c"># or run a script:</span>
-</span><span id="__span-39-5"><a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="n">java</span> <span class="n">-cp</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">onion</span><span class="p">.</span><span class="n">tools</span><span class="p">.</span><span class="n">ScriptRunner</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="n">sbt</span> <span class="n">assembly</span>
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="c"># compile a source file:</span>
+</span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="n">java</span> <span class="n">-jar</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
+</span><span id="__span-40-4"><a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="c"># or run a script:</span>
+</span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="n">java</span> <span class="n">-cp</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">onion</span><span class="p">.</span><span class="n">tools</span><span class="p">.</span><span class="n">ScriptRunner</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
 </span></code></pre></div></p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
@@ -5327,7 +5449,7 @@ a source file to <code>.class</code> files:</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

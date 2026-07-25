@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1511,6 +1511,34 @@
     
   
     スクリプトランナー（onion）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトCLI
   
 
     
@@ -3361,6 +3389,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../tools/repl/" class="md-nav__link">
         
   
@@ -4235,25 +4291,39 @@ pass through — no <code>\\d</code> escaping) that desugar to the calls <code>r
 </span></code></pre></div>
 <p>The literal and the function form are equivalent, so dynamic values just
 use <code>file(path)</code>.</p>
+<p>The prefix is not limited to <code>re</code>/<code>file</code>/<code>http</code> — <strong>any identifier</strong> immediately
+followed by a raw string is a scheme literal that desugars to <code>prefix("...")</code>, so
+you can define your own by defining a function of that name (no new machinery):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>def sql(query: String): String = &quot;[SQL] &quot; + query.trim()
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>def money(raw: String): Double = Double::parseDouble(raw.substring(1))
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>sql&quot;SELECT * FROM users WHERE id = 5&quot;   // -&gt; sql(&quot;SELECT ...&quot;)
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>money&quot;$19.99&quot;                            // -&gt; money(&quot;$19.99&quot;) -&gt; 19.99
+</span></code></pre></div>
+<p>The identifier must be immediately adjacent to the quote (<code>prefix"..."</code>); with a
+space (<code>prefix "..."</code>) it is an ordinary identifier followed by a string. A
+reserved keyword immediately followed by a string is unaffected — <code>return"x"</code>
+stays <code>return "x"</code>, not a scheme call. An undefined prefix is a normal "method
+not found" error, not a lexer error.</p>
 <h2 id="pattern-attached-records">Pattern-Attached Records<a class="headerlink" href="#pattern-attached-records" title="Permanent link">&para;</a></h2>
 <p>Attach a regex to a record and a typed parser is derived from the shape —
 capture groups convert to the component types:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>record Access(time: String, method: String, path: String, status: Int)
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>val hits = Access::parseAll(file&quot;access.log&quot;.text())   // List[Access], bad lines skipped
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>val one  = Access::parse(line)                          // Access? (null on no match)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>record Access(time: String, method: String, path: String, status: Int)
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>val hits = Access::parseAll(file&quot;access.log&quot;.text())   // List[Access], bad lines skipped
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>val one  = Access::parse(line)                          // Access? (null on no match)
 </span></code></pre></div>
 <h2 id="deriving-serialization-with-derive">Deriving Serialization with <code>derive!</code><a class="headerlink" href="#deriving-serialization-with-derive" title="Permanent link">&para;</a></h2>
 <p><code>derive!(Json)</code> / <code>derive!(Yaml)</code> synthesize both directions of a format from the
 record's shape — no hand-written serializer. <code>derive!</code> is a macro (the <code>!</code> marks
 expansion at the use site), not a type class:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>User::toJson(u)              // {&quot;name&quot;:&quot;ko&quot;,&quot;age&quot;:3}
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>val a = User::fromJson(s)    // User?  (null on bad input)
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>User::toYaml(u)              // name: ko\nage: 3
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>val b = User::fromYaml(s)    // User?
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record User(name: String, age: Int) derive!(Json, Yaml)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>User::toJson(u)              // {&quot;name&quot;:&quot;ko&quot;,&quot;age&quot;:3}
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>val a = User::fromJson(s)    // User?  (null on bad input)
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>User::toYaml(u)              // name: ko\nage: 3
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>val b = User::fromYaml(s)    // User?
 </span></code></pre></div>
 <p>Every format shares one <code>toMap</code> / <code>fromMap</code> core, so adding a format is just an
 stdlib type with <code>parse</code> / <code>stringify</code> over the shared <code>Map</code> — the macro is
@@ -4264,9 +4334,9 @@ is E0063.</p>
 <h2 id="compile-time-laws-and-examples">Compile-Time Laws and Examples<a class="headerlink" href="#compile-time-laws-and-examples" title="Permanent link">&para;</a></h2>
 <p>A record can carry <code>law</code> and <code>example</code> clauses that the <strong>compiler runs at build
 time</strong> — the specification lives in the language, not a separate test suite:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Pt(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  example { Pt::parse(&quot;3,4&quot;) == new Pt(3, 4) }
 </span></code></pre></div>
 <p><code>example { e }</code> must evaluate to <code>true</code>. <code>law name(p: T) { e }</code> is property-checked:
 the compiler generates sample values for <code>p</code> and requires <code>e</code> to hold for all of
@@ -4277,47 +4347,47 @@ skipped; the check is on by default.</p>
 <h2 id="pipeline-operator">Pipeline Operator<a class="headerlink" href="#pipeline-operator" title="Permanent link">&para;</a></h2>
 <p><code>e |&gt; f</code> calls <code>f(e)</code>; <code>e |&gt; f(a)</code> injects <code>e</code> as the first argument. A
 newline before <code>|&gt;</code> continues the pipeline:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>file&quot;access.log&quot;.lines()
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  .map { l =&gt; classify(l) }
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  .groupBy { c =&gt; c }
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  .mapValues { xs =&gt; xs.size }
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>  |&gt; println
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>file&quot;access.log&quot;.lines()
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  .map { l =&gt; classify(l) }
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  .groupBy { c =&gt; c }
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  .mapValues { xs =&gt; xs.size }
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>  |&gt; println
 </span></code></pre></div>
 <h2 id="auto-cli">Auto-CLI<a class="headerlink" href="#auto-cli" title="Permanent link">&para;</a></h2>
 <p>A top-level <code>main</code> with typed parameters derives its whole command-line
 interface: required parameters are positional, defaulted parameters become
 <code>--name</code> flags (<code>Boolean</code> defaults become switches), and a usage line is
 generated on error:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void {
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  var msg = &quot;hello &quot; + name + &quot; x&quot; + count
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  if loud { msg = msg.toUpperCase() }
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  println(msg)
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>def main(name: String, count: Int = 3, loud: Boolean = false): void {
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  var msg = &quot;hello &quot; + name + &quot; x&quot; + count
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  if loud { msg = msg.toUpperCase() }
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  println(msg)
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>}
 </span></code></pre></div>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>world<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span><span class="w"> </span>--loud
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="go">HELLO WORLD X5</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>world<span class="w"> </span>--count<span class="o">=</span><span class="m">5</span><span class="w"> </span>--loud<span class="w">     </span><span class="c1"># --name=value form works too</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="go">HELLO WORLD X5</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>--help<span class="w">                      </span><span class="c1"># prints usage and exits 0</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="go">error: missing argument: name</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>world<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span><span class="w"> </span>--loud
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="go">HELLO WORLD X5</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>world<span class="w"> </span>--count<span class="o">=</span><span class="m">5</span><span class="w"> </span>--loud<span class="w">     </span><span class="c1"># --name=value form works too</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="go">HELLO WORLD X5</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on<span class="w"> </span>--help<span class="w">                      </span><span class="c1"># prints usage and exits 0</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="gp">$ </span>onion<span class="w"> </span>greet.on
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="go">error: missing argument: name</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
 </span></code></pre></div>
 <p>Flags accept both <code>--name value</code> and <code>--name=value</code>; <code>--help</code> (or <code>-h</code>) prints
 the generated usage and exits.</p>
 <h2 id="putting-it-together">Putting It Together<a class="headerlink" href="#putting-it-together" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>#!/usr/bin/env onion
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>record Hit(ip: String, method: String, path: String, status: Int)
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>def main(log: String, minStatus: Int = 500): void {
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  Hit::parseAll(file(log).text())
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    .filter { h =&gt; h.status() &gt;= minStatus }
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    .groupBy { h =&gt; h.path() }
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    .mapValues { xs =&gt; xs.size }
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    |&gt; println
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>#!/usr/bin/env onion
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>record Hit(ip: String, method: String, path: String, status: Int)
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>def main(log: String, minStatus: Int = 500): void {
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>  Hit::parseAll(file(log).text())
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    .filter { h =&gt; h.status() &gt;= minStatus }
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    .groupBy { h =&gt; h.path() }
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    .mapValues { xs =&gt; xs.size }
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>    |&gt; println
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>}
 </span></code></pre></div>
 
 
@@ -4433,7 +4503,7 @@ the generated usage and exits.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

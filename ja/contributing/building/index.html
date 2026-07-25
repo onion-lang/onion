@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1526,6 +1526,34 @@
     
   
     スクリプトランナー（onion）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトCLI
   
 
     
@@ -3756,6 +3784,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../tools/repl/" class="md-nav__link">
         
   
@@ -5072,34 +5128,100 @@
 <p>推奨REPLを実行:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sbt<span class="w"> </span>repl
 </span></code></pre></div>
-<p>ベンチマークスイートを実行:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sbt<span class="w"> </span>bench
+<p>readiness ベンチマークスイートを実行します:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sbt<span class="w"> </span>benchmark
 </span></code></pre></div>
+<p>デフォルトスイートは、次の6つの明示的なプロトコルを報告します:</p>
+<ul>
+<li><code>run/Hello.on</code>、<code>run/TodoManager.on</code>、<code>run/StatsApp.on</code> に対する
+  steady-state fresh compiler 計測</li>
+<li>子 JVM の起動と終了を含む process-cold の
+  <code>onion run/Hello.on</code> 計測</li>
+<li>1つの永続的かつ状態が増加する Onion REPL セッションへの連続入力</li>
+<li><code>benchmarks/fixtures/automation-project/</code> にある決定的な20ファイル
+  automation fixture の一括コンパイル</li>
+</ul>
+<p>process-cold のデフォルト warmup は3回、その他は8回です。全プロトコルを
+25回計測し、1 iteration の timeout は30秒です。<code>--warmups N</code> は各
+scenario のデフォルトを上書きします。schema-v3 JSON は有効な設定を
+scenario ごとに保存するため、異なる lifecycle を同一条件の計測として
+扱いません。また、生のナノ秒計測値、中央値、p95、取得可能なフェーズ別
+時間、ソース規模、JVM/OS メタデータ、割り当てメモリ、型付けされた
+絶対性能 policy 判定も保持します。</p>
+<p>最初の実用化マイルストーンでは、次の上限値を境界値を含めて適用します:</p>
+<table>
+<thead>
+<tr>
+<th>プロトコル</th>
+<th style="text-align: right;">中央値</th>
+<th style="text-align: right;">p95</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新規プロセスでの <code>onion Hello.on</code></td>
+<td style="text-align: right;">1.5 s</td>
+<td style="text-align: right;">2.5 s</td>
+</tr>
+<tr>
+<td><code>Hello.on</code> の steady-state compile</td>
+<td style="text-align: right;">150 ms</td>
+<td style="text-align: right;">300 ms</td>
+</tr>
+<tr>
+<td><code>StatsApp.on</code> の steady-state compile</td>
+<td style="text-align: right;">750 ms</td>
+<td style="text-align: right;">1.2 s</td>
+</tr>
+<tr>
+<td>2回目以降の REPL snippet</td>
+<td style="text-align: right;">100 ms</td>
+<td style="text-align: right;">250 ms</td>
+</tr>
+<tr>
+<td>20ファイル・約2,000行のプロジェクト</td>
+<td style="text-align: right;">2.0 s</td>
+<td style="text-align: right;">3.0 s</td>
+</tr>
+</tbody>
+</table>
+<p>絶対性能 policy は、取得した環境が reference lane（Ubuntu 24.04
+x86-64、Eclipse Adoptium Temurin JDK 21、割り当て processor 2個、
+割り当てメモリ 4 GiB、最大 heap 2 GiB、G1）と完全に一致する場合だけ
+強制されます。この lane で上限を超えると benchmark task は失敗します。
+それ以外の環境では各判定は <code>not-applicable</code>、全体 status は
+<code>informational</code> です。この計測は profile には利用できますが、
+release evidence にはなりません。</p>
+<p>機械可読レポートは <code>target/readiness/benchmark-v3.json</code> に書き出されます。
+プロトコルだけを短時間で確認するには次を実行します:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sbt<span class="w"> </span><span class="s1">&#39;benchmark --warmups 0 --iterations 1&#39;</span>
+</span></code></pre></div>
+<p><code>sbt bench</code> は互換エイリアスとして残り、同じオプションを受け付けます。</p>
 <p>コンパイルプロファイルを出力:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sbt<span class="w"> </span><span class="s1">&#39;runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sbt<span class="w"> </span><span class="s1">&#39;runMain onion.tools.CompilerFrontend --profile-compile run/Hello.on&#39;</span>
 </span></code></pre></div>
 <h3 id="sbt_1">対話型SBT<a class="headerlink" href="#sbt_1" title="Permanent link">&para;</a></h3>
 <p>SBTシェルを起動:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sbt
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>sbt
 </span></code></pre></div>
 <p>その後、コマンドを実行:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>&gt; compile
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>&gt; test
-</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>&gt; run Hello.on
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>&gt; ~compile  # 継続的コンパイル
-</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>&gt; exit
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>&gt; compile
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>&gt; test
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>&gt; run Hello.on
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>&gt; ~compile  # 継続的コンパイル
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>&gt; exit
 </span></code></pre></div></p>
 <h2 id="_17">パーサー開発<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <h3 id="_18">文法の修正<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
 <ol>
 <li>
 <p>JavaCC文法を編集:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>vim<span class="w"> </span>grammar/JJOnionParser.jj
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>vim<span class="w"> </span>grammar/JJOnionParser.jj
 </span></code></pre></div></p>
 </li>
 <li>
 <p>パーサーを再生成:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>sbt<span class="w"> </span>clean<span class="w"> </span>compile
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>sbt<span class="w"> </span>clean<span class="w"> </span>compile
 </span></code></pre></div></p>
 </li>
 </ol>
@@ -5108,11 +5230,11 @@
 - <code>sbt clean</code> を実行した場合</p>
 <h3 id="_19">パーサーの場所<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
 <p>生成されたパーサー:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>├── JJOnionParser.java
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>├── Token.java
-</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>├── TokenManager.java
-</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>└── ...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>target/scala-3.3.7/src_managed/main/java/onion/compiler/parser/
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>├── JJOnionParser.java
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>├── Token.java
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>├── TokenManager.java
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>└── ...
 </span></code></pre></div></p>
 <h2 id="ide">IDE設定<a class="headerlink" href="#ide" title="Permanent link">&para;</a></h2>
 <h3 id="intellij-idea">IntelliJ IDEA<a class="headerlink" href="#intellij-idea" title="Permanent link">&para;</a></h3>
@@ -5135,30 +5257,30 @@
 </ol>
 <h2 id="_20">トラブルシューティング<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
 <h3 id="_21">パーサー生成に失敗する<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># クリーンして再ビルド</span>
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>sbt<span class="w"> </span>clean
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>rm<span class="w"> </span>-rf<span class="w"> </span>target
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>sbt<span class="w"> </span>compile
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># クリーンして再ビルド</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>sbt<span class="w"> </span>clean
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>rm<span class="w"> </span>-rf<span class="w"> </span>target
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>sbt<span class="w"> </span>compile
 </span></code></pre></div>
 <h3 id="_22">メモリ不足<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
 <p>SBTのメモリを増やします。
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SBT_OPTS</span><span class="o">=</span><span class="s2">&quot;-Xmx2G&quot;</span>
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>sbt<span class="w"> </span>compile
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SBT_OPTS</span><span class="o">=</span><span class="s2">&quot;-Xmx2G&quot;</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>sbt<span class="w"> </span>compile
 </span></code></pre></div></p>
 <p>または <code>.sbtopts</code> を編集:
-<div class="language-text highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>-Xmx2G
-</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>-Xss2M
+<div class="language-text highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>-Xmx2G
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>-Xss2M
 </span></code></pre></div></p>
 <h3 id="_23">依存関係の問題<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
 <p>Ivyキャッシュをクリア:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.ivy2/cache
-</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>sbt<span class="w"> </span>update
-</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>sbt<span class="w"> </span>compile
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>rm<span class="w"> </span>-rf<span class="w"> </span>~/.ivy2/cache
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>sbt<span class="w"> </span>update
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>sbt<span class="w"> </span>compile
 </span></code></pre></div></p>
 <h3 id="_24">コンパイルエラー<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
 <p>ScalaとJavaのバージョンを確認:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>sbt<span class="w"> </span>scalaVersion
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>java<span class="w"> </span>-version
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>sbt<span class="w"> </span>scalaVersion
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>java<span class="w"> </span>-version
 </span></code></pre></div></p>
 <p>要件を満たしていることを確認:
 - Scala 3.3.7
@@ -5166,35 +5288,35 @@
 <h2 id="_25">ビルド設定<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h2>
 <h3 id="buildsbt">build.sbt<a class="headerlink" href="#buildsbt" title="Permanent link">&para;</a></h3>
 <p>主な設定:</p>
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1">// バージョンは sbt-dynver によって git タグから導出される</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">scalaVersion</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;3.3.7&quot;</span>
-</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="n">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;onion&quot;</span>
-</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="n">organization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;org.onion_lang&quot;</span>
-</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>
-</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="c1">// 依存関係</span>
-</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="n">libraryDependencies</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">  </span><span class="s">&quot;org.ow2.asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;9.8&quot;</span><span class="p">,</span>
-</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">  </span><span class="s">&quot;net.java.dev.javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;5.0&quot;</span><span class="p">,</span>
-</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="w">  </span><span class="s">&quot;org.scalatest&quot;</span><span class="w"> </span><span class="o">%%</span><span class="w"> </span><span class="s">&quot;scalatest&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;3.2.19&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
-</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a><span class="p">)</span>
-</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a>
-</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a><span class="c1">// メインクラス</span>
-</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a><span class="n">mainClass</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="s">&quot;onion.tools.CompilerFrontend&quot;</span><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1">// バージョンは sbt-dynver によって git タグから導出される</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="n">scalaVersion</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;3.3.7&quot;</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="n">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;onion&quot;</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="n">organization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">&quot;org.onion_lang&quot;</span>
+</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>
+</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="c1">// 依存関係</span>
+</span><span id="__span-34-7"><a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="n">libraryDependencies</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-34-8"><a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a><span class="w">  </span><span class="s">&quot;org.ow2.asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;asm&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;9.8&quot;</span><span class="p">,</span>
+</span><span id="__span-34-9"><a id="__codelineno-34-9" name="__codelineno-34-9" href="#__codelineno-34-9"></a><span class="w">  </span><span class="s">&quot;net.java.dev.javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;javacc&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;5.0&quot;</span><span class="p">,</span>
+</span><span id="__span-34-10"><a id="__codelineno-34-10" name="__codelineno-34-10" href="#__codelineno-34-10"></a><span class="w">  </span><span class="s">&quot;org.scalatest&quot;</span><span class="w"> </span><span class="o">%%</span><span class="w"> </span><span class="s">&quot;scalatest&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;3.2.19&quot;</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
+</span><span id="__span-34-11"><a id="__codelineno-34-11" name="__codelineno-34-11" href="#__codelineno-34-11"></a><span class="p">)</span>
+</span><span id="__span-34-12"><a id="__codelineno-34-12" name="__codelineno-34-12" href="#__codelineno-34-12"></a>
+</span><span id="__span-34-13"><a id="__codelineno-34-13" name="__codelineno-34-13" href="#__codelineno-34-13"></a><span class="c1">// メインクラス</span>
+</span><span id="__span-34-14"><a id="__codelineno-34-14" name="__codelineno-34-14" href="#__codelineno-34-14"></a><span class="n">mainClass</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="s">&quot;onion.tools.CompilerFrontend&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="_26">コンパイラオプション<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
 <p>Scalaコンパイラオプション:
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">scalacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span><span class="s">&quot;-encoding&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;utf8&quot;</span><span class="p">,</span>
-</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span><span class="s">&quot;-unchecked&quot;</span><span class="p">,</span>
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span><span class="s">&quot;-deprecation&quot;</span><span class="p">,</span>
-</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">  </span><span class="s">&quot;-feature&quot;</span>
-</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">scalacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="s">&quot;-encoding&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;utf8&quot;</span><span class="p">,</span>
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">  </span><span class="s">&quot;-unchecked&quot;</span><span class="p">,</span>
+</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">  </span><span class="s">&quot;-deprecation&quot;</span><span class="p">,</span>
+</span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">  </span><span class="s">&quot;-feature&quot;</span>
+</span><span id="__span-35-6"><a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="p">)</span>
 </span></code></pre></div></p>
 <p>Javaコンパイラオプション:
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">javacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="s">&quot;-source&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;17&quot;</span><span class="p">,</span>
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">  </span><span class="s">&quot;-Xlint:unchecked&quot;</span>
-</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="n">javacOptions</span><span class="w"> </span><span class="o">++=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span><span class="s">&quot;-source&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;17&quot;</span><span class="p">,</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">  </span><span class="s">&quot;-Xlint:unchecked&quot;</span>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="p">)</span>
 </span></code></pre></div></p>
 <h2 id="_27">パフォーマンスのヒント<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h2>
 <h3 id="_28">より速いビルド<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
@@ -5206,27 +5328,27 @@
 </ol>
 <h3 id="_29">並列コンパイル<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h3>
 <p>SBTはデフォルトで並列コンパイルを行います。スレッド数を調整する場合:</p>
-<div class="language-scala highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="nc">Global</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">concurrentRestrictions</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
-</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span><span class="nc">Tags</span><span class="p">.</span><span class="n">limitAll</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="p">)</span>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nc">Global</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">concurrentRestrictions</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">(</span>
+</span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">  </span><span class="nc">Tags</span><span class="p">.</span><span class="n">limitAll</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="_30">プラットフォーム固有の注意<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h2>
 <h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
 <p><code>JAVA_HOME</code> の設定が必要な場合があります。
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span><span class="k">$(</span>/usr/libexec/java_home<span class="w"> </span>-v<span class="w"> </span><span class="m">17</span><span class="k">)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span><span class="k">$(</span>/usr/libexec/java_home<span class="w"> </span>-v<span class="w"> </span><span class="m">17</span><span class="k">)</span>
 </span></code></pre></div></p>
 <h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
 <p>十分なメモリがあることを確認:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>free<span class="w"> </span>-h
-</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="c1"># 必要に応じてスワップを増やす</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>free<span class="w"> </span>-h
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="c1"># 必要に応じてスワップを増やす</span>
 </span></code></pre></div></p>
 <h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
 <p>PowerShellまたはGit Bashを使用します。パスはバックスラッシュを使います。
-<div class="language-powershell highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">sbt</span> <span class="n">assembly</span>
-</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="c"># ソースをコンパイル:</span>
-</span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="n">java</span> <span class="n">-jar</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
-</span><span id="__span-39-4"><a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="c"># またはスクリプトを実行:</span>
-</span><span id="__span-39-5"><a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="n">java</span> <span class="n">-cp</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">onion</span><span class="p">.</span><span class="n">tools</span><span class="p">.</span><span class="n">ScriptRunner</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="n">sbt</span> <span class="n">assembly</span>
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="c"># ソースをコンパイル:</span>
+</span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="n">java</span> <span class="n">-jar</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
+</span><span id="__span-40-4"><a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="c"># またはスクリプトを実行:</span>
+</span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="n">java</span> <span class="n">-cp</span> <span class="n">target</span><span class="p">\</span><span class="n">scala</span><span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">3</span><span class="p">.</span><span class="n">7</span><span class="p">\</span><span class="n">onion</span><span class="p">.</span><span class="n">jar</span> <span class="n">onion</span><span class="p">.</span><span class="n">tools</span><span class="p">.</span><span class="n">ScriptRunner</span> <span class="n">Hello</span><span class="p">.</span><span class="n">on</span>
 </span></code></pre></div></p>
 <h2 id="_31">次のステップ<a class="headerlink" href="#_31" title="Permanent link">&para;</a></h2>
 <ul>
@@ -5348,7 +5470,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

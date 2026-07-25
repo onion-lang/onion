@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **New: `run/BrokenLogDemo.on` — the "broken log" story, runnable (partial #355).** A
+  concrete demo exercising `onion.Shape`, `onion.Shapes::regex` and `onion.Outcome`
+  end to end: an access-log shape reads six lines, two of them malformed, and
+  `Outcome::values`/`Outcome::defects` split the four good rows from the two reported
+  defects instead of the parse either crashing on the first bad line or silently
+  dropping it. Also exercises the `sepBy`, `xmap` and `orElse` combinators. This covers
+  the `run/` sample half of #355; the EN/JA guide pages, doc examples and crash-corpus
+  entries are still open.
+
 - **Constant narrowing now reaches constructor arguments (#374).** `val b: Byte = 100` has always
   narrowed an in-range integer literal to `Byte`/`Short`/`Char`, but `new All("hi", -3, -4)` for a
   `Short`/`Byte`-typed constructor parameter reported `E0021` ("constructor applicable ... is not

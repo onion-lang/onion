@@ -38,5 +38,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs RecordLaws.on") {
       assert(Shell.Success("ok") == runSample("run/RecordLaws.on"))
     }
+
+    it("runs BrokenLogDemo.on") {
+      assert(Shell.Success(4) == runSample("run/BrokenLogDemo.on"))
+    }
   }
 }

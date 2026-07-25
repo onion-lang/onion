@@ -153,7 +153,13 @@ public final class Cli {
     }
 
     public static boolean parseBoolean(String name, String value) {
-        return Boolean.parseBoolean(value);
+        // Every other parseX here rejects malformed input; this one used to be a bare
+        // Boolean.parseBoolean, so `--count=maybe` exited with an error while
+        // `--loud=maybe` silently became false (issue #349).
+        if (!Scalars.isBoolean(value)) {
+            die("invalid value for --" + name + ": '" + value + "' (expected true or false)");
+        }
+        return Scalars.toBoolean(value);
     }
 
     /**

@@ -398,21 +398,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   /** The CLI conversion kind for a parameter type, or None when unsupported. */
-  private def cliKindOf(typeRef: AST.TypeNode): Option[String] = {
-    if (typeRef == null) return None
-    typeRef.desc match {
-      case AST.PrimitiveType(AST.KInt) => Some("Int")
-      case AST.PrimitiveType(AST.KLong) => Some("Long")
-      case AST.PrimitiveType(AST.KDouble) => Some("Double")
-      case AST.PrimitiveType(AST.KFloat) => Some("Float")
-      case AST.PrimitiveType(AST.KBoolean) => Some("Boolean")
-      case AST.PrimitiveType(AST.KShort) => Some("Short")
-      case AST.PrimitiveType(AST.KByte) => Some("Byte")
-      case AST.ReferenceType("String", _) => Some("String")
-      case AST.ReferenceType("java.lang.String", _) => Some("String")
-      case _ => None
-    }
-  }
+  private def cliKindOf(typeRef: AST.TypeNode): Option[String] =
+    ScalarConversions.ofAst(typeRef).map(_.tag)
 
   /** Builds the AST converting a raw CLI string to the parameter's type.
    *  For numeric types, delegates to onion.Cli.parseInt/parseLong/... which
@@ -422,16 +409,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val cliType = AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false)
     def parseViaCli(method: String): AST.Expression =
       AST.StaticMethodCall(loc, cliType, method, List(AST.StringLiteral(loc, paramName), raw))
-    kind match {
-      case "String"  => raw
-      case "Int"     => parseViaCli("parseInt")
-      case "Long"    => parseViaCli("parseLong")
-      case "Double"  => parseViaCli("parseDouble")
-      case "Float"   => parseViaCli("parseFloat")
-      case "Boolean" => parseViaCli("parseBoolean")
-      case "Short"   => parseViaCli("parseShort")
-      case "Byte"    => parseViaCli("parseByte")
-      case _         => raw
+    ScalarConversions.byTag(kind) match {
+      case Some(k) if !ScalarConversions.isIdentity(k) => parseViaCli(k.cliParseMethod)
+      case _                                           => raw
     }
   }
 
@@ -444,16 +424,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def convertCapturedValue(loc: Location, kind: String, raw: AST.Expression): AST.Expression = {
     def parseWith(wrapper: String, method: String): AST.Expression =
       AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType(wrapper, true), false), method, List(raw))
-    kind match {
-      case "String"  => raw
-      case "Int"     => parseWith("java.lang.Integer", "parseInt")
-      case "Long"    => parseWith("java.lang.Long", "parseLong")
-      case "Double"  => parseWith("java.lang.Double", "parseDouble")
-      case "Float"   => parseWith("java.lang.Float", "parseFloat")
-      case "Boolean" => parseWith("java.lang.Boolean", "parseBoolean")
-      case "Short"   => parseWith("java.lang.Short", "parseShort")
-      case "Byte"    => parseWith("java.lang.Byte", "parseByte")
-      case _         => raw
+    ScalarConversions.byTag(kind) match {
+      case Some(k) if !ScalarConversions.isIdentity(k) => parseWith(k.wrapper, k.parseMethod)
+      case _                                           => raw
     }
   }
 
@@ -660,7 +633,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.BlockExpression(loc, List(AST.NullLiteral(loc)))
     )
     val tryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, selectExpr)))
-    val catchArg = AST.Argument(loc, "__nfe", AST.TypeNode(loc, AST.ReferenceType("NumberFormatException", false), false))
+    // IllegalArgumentException rather than NumberFormatException: the latter is a subtype,
+    // so numeric behaviour is unchanged, but a strict Boolean conversion (onion.Scalars)
+    // reports a malformed field this way too (issue #349).
+    val catchArg = AST.Argument(loc, "__nfe", AST.TypeNode(loc, AST.ReferenceType("IllegalArgumentException", false), false))
     val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
     val parseTry = AST.TryExpression(loc, Nil, tryBody, List((catchArg, catchBody)), null)
     val parseBody = AST.BlockExpression(loc, List(parseTry))
@@ -730,16 +706,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   /** Maps a record component kind (from cliKindOf) to its Json static getter. */
-  private def jsonGetterOf(kind: String): String = kind match {
-    case "Int"     => "getInt"
-    case "Long"    => "getLong"
-    case "Double"  => "getDouble"
-    case "Float"   => "getFloat"
-    case "Boolean" => "getBoolean"
-    case "Short"   => "getShort"
-    case "Byte"    => "getByte"
-    case _         => "getString" // String, and the unsupported fallback (typing rejects bad components)
-  }
+  private def jsonGetterOf(kind: String): String =
+    // getString is also the fallback for an unsupported component; typing rejects those
+    // before synthesis runs (E0062).
+    ScalarConversions.byTag(kind).map(_.jsonGetter).getOrElse("getString")
 
   /**
    * `derive!(Json)` / `derive!(Yaml)` records: synthesize a format-agnostic core

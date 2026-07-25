@@ -76,6 +76,21 @@ class SymbolTable {
  * Handles text document operations for the Onion Language Server.
  * Provides diagnostics, hover, completion, and go-to-definition.
  */
+object OnionTextDocumentService {
+
+  /**
+   * Compiler settings for editor validation.
+   *
+   * `checkLaws = false` is the load-bearing part: `law` and `example` clauses are
+   * executed by LawCheckPhase, so leaving them on means the editor runs whatever the
+   * file currently says on every keystroke, in a half-typed state (issue #346). Laws
+   * belong to the build -- `onionc`, `onion`, `onion build`, `onion test` -- where they
+   * run once against a file the author considers finished.
+   */
+  def validationConfig: CompilerConfig =
+    CompilerConfig(Seq("."), null, "UTF-8", "", 100, checkLaws = false)
+}
+
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {
   private var client: org.eclipse.lsp4j.services.LanguageClient = _
   private val documents = new ConcurrentHashMap[String, DocumentState]()
@@ -571,8 +586,7 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
 
   private def validateDocument(uri: String, content: String): Unit = {
     val fileName = extractFileName(uri)
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 100)
-    val compiler = new OnionCompiler(config)
+    val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig)
 
     val diagnostics =
       try {

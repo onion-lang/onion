@@ -7,18 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **A `Boolean` field read from text is now validated (breaking).** `java.lang.Boolean.parseBoolean`
-  never fails: it maps everything that is not `"true"` to `false`. Both boundary paths used it, so
-  `record Flag(on: Boolean) from re"(\w+)"` turned `"maybe"` into a valid-looking `false` instead of
-  a parse failure, and `--loud=maybe` was silently `false` while `--count=maybe` exited with an error.
-  Both now reject anything that is not `true`/`false` (in any case). This is the one failure mode a
-  parser must never have — turning malformed input into a plausible value.
+- **`law`/`example` compile-time check failures (E0064/E0065) are now bilingual.** `LawCheckPhase`
+  built these two diagnostics as hardcoded English string interpolation instead of going through
+  the `errorMessage`/`errorMessage_ja` resource bundles like every other error, so a Japanese
+  locale never got a translated message for a falsified law or a failed example. Added the message
+  keys to both bundles and switched the phase to format through `toolbox.Message`.
 
-- **One table for the scalar types a boundary derivation can read.** The same eight types were
-  enumerated in five places (`cliKindOf`, `convertCliValue`, `convertCapturedValue`, `jsonGetterOf`,
-  and `onion.Cli`'s helpers) plus a sixth type-level copy in typing, so adding one meant five edits
-  in two languages that had to agree, with nothing checking that they did. `E0061`/`E0062` now list
-  the supported types from that table rather than from a hard-coded sentence that could go stale.
+- **`law`/`example` can no longer silently not run.** A law whose parameter type had no sample
+  generator — an array, a `Map`, an enum, an interface, an ordinary class with two constructors —
+  was skipped with no diagnostic, which made it indistinguishable from a law that held. It is now
+  **E0074**, and a class that declares checks but fails to load is **E0075**. Law diagnostics also
+  gained the file and line they were written on (they reported neither), and the sample count and
+  RNG seed became `--law-samples`/`--law-seed` and are reported alongside every counterexample so
+  the run that produced it can be repeated. The language server no longer executes laws: it
+  validates on every keystroke, so it was running whatever the buffer said, in a half-typed state.
+  `--no-check-laws` turns them off elsewhere.
+
+- **Every diagnostic caret now underlines the whole token.** `Location` has carried `endLine`/
+  `endColumn` since it was written and the renderer has known how to draw a range, but no production
+  code ever set them, so every caret was a single `^` at the first character.
+
+- **New: `onion.Shape` — the data boundary as a value.** A partial, potentially bidirectional
+  correspondence between external text and a typed value, with the two laws kept apart: `parse ∘
+  print == id` is guaranteed wherever `print` exists, while `print ∘ parse == id` is false in
+  general (`"007"` is a perfectly good `Int` that prints back as `"7"`). A shape that satisfies
+  both is *lossless*, which is rare and is what a lens needs. `canPrint()` says up front when a
+  shape is read-only — a regex with a `\s+` separator has no unique rendering — instead of the
+  printing method simply never appearing. Component failures accumulate: reading `"abc,def"` as
+  two `Int`s reports two defects, not the first.
+
+  Combinators: `eachLine` keeps the rows it could read *and* the reasons the rest could not, each
+  positioned on its line — a thousand-line log with five bad lines gives 995 values and 5 defects,
+  where `parseAll` today returns 995 values and no trace the other five existed. `lines` is the
+  all-or-nothing form, `sepBy` repeats with a literal separator, `xmap` transports a shape along an
+  isomorphism (both directions, so `print` survives), and `orElse` reports both spellings' defects
+  when neither reads. Nothing in the language lowers to these yet; that is the next step.
 
 - **New: `onion.Origin`, `onion.Outcome`, `onion.Defect`.** Where a value came from, and the result
   of trying to read one. `Outcome` is not `Result[T, List[Defect]]` because its `zip` *accumulates*:
@@ -26,20 +49,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would report only the first. Nothing produces them yet; they are the vocabulary the shape work
   will speak.
 
-- **`law`/`example` can no longer silently not run.** A law whose parameter type had no sample
-  generator — an array, a `Map`, an enum, an interface, an ordinary class with two constructors —
-  was skipped with no diagnostic, which made it indistinguishable from a law that held. It is now
-  **E0074**, and a class that declares checks but fails to load is **E0075**. Law diagnostics also
-  gained the file and line they were written on (they reported neither), `E0064`/`E0065` gained
-  Japanese messages (they were hard-coded English, the only codes bypassing i18n), and the sample
-  count and RNG seed became `--law-samples`/`--law-seed` and are reported with every counterexample
-  so it can be reproduced. The language server no longer executes laws: it validates on every
-  keystroke, so it was running whatever the buffer said, in a half-typed state. `--no-check-laws`
-  turns them off elsewhere.
+- **One table for the scalar types a boundary derivation can read.** The same eight types were
+  enumerated in five places (`cliKindOf`, `convertCliValue`, `convertCapturedValue`, `jsonGetterOf`,
+  and `onion.Cli`'s helpers) plus a sixth type-level copy in typing, so adding one meant five edits
+  in two languages that had to agree, with nothing checking that they did. `E0061`/`E0062` now list
+  the supported types from that table rather than from a hard-coded sentence that could go stale.
 
-- **Every diagnostic caret now underlines the whole token.** `Location` has carried `endLine`/
-  `endColumn` since it was written and the renderer has known how to draw a range, but no production
-  code ever set them, so every caret was a single `^` at the first character.
+- **A `Boolean` field read from text is now validated (breaking).** `java.lang.Boolean.parseBoolean`
+  never fails: it maps everything that is not `"true"` to `false`. Both boundary paths used it, so
+  `record Flag(on: Boolean) from re"(\w+)"` turned `"maybe"` into a valid-looking `false` instead of
+  a parse failure, and `--loud=maybe` was silently `false` while `--count=maybe` exited with an error.
+  Both now reject anything that is not `true`/`false` (in any case). This is the one failure mode a
+  parser must never have — turning malformed input into a plausible value.
+
+## [0.6.0] - 2026-07-25
 
 - **Fixed wrong `Http` method names in the stdlib docs (en/ja).** `docs/reference/stdlib.md`
   documented `Http::urlEncode`/`Http::urlDecode`, but the implemented (and tested) names are

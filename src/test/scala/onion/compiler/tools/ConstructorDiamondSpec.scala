@@ -4,8 +4,10 @@ import onion.tools.Shell
 
 /**
  * A generic constructor may omit its type arguments when the expected type pins
- * them (constructor diamond): `val b: Box[String] = new Box("x")`. Without an
- * expected type the bare generic is still rejected (E0066).
+ * them (constructor diamond): `val b: Box[String] = new Box("x")`. When no
+ * expected type supplies them they are inferred from the constructor arguments
+ * instead (issue #305, covered by GenericConstructorInferenceSpec); a bare
+ * generic that nothing pins is still rejected (E0066).
  */
 class ConstructorDiamondSpec extends AbstractShellSpec {
   private val box =
@@ -50,8 +52,18 @@ class ConstructorDiamondSpec extends AbstractShellSpec {
         "def main(args: String[]): String { val b: Box[String] = new Box[String](\"x\")\n return b.get() }", "None", Array())
       assert(Shell.Success("x") == r)
     }
-    it("still rejects a bare generic constructor with no expected type") {
-      assert(Shell.Failure(-1) == shell.run(box + "def main(args: String[]): Int { val b = new Box(\"hi\")\n return 0 }", "None", Array()))
+    it("falls back to argument inference when there is no expected type") {
+      // Previously E0066: with no expected type the bare generic was rejected.
+      // The constructor arguments now pin T the same way a generic method call
+      // infers from its arguments (#305).
+      assert(Shell.Success("hi") == shell.run(
+        box + "def main(args: String[]): String { val b = new Box(\"hi\")\n return b.get() }", "None", Array()))
+    }
+
+    it("still rejects a bare generic constructor that nothing pins") {
+      assert(Shell.Failure(-1) == shell.run(
+        "class Empty[T] { public: def this {} }\ndef main(args: String[]): Int { val e = new Empty()\n return 0 }",
+        "None", Array()))
     }
   }
 }

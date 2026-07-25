@@ -93,12 +93,6 @@ val         var         when        while
 `record Pair[A, B](first: A, second: B)`。ワイルドカード `?`、`? extends T`、
 `? super T` を型引数として受け入れます。
 
-### ジェネリクス
-
-`[]` 構文の消去ベースジェネリクス: `class Box[T]`、`def first[T](xs: List[T]): T`、
-`record Pair[A, B](first: A, second: B)`。ワイルドカード `?`、`? extends T`、
-`? super T` を型引数として受け入れます。
-
 プリミティブ型も型引数として使えます。内部ではボックス化されます
 （`Int` -> `Integer`）ので、`Comparator[Int]` のような Java 汎用インターフェースを
 プリミティブなパラメータ型で実装できます。コンパイラは消去されたボックス化された
@@ -112,7 +106,7 @@ public:
   }
 }
 
-val nums: ArrayList[Int] = [5, 1, 3]
+val nums: List[Int] = [5, 1, 3]
 Collections::sort(nums, new IntComparator())
 ```
 

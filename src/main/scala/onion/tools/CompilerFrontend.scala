@@ -14,6 +14,7 @@ import onion.compiler.exceptions.ScriptException
 import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.Message
 import onion.compiler.toolbox.Systems
+import onion.compiler.verification.ArgGenerator
 import onion.tools.option._
 
 /**
@@ -63,6 +64,9 @@ object CompilerFrontend {
   private final val PROFILE_OUTPUT: String = "--profile-output"
   private final val WARN_LEVEL: String = "--warn"
   private final val SUPPRESS_WARNINGS: String = "--Wno"
+  private final val NO_CHECK_LAWS: String = "--no-check-laws"
+  private final val LAW_SEED: String = "--law-seed"
+  private final val LAW_SAMPLES: String = "--law-samples"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_OUTPUT: String = "."
@@ -85,7 +89,10 @@ class CompilerFrontend {
     config(PROFILE_FORMAT, true),
     config(PROFILE_OUTPUT, true),
     config(WARN_LEVEL, true),
-    config(SUPPRESS_WARNINGS, true)
+    config(SUPPRESS_WARNINGS, true),
+    config(NO_CHECK_LAWS, false),
+    config(LAW_SEED, true),
+    config(LAW_SAMPLES, true)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -139,6 +146,9 @@ class CompilerFrontend {
          |  --profile-output <target>   Send profile to stderr, stdout, or a file path
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
+         |  --no-check-laws             Do not execute record `law`/`example` clauses
+         |  --law-seed <n>              RNG seed for law sample generation
+         |  --law-samples <n>           Number of samples generated per law parameter
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -175,6 +185,9 @@ class CompilerFrontend {
       option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
     )
     val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
+    val noCheckLaws = option.get(NO_CHECK_LAWS).contains(NoValuedParam)
+    val lawSeed = longParam(option, LAW_SEED, ArgGenerator.DefaultSeed)
+    val lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples)
     val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
     val compileProfile = parseCompileProfile(option)
     val warningLevel = parseWarningLevel(option.get(WARN_LEVEL))
@@ -197,10 +210,24 @@ class CompilerFrontend {
         suppressedWarnings = suppressed,
         dumpAst = dumpAst,
         dumpTypedAst = dumpTypedAst,
-        compileProfile = profile
+        compileProfile = profile,
+        checkLaws = !noCheckLaws,
+        lawSeed = lawSeed,
+        lawSamples = lawSamples
       )
     }
   }
+
+
+  /** A positive integer option, falling back to `default` when absent or unparsable. */
+  private def intParam(option: Map[String, CommandLineParam], name: String, default: Int): Int =
+    option.get(name).collect { case ValuedParam(v) => v }
+      .flatMap(v => v.toIntOption).filter(_ > 0).getOrElse(default)
+
+  /** A long option, falling back to `default` when absent or unparsable. */
+  private def longParam(option: Map[String, CommandLineParam], name: String, default: Long): Long =
+    option.get(name).collect { case ValuedParam(v) => v }
+      .flatMap(v => v.toLongOption).getOrElse(default)
 
   private def parseCompileProfile(option: Map[String, CommandLineParam]): Option[CompileProfileSettings] = {
     val enabled = option.get(PROFILE_COMPILE).contains(NoValuedParam)

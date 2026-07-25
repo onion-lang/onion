@@ -85,9 +85,17 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val mainClasses = classes.map(generateClass)
     mainClasses ++ generatedClosures.toSeq
 
+  /**
+   * The SourceFile attribute. TypingHeaderPass records the unit a class came from, so
+   * prefer it: synthesizing `<SimpleName>.on` names a file that need not exist, which
+   * misdirects both JVM stack traces and anything reading the attribute back (issue
+   * #346). Falls back to the synthesized name for classes with no recorded unit.
+   */
   private def sourceFileName(classDef: ClassDefinition): String =
-    val simpleName = classDef.name.split('.').last
-    s"$simpleName.on"
+    Option(classDef.getSourceFile).filter(_.nonEmpty).getOrElse {
+      val simpleName = classDef.name.split('.').last
+      s"$simpleName.on"
+    }
 
   private def generateClass(classDef: ClassDefinition): CompiledClass =
     val cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES)

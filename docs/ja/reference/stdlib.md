@@ -517,6 +517,298 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 // Bob    Sales
 ```
 
+## System モジュール
+
+Java の `System` クラスを介したシステムレベル操作へのアクセス。
+
+### System::out
+
+標準出力ストリーム:
+
+```onion
+System::out.println("直接システム出力")
+System::out.print("改行なし")
+```
+
+### System::in
+
+標準入力ストリーム:
+
+```onion
+import {
+  java.io.BufferedReader;
+  java.io.InputStreamReader;
+}
+
+val reader: BufferedReader = new BufferedReader(
+  new InputStreamReader(System::in)
+)
+```
+
+### System::currentTimeMillis
+
+現在時刻をミリ秒で取得:
+
+```onion
+val time: Long = System::currentTimeMillis()
+IO::println("現在時刻: " + time)
+```
+
+### System::getProperty
+
+システムプロパティを取得:
+
+```onion
+val os: String = System::getProperty("os.name")
+val user: String = System::getProperty("user.name")
+val home: String = System::getProperty("user.home")
+```
+
+### System::exit
+
+プログラムを終了:
+
+```onion
+System::exit(0)  // 成功
+System::exit(1)  // エラー
+```
+
+## Iterables モジュール
+
+`onion.Iterables`（Java インターフェース）で提供。
+
+コレクションや配列向けのイテレーションユーティリティ:
+
+- `Iterables::map(list|iterable, f)`
+- `Iterables::filter(list|iterable, predicate)`
+- `Iterables::foldl(iterable, init, f)`
+- `Iterables::exists(iterable, predicate)`
+- `Iterables::forAll(iterable, predicate)`
+- `Iterables::sort(list, comparator)`
+- `Iterables::listOf(elements...)`
+
+## Files モジュール
+
+ファイル I/O（`onion.Files`）:
+
+```onion
+Files::readText("path.txt")            // ファイル全体を String として
+Files::readLines("path.txt")           // String[]
+Files::writeText("out.txt", content)
+Files::readBytes(path) / Files::writeBytes(path, bytes)
+Files::list("dir")                     // エントリ名の List
+Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
+Files::delete(path) / Files::exists(path)
+```
+
+パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
+
+```onion
+Files::getFileName("a/b/c.txt")        // "c.txt"
+Files::getParent("a/b/c.txt")          // "a/b"
+Files::joinPath("a/b", "c.txt")        // "a/b/c.txt"
+Files::ext("report.txt")               // "txt"（拡張子。予約語を避けた名前）
+Files::stem("report.txt")              // "report"
+Files::withExtension("report.txt", "md")   // "report.md"
+```
+
+## Csv モジュール
+
+RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。
+
+```onion
+val rows = Csv::parse(text)                  // List of List of String
+val recs = Csv::parseWithHeader(text)        // List of Map（ヘッダー -> 値）
+
+Csv::column(rows, 0)                          // 位置指定で1列取得
+Csv::columnByName(recs, "age")                // ヘッダー名で1列取得
+
+val out  = Csv::stringify(rows)               // rows -> CSV テキスト
+val out2 = Csv::stringifyWithHeader(recs)     // records -> CSV（parseWithHeader の逆）
+```
+
+## Proc モジュール
+
+スクリプト向けのプロセス実行（`onion.Proc`）:
+
+```onion
+val r = Proc::capture("git", "status")  // r.status() / r.stdout() / r.stderr() / r.succeeded()
+Proc::run("ls", "-la")                  // stdout を String で取得（失敗時は例外）
+Proc::exec("make", "build")             // 終了コード、出力はそのまま素通し
+Proc::captureIn("/tmp", "ls")           // ...In 系は作業ディレクトリを指定
+```
+
+## Args モジュール
+
+コマンドライン引数のパース（`onion.Args`）:
+
+```onion
+val parsed = Args::parse(args)
+parsed.flag("verbose")                  // --verbose
+parsed.option("out", "a.out")           // --out path（デフォルト値付き）
+parsed.intOption("level", 3)
+parsed.positional()                     // オプション以外の引数の List
+```
+
+## Colls モジュール
+
+コレクションのファクトリとパイプライン（`onion.Colls`）:
+
+```onion
+Colls::listOf("a", "b", "c")            // 不変の List
+Colls::mutableListOf(1, 2, 3)           // ArrayList
+Colls::range(0, 5)                      // List [0,1,2,3,4]
+Colls::sortedBy(people) { p => p.age() }
+// map/filter/reduce/fold のパイプラインは List/Iterable/配列の拡張メソッド:
+// xs.map { x => x * 2 }.filter { x => x > 0 }
+```
+
+## DateTime
+
+エポックミリ秒を使った日時ユーティリティ。
+
+### 現在時刻
+
+```
+DateTime::now(): Long              // 現在のエポックミリ秒
+DateTime::nowString(): String      // ISO 形式（ローカルタイムゾーン）
+DateTime::nowString(pattern): String
+```
+
+### パース
+
+```
+DateTime::parse(isoString): Long
+DateTime::parse(dateTime, pattern): Long
+```
+
+### フォーマット
+
+```
+DateTime::format(epochMillis): String
+DateTime::format(epochMillis, pattern): String
+```
+
+### 構成要素
+
+```
+DateTime::year(epochMillis): Int
+DateTime::month(epochMillis): Int       // 1-12
+DateTime::day(epochMillis): Int         // 1-31
+DateTime::hour(epochMillis): Int        // 0-23
+DateTime::minute(epochMillis): Int      // 0-59
+DateTime::second(epochMillis): Int      // 0-59
+DateTime::dayOfWeek(epochMillis): Int   // 1=月曜, 7=日曜
+DateTime::dayOfYear(epochMillis): Int   // 1-366
+```
+
+### 演算
+
+```
+DateTime::addDays(epochMillis, days): Long
+DateTime::addHours(epochMillis, hours): Long
+DateTime::addMinutes(epochMillis, minutes): Long
+DateTime::addSeconds(epochMillis, seconds): Long
+DateTime::addMonths(epochMillis, months): Long
+DateTime::addYears(epochMillis, years): Long
+```
+
+### 比較
+
+```
+DateTime::diff(time1, time2): Long        // ミリ秒単位の差分
+DateTime::diffDays(time1, time2): Int
+DateTime::diffHours(time1, time2): Long   // hours / minutes / seconds は整数値
+DateTime::diffMinutes(time1, time2): Long
+DateTime::diffSeconds(time1, time2): Long
+DateTime::isBefore(time1, time2): Boolean
+DateTime::isAfter(time1, time2): Boolean
+DateTime::dayName(epochMillis): String    // "Friday"（英語、ロケール非依存）
+DateTime::monthName(epochMillis): String  // "March"
+```
+
+### ファクトリ
+
+```
+DateTime::of(year, month, day): Long
+DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::startOfDay(epochMillis): Long
+DateTime::endOfDay(epochMillis): Long
+```
+
+### 例
+
+```
+val now: Long = DateTime::now();
+IO::println("今日: " + DateTime::format(now, "yyyy-MM-dd"));
+
+val tomorrow: Long = DateTime::addDays(now, 1);
+IO::println("明日: " + DateTime::format(tomorrow));
+
+val birthday: Long = DateTime::of(1990, 5, 15);
+val age: Int = DateTime::diffDays(now, birthday) / 365;
+```
+
+---
+
+## Regex
+
+正規表現ユーティリティ。
+
+### マッチング
+
+```
+Regex::matches(input, pattern): Boolean   // 文字列全体がマッチ
+Regex::find(input, pattern): Boolean      // どこかにパターンが見つかる
+```
+
+### 抽出
+
+```
+Regex::findAll(input, pattern): String[]
+Regex::findFirst(input, pattern): String
+Regex::groups(input, pattern): String[]       // 最初のマッチのグループ
+Regex::groupsAll(input, pattern): String[][]  // 全マッチのグループ
+```
+
+### 置換
+
+```
+Regex::replace(input, pattern, replacement): String
+Regex::replaceFirst(input, pattern, replacement): String
+```
+
+### 分割
+
+```
+Regex::split(input, pattern): String[]
+Regex::split(input, pattern, limit): String[]
+```
+
+### ユーティリティ
+
+```
+Regex::quote(literal): String    // 特殊文字をエスケープ
+Regex::isValid(pattern): Boolean
+```
+
+### 例
+
+```
+val text: String = "Email: alice@example.com, bob@test.org";
+val emails: String[] = Regex::findAll(text, "[\\w.]+@[\\w.]+");
+// ["alice@example.com", "bob@test.org"]
+
+val masked: String = Regex::replace(text, "@[\\w.]+", "@***");
+// "Email: alice@***, bob@***"
+
+if (Regex::matches("hello123", "[a-z]+\\d+")) {
+  IO::println("パターンマッチ!");
+}
+```
+
+---
+
 ## 次のステップ
 
 - [基本構文](../guide/basic-syntax.md) - 言語構文の詳細

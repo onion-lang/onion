@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A boxed platform value unboxed to a non-null primitive now warns (W0015, #318).**
+  `Json::getInt(obj, key)` (and the other `Json::get*` accessors) return a boxed Java value
+  (`Integer`, `Long`, ...) that is `null` when the key is missing. Assigning or passing it where a
+  non-null primitive (`Int`, `Long`, ...) is expected silently unboxed it, so a missing key threw a
+  raw `NullPointerException` instead of a clear diagnostic. `processAssignable` now emits `W0015`
+  at that unboxing site, mirroring the existing `W0012` null-to-non-nullable trade-off (values from
+  Java stay unchecked but get a warning); use `Json::getIntOr(obj, key, default)` or check the
+  boxed accessor's result for null to avoid it. Suppressible with `--Wno W0015` /
+  `--Wno platform-unboxing`.
 - **A convention-over-configuration project workflow: `onion new/build/run/test/clean`.**
   `onion new hello` scaffolds a manifest (`onion.toml`), `src/`, and `tests/`; `onion build`
   compiles and caches the result under `target/` (invalidated by a SHA-256 fingerprint over the

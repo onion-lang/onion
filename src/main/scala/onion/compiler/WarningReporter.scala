@@ -100,6 +100,12 @@ class WarningReporter(
       s"$count top-level $plural ignored because a main is defined; move the code into main to run it")
   }
 
+  def platformUnboxing(location: Location, boxedTypeName: String, primitiveTypeName: String): Unit = {
+    report(WarningCategory.PlatformUnboxing, location,
+      s"boxed value of type '$boxedTypeName' is implicitly unboxed to non-null '$primitiveTypeName'; " +
+        s"if the platform value can be null (e.g. a missing Json key), this throws a NullPointerException at runtime")
+  }
+
   def getWarnings: Seq[CompileWarning] = warnings.toSeq
 
   def hasWarnings: Boolean = warnings.nonEmpty

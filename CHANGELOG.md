@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-25
+
 - **Documented nine more stdlib modules in Japanese (`docs/ja/reference/stdlib.md`).**
   The Japanese "モジュール一覧" (modules at a glance) summary table already listed
   `System`, `Files`, `Proc`, `Args`, `Iterables`, `Colls`, `Csv`, `DateTime`, and

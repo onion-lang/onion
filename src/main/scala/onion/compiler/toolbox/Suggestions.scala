@@ -21,8 +21,26 @@ object Suggestions {
    * @param maxDistance Maximum edit distance to consider (default: 3)
    * @return Some(similarName) if a close match is found, None otherwise
    */
+  /**
+   * Names that mean the same thing in a neighbouring language but are spelled
+   * too differently for edit distance to connect (`length` and `size` are 6
+   * edits apart). Reaching for the other language's spelling is a vocabulary
+   * mix-up rather than a typo, so it needs an explicit mapping; a candidate is
+   * only ever suggested when the target type really declares it.
+   */
+  private val aliases: Map[String, Seq[String]] = Map(
+    "length" -> Seq("size"),
+    "size" -> Seq("length"),
+    "count" -> Seq("size", "length")
+  )
+
   def findSimilar(name: String, candidates: Seq[String], maxDistance: Int = 3): Option[String] = {
     if (name.isEmpty || candidates.isEmpty) return None
+
+    val aliased = aliases.getOrElse(name.toLowerCase, Seq.empty)
+      .find(alias => candidates.exists(_.equalsIgnoreCase(alias)))
+      .flatMap(alias => candidates.find(_.equalsIgnoreCase(alias)))
+    if (aliased.isDefined) return aliased
 
     val scored = candidates.map { candidate =>
       (candidate, levenshteinDistance(name.toLowerCase, candidate.toLowerCase))

@@ -89,6 +89,22 @@ val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
 
 引数に一致するコンストラクタがありません。コンパイラは利用可能なコンストラクタを一覧表示します。
 
+### `E0073` — Map は直接反復できない
+
+`foreach` は配列か `iterator()` を持つ値を走査しますが、`Map` はそのどちらでもありません。
+
+```onion
+val m = ["a": 1]
+foreach k: String in m { println(k) }   // E0073
+```
+
+エントリを回す分割代入形式を使うか、ビューを選んでください。
+
+```onion
+foreach (k, v) in m { println(k + "=" + v) }
+foreach k: String in m.keySet() { println(k) }
+```
+
 ## Null 安全エラー
 
 ### `E0057` — 型引数が null の可能性がある

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A not-found member now points at the member that exists.** Three everyday mistakes produced
+  errors the compiler already had the answer to. `xs.length` on a `List` reported "field
+  List[Int].length is not found" with no suggestion at all, because only *fields* were considered as
+  candidates and a `List` has none — the fix, `size`, is a method. Field lookup now also offers
+  no-argument methods (reachable through the same paren-less syntax), and `length`/`size`/`count` are
+  treated as known cross-language aliases, since they are six edit distances apart and name
+  similarity could never connect them. `p.name()` where `name` is a field (a natural mix-up with
+  record component accessors, which really are methods) now says so and points at the parentheses
+  instead of failing silently. An alias is only ever suggested when the receiver actually declares it.
+
+- **`foreach` over a `Map` explains the `(k, v)` form (E0073).** `foreach k: String in someMap` used
+  to fail with "method applicable for Map[String, Int].iterator() is not found" — leaking the
+  desugaring by naming a method the user never wrote, with no hint that `foreach (k, v) in ...`
+  is the form they wanted. It is now a dedicated diagnostic naming that form and the
+  `.keySet()` / `.values()` / `.entrySet()` alternatives. The `(k, v)` form itself is desugared by
+  the parser into an `entrySet()` walk, so only the bare form reaches this check.
+
 - **A generic constructor infers its type arguments from the constructor arguments (#305).**
   Generic *methods* already inferred from their arguments (`id("hi")` binds `T = String`), and a
   constructor already inferred from an expected type (`val b: Box[String] = new Box("x")`), but

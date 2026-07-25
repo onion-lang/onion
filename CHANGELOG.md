@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-25
+
 - **README rewritten around what Onion is for.** It opened with "an object-oriented and
   statically typed programming language" that "compiles into JVM class files" — a category
   shared with Kotlin, Scala and Java — while its most distinctive section sat 171 lines

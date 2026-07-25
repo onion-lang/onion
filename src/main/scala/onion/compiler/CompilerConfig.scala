@@ -24,5 +24,10 @@ case class CompilerConfig(
   dumpAst: Boolean = false,
   dumpTypedAst: Boolean = false,
   compileProfile: onion.compiler.pipeline.CompileProfileSettings = onion.compiler.pipeline.CompileProfileSettings(),
-  checkLaws: Boolean = true
+  checkLaws: Boolean = true,
+  // Sample count and RNG seed for `law` checking. Settings rather than constants so a
+  // reported counterexample can be reproduced, and so a run can be widened to look for
+  // others (issue #346).
+  lawSamples: Int = onion.compiler.verification.ArgGenerator.DefaultSamples,
+  lawSeed: Long = onion.compiler.verification.ArgGenerator.DefaultSeed
 )

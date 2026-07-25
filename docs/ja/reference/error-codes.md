@@ -105,6 +105,33 @@ foreach (k, v) in m { println(k + "=" + v) }
 foreach k: String in m.keySet() { println(k) }
 ```
 
+### `E0074` — law の引数型からサンプルを生成できない
+
+`law` はビルド時に生成したサンプル値で検査されるため、すべての引数型に生成器が必要です。
+生成できる型は `String`, `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte` と、
+全成分が生成可能なレコードです。
+
+```onion
+record Dummy(v: Int)
+  law overArray(xs: Int[]) { xs != null }   // E0074: Int[] の生成器がない
+```
+
+それ以外——配列、`Map`、enum、インターフェース、コンストラクタが複数あるクラス——には
+生成器がありません。以前はこうした law が黙って読み飛ばされ、**成立した law と区別が
+つきませんでした**。実行できない検査が「通った検査」に見えてはいけません。
+引数の型を変えるか、law を削除してください。
+
+```onion
+record Pt(x: Int, y: Int)
+  law reflexive(p: Pt) { p == p }          // OK: flat なレコードは生成可能
+```
+
+### `E0075` — law を持つクラスをロードできなかった
+
+law はコンパイル済みクラスに対して実行されます。`law` / `example` 句を持つクラスを
+ロードできなかった場合、その検査は1つも実行されていません。`E0074` と同じ理由で、
+黙って見逃さずに報告します。
+
 ## Null 安全エラー
 
 ### `E0057` — 型引数が null の可能性がある

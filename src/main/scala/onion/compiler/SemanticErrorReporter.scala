@@ -221,7 +221,7 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(items => asString(items(0)))
     ),
     SemanticError.DUPLICATE_FUNCTION -> ErrorDef(
-      "error.semantic.duplicatedGlobalVariable",
+      "error.semantic.duplicatedFunction",
       Seq(items => asString(items(0)), items => typeNames(asTypeArray(items(1))))
     ),
     SemanticError.DUPLICATE_CONSTRUCTOR -> ErrorDef(

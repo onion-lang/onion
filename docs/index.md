@@ -12,6 +12,7 @@
 - **Bidirectional Records** - One `record ... from re"..." derive!(Json, Yaml)` declaration derives parse/format and JSON/YAML serde in *both* directions
 - **Compile-Time Specs** - `law` / `example` clauses on a record are executed by the compiler at build time, so invariants like `parse∘format == id` are machine-checked
 - **Concise Classes** - Primary constructors: `class Point(val x: Int, val y: Int)`
+- **Type Classes** - `trait` / `instance` with dictionary passing for constrained generics (`sum[T: Numeric]`)
 - **Object-Oriented** - Classes, inheritance, interfaces, and method overloading
 - **Functional Elements** - Lambda expressions, closures, and first-class functions
 - **Monadic Composition** - Do notation for Option, Result, and Future types
@@ -93,6 +94,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 - [Classes and Objects](guide/classes-and-objects.md) - Object-oriented programming
 - [Inheritance](guide/inheritance.md) - Subclassing and interface implementation
 - [Collections](guide/collections.md) - Lists, maps, and built-in pipelines
+- [Type Classes](guide/type-classes.md) - `trait`, `instance`, and constrained generics
 - [Java Interoperability](guide/java-interop.md) - Using Java libraries
 - [Scripting](guide/scripting.md) - re""/file"" literals, derive!, law/example, pipelines, auto-CLI
 
@@ -130,6 +132,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 
 ## Design Notes
 
+- [Type Classes](design/type-classes.md) - `trait`/`instance`, coherence, and dictionary passing
 - [Generics Design](GENERICS_DESIGN.md) - Erasure-based generics design
 - [Parser Refactoring](parser-refactoring.md) - Separating grammar from AST building
 - [Quality Bar](quality-bar.md) - Measurable practical-quality indicators

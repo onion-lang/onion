@@ -348,9 +348,14 @@ private[compiler] final class SimpleExpressionTypingSupport(
             case None =>
               // Fields that can't be reached this way (e.g. an instance field from
               // a static method) still suggest the qualified form to use.
-              fieldQualificationHint(node.name, context) match {
-                case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
-                case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+              // A name whose own declaration failed to type is already accounted
+              // for by that error; saying "not found" once per use would be both
+              // wrong (it *is* declared) and louder than the root cause (#333).
+              if (!context.isFailedDeclaration(node.name)) {
+                fieldQualificationHint(node.name, context) match {
+                  case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
+                  case None => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray)
+                }
               }
               None
           }

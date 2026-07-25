@@ -264,6 +264,19 @@ class LocalContext {
     usageTracker.recordUsage(name)
   }
 
+  // Declarations whose type could not be determined (the initializer failed to
+  // type, and no explicit type was given). The name is NOT bound -- binding it
+  // at some placeholder type just trades "variable not found" noise for
+  // wrong-type noise on the placeholder. Instead the name is remembered so a
+  // later reference can stay silent: the root cause is already reported, and
+  // repeating "variable is not found" once per use is both misleading (the
+  // variable *is* declared) and drowns out the real error (issue #333).
+  private val failedDeclarations = scala.collection.mutable.HashSet[String]()
+
+  def recordFailedDeclaration(name: String): Unit = failedDeclarations += name
+
+  def isFailedDeclaration(name: String): Boolean = failedDeclarations.contains(name)
+
   /**
    * Gets all unused local variables (not parameters).
    */

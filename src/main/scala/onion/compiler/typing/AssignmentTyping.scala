@@ -21,7 +21,12 @@ final class AssignmentTyping(
     var value: Term = typed(node.rhs, context, expectedType).getOrElse(null)
     if (value == null) return null
     if (bind == null) {
-      bodyContext.report(VARIABLE_NOT_FOUND, id, id.name, context.allNames.toArray)
+      // Assigning to a name whose declaration failed to type: the root cause is
+      // already reported, so stay silent rather than adding a misleading
+      // "variable is not found" (#333).
+      if (!context.isFailedDeclaration(id.name)) {
+        bodyContext.report(VARIABLE_NOT_FOUND, id, id.name, context.allNames.toArray)
+      }
       return null
     }
     if (!bind.isMutable) {

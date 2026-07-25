@@ -38,13 +38,21 @@ confidence, so it is a prerequisite rather than a cleanup.
 | [#348](https://github.com/onion-lang/onion/issues/348) | `Outcome[T]` and `Defect` — one failure channel, with accumulation |
 | [#349](https://github.com/onion-lang/onion/issues/349) | one scalar conversion registry (collapse five duplicated switches) |
 | [#350](https://github.com/onion-lang/onion/issues/350) | `Shape[T]` and named `shape` declarations |
-| [#351](https://github.com/onion-lang/onion/issues/351) | Shape combinators — `lines`, `sepBy`, `xmap`, `zip`, `orElse` |
-| [#352](https://github.com/onion-lang/onion/issues/352) | json/yaml/csv shapes, retiring `derive!` |
+| [#351](https://github.com/onion-lang/onion/issues/351) | Shape combinators — `lines`, `sepBy`, `xmap`, `orElse` (`zip` deliberately deferred — see below) |
+| [#352](https://github.com/onion-lang/onion/issues/352) | json/yaml shapes, retiring `derive!` (`csv` deliberately deferred — see below) |
 | [#353](https://github.com/onion-lang/onion/issues/353) | resource literals take a shape; `Cli` stops calling `System.exit` |
 | [#354](https://github.com/onion-lang/onion/issues/354) | fix the positioning — README, EN/JA parity, quality-bar baseline |
 | [#355](https://github.com/onion-lang/onion/issues/355) | broken-log demo, guides, examples, crash corpus |
 
 Rough order: #346 → #347 → #348 → #349 → #350 → #351 → {#352, #353} → {#354, #355}.
+
+Both #351 and #352 shipped narrower than this table originally described, by deliberate
+choice made while implementing them, not by oversight: a shape-level `zip` over two *text*
+shapes has no rule for where one component's text ends and the next begins without a
+delimiter (`sepBy` is that rule; see typed-boundaries.md §5.3), and a `csv` shape is a
+*row* shape needing a decision about the header row that `json`/`yaml` do not, so it is
+better designed against a concrete demo than guessed at in isolation (PR #379). Neither
+has an open tracking issue as of this writing.
 
 **Demo:** 1,000 access-log lines, 5 malformed. You get 995 typed values *and* 5 defects
 with line numbers. Today `parseAll` returns 995 values and no trace the other 5 existed.

@@ -390,7 +390,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../../../design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -2016,6 +2016,28 @@
     <span class="md-ellipsis">
       
         E0073 — Map は直接反復できない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0074-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0074 — law の引数型からサンプルを生成できない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0075-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0075 — law を持つクラスをロードできなかった
       
     </span>
   </a>
@@ -4098,6 +4120,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../design/typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../GENERICS_DESIGN/" class="md-nav__link">
         
   
@@ -4364,6 +4526,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0074-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0074 — law の引数型からサンプルを生成できない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0075-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0075 — law を持つクラスをロードできなかった
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4528,13 +4712,31 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>foreach (k, v) in m { println(k + &quot;=&quot; + v) }
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>foreach k: String in m.keySet() { println(k) }
 </span></code></pre></div>
+<h3 id="e0074-law"><code>E0074</code> — law の引数型からサンプルを生成できない<a class="headerlink" href="#e0074-law" title="Permanent link">&para;</a></h3>
+<p><code>law</code> はビルド時に生成したサンプル値で検査されるため、すべての引数型に生成器が必要です。
+生成できる型は <code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code> と、
+全成分が生成可能なレコードです。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record Dummy(v: Int)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  law overArray(xs: Int[]) { xs != null }   // E0074: Int[] の生成器がない
+</span></code></pre></div>
+<p>それ以外——配列、<code>Map</code>、enum、インターフェース、コンストラクタが複数あるクラス——には
+生成器がありません。以前はこうした law が黙って読み飛ばされ、<strong>成立した law と区別が
+つきませんでした</strong>。実行できない検査が「通った検査」に見えてはいけません。
+引数の型を変えるか、law を削除してください。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  law reflexive(p: Pt) { p == p }          // OK: flat なレコードは生成可能
+</span></code></pre></div>
+<h3 id="e0075-law"><code>E0075</code> — law を持つクラスをロードできなかった<a class="headerlink" href="#e0075-law" title="Permanent link">&para;</a></h3>
+<p>law はコンパイル済みクラスに対して実行されます。<code>law</code> / <code>example</code> 句を持つクラスを
+ロードできなかった場合、その検査は1つも実行されていません。<code>E0074</code> と同じ理由で、
+黙って見逃さずに報告します。</p>
 <h2 id="null">Null 安全エラー<a class="headerlink" href="#null" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-null"><code>E0057</code> — 型引数が null の可能性がある<a class="headerlink" href="#e0057-null" title="Permanent link">&para;</a></h3>
 <p>裸の型引数 <code>[T]</code> は nullable な型で実体化される可能性があるため、null チェックまたは非 null 制限なしには直接デリファレンスできません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>class Box[T] {
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>public:
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>class Box[T] {
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>public:
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>}
 </span></code></pre></div>
 <p>修正方法:
 - <code>?.</code> / <code>?:</code> / <code>if x != null</code> を使う。
@@ -4542,18 +4744,18 @@
 <h2 id="_4">パターンマッチングエラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sealed interface Shape {}
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>record Circle(r: Int) &lt;: Shape
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>select shape {
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sealed interface Shape {}
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>record Circle(r: Int) &lt;: Shape
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>select shape {
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>}
 </span></code></pre></div>
 <h2 id="_5">パーサーエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="_6">関連項目<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>

@@ -388,7 +388,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -3789,6 +3789,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../design/typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../GENERICS_DESIGN/" class="md-nav__link">
         
   
@@ -4014,14 +4154,17 @@
 <p>"Practical quality" is intentionally vague, so this file pins it to a set of
 <strong>objectively measurable indicators</strong>. Each row has a measurement you can run
 and a threshold; the language has reached the bar when <em>every</em> row passes.</p>
-<p>Baseline figures are the ground-truth values as of 2026-06-26 (develop @ 6a2d0e4).</p>
+<p>Baseline figures are the ground-truth values as of 2026-07-26 (develop @ f6cf5e83),
+<strong>re-measured</strong> rather than carried forward — the previous baseline (2026-06-26 @ 6a2d0e4)
+had drifted badly enough to be misleading: it recorded 1193 tests against an actual 2445,
+36 samples against 59, and ~24 diagnostic codes against 74.</p>
 <table>
 <thead>
 <tr>
 <th>#</th>
 <th>Dimension</th>
 <th>How to measure</th>
-<th>Current (2026-06-26)</th>
+<th>Current (2026-07-26)</th>
 <th>Pass threshold</th>
 </tr>
 </thead>
@@ -4029,22 +4172,22 @@ and a threshold; the language has reached the bar when <em>every</em> row passes
 <tr>
 <td>1</td>
 <td>Test suite</td>
-<td><code>SBT_OPTS="-Xmx2g" sbt -batch test</code></td>
-<td>1193 pass / 0 fail</td>
+<td><code>sbt -batch -Duser.language=en test</code></td>
+<td>2445 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Sample health</td>
-<td><code>SampleProgramsSpec</code> (compiles every <code>run/*.on</code>)</td>
-<td>36 / 36 compile</td>
+<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code> (both compile every <code>run/*.on</code>)</td>
+<td>59 / 59 compile</td>
 <td>all compile, no rot</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Large programs</td>
 <td>count of <code>run/*.on</code> ≥ 100 lines that run end-to-end as-is</td>
-<td>5 (OrderReport, StatsApp, TodoManager, ShapeProcessor, TextAnalyzer)</td>
+<td>5 (OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager)</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4058,25 +4201,32 @@ and a threshold; the language has reached the bar when <em>every</em> row passes
 <td>5</td>
 <td>Known usability bugs</td>
 <td>implemented-but-unreachable / broken features still open</td>
-<td>0</td>
+<td>1 (<a href="https://github.com/onion-lang/onion/issues/374">#374</a>)</td>
 <td>0</td>
 </tr>
 <tr>
 <td>6</td>
 <td>Docs parity</td>
 <td><code>docs/guide</code> vs <code>docs/ja/guide</code> count + every code block compiles</td>
-<td>12 / 12</td>
+<td>13 / 13</td>
 <td>parity + all blocks verified</td>
 </tr>
 <tr>
 <td>7</td>
 <td>Diagnostics</td>
 <td>distinct <code>E00xx</code> codes with EN+JA messages</td>
-<td>~24</td>
+<td>74</td>
 <td>every common error has a dedicated code</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Do not set <code>SBT_OPTS</code>.</strong> The previous version of this file recommended
+<code>SBT_OPTS="-Xmx2g"</code>, which now <em>lowers</em> the heap below the project's own default of 4g and
+makes the suite die with an <code>OutOfMemoryError</code> partway through. The default is correct.</p>
+<p><code>-Duser.language=en</code> matters: error messages are bilingual and resolved from the JVM
+default locale, so a test asserting on message text passes in a Japanese locale and fails
+in release CI, which runs in English. Assert on error <strong>codes</strong>, not localized text.</p>
+<p>The one cancelled test is the distribution smoke test, gated behind <code>-Donion.dist.path</code>.</p>
 <p><strong>Practical quality is reached when rows 1–7 all pass.</strong> This turns the open-ended
 goal "reach practical quality" into a checkable state.</p>
 <h2 id="row-4-feature-coverage-checklist">Row 4 — feature coverage checklist<a class="headerlink" href="#row-4-feature-coverage-checklist" title="Permanent link">&para;</a></h2>
@@ -4101,7 +4251,14 @@ goal "reach practical quality" into a checkable state.</p>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> extension methods used in a large sample (<code>StatsApp</code>, <code>ShapeProcessor</code>, <code>TextAnalyzer</code>, <code>TodoManager</code>)</li>
 </ul>
 <h2 id="row-5-currently-open-usability-bugs-tracked">Row 5 — currently open usability bugs (tracked)<a class="headerlink" href="#row-5-currently-open-usability-bugs-tracked" title="Permanent link">&para;</a></h2>
-<p>None. The two previously tracked issues have been resolved:</p>
+<ol>
+<li><strong>Constant narrowing does not reach constructor arguments.</strong> <code>val b: Byte = 100</code>
+   narrows, but <code>new R(..., -3)</code> against a <code>Short</code> component is <code>E0021</code>
+   ("constructor applicable for R(..., Int) is not found") and needs <code>(-3 as Short)</code>.
+   Found while writing <code>ScalarConversionSpec</code>; it will be hit again by anything that
+   builds a record out of parsed components. (<a href="https://github.com/onion-lang/onion/issues/374">#374</a>)</li>
+</ol>
+<p>Previously tracked and resolved:</p>
 <ol>
 <li><strong>Primitive-type extensions</strong> — fixed. <code>extension Int { def double(): Int = self * 2 }</code> and <code>(5).double()</code> now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.</li>
 <li><strong>Top-level function called from a class method</strong> — fixed. Top-level <code>val</code>/<code>var</code> and functions are emitted as static members of the synthetic top-level class, and bare identifiers / unqualified calls in class methods fall back to these static members.</li>

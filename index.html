@@ -388,7 +388,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -3965,6 +3965,146 @@
   
   
     <li class="md-nav__item">
+      <a href="design/typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="GENERICS_DESIGN/" class="md-nav__link">
         
   
@@ -4238,6 +4378,7 @@
 <li><strong>Bidirectional Records</strong> - One <code>record ... from re"..." derive!(Json, Yaml)</code> declaration derives parse/format and JSON/YAML serde in <em>both</em> directions</li>
 <li><strong>Compile-Time Specs</strong> - <code>law</code> / <code>example</code> clauses on a record are executed by the compiler at build time, so invariants like <code>parse∘format == id</code> are machine-checked</li>
 <li><strong>Concise Classes</strong> - Primary constructors: <code>class Point(val x: Int, val y: Int)</code></li>
+<li><strong>Type Classes</strong> - <code>trait</code> / <code>instance</code> with dictionary passing for constrained generics (<code>sum[T: Numeric]</code>)</li>
 <li><strong>Object-Oriented</strong> - Classes, inheritance, interfaces, and method overloading</li>
 <li><strong>Functional Elements</strong> - Lambda expressions, closures, and first-class functions</li>
 <li><strong>Monadic Composition</strong> - Do notation for Option, Result, and Future types</li>
@@ -4316,6 +4457,7 @@
 <li><a href="guide/classes-and-objects/">Classes and Objects</a> - Object-oriented programming</li>
 <li><a href="guide/inheritance/">Inheritance</a> - Subclassing and interface implementation</li>
 <li><a href="guide/collections/">Collections</a> - Lists, maps, and built-in pipelines</li>
+<li><a href="guide/type-classes/">Type Classes</a> - <code>trait</code>, <code>instance</code>, and constrained generics</li>
 <li><a href="guide/java-interop/">Java Interoperability</a> - Using Java libraries</li>
 <li><a href="guide/scripting/">Scripting</a> - re""/file"" literals, derive!, law/example, pipelines, auto-CLI</li>
 </ul>
@@ -4353,6 +4495,7 @@
 </ul>
 <h2 id="design-notes">Design Notes<a class="headerlink" href="#design-notes" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="design/type-classes/">Type Classes</a> - <code>trait</code>/<code>instance</code>, coherence, and dictionary passing</li>
 <li><a href="GENERICS_DESIGN/">Generics Design</a> - Erasure-based generics design</li>
 <li><a href="parser-refactoring/">Parser Refactoring</a> - Separating grammar from AST building</li>
 <li><a href="quality-bar/">Quality Bar</a> - Measurable practical-quality indicators</li>

@@ -12,13 +12,13 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.org/examples/async/">
+        <link rel="canonical" href="https://onion-lang.org/design/readme-rewrite-proposal/">
       
       
-        <link rel="prev" href="../json-http/">
+        <link rel="prev" href="../roadmap/">
       
       
-        <link rel="next" href="../error-handling/">
+        <link rel="next" href="../type-classes/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Async & Concurrency - Onion Programming Language</title>
+        <title>README Rewrite Proposal - Onion Programming Language</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#async-concurrency-examples" class="md-skip">
+        <a href="#readme-rewrite-proposal" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Async & Concurrency
+              README Rewrite Proposal
             
           </span>
         </div>
@@ -304,13 +304,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -386,11 +384,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../design/typed-boundaries/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -2809,31 +2809,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -2851,7 +2848,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2869,7 +2866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -2897,7 +2894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -2925,7 +2922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -2953,7 +2950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -2981,7 +2978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3009,7 +3006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3034,37 +3031,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Async & Concurrency
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -3080,103 +3050,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Waiting for Multiple Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do-Notation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Async Downloader
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Racing Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3189,7 +3062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3858,28 +3731,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -3897,7 +3773,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3915,7 +3791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/typed-boundaries/" class="md-nav__link">
+      <a href="../typed-boundaries/" class="md-nav__link">
         
   
   
@@ -3943,7 +3819,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+      <a href="../onion-v0.5-audit/" class="md-nav__link">
         
   
   
@@ -3971,7 +3847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/roadmap/" class="md-nav__link">
+      <a href="../roadmap/" class="md-nav__link">
         
   
   
@@ -3996,10 +3872,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -4015,6 +3918,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-precisely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem, precisely
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-opening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed opening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#companion-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Companion changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-deliberately-not-proposed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is deliberately not proposed
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -4027,7 +3994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/type-classes/" class="md-nav__link">
+      <a href="../type-classes/" class="md-nav__link">
         
   
   
@@ -4166,10 +4133,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
+  <a href="#the-problem-precisely" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating Futures
+        The problem, precisely
       
     </span>
   </a>
@@ -4177,10 +4144,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
+  <a href="#proposed-opening" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Waiting for Multiple Futures
+        Proposed opening
       
     </span>
   </a>
@@ -4188,10 +4155,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
+  <a href="#companion-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Do-Notation
+        Companion changes
       
     </span>
   </a>
@@ -4199,43 +4166,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#what-is-deliberately-not-proposed" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Async Downloader
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Racing Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
+        What is deliberately not proposed
       
     </span>
   </a>
@@ -4262,102 +4196,111 @@
   
 
 
-<h1 id="async-concurrency-examples">Async &amp; Concurrency Examples<a class="headerlink" href="#async-concurrency-examples" title="Permanent link">&para;</a></h1>
-<p>Onion provides a <code>Future</code> type and <code>do[Future]</code> notation for asynchronous programming.</p>
-<h2 id="creating-futures">Creating Futures<a class="headerlink" href="#creating-futures" title="Permanent link">&para;</a></h2>
-<p>Run work in the background with <code>Future::async</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  })
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>}
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>val f = fetchPage(&quot;https://example.com&quot;, 100L)
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>println(f.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="waiting-for-multiple-futures">Waiting for Multiple Futures<a class="headerlink" href="#waiting-for-multiple-futures" title="Permanent link">&para;</a></h2>
-<p>Launch several futures and wait for all of them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>val f1 = fetchPage(&quot;a&quot;, 50L)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val f2 = fetchPage(&quot;b&quot;, 30L)
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>val f3 = fetchPage(&quot;c&quot;, 40L)
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  foreach r: Object in results {
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    println(&quot;  &quot; + (r as String))
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  }
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>})
-</span></code></pre></div>
-<h2 id="do-notation">Do-Notation<a class="headerlink" href="#do-notation" title="Permanent link">&para;</a></h2>
-<p>Chain futures with <code>do[Future]</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>}
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>Handle failures with <code>onFailure</code>, <code>recover</code>, or <code>recoverWith</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val risky: Future[Int] = Future::failed(new Exception(&quot;simulated failure&quot;))
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>risky.onFailure((error: Throwable) -&gt; {
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  println(&quot;caught: &quot; + error.getMessage())
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>})
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>val recovered = risky.recover((error: Throwable) -&gt; {
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  println(&quot;recovering from &quot; + error.getMessage())
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  return 0
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>})
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>println(&quot;value=&quot; + recovered.getOrElse(-1))
-</span></code></pre></div>
-<h2 id="complete-example-async-downloader">Complete Example: Async Downloader<a class="headerlink" href="#complete-example-async-downloader" title="Permanent link">&para;</a></h2>
-<p><strong><code>AsyncDownloader.on</code></strong> downloads several simulated pages concurrently and aggregates the results.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  })
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>val urls = [
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  &quot;https://example.com/a&quot;,
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  &quot;https://example.com/b&quot;,
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>  &quot;https://example.com/c&quot;
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>]
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>val f1 = fetchPage(urls[0] as String, 50L)
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>val f2 = fetchPage(urls[1] as String, 30L)
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>val f3 = fetchPage(urls[2] as String, 40L)
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>})
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>}
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="racing-futures">Racing Futures<a class="headerlink" href="#racing-futures" title="Permanent link">&para;</a></h2>
-<p>Use <code>race</code> to get the value from the first future that completes.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val fast = fetchPage(&quot;fast&quot;, 10L)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>val slow = fetchPage(&quot;slow&quot;, 100L)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>val winner = fast.race(slow)
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>println(&quot;winner: &quot; + winner.getOrElse(&quot;none&quot;))
-</span></code></pre></div>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h1 id="readme-rewrite-proposal">README rewrite — proposal<a class="headerlink" href="#readme-rewrite-proposal" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>proposal.</strong> Nothing in <code>README.md</code> has been changed. This is the concrete
+version of <a href="https://github.com/onion-lang/onion/issues/354">#354</a>, split out so the
+wording can be argued about before it lands.</p>
+<h2 id="the-problem-precisely">The problem, precisely<a class="headerlink" href="#the-problem-precisely" title="Permanent link">&para;</a></h2>
+<p><code>README.md</code> currently sells two different languages.</p>
+<p><strong>Lines 1–4</strong> — the first thing anyone reads:</p>
+<blockquote>
+<p>Onion - A Statically Typed Programming Language on JVM
+Onion is an object-oriented and statically typed programming language. Source codes of
+Onion compiles into JVM class files as in-memory or real files.</p>
+</blockquote>
+<p>Every property claimed there — static typing, object orientation, JVM bytecode — is
+shared with Kotlin, Scala, Java, Groovy and Ceylon. It is a <em>category</em>, not a reason to
+use Onion. Lines 5–7 then spend the next paragraph on rewrite history (Java → Scala,
+JavaCC), which is interesting to a contributor and irrelevant to a reader deciding
+whether to care.</p>
+<p><strong>Lines 171–205</strong> — "Shape-First Scripting", buried as the sixth subsection of "Language
+Snapshot":</p>
+<blockquote>
+<p>Onion collapses the boilerplate layers a script usually needs.</p>
+</blockquote>
+<p><em>That</em> is the actual thesis, and it is 171 lines down.</p>
+<p>Three further inconsistencies, from <a href="../onion-v0.5-audit/">audit §8</a>:</p>
 <ul>
-<li><a href="../json-http/">JSON &amp; HTTP Examples</a> - Combine futures with HTTP requests</li>
-<li><a href="../error-handling/">Error Handling Examples</a> - Handle async failures</li>
-<li><a href="../../reference/stdlib/">Standard Library Reference</a> - Full Future API</li>
+<li><code>grep -nE "trait|instance|type class" README.md</code> → <strong>0 matches</strong>, although type classes
+  are implemented and shipped (<code>docs/design/type-classes.md:1</code>, "implemented (v1)") and
+  documented in <code>docs/guide/type-classes.md</code> in both languages. A headline feature is
+  absent from the front door.</li>
+<li><code>docs/index.md</code> lists 13 key features; <code>docs/ja/index.md</code> lists 11. The two missing from
+  Japanese are <strong>"Bidirectional Records"</strong> and <strong>"Compile-Time Specs"</strong> — the two most
+  distinctive items in the list.</li>
+<li><code>CHANGELOG.md</code> contains no positioning statement, so there is no third source to
+  arbitrate the README's self-contradiction.</li>
 </ul>
+<h2 id="proposed-opening">Proposed opening<a class="headerlink" href="#proposed-opening" title="Permanent link">&para;</a></h2>
+<p>Replacing lines 1–7:</p>
+<div class="language-markdown highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gu">## Onion — typed tools for a messy world</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Onion is a statically typed language for turning messy external data and operations
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>into checked, reversible tools. It runs on the JVM and calls Java directly.
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>Most languages hand you a <span class="sb">`String`</span> at the boundary and wish you luck. Onion asks you
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>to describe the boundary once — and derives the parser, the printer, the failure
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>channel and the command-line interface from that one description.
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>```onion
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>record Access(time: String, method: String, path: String, status: Int)
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  from re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  law roundtrip(a: Access) { Access::parse(Access::format(a)) == a }
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>def main(path: String, min: Int = 400): void {
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  file(path).lines()
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    .map { line =&gt; Access::parse(line) }
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    .filter { a =&gt; a != null &amp;&amp; a.status() &gt;= min }
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    |&gt; println
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>}
+</span></code></pre></div>
+<p>One declaration gives you <code>parse</code>, <code>format</code>, a <code>law</code> the <strong>compiler checks at build
+time</strong>, and a CLI with <code>--min</code> and <code>--help</code> derived from <code>main</code>'s signature.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Notes on the sample: it is deliberately written in **current** v0.5 syntax, not the
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>proposed `shape` syntax, so the README stays true while v0.6 is in progress. When
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>[#350](https://github.com/onion-lang/onion/issues/350) lands, this block changes with it.
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>The rewrite history (current lines 5–7) moves to `## Architecture` (line 207), where it
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>belongs.
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>## Proposed structure
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>Current order buries the differentiators under the generic features:
+</span></code></pre></div>
+Language Snapshot
+  Null Safety            ← Kotlin has this
+  Records, Enums, …      ← Java/Scala have this
+  Do Notation            ← Scala/Haskell have this
+  Trailing Lambda        ← Kotlin has this
+  Async with Future      ← everyone has this
+  Shape-First Scripting  ← ONLY Onion has this
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Proposed: lead with what is unique, then the table stakes.
+</span></code></pre></div>
+Language Snapshot
+  Boundaries           bidirectional records, scheme literals, |&gt;, auto-CLI
+  Checked at Build     law / example, exhaustiveness, null safety
+  Types                records, enums, generics, type classes   ← currently missing entirely
+  Everyday             do notation, trailing lambdas, Future
+```</p>
+<p>A reader who stops after the first section should already know what Onion is for.</p>
+<h2 id="companion-changes">Companion changes<a class="headerlink" href="#companion-changes" title="Permanent link">&para;</a></h2>
+<p>Same issue, since they are the same inconsistency:</p>
+<ul>
+<li>add the two missing bullets to <code>docs/ja/index.md</code> so EN/JA parity is real (13 vs 11);</li>
+<li>link <code>guide/type-classes.md</code> from both guide indexes — the file exists in
+  <code>docs/guide/</code> and <code>docs/ja/guide/</code> and is in <code>mkdocs.yml</code>, but neither index links it;</li>
+<li>link <code>docs/design/</code> from <code>docs/index.md</code>, which today links three design-ish documents
+  that live <em>outside</em> that directory (<code>GENERICS_DESIGN.md</code>, <code>parser-refactoring.md</code>,
+  <code>quality-bar.md</code>) and does not link <code>docs/design/type-classes.md</code> at all;</li>
+<li>refresh the <code>docs/quality-bar.md</code> baseline: it records "1193 pass / 0 fail" and
+  "36 / 36 compile" as of 2026-06-26, against an actual ~2,450 tests and 59 files in <code>run/</code>.</li>
+</ul>
+<h2 id="what-is-deliberately-not-proposed">What is deliberately not proposed<a class="headerlink" href="#what-is-deliberately-not-proposed" title="Permanent link">&para;</a></h2>
+<p><strong>Deleting "statically typed" or "JVM".</strong> They are true, they are what a reader filters
+on, and they belong in the second sentence. The objection is to leading with them.</p>
+<p><strong>Rewriting the README around v0.6 syntax now.</strong> The README must describe the language
+that exists. The positioning changes now because it is wrong now; the code samples change
+when the code does.</p>
 
 
 
@@ -4393,7 +4336,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../json-http/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JSON &amp; HTTP">
+          <a href="../roadmap/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Roadmap: v0.6-v0.8">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4403,20 +4346,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                JSON & HTTP
+                Roadmap: v0.6-v0.8
               </div>
             </div>
           </a>
         
         
           
-          <a href="../error-handling/" class="md-footer__link md-footer__link--next" aria-label="Next: Error Handling">
+          <a href="../type-classes/" class="md-footer__link md-footer__link--next" aria-label="Next: Type Classes">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Error Handling
+                Type Classes
               </div>
             </div>
             <div class="md-footer__button md-icon">

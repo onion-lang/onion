@@ -12,13 +12,13 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.org/examples/async/">
+        <link rel="canonical" href="https://onion-lang.org/design/onion-v0.5-audit/">
       
       
-        <link rel="prev" href="../json-http/">
+        <link rel="prev" href="../typed-boundaries/">
       
       
-        <link rel="next" href="../error-handling/">
+        <link rel="next" href="../roadmap/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Async & Concurrency - Onion Programming Language</title>
+        <title>v0.5 Audit - Onion Programming Language</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#async-concurrency-examples" class="md-skip">
+        <a href="#onion-v05-audit-evidence-based" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Async & Concurrency
+              v0.5 Audit
             
           </span>
         </div>
@@ -304,13 +304,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -386,11 +384,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../design/typed-boundaries/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -2809,31 +2809,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -2851,7 +2848,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2869,7 +2866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -2897,7 +2894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -2925,7 +2922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -2953,7 +2950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -2981,7 +2978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3009,7 +3006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3034,37 +3031,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Async & Concurrency
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -3080,103 +3050,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Waiting for Multiple Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do-Notation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Async Downloader
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Racing Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3189,7 +3062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3858,28 +3731,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -3897,7 +3773,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3915,7 +3791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/typed-boundaries/" class="md-nav__link">
+      <a href="../typed-boundaries/" class="md-nav__link">
         
   
   
@@ -3940,10 +3816,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -3959,6 +3862,264 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-onion-already-does-well" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What Onion already does well
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-four-boundary-mechanisms-that-share-nothing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Four boundary mechanisms that share nothing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Four boundary mechanisms that share nothing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-same-eight-scalars-are-switched-on-in-five-places" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The same eight scalars are switched on in five places
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-the-four-mechanisms-disagree-about-what-a-kind-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 The four mechanisms disagree about what a "kind" is
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-five-failure-conventions-for-one-concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Five failure conventions for one concept
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Five failure conventions for one concept">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-parseall-drops-bad-lines-with-no-trace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 parseAll drops bad lines with no trace
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-a-missing-string-key-silently-constructs-a-broken-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 A missing String key silently constructs a broken record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-boolean-conversion-cannot-fail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Boolean conversion cannot fail
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-law-can-silently-not-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. law can silently not run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-no-runtime-notion-of-where-a-value-came-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. No runtime notion of where a value came from
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-result-option-exist-but-the-boundary-layer-ignores-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Result / Option exist but the boundary layer ignores them
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-effect-surface-and-why-capabilities-are-harder-than-they-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The effect surface, and why capabilities are harder than they look
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. The effect surface, and why capabilities are harder than they look">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-the-surface-itself-is-small-and-already-segregated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 The surface itself is small and already segregated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-five-effectful-classes-are-ambiently-imported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Five effectful classes are ambiently imported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-java-interop-is-completely-unrestricted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Java interop is completely unrestricted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-the-existing-annotation-mechanism-cannot-carry-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 The existing annotation mechanism cannot carry effects
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-positioning-is-internally-inconsistent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Positioning is internally inconsistent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-structural-debt-that-constrains-the-design-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Structural debt that constrains the design space
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-the-bar-a-new-language-feature-must-clear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. The bar a new language feature must clear
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3971,7 +4132,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/roadmap/" class="md-nav__link">
+      <a href="../roadmap/" class="md-nav__link">
         
   
   
@@ -3999,7 +4160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+      <a href="../readme-rewrite-proposal/" class="md-nav__link">
         
   
   
@@ -4027,7 +4188,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/type-classes/" class="md-nav__link">
+      <a href="../type-classes/" class="md-nav__link">
         
   
   
@@ -4166,10 +4327,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
+  <a href="#1-what-onion-already-does-well" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating Futures
+        1. What Onion already does well
       
     </span>
   </a>
@@ -4177,10 +4338,99 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
+  <a href="#2-four-boundary-mechanisms-that-share-nothing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Waiting for Multiple Futures
+        2. Four boundary mechanisms that share nothing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Four boundary mechanisms that share nothing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-same-eight-scalars-are-switched-on-in-five-places" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The same eight scalars are switched on in five places
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-the-four-mechanisms-disagree-about-what-a-kind-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 The four mechanisms disagree about what a "kind" is
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-five-failure-conventions-for-one-concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Five failure conventions for one concept
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Five failure conventions for one concept">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-parseall-drops-bad-lines-with-no-trace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 parseAll drops bad lines with no trace
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-a-missing-string-key-silently-constructs-a-broken-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 A missing String key silently constructs a broken record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-boolean-conversion-cannot-fail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Boolean conversion cannot fail
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-law-can-silently-not-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. law can silently not run
       
     </span>
   </a>
@@ -4188,10 +4438,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
+  <a href="#5-no-runtime-notion-of-where-a-value-came-from" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Do-Notation
+        5. No runtime notion of where a value came from
       
     </span>
   </a>
@@ -4199,10 +4449,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#6-result-option-exist-but-the-boundary-layer-ignores-them" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
+        6. Result / Option exist but the boundary layer ignores them
       
     </span>
   </a>
@@ -4210,10 +4460,71 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
+  <a href="#7-the-effect-surface-and-why-capabilities-are-harder-than-they-look" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Async Downloader
+        7. The effect surface, and why capabilities are harder than they look
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. The effect surface, and why capabilities are harder than they look">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-the-surface-itself-is-small-and-already-segregated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 The surface itself is small and already segregated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-five-effectful-classes-are-ambiently-imported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Five effectful classes are ambiently imported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-java-interop-is-completely-unrestricted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Java interop is completely unrestricted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-the-existing-annotation-mechanism-cannot-carry-effects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 The existing annotation mechanism cannot carry effects
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-positioning-is-internally-inconsistent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Positioning is internally inconsistent
       
     </span>
   </a>
@@ -4221,10 +4532,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
+  <a href="#9-structural-debt-that-constrains-the-design-space" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Racing Futures
+        9. Structural debt that constrains the design space
       
     </span>
   </a>
@@ -4232,10 +4543,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#10-the-bar-a-new-language-feature-must-clear" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        10. The bar a new language feature must clear
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
       
     </span>
   </a>
@@ -4262,102 +4584,443 @@
   
 
 
-<h1 id="async-concurrency-examples">Async &amp; Concurrency Examples<a class="headerlink" href="#async-concurrency-examples" title="Permanent link">&para;</a></h1>
-<p>Onion provides a <code>Future</code> type and <code>do[Future]</code> notation for asynchronous programming.</p>
-<h2 id="creating-futures">Creating Futures<a class="headerlink" href="#creating-futures" title="Permanent link">&para;</a></h2>
-<p>Run work in the background with <code>Future::async</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  })
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>}
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>val f = fetchPage(&quot;https://example.com&quot;, 100L)
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>println(f.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="waiting-for-multiple-futures">Waiting for Multiple Futures<a class="headerlink" href="#waiting-for-multiple-futures" title="Permanent link">&para;</a></h2>
-<p>Launch several futures and wait for all of them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>val f1 = fetchPage(&quot;a&quot;, 50L)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val f2 = fetchPage(&quot;b&quot;, 30L)
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>val f3 = fetchPage(&quot;c&quot;, 40L)
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  foreach r: Object in results {
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    println(&quot;  &quot; + (r as String))
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  }
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>})
-</span></code></pre></div>
-<h2 id="do-notation">Do-Notation<a class="headerlink" href="#do-notation" title="Permanent link">&para;</a></h2>
-<p>Chain futures with <code>do[Future]</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>}
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>Handle failures with <code>onFailure</code>, <code>recover</code>, or <code>recoverWith</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val risky: Future[Int] = Future::failed(new Exception(&quot;simulated failure&quot;))
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>risky.onFailure((error: Throwable) -&gt; {
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  println(&quot;caught: &quot; + error.getMessage())
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>})
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>val recovered = risky.recover((error: Throwable) -&gt; {
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  println(&quot;recovering from &quot; + error.getMessage())
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  return 0
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>})
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>println(&quot;value=&quot; + recovered.getOrElse(-1))
-</span></code></pre></div>
-<h2 id="complete-example-async-downloader">Complete Example: Async Downloader<a class="headerlink" href="#complete-example-async-downloader" title="Permanent link">&para;</a></h2>
-<p><strong><code>AsyncDownloader.on</code></strong> downloads several simulated pages concurrently and aggregates the results.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  })
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>val urls = [
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  &quot;https://example.com/a&quot;,
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  &quot;https://example.com/b&quot;,
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>  &quot;https://example.com/c&quot;
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>]
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>val f1 = fetchPage(urls[0] as String, 50L)
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>val f2 = fetchPage(urls[1] as String, 30L)
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>val f3 = fetchPage(urls[2] as String, 40L)
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>})
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>}
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="racing-futures">Racing Futures<a class="headerlink" href="#racing-futures" title="Permanent link">&para;</a></h2>
-<p>Use <code>race</code> to get the value from the first future that completes.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val fast = fetchPage(&quot;fast&quot;, 10L)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>val slow = fetchPage(&quot;slow&quot;, 100L)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>val winner = fast.race(slow)
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>println(&quot;winner: &quot; + winner.getOrElse(&quot;none&quot;))
-</span></code></pre></div>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h1 id="onion-v05-audit-evidence-based">Onion v0.5 Audit (evidence-based)<a class="headerlink" href="#onion-v05-audit-evidence-based" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>audit only.</strong> This document records what Onion v0.5 <em>is</em>, with citations
+to the implementation. It proposes nothing; the design that follows from it lives in
+<a href="../typed-boundaries/">typed-boundaries.md</a>, and the schedule lives in
+<a href="../roadmap/">roadmap.md</a>.</p>
+<p>Every claim below names a file and line range. Where a finding is "nothing does X",
+the search that established it is given so the claim can be re-run. Line numbers are
+as of <code>develop</code> @ <code>e4a3033c</code> (2026-07-25).</p>
+<hr />
+<h2 id="1-what-onion-already-does-well">1. What Onion already does well<a class="headerlink" href="#1-what-onion-already-does-well" title="Permanent link">&para;</a></h2>
+<p>These are load-bearing and should survive any repositioning.</p>
+<p><strong>A compile-time verification phase that actually runs user code.</strong> <code>law</code> and <code>example</code>
+clauses on records are desugared into static boolean methods
+(<code>Rewriting.scala:583-596</code>, named <code>onion$$law$$&lt;name&gt;</code> / <code>onion$$example$$&lt;name&gt;</code>) and
+executed by a real pipeline phase after bytecode generation
+(<code>verification/LawCheckPhase.scala:32-58</code>), which loads the freshly compiled classes
+through <code>OnionClassLoader</code> and invokes them reflectively. A falsified law fails the
+build with a counterexample (<code>LawCheckPhase.scala:89-91</code>). Very few languages check
+properties as part of <code>compile</code>. §4 covers what is wrong with it; the <em>idea</em> is sound
+and is the natural place to machine-check a round-trip law.</p>
+<p><strong>A derivation that produces both directions.</strong> <code>record R(...) from re"..."</code> synthesizes
+<code>parse</code> (<code>Rewriting.scala:667-670</code>) and — when the pattern is invertible —
+<code>format</code> (<code>Rewriting.scala:704-727</code>). The invertibility analysis (<code>formatSegments</code>,
+<code>Rewriting.scala:862-900</code>) is genuinely conservative: it rejects escapes, non-capturing
+groups, nesting, quantified groups and bare metacharacters rather than guessing.</p>
+<p><strong>Derivation reuses the type checker instead of duplicating it.</strong> <code>synthesizeFromMethods</code>
+emits an ordinary <code>AST.RegexPattern</code> with one generated binding per component
+(<code>Rewriting.scala:644-645</code>), so the regex select-pattern's existing checks apply to it
+for free: bad pattern → <code>E0059</code>, group-count ≠ component-count → <code>E0060</code>
+(<code>typing/SelectExpressionTyping.scala:467-479</code>). "Capture groups must match components"
+is enforced with no dedicated code.</p>
+<p><strong>An open scheme-literal mechanism.</strong> <code>re"…"</code> / <code>file"…"</code> / <code>http"…"</code> are not special:
+the parser rewrites <code>prefix"raw"</code> into the unqualified call <code>prefix("raw")</code>
+(<code>grammar/JJOnionParser.jj:255-261</code>, dispatched at <code>:2755-2760</code>). The generic
+<code>SCHEME_STRING</code> token (<code>:1124-1139</code>) means <strong>any</strong> identifier prefix works, so a user
+registers a scheme just by defining a function of that name — verified by
+<code>src/test/scala/onion/compiler/tools/UserSchemeLiteralSpec.scala</code>. New boundary syntax
+does not require grammar changes.</p>
+<p><strong>A no-crash bar with teeth.</strong> <code>MutationFuzzSpec.scala</code> runs a deterministic mutation
+fuzzer (seed <code>20260610L</code>, 60 mutations × 59 <code>run/*.on</code> seeds = 3,540 mutants) and treats
+both escaped <code>Throwable</code>s and <code>I0000</code> internal-error diagnostics as failures
+(<code>:30-38</code>). <code>CompilerCrashRegressionSpec.scala</code> pins a 29-file crash corpus under
+<code>src/test/resources/crash-corpus/</code>, named so the corpus reads as a history.</p>
+<p><strong>A single choke point for assignability.</strong> Every "does this value fit this expected
+type" decision in the compiler funnels through <code>AssignabilitySupport.processAssignable</code>
+(<code>typing/AssignabilitySupport.scala:60-190</code>) via the forwarder
+<code>TypingBodyPass.processAssignable</code> (<code>typing/TypingBodyPass.scala:75-76</code>); argument
+positions reach it through an injected function value in
+<code>typing/CallArgumentTypingSupport.scala:13</code>. 38 references, one implementation. Any
+future subsumption rule has exactly one place to go.</p>
+<p><strong><code>Result</code> and <code>Option</code> are complete and wired into <code>do</code> notation.</strong> <code>Result.java:161-312</code>
+and <code>Option.java:115-237</code> carry <code>map</code>/<code>flatMap</code>/<code>fold</code>/<code>recover</code>/<code>orElse</code>, plus the
+<code>successful</code>/<code>bind</code> pair that <code>do[Result]</code> / <code>do[Option]</code> desugar to.</p>
+<hr />
+<h2 id="2-four-boundary-mechanisms-that-share-nothing">2. Four boundary mechanisms that share nothing<a class="headerlink" href="#2-four-boundary-mechanisms-that-share-nothing" title="Permanent link">&para;</a></h2>
+<p>Onion has four ways to turn external text into typed values. They were built
+independently and have no common vocabulary.</p>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Implementation</th>
+<th>Component types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>record R(...) from re"..."</code></td>
+<td><code>Rewriting.scala:636-730</code></td>
+<td>8 scalars</td>
+</tr>
+<tr>
+<td><code>derive!(Json, Yaml)</code></td>
+<td><code>Rewriting.scala:772-851</code></td>
+<td>the same 8 scalars</td>
+</tr>
+<tr>
+<td>auto-CLI from <code>main</code>'s signature</td>
+<td><code>Rewriting.scala:292-436</code> + <code>src/main/java/onion/Cli.java</code></td>
+<td>the same 8 scalars</td>
+</tr>
+<tr>
+<td>scheme literals (<code>file""</code> / <code>http""</code>)</td>
+<td><code>grammar/JJOnionParser.jj:2755-2760</code> → <code>src/main/java/onion/Resources.java</code></td>
+<td>untyped; fixed method menu</td>
+</tr>
+</tbody>
+</table>
+<h3 id="21-the-same-eight-scalars-are-switched-on-in-five-places">2.1 The same eight scalars are switched on in five places<a class="headerlink" href="#21-the-same-eight-scalars-are-switched-on-in-five-places" title="Permanent link">&para;</a></h3>
+<p><code>Int, Long, Double, Float, Boolean, Short, Byte, String</code> — enumerated separately at:</p>
 <ul>
-<li><a href="../json-http/">JSON &amp; HTTP Examples</a> - Combine futures with HTTP requests</li>
-<li><a href="../error-handling/">Error Handling Examples</a> - Handle async failures</li>
-<li><a href="../../reference/stdlib/">Standard Library Reference</a> - Full Future API</li>
+<li><code>Rewriting.scala:401-415</code> — <code>cliKindOf</code>, AST type → tag string</li>
+<li><code>Rewriting.scala:421-436</code> — <code>convertCliValue</code>, tag → <code>onion.Cli.parseX</code> call</li>
+<li><code>Rewriting.scala:438-458</code> — <code>convertCapturedValue</code>, tag → <code>java.lang.X.parseX</code> call</li>
+<li><code>Rewriting.scala:733-742</code> — <code>jsonGetterOf</code>, tag → <code>Json.getX</code> name</li>
+<li><code>src/main/java/onion/Cli.java:101-157</code> — the <code>parseX(name, value)</code> runtime helpers</li>
 </ul>
+<p>and a sixth, type-level copy of the same set in
+<code>typing/TypingOutlinePass.scala:297-305</code> (<code>isFromDerivableType</code>, with
+<code>isDataDerivableType</code> delegating to it at <code>:304-305</code>).</p>
+<p>Adding one component type — <code>java.time.LocalDate</code>, say — means six edits in two
+languages. This is not a missing feature; it is a missing abstraction.</p>
+<h3 id="22-the-four-mechanisms-disagree-about-what-a-kind-is">2.2 The four mechanisms disagree about what a "kind" is<a class="headerlink" href="#22-the-four-mechanisms-disagree-about-what-a-kind-is" title="Permanent link">&para;</a></h3>
+<p><code>cliKindOf</code> returns a <code>String</code> tag that three other functions re-match by string
+equality. <code>Rewriting.scala:444-458</code> (<code>convertCapturedValue</code>, for <code>from re"…"</code>) and
+<code>Rewriting.scala:421-436</code> (<code>convertCliValue</code>, for auto-CLI) deliberately generate
+<em>different</em> conversion calls for the same tag: the former uses raw
+<code>java.lang.Integer.parseInt</code> so a <code>NumberFormatException</code> can be caught and turned into
+<code>null</code> (<code>Rewriting.scala:663-665</code>), the latter uses <code>onion.Cli.parseInt</code> so a failure
+prints and exits. Two conversion policies, selected by which desugaring you are in.</p>
+<hr />
+<h2 id="3-five-failure-conventions-for-one-concept">3. Five failure conventions for one concept<a class="headerlink" href="#3-five-failure-conventions-for-one-concept" title="Permanent link">&para;</a></h2>
+<p>"The external data did not match what we expected" is expressed five different ways.</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Behaviour</th>
+<th>Citation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Regex does not match</td>
+<td>returns <code>null</code></td>
+<td><code>Rewriting.scala:660</code></td>
+</tr>
+<tr>
+<td>Numeric conversion fails</td>
+<td>returns <code>null</code> — <strong>indistinguishable from no-match</strong></td>
+<td><code>Rewriting.scala:663-665</code></td>
+</tr>
+<tr>
+<td>A line in <code>parseAll</code> is malformed</td>
+<td><strong>silently dropped</strong></td>
+<td><code>Rewriting.scala:683-688</code></td>
+</tr>
+<tr>
+<td>JSON/YAML is malformed</td>
+<td>returns <code>null</code>, discarding the parser's position</td>
+<td><code>Rewriting.scala:832-834</code></td>
+</tr>
+<tr>
+<td>A CLI argument is invalid</td>
+<td><strong><code>System.exit(1)</code></strong></td>
+<td><code>src/main/java/onion/Cli.java:186-189</code></td>
+</tr>
+<tr>
+<td>A CSV row is ragged</td>
+<td>does not fail; the row is accepted as-is</td>
+<td><code>src/main/java/onion/Csv.java:76-79</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="31-parseall-drops-bad-lines-with-no-trace">3.1 <code>parseAll</code> drops bad lines with no trace<a class="headerlink" href="#31-parseall-drops-bad-lines-with-no-trace" title="Permanent link">&para;</a></h3>
+<p>The synthesized loop guards the accumulator with a plain null check and <strong>no else
+branch</strong> (<code>Rewriting.scala:683-688</code> — <code>AST.IfExpression(..., NotEqual(__r, null), add, null)</code>).
+The signature is <code>parseAll(text: String): List[R]</code>, so a caller cannot learn how many
+lines were dropped, which ones, or why. <code>docs/reference/specification.md:252-253</code>
+documents this as intended ("parses each, drops the <code>null</code>s") and
+<code>RecordFromRegexSpec.scala:84</code> locks it in.</p>
+<h3 id="32-a-missing-string-key-silently-constructs-a-broken-record">3.2 A missing String key silently constructs a broken record<a class="headerlink" href="#32-a-missing-string-key-silently-constructs-a-broken-record" title="Permanent link">&para;</a></h3>
+<p>This is the sharpest instance. For a record component of type <code>String</code>, the synthesized
+<code>fromMap</code> calls <code>Json.getString</code>, which returns <code>null</code> both when the key is absent and
+when it holds a non-string (<code>src/main/java/onion/Json.java:139-142</code>). That <code>null</code> is
+passed straight to the record constructor, and the generated constructor performs <strong>no
+validation</strong> (<code>typing/TypingOutlinePass.scala:196-217</code> creates fields, accessors and the
+<code>ConstructorDefinition</code> with no null check).</p>
+<p>So <code>R::fromJson("{}")</code> for a record with a <code>String</code> component returns a <em>successfully
+constructed</em> record whose non-nullable field is <code>null</code> — not <code>null</code>, not an error. The
+numeric case is caught only incidentally, by the unbox NPE being trapped at
+<code>Rewriting.scala:802-804</code>. <strong>There is no test covering the String case.</strong></p>
+<h3 id="33-boolean-conversion-cannot-fail">3.3 Boolean conversion cannot fail<a class="headerlink" href="#33-boolean-conversion-cannot-fail" title="Permanent link">&para;</a></h3>
+<p><code>convertCapturedValue</code> maps the <code>Boolean</code> kind to <code>java.lang.Boolean.parseBoolean</code>
+(<code>Rewriting.scala:453</code>), which never throws: <code>"maybe"</code>, <code>"yes"</code> and <code>"1"</code> all become
+<code>false</code>. <code>Cli.parseBoolean</code> (<code>Cli.java:155-157</code>) has the same shape, and is the only
+<code>parseX</code> in that file that does not validate — <code>--count=maybe</code> exits with an error while
+<code>--loud=maybe</code> is silently <code>false</code>.</p>
+<hr />
+<h2 id="4-law-can-silently-not-run">4. <code>law</code> can silently not run<a class="headerlink" href="#4-law-can-silently-not-run" title="Permanent link">&para;</a></h2>
+<p>The verification phase is the feature most at odds with its own promise.</p>
+<p><strong>A law over a non-generatable parameter type is skipped with no diagnostic.</strong>
+<code>LawCheckPhase.scala:80-81</code>:</p>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">perParam</span><span class="p">:</span><span class="w"> </span><span class="nc">Array</span><span class="p">[</span><span class="nc">List</span><span class="p">[</span><span class="nc">AnyRef</span><span class="p">]]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">paramTypes</span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">t</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">ArgGenerator</span><span class="p">.</span><span class="n">generateValues</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">loader</span><span class="p">).</span><span class="n">orNull</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">perParam</span><span class="p">.</span><span class="n">exists</span><span class="p">(</span><span class="n">_</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="c1">// a parameter type isn&#39;t generatable — skip this law (MVP)</span>
+</span></code></pre></div>
+<p><code>ArgGenerator</code> can generate the 8 scalars plus their boxed forms and <code>String</code>
+(<code>verification/ArgGenerator.scala:72-82</code>), and "flat records" — exactly one declared
+constructor, non-empty parameters, every parameter recursively generatable, depth ≤ 3
+(<code>ArgGenerator.scala:212-274</code>). Arrays, <code>List</code>, <code>Map</code>, enums, interfaces, generics and
+any multi-constructor class are not generatable. A law over one of them is
+indistinguishable from a law that passed.</p>
+<p><strong>Two more silent-skip paths.</strong> A class that fails to load takes all of its laws and
+examples with it (<code>LawCheckPhase.scala:44</code> swallows <code>Throwable</code> into <code>null</code>), and record
+instantiation failures are dropped entry-by-entry (<code>ArgGenerator.scala:261-271</code> catches
+five exception types), which can cascade into a whole-law skip via the rule above.</p>
+<p><strong>Nothing tests any of this.</strong> There is no <code>ArgGeneratorSpec</code> and no
+<code>src/test/scala/onion/compiler/verification/</code> directory. <code>LawExampleSpec.scala</code>'s six
+cases assert only <code>Shell.Success("ok")</code> vs <code>Shell.Failure</code>; no test asserts an error
+code, a message, or a counterexample value.</p>
+<p><strong>Sampling is unreported and unconfigurable.</strong> <code>N = 40</code> is hard-coded twice
+(<code>LawCheckPhase.scala:26</code>, <code>ArgGenerator.scala:18</code>); the seed is fixed at <code>42L</code>
+(<code>ArgGenerator.scala:20-22</code>) and appears in no message. <code>CompilerConfig</code> exposes only
+<code>checkLaws: Boolean</code> (<code>CompilerConfig.scala:27</code>). There is no shrinking anywhere — the
+first failing tuple is reported verbatim and the loop stops (<code>LawCheckPhase.scala:83-98</code>).</p>
+<p><strong>Diagnostics lose their location.</strong> <code>LawCheckPhase.scala:114-115</code>:</p>
+<div class="language-scala highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">private</span><span class="w"> </span><span class="k">def</span><span class="w"> </span><span class="nf">err</span><span class="p">(</span><span class="n">code</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">cc</span><span class="p">:</span><span class="w"> </span><span class="nc">CompiledClass</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="nc">CompileError</span><span class="w"> </span><span class="o">=</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nc">CompileError</span><span class="p">(</span><span class="n">cc</span><span class="p">.</span><span class="n">className</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">code</span><span class="p">))</span>
+</span></code></pre></div>
+<p>The class name is put in the <code>sourceFile</code> slot and the location is <code>null</code>, even though
+<code>AST.LawClause.location</code> was captured at <code>Rewriting.scala:586</code> and discarded. In
+<code>DiagnosticRenderer.formatError</code> (<code>diagnostics/DiagnosticRenderer.scala:64-79</code>) this
+yields no file, no line, no caret, no source excerpt; in the LSP it lands at line 0,
+column 0 (<code>tools/lsp/OnionTextDocumentService.scala:622-627</code>).</p>
+<p><strong><code>E0064</code> / <code>E0065</code> bypass i18n.</strong> They are declared at <code>SemanticError.scala:132-133</code>
+but have <strong>no entries in <code>src/main/resources/errorMessage.properties</code></strong> and no
+<code>SemanticErrorReporter</code> registration; all four messages are hard-coded English string
+interpolations at <code>LawCheckPhase.scala:69,72,90,95</code>. They are the only codes that do this.</p>
+<p><strong>Law checking is always on, including in the editor.</strong> <code>checkLaws</code> defaults to <code>true</code>
+(<code>CompilerConfig.scala:27</code>) and no CLI flag sets it (<code>ScriptRunner.scala:266-278</code> and
+<code>CompilerFrontend.scala:189-201</code> construct <code>CompilerConfig</code> without it). The language
+server uses the defaults (<code>tools/lsp/OnionTextDocumentService.scala:574</code>), so <strong>the LSP
+executes user code on every document validation.</strong></p>
+<p><strong>The documented behaviour does not match.</strong> <code>docs/reference/specification.md:321-323</code>
+promises "a message showing the expression that returned <code>false</code>"; the implementation
+emits only the clause's label.</p>
+<hr />
+<h2 id="5-no-runtime-notion-of-where-a-value-came-from">5. No runtime notion of where a value came from<a class="headerlink" href="#5-no-runtime-notion-of-where-a-value-came-from" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>onion.compiler.Location</code> (<code>Location.scala:18-42</code>) is compile-time only. Its
+  <code>endLine</code> / <code>endColumn</code> span fields exist and are <strong>never set by production code</strong> —
+  <code>grep -rn "withSpan|endLine|endColumn" src/main/scala</code> matches only <code>Location.scala</code>
+  itself and an unrelated <code>RawDoc.endLine</code> in <code>tools/doc/DocModel.scala</code>. The only
+  producers of a spanned <code>Location</code> are tests (<code>src/test/scala/onion/compiler/TestSupport.scala:25</code>,
+  <code>.../diagnostics/DiagnosticRendererSpec.scala:23</code>). Consequently <code>spanLength</code> is always
+  1 and every caret rendered by <code>DiagnosticRenderer.underlineAt</code> (<code>:129-138</code>) is a single <code>^</code>.
+  The LSP works around this by re-deriving an end position from the line text
+  (<code>OnionTextDocumentService.scala:628</code>).</li>
+<li>At runtime, position information exists in exactly two places and both are discarded
+  by the generated code: <code>Json.JsonParseException.position</code> (a character offset,
+  <code>Json.java:35-46</code>) and <code>Yaml.YamlParseException.line</code> (<code>Yaml.java:35-46</code>), both swallowed
+  by the synthesized <code>fromXxx</code>'s <code>catch Exception → null</code> (<code>Rewriting.scala:832-834</code>).</li>
+<li><code>grep -rniE "provenance|sourceSpan|valueOrigin" src/main src/test</code> → <strong>0 matches.</strong>
+  There is no type, field or convention associating a runtime value with a syntactic origin.</li>
+</ul>
+<h2 id="6-result-option-exist-but-the-boundary-layer-ignores-them">6. <code>Result</code> / <code>Option</code> exist but the boundary layer ignores them<a class="headerlink" href="#6-result-option-exist-but-the-boundary-layer-ignores-them" title="Permanent link">&para;</a></h2>
+<p><code>Result</code> and <code>Option</code> are complete (§1) and are the declared <code>do</code>-notation carriers, yet
+<code>grep</code> over <code>src/main/java/onion/</code> shows their only consumer in the standard library is
+<code>Future.java:281,294</code>. <code>Json</code>, <code>Yaml</code>, <code>Csv</code>, <code>Regex</code>, <code>FileResource</code>, <code>HttpResource</code>,
+<code>Config</code>, <code>Cli</code> and every synthesized <code>parse</code> return <code>null</code>, an empty collection, or exit.</p>
+<p><code>Result</code> also lacks <code>zip</code> / <code>product</code> / any error-accumulating combinator, so reporting
+three simultaneously-bad fields in one pass is not expressible today.</p>
+<hr />
+<h2 id="7-the-effect-surface-and-why-capabilities-are-harder-than-they-look">7. The effect surface, and why capabilities are harder than they look<a class="headerlink" href="#7-the-effect-surface-and-why-capabilities-are-harder-than-they-look" title="Permanent link">&para;</a></h2>
+<h3 id="71-the-surface-itself-is-small-and-already-segregated">7.1 The surface itself is small and already segregated<a class="headerlink" href="#71-the-surface-itself-is-small-and-already-segregated" title="Permanent link">&para;</a></h3>
+<p>12 of 45 classes in <code>src/main/java/onion/</code> perform effects, ~110 entry points total:</p>
+<table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Classes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>filesystem</td>
+<td><code>Files</code> (352 L), <code>FileResource</code> (77 L)</td>
+</tr>
+<tr>
+<td>process</td>
+<td><code>Proc</code> (144 L)</td>
+</tr>
+<tr>
+<td>network</td>
+<td><code>Http</code> (281 L), <code>HttpResource</code> (65 L)</td>
+</tr>
+<tr>
+<td>filesystem + env</td>
+<td><code>Config</code> (155 L)</td>
+</tr>
+<tr>
+<td>console</td>
+<td><code>IO</code> (240 L), <code>Cli</code> (209 L)</td>
+</tr>
+<tr>
+<td>clock</td>
+<td><code>DateTime</code> (2 effectful of ~40 methods: <code>now</code> :24, <code>nowString</code> :31,:38), <code>Timing</code></td>
+</tr>
+<tr>
+<td>randomness</td>
+<td><code>Rand</code> (every public method)</td>
+</tr>
+</tbody>
+</table>
+<p>The remaining 33 (<code>Json</code>, <code>Yaml</code>, <code>Csv</code>, <code>Regex</code>, <code>Strings</code>, <code>Colls</code>, <code>Maps</code>, <code>Sets</code>,
+<code>OnionMath</code>, <code>Stats</code>, <code>Text</code>, <code>Format</code>, <code>Codec</code>, <code>Hash</code>, <code>Result</code>, <code>Option</code>, …) are pure.
+<code>Resources.java:17-35</code> is already shaped like a capability factory: <code>file(String)</code> →
+<code>FileResource</code>, <code>http(String)</code> → <code>HttpResource</code>, <code>re(String)</code> → <code>Pattern</code>.</p>
+<p>That is a good starting position. The two problems are below.</p>
+<h3 id="72-five-effectful-classes-are-ambiently-imported">7.2 Five effectful classes are ambiently imported<a class="headerlink" href="#72-five-effectful-classes-are-ambiently-imported" title="Permanent link">&para;</a></h3>
+<p><code>src/main/resources/onion/default-static-imports.txt</code>, loaded by
+<code>DefaultStaticImports.scala:15-34</code>, static-imports into <strong>every</strong> source file:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>java.lang.System, java.lang.Runtime, java.lang.Math,
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>onion.IO, onion.Strings, onion.Files, onion.Iterables, onion.Regex,
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>onion.DateTime, onion.Http, onion.Resources, onion.Csv
+</span></code></pre></div>
+<p>So <code>println(...)</code>, <code>readText(...)</code>, <code>get(url)</code>, <code>now()</code> and <code>System::exit</code> are callable
+unqualified, from anywhere, and are <strong>indistinguishable at the call site from pure
+calls</strong>. Any capability story has to confront this: tracking the effect is possible, but
+making it <em>visible to a reader</em> is not, while the most common effectful call in the
+language is a bare <code>println</code>.</p>
+<p>On top of that, <code>TypingHeaderPass.scala:42-73</code> implicitly on-demand-imports
+<code>onion.*, java.lang.*, java.io.*, java.util.*, javax.swing.*, java.awt.event.*</code> into every
+unit, and only single-class imports are validated (<code>:67-68</code>).</p>
+<h3 id="73-java-interop-is-completely-unrestricted">7.3 Java interop is completely unrestricted<a class="headerlink" href="#73-java-interop-is-completely-unrestricted" title="Permanent link">&para;</a></h3>
+<p><code>ClassTable.loadOrNull</code> (<code>ClassTable.scala:57-77</code>) tries the classpath and falls back to
+<code>Class.forName</code> with no name filter, package allowlist, or module check. The parent-first
+list in <code>ExplicitClasspathClassLoader.scala:50-51</code> (<code>java.</code>, <code>javax.</code>, <code>jdk.</code>, <code>sun.</code>,
+<code>com.sun.</code>) is about <em>resolution order</em>, not permission.
+<code>grep -rniE "whitelist|blacklist|allowlist|forbidden|restricted" src/main/scala</code> returns
+one unrelated comment (<code>TypingOutlinePass.scala:40</code>).</p>
+<h3 id="74-the-existing-annotation-mechanism-cannot-carry-effects">7.4 The existing annotation mechanism cannot carry effects<a class="headerlink" href="#74-the-existing-annotation-mechanism-cannot-carry-effects" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Storage is <code>MethodDefinition.annotations: Set[String]</code> (<code>TypedAST.scala:735</code>) — bare
+  names, no arguments, no positions.</li>
+<li><strong>The <code>Method</code> trait itself has no <code>annotations</code> member</strong> (<code>TypedAST.scala:1371-1395</code>
+  declares <code>affiliation</code>, <code>arguments</code>, <code>returnType</code>, <code>typeParameters</code>, <code>isVararg</code>,
+  <code>argumentsWithDefaults</code> — and nothing else). <code>AsmRefs.scala</code> and <code>ReflectionRefs.scala</code>
+  never read annotations, so <strong>no annotation on a Java method reaches the type checker.</strong></li>
+<li>Nothing is emitted to bytecode: <code>grep -rn "visitAnnotation" src/main/scala</code> → <strong>0 matches.</strong></li>
+<li><code>AST.Annotation</code> (<code>AST.scala:300</code>) attaches only to <code>FunctionDeclaration</code> (<code>:268</code>) and
+  <code>MethodDeclaration</code> (<code>:302</code>) — not to classes, fields or parameters.</li>
+<li>There are exactly two readers, both testing one string:
+  <code>optimization/TailCallOptimization.scala:93</code> and
+  <code>optimization/MutualRecursionOptimization.scala:133</code>. The latter <strong>drops annotations
+  entirely</strong> when it rebuilds a method (<code>:321</code>, <code>annotations = Set.empty</code>).</li>
+</ul>
+<p>Effect information therefore cannot ride on annotations. It needs an out-of-band table
+plus a new member on the <code>Method</code> trait.</p>
+<hr />
+<h2 id="8-positioning-is-internally-inconsistent">8. Positioning is internally inconsistent<a class="headerlink" href="#8-positioning-is-internally-inconsistent" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>README contradicts itself.</strong> <code>README.md:3-4</code> sells "an object-oriented and statically
+  typed programming language… compiles into JVM class files", while <code>README.md:171-205</code>
+  ("Shape-First Scripting") sells scheme literals, <code>record … from re"…"</code>, <code>|&gt;</code> and an
+  auto-derived CLI. The opening paragraph and the most distinctive section describe two
+  different languages.</li>
+<li><strong>Type classes are invisible from the front door.</strong>
+  <code>grep -nE "trait|instance|type class" README.md</code> → 0 matches, although
+  <code>docs/design/type-classes.md:1</code> records them as "implemented (v1)" and
+  <code>docs/guide/type-classes.md</code> exists in both languages.</li>
+<li><strong>EN/JA feature lists have drifted.</strong> <code>docs/index.md:9-21</code> lists 13 key features;
+  <code>docs/ja/index.md</code> lists 11. The two missing from the Japanese list are
+  <strong>"Bidirectional Records" and "Compile-Time Specs"</strong> — the two most distinctive claims
+  in the set.</li>
+<li><strong>Neither guide index links <code>guide/type-classes.md</code></strong>, though the file exists in
+  <code>docs/guide/</code> and <code>docs/ja/guide/</code> and both are in <code>mkdocs.yml</code>.</li>
+<li><strong>There is no central design document.</strong> <code>docs/design/</code> contained exactly one file
+  before this one (<code>type-classes.md</code>), and <code>docs/index.md</code> does not link it. The three
+  design-ish documents that are linked (<code>docs/GENERICS_DESIGN.md</code>,
+  <code>docs/parser-refactoring.md</code>, <code>docs/quality-bar.md</code>) live outside <code>docs/design/</code>.</li>
+<li><strong><code>CHANGELOG.md</code> contains no positioning statement</strong>, so there is no third source to
+  arbitrate the README's self-contradiction.</li>
+</ul>
+<hr />
+<h2 id="9-structural-debt-that-constrains-the-design-space">9. Structural debt that constrains the design space<a class="headerlink" href="#9-structural-debt-that-constrains-the-design-space" title="Permanent link">&para;</a></h2>
+<p><strong>There is no IR between the typed AST and code generation.</strong> The pipeline
+(<code>pipeline/PipelineRunner.scala:15-41</code>) runs
+parsing → rewriting → typing → TCO → mutual-recursion → bytecode → law-check, and
+<code>backend/BytecodeGenerationPhase.scala:11-12</code> takes <code>Seq[TypedAST.ClassDefinition]</code>
+straight into ASM emission (<code>backend/asm/</code>, 2,905 lines across 13 files). <code>TypedAST</code> is
+simultaneously the type checker's output, the optimizers' mutable working representation
+(<code>var block</code> at <code>TypedAST.scala:731</code>, TCO metadata setters at <code>:756-765</code>) and the codegen
+input. <strong>There is nowhere to put a lowered, effect-erased form.</strong> Any new type-level
+concept must either be fully erased inside <code>Typing</code>, or be understood by the ASM backend.</p>
+<p><strong><code>Rewriting.scala</code> is 1,416 lines carrying ten unrelated desugarings:</strong> type-class
+dictionary passing (<code>:129</code>), ADT enums (<code>:235</code>), auto-CLI (<code>:309</code>), <code>instance</code> lowering
+(<code>:501</code>), <code>Trait[T]::</code> lowering (<code>:539</code>), <code>from re"…"</code> (<code>:636</code>), <code>derive!</code> (<code>:772</code>),
+<code>law</code>/<code>example</code> (<code>:584</code>,<code>:591</code>), do-notation (<code>:1154</code>), and return-type hint propagation
+(<code>:917</code>). Its header comment (<code>:23-77</code>) still documents only do-notation — stale by eight
+features. <code>rewriteExpression</code> (<code>:999-1152</code>) is a ~90-case identity traversal that must be
+extended by hand for every new AST node.</p>
+<p><strong>Scheme-literal desugaring is split across two phases</strong> — the parser rewrites the token
+(<code>grammar/JJOnionParser.jj:255-261</code>) and <code>Rewriting</code> handles everything else.</p>
+<p><strong>The typing package is 71 files / 13,943 lines</strong>, of which call resolution alone is
+spread over 13 files (<code>MethodCallTyping</code>, <code>MethodResolution</code>, <code>MethodLookupSupport</code>,
+<code>MethodTargetTypingSupport</code>, <code>MethodInvocationBuilderSupport</code>, <code>InstanceMethodCallSupport</code>,
+<code>StaticMethodCallSupport</code>, <code>UnqualifiedMethodCallSupport</code>, <code>StaticImportMethodCallSupport</code>,
+<code>CallableValueCallSupport</code>, and three reporting/fallback helpers). Largest single files:
+<code>TypingOutlinePass</code> 754, <code>BlockElementLowering</code> 732, <code>SelectExpressionTyping</code> 699,
+<code>ConstructionTyping</code> 658, <code>ClosureTyping</code> 615.</p>
+<p><strong>The one choke point is already overloaded.</strong> <code>AssignabilitySupport.processAssignable</code>
+(<code>AssignabilitySupport.scala:60-190</code>) is the right insertion point for any new subsumption
+rule (§1), but that single ~130-line method already handles empty-collection retyping
+(<code>:65</code>), bottom types (<code>:67-81</code>), constant narrowing (<code>:86-90</code>), boxing (<code>:92-102</code>), the
+null-to-non-nullable warning (<code>:104-109</code>), primitive/null rejection (<code>:111-115</code>), platform
+unboxing (<code>:117-133</code>) and structural type-variable assignability (<code>:138-179</code>).</p>
+<hr />
+<h2 id="10-the-bar-a-new-language-feature-must-clear">10. The bar a new language feature must clear<a class="headerlink" href="#10-the-bar-a-new-language-feature-must-clear" title="Permanent link">&para;</a></h2>
+<p>From <code>docs/quality-bar.md</code> and the test infrastructure:</p>
+<ul>
+<li>an entry in <strong>both</strong> <code>docs/guide/</code> and <code>docs/ja/guide/</code> (parity is a measured row)</li>
+<li>a <code>**Xxx.on**</code>-labeled example under <code>docs/examples/</code> <strong>and</strong> <code>docs/ja/examples/</code>.
+  Only labeled blocks are compile-checked, and blocks containing <code>...</code> are skipped
+  (<code>src/test/scala/onion/compiler/tools/DocExamplesCompileSpec.scala:33,47</code>). The scan
+  covers <code>docs/examples</code> and <code>docs/ja/examples</code> only (<code>:36</code>) — <strong><code>docs/design/</code> is not
+  compile-checked</strong>, which is why this document and <code>typed-boundaries.md</code> may show
+  proposed syntax.</li>
+<li>usage inside a ≥100-line <code>run/*.on</code> program, which then also becomes a fuzz seed
+  (+60 mutants)</li>
+<li>a <code>src/test/resources/crash-corpus/</code> entry per crash found during development
+  (29 today; the type-class work added 3)</li>
+<li>dedicated <code>E00xx</code> codes with <strong>both</strong> EN and JA messages</li>
+<li>no regression in the ~2,450-test suite, which runs serially
+  (<code>build.sbt:183</code>, <code>Test / parallelExecution := false</code>)</li>
+</ul>
+<p><strong>The quality-bar baseline is stale.</strong> <code>docs/quality-bar.md:7-12</code> records "1193 pass / 0
+fail" and "36 / 36 compile" as of 2026-06-26; the suite is now ~2,450 tests and there are
+59 files in <code>run/</code>. Row 3's list of large programs and row 7's "~24 codes" are likewise
+behind.</p>
+<p><strong>An unwired asset.</strong> <code>src/main/scala/onion/tools/readiness/docs/</code>
+(<code>MarkdownExampleExtractor.scala</code>, 347 lines, plus <code>DocumentationDirective.scala</code> and
+<code>DocumentationExample.scala</code>) implements a richer doc-example framework supporting
+<code>&lt;!-- onion-example: compile | run | reject code=E0059 | fragment reason="…" --&gt;</code> and
+<code>&lt;!-- onion-output: stdout --&gt;</code> directives. Its specs exercise it against inline strings
+only; <strong>it is not connected to the documentation tree.</strong> It is available as a foundation
+for stricter doc verification.</p>
+<hr />
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p>The recurring pattern is not missing features — it is <strong>four parallel implementations of
+one idea, each choosing its own failure convention, none of which can say where anything
+came from.</strong> The eight-scalar list is written out five times (§2.1); the same conceptual
+failure is reported five ways (§3); the compile-time verification that would catch the
+resulting bugs can silently not run (§4); and there is no runtime type that carries a
+position, so even the failures that <em>are</em> reported cannot point at their cause (§5).</p>
+<p>The design in <a href="../typed-boundaries/">typed-boundaries.md</a> addresses this by naming the
+missing abstraction rather than adding a fifth mechanism.</p>
 
 
 
@@ -4393,7 +5056,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../json-http/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JSON &amp; HTTP">
+          <a href="../typed-boundaries/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Typed Boundaries (thesis)">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4403,20 +5066,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                JSON & HTTP
+                Typed Boundaries (thesis)
               </div>
             </div>
           </a>
         
         
           
-          <a href="../error-handling/" class="md-footer__link md-footer__link--next" aria-label="Next: Error Handling">
+          <a href="../roadmap/" class="md-footer__link md-footer__link--next" aria-label="Next: Roadmap: v0.6-v0.8">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Error Handling
+                Roadmap: v0.6-v0.8
               </div>
             </div>
             <div class="md-footer__button md-icon">

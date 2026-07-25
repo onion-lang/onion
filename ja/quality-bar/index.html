@@ -390,7 +390,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../../design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -3881,6 +3881,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../design/typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../GENERICS_DESIGN/" class="md-nav__link">
         
   
@@ -4035,14 +4175,17 @@
 
 <h1 id="onion">Onion の実用的品質基準<a class="headerlink" href="#onion" title="Permanent link">&para;</a></h1>
 <p>「実用的品質」は意図的に曖昧な表現なので、このファイルではそれを<strong>客観的に測定可能な指標</strong>のセットに固定します。各行には実行可能な測定方法と閾値があり、すべての行が通過したときに言語は基準に達したとみなされます。</p>
-<p>ベースライン数値は、2026-06-26 時点（develop @ 6a2d0e4）の真の値です。</p>
+<p>ベースライン数値は 2026-07-26 時点（develop @ f6cf5e83）の実測値です。前回のベースライン
+（2026-06-26 @ 6a2d0e4）は持ち越さず<strong>測り直しました</strong>。乖離が誤解を招く水準に達していた
+ためです——テスト数は 1193 と記録されていましたが実際は 2445、サンプルは 36 に対し 59、
+診断コードは ~24 に対し 74 でした。</p>
 <table>
 <thead>
 <tr>
 <th>#</th>
 <th>次元</th>
 <th>測定方法</th>
-<th>現在値（2026-06-26）</th>
+<th>現在値（2026-07-26）</th>
 <th>合格閾値</th>
 </tr>
 </thead>
@@ -4050,22 +4193,22 @@
 <tr>
 <td>1</td>
 <td>テストスイート</td>
-<td><code>SBT_OPTS="-Xmx2g" sbt -batch test</code></td>
-<td>1193 pass / 0 fail</td>
+<td><code>sbt -batch -Duser.language=en test</code></td>
+<td>2445 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
-<td><code>SampleProgramsSpec</code>（すべての <code>run/*.on</code> をコンパイル）</td>
-<td>36 / 36 compile</td>
+<td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
+<td>59 / 59 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>5（OrderReport、StatsApp、TodoManager、ShapeProcessor、TextAnalyzer）</td>
+<td>5（OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager）</td>
 <td>≥ 5</td>
 </tr>
 <tr>
@@ -4079,25 +4222,32 @@
 <td>5</td>
 <td>既知の使い勝手バグ</td>
 <td>実装済みだが到達不能/壊れた機能として未解決のもの</td>
-<td>0</td>
+<td>1（<a href="https://github.com/onion-lang/onion/issues/374">#374</a>）</td>
 <td>0</td>
 </tr>
 <tr>
 <td>6</td>
 <td>ドキュメントの対等性</td>
 <td><code>docs/guide</code> と <code>docs/ja/guide</code> の数 + すべてのコードブロックがコンパイル可能</td>
-<td>12 / 12</td>
+<td>13 / 13</td>
 <td>対等性 + すべてのブロックを検証</td>
 </tr>
 <tr>
 <td>7</td>
 <td>診断メッセージ</td>
 <td>英語と日本語の <code>E00xx</code> コード</td>
-<td>~24</td>
+<td>74</td>
 <td>よくあるエラーごとに専用コード</td>
 </tr>
 </tbody>
 </table>
+<p><strong><code>SBT_OPTS</code> は設定しないでください。</strong> 以前のこのファイルは <code>SBT_OPTS="-Xmx2g"</code> を薦めて
+いましたが、これは現在プロジェクト既定の 4g を<em>下げて</em>しまい、スイートの途中で
+<code>OutOfMemoryError</code> を起こします。既定のままが正しい値です。</p>
+<p><code>-Duser.language=en</code> は重要です。エラーメッセージは二言語で JVM の既定ロケールから解決される
+ため、メッセージ文字列を検査するテストは日本語ロケールでは通り、英語ロケールで走るリリース CI
+で落ちます。<strong>エラーコード</strong>を検査してください。</p>
+<p>cancelled の1件は <code>-Donion.dist.path</code> で切られている配布物 smoke テストです。</p>
 <p><strong>実用的品質は、行1〜7がすべて合格したときに達成されます。</strong> これにより、「実用的品質に到達する」という漠然とした目標を検証可能な状態に変換します。</p>
 <h2 id="4">行4 — 機能網羅性チェックリスト<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
 <p>機能は、大規模サンプル（<code>run/</code>）の少なくとも1つで動作したときに網羅されたとカウントされます。マイクロテストだけでは不十分です。</p>
@@ -4120,7 +4270,14 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 大規模サンプルで使われる拡張メソッド（<code>StatsApp</code>、<code>ShapeProcessor</code>、<code>TextAnalyzer</code>、<code>TodoManager</code>）</li>
 </ul>
 <h2 id="5">行5 — 現在の未解決使い勝手バグ（追跡中）<a class="headerlink" href="#5" title="Permanent link">&para;</a></h2>
-<p>なし。以前追跡していた2つの問題は解決済みです。</p>
+<ol>
+<li><strong>定数ナローイングがコンストラクタ引数位置に届かない。</strong> <code>val b: Byte = 100</code> はナローイング
+   されますが、<code>Short</code> 成分に対する <code>new R(..., -3)</code> は <code>E0021</code>（"constructor applicable for
+   R(..., Int) is not found"）になり、<code>(-3 as Short)</code> が必要です。<code>ScalarConversionSpec</code> を
+   書いている最中に発見しました。パース結果からレコードを組み立てるものは今後も踏みます。
+   （<a href="https://github.com/onion-lang/onion/issues/374">#374</a>）</li>
+</ol>
+<p>以前追跡していて解決済みのもの:</p>
 <ol>
 <li><strong>プリミティブ型の拡張メソッド</strong> — 修正済み。<code>extension Int { def double(): Int = self * 2 }</code> と <code>(5).double()</code> が動作します。プリミティブ受信側の拡張メソッドはボックス化されたクラス名で登録され、呼び出し時にターゲットをアンボックスしてから静的メソッドを呼び出します。</li>
 <li><strong>クラスメソッドから呼ばれるトップレベル関数</strong> — 修正済み。トップレベルの <code>val</code>/<code>var</code> と関数は合成トップレベルクラスの static メンバーとして出力され、クラスメソッド内の裸識別子/修飾なし呼び出しはこれらの static メンバーにフォールバックします。</li>

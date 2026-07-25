@@ -390,7 +390,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -3991,6 +3991,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../design/typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../GENERICS_DESIGN/" class="md-nav__link">
         
   
@@ -4261,6 +4401,9 @@
 <li><strong>静的型付け</strong> - ローカル型推論によりコンパイル時にエラーを検出</li>
 <li><strong>Null安全</strong> - Nullable型 (<code>T?</code>)、安全呼び出し (<code>?.</code>)・安全添字 (<code>?[]</code>)・Elvis (<code>?:</code>)・非nullアサーション (<code>!!</code>)、スマートキャスト、nullable対応ジェネリクス</li>
 <li><strong>データ型</strong> - レコード（分解宣言・ジェネリクス対応）、データ付きenum、sealed階層の網羅性検査つきパターンマッチ</li>
+<li><strong>双方向レコード</strong> - <code>record ... from re"..." derive!(Json, Yaml)</code> 一つの宣言から parse/format と JSON/YAML の相互変換を<em>両方向</em>とも導出</li>
+<li><strong>コンパイル時仕様</strong> - レコードの <code>law</code> / <code>example</code> 句をコンパイラがビルド時に実行するので、<code>parse∘format == id</code> のような不変条件が機械検査される</li>
+<li><strong>型クラス</strong> - <code>trait</code> / <code>instance</code> と、制約付きジェネリクスへの辞書渡し（<code>sum[T: Numeric]</code>）</li>
 <li><strong>簡潔なクラス定義</strong> - プライマリコンストラクタ <code>class Point(val x: Int, val y: Int)</code></li>
 <li><strong>オブジェクト指向</strong> - クラス、継承、インターフェース、メソッドオーバーロード</li>
 <li><strong>関数型要素</strong> - ラムダ式、クロージャ、第一級関数</li>
@@ -4340,6 +4483,7 @@
 <li><a href="guide/classes-and-objects/">クラスとオブジェクト</a> - オブジェクト指向</li>
 <li><a href="guide/inheritance/">継承</a> - サブクラスとインターフェース実装</li>
 <li><a href="guide/collections/">コレクション</a> - リスト、マップ、組み込みパイプライン</li>
+<li><a href="guide/type-classes/">型クラス</a> - <code>trait</code>、<code>instance</code>、制約付きジェネリクス</li>
 <li><a href="guide/java-interop/">Javaとの相互運用</a> - Javaライブラリの利用</li>
 <li><a href="guide/scripting/">スクリプティング</a> - リテラル、derive!、law/example、パイプライン</li>
 </ul>
@@ -4377,6 +4521,7 @@
 </ul>
 <h2 id="_9">デザインノート<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../design/type-classes/">型クラス</a> - <code>trait</code>/<code>instance</code>、coherence、辞書渡し</li>
 <li><a href="GENERICS_DESIGN/">ジェネリクス設計</a> - 消去ベースジェネリクスの設計</li>
 <li><a href="parser-refactoring/">パーサーリファクタリング</a> - Builderパターンによる文法とASTの分離</li>
 <li><a href="quality-bar/">品質基準</a> - 実用的品質の測定可能な指標</li>

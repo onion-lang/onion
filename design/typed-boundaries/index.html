@@ -12,13 +12,13 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.org/examples/async/">
+        <link rel="canonical" href="https://onion-lang.org/design/typed-boundaries/">
       
       
-        <link rel="prev" href="../json-http/">
+        <link rel="prev" href="../../RELEASING/">
       
       
-        <link rel="next" href="../error-handling/">
+        <link rel="next" href="../onion-v0.5-audit/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Async & Concurrency - Onion Programming Language</title>
+        <title>Typed Boundaries (thesis) - Onion Programming Language</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#async-concurrency-examples" class="md-skip">
+        <a href="#typed-boundaries-onions-design-thesis" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Async & Concurrency
+              Typed Boundaries (thesis)
             
           </span>
         </div>
@@ -304,13 +304,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -386,11 +384,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../design/typed-boundaries/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -2809,31 +2809,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -2851,7 +2848,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2869,7 +2866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -2897,7 +2894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -2925,7 +2922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -2953,7 +2950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -2981,7 +2978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3009,7 +3006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3034,37 +3031,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Async & Concurrency
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -3080,103 +3050,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Waiting for Multiple Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do-Notation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Async Downloader
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Racing Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3189,7 +3062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3858,28 +3731,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -3897,7 +3773,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3912,10 +3788,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../design/typed-boundaries/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -3931,6 +3834,325 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-positioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Positioning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Positioning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#design-constraints-this-document-holds-itself-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design constraints this document holds itself to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-core-in-four-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The core, in four concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-core-1-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Core 1 — Origin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-core-2-outcomet-and-defect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Core 2 — Outcome[T] and Defect
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Core 2 — Outcome[T] and Defect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-why-not-resultt-listdefect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Why not Result[T, List[Defect]]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-what-this-replaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 What this replaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-core-3-shapet-the-data-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Core 3 — Shape[T], the data boundary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Core 3 — Shape[T], the data boundary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-semi-formal-laws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Semi-formal laws
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-shapes-are-named-values-not-record-attachments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Shapes are named values, not record attachments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-combinators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Combinators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-one-conversion-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 One conversion registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-typing-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Typing rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-core-4-tool-capabilities-and-plans-the-moat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Core 4 — tool, capabilities, and plans (the moat)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Core 4 — tool, capabilities, and plans (the moat)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-why-this-is-a-moat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Why this is a moat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-effects-and-the-effect-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Effects and the effect table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-the-unknown-effect-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 The unknown-effect decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-ambient-effects-the-hardest-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Ambient effects — the hardest problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-typing-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Typing rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-erasure-a-hard-feasibility-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Erasure — a hard feasibility constraint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-error-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Error model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-compatibility-the-breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Compatibility — the breaking changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-reversibility-v08-sketched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Reversibility (v0.8, sketched)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-rejected-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Rejected alternatives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-what-this-buys-concretely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. What this buys, concretely
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3943,7 +4165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+      <a href="../onion-v0.5-audit/" class="md-nav__link">
         
   
   
@@ -3971,7 +4193,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/roadmap/" class="md-nav__link">
+      <a href="../roadmap/" class="md-nav__link">
         
   
   
@@ -3999,7 +4221,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+      <a href="../readme-rewrite-proposal/" class="md-nav__link">
         
   
   
@@ -4027,7 +4249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/type-classes/" class="md-nav__link">
+      <a href="../type-classes/" class="md-nav__link">
         
   
   
@@ -4166,10 +4388,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
+  <a href="#1-positioning" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating Futures
+        1. Positioning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Positioning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#design-constraints-this-document-holds-itself-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design constraints this document holds itself to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-core-in-four-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The core, in four concepts
       
     </span>
   </a>
@@ -4177,10 +4427,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
+  <a href="#3-core-1-origin" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Waiting for Multiple Futures
+        3. Core 1 — Origin
       
     </span>
   </a>
@@ -4188,10 +4438,204 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
+  <a href="#4-core-2-outcomet-and-defect" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Do-Notation
+        4. Core 2 — Outcome[T] and Defect
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Core 2 — Outcome[T] and Defect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-why-not-resultt-listdefect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Why not Result[T, List[Defect]]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-what-this-replaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 What this replaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-core-3-shapet-the-data-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Core 3 — Shape[T], the data boundary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Core 3 — Shape[T], the data boundary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-semi-formal-laws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Semi-formal laws
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-shapes-are-named-values-not-record-attachments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Shapes are named values, not record attachments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-combinators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Combinators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-one-conversion-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 One conversion registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-typing-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Typing rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-core-4-tool-capabilities-and-plans-the-moat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Core 4 — tool, capabilities, and plans (the moat)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Core 4 — tool, capabilities, and plans (the moat)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-why-this-is-a-moat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Why this is a moat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-effects-and-the-effect-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Effects and the effect table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-the-unknown-effect-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 The unknown-effect decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-ambient-effects-the-hardest-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Ambient effects — the hardest problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-typing-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Typing rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-erasure-a-hard-feasibility-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Erasure — a hard feasibility constraint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-error-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Error model
       
     </span>
   </a>
@@ -4199,10 +4643,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#8-compatibility-the-breaking-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
+        8. Compatibility — the breaking changes
       
     </span>
   </a>
@@ -4210,10 +4654,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
+  <a href="#9-reversibility-v08-sketched" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Async Downloader
+        9. Reversibility (v0.8, sketched)
       
     </span>
   </a>
@@ -4221,10 +4665,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
+  <a href="#10-rejected-alternatives" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Racing Futures
+        10. Rejected alternatives
       
     </span>
   </a>
@@ -4232,10 +4676,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#11-what-this-buys-concretely" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        11. What this buys, concretely
       
     </span>
   </a>
@@ -4262,102 +4706,587 @@
   
 
 
-<h1 id="async-concurrency-examples">Async &amp; Concurrency Examples<a class="headerlink" href="#async-concurrency-examples" title="Permanent link">&para;</a></h1>
-<p>Onion provides a <code>Future</code> type and <code>do[Future]</code> notation for asynchronous programming.</p>
-<h2 id="creating-futures">Creating Futures<a class="headerlink" href="#creating-futures" title="Permanent link">&para;</a></h2>
-<p>Run work in the background with <code>Future::async</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  })
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>}
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>val f = fetchPage(&quot;https://example.com&quot;, 100L)
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>println(f.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="waiting-for-multiple-futures">Waiting for Multiple Futures<a class="headerlink" href="#waiting-for-multiple-futures" title="Permanent link">&para;</a></h2>
-<p>Launch several futures and wait for all of them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>val f1 = fetchPage(&quot;a&quot;, 50L)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val f2 = fetchPage(&quot;b&quot;, 30L)
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>val f3 = fetchPage(&quot;c&quot;, 40L)
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  foreach r: Object in results {
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    println(&quot;  &quot; + (r as String))
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  }
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>})
-</span></code></pre></div>
-<h2 id="do-notation">Do-Notation<a class="headerlink" href="#do-notation" title="Permanent link">&para;</a></h2>
-<p>Chain futures with <code>do[Future]</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>}
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>Handle failures with <code>onFailure</code>, <code>recover</code>, or <code>recoverWith</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val risky: Future[Int] = Future::failed(new Exception(&quot;simulated failure&quot;))
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>risky.onFailure((error: Throwable) -&gt; {
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  println(&quot;caught: &quot; + error.getMessage())
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>})
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>val recovered = risky.recover((error: Throwable) -&gt; {
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  println(&quot;recovering from &quot; + error.getMessage())
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  return 0
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>})
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>println(&quot;value=&quot; + recovered.getOrElse(-1))
-</span></code></pre></div>
-<h2 id="complete-example-async-downloader">Complete Example: Async Downloader<a class="headerlink" href="#complete-example-async-downloader" title="Permanent link">&para;</a></h2>
-<p><strong><code>AsyncDownloader.on</code></strong> downloads several simulated pages concurrently and aggregates the results.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  })
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>val urls = [
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  &quot;https://example.com/a&quot;,
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  &quot;https://example.com/b&quot;,
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>  &quot;https://example.com/c&quot;
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>]
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>val f1 = fetchPage(urls[0] as String, 50L)
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>val f2 = fetchPage(urls[1] as String, 30L)
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>val f3 = fetchPage(urls[2] as String, 40L)
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>})
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>}
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="racing-futures">Racing Futures<a class="headerlink" href="#racing-futures" title="Permanent link">&para;</a></h2>
-<p>Use <code>race</code> to get the value from the first future that completes.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val fast = fetchPage(&quot;fast&quot;, 10L)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>val slow = fetchPage(&quot;slow&quot;, 100L)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>val winner = fast.race(slow)
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>println(&quot;winner: &quot; + winner.getOrElse(&quot;none&quot;))
-</span></code></pre></div>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h1 id="typed-boundaries-onions-design-thesis">Typed Boundaries — Onion's design thesis<a class="headerlink" href="#typed-boundaries-onions-design-thesis" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>proposed.</strong> Nothing here is implemented. This document defines what Onion is
+<em>for</em> from v0.6 onward and the small semantic core it derives from. The evidence it
+argues from is in <a href="../onion-v0.5-audit/">onion-v0.5-audit.md</a>; the schedule is in
+<a href="../roadmap/">roadmap.md</a>.</p>
+<p>Code blocks show <strong>proposed</strong> syntax. <code>docs/design/</code> is deliberately outside the scope of
+<code>DocExamplesCompileSpec</code> (<code>src/test/scala/onion/compiler/tools/DocExamplesCompileSpec.scala:36</code>),
+so nothing here is compile-checked.</p>
+<hr />
+<h2 id="1-positioning">1. Positioning<a class="headerlink" href="#1-positioning" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Onion — typed tools for a messy world.</strong>
+A statically typed language for turning messy external data and operations into
+checked, reversible tools.</p>
+</blockquote>
+<p>Today Onion introduces itself as "an object-oriented and statically typed programming
+language" that "compiles into JVM class files" (<code>README.md:3-4</code>). Every word of that is
+shared with Kotlin, Scala and Java. It is a category, not a reason.</p>
+<p>The reason is at the <strong>boundary</strong>: the place where untrusted text becomes a typed value,
+and where a program reaches out and changes the world. That is where real programs
+actually fail, and it is the one place mainstream languages still hand you a <code>String</code> and
+wish you luck. Onion's claim is:</p>
 <ul>
-<li><a href="../json-http/">JSON &amp; HTTP Examples</a> - Combine futures with HTTP requests</li>
-<li><a href="../error-handling/">Error Handling Examples</a> - Handle async failures</li>
-<li><a href="../../reference/stdlib/">Standard Library Reference</a> - Full Future API</li>
+<li><strong>Describe the boundary once, declaratively.</strong> Both directions, the failure channel and
+  the tooling are <em>derived</em>, not hand-written.</li>
+<li><strong>A failure at the boundary is a value that knows where it came from.</strong> Not <code>null</code>, not
+  a silently dropped line, not <code>System.exit(1)</code>.</li>
+<li><strong>The effects a tool may perform are part of its type</strong>, so a contract can be published
+  and a dry run can be trusted.</li>
 </ul>
+<p>Onion v0.5 already has four half-built boundary mechanisms (audit §2). This design does
+not add a fifth. It names the abstraction they were all approximating and rebuilds them
+on it.</p>
+<h3 id="design-constraints-this-document-holds-itself-to">Design constraints this document holds itself to<a class="headerlink" href="#design-constraints-this-document-holds-itself-to" title="Permanent link">&para;</a></h3>
+<ol>
+<li>No feature grab-bag — four new concepts, and every existing mechanism is re-derived
+   from them or deleted.</li>
+<li>Not a small version of an existing language — the weirdness must be somewhere no
+   mainstream language goes.</li>
+<li>Failure visibility over convenience — where the two conflict, visibility wins, even at
+   the cost of ergonomics.</li>
+<li>Derive from a small semantic core — concepts must compose, not accumulate.</li>
+<li>Weirdness must be semantic, not syntactic — cute syntax is not a moat.</li>
+</ol>
+<hr />
+<h2 id="2-the-core-in-four-concepts">2. The core, in four concepts<a class="headerlink" href="#2-the-core-in-four-concepts" title="Permanent link">&para;</a></h2>
+<p>Two of these are <em>boring</em> — they are what any language doing this seriously would need,
+and they are where most of the v0.6 work goes. Two are the <em>moat</em>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Concept</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Core 1</td>
+<td><code>Origin</code></td>
+<td>where a runtime value came from</td>
+</tr>
+<tr>
+<td>Core 2</td>
+<td><code>Outcome[T]</code> / <code>Defect</code></td>
+<td>the one failure channel</td>
+</tr>
+<tr>
+<td><strong>Core 3</strong></td>
+<td><strong><code>Shape[T]</code></strong></td>
+<td><strong>the data boundary — the boring foundation</strong></td>
+</tr>
+<tr>
+<td><strong>Core 4</strong></td>
+<td><strong><code>tool</code> / <code>Capability</code> / <code>Plan</code></strong></td>
+<td><strong>the operation boundary — the moat</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-core-1-origin">3. Core 1 — <code>Origin</code><a class="headerlink" href="#3-core-1-origin" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>record Origin(source: String, line: Int, column: Int, span: Int)
+</span></code></pre></div>
+<p>The runtime counterpart to the compiler's <code>onion.compiler.Location</code>. Onion has nothing
+like it today: <code>grep -rniE "provenance|sourceSpan|valueOrigin" src/main src/test</code> returns
+zero matches (audit §5), the two exceptions that <em>do</em> carry a position
+(<code>Json.JsonParseException.position</code>, <code>Yaml.YamlParseException.line</code>) have it discarded by
+the generated code, and even the compile-time <code>Location</code>'s span fields are never set in
+production, so every diagnostic caret is a single <code>^</code>.</p>
+<p><code>Origin</code> is listed first because everything else degrades to hand-waving without it. A
+<code>Defect</code> with no <code>Origin</code> is just a string; a Lens (§9) has nothing to attach to.</p>
+<p><code>source</code> is deliberately a free-form string, not a <code>File</code> — it names a file path, a URL,
+<code>"&lt;stdin&gt;"</code> or <code>"&lt;literal&gt;"</code> depending on where the text entered the program.</p>
+<p><strong>Companion change (compile-time).</strong> <code>Location</code>'s dead <code>endLine</code>/<code>endColumn</code> span
+(<code>Location.scala:21-22</code>) gets populated by the parser so <code>spanLength</code> stops always
+returning 1 and <code>DiagnosticRenderer.underlineAt</code> (<code>:129-138</code>) can underline a real range.
+A language selling diagnostics quality cannot ship one-character carets.</p>
+<hr />
+<h2 id="4-core-2-outcomet-and-defect">4. Core 2 — <code>Outcome[T]</code> and <code>Defect</code><a class="headerlink" href="#4-core-2-outcomet-and-defect" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>record Defect(origin: Origin?, path: String, expected: String, actual: String)
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>enum Outcome[T] {
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  case Ok(value: T)
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  case Bad(defects: List[Defect])
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>}
+</span></code></pre></div>
+<p><code>path</code> locates the failure <em>inside</em> the value (<code>"status"</code>, <code>"items[3].price"</code>);
+<code>origin</code> locates it in the <em>text</em>. Both are needed: one answers "which field", the other
+"which byte".</p>
+<h3 id="41-why-not-resultt-listdefect">4.1 Why not <code>Result[T, List[Defect]]</code><a class="headerlink" href="#41-why-not-resultt-listdefect" title="Permanent link">&para;</a></h3>
+<p>Because the two have different composition laws, and the difference is the point.</p>
+<p><code>Result</code> is monadic: <code>bind</code> short-circuits, so the first bad field hides the rest.
+<code>Outcome</code> additionally offers an <strong>accumulating</strong> product:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Ok(f)      zip  Ok(x)       =  Ok((f, x))
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Bad(d₁)    zip  Ok(_)       =  Bad(d₁)
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Ok(_)      zip  Bad(d₂)     =  Bad(d₂)
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Bad(d₁)    zip  Bad(d₂)     =  Bad(d₁ ++ d₂)          ← the reason this type exists
+</span></code></pre></div>
+<p>This is the standard Validation-vs-Either split, and it is exactly what a boundary needs:
+a record with three malformed fields should report three defects in one pass, not one
+defect three times. <code>Result</code> has no <code>zip</code> or accumulating combinator at all today
+(audit §6), so this cannot be expressed by reusing it.</p>
+<p><code>Outcome</code> still gets <code>successful</code>/<code>bind</code> so <code>do[Outcome]</code> works with the existing
+machinery — <code>bind</code> short-circuits (it must; the second computation may depend on the
+first), <code>zip</code> accumulates. Both are available; the derivation in §5 uses <code>zip</code>.</p>
+<h3 id="42-what-this-replaces">4.2 What this replaces<a class="headerlink" href="#42-what-this-replaces" title="Permanent link">&para;</a></h3>
+<p>Audit §3 lists five conventions for one concept. All five collapse:</p>
+<table>
+<thead>
+<tr>
+<th>Today</th>
+<th>v0.6</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>null</code> on regex no-match (<code>Rewriting.scala:660</code>)</td>
+<td><code>Bad([Defect(origin, "", "&lt;pattern&gt;", line)])</code></td>
+</tr>
+<tr>
+<td><code>null</code> on conversion failure, indistinguishable (<code>:663-665</code>)</td>
+<td><code>Bad</code> with <code>expected: "Int"</code>, <code>actual: "abc"</code> — <strong>distinguishable</strong></td>
+</tr>
+<tr>
+<td>silently dropped <code>parseAll</code> lines (<code>:683-688</code>)</td>
+<td>every drop is a <code>Defect</code> with its line's <code>Origin</code></td>
+</tr>
+<tr>
+<td><code>null</code> from <code>fromJson</code>, position discarded (<code>:832-834</code>)</td>
+<td>the parser's position becomes an <code>Origin</code></td>
+</tr>
+<tr>
+<td><code>System.exit(1)</code> from <code>Cli</code> (<code>Cli.java:186-189</code>)</td>
+<td><code>Outcome</code>, returned to the caller</td>
+</tr>
+</tbody>
+</table>
+<p>And two silent-corruption holes close:</p>
+<ul>
+<li><strong>A missing String key</strong> currently constructs a record with a <code>null</code> non-nullable field
+  and calls it success (audit §3.2). It becomes <code>Bad(path: "name", expected: "String",
+  actual: "absent")</code>.</li>
+<li><strong><code>"maybe"</code> currently parses as <code>false</code></strong> via <code>Boolean.parseBoolean</code>
+  (<code>Rewriting.scala:453</code>, audit §3.3). Boolean conversion becomes strict; anything outside
+  the shape's accepted spellings is a <code>Defect</code>.</li>
+</ul>
+<p>Both are breaking changes and both are the point: constraint 3 says visibility beats
+convenience.</p>
+<hr />
+<h2 id="5-core-3-shapet-the-data-boundary">5. Core 3 — <code>Shape[T]</code>, the data boundary<a class="headerlink" href="#5-core-3-shapet-the-data-boundary" title="Permanent link">&para;</a></h2>
+<p>A <code>Shape[T]</code> is a first-class value describing a <strong>partial, potentially bidirectional</strong>
+correspondence between external text and a typed value.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Shape[T] = {
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  parse : (Text, Origin) -&gt; Outcome[T]
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  print : T -&gt; Text                       // present only when derivable
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>}
+</span></code></pre></div>
+<h3 id="51-semi-formal-laws">5.1 Semi-formal laws<a class="headerlink" href="#51-semi-formal-laws" title="Permanent link">&para;</a></h3>
+<p>Write <code>dom(S) = { t | S.parse(t, _) is Ok }</code>.</p>
+<p><strong>(L1) Round-trip — print then parse.</strong> For every shape that has <code>print</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>∀ v : T.   S.parse(S.print(v), _)  ==  Ok(v)
+</span></code></pre></div>
+<p>This is the law worth having, and it is the one a shape must guarantee.</p>
+<p><strong>(L2) Normalization — parse then print.</strong> <em>Not</em> guaranteed, and deliberately so:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>∀ t ∈ dom(S).  S.print(S.parse(t, _).value)  ==  t        -- FALSE in general
+</span></code></pre></div>
+<p><code>"007"</code> parses to <code>7</code> and prints as <code>"7"</code>. <code>{ "a":1 }</code> and <code>{"a": 1}</code> parse alike. A shape
+satisfying L2 as well is called <strong>lossless</strong>, and losslessness is rare, valuable, and the
+foundation of §9's Lens. Most shapes are L1-only.</p>
+<p>Keeping L1 and L2 distinct is the substance behind "reversible". Today's synthesized
+<code>format</code> conflates them: the comment at <code>Rewriting.scala:697-703</code> claims
+<code>parse(format(x)) == x</code> "for data that doesn't collide with the literals" — an L1 claim
+with an unchecked side condition, and nothing verifies it (audit §1, §3).</p>
+<p><strong>(L3) Failure carries position.</strong> <code>S.parse(t, o)</code> returning <code>Bad(ds)</code> implies every
+<code>d ∈ ds</code> has <code>d.origin</code> derived from <code>o</code> — a defect always points somewhere.</p>
+<h3 id="52-shapes-are-named-values-not-record-attachments">5.2 Shapes are named values, not record attachments<a class="headerlink" href="#52-shapes-are-named-values-not-record-attachments" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>record Access(time: String, method: String, path: String, status: Int)
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>shape AccessLine : Access = re&quot;(\S+) (\w+) (\S+) (\d+)&quot;
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>shape AccessJson : Access = json
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>shape AccessCsv  : Access = csv
+</span></code></pre></div>
+<p>Today a record may have <strong>one</strong> <code>from re"..."</code> and a fixed marker set
+<code>derive!(Json, Yaml)</code>, which bolts nine statics onto the record (<code>parse</code>, <code>parseAll</code>,
+<code>format</code>, <code>toMap</code>, <code>fromMap</code>, <code>toJson</code>, <code>fromJson</code>, <code>toYaml</code>, <code>fromYaml</code>). That does not
+scale past two formats, and the names collide the moment you want two regex shapes for
+the same type — a v1 log line and a v2 log line, say.</p>
+<p>Making shapes named values fixes all of it and buys composition:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>val r: Outcome[Access] = AccessLine.parse(line)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>val s: String          = AccessLine.print(rec)
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>// many shapes for one type; pick at the call site
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>val rows: Outcome[List[Access]] = file&quot;access.log&quot;.as(AccessLine.lines)
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>val body: Outcome[Access]       = http&quot;…/latest&quot;.as(AccessJson)
+</span></code></pre></div>
+<h3 id="53-combinators">5.3 Combinators<a class="headerlink" href="#53-combinators" title="Permanent link">&para;</a></h3>
+<p>Shapes compose, which is what makes them an abstraction rather than a fourth macro:</p>
+<table>
+<thead>
+<tr>
+<th>Combinator</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>S.eachLine</code></td>
+<td><code>Shape[T] -&gt; (Text, Origin) -&gt; List[Outcome[T]]</code></td>
+<td>one outcome per line, each positioned on its line</td>
+</tr>
+<tr>
+<td><code>S.lines</code></td>
+<td><code>Shape[T] -&gt; Shape[List[T]]</code></td>
+<td>all-or-nothing; <strong>every failed line is a <code>Defect</code></strong>, none dropped</td>
+</tr>
+<tr>
+<td><code>S.sepBy(sep)</code></td>
+<td><code>Shape[T] -&gt; Shape[List[T]]</code></td>
+<td>repetition with a <strong>literal</strong> separator</td>
+</tr>
+<tr>
+<td><code>S.xmap(f, g)</code></td>
+<td><code>Shape[T] -&gt; (T-&gt;U, U-&gt;T) -&gt; Shape[U]</code></td>
+<td>isomorphism; preserves L1</td>
+</tr>
+<tr>
+<td><code>S.orElse(R)</code></td>
+<td><code>Shape[T] -&gt; Shape[T] -&gt; Shape[T]</code></td>
+<td>first success; on total failure, defects from both</td>
+</tr>
+</tbody>
+</table>
+<p><code>eachLine</code> and <code>lines</code> answer different questions, and an earlier draft of this document
+conflated them by claiming <code>lines</code> returns "995 values <em>and</em> 5 defects". It cannot: an
+<code>Outcome</code> is a value <strong>or</strong> defects. A log file is exactly the case where a partial result
+is worth having, so <code>eachLine</code> returns one outcome per line and <code>Outcome.values</code> /
+<code>Outcome.defects</code> (§4) recover both; <code>lines</code> is for when a partial result is meaningless.</p>
+<p><code>sepBy</code> takes a literal separator rather than a pattern because a regex separator has no
+unique rendering — the shape would silently become read-only. A general <code>zip</code> over two
+<em>text</em> shapes is deliberately absent: a product needs a rule for where one component's
+text ends and the next begins, and without a delimiter there is none. <code>sepBy</code> is that rule.</p>
+<p><code>xmap</code> takes a <em>pair</em> of functions rather than a single <code>map</code> precisely because a shape is
+bidirectional: a one-way <code>map</code> would silently destroy <code>print</code>. That asymmetry is the type
+telling the truth.</p>
+<p><code>eachLine</code> is where audit §3.1 dies. A run over 1,000 lines with 5 malformed ones yields
+the 995 values <em>and</em> 5 defects carrying their line numbers — today's <code>parseAll</code> returns
+995 values and no evidence the other 5 existed.</p>
+<h3 id="54-one-conversion-registry">5.4 One conversion registry<a class="headerlink" href="#54-one-conversion-registry" title="Permanent link">&para;</a></h3>
+<p>The eight-scalar switch that exists five times over (audit §2.1) becomes one registry
+mapping a component type to a <code>Shape</code> for that scalar. Adding <code>java.time.LocalDate</code> means
+one entry, not six edits across two languages.</p>
+<p>The registry is also the natural place to make Boolean strict (§4.2) and to give each
+scalar an <em>L1-checked</em> print, since a scalar shape is exactly a tiny bidirectional pair.</p>
+<h3 id="55-typing-rules">5.5 Typing rules<a class="headerlink" href="#55-typing-rules" title="Permanent link">&para;</a></h3>
+<p>Shape formation from a regex, for a record <code>τ</code> with components <code>c₁:τ₁ … cₙ:τₙ</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>  Γ ⊢ τ record with components c₁:τ₁ … cₙ:τₙ
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  ∀i. τᵢ ∈ ScalarRegistry
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  p compiles;  groups(p) = n
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>─────────────────────────────────────────────── (S-Regex)
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  Γ ⊢ shape S : τ = re&quot;p&quot;    ⇒    S : Shape[τ]
+</span></code></pre></div>
+<p>Failing premises map onto the existing codes, which is deliberate — <code>E0059</code> (bad pattern)
+and <code>E0060</code> (group/component mismatch) already exist and already fire for
+<code>from re"..."</code> because the desugaring routes through the regex select-pattern
+(<code>typing/SelectExpressionTyping.scala:467-479</code>, audit §1). <code>E0061</code>'s role (unsupported
+component type) is taken over by "no entry in the registry".</p>
+<p>Print derivability is a <em>judgement about the shape</em>, not a silent fork:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>  segments(p) = literal/slot decomposition
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  every slot is flat, top-level and unquantified
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>──────────────────────────────────────────────── (S-Print)
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  Γ ⊢ S has print,  and L1 holds for S
+</span></code></pre></div>
+<p>When the premise fails, <code>S</code> is parse-only and <code>S.print</code> is a <strong>compile error naming the
+construct that made it non-invertible</strong> — see the error model below. Today <code>formatSegments</code>
+(<code>Rewriting.scala:862-900</code>) just returns <code>None</code> and no <code>format</code> appears, so the user gets
+"method not found" for a method they were never told would be missing.</p>
+<hr />
+<h2 id="6-core-4-tool-capabilities-and-plans-the-moat">6. Core 4 — <code>tool</code>, capabilities, and plans (the moat)<a class="headerlink" href="#6-core-4-tool-capabilities-and-plans-the-moat" title="Permanent link">&para;</a></h2>
+<p><code>Shape</code> types the <strong>data</strong> crossing the boundary. <code>Capability</code> types the <strong>effects</strong>
+crossing it. Same principle, other axis — which is why this is a completion of the thesis
+rather than a second feature.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tool ingest(src: File, dst: File, dry: Boolean = false)
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  requires { read(src), write(dst) }
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>{
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  val rows = file(src).as(AccessLine.lines)
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>  ...
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>}
+</span></code></pre></div>
+<p>One declaration derives four things:</p>
+<ol>
+<li><strong>The CLI</strong> — flags, positionals, usage, <code>--help</code>, shell completion.</li>
+<li><strong>A machine-readable contract</strong> — emitted as a resource and printed by <code>--contract</code>.</li>
+<li><strong>A capability set</strong> — checked statically against the body.</li>
+<li><strong>A plan</strong> — <code>--plan</code> reports what the run <em>would</em> do, without doing it.</li>
+</ol>
+<h3 id="61-why-this-is-a-moat">6.1 Why this is a moat<a class="headerlink" href="#61-why-this-is-a-moat" title="Permanent link">&para;</a></h3>
+<p>Python + argparse, Go's <code>flag</code>, Rust's clap and every <code>#[derive(Parser)]</code> in between
+derive a CLI from a signature. <strong>None of them derive a trustworthy dry run</strong>, because
+none of them know what the body does. Effect systems (Koka, Eff, Unison's abilities) know
+what the body does but are whole-language type systems with a correspondingly steep price,
+and they do not emit tool contracts.</p>
+<p>Onion's bet is the narrow intersection: <strong>effects tracked only at the tool boundary,
+which is exactly enough to publish a contract and derive a plan.</strong> In an era where the
+caller of a script is increasingly an agent rather than a person, "here is a machine-
+readable contract, and here is a dry run you can trust" is a concrete, checkable value
+proposition. It is semantic weirdness — effects in the type — not syntactic.</p>
+<h3 id="62-effects-and-the-effect-table">6.2 Effects and the effect table<a class="headerlink" href="#62-effects-and-the-effect-table" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>ε ::= read(p) | write(p) | net(h) | exec(c) | env | clock | rand | console | unknown
+</span></code></pre></div>
+<p>Audit §7.1 is the good news: only 12 of 45 stdlib classes are effectful, ~110 entry
+points, already lexically segregated, and <code>Resources.java:17-35</code> is already shaped like a
+capability factory.</p>
+<p>Audit §7.4 is the bad news: <strong>effects cannot ride on annotations.</strong> The <code>Method</code> trait has
+no <code>annotations</code> member (<code>TypedAST.scala:1371-1395</code>), <code>AsmRefs</code>/<code>ReflectionRefs</code> never
+read annotations so nothing on a Java method reaches the type checker, nothing is emitted
+to bytecode (<code>visitAnnotation</code> → 0 matches), and <code>MutualRecursionOptimization.scala:321</code>
+drops the field it does have. So:</p>
+<ul>
+<li>effects live in an <strong>out-of-band effect table</strong>, keyed by class + method signature,
+  shipped as a resource — the same shape as <code>default-static-imports.txt</code>;</li>
+<li>the <code>Method</code> trait gains a way to report its effects, defaulting to <code>unknown</code> for
+  anything the table does not name.</li>
+</ul>
+<h3 id="63-the-unknown-effect-decision">6.3 The unknown-effect decision<a class="headerlink" href="#63-the-unknown-effect-decision" title="Permanent link">&para;</a></h3>
+<p>A Java method not in the table has unknown effects. The two obvious policies are both wrong:</p>
+<ul>
+<li><em>unknown = forbidden</em> kills interop instantly — Onion's whole stdlib story is Java
+  interop, and no table will ever cover the JDK plus every jar on the classpath;</li>
+<li><em>unknown = harmless</em> makes the guarantee a lie, which is worse than having no guarantee.</li>
+</ul>
+<p><strong>The proposal is: <code>unknown</code> is a real effect that propagates.</strong> It costs nothing inside
+ordinary code, but it must be explicitly admitted at a tool boundary:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tool scrape(url: String) requires { net(url), unknown } { ... }
+</span></code></pre></div>
+<p><code>--plan</code> then honestly reports <code>unknown</code> for the parts it cannot characterize, instead of
+claiming a clean bill of health. The user can shrink the surface by adding table entries.
+This keeps constraint 3 (visibility over convenience) without making interop unusable.</p>
+<h3 id="64-ambient-effects-the-hardest-problem">6.4 Ambient effects — the hardest problem<a class="headerlink" href="#64-ambient-effects-the-hardest-problem" title="Permanent link">&para;</a></h3>
+<p><code>println</code>, <code>readText</code>, <code>get</code> and <code>System::exit</code> are callable unqualified from anywhere,
+because <code>onion.IO</code>, <code>onion.Files</code>, <code>onion.Http</code>, <code>onion.DateTime</code>, <code>onion.Resources</code> and
+<code>java.lang.System</code> are default static imports (audit §7.2).</p>
+<p>Tracking their effects still works — resolution knows which method it picked. What breaks
+is <em>legibility</em>: a reader cannot see that a line is effectful, so <code>requires</code> clauses will
+look arbitrary. Narrowing the default static import set is the fix, and it is a large
+breaking change in its own right, orthogonal to everything else here. It is therefore
+scheduled as <strong>its own roadmap item</strong>, not folded into the capability work.</p>
+<p><code>console</code> is the pragmatic escape valve: it is the one effect that is likely to be
+implicitly permitted, because a <code>println</code> in a tool is not what anyone is trying to guard
+against.</p>
+<h3 id="65-typing-rules">6.5 Typing rules<a class="headerlink" href="#65-typing-rules" title="Permanent link">&para;</a></h3>
+<p>Effects ride alongside the type as <code>τ ! ε</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>  m ∈ EffectTable,  EffectTable(m) = ε_m
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>────────────────────────────────────────────── (E-Call)
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  Γ ⊢ m(ē) : τ ! ε_m ∪ effects(ē)
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>  m ∉ EffectTable
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>────────────────────────────────────────────── (E-Unknown)
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>  Γ ⊢ m(ē) : τ ! {unknown} ∪ effects(ē)
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>  Γ, x̄:τ̄ ⊢ body : τ ! ε        ε ⊆ δ
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>────────────────────────────────────────────── (T-Tool)
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>  Γ ⊢ tool f(x̄:τ̄) requires δ { body }   ok
+</span></code></pre></div>
+<p>An effect the <code>requires</code> clause does not admit is an error, and the message names both the missing capability <em>and</em> the call site
+that introduced it — the diagnostic is useless otherwise.</p>
+<p>Effects propagate through ordinary functions by inference (no annotation burden), and are
+<strong>only declared and checked at <code>tool</code> boundaries</strong>. There is no effect polymorphism, no
+effect variables in ordinary signatures, no handlers. That restraint is what keeps this
+from being a small version of Koka (constraint 2).</p>
+<h3 id="66-erasure-a-hard-feasibility-constraint">6.6 Erasure — a hard feasibility constraint<a class="headerlink" href="#66-erasure-a-hard-feasibility-constraint" title="Permanent link">&para;</a></h3>
+<p>Audit §9: there is <strong>no IR between the typed AST and codegen</strong>. <code>TypedAST</code> is the type
+checker's output, the optimizers' mutable working representation and the ASM backend's
+input all at once, so there is nowhere to put a lowered, effect-annotated form.</p>
+<p>Therefore <strong>effects must be completely erased inside <code>Typing</code></strong>. A <code>tool</code> lowers to:</p>
+<ul>
+<li>an ordinary static method with the declared parameters,</li>
+<li>a synthesized contract constant (the machine-readable descriptor),</li>
+<li>a synthesized entry point that parses argv via the parameters' shapes and dispatches.</li>
+</ul>
+<p>The ASM backend learns nothing new. This is not an optimization — it is the condition
+under which the feature is buildable at all without first introducing an IR.</p>
+<hr />
+<h2 id="7-error-model">7. Error model<a class="headerlink" href="#7-error-model" title="Permanent link">&para;</a></h2>
+<p>Codes are allocated <strong>sequentially as features land</strong>, not reserved in advance — a
+reserved block leaves permanent gaps whenever a planned feature changes shape. The
+numbers below are therefore indicative of order, not commitments.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>E0074</code></td>
+<td>a law's parameter type has no generator — <strong>an error, not a silent skip</strong></td>
+<td><strong>shipped</strong> (<a href="https://github.com/onion-lang/onion/issues/346">#346</a>)</td>
+</tr>
+<tr>
+<td><code>E0075</code></td>
+<td>a class declaring laws could not be loaded, so none of its checks ran</td>
+<td><strong>shipped</strong> (<a href="https://github.com/onion-lang/onion/issues/346">#346</a>)</td>
+</tr>
+<tr>
+<td>next</td>
+<td><code>print</code> used on a shape that is not invertible — message names the construct responsible</td>
+<td>v0.6</td>
+</tr>
+<tr>
+<td>next</td>
+<td>no scalar-registry entry for a component type (replaces <code>E0061</code>/<code>E0062</code>'s role)</td>
+<td>v0.6</td>
+</tr>
+<tr>
+<td>next</td>
+<td>a tool's body performs an effect its <code>requires</code> clause does not admit</td>
+<td>v0.7</td>
+</tr>
+<tr>
+<td>next</td>
+<td>a <code>requires</code> clause admits a capability the body cannot perform (dead capability)</td>
+<td>v0.7</td>
+</tr>
+</tbody>
+</table>
+<p>Every one gets an entry in <strong>both</strong> <code>errorMessage.properties</code> and
+<code>errorMessage_ja.properties</code>. That is worth stating because <code>E0064</code>/<code>E0065</code> are today the
+only codes that bypass the i18n table entirely, with English hard-coded at
+<code>LawCheckPhase.scala:69,72,90,95</code> (audit §4).</p>
+<p><code>E0074</code> deserves emphasis, and is the reason it shipped first. Onion's headline claim is
+that <code>parse ∘ print == id</code> is machine-checked at build time. Before #346 a law whose
+parameter type had no generator was skipped with a bare <code>return</code> and no diagnostic, with
+no test covering it. <strong>A verification that can silently not run is worse than no
+verification</strong>, because it produces unearned confidence. Turning that skip into an error
+is a prerequisite for the whole Shape story, not a nicety.</p>
+<hr />
+<h2 id="8-compatibility-the-breaking-changes">8. Compatibility — the breaking changes<a class="headerlink" href="#8-compatibility-the-breaking-changes" title="Permanent link">&para;</a></h2>
+<p>Onion has one user, so these are affordable. Listing them explicitly is the point.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Change</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>R::parse</code> returns <code>Outcome[R]</code>, not <code>R?</code></td>
+<td>no-match and conversion-failure become distinguishable (audit §3)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>parseAll</code> → <code>S.lines</code>, returning <code>Outcome[List[R]]</code></td>
+<td>dropped lines become visible defects (audit §3.1)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>fromJson</code> returns <code>Outcome[R]</code>; a missing <code>String</code> key is a defect</td>
+<td>closes the silent-corruption hole (audit §3.2)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Boolean conversion is strict</td>
+<td><code>"maybe"</code> is a defect, not <code>false</code> (audit §3.3)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>onion.Cli</code> no longer calls <code>System.exit</code></td>
+<td>makes CLI failures catchable and testable (audit §3)</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>record … from re"…"</code> / <code>derive!(…)</code> replaced by named <code>shape</code> declarations</td>
+<td>one type may have many shapes; removes nine bolted-on statics (§5.2)</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>FileResource</code>/<code>HttpResource</code>'s fixed method menu replaced by <code>.as(shape)</code></td>
+<td>a fixed menu cannot be extended by a user (audit §2)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>law checking is off by default in the LSP; <code>--check-laws</code> controls it elsewhere</td>
+<td>the language server currently executes user code on every validation (audit §4)</td>
+</tr>
+<tr>
+<td>9</td>
+<td><em>(v0.7)</em> the default static import set narrows</td>
+<td>ambient effects are unreadable (§6.4)</td>
+</tr>
+</tbody>
+</table>
+<p>Changes 1–5 are mechanical at the call site. Change 6 is a rewrite of every shape
+declaration. Change 9 is the largest and is scheduled separately.</p>
+<hr />
+<h2 id="9-reversibility-v08-sketched">9. Reversibility (v0.8, sketched)<a class="headerlink" href="#9-reversibility-v08-sketched" title="Permanent link">&para;</a></h2>
+<p>A <strong>lossless</strong> shape satisfies L2 as well as L1 (§5.1): parsing and reprinting is the
+identity on the text, comments and whitespace included. That makes a <em>lens</em> possible —
+read a config, change one field, write it back, and the diff is one line:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>val cfg = file&quot;app.conf&quot;.as(ConfShape)     // lossless
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>val out = ConfShape.print(cfg.value.with(port = 9090))
+</span></code></pre></div>
+<p>This is worth flagging as <strong>the payoff that motivates <code>Origin</code></strong>. Provenance is not
+decoration: it is what lets the printer put untouched text back exactly where it was.</p>
+<p>Deliberately scheduled last. Attempted first, it would require building <code>Origin</code>,
+<code>Outcome</code> and <code>Shape</code> anyway, plus a residue representation — with none of the earlier
+pieces available to test against.</p>
+<hr />
+<h2 id="10-rejected-alternatives">10. Rejected alternatives<a class="headerlink" href="#10-rejected-alternatives" title="Permanent link">&para;</a></h2>
+<p><strong>Lossless Lens as the v0.6 headline.</strong> This was the original nomination for the moat.
+Rejected as the <em>first</em> move: there is no runtime provenance type to attach a lens to
+(audit §5 — zero matches for <code>provenance</code>/<code>sourceSpan</code>/<code>valueOrigin</code>), so it would mean
+building the entire foundation <em>and</em> the hardest feature simultaneously, with nothing to
+validate the foundation against. It becomes cheap once <code>Origin</code> exists, so it is v0.8 (§9).</p>
+<p><strong>A general effect system (algebraic effects, handlers, effect polymorphism).</strong> Rejected
+under constraint 2: it makes Onion a small version of Koka, costs a whole-language type
+system change, and is not what produces the value. The value is the <em>contract at the
+boundary</em>; effects on every function are the expensive part with the worst
+ergonomics-to-payoff ratio. Effects are declared and checked <strong>only at <code>tool</code> boundaries</strong>.</p>
+<p><strong>Carrying effects into codegen.</strong> Rejected on feasibility: there is no IR between
+<code>TypedAST</code> and ASM emission (audit §9), so this would mean teaching a 2,905-line backend
+about a new type-level concept, or building an IR first. Effects erase inside <code>Typing</code> (§6.6).</p>
+<p><strong>Keeping <code>from re"…"</code> syntax and swapping only the internals.</strong> Rejected because
+breaking changes are affordable here and the syntax should name the concept. The
+attachment form also structurally caps a type at one regex shape and a fixed marker list
+(§5.2) — the limitation is in the syntax, not the implementation.</p>
+<p><strong><code>Shape</code> as an open type class over arbitrary user types.</strong> Deferred, not rejected
+outright. Onion has type classes (<code>docs/design/type-classes.md</code>), so <code>Shape[T]</code> as a
+class with user-written instances is tempting. But the first version needs a <em>closed</em>,
+derivable set with an explicit escape hatch, so that "the compiler knows whether <code>print</code>
+exists and why" (§5.5) stays decidable. Opening it is a natural v0.8+ step once the
+closed core has proven its laws.</p>
+<p><strong>Refinement or dependent types for validation.</strong> Rejected under constraint 1 and cost:
+<code>status: Int where 100 &lt;= status &lt; 600</code> is attractive, but it is a second, much larger type
+system serving a narrow slice of the boundary story, and <code>Shape</code> + <code>Outcome</code> already
+express the same constraint as a parse-time defect with a position — which is strictly
+more useful at a boundary, because it can say <em>where</em> in the input the bad value was.</p>
+<p><strong>Making <code>Outcome</code> an alias for <code>Result[T, List[Defect]]</code>.</strong> Rejected: the accumulating
+<code>zip</code> (§4.1) has different laws from <code>Result</code>'s short-circuiting <code>bind</code>, and conflating
+them is how "report all three bad fields" quietly becomes "report the first bad field".</p>
+<p><strong>Fixing the four mechanisms in place instead of unifying them.</strong> Rejected as the
+non-solution it is: it would mean five copies of the scalar table instead of five, five
+failure conventions instead of five, and no answer to "what <em>is</em> Onion for".</p>
+<hr />
+<h2 id="11-what-this-buys-concretely">11. What this buys, concretely<a class="headerlink" href="#11-what-this-buys-concretely" title="Permanent link">&para;</a></h2>
+<p>Three demos, one per milestone, each impossible or silently wrong today.</p>
+<p><strong>Repair a broken log (v0.6).</strong> 1,000 access-log lines, 5 malformed. <code>AccessLine.lines</code>
+returns 995 typed values <em>and</em> 5 defects with line numbers and reasons. Today <code>parseAll</code>
+returns 995 values and no trace of the other 5 (audit §3.1).</p>
+<p><strong>A tool an agent can call (v0.7).</strong> One <code>tool</code> declaration yields a CLI, <code>--help</code>, a
+machine-readable contract and <code>--plan</code>. An agent reads the contract, runs <code>--plan</code> to see
+that it would write two files and hit one host, and only then executes. Today the CLI
+"contract" is a comma-separated string with the types erased
+(<code>Rewriting.scala:371-376</code> → <code>Cli.java:26-42</code>) and there is no dry run at all.</p>
+<p><strong>Edit a config without destroying it (v0.8).</strong> Read a commented config, change one
+field, write it back with comments and formatting intact.</p>
 
 
 
@@ -4393,7 +5322,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../json-http/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JSON &amp; HTTP">
+          <a href="../../RELEASING/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Releasing">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4403,20 +5332,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                JSON & HTTP
+                Releasing
               </div>
             </div>
           </a>
         
         
           
-          <a href="../error-handling/" class="md-footer__link md-footer__link--next" aria-label="Next: Error Handling">
+          <a href="../onion-v0.5-audit/" class="md-footer__link md-footer__link--next" aria-label="Next: v0.5 Audit">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Error Handling
+                v0.5 Audit
               </div>
             </div>
             <div class="md-footer__button md-icon">

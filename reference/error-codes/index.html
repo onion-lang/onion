@@ -390,7 +390,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../GENERICS_DESIGN/" class="md-tabs__link">
+        <a href="../../design/typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -3682,6 +3682,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0074-a-laws-parameter-type-cannot-be-generated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0074 — A law's parameter type cannot be generated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0075-a-class-declaring-laws-could-not-be-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0075 — A class declaring laws could not be loaded
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4080,6 +4102,146 @@
   
   
     <li class="md-nav__item">
+      <a href="../../design/typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../GENERICS_DESIGN/" class="md-nav__link">
         
   
@@ -4346,6 +4508,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0074-a-laws-parameter-type-cannot-be-generated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0074 — A law's parameter type cannot be generated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0075-a-class-declaring-laws-could-not-be-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0075 — A class declaring laws could not be loaded
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4510,13 +4694,31 @@ value.  Return on every path, or use an expression body.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>foreach (k, v) in m { println(k + &quot;=&quot; + v) }
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>foreach k: String in m.keySet() { println(k) }
 </span></code></pre></div>
+<h3 id="e0074-a-laws-parameter-type-cannot-be-generated"><code>E0074</code> — A law's parameter type cannot be generated<a class="headerlink" href="#e0074-a-laws-parameter-type-cannot-be-generated" title="Permanent link">&para;</a></h3>
+<p><code>law</code> is checked at build time over generated sample values, so every parameter type
+needs a generator. Generatable types are <code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>,
+<code>Boolean</code>, <code>Short</code>, <code>Byte</code>, and records whose components are all generatable.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record Dummy(v: Int)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  law overArray(xs: Int[]) { xs != null }   // E0074: no generator for Int[]
+</span></code></pre></div>
+<p>Anything else — arrays, <code>Map</code>, enums, interfaces, or a class with more than one
+constructor — has no generator. Such a law used to be skipped silently, which made it
+indistinguishable from a law that held; a check that cannot run must not look like one
+that passed. Change the parameter type, or remove the law.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
+</span></code></pre></div>
+<h3 id="e0075-a-class-declaring-laws-could-not-be-loaded"><code>E0075</code> — A class declaring laws could not be loaded<a class="headerlink" href="#e0075-a-class-declaring-laws-could-not-be-loaded" title="Permanent link">&para;</a></h3>
+<p>Laws run against the compiled classes. If a class that declares <code>law</code> / <code>example</code>
+clauses cannot be loaded, none of its checks ran — reported rather than passed over,
+for the same reason as <code>E0074</code>.</p>
 <h2 id="null-safety-errors">Null-safety errors<a class="headerlink" href="#null-safety-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-type-parameter-may-be-null"><code>E0057</code> — Type parameter may be null<a class="headerlink" href="#e0057-type-parameter-may-be-null" title="Permanent link">&para;</a></h3>
 <p>A bare type parameter <code>[T]</code> can be instantiated with a nullable type, so direct dereference is not allowed without a null-check or a non-null bound.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>class Box[T] {
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>public:
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>class Box[T] {
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>public:
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>}
 </span></code></pre></div>
 <p>Fixes:
 - Use <code>?.</code> / <code>?:</code> / <code>if x != null</code>.
@@ -4524,18 +4726,18 @@ value.  Return on every path, or use an expression body.</p>
 <h2 id="pattern-matching-errors">Pattern-matching errors<a class="headerlink" href="#pattern-matching-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0042-non-exhaustive-pattern-match"><code>E0042</code> — Non-exhaustive pattern match<a class="headerlink" href="#e0042-non-exhaustive-pattern-match" title="Permanent link">&para;</a></h3>
 <p>A <code>select</code> on a sealed type does not cover all cases.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sealed interface Shape {}
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>record Circle(r: Int) &lt;: Shape
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>select shape {
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>  // missing Rect case → E0042
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sealed interface Shape {}
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>record Circle(r: Int) &lt;: Shape
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>record Rect(w: Int, h: Int) &lt;: Shape
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>select shape {
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  // missing Rect case → E0042
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>}
 </span></code></pre></div>
 <h2 id="parser-errors">Parser errors<a class="headerlink" href="#parser-errors" title="Permanent link">&para;</a></h2>
 <p>Parser errors do not carry <code>E</code> codes; they report the encountered token and the expected tokens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>

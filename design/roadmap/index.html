@@ -12,13 +12,13 @@
         <meta name="author" content="Onion Language Team">
       
       
-        <link rel="canonical" href="https://onion-lang.org/examples/async/">
+        <link rel="canonical" href="https://onion-lang.org/design/roadmap/">
       
       
-        <link rel="prev" href="../json-http/">
+        <link rel="prev" href="../onion-v0.5-audit/">
       
       
-        <link rel="next" href="../error-handling/">
+        <link rel="next" href="../readme-rewrite-proposal/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Async & Concurrency - Onion Programming Language</title>
+        <title>Roadmap: v0.6-v0.8 - Onion Programming Language</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#async-concurrency-examples" class="md-skip">
+        <a href="#roadmap-v06-to-v08" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Async & Concurrency
+              Roadmap: v0.6-v0.8
             
           </span>
         </div>
@@ -304,13 +304,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../examples/overview/" class="md-tabs__link">
           
   
   
@@ -386,11 +384,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../design/typed-boundaries/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../typed-boundaries/" class="md-tabs__link">
           
   
   
@@ -2809,31 +2809,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -2851,7 +2848,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2869,7 +2866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../examples/overview/" class="md-nav__link">
         
   
   
@@ -2897,7 +2894,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic/" class="md-nav__link">
+      <a href="../../examples/basic/" class="md-nav__link">
         
   
   
@@ -2925,7 +2922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../oop/" class="md-nav__link">
+      <a href="../../examples/oop/" class="md-nav__link">
         
   
   
@@ -2953,7 +2950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../functional/" class="md-nav__link">
+      <a href="../../examples/functional/" class="md-nav__link">
         
   
   
@@ -2981,7 +2978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scripting/" class="md-nav__link">
+      <a href="../../examples/scripting/" class="md-nav__link">
         
   
   
@@ -3009,7 +3006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../json-http/" class="md-nav__link">
+      <a href="../../examples/json-http/" class="md-nav__link">
         
   
   
@@ -3034,37 +3031,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Async & Concurrency
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../examples/async/" class="md-nav__link">
         
   
   
@@ -3080,103 +3050,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Creating Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Waiting for Multiple Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do-Notation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Async Downloader
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Racing Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3189,7 +3062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../error-handling/" class="md-nav__link">
+      <a href="../../examples/error-handling/" class="md-nav__link">
         
   
   
@@ -3858,28 +3731,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -3897,7 +3773,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3915,7 +3791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/typed-boundaries/" class="md-nav__link">
+      <a href="../typed-boundaries/" class="md-nav__link">
         
   
   
@@ -3943,7 +3819,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
+      <a href="../onion-v0.5-audit/" class="md-nav__link">
         
   
   
@@ -3968,10 +3844,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../design/roadmap/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -3987,6 +3890,48 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#v06-one-boundary-one-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.6 — One boundary, one failure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v07-contracts-and-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.7 — Contracts and capabilities
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3999,7 +3944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/readme-rewrite-proposal/" class="md-nav__link">
+      <a href="../readme-rewrite-proposal/" class="md-nav__link">
         
   
   
@@ -4027,7 +3972,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design/type-classes/" class="md-nav__link">
+      <a href="../type-classes/" class="md-nav__link">
         
   
   
@@ -4166,10 +4111,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-futures" class="md-nav__link">
+  <a href="#v06-one-boundary-one-failure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating Futures
+        v0.6 — One boundary, one failure
       
     </span>
   </a>
@@ -4177,65 +4122,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#waiting-for-multiple-futures" class="md-nav__link">
+  <a href="#v07-contracts-and-capabilities" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Waiting for Multiple Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#do-notation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Do-Notation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-async-downloader" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Async Downloader
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#racing-futures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Racing Futures
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
+        v0.7 — Contracts and capabilities
       
     </span>
   </a>
@@ -4262,102 +4152,243 @@
   
 
 
-<h1 id="async-concurrency-examples">Async &amp; Concurrency Examples<a class="headerlink" href="#async-concurrency-examples" title="Permanent link">&para;</a></h1>
-<p>Onion provides a <code>Future</code> type and <code>do[Future]</code> notation for asynchronous programming.</p>
-<h2 id="creating-futures">Creating Futures<a class="headerlink" href="#creating-futures" title="Permanent link">&para;</a></h2>
-<p>Run work in the background with <code>Future::async</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  })
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>}
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>val f = fetchPage(&quot;https://example.com&quot;, 100L)
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>println(f.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="waiting-for-multiple-futures">Waiting for Multiple Futures<a class="headerlink" href="#waiting-for-multiple-futures" title="Permanent link">&para;</a></h2>
-<p>Launch several futures and wait for all of them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>val f1 = fetchPage(&quot;a&quot;, 50L)
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>val f2 = fetchPage(&quot;b&quot;, 30L)
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>val f3 = fetchPage(&quot;c&quot;, 40L)
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  foreach r: Object in results {
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    println(&quot;  &quot; + (r as String))
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  }
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>})
-</span></code></pre></div>
-<h2 id="do-notation">Do-Notation<a class="headerlink" href="#do-notation" title="Permanent link">&para;</a></h2>
-<p>Chain futures with <code>do[Future]</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>}
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>Handle failures with <code>onFailure</code>, <code>recover</code>, or <code>recoverWith</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>val risky: Future[Int] = Future::failed(new Exception(&quot;simulated failure&quot;))
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>risky.onFailure((error: Throwable) -&gt; {
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  println(&quot;caught: &quot; + error.getMessage())
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>})
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>val recovered = risky.recover((error: Throwable) -&gt; {
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  println(&quot;recovering from &quot; + error.getMessage())
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  return 0
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>})
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>println(&quot;value=&quot; + recovered.getOrElse(-1))
-</span></code></pre></div>
-<h2 id="complete-example-async-downloader">Complete Example: Async Downloader<a class="headerlink" href="#complete-example-async-downloader" title="Permanent link">&para;</a></h2>
-<p><strong><code>AsyncDownloader.on</code></strong> downloads several simulated pages concurrently and aggregates the results.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def fetchPage(url: String, delayMs: Long): Future[String] {
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  return Future::async(() -&gt; {
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    Thread::sleep(delayMs)
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    return &quot;body of &quot; + url
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  })
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>}
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>val urls = [
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  &quot;https://example.com/a&quot;,
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  &quot;https://example.com/b&quot;,
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>  &quot;https://example.com/c&quot;
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>]
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>val f1 = fetchPage(urls[0] as String, 50L)
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>val f2 = fetchPage(urls[1] as String, 30L)
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>val f3 = fetchPage(urls[2] as String, 40L)
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>Future::all(f1, f2, f3).onSuccess((results: List[Object]) -&gt; {
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>  println(&quot;Downloaded &quot; + results.size + &quot; pages&quot;)
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>})
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>val combined: Future[String] = do[Future] {
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>  a &lt;- fetchPage(&quot;page-a&quot;, 20L)
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>  b &lt;- fetchPage(&quot;page-b&quot;, 20L)
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>  ret a.length() + &quot;:&quot; + b.length()
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>}
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>println(combined.getOrElse(&quot;failed&quot;))
-</span></code></pre></div>
-<h2 id="racing-futures">Racing Futures<a class="headerlink" href="#racing-futures" title="Permanent link">&para;</a></h2>
-<p>Use <code>race</code> to get the value from the first future that completes.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>val fast = fetchPage(&quot;fast&quot;, 10L)
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>val slow = fetchPage(&quot;slow&quot;, 100L)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>val winner = fast.race(slow)
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>println(&quot;winner: &quot; + winner.getOrElse(&quot;none&quot;))
-</span></code></pre></div>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h1 id="roadmap-v06-to-v08">Roadmap — v0.6 to v0.8<a class="headerlink" href="#roadmap-v06-to-v08" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>index.</strong> The roadmap itself lives on GitHub, because a roadmap in a file goes
+stale the moment work starts. This page exists so a reader who is not looking at the
+issue tracker can see the shape of the plan and follow it to the detail.</p>
 <ul>
-<li><a href="../json-http/">JSON &amp; HTTP Examples</a> - Combine futures with HTTP requests</li>
-<li><a href="../error-handling/">Error Handling Examples</a> - Handle async failures</li>
-<li><a href="../../reference/stdlib/">Standard Library Reference</a> - Full Future API</li>
+<li>Why: <a href="../onion-v0.5-audit/">onion-v0.5-audit.md</a> — what v0.5 is, with citations</li>
+<li>What: <a href="../typed-boundaries/">typed-boundaries.md</a> — the design thesis</li>
+<li>When: the milestones below</li>
 </ul>
+<table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>Theme</th>
+<th>Issues</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/milestone/17">v0.6</a></td>
+<td>One boundary, one failure</td>
+<td>10</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/milestone/18">v0.7</a></td>
+<td>Contracts and capabilities</td>
+<td>6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/milestone/19">v0.8</a></td>
+<td>Reversible</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<p>Each issue carries the same fields: user value, differentiation, dependencies, affected
+modules, complexity, migration risk, test strategy, docs impact, demo.</p>
+<hr />
+<h2 id="v06-one-boundary-one-failure">v0.6 — One boundary, one failure<a class="headerlink" href="#v06-one-boundary-one-failure" title="Permanent link">&para;</a></h2>
+<p>The boring foundation. Onion has four boundary mechanisms that share nothing and five
+ways to report the same failure (audit §2, §3); this milestone replaces them with one
+declarative data boundary and one failure channel that knows where things came from.</p>
+<p>Verification is fixed <strong>first</strong>, deliberately. The headline claim is that
+<code>parse ∘ print == id</code> is machine-checked at build time — but today a law whose parameter
+type has no generator is skipped with no diagnostic and no test coverage
+(<code>LawCheckPhase.scala:80-81</code>). A verification that can silently not run produces unearned
+confidence, so it is a prerequisite rather than a cleanup.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Item</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/346">#346</a></td>
+<td>law/example verification must never silently skip</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/347">#347</a></td>
+<td><code>Origin</code> — a runtime type for where a value came from</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/348">#348</a></td>
+<td><code>Outcome[T]</code> and <code>Defect</code> — one failure channel, with accumulation</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/349">#349</a></td>
+<td>one scalar conversion registry (collapse five duplicated switches)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/350">#350</a></td>
+<td><code>Shape[T]</code> and named <code>shape</code> declarations</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/351">#351</a></td>
+<td>Shape combinators — <code>lines</code>, <code>sepBy</code>, <code>xmap</code>, <code>zip</code>, <code>orElse</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/352">#352</a></td>
+<td>json/yaml/csv shapes, retiring <code>derive!</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/353">#353</a></td>
+<td>resource literals take a shape; <code>Cli</code> stops calling <code>System.exit</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/354">#354</a></td>
+<td>fix the positioning — README, EN/JA parity, quality-bar baseline</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/355">#355</a></td>
+<td>broken-log demo, guides, examples, crash corpus</td>
+</tr>
+</tbody>
+</table>
+<p>Rough order: #346 → #347 → #348 → #349 → #350 → #351 → {#352, #353} → {#354, #355}.</p>
+<p><strong>Demo:</strong> 1,000 access-log lines, 5 malformed. You get 995 typed values <em>and</em> 5 defects
+with line numbers. Today <code>parseAll</code> returns 995 values and no trace the other 5 existed.</p>
+<h2 id="v07-contracts-and-capabilities">v0.7 — Contracts and capabilities<a class="headerlink" href="#v07-contracts-and-capabilities" title="Permanent link">&para;</a></h2>
+<p>The differentiator. <code>Shape</code> types the data crossing the boundary; capabilities type the
+effects crossing it. One <code>tool</code> declaration derives its CLI, a machine-readable contract,
+a statically checked capability set, and a <code>--plan</code> dry run.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Item</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/356">#356</a></td>
+<td>effect table and <code>Method</code>-level effect access</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/357">#357</a></td>
+<td><code>tool</code> declaration, effect inference, capability checking</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/358">#358</a></td>
+<td>machine-readable contract, and derive the CLI from it</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/359">#359</a></td>
+<td><code>--plan</code>, a dry run derived from the effect set</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/360">#360</a></td>
+<td>narrow the default static import set</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/361">#361</a></td>
+<td>agent-callable tool demo</td>
+</tr>
+</tbody>
+</table>
+<h1 id="360-is-independent-of-the-rest-and-is-the-highest-blast-radius-change-in-the-roadmap">360 is independent of the rest and is the highest-blast-radius change in the roadmap;<a class="headerlink" href="#360-is-independent-of-the-rest-and-is-the-highest-blast-radius-change-in-the-roadmap" title="Permanent link">&para;</a></h1>
+<p>it is kept separate for that reason.</p>
+<p><strong>Demo:</strong> an agent reads a tool's contract, runs <code>--plan</code> to see it would write two files
+and contact one host, and only then executes. Today the CLI "contract" is a
+comma-separated string with the types erased, and there is no dry run at all.</p>
+<h2 id="v08-reversible">v0.8 — Reversible<a class="headerlink" href="#v08-reversible" title="Permanent link">&para;</a></h2>
+<p>The moonshot, scheduled last because <code>Origin</code> (#347) makes it affordable and attempting
+it first would mean building the entire foundation plus the hardest feature at once.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Item</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/362">#362</a></td>
+<td>lossless shapes and residue</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/363">#363</a></td>
+<td>lens — edit parsed data and write it back intact</td>
+</tr>
+<tr>
+<td><a href="https://github.com/onion-lang/onion/issues/364">#364</a></td>
+<td>open <code>Shape</code> to user-written instances</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Demo:</strong> read a commented config, change one field, write it back — comments and
+formatting intact, <code>diff</code> shows one line.</p>
+<hr />
+<h2 id="breaking-changes">Breaking changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h2>
+<p>Onion has one user today, so v0.6 and v0.7 break compatibility where the alternative is
+carrying a bad design forward. The full list with rationale is in
+<a href="../typed-boundaries/">typed-boundaries.md §8</a>. The largest are: <code>parse</code> returning
+<code>Outcome</code> instead of <code>T?</code>, <code>derive!</code> and <code>from re"…"</code> being replaced by named <code>shape</code>
+declarations, <code>Cli</code> no longer calling <code>System.exit</code>, and (v0.7) the default static import
+set narrowing.</p>
+<hr />
+<h2 id="feasibility-the-first-slice">Feasibility: the first slice<a class="headerlink" href="#feasibility-the-first-slice" title="Permanent link">&para;</a></h2>
+<p>Before committing to the milestones above, two structural risks were checked against the
+implementation. Both came back clear.</p>
+<h3 id="risk-1-is-processassignable-a-bottleneck-it-is-not-on-the-path">Risk 1 — is <code>processAssignable</code> a bottleneck? <strong>It is not on the path.</strong><a class="headerlink" href="#risk-1-is-processassignable-a-bottleneck-it-is-not-on-the-path" title="Permanent link">&para;</a></h3>
+<p><code>AssignabilitySupport.processAssignable</code> (<code>typing/AssignabilitySupport.scala:60-190</code>) is
+the single choke point every "does this value fit this type" decision passes through — 38
+references, one implementation. It looked like the natural home for any new subsumption
+rule, but it is already a ~130-line method carrying seven orthogonal concerns
+(empty-collection retyping, bottom types, constant narrowing, boxing, the
+null-to-non-nullable warning, primitive/null rejection, platform unboxing, structural
+type-variable assignability), so adding an eighth would be the riskiest edit in the plan.</p>
+<p>It turns out not to be needed:</p>
+<ul>
+<li><strong><code>Shape[T]</code> needs nothing there.</strong> A shape is an ordinary generic class. "A lossless
+  shape is usable where an L1 shape is expected" is plain subtyping, already handled.</li>
+<li><strong>Effects need nothing there either.</strong> Effects are declared and checked <em>only</em> at <code>tool</code>
+  boundaries (<a href="../typed-boundaries/">typed-boundaries.md §6.5</a>), which is a whole-program
+  question about a call graph, not a pairwise type-compatibility question. It belongs in
+  its own pass.</li>
+</ul>
+<p>That pass has direct precedent. <code>CompilerPhase</code> is a four-line trait
+(<code>pipeline/CompilerPhase.scala</code>) and <code>CompilationPhases</code> already holds <strong>two</strong> phases of
+exactly the shape an effect check needs — <code>CompilerPhase[Seq[TypedAST.ClassDefinition],
+Seq[TypedAST.ClassDefinition]]</code> (<code>pipeline/PipelineRunner.scala:19-20</code>, the TCO and
+mutual-recursion passes). Adding a third is a local change.</p>
+<p>One caveat: <code>PipelineRunnerSpec.scala:22-31</code> pins the phase-name sequence, so a new phase
+means updating that spec deliberately rather than by accident. That is a feature.</p>
+<h3 id="risk-2-does-the-slice-need-compiler-changes-at-all-barely">Risk 2 — does the slice need compiler changes at all? <strong>Barely.</strong><a class="headerlink" href="#risk-2-does-the-slice-need-compiler-changes-at-all-barely" title="Permanent link">&para;</a></h3>
+<p><code>Origin</code>, <code>Defect</code> and <code>Outcome[T]</code> are ordinary classes in <code>src/main/java/onion/</code>. The
+<code>zip</code>/<code>bind</code> law split is a library concern. A first <code>Shape[T]</code> with <code>parse</code>/<code>print</code> is
+likewise a library type. <strong>The compiler is not involved until the <code>shape</code> declaration form
+and the non-invertible-<code>print</code> diagnostic</strong>, which means the risky, high-blast-radius work (grammar, <code>Rewriting.scala</code>'s
+already-overloaded 1,416 lines, <code>TypingOutlinePass</code>) can be deferred until the runtime
+design has been validated against real programs.</p>
+<p>That is the opposite of the usual order and it is the right one here: the semantics are
+the uncertain part, not the syntax.</p>
+<h3 id="recommended-starting-order">Recommended starting order<a class="headerlink" href="#recommended-starting-order" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>#346 first, and alone.</strong> It is the only item that changes behaviour people already
+   depend on, it is self-contained, and everything downstream leans on laws actually
+   running. It also has the sharpest first failing test.</li>
+<li><strong>#347 → #348 as pure library work</strong>, verified by ordinary specs.</li>
+<li><strong>#349 (the scalar registry) as the first compiler edit</strong>, because it is a
+   consolidation of code that already exists — five switches becoming one — rather than a
+   new concept. It is the cheapest way to find out how much <code>Rewriting.scala</code> resists.</li>
+<li><strong>#350 only then.</strong></li>
+</ol>
+<h3 id="the-first-failing-test">The first failing test<a class="headerlink" href="#the-first-failing-test" title="Permanent link">&para;</a></h3>
+<p>For #346, in a file that does not exist yet
+(<code>src/test/scala/onion/compiler/verification/ArgGeneratorSpec.scala</code> — note there is no
+<code>verification</code> test directory at all today):</p>
+<blockquote>
+<p>A record carrying <code>law l(xs: List) { true }</code> compiles today and reports nothing,
+because <code>LawCheckPhase.scala:80-81</code> returns silently when a parameter type has no
+generator. The test asserts the compilation fails with <strong><code>E0074</code></strong>.</p>
+</blockquote>
+<p>It fails today for the right reason — the compile succeeds — and it pins the single
+behaviour that makes the rest of the roadmap honest.</p>
 
 
 
@@ -4393,7 +4424,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../json-http/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JSON &amp; HTTP">
+          <a href="../onion-v0.5-audit/" class="md-footer__link md-footer__link--prev" aria-label="Previous: v0.5 Audit">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -4403,20 +4434,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                JSON & HTTP
+                v0.5 Audit
               </div>
             </div>
           </a>
         
         
           
-          <a href="../error-handling/" class="md-footer__link md-footer__link--next" aria-label="Next: Error Handling">
+          <a href="../readme-rewrite-proposal/" class="md-footer__link md-footer__link--next" aria-label="Next: README Rewrite Proposal">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Error Handling
+                README Rewrite Proposal
               </div>
             </div>
             <div class="md-footer__button md-icon">

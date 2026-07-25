@@ -9,6 +9,9 @@
 - **静的型付け** - ローカル型推論によりコンパイル時にエラーを検出
 - **Null安全** - Nullable型 (`T?`)、安全呼び出し (`?.`)・安全添字 (`?[]`)・Elvis (`?:`)・非nullアサーション (`!!`)、スマートキャスト、nullable対応ジェネリクス
 - **データ型** - レコード（分解宣言・ジェネリクス対応）、データ付きenum、sealed階層の網羅性検査つきパターンマッチ
+- **双方向レコード** - `record ... from re"..." derive!(Json, Yaml)` 一つの宣言から parse/format と JSON/YAML の相互変換を*両方向*とも導出
+- **コンパイル時仕様** - レコードの `law` / `example` 句をコンパイラがビルド時に実行するので、`parse∘format == id` のような不変条件が機械検査される
+- **型クラス** - `trait` / `instance` と、制約付きジェネリクスへの辞書渡し（`sum[T: Numeric]`）
 - **簡潔なクラス定義** - プライマリコンストラクタ `class Point(val x: Int, val y: Int)`
 - **オブジェクト指向** - クラス、継承、インターフェース、メソッドオーバーロード
 - **関数型要素** - ラムダ式、クロージャ、第一級関数
@@ -91,6 +94,7 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 - [クラスとオブジェクト](guide/classes-and-objects.md) - オブジェクト指向
 - [継承](guide/inheritance.md) - サブクラスとインターフェース実装
 - [コレクション](guide/collections.md) - リスト、マップ、組み込みパイプライン
+- [型クラス](guide/type-classes.md) - `trait`、`instance`、制約付きジェネリクス
 - [Javaとの相互運用](guide/java-interop.md) - Javaライブラリの利用
 - [スクリプティング](guide/scripting.md) - リテラル、derive!、law/example、パイプライン
 
@@ -128,6 +132,7 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 
 ## デザインノート
 
+- [型クラス](../design/type-classes.md) - `trait`/`instance`、coherence、辞書渡し
 - [ジェネリクス設計](GENERICS_DESIGN.md) - 消去ベースジェネリクスの設計
 - [パーサーリファクタリング](parser-refactoring.md) - Builderパターンによる文法とASTの分離
 - [品質基準](quality-bar.md) - 実用的品質の測定可能な指標

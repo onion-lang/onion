@@ -108,6 +108,12 @@ private[compiler] final class AssignabilitySupport(
       }
       val boxedType = Boxing.boxedType(bodyContext.table, targetBasicType)
       if (TypeRules.isAssignable(boxedType, actual.`type`)) {
+        // The source is a boxed reference (typically a Java-interop platform
+        // value, e.g. Json::getInt's Integer) with no Onion-tracked
+        // nullability; unboxing it to a non-null primitive crashes with a raw
+        // NPE if the value is actually null (#318). Mirrors the W0012
+        // null-to-non-nullable trade-off above: warn rather than block.
+        bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
         return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }
     }

@@ -35,6 +35,8 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--dump-typed-ast` - Print typed AST summary to stderr
 - `--warn <off|on|error>` - Set warning level
 - `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
+- `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)
+- `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
 
 ## High-Level Architecture
 

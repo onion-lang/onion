@@ -16,7 +16,10 @@ class LawCheckMessageI18nSpec extends AnyFunSpec with Diagrams {
     "error.semantic.exampleFailedFalse",
     "error.semantic.exampleFailedThrew",
     "error.semantic.lawFalsified",
-    "error.semantic.lawThrew"
+    "error.semantic.lawThrew",
+    // A law that cannot run, and a class whose checks never ran (#346).
+    "error.semantic.lawParameterNotGeneratable",
+    "error.semantic.lawClassNotLoadable"
   )
 
   private def assertResolvable(locale: Locale): Unit = {
@@ -38,9 +41,32 @@ class LawCheckMessageI18nSpec extends AnyFunSpec with Diagrams {
   }
 
   it("formats placeholders via onion.compiler.toolbox.Message") {
-    val falsified = onion.compiler.toolbox.Message("error.semantic.lawFalsified", Array[Any]("roundtrip", "Pt", "3, 4"))
+    // lawFalsified carries a fourth argument: how to reproduce the run that produced the
+    // counterexample. A message with an unfilled placeholder prints a literal "{3}", so
+    // the argument count is part of the contract, not an implementation detail.
+    val falsified = onion.compiler.toolbox.Message(
+      "error.semantic.lawFalsified", Array[Any]("roundtrip", "Pt", "3, 4", "--law-seed 42 --law-samples 40"))
     assert(falsified.contains("roundtrip"))
     assert(falsified.contains("Pt"))
     assert(falsified.contains("3, 4"))
+    assert(falsified.contains("--law-seed 42"))
+  }
+
+  it("leaves no unfilled placeholder in either locale") {
+    val filled = Map(
+      "error.semantic.exampleFailedFalse" -> Array[Any]("ex", "R"),
+      "error.semantic.exampleFailedThrew" -> Array[Any]("ex", "R", "Boom"),
+      "error.semantic.lawFalsified" -> Array[Any]("l", "R", "1", "seed"),
+      "error.semantic.lawThrew" -> Array[Any]("l", "R", "1", "Boom", "seed"),
+      "error.semantic.lawParameterNotGeneratable" -> Array[Any]("l", "R", "int[]"),
+      "error.semantic.lawClassNotLoadable" -> Array[Any]("R")
+    )
+    for (locale <- Seq(Locale.ENGLISH, Locale.JAPANESE)) {
+      val bundle = ResourceBundle.getBundle("errorMessage", locale)
+      for ((key, args) <- filled) {
+        val text = java.text.MessageFormat.format(bundle.getString(key), args*)
+        assert(!text.matches("(?s).*\\{\\d+\\}.*"), s"$key left a placeholder unfilled in $locale: $text")
+      }
+    }
   }
 }

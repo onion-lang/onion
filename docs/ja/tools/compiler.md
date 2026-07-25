@@ -104,6 +104,18 @@ onionc --warn error MyProgram.on
 onionc --Wno W0001,unused-parameter MyProgram.on
 ```
 
+### `--no-check-laws`
+
+レコードの `law` / `example` 句を実行しません。
+
+既定ではコンパイル時に実行される——つまりコンパイラがそのコードを走らせます。
+実行したくないファイルをコンパイルする場合に指定してください。引き換えに
+`parse ∘ format == id` のような不変条件は検査されなくなります。
+
+```bash
+onionc --no-check-laws MyProgram.on
+```
+
 ## 例
 
 ### 基本的なコンパイル

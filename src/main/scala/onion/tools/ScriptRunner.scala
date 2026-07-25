@@ -143,6 +143,7 @@ object ScriptRunner {
   private final val PROFILE_OUTPUT: String = "--profile-output"
   private final val WARN_LEVEL: String = "--warn"
   private final val SUPPRESS_WARNINGS: String = "--Wno"
+  private final val NO_CHECK_LAWS: String = "--no-check-laws"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_MAX_ERROR: Int = 10
@@ -166,7 +167,8 @@ class ScriptRunner {
     conf(PROFILE_FORMAT, true),
     conf(PROFILE_OUTPUT, true),
     conf(WARN_LEVEL, true),
-    conf(SUPPRESS_WARNINGS, true)
+    conf(SUPPRESS_WARNINGS, true),
+    conf(NO_CHECK_LAWS, false)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -235,6 +237,7 @@ class ScriptRunner {
          |  --profile-output <target>   Send profile to stderr, stdout, or a file path
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
+         |  --no-check-laws             Do not execute record `law`/`example` clauses
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -274,7 +277,8 @@ class ScriptRunner {
       suppressedWarnings = suppressed,
       dumpAst = dumpAst,
       dumpTypedAst = dumpTypedAst,
-      compileProfile = profile
+      compileProfile = profile,
+      checkLaws = !option.get(NO_CHECK_LAWS).contains(NoValuedParam)
     ))
   }
 

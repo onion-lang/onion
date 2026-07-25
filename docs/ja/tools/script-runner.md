@@ -92,6 +92,14 @@ onion --warn error MyScript.on
 onion --Wno W0001,unused-parameter MyScript.on
 ```
 
+### `--no-check-laws`
+
+レコードの `law` / `example` 句を実行しません。
+
+```bash
+onion --no-check-laws MyScript.on
+```
+
 ## プログラム引数
 
 ソースファイルの後ろに指定した引数は、プログラムに渡されます。

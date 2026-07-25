@@ -92,6 +92,14 @@ Suppress specific warning categories by code or name.
 onion --Wno W0001,unused-parameter MyScript.on
 ```
 
+### `--no-check-laws`
+
+Do not execute a record's `law` / `example` clauses.
+
+```bash
+onion --no-check-laws MyScript.on
+```
+
 ## Program Arguments
 
 Arguments after the source file(s) are passed to your program:

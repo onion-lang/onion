@@ -104,6 +104,18 @@ Suppress specific warning categories by code or name.
 onionc --Wno W0001,unused-parameter MyProgram.on
 ```
 
+### `--no-check-laws`
+
+Do not execute a record's `law` / `example` clauses.
+
+They run at compile time by default, which means the compiler executes that code.
+Turn them off when compiling a file you do not want to run — the trade-off is that
+invariants like `parse ∘ format == id` stop being checked.
+
+```bash
+onionc --no-check-laws MyProgram.on
+```
+
 ## Examples
 
 ### Basic Compilation

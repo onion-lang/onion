@@ -63,6 +63,7 @@ object CompilerFrontend {
   private final val PROFILE_OUTPUT: String = "--profile-output"
   private final val WARN_LEVEL: String = "--warn"
   private final val SUPPRESS_WARNINGS: String = "--Wno"
+  private final val NO_CHECK_LAWS: String = "--no-check-laws"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_OUTPUT: String = "."
@@ -85,7 +86,8 @@ class CompilerFrontend {
     config(PROFILE_FORMAT, true),
     config(PROFILE_OUTPUT, true),
     config(WARN_LEVEL, true),
-    config(SUPPRESS_WARNINGS, true)
+    config(SUPPRESS_WARNINGS, true),
+    config(NO_CHECK_LAWS, false)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -139,6 +141,7 @@ class CompilerFrontend {
          |  --profile-output <target>   Send profile to stderr, stdout, or a file path
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
+         |  --no-check-laws             Do not execute record `law`/`example` clauses
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -175,6 +178,7 @@ class CompilerFrontend {
       option.get(MAX_ERROR).collect{ case ValuedParam(value) => value}
     )
     val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
+    val noCheckLaws = option.get(NO_CHECK_LAWS).contains(NoValuedParam)
     val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
     val compileProfile = parseCompileProfile(option)
     val warningLevel = parseWarningLevel(option.get(WARN_LEVEL))
@@ -197,7 +201,8 @@ class CompilerFrontend {
         suppressedWarnings = suppressed,
         dumpAst = dumpAst,
         dumpTypedAst = dumpTypedAst,
-        compileProfile = profile
+        compileProfile = profile,
+        checkLaws = !noCheckLaws
       )
     }
   }

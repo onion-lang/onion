@@ -173,6 +173,15 @@ lazy val onionSettings = Seq(
   }
 )
 
+// The project test runner (onion.tools.project.ProjectTestRunner) has to capture
+// System.out/System.err to report a failing Onion test's output, and those
+// streams are process-global. With sbt's default parallel suite execution, any
+// other suite printing during that window lands inside the captured text, so
+// assertions on it fail at random -- one CI job on PR #335 failed this way while
+// the other passed, on a change that touched only workflow YAML. Serial suites
+// cost a few seconds and make the signal trustworthy.
+Test / parallelExecution := false
+
 run / fork := true
 run / connectInput := true
 repl / fork := true

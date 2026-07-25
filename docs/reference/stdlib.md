@@ -6,7 +6,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 
 | Area | Modules |
 |------|---------|
-| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI) |
+| **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI), `Http` (HTTP client) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
 | **Numbers** | `Math`, `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
@@ -1036,9 +1036,10 @@ Http::delete(url): String
 ### URL Utilities
 
 ```
-Http::urlEncode(str): String
-Http::urlDecode(str): String
-Http::buildQuery(params): String    // params: ["key1", "val1", ...]
+Http::encodeUrl(str): String
+Http::decodeUrl(str): String
+Http::buildQuery(params): String        // params: ["key1", "val1", ...]
+Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
 ```
 
 ### Example

@@ -132,6 +132,19 @@ Laws run against the compiled classes. If a class that declares `law` / `example
 clauses cannot be loaded, none of its checks ran — reported rather than passed over,
 for the same reason as `E0074`.
 
+### `E0076` — Unknown shape format
+
+A `shape name = <format>` clause names a document format the compiler does not know.
+Guessing would produce a shape that silently reads nothing, so it is an error listing
+what is supported.
+
+```onion
+record Pt(x: Int, y: Int)
+  shape doc = toml     // E0076: supported formats are json, yaml
+```
+
+For an inline pattern, write `shape name = re"..."`.
+
 ## Null-safety errors
 
 ### `E0057` — Type parameter may be null

@@ -316,19 +316,29 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
    * component (E0060) -- the same two checks the `from` clause gets by lowering through a
    * regex select pattern. Returns false when it reported a problem.
    */
-  private def checkShapePattern(clause: AST.ShapeClause, componentCount: Int): Boolean =
-    try {
-      val compiled = java.util.regex.Pattern.compile(clause.pattern)
-      val groups = compiled.matcher("").groupCount()
-      if (groups != componentCount) {
-        report(SemanticError.REGEX_GROUP_MISMATCH, clause, groups.toString, componentCount.toString)
+  private def checkShapePattern(clause: AST.ShapeClause, componentCount: Int): Boolean = clause.source match {
+    case AST.RegexSource(pattern) =>
+      try {
+        val compiled = java.util.regex.Pattern.compile(pattern)
+        val groups = compiled.matcher("").groupCount()
+        if (groups != componentCount) {
+          report(SemanticError.REGEX_GROUP_MISMATCH, clause, groups.toString, componentCount.toString)
+          false
+        } else true
+      } catch {
+        case e: java.util.regex.PatternSyntaxException =>
+          report(SemanticError.REGEX_PATTERN_INVALID, clause, e.getDescription + " (at index " + e.getIndex + ")")
+          false
+      }
+    case AST.FormatSource(format) =>
+      // The same reasoning as derive!'s marker check: an unknown name is a typo, and
+      // guessing at it would produce a shape that silently reads nothing.
+      if (ShapeFormats.isSupported(format)) true
+      else {
+        report(SemanticError.SHAPE_FORMAT_UNKNOWN, clause, format, ShapeFormats.supportedNames)
         false
-      } else true
-    } catch {
-      case e: java.util.regex.PatternSyntaxException =>
-        report(SemanticError.REGEX_PATTERN_INVALID, clause, e.getDescription + " (at index " + e.getIndex + ")")
-        false
-    }
+      }
+  }
 
   /** Component types `derive!` (Json/Yaml) can serialize — the same scalar set as `from`. */
   private def isDataDerivableType(tp: Type): Boolean = isFromDerivableType(tp)

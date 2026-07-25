@@ -326,7 +326,17 @@ object AST {
    * statics onto it, a record may carry as many shape clauses as it needs: a v1 and a v2
    * log format can coexist, each reached by its own name.
    */
-  case class ShapeClause(location: Location, name: String, pattern: String) extends Node
+  case class ShapeClause(location: Location, name: String, source: ShapeSource) extends Node
+  /** What a shape clause reads: an inline regex, or a named document format. */
+  sealed trait ShapeSource
+  case class RegexSource(pattern: String) extends ShapeSource
+  /** `json` / `yaml` — a structured document whose keys are the component names. */
+  case class FormatSource(format: String) extends ShapeSource
+  /** Java-callable factories for the two shape sources. */
+  def regexShapeClause(location: Location, name: String, pattern: String): ShapeClause =
+    ShapeClause(location, name, RegexSource(pattern))
+  def formatShapeClause(location: Location, name: String, format: String): ShapeClause =
+    ShapeClause(location, name, FormatSource(format))
   /** A `law name(p: T) { boolean-expr }` clause on a record — a compile-time property check. */
   case class LawClause(location: Location, name: String, params: List[Argument], body: BlockExpression) extends Node
   /** An `example { boolean-expr }` clause on a record — a compile-time concrete check. */

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Fixed wrong `Http` method names in the stdlib docs (en/ja).** `docs/reference/stdlib.md`
+  documented `Http::urlEncode`/`Http::urlDecode`, but the implemented (and tested) names are
+  `encodeUrl`/`decodeUrl` — following the doc raised a "method not found" error. Corrected both
+  names, documented the previously-missing `Http::buildUrl`, added `Http` to the "Modules at a
+  glance" summary table (English and Japanese), and added the Japanese `Http` module section that
+  was missing entirely. The header-argument example was also wrong — it showed a
+  list literal against an overload that only took a `String[]` — which is what prompted the
+  List-over-arrays change below; the header parameter now genuinely takes the documented list form.
+
 - **The standard library takes and returns `List`, not arrays (breaking).** A user following the docs
   had to know, per method, whether a result was a `List` (use `.size`, index with `[]`) or an array
   (use `.length`) — and had to build `new String[]{...}` to pass HTTP headers or query parameters,

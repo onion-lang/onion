@@ -103,6 +103,36 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
           processNestedFieldPattern(nestedFieldPat, nestedField.`type`, nestedPath, bindingEntries, nestedConditions, nested)
         }
 
+      case tp @ AST.TypePattern(_, bindingName, typeRef) =>
+        // A nested type pattern: `Add(l, n is Num)`. Like the nested
+        // destructuring case it contributes an instanceof condition on the
+        // field, but binds the field itself at the narrowed type instead of
+        // decomposing it further -- so it also works for a component whose type
+        // is not a record (`Wrap(s is String)`), which a nested constructor
+        // pattern cannot express (issue #299).
+        val mappedType = typing.mapFrom(typeRef).getOrElse(break(None))
+        if (!mappedType.isObjectType) {
+          typing.report(INCOMPATIBLE_TYPE, tp, typing.rootClass, mappedType)
+          break(None)
+        }
+        def buildAccessor(base: Term, path: List[AccessStep]): Term = path match {
+          case Nil => base
+          case AccessStep(castType, getter) :: rest =>
+            val cast = new AsInstanceOf(base, castType)
+            if (getter == null) buildAccessor(cast, rest)
+            else buildAccessor(new Call(cast, getter, Array.empty), rest)
+        }
+        nestedConditions +=
+          new InstanceOf(buildAccessor(new RefLocal(bind), currentPath), mappedType.asInstanceOf[ObjectType])
+        // The field is declared at its component type, so the binding's access
+        // path needs a final cast-only step down to the narrowed type. Without
+        // it the loaded value keeps the wider static type while the binding
+        // claims the narrower one, and codegen emits an unverifiable frame.
+        bindingEntries += BindingEntry(
+          bindingName,
+          mappedType,
+          currentPath :+ AccessStep(mappedType.asInstanceOf[ClassType], null))
+
       case other =>
         // Other patterns not supported in destructuring position
         typing.report(NOT_A_RECORD_TYPE, parentNode, s"unsupported pattern type in destructuring: ${other.getClass.getSimpleName}")

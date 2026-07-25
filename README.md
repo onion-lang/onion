@@ -1,10 +1,49 @@
-## Onion - A Statically Typed Programming Language on JVM [![Build Status](https://github.com/onion-lang/onion/actions/workflows/scala.yml/badge.svg?branch=main)](https://github.com/onion-lang/onion/actions)
+## Onion — typed tools for a messy world [![Build Status](https://github.com/onion-lang/onion/actions/workflows/scala.yml/badge.svg?branch=main)](https://github.com/onion-lang/onion/actions)
 
-Onion is an object-oriented and statically typed programming language. Source codes of Onion 
-compiles into JVM class files as in-memory or real files.
+Onion is a statically typed language for turning messy external data into checked,
+reversible tools. It runs on the JVM and calls Java directly.
 
-Originally, Onion was written in Java.  It has been rewritten in Scala completely except Parser,
-using JavaCC.
+Most languages hand you a `String` at the boundary and wish you luck. Onion asks you to
+describe the boundary once — and derives the parser, the printer, the failure channel and
+the command-line interface from that one description.
+
+```onion
+record Access(ip: String, method: String, path: String, status: Int)
+  shape common = re"(\S+) (\w+) (\S+) (\d+)"
+
+def main(path: String, min: Int = 400): void {
+  val each = file(path).eachLine(Access::common())
+
+  foreach a: Access in Outcome::values(each) {
+    if a.status() >= min { println(a.status() + " " + a.path()) }
+  }
+  foreach d: Defect in Outcome::defects(each) {
+    println("line " + d.origin().line() + ": " + d.expected())
+  }
+}
+```
+
+One declaration gives you parsing, printing, and a CLI with `--min` and `--help` derived
+from `main`'s signature.
+
+The last two lines are the point. A thousand-line log with five corrupted lines gives you
+995 rows **and** the five you could not read, each with its line number — where almost
+every other tool hands back 995 rows and no indication the other five ever existed.
+
+Properties can be checked by the compiler, at build time:
+
+```onion
+record Pt(x: Int, y: Int)
+  shape text = re"(-?\d+),(-?\d+)"
+  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+```
+
+That law really runs — over generated samples, during `onionc`. It is deliberately not on
+the `Access` shape above: `\S+` cannot match an empty string, so printing an `Access` with
+an empty `ip` produces text that does not parse back. The round trip holds on the data a
+shape can actually represent, and saying which is the difference between a reversible
+language and one that claims to be. Writing the law on `Access` is how the sentence you
+just read got corrected.
 
 ## Installation
 
@@ -72,6 +111,13 @@ val inc = (x: Int) -> { return x + 1; }
 println(double(21))
 ```
 
+### Boundaries
+
+See [Shapes](https://onion-lang.org/guide/shapes/) for the whole story: named shapes per
+record, `Outcome` instead of `null`, per-line reads that keep what failed, and `canPrint()`
+answering whether a shape is reversible rather than the printing method silently not
+existing.
+
 ### Null Safety
 
 Kotlin-style null safety, including nullable-aware generics:
@@ -116,6 +162,22 @@ select shape {                                     // exhaustiveness-checked
   case Rect(w, h): println(w * h)
 }
 ```
+
+### Type Classes
+
+```onion
+trait Numeric[T] {
+  def plus(a: T, b: T): T
+  def zero(): T
+}
+instance Numeric[Int] {
+  def plus(a: Int, b: Int): Int = a + b
+  def zero(): Int = 0
+}
+def sum[T: Numeric](xs: List[T]): T { ... }
+```
+
+`trait` / `instance` with dictionary passing for constrained generics.
 
 ### Do Notation for Monadic Composition
 
@@ -205,6 +267,9 @@ def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 ```
 
 ## Architecture
+
+Onion was originally written in Java, and has been rewritten in Scala completely except
+the parser, which uses JavaCC.
 
 The post-parse compiler is now an explicit pipeline:
 

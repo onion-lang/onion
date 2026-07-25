@@ -48,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `endColumn` since it was written and the renderer has known how to draw a range, but no production
   code ever set them, so every caret was a single `^` at the first character.
 
+- **README rewritten around what Onion is for.** It opened with "an object-oriented and
+  statically typed programming language" that "compiles into JVM class files" — a category
+  shared with Kotlin, Scala and Java — while its most distinctive section sat 171 lines
+  down. It now leads with the boundary, and with a runnable example whose last two lines
+  are the point. Type classes, shipped since v1 and mentioned nowhere in the README, are
+  there too.
+
 - **`shape name = re"..."` on a record.** A named, first-class boundary, synthesized as a
   static method returning a `Shape[R]`. A record may carry **several** — a v1 and a v2 log
   format can coexist — which `from re"..."` structurally cannot do, since it allows one

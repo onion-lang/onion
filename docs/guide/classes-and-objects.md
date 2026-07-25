@@ -346,22 +346,29 @@ public:
 }
 ```
 
-When the expected type pins the type argument, the constructor infers it, so
-`new Box(...)` needs no `[T]` (the "diamond"). Explicit type arguments still
-work, and both forms are equivalent:
+A constructor infers its type arguments, so `new Box(...)` needs no `[T]` (the
+"diamond"). They are inferred from the expected type when there is one, and
+otherwise from the constructor arguments — the same way a generic method call
+infers from its arguments. Explicit type arguments still work, and all forms
+are equivalent:
 
 ```onion
-val b: Box[String] = new Box("x")           // T inferred as String
+val b: Box[String] = new Box("x")           // T inferred from the expected type
 val n: Box[Integer] = new Box(9)            // T inferred as Integer
 val b2: Box[String] = new Box[String]("y")  // explicit — same result
+val b3 = new Box("z")                       // T inferred from the argument
 ```
 
-With no expected type to infer from, the bare generic is rejected — supply an
+Argument inference requires every type parameter to be pinned by an argument.
+When nothing determines them, the bare generic is still rejected — supply an
 expected type or explicit type arguments:
 
 ```onion
-// val bad = new Box("x")   // ERROR E0066: raw generic type Box —
-                            // write `new Box[String]("x")` or annotate the target
+class Empty[T] { public: def this {} }
+
+// val bad = new Empty()    // ERROR E0066: raw generic type Empty — nothing to
+                            // infer T from; write `new Empty[String]()` or
+                            // annotate the target
 ```
 
 Type arguments are invariant (`Box[Dog]` is not a `Box[Animal]`); see

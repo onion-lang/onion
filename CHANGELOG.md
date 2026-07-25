@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **A generic constructor infers its type arguments from the constructor arguments (#305).**
+  Generic *methods* already inferred from their arguments (`id("hi")` binds `T = String`), and a
+  constructor already inferred from an expected type (`val b: Box[String] = new Box("x")`), but
+  `val b = new Box("hi")` — where the argument alone determines `T` — was rejected as a raw type
+  (E0066), so everyday generic code needed a redundant `new Box[String]("hi")` or an annotated
+  target. It is now inferred, using the same engine that binds a generic method's type variables,
+  so both paths follow identical rules (nested generics, primitive boxing into the type argument,
+  and multi-parameter classes all work). Inference only applies when *every* type parameter is
+  pinned by an argument and all matching constructors agree on the result; a bare generic that
+  nothing determines (`new Empty()`) is still an E0066 raw type, and an inferred argument is a real
+  type — `val wrong: Box[Int] = new Box("str")` is still rejected.
 - **Documented nine more stdlib modules in Japanese (`docs/ja/reference/stdlib.md`).**
   The Japanese "モジュール一覧" (modules at a glance) summary table already listed
   `System`, `Files`, `Proc`, `Args`, `Iterables`, `Colls`, `Csv`, `DateTime`, and

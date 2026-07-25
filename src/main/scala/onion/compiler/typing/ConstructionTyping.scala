@@ -148,8 +148,88 @@ final class ConstructionTyping(
       case _ => None
     }
 
+  /**
+   * The bare generic class named by `new C(...)`, or None when `C` is not a
+   * generic class written without type arguments. Uses `mapFrom` rather than
+   * `mapFromDeclared` so probing does not itself report E0066 for the very raw
+   * type we are about to infer arguments for.
+   */
+  private def bareGenericTarget(node: AST.NewObject): Option[ClassType] =
+    typing.mapFrom(node.typeRef) match {
+      case Some(raw: ClassType)
+        if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty => Some(raw)
+      case _ => None
+    }
+
+  /**
+   * Constructor diamond from the arguments: when `new C(...)` names a generic
+   * class without type arguments and no expected type supplies them, infer them
+   * from the constructor arguments the way a generic *method* call already does
+   * (`id("hi")` infers T = String), instead of rejecting the bare type as raw
+   * (E0066) -- issue #305.
+   *
+   * The inference reuses the generic-method engine by describing the candidate
+   * constructor as a synthetic method carrying the *class's* type parameters, so
+   * both paths bind type variables by exactly the same rules.
+   *
+   * Only unambiguous cases are inferred: every candidate constructor that
+   * matches the argument shape must agree on the resulting type arguments, and
+   * every class type parameter must actually be constrained by an argument.
+   * Anything else returns None, leaving the existing raw-type diagnostic in
+   * place rather than silently guessing.
+   */
+  private def diamondTypeFromArguments(node: AST.NewObject, context: LocalContext): Option[ClassType] = {
+    // A closure argument cannot be typed before its target type is known, and
+    // named arguments take a separate resolution path; both keep the existing
+    // behavior rather than participating in inference.
+    if (node.args.exists(_.isInstanceOf[AST.ClosureExpression])) return None
+    if (hasNamedArguments(node.args)) return None
+
+    bareGenericTarget(node).flatMap { raw =>
+      // Probe-type the arguments: a genuine error here is reported once by the
+      // real resolution path below, not twice by this speculative pass.
+      val args = typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
+      if (args == null || args.exists(_ == null)) return None
+
+      val typeParams = raw.typeParameters
+      val candidates = raw.constructors.collect {
+        case cd: ConstructorDefinition
+          if cd.getArgs.length == args.length ||
+            (cd.argumentsWithDefaults != null && args.length < cd.argumentsWithDefaults.length && args.length >= cd.minArguments) => cd
+      }
+      if (candidates.isEmpty) return None
+
+      val solutions: List[List[Type]] = candidates.toList.flatMap { candidate =>
+        val synthetic = new MethodDefinition(
+          node.location,
+          candidate.modifier,
+          raw,
+          "<init>",
+          candidate.getArgs.take(args.length),
+          raw,
+          null,
+          typeParams
+        )
+        val bindings = typing.withSuppressedReporting {
+          GenericMethodTypeArguments.inferWithoutDefaults(
+            typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+        }
+        // Every class type parameter must be pinned by an argument; a partially
+        // inferred type would otherwise silently default the rest to their bound.
+        if (typeParams.forall(tp => bindings.contains(tp.name)))
+          Some(typeParams.map(tp => bindings(tp.name)).toList)
+        else None
+      }.distinct
+
+      solutions match {
+        case only :: Nil => Some(AppliedClassType(raw, only))
+        case _ => None
+      }
+    }
+  }
+
   def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] = {
-    val typeRef = diamondType(node, expected).getOrElse {
+    val typeRef = diamondType(node, expected).orElse(diamondTypeFromArguments(node, context)).getOrElse {
       typing.mapFromDeclared(node.typeRef) match {
         case Some(ct: ClassType) => ct
         case Some(other) =>

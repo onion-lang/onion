@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `endColumn` since it was written and the renderer has known how to draw a range, but no production
   code ever set them, so every caret was a single `^` at the first character.
 
+- **New: `onion.Shape` — the data boundary as a value.** A partial, potentially bidirectional
+  correspondence between external text and a typed value, with the two laws kept apart: `parse ∘
+  print == id` is guaranteed wherever `print` exists, while `print ∘ parse == id` is false in
+  general (`"007"` is a perfectly good `Int` that prints back as `"7"`). A shape that satisfies
+  both is *lossless*, which is rare and is what a lens needs. `canPrint()` says up front when a
+  shape is read-only — a regex with a `\s+` separator has no unique rendering — instead of the
+  printing method simply never appearing. Component failures accumulate: reading `"abc,def"` as
+  two `Int`s reports two defects, not the first.
+
+  Combinators: `eachLine` keeps the rows it could read *and* the reasons the rest could not, each
+  positioned on its line — a thousand-line log with five bad lines gives 995 values and 5 defects,
+  where `parseAll` today returns 995 values and no trace the other five existed. `lines` is the
+  all-or-nothing form, `sepBy` repeats with a literal separator, `xmap` transports a shape along an
+  isomorphism (both directions, so `print` survives), and `orElse` reports both spellings' defects
+  when neither reads. Nothing in the language lowers to these yet; that is the next step.
+
 - **New: `onion.Origin`, `onion.Outcome`, `onion.Defect`.** Where a value came from, and the result
   of trying to read one. `Outcome` is not `Result[T, List[Defect]]` because its `zip` *accumulates*:
   a record with three malformed fields reports three defects in one pass, where a monadic `bind`

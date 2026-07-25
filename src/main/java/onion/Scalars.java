@@ -32,6 +32,38 @@ public final class Scalars {
             "expected true or false, found " + (value == null ? "null" : "'" + value + "'"));
     }
 
+    /**
+     * Reads {@code text} as the scalar kind named by {@code tag}, reporting a positioned
+     * defect rather than throwing.
+     *
+     * <p>The tag vocabulary is the compiler-side conversion table's, so a shape and the
+     * derivations that generate one speak the same names.
+     *
+     * @param tag    one of String, Int, Long, Double, Float, Boolean, Short, Byte
+     * @param text   the text to read
+     * @param origin where that text came from, or {@code null}
+     * @param path   where in the value this belongs, used as the defect's path
+     */
+    public static Outcome<Object> read(String tag, String text, Origin origin, String path) {
+        try {
+            switch (tag) {
+                case "String":  return Outcome.ok((Object) text);
+                case "Int":     return Outcome.ok((Object) Integer.valueOf(text));
+                case "Long":    return Outcome.ok((Object) Long.valueOf(text));
+                case "Double":  return Outcome.ok((Object) Double.valueOf(text));
+                case "Float":   return Outcome.ok((Object) Float.valueOf(text));
+                case "Boolean": return Outcome.ok((Object) Boolean.valueOf(toBoolean(text)));
+                case "Short":   return Outcome.ok((Object) Short.valueOf(text));
+                case "Byte":    return Outcome.ok((Object) Byte.valueOf(text));
+                default:
+                    return Outcome.bad(Defect.at(origin, path, "a supported scalar type", tag));
+            }
+        } catch (IllegalArgumentException e) {
+            // NumberFormatException is a subtype, so every numeric kind lands here too.
+            return Outcome.bad(Defect.at(origin, path, tag, text));
+        }
+    }
+
     /** Whether {@code value} is a boolean spelling {@link #toBoolean} accepts. */
     public static boolean isBoolean(String value) {
         return value != null && (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false"));

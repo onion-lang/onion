@@ -39,24 +39,6 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
-  /** The compile-time int value of an integer literal or its unary negation,
-    * for constant narrowing (`100`, `-128`). */
-  private def constantIntOf(term: Term): Option[Int] = term match {
-    case iv: IntValue => Some(iv.value)
-    case u: UnaryTerm if u.kind == UnaryTerm.Kind.MINUS =>
-      u.operand match { case iv: IntValue => Some(-iv.value); case _ => None }
-    case _ => None
-  }
-
-  /** Whether an integer literal fits the range of a narrow integral target,
-    * enabling `val b: Byte = 100` style constant narrowing. */
-  private def integerLiteralFits(bt: BasicType, value: Int): Boolean = bt match {
-    case BasicType.BYTE  => value >= -128 && value <= 127
-    case BasicType.SHORT => value >= -32768 && value <= 32767
-    case BasicType.CHAR  => value >= 0 && value <= 65535
-    case _ => false
-  }
-
   def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
     if (actual == null) return null
     // Target-type an empty collection literal ([] / [:]) to the expected
@@ -84,7 +66,7 @@ private[compiler] final class AssignabilitySupport(
     // Constant narrowing: an integer literal (or its negation) that fits the
     // target range target-types to Byte/Short/Char (like Java's `byte b = 100`).
     expected match {
-      case bt: BasicType if constantIntOf(actual).exists(v => integerLiteralFits(bt, v)) =>
+      case bt: BasicType if ConstantNarrowing.constantIntOf(actual).exists(v => ConstantNarrowing.fits(bt, v)) =>
         return new AsInstanceOf(node.location, actual, bt)
       case _ =>
     }

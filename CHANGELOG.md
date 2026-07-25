@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Constant narrowing now reaches constructor arguments (#374).** `val b: Byte = 100` has always
+  narrowed an in-range integer literal to `Byte`/`Short`/`Char`, but `new All("hi", -3, -4)` for a
+  `Short`/`Byte`-typed constructor parameter reported `E0021` ("constructor applicable ... is not
+  found") and needed an explicit `(-3 as Short)` cast. Constructor overload resolution matched
+  arguments only via boxing-aware assignability, never consulting the same constant-narrowing
+  rule `AssignabilitySupport` already applied to plain assignment. Extracted the literal-narrowing
+  check into a shared `ConstantNarrowing` helper and applied it to `ConstructionTyping`'s
+  boxing-fallback constructor resolution, both when selecting the matching constructor and when
+  adapting the chosen literal argument's type.
+
 - **`law`/`example` compile-time check failures (E0064/E0065) are now bilingual.** `LawCheckPhase`
   built these two diagnostics as hardcoded English string interpolation instead of going through
   the `errorMessage`/`errorMessage_ja` resource bundles like every other error, so a Japanese

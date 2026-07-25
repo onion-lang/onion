@@ -343,10 +343,21 @@ final class ConstructionTyping(
     }
   }
 
+  /** Whether `actual` can fill a parameter declared `formal`, either through
+    * ordinary boxing-aware assignability or -- for a literal like `-3` against
+    * a `Byte`/`Short`/`Char` formal -- constant narrowing (issue #374). */
+  private def formalAccepts(formal: Type, actual: Term): Boolean =
+    TypeRelations.isAssignableWithBoxing(formal, actual.`type`, bodyContext.table) ||
+      (formal match {
+        case bt: BasicType => ConstantNarrowing.constantIntOf(actual).exists(v => ConstantNarrowing.fits(bt, v))
+        case _ => false
+      })
+
   /**
    * Boxing-aware constructor fallback: substitutes class type arguments into
-   * the constructor signatures, matches with primitive boxing, and adapts
-   * the argument terms (boxing primitives) for the unique match.
+   * the constructor signatures, matches with primitive boxing or constant
+   * narrowing, and adapts the argument terms (boxing primitives, narrowing
+   * literals) for the unique match.
    */
   private def findConstructorWithBoxing(
     typeRef: ClassType,
@@ -358,14 +369,18 @@ final class ConstructionTyping(
     val candidates = typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == parameters.length &&
-        formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, bodyContext.table))
+        formals.indices.forall(i => formalAccepts(formals(i), parameters(i)))
     }
     if (candidates.length != 1) (candidates, parameters)
     else {
       val formals = substitutedArgs(candidates(0))
       val adapted = parameters.zip(formals).map { (p, f) =>
         if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-        else p
+        else f match {
+          case bt: BasicType if bt != p.`type` && ConstantNarrowing.constantIntOf(p).exists(v => ConstantNarrowing.fits(bt, v)) =>
+            new AsInstanceOf(p.location, p, bt)
+          case _ => p
+        }
       }
       (candidates, adapted)
     }

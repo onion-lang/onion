@@ -7,47 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-07-25
-
-- **New: `run/BrokenLogDemo.on` — the "broken log" story, runnable (partial #355).** A
-  concrete demo exercising `onion.Shape`, `onion.Shapes::regex` and `onion.Outcome`
-  end to end: an access-log shape reads six lines, two of them malformed, and
-  `Outcome::values`/`Outcome::defects` split the four good rows from the two reported
-  defects instead of the parse either crashing on the first bad line or silently
-  dropping it. Also exercises the `sepBy`, `xmap` and `orElse` combinators. This covers
-  the `run/` sample half of #355; the EN/JA guide pages, doc examples and crash-corpus
-  entries are still open.
-
-- **Constant narrowing now reaches constructor arguments (#374).** `val b: Byte = 100` has always
-  narrowed an in-range integer literal to `Byte`/`Short`/`Char`, but `new All("hi", -3, -4)` for a
-  `Short`/`Byte`-typed constructor parameter reported `E0021` ("constructor applicable ... is not
-  found") and needed an explicit `(-3 as Short)` cast. Constructor overload resolution matched
-  arguments only via boxing-aware assignability, never consulting the same constant-narrowing
-  rule `AssignabilitySupport` already applied to plain assignment. Extracted the literal-narrowing
-  check into a shared `ConstantNarrowing` helper and applied it to `ConstructionTyping`'s
-  boxing-fallback constructor resolution, both when selecting the matching constructor and when
-  adapting the chosen literal argument's type.
-
-- **`law`/`example` compile-time check failures (E0064/E0065) are now bilingual.** `LawCheckPhase`
-  built these two diagnostics as hardcoded English string interpolation instead of going through
-  the `errorMessage`/`errorMessage_ja` resource bundles like every other error, so a Japanese
-  locale never got a translated message for a falsified law or a failed example. Added the message
-  keys to both bundles and switched the phase to format through `toolbox.Message`.
-
-- **`law`/`example` can no longer silently not run.** A law whose parameter type had no sample
-  generator — an array, a `Map`, an enum, an interface, an ordinary class with two constructors —
-  was skipped with no diagnostic, which made it indistinguishable from a law that held. It is now
-  **E0074**, and a class that declares checks but fails to load is **E0075**. Law diagnostics also
-  gained the file and line they were written on (they reported neither), and the sample count and
-  RNG seed became `--law-samples`/`--law-seed` and are reported alongside every counterexample so
-  the run that produced it can be repeated. The language server no longer executes laws: it
-  validates on every keystroke, so it was running whatever the buffer said, in a half-typed state.
-  `--no-check-laws` turns them off elsewhere.
-
-- **Every diagnostic caret now underlines the whole token.** `Location` has carried `endLine`/
-  `endColumn` since it was written and the renderer has known how to draw a range, but no production
-  code ever set them, so every caret was a single `^` at the first character.
-
 - **README rewritten around what Onion is for.** It opened with "an object-oriented and
   statically typed programming language" that "compiles into JVM class files" — a category
   shared with Kotlin, Scala and Java — while its most distinctive section sat 171 lines
@@ -89,6 +48,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that succeed. `tryParse` is the same parse returning an `Outcome`, so the error paths are
   finally reachable; `parse` remains as the thin exiting wrapper the generated entry point
   uses, with the exit now in one place rather than seven.
+
+## [0.7.0] - 2026-07-25
+
+- **New: `run/BrokenLogDemo.on` — the "broken log" story, runnable (partial #355).** A
+  concrete demo exercising `onion.Shape`, `onion.Shapes::regex` and `onion.Outcome`
+  end to end: an access-log shape reads six lines, two of them malformed, and
+  `Outcome::values`/`Outcome::defects` split the four good rows from the two reported
+  defects instead of the parse either crashing on the first bad line or silently
+  dropping it. Also exercises the `sepBy`, `xmap` and `orElse` combinators. This covers
+  the `run/` sample half of #355; the EN/JA guide pages, doc examples and crash-corpus
+  entries are still open.
+
+- **Constant narrowing now reaches constructor arguments (#374).** `val b: Byte = 100` has always
+  narrowed an in-range integer literal to `Byte`/`Short`/`Char`, but `new All("hi", -3, -4)` for a
+  `Short`/`Byte`-typed constructor parameter reported `E0021` ("constructor applicable ... is not
+  found") and needed an explicit `(-3 as Short)` cast. Constructor overload resolution matched
+  arguments only via boxing-aware assignability, never consulting the same constant-narrowing
+  rule `AssignabilitySupport` already applied to plain assignment. Extracted the literal-narrowing
+  check into a shared `ConstantNarrowing` helper and applied it to `ConstructionTyping`'s
+  boxing-fallback constructor resolution, both when selecting the matching constructor and when
+  adapting the chosen literal argument's type.
+
+- **`law`/`example` compile-time check failures (E0064/E0065) are now bilingual.** `LawCheckPhase`
+  built these two diagnostics as hardcoded English string interpolation instead of going through
+  the `errorMessage`/`errorMessage_ja` resource bundles like every other error, so a Japanese
+  locale never got a translated message for a falsified law or a failed example. Added the message
+  keys to both bundles and switched the phase to format through `toolbox.Message`.
+
+- **`law`/`example` can no longer silently not run.** A law whose parameter type had no sample
+  generator — an array, a `Map`, an enum, an interface, an ordinary class with two constructors —
+  was skipped with no diagnostic, which made it indistinguishable from a law that held. It is now
+  **E0074**, and a class that declares checks but fails to load is **E0075**. Law diagnostics also
+  gained the file and line they were written on (they reported neither), and the sample count and
+  RNG seed became `--law-samples`/`--law-seed` and are reported alongside every counterexample so
+  the run that produced it can be repeated. The language server no longer executes laws: it
+  validates on every keystroke, so it was running whatever the buffer said, in a half-typed state.
+  `--no-check-laws` turns them off elsewhere.
+
+- **Every diagnostic caret now underlines the whole token.** `Location` has carried `endLine`/
+  `endColumn` since it was written and the renderer has known how to draw a range, but no production
+  code ever set them, so every caret was a single `^` at the first character.
 
 - **New: `onion.Shape` — the data boundary as a value.** A partial, potentially bidirectional
   correspondence between external text and a typed value, with the two laws kept apart: `parse ∘

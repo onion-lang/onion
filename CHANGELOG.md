@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-25
+
 - **A duplicate `law`/`example` clause name on a record crashed the compiler instead of
   being rejected (internal-error fix, found by the mutation fuzzer).** Two clauses that
   mangle to the same synthesized method — e.g. two `law roundtrip(p: Point) { ... }` on the

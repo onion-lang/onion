@@ -5,9 +5,10 @@ import onion.compiler.TypedAST.*
 /**
  * Constant narrowing: an integer literal (or its negation) that fits a
  * narrow integral target's range target-types to Byte/Short/Char, mirroring
- * Java's `byte b = 100`. Shared between plain assignment (`AssignabilitySupport`)
- * and constructor overload resolution (`ConstructionTyping`), which both need to
- * recognize the same literals.
+ * Java's `byte b = 100`. Shared between plain assignment (`AssignabilitySupport`),
+ * constructor overload resolution (`ConstructionTyping`), and method overload
+ * resolution (`MethodResolutionSupport`), which all need to recognize the same
+ * literals.
  */
 private[typing] object ConstantNarrowing {
 

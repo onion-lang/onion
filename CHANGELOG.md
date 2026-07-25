@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   over generic hierarchies as well — a parameterized scrutinee previously skipped the sealed check
   entirely, so a `select` missing a case compiled and returned null at runtime.
 
+
 - **A type pattern nests inside a destructuring pattern (#299).** `case Add(l, n is Num)` was a
   syntax error, even though a type pattern worked at the top level of a `case` and record patterns
   already nested — so `is` was the one pattern form that could not nest. It now can, and the nested

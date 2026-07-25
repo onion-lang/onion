@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-25
+
 - **Fixed wrong `Http` method names in the stdlib docs (en/ja).** `docs/reference/stdlib.md`
   documented `Http::urlEncode`/`Http::urlDecode`, but the implemented (and tested) names are
   `encodeUrl`/`decodeUrl` — following the doc raised a "method not found" error. Corrected both

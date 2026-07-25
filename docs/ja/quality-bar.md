@@ -9,11 +9,11 @@
 
 | # | 次元 | 測定方法 | 現在値（2026-07-26） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2445 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 60 / 60 compile | すべてコンパイル、rot なし |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2579 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 61 / 61 compile | すべてコンパイル、rot なし |
 | 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 6（LogReport、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
-| 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 1（[#374](https://github.com/onion-lang/onion/issues/374)） | 0 |
+| 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 14 / 14 | 対等性 + すべてのブロックを検証 |
 | 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 77 | よくあるエラーごとに専用コード |
 
@@ -52,13 +52,15 @@ cancelled の1件は `-Donion.dist.path` で切られている配布物 smoke �
 
 ## 行5 — 現在の未解決使い勝手バグ（追跡中）
 
-1. **定数ナローイングがコンストラクタ引数位置に届かない。** `val b: Byte = 100` はナローイング
-   されますが、`Short` 成分に対する `new R(..., -3)` は `E0021`（"constructor applicable for
-   R(..., Int) is not found"）になり、`(-3 as Short)` が必要です。`ScalarConversionSpec` を
-   書いている最中に発見しました。パース結果からレコードを組み立てるものは今後も踏みます。
-   （[#374](https://github.com/onion-lang/onion/issues/374)）
+未解決なし。
 
 以前追跡していて解決済みのもの:
 
 1. **プリミティブ型の拡張メソッド** — 修正済み。`extension Int { def double(): Int = self * 2 }` と `(5).double()` が動作します。プリミティブ受信側の拡張メソッドはボックス化されたクラス名で登録され、呼び出し時にターゲットをアンボックスしてから静的メソッドを呼び出します。
 2. **クラスメソッドから呼ばれるトップレベル関数** — 修正済み。トップレベルの `val`/`var` と関数は合成トップレベルクラスの static メンバーとして出力され、クラスメソッド内の裸識別子/修飾なし呼び出しはこれらの static メンバーにフォールバックします。
+3. **定数ナローイングがコンストラクタ引数位置に届かない。** `val b: Byte = 100` はナローイング
+   されますが、`Short` 成分に対する `new R(..., -3)` は `E0021`（「constructor applicable for
+   R(..., Int) is not found」）になり、`(-3 as Short)` が必要でした。コンストラクタでは修正済み
+   （[#374](https://github.com/onion-lang/onion/issues/374)）。同じ抜け穴が通常のメソッド/関数の
+   オーバーロード解決（`Short` 引数に対する `takesShort(-3)` が `E0005` になる）にもあることが
+   同時に見つかり、あわせて修正しました — どちらも `ConstantNarrowing` ヘルパーを共有します。

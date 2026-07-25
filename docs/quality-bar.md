@@ -11,8 +11,8 @@ had drifted badly enough to be misleading: it recorded 1193 tests against an act
 
 | # | Dimension | How to measure | Current (2026-07-26) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2445 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 60 / 60 compile | all compile, no rot |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2579 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 61 / 61 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 6 (LogReport, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |

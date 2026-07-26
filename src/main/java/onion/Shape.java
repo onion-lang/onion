@@ -64,6 +64,48 @@ public interface Shape<T> {
     /** A description of what this shape reads, for diagnostics. */
     String describe();
 
+    // ------------------------------------------------------------- losslessness
+
+    /**
+     * Whether this shape is <em>lossless</em>: whether it can satisfy L2 by carrying the
+     * unconsumed parts of the input as a {@link Residue}. Most shapes are not, and this
+     * default says so instead of letting them pretend.
+     */
+    default boolean isLossless() {
+        return false;
+    }
+
+    /**
+     * Reads a value <em>and</em> the residue of everything around it, such that
+     * {@code printLossless(r.value(), r.residue())} reproduces the input byte for byte.
+     *
+     * @throws UnsupportedOperationException when {@link #isLossless()} is false —
+     *         asking a lossy shape for a residue is a programming error, not a data
+     *         defect, and answering with an empty residue would quietly break L2.
+     */
+    default Outcome<Lossless<T>> parseLossless(String text, Origin origin) {
+        throw new UnsupportedOperationException(
+            "shape " + describe() + " is not lossless; parseLossless has no meaning for it");
+    }
+
+    /** {@link #parseLossless} against text with no known provenance. */
+    default Outcome<Lossless<T>> parseLossless(String text) {
+        return parseLossless(text, Origin.atLine("<input>", 1));
+    }
+
+    /**
+     * Renders a value through the residue of the text it was read from: unchanged parts
+     * are reproduced exactly — comments, spacing, key order, even the original spelling
+     * of an unchanged value — and only deliberately changed values re-render.
+     *
+     * @throws UnsupportedOperationException when {@link #isLossless()} is false
+     * @throws IllegalArgumentException when the residue was produced by another shape
+     */
+    default String printLossless(T value, Residue residue) {
+        throw new UnsupportedOperationException(
+            "shape " + describe() + " is not lossless; printLossless has no meaning for it");
+    }
+
     // ------------------------------------------------------------- combinators
 
     /**

@@ -12,7 +12,8 @@ private[compiler] object ShapeFormats {
   /** Format name -> the `onion.Shapes` factory that builds it. */
   val all: List[(String, String)] = List(
     "json" -> "json",
-    "yaml" -> "yaml"
+    "yaml" -> "yaml",
+    "config" -> "config"
   )
 
   def factoryFor(format: String): Option[String] =

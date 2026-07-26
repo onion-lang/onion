@@ -126,6 +126,39 @@ ordinary case at a boundary.
 
 The method is `read`, not `as`: `as` is the cast keyword.
 
+## Lossless shapes: L1 and L2
+
+Every printing shape guarantees **L1**, the round-trip law: `parse(print(v)) == Ok(v)`.
+The reverse law — **L2**, `print(parse(t)) == t` — is false in general, for ordinary
+reasons: `"007"` is a perfectly good `Int` that prints back as `"7"`, and two documents
+that differ only in whitespace parse alike. A shape that satisfies L2 as well is
+**lossless**, and losslessness is what an edit-and-write-back is built on.
+
+`shape name = config` is the first lossless shape: a commented `key = value` document.
+`parseLossless` returns the value together with a `Residue` — everything the shape did
+not consume: comments, blank lines, key order, spacing, unknown keys, and the original
+spelling of every value. `printLossless` reassembles the two:
+
+```onion
+record Server(host: String, port: Int, debug: Boolean)
+  shape cfg = config
+  example l2 {
+    val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
+    val r = Server::cfg().parseLossless(t).get()
+    Server::cfg().printLossless(r.value(), r.residue()) == t
+  }
+```
+
+The `example` clause is the point: L2 is not a comment, it is machine-checked at build
+time, and a shape that stopped satisfying it would stop compiling. Editing goes through
+the same pair — change one component and only its value slot re-renders; an *unchanged*
+component keeps its original spelling, so `007` stays `007` unless the program actually
+changed the port.
+
+Losslessness is a claim, not a default: `isLossless()` answers honestly, a lossy shape
+refuses `parseLossless` instead of pretending with an empty residue, and a residue is
+only accepted by the shape that produced it.
+
 ## Checking a shape at build time
 
 `law` runs at compile time, so the round-trip property can be machine-checked:

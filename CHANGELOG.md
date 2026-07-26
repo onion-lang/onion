@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-26
+
 - **BREAKING: inheritance is spelled with words. `:` became `extends` and `<:` became
   `conforms`.** `class Dog : Animal <: Greeter` is now
   `class Dog extends Animal conforms Greeter`; the same change applies to `record`,

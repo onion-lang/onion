@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`run/JsonYamlShapeDemo.on` — a standalone example for `shape name = json`/`yaml`.**
+  The v0.8.0 named document-boundary shape had unit-test coverage (`FormatShapeSpec.scala`)
+  but no `run/` sample demonstrating it end-to-end. Added one covering parsing, the
+  round-trip law, a missing key, several bad fields reported at once, and a malformed
+  document's line number — mirroring the existing `BrokenLogDemo.on` pattern for the
+  regex-shape form.
+
 ## [0.8.0] - 2026-07-25
 
 The v0.8.0 tag was moved after the fact. As first cut it promised `eachLine` on

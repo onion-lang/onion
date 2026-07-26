@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`tool` declarations with checked capabilities (#357).** A tool is a function with a
+  boundary: `tool ingest(src: String, dst: String) requires { read(src), write(dst) }
+  { ... }`. The compiler infers the body's effects (transitively, through ordinary
+  functions, with no annotation burden anywhere else) and holds the declaration to
+  them: an undeclared effect is **E0077**, reported at the exact call site and naming
+  both the effect and the callee; a declared capability the body cannot perform is
+  **E0078**; a capability outside the vocabulary or naming a non-parameter is
+  **E0079**. `unknown` is a real effect — an unlisted Java call must be admitted
+  explicitly (`requires { unknown }`), never assumed harmless. Effects are erased
+  inside typing: a tool emits bit-identical bytecode to the equivalent function
+  (pinned by `ToolErasureSpec`), so the boundary costs nothing at runtime. `tool` and
+  `requires` are soft keywords. New guide chapter EN+JA.
+
 - **Effect table, per-method effect inference, and `--effects` (#356).** The first layer
   of the capability work: every method now has a statically computed *effect set* over
   the vocabulary `read write net exec env clock rand console unknown` (empty prints as

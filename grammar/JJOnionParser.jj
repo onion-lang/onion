@@ -1245,6 +1245,10 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
   // a confusing syntax error instead of E0048/E0049. A 1-token predicate commits
   // to block_element before that happens, so enterSection() can tokenize the EOL.
   top=block_element()
+| LOOKAHEAD({getToken(1).image.equals("tool") && getToken(2).kind == ID && getToken(3).image.equals("(")})
+  // `tool` is a soft keyword: only `tool name(` opens a tool declaration, so it stays
+  // usable as an ordinary identifier everywhere else.
+  top=tool_decl()
 | LOOKAHEAD(2)
   top=block_element()
 | LOOKAHEAD("extension")
@@ -1349,6 +1353,53 @@ List<AST.TypeNode> throws_clause() : {
   "throws" ty=class_type() {append(types, ty);}
   ("," ty=class_type() {append(types, ty);})*
   {return toList(types);}
+}
+
+/**
+ * A tool declaration (issue #357): an ordinary function plus a capability boundary.
+ *
+ *   tool ingest(src: String, dry: Boolean = false): Int
+ *     requires { read(src), console }
+ *   { ... }
+ *
+ * `tool` and `requires` are soft keywords. The declaration parses to a plain
+ * FunctionDeclaration whose annotations carry the boundary — "onion.tool" plus one
+ * "requires:cap" entry per capability — because annotations already flow unchanged
+ * into the typed MethodDefinition, where CapabilityCheckPass reads them. Effects are
+ * fully erased below typing: the backend sees an ordinary static method.
+ */
+AST.FunctionDeclaration tool_decl() : {
+  Token t1, t2;
+  List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
+  AST.TypeNode ty = null;
+  AST.BlockExpression b = null;
+  ArrayBuffer<AST.Annotation> anns = new ArrayBuffer<AST.Annotation>();
+  String cap = null;
+}{
+  t1=<ID> t2=id() { append(anns, new AST.Annotation(p(t1), "onion.tool")); }
+  "(" args=args() ")" [":" ty=return_type()]
+  [ LOOKAHEAD({getToken(1).image.equals("requires") && getToken(2).image.equals("{")})
+    <ID> "{" eols()
+      cap=capability() { append(anns, new AST.Annotation(p(t1), "requires:" + cap)); }
+      ("," eols() cap=capability() { append(anns, new AST.Annotation(p(t1), "requires:" + cap)); })*
+      eols()
+    "}"
+  ]
+  b=block()
+  {
+    return new AST.FunctionDeclaration(
+      p(t1), 0, c(t2), args, ty, b,
+      scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty(),
+      scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty(),
+      toList(anns));
+  }
+}
+
+/** One capability in a requires clause: an effect name, optionally tied to a
+ *  parameter — `read(src)`, `net(url)`, or a bare `console` / `unknown`. */
+String capability() : { Token n; Token a = null; }{
+  n=id() ["(" a=id() ")"]
+  { return a == null ? n.image : n.image + "(" + a.image + ")"; }
 }
 
 AST.TypeDeclaration type_decl(int modifiers) :{AST.TypeDeclaration ty = null;}{

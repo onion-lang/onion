@@ -1,0 +1,102 @@
+# Tools and Capabilities
+
+A `tool` is a function with a boundary: it says up front what it is allowed to do to
+the world outside the program, and the compiler holds it to that.
+
+```onion
+tool ingest(src: String, dst: String): Int
+  requires { read(src), write(dst) }
+{
+  val data = Files::readText(src)
+  Files::writeText(dst, data)
+  return 0
+}
+```
+
+The `requires` clause lists *capabilities*: effects the body may perform, each
+optionally tied to the parameter it acts through. If the body — or anything it calls,
+however indirectly — performs an effect the clause does not declare, the program does
+not compile.
+
+## The deal: inference everywhere, declaration at the boundary
+
+Ordinary functions carry no effect annotations, ever. The compiler infers what each one
+can do by looking at its body and joining across calls (the [effects
+reference](../reference/effects.md) describes the vocabulary and the analysis). You
+declare effects in exactly one place — a `tool` boundary — and the check compares the
+declaration against the inference:
+
+```onion
+def helper(msg: String): void {
+  IO::println(msg)          // inferred: console — no annotation needed
+}
+
+tool speak(msg: String): Int
+  requires { console }      // declared once, at the boundary
+{
+  helper(msg)               // covered: helper's inferred console is inside the clause
+  return 0
+}
+```
+
+There is no effect polymorphism, no effect variables in ordinary signatures, no
+handlers. That restraint is deliberate: the point is a checkable promise at the edge of
+a program, not a whole-language effect system.
+
+## What a violation looks like
+
+A tool that declares only `read` and then writes fails to compile, and the diagnostic
+names the effect, the callee, and the exact call that introduced it:
+
+```
+ingest.on:5:8: [E0077] tool `sneaky` performs `write` here (calling
+onion.Files::writeText) but does not declare it. Add `write` to its
+`requires { ... }` clause.
+  5 |   Files::writeText(dst, data)
+    |        ~~
+```
+
+The check is honest in the other direction too. A capability the body cannot exercise
+is an error, not decoration — a tool that claims `net` and never touches the network is
+overclaiming, and gets `E0078`. And a capability that is not in the vocabulary, or that
+names a parameter the tool does not have, is `E0079`.
+
+## `unknown` must be admitted, not assumed away
+
+A Java method the effect table cannot vouch for has *unknown* effects — no table will
+ever cover the JDK plus every jar on a classpath. Treating unknown as forbidden would
+kill interop; treating it as harmless would make the guarantee a lie. So `unknown`
+propagates like any other effect and must be admitted explicitly at the boundary:
+
+```onion
+import { java.util.Random; }
+
+tool roll(): Int
+  requires { unknown }      // says out loud: this body calls code I cannot vouch for
+{
+  return new Random().nextInt()
+}
+```
+
+Without the clause, the call site gets `E0077` naming `unknown`. With it, the tool's
+contract is truthful: "this does something the analysis cannot bound."
+
+## What a tool costs at runtime: nothing
+
+Effects are checked during type checking and erased there. A `tool` compiles to
+exactly the bytecode of the equivalent function — the compiler's test suite pins this
+by disassembling both and comparing instruction for instruction. The boundary is a
+compile-time promise, not a runtime sandbox: it costs nothing to call a tool, and it
+stops nothing at runtime. What it guarantees is narrower and more useful — *a tool that
+compiles cannot quietly do more than its declaration says*.
+
+## Two details worth knowing
+
+A closure's effects are charged to the function that *creates* it, not the one that
+eventually invokes it. If a tool builds a lambda that prints, the tool needs `console`
+even if the lambda is only invoked elsewhere — the creation site is the one the checker
+can always see.
+
+And `tool` / `requires` are soft keywords: only `tool name(` opens a declaration and
+only `requires {` opens the clause, so both remain usable as ordinary identifiers in
+existing code.

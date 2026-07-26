@@ -142,6 +142,9 @@ object SemanticError {
   case object LAW_PARAMETER_NOT_GENERATABLE extends SemanticError(74)
   case object LAW_CLASS_NOT_LOADABLE extends SemanticError(75)
   case object SHAPE_FORMAT_UNKNOWN extends SemanticError(76)
+  case object TOOL_UNDECLARED_EFFECT extends SemanticError(77)
+  case object TOOL_UNUSED_CAPABILITY extends SemanticError(78)
+  case object TOOL_BAD_CAPABILITY extends SemanticError(79)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

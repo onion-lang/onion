@@ -197,6 +197,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     for(unit <- source) processOutline(unit)
     for(unit <- source) processTyping(unit)
     for(unit <- source) processDuplication(unit)
+    // Pass 5 (issue #357): capability boundaries. Needs every unit typed first —
+    // effect inference is cross-unit — and runs before finishOrThrow so violations
+    // surface as ordinary semantic errors. Effects are erased at this line: nothing
+    // downstream (optimizers, backend) sees them.
+    new onion.compiler.typing.CapabilityCheckPass(this).run(table_.classes.values.toSeq)
     diagnostics.finishOrThrow()
     table_.classes.values.toSeq
   }

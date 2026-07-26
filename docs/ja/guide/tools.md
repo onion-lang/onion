@@ -134,3 +134,34 @@ usage: ingest.on <src> <dst> [--count <Int>] [--loud]
 上の節で検査された宣言そのものです。契約が「してよい」と言うことは、コンパイラが
 「それを超えられない」と証明したことです。
 
+## `--plan`：実行せずに「実行したら何が起きるか」
+
+検査済み capability の見返りがこれです。コンパイラは本体が何をしうるかを知っているので、
+CLI は*この呼び出し*が何をするかを —— 宣言された効果集合を実際の引数値で具体化して ——
+報告し、何も実行せずに終了できます：
+
+```bash
+$ onion ingest.on access.log /backup/access.log --plan
+plan: `ingest` would
+  read    src = access.log
+  write   dst = /backup/access.log
+  console
+(nothing was executed)
+```
+
+引数は本物の実行とまったく同じに解析されます —— 不正な値は実行が失敗するのと同じように
+プランも失敗させます。デフォルトに任せたオペランドは契約のデフォルトを表示します。
+正直さの規則は両方向に厳格です。ambient な効果（`console`、`clock`、`env`、`rand`）は
+名前だけで表示されます。解析がパラメータに結びつけられなかったオペランドは、推測される
+ことなく `(operand not statically known)` と報告されます。そして `unknown` を運ぶ本体は
+それを声に出して言います：
+
+```
+  unknown  — calls code the analysis cannot characterize; this plan is a lower bound
+```
+
+特徴づけられなかったものを黙って省くプランは、プランがないより悪い。これが、この
+ドライランを飾りではなく*信頼に足るもの*にしています。シグネチャから導出した CLI は
+コモディティですが、検査済み効果集合から導出したプランはそうではありません ——
+本体が何をするかを知っている必要があるからです。
+

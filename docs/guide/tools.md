@@ -144,3 +144,34 @@ The capability line in `--help` and the `capabilities` field in the contract are
 documentation — they are the checked declaration from the section above. What the
 contract says the tool may do is what the compiler proved it cannot exceed.
 
+## `--plan`: what a run would do, without doing it
+
+The payoff of checked capabilities. Because the compiler knows what the body can do,
+the CLI can report what a *particular invocation* would do — the declared effect set
+instantiated with the actual argument values — and exit without performing any of it:
+
+```bash
+$ onion ingest.on access.log /backup/access.log --plan
+plan: `ingest` would
+  read    src = access.log
+  write   dst = /backup/access.log
+  console
+(nothing was executed)
+```
+
+Arguments are parsed exactly as a real run would parse them — a bad value fails the
+plan the same way it would fail the run — and an operand left to its default shows the
+default from the contract. The honesty rules are strict in both directions. An ambient
+effect (`console`, `clock`, `env`, `rand`) is named bare. An operand the analysis
+cannot tie to a parameter is reported as `(operand not statically known)`, never
+guessed. And a body carrying `unknown` says so out loud:
+
+```
+  unknown  — calls code the analysis cannot characterize; this plan is a lower bound
+```
+
+A plan that quietly omitted what it could not characterize would be worse than no
+plan. This is what makes the dry run *trustworthy* rather than decorative: a CLI
+derived from a signature is commodity; a plan derived from the checked effect set
+requires knowing what the body does.
+

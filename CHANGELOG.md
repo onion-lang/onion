@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`--plan`: a trustworthy dry run derived from the checked effect set (#359).**
+  `onion tool.on <args> --plan` parses the arguments exactly as a real run would, then
+  prints what that run *would* do — each declared capability instantiated with the
+  bound argument value (`write   dst = /backup/access.log`), defaults shown from the
+  contract — and exits without performing any effect. Ambient effects print bare; an
+  operand the analysis cannot tie down prints as not statically known rather than
+  guessed; and a body carrying `unknown` says so out loud, marking the plan a lower
+  bound — a plan that quietly omits what it could not characterize would be worse than
+  no plan. Verified by specs that assert the planned write never happens.
+
 - **Machine-readable tool contracts, and a CLI derived from them (#358).** A script
   whose top level declares tools (and has no `main` of its own) is now a command-line
   program: the compiler builds a JSON contract from the declarations — parameters with

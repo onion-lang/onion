@@ -189,6 +189,40 @@ record Pt(x: Int, y: Int)
 A law whose parameter type cannot be sampled is an error (E0074), not a silent skip — a
 check that does not run must not look like one that passed.
 
+## Writing your own shape
+
+The shipped derivations (`re""`, `json`, `yaml`, `config`) are a closed set on purpose —
+their laws come with them. For a format the compiler has never heard of — fixed-width
+records, binary framing, a bespoke wire protocol — implement `onion.Shape[T]` directly:
+
+```onion
+class FixedWidth conforms Shape[Person] {
+public:
+  def this {}
+  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+  def canPrint(): Boolean = true
+  def print(v: Person): String { ... }
+  def describe(): String = "fixed-width Person"
+}
+
+example fixedWidthL1 {
+  val s = new FixedWidth()
+  val v = new Person("KOTA", 42)
+  s.parse(s.print(v)).get() == v
+}
+```
+
+The combinators — `eachLine`, `sepBy`, `xmap`, `orElse` — come for free, and failures
+speak the same `Outcome`/`Defect` vocabulary as every shipped shape.
+
+The `example` is not optional. A derived shape's laws are guaranteed by construction;
+a user-written one *asserts* them instead, so a concrete class implementing
+`onion.Shape` compiles only when its file states at least one machine-checked `law` or
+`example` (**E0080** otherwise). The round-trip `s.parse(s.print(v)).get() == v` is
+the canonical claim; top-level `example [name] { expr }` is the vehicle, and it runs
+at build time like every other law — a false claim is E0065. A parse-only shape says
+so through `canPrint(): false` and asserts whatever laws its reading direction has.
+
 ## When to reach for `Shapes` directly
 
 `onion.Shapes::regex` and `::json` are the same construction as ordinary API, for a shape

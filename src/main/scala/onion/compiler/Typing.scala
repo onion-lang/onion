@@ -202,6 +202,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // surface as ordinary semantic errors. Effects are erased at this line: nothing
     // downstream (optimizers, backend) sees them.
     new onion.compiler.typing.CapabilityCheckPass(this).run(table_.classes.values.toSeq)
+    // Issue #364: a user-written Shape instance must assert its laws.
+    new onion.compiler.typing.ShapeInstanceLawPass(this).run(table_.classes.values.toSeq)
     diagnostics.finishOrThrow()
     table_.classes.values.toSeq
   }

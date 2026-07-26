@@ -187,6 +187,40 @@ record Pt(x: Int, y: Int)
 引数の型からサンプルを生成できない law はエラー（E0074）になります。読み飛ばしません。
 実行されない検査が「通った検査」に見えてはいけないからです。
 
+## 自分の shape を書く
+
+同梱の導出（`re""`、`json`、`yaml`、`config`）は意図的に閉じた集合です —— 法則が
+導出と一緒に付いてくるからです。コンパイラが知らないフォーマット —— 固定幅レコード、
+バイナリフレーミング、独自ワイヤプロトコル —— には `onion.Shape[T]` を直接実装します：
+
+```onion
+class FixedWidth conforms Shape[Person] {
+public:
+  def this {}
+  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+  def canPrint(): Boolean = true
+  def print(v: Person): String { ... }
+  def describe(): String = "fixed-width Person"
+}
+
+example fixedWidthL1 {
+  val s = new FixedWidth()
+  val v = new Person("KOTA", 42)
+  s.parse(s.print(v)).get() == v
+}
+```
+
+コンビネータ —— `eachLine`、`sepBy`、`xmap`、`orElse` —— は無償で付いてきて、失敗は
+同梱 shape と同じ `Outcome`/`Defect` の語彙で語られます。
+
+この `example` は任意ではありません。導出された shape の法則は構成から保証されますが、
+ユーザーが書いた shape は法則を*主張*する側です。だから `onion.Shape` を実装する具象
+クラスは、そのファイルが機械検査される `law` か `example` を少なくとも1つ述べている
+ときだけコンパイルされます（なければ **E0080**）。代表的な主張は round-trip
+`s.parse(s.print(v)).get() == v` で、トップレベル `example [name] { expr }` がその
+乗り物です。他の law と同じくビルド時に実行され、偽の主張は E0065 になります。
+parse 専用の shape は `canPrint(): false` でそう言い、読む方向の法則を主張します。
+
 ## `Shapes` を直接使うとき
 
 `onion.Shapes::regex` と `::json` は同じ構築を通常の API として公開しています。自分で

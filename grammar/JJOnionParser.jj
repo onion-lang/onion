@@ -1223,7 +1223,9 @@ AST.ImportClause import_decl() :{
     ( {sb = new StringBuffer(); alias = null; staticMethod = null; enterSection();}
       (LOOKAHEAD(2) n=import_id() "." {sb.append(c(n)); sb.append(".");})+
       (n=import_id() | star="*" {n = star;}) {s = c(n); sb.append(s);}
-      [ "::" staticMethod=import_id() ]
+      // `Class::member` imports one static member; `Class::*` imports them all —
+      // the migration path for the narrowed default static import set (#360).
+      [ "::" ( staticMethod=import_id() | staticMethod="*" ) ]
       [<K_AS> alias=id() {s = c(alias);}]
       eos_or_block_end()
       {

@@ -211,7 +211,7 @@ Math::random()
 System::out.println("Java style")
 ```
 
-Default static imports make some class members available without `::` (for example, `println("Hello")` from `onion.IO`). The list lives in `src/main/resources/onion/default-static-imports.txt`.
+Default static imports make some class members available without `::` (for example, `println("Hello")` from `onion.IO`). The default set is deliberately narrow — pure helpers plus `onion.IO` as the one console exception — so an effectful line looks effectful: `Files::readText`, `Http::get`, `DateTime::now` and `System::exit` must be written qualified, or imported explicitly with `import { onion.Files::* }` (a whole class) or `import { java.lang.System::exit }` (one member). The list lives in `src/main/resources/onion/default-static-imports.txt`.
 
 ### Type Casting with `as`
 

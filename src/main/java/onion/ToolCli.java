@@ -69,6 +69,17 @@ public final class ToolCli {
         for (String a : args) {
             if (a.equals("--help") || a.equals("-h")) { System.out.print(help(tools)); return Result.exit(0); }
         }
+        // --plan (issue #359): parse exactly as a real run would, then report what the
+        // run WOULD do — the declared-and-checked effect set instantiated with the
+        // bound argument values — and exit without performing any of it.
+        boolean plan = false;
+        {
+            List<String> stripped = new ArrayList<>();
+            for (String a : args) {
+                if (a.equals("--plan")) plan = true; else stripped.add(a);
+            }
+            if (plan) args = stripped.toArray(new String[0]);
+        }
 
         int toolIndex = 0;
         String[] rest = args;
@@ -163,7 +174,62 @@ public final class ToolCli {
             System.err.print(usage(tool, tools.size() > 1));
             return Result.exit(1);
         }
+        if (plan) {
+            System.out.print(plan(tool, params, values));
+            return Result.exit(0);
+        }
         return Result.run(toolIndex, values);
+    }
+
+    // ---- the plan: declared capabilities instantiated with bound arguments --------
+
+    private static String plan(Map<String, Object> tool, List<Map<String, Object>> params,
+                               Object[] values) {
+        StringBuilder sb = new StringBuilder("plan: `" + name(tool) + "` would\n");
+        List<Object> caps = list(tool, "capabilities");
+        if (caps.isEmpty()) {
+            sb.append("  perform no effects (pure)\n");
+        }
+        for (Object capObj : caps) {
+            String cap = String.valueOf(capObj);
+            String effect = cap;
+            String paramName = null;
+            int open = cap.indexOf('(');
+            if (open >= 0 && cap.endsWith(")")) {
+                effect = cap.substring(0, open);
+                paramName = cap.substring(open + 1, cap.length() - 1);
+            }
+            if (effect.equals("unknown")) {
+                // A plan that quietly omits what it could not characterize is worse
+                // than no plan.
+                sb.append("  unknown  — calls code the analysis cannot characterize; ")
+                  .append("this plan is a lower bound\n");
+            } else if (paramName == null) {
+                // Ambient effects have no operand; a parameterizable one declared bare
+                // has an operand the analysis could not tie down — say which is which.
+                if (effect.equals("console") || effect.equals("env")
+                        || effect.equals("clock") || effect.equals("rand")) {
+                    sb.append("  ").append(effect).append('\n');
+                } else {
+                    sb.append("  ").append(pad(effect, 8)).append("(operand not statically known)\n");
+                }
+            } else {
+                int idx = -1;
+                for (int i = 0; i < params.size(); i++) {
+                    if (str(params.get(i), "name").equals(paramName)) { idx = i; break; }
+                }
+                String operand;
+                if (idx < 0) operand = "(operand not statically known)";
+                else if (values[idx] != null) operand = paramName + " = " + values[idx];
+                else {
+                    Object dflt = params.get(idx).get("default");
+                    operand = paramName + " = " + (dflt == null ? "(unset)" : dflt + " (default)");
+                }
+                sb.append("  ").append(pad(effect, 8)).append(operand).append('\n');
+            }
+        }
+        sb.append("(nothing was executed)\n");
+        return sb.toString();
     }
 
     // ---- help / usage, straight from the contract -------------------------------
@@ -183,6 +249,7 @@ public final class ToolCli {
                 sb.append("  requires: ").append(String.join(", ", rendered)).append('\n');
             }
         }
+        sb.append("  ").append(pad("--plan", 24)).append("show what a run would do, without doing it\n");
         sb.append("  ").append(pad("--contract", 24)).append("print the machine-readable contract\n");
         sb.append("  ").append(pad("--help, -h", 24)).append("show this help\n");
         return sb.toString();

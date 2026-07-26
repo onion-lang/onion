@@ -1704,7 +1704,7 @@ AST.EnumDeclaration enum_decl(int mset) : {
     // in the Rewriting phase to a sealed interface + one record per case.
     LOOKAHEAD({la("case")})
     (
-      constant = enum_case_constant() {append(constants, constant);}
+      constant = enum_case_constant() {append(constants, constant);} [";"]
     )+
     (sec=access_section() {append(sections, sec);})*
   |

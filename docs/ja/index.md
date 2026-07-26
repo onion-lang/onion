@@ -107,6 +107,7 @@ val display: String = name ?: "unknown"  // デフォルト値のためのエル
 - [標準ライブラリ](reference/stdlib.md) - IO、Option、Result、Future、Rand、Assert、Timing、Json、Yamlなど
 - [コンパイラアーキテクチャ](reference/compiler-architecture.md) - コンパイラの内部構造
 - [エラーコード](reference/error-codes.md) - よくあるコンパイルエラーと修正方法
+- [効果](reference/effects.md) - 効果の語彙・効果表・`--effects`
 - [末尾呼び出し最適化](compiler/tail-call-optimization.md) - TCOの検出と今後の変換
 
 ## サンプル集

@@ -67,6 +67,7 @@ object CompilerFrontend {
   private final val NO_CHECK_LAWS: String = "--no-check-laws"
   private final val LAW_SEED: String = "--law-seed"
   private final val LAW_SAMPLES: String = "--law-samples"
+  private final val SHOW_EFFECTS: String = "--effects"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_OUTPUT: String = "."
@@ -92,7 +93,8 @@ class CompilerFrontend {
     config(SUPPRESS_WARNINGS, true),
     config(NO_CHECK_LAWS, false),
     config(LAW_SEED, true),
-    config(LAW_SAMPLES, true)
+    config(LAW_SAMPLES, true),
+    config(SHOW_EFFECTS, false)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -115,6 +117,7 @@ class CompilerFrontend {
             val result = compile(config, params)
             emitDiagnostics(result)
             emitProfile(config, result)
+            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(result)
             if (result.hasErrors) -1
             else if (generateFiles(result.classes)) 0
             else -1
@@ -149,6 +152,7 @@ class CompilerFrontend {
          |  --no-check-laws             Do not execute record `law`/`example` clauses
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
+         |  --effects                   Print each method's inferred effect set to stderr
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |
@@ -258,6 +262,14 @@ class CompilerFrontend {
 
   private def emitDiagnostics(result: CompilationResult): Unit =
     DiagnosticRenderer.printDiagnostics(result.diagnostics)
+
+  /** `--effects`: the inferred effect set of every compiled method, to stderr. */
+  private def emitEffects(result: CompilationResult): Unit = {
+    val classes = result.debugArtifacts.typedClasses.getOrElse(Seq.empty)
+    onion.compiler.effects.EffectInference.infer(classes).foreach { me =>
+      System.err.println(me.render)
+    }
+  }
 
   private def emitProfile(config: CompilerConfig, result: CompilationResult): Unit = {
     if (config.verbose) {

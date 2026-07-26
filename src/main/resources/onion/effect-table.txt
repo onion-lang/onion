@@ -1,0 +1,282 @@
+# The effect table (issue #356). Consulted by onion.compiler.effects.EffectTable.
+#
+# Format:   Class#method=effect[,effect...]     one method (all overloads)
+#           Class#*=effect[,effect...]          every method of the class
+#           Class#method=pure                   explicitly effect-free
+# A specific entry beats the class wildcard. Anything not covered here is
+# `unknown` — not known pure — and the reference page is docs/reference/effects.md.
+#
+# Vocabulary: read write net exec env clock rand console unknown
+#
+# Granularity is per-type, not per-instance: a PrintStream over a file is `write`,
+# but in Onion code PrintStream means System::out/err, so it is classified console.
+# Closure-running helpers (Future::async, Timing::measure) carry only their own
+# effects; the closure body's effects are charged to the method that creates the
+# closure (see EffectInference).
+
+# ---- filesystem ------------------------------------------------------------
+
+onion.Files#readText=read
+onion.Files#readBytes=read
+onion.Files#readLines=read
+onion.Files#exists=read
+onion.Files#isDirectory=read
+onion.Files#isFile=read
+onion.Files#size=read
+onion.Files#list=read
+onion.Files#listFiles=read
+onion.Files#glob=read
+onion.Files#visitFile=read
+onion.Files#preVisitDirectory=read
+onion.Files#visitFileFailed=read
+onion.Files#writeText=write
+onion.Files#writeBytes=write
+onion.Files#writeLines=write
+onion.Files#appendText=write
+onion.Files#delete=write
+onion.Files#mkdirs=write
+onion.Files#copy=read,write
+onion.Files#copyDir=read,write
+onion.Files#move=read,write
+# path-string helpers never touch the filesystem
+onion.Files#ext=pure
+onion.Files#stem=pure
+onion.Files#joinPath=pure
+onion.Files#getFileName=pure
+onion.Files#getParent=pure
+onion.Files#withExtension=pure
+# resolves against the current working directory (user.dir)
+onion.Files#getAbsolutePath=env
+
+onion.FileResource#<init>=pure
+onion.FileResource#path=pure
+onion.FileResource#toString=pure
+onion.FileResource#exists=read
+onion.FileResource#read=read
+onion.FileResource#text=read
+onion.FileResource#lines=read
+onion.FileResource#eachLine=read
+onion.FileResource#csv=read
+onion.FileResource#csvRows=read
+onion.FileResource#json=read
+onion.FileResource#write=write
+onion.FileResource#append=write
+
+# ---- processes -------------------------------------------------------------
+
+onion.Proc#*=exec
+
+# ---- network ---------------------------------------------------------------
+
+onion.Http#get=net
+onion.Http#post=net
+onion.Http#put=net
+onion.Http#delete=net
+onion.Http#postJson=net
+onion.Http#getResponse=net
+onion.Http#postResponse=net
+onion.Http#buildQuery=pure
+onion.Http#buildUrl=pure
+onion.Http#encodeUrl=pure
+onion.Http#decodeUrl=pure
+onion.Http#isOk=pure
+onion.Http#isError=pure
+
+onion.HttpResource#<init>=pure
+onion.HttpResource#url=pure
+onion.HttpResource#toString=pure
+onion.HttpResource#get=net
+onion.HttpResource#post=net
+onion.HttpResource#put=net
+onion.HttpResource#delete=net
+onion.HttpResource#getJson=net
+onion.HttpResource#postJson=net
+onion.HttpResource#read=net
+onion.HttpResource#eachLine=net
+
+# ---- configuration ---------------------------------------------------------
+
+onion.Config#loadJson=read
+onion.Config#getEnv=env
+onion.Config#getWithEnvOverride=env
+onion.Config#parseJson=pure
+onion.Config#get=pure
+onion.Config#getString=pure
+onion.Config#getInt=pure
+onion.Config#getLong=pure
+onion.Config#getDouble=pure
+onion.Config#getBoolean=pure
+onion.Config#hasPath=pure
+
+# ---- console ---------------------------------------------------------------
+
+onion.IO#*=console
+onion.IO#format=pure
+
+# usage-printing entry points also terminate the JVM on failure
+onion.Cli#parse=console,exec
+onion.Cli#requireArgs=console,exec
+onion.Cli#tryParse=pure
+onion.Cli#rest=pure
+onion.Cli#parseBoolean=pure
+onion.Cli#parseByte=pure
+onion.Cli#parseShort=pure
+onion.Cli#parseInt=pure
+onion.Cli#parseLong=pure
+onion.Cli#parseFloat=pure
+onion.Cli#parseDouble=pure
+
+# ---- clock -----------------------------------------------------------------
+
+onion.DateTime#*=pure
+onion.DateTime#now=clock
+onion.DateTime#nowString=clock
+
+onion.Timing#*=clock
+onion.Timing#formatMillis=pure
+onion.Timing#formatNanos=pure
+
+onion.Future#*=pure
+onion.Future#delay=clock
+onion.Future#awaitTimeout=clock
+
+# ---- randomness ------------------------------------------------------------
+
+onion.Rand#*=rand
+onion.OnionMath#*=pure
+onion.OnionMath#random=rand
+onion.OnionMath#randomInt=rand
+
+# ---- pure onion stdlib -----------------------------------------------------
+
+onion.Args#*=pure
+onion.Assert#*=pure
+onion.Codec#*=pure
+onion.Colls#*=pure
+onion.Csv#*=pure
+onion.Defect#*=pure
+onion.Format#*=pure
+onion.Hash#*=pure
+onion.Iterables#*=pure
+onion.Json#*=pure
+onion.LineShape#*=pure
+onion.MappedShape#*=pure
+onion.Maps#*=pure
+onion.Option#*=pure
+onion.OrElseShape#*=pure
+onion.Origin#*=pure
+onion.Outcome#*=pure
+onion.Range#*=pure
+onion.Regex#*=pure
+onion.Resources#*=pure
+onion.Result#*=pure
+onion.Scalars#*=pure
+onion.SepByShape#*=pure
+onion.Sets#*=pure
+onion.Shape#*=pure
+onion.Shapes#*=pure
+onion.Stats#*=pure
+onion.Strings#*=pure
+onion.Text#*=pure
+onion.View#*=pure
+onion.XmapShape#*=pure
+onion.Yaml#*=pure
+
+# invoking a function value is charged where the closure was created
+onion.Function0#*=pure
+onion.Function1#*=pure
+onion.Function2#*=pure
+onion.Function3#*=pure
+onion.Function4#*=pure
+onion.Function5#*=pure
+onion.Function6#*=pure
+onion.Function7#*=pure
+onion.Function8#*=pure
+onion.Function9#*=pure
+onion.Function10#*=pure
+
+# ---- JDK baseline ----------------------------------------------------------
+
+java.lang.Object#*=pure
+java.lang.String#*=pure
+java.lang.StringBuilder#*=pure
+java.lang.StringBuffer#*=pure
+java.lang.CharSequence#*=pure
+java.lang.Integer#*=pure
+java.lang.Long#*=pure
+java.lang.Double#*=pure
+java.lang.Float#*=pure
+java.lang.Short#*=pure
+java.lang.Byte#*=pure
+java.lang.Boolean#*=pure
+java.lang.Character#*=pure
+java.lang.Number#*=pure
+java.lang.Math#*=pure
+java.lang.StrictMath#*=pure
+java.lang.Enum#*=pure
+java.lang.Comparable#*=pure
+java.lang.Iterable#*=pure
+java.math.BigInteger#*=pure
+java.math.BigDecimal#*=pure
+
+java.lang.Throwable#*=pure
+java.lang.Throwable#printStackTrace=console
+java.lang.Exception#*=pure
+java.lang.Exception#printStackTrace=console
+java.lang.RuntimeException#*=pure
+java.lang.RuntimeException#printStackTrace=console
+
+java.util.List#*=pure
+java.util.Map#*=pure
+java.util.Map$Entry#*=pure
+java.util.Map.Entry#*=pure
+java.util.Set#*=pure
+java.util.Collection#*=pure
+java.util.Iterator#*=pure
+java.util.ArrayList#*=pure
+java.util.LinkedList#*=pure
+java.util.HashMap#*=pure
+java.util.LinkedHashMap#*=pure
+java.util.TreeMap#*=pure
+java.util.HashSet#*=pure
+java.util.LinkedHashSet#*=pure
+java.util.TreeSet#*=pure
+java.util.Arrays#*=pure
+java.util.Collections#*=pure
+java.util.Objects#*=pure
+java.util.Optional#*=pure
+java.util.StringJoiner#*=pure
+java.util.regex.Pattern#*=pure
+java.util.regex.Matcher#*=pure
+
+# ---- JDK effect points -----------------------------------------------------
+
+java.lang.System#getenv=env
+java.lang.System#getProperty=env
+java.lang.System#getProperties=env
+java.lang.System#setProperty=env
+java.lang.System#lineSeparator=pure
+java.lang.System#arraycopy=pure
+java.lang.System#identityHashCode=pure
+java.lang.System#currentTimeMillis=clock
+java.lang.System#nanoTime=clock
+java.lang.System#exit=exec
+java.lang.System#console=console
+java.lang.System#gc=pure
+
+java.lang.Runtime#getRuntime=pure
+java.lang.Runtime#exec=exec
+java.lang.Runtime#exit=exec
+java.lang.Runtime#halt=exec
+java.lang.Runtime#availableProcessors=env
+java.lang.Runtime#totalMemory=env
+java.lang.Runtime#freeMemory=env
+java.lang.Runtime#maxMemory=env
+java.lang.Runtime#gc=pure
+
+java.lang.Thread#sleep=clock
+java.lang.Class#getName=pure
+java.lang.Class#getSimpleName=pure
+
+# System::out / System::err are PrintStreams
+java.io.PrintStream#*=console

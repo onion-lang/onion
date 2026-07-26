@@ -17,7 +17,7 @@ class AbstractMethodMemberOrderSpec extends AbstractShellSpec {
         |  abstract def area(): Double
         |  abstract def perimeter(): Double
         |}
-        |class Square : Shape {
+        |class Square extends Shape {
         |public:
         |  def this {}
         |  def area(): Double = 4.0

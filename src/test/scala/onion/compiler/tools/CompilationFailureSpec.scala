@@ -78,7 +78,7 @@ class CompilationFailureSpec extends AbstractShellSpec {
           |public:
           |  final def calculate(): Int { return 42; }
           |}
-          |class Derived : Base {
+          |class Derived extends Base {
           |public:
           |  def calculate(): Int { return 100; }
           |}
@@ -121,7 +121,7 @@ class CompilationFailureSpec extends AbstractShellSpec {
           |public:
           |  abstract def speak(): String;
           |}
-          |class Dog : Animal {
+          |class Dog extends Animal {
           |public:
           |  // Missing speak() implementation
           |}

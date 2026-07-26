@@ -4,7 +4,7 @@ import onion.tools.Shell
 
 /**
  * A generic record may implement a generic interface parameterized by the
- * record's own type variable (`record Foo[T](v: T) <: Bar[T]`). The record's
+ * record's own type variable (`record Foo[T](v: T) conforms Bar[T]`). The record's
  * type parameters must be in scope while its supertypes are resolved — a
  * generic class already worked, but a generic record used to fail with E0003
  * ("type Bar[T] not found") because its supertype clause was resolved outside
@@ -19,7 +19,7 @@ class GenericRecordInterfaceSpec extends AbstractShellSpec {
           | interface Bar[T] {
           |   def get(): T
           | }
-          | record Foo[T](v: T) <: Bar[T] {
+          | record Foo[T](v: T) conforms Bar[T] {
           | public:
           |   def get(): T = v()
           | }
@@ -38,7 +38,7 @@ class GenericRecordInterfaceSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           | interface Named { def label(): String }
-          | record Foo[T](v: T) <: Named {
+          | record Foo[T](v: T) conforms Named {
           | public:
           |   def label(): String = "foo"
           | }

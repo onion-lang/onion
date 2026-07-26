@@ -86,10 +86,10 @@ object SignatureRenderer {
   def renderClass(c: AST.ClassDeclaration): String = {
     val tp = renderTypeParams(c.typeParameters)
     val sup =
-      if (c.superClass == null) "" else s" : ${renderType(c.superClass)}"
+      if (c.superClass == null) "" else s" extends ${renderType(c.superClass)}"
     val ifaces =
       if (c.superInterfaces.isEmpty) ""
-      else s" <: ${c.superInterfaces.map(renderType).mkString(", ")}"
+      else s" conforms ${c.superInterfaces.map(renderType).mkString(", ")}"
     s"class ${c.name}$tp$sup$ifaces"
   }
 
@@ -97,7 +97,7 @@ object SignatureRenderer {
     val tp = renderTypeParams(i.typeParameters)
     val ifaces =
       if (i.superInterfaces.isEmpty) ""
-      else s" <: ${i.superInterfaces.map(renderType).mkString(", ")}"
+      else s" conforms ${i.superInterfaces.map(renderType).mkString(", ")}"
     s"interface ${i.name}$tp$ifaces"
   }
 
@@ -106,7 +106,7 @@ object SignatureRenderer {
     val args = r.args.map(renderArg).mkString(", ")
     val ifaces =
       if (r.superInterfaces.isEmpty) ""
-      else s" <: ${r.superInterfaces.map(renderType).mkString(", ")}"
+      else s" conforms ${r.superInterfaces.map(renderType).mkString(", ")}"
     s"record ${r.name}$tp($args)$ifaces"
   }
 

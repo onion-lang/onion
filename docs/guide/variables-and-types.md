@@ -295,7 +295,7 @@ identical parameterization is compatible:
 
 ```onion
 class Animal { public: def this {} }
-class Dog : Animal { public: def this {} }
+class Dog extends Animal { public: def this {} }
 
 class Box[T] {
   val v: T

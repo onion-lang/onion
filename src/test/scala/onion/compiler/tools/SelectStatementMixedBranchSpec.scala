@@ -134,8 +134,8 @@ class SelectStatementMixedBranchSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Shape {}
-          |record Circle(r: Int) <: Shape
-          |record Square(s: Int) <: Shape
+          |record Circle(r: Int) conforms Shape
+          |record Square(s: Int) conforms Shape
           |class Test {
           |public:
           |  static def area(sh: Shape): void {

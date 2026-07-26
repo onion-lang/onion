@@ -10,7 +10,7 @@ import onion.tools.Shell
  */
 class IfExpressionTargetTypeSpec extends AbstractShellSpec {
   private val decls =
-    "sealed interface Event\nrecord Click(x: Int) <: Event\nrecord Key(c: Int) <: Event\n"
+    "sealed interface Event\nrecord Click(x: Int) conforms Event\nrecord Key(c: Int) conforms Event\n"
 
   it("adopts the expected supertype for mixed-subtype branches") {
     assert(Shell.Success("click1") == shell.run(

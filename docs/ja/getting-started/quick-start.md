@@ -165,7 +165,7 @@ interface Logger {
   def count(): Int
 }
 
-class BasicLogger <: Logger {
+class BasicLogger conforms Logger {
   var n: Int
 
   public:
@@ -178,7 +178,7 @@ class BasicLogger <: Logger {
 }
 
 // `forward` は Logger インターフェースを `delegate` への委譲で自動実装します。
-class PrefixLogger <: Logger {
+class PrefixLogger conforms Logger {
   forward val delegate: Logger
 
   public:
@@ -189,9 +189,9 @@ class PrefixLogger <: Logger {
 ```
 
 構文：
-- `class Child : Parent` - クラスを継承
-- `class Impl <: Interface` - インターフェースを実装
-- `class Multi : Parent <: Interface` - 両方
+- `class Child extends Parent` - クラスを継承
+- `class Impl conforms Interface` - インターフェースを実装
+- `class Multi extends Parent conforms Interface` - 両方
 - `forward val m: Interface` - `Interface` を `m` への委譲で自動実装
 
 ## Java相互運用

@@ -5,7 +5,7 @@ import onion.tools.Shell
 /**
  * Issue #271: a class extending a generic parent with a concrete type argument
  * must specialize the parent's type parameter when an inherited method is called
- * unqualified (via self). `class StrBox : Box[String]` calling inherited
+ * unqualified (via self). `class StrBox extends Box[String]` calling inherited
  * `Box.get(): T` must see `String`, not the raw `T`.
  */
 class GenericInheritanceSelfCallSpec extends AbstractShellSpec {
@@ -19,7 +19,7 @@ class GenericInheritanceSelfCallSpec extends AbstractShellSpec {
           |   def this(v: T) { value = v }
           |   def get(): T { return value }
           | }
-          | class StrBox(v: String) : Box[String](v) {
+          | class StrBox(v: String) extends Box[String](v) {
           | public:
           |   def upper(): String {
           |     val g: String = get()
@@ -48,7 +48,7 @@ class GenericInheritanceSelfCallSpec extends AbstractShellSpec {
           |   def this(v: T) { value = v }
           |   def get(): T { return value }
           | }
-          | class IntBox(v: Integer) : Box[Integer](v) {
+          | class IntBox(v: Integer) extends Box[Integer](v) {
           | public:
           |   def plusOne(): Int {
           |     val g: Int = get()
@@ -77,11 +77,11 @@ class GenericInheritanceSelfCallSpec extends AbstractShellSpec {
           |   def this(v: T) { value = v }
           |   def get(): T { return value }
           | }
-          | class Mid[U](v: U) : Box[U](v) {
+          | class Mid[U](v: U) extends Box[U](v) {
           | public:
           |   def mid(): U { return get() }
           | }
-          | class StrBox2(v: String) : Mid[String](v) {
+          | class StrBox2(v: String) extends Mid[String](v) {
           | public:
           |   def upper(): String {
           |     val g: String = get()

@@ -14,7 +14,7 @@ class GenericsBridgeSpec extends AbstractShellSpec {
           |  }
           |}
           |
-          |class Sub : Base[String] {
+          |class Sub extends Base[String] {
           |public:
           |  def get(x: String): String {
           |    return x + "!"
@@ -41,7 +41,7 @@ class GenericsBridgeSpec extends AbstractShellSpec {
           |  def get(): T { return this.item }
           |}
           |
-          |class StringBox : Box[String] {
+          |class StringBox extends Box[String] {
           |public:
           |  def this(s: String) : (s) {}
           |  def shout(): String { return this.get().toUpperCase() }

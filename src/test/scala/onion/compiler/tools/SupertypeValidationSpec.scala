@@ -10,7 +10,7 @@ class SupertypeValidationSpec extends AbstractShellSpec {
       val result = silenceErr {
         shell.run(
           """
-            |class Bad : int {
+            |class Bad extends int {
             |public:
             |  static def main(args: String[]): Int { return 0 }
             |}
@@ -26,7 +26,7 @@ class SupertypeValidationSpec extends AbstractShellSpec {
       val result = silenceErr {
         shell.run(
           """
-            |class Bad <: int {
+            |class Bad conforms int {
             |public:
             |  static def main(args: String[]): Int { return 0 }
             |}
@@ -42,7 +42,7 @@ class SupertypeValidationSpec extends AbstractShellSpec {
       val result = silenceErr {
         shell.run(
           """
-            |interface I <: int {
+            |interface I conforms int {
             |  def f(): int
             |}
             |

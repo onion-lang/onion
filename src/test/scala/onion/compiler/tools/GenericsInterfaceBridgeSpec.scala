@@ -11,7 +11,7 @@ class GenericsInterfaceBridgeSpec extends AbstractShellSpec {
           |  def get(x: T): T
           |}
           |
-          |class Impl <: I[String] {
+          |class Impl conforms I[String] {
           |public:
           |  def get(x: String): String {
           |    return x + "!"

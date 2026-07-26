@@ -8,8 +8,8 @@ class SelectPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Animal {}
-          |record Dog(name: String) <: Animal
-          |record Cat(name: String) <: Animal
+          |record Dog(name: String) conforms Animal
+          |record Cat(name: String) conforms Animal
           |
           |class Test {
           |public:
@@ -34,9 +34,9 @@ class SelectPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Shape {}
-          |record Circle(radius: Int) <: Shape
-          |record Square(side: Int) <: Shape
-          |record Triangle(base: Int, height: Int) <: Shape
+          |record Circle(radius: Int) conforms Shape
+          |record Square(side: Int) conforms Shape
+          |record Triangle(base: Int, height: Int) conforms Shape
           |
           |class Test {
           |public:
@@ -87,8 +87,8 @@ class SelectPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Result {}
-          |record Success(value: Int) <: Result
-          |record Error(message: String) <: Result
+          |record Success(value: Int) conforms Result
+          |record Error(message: String) conforms Result
           |
           |class Test {
           |public:
@@ -139,8 +139,8 @@ class SelectPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Box {}
-          |record IntBox(value: Int) <: Box
-          |record StringBox(value: String) <: Box
+          |record IntBox(value: Int) conforms Box
+          |record StringBox(value: String) conforms Box
           |
           |class Test {
           |public:
@@ -194,8 +194,8 @@ class SelectPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Value {}
-          |record IntVal(n: Int) <: Value
-          |record StrVal(s: String) <: Value
+          |record IntVal(n: Int) conforms Value
+          |record StrVal(s: String) conforms Value
           |
           |class Test {
           |public:

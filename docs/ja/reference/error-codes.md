@@ -170,8 +170,8 @@ sealed 型に対する `select` がすべてのケースを網羅していませ
 
 ```onion
 sealed interface Shape {}
-record Circle(r: Int) <: Shape
-record Rect(w: Int, h: Int) <: Shape
+record Circle(r: Int) conforms Shape
+record Rect(w: Int, h: Int) conforms Shape
 
 select shape {
   case Circle(r): println("circle")

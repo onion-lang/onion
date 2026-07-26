@@ -158,7 +158,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
     // Process super interfaces if any — with the record's type parameters in
     // scope, so a generic supertype like `Bar[T]` resolves (T is the record's
-    // own type parameter). Without this scope, `record Foo[T](v: T) <: Bar[T]`
+    // own type parameter). Without this scope, `record Foo[T](v: T) conforms Bar[T]`
     // failed with E0003 while the equivalent generic class (which resolves its
     // supertypes inside its type-parameter scope) worked.
     val interfaces = Buffer[ClassType]()
@@ -169,7 +169,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           interfaces += superType
           // Register this record as a subtype of sealed interfaces. A generic
           // record implements a *parameterization* of the interface
-          // (`record Some[T](..) <: Opt[T]`), which is an AppliedClassType, so
+          // (`record Some[T](..) conforms Opt[T]`), which is an AppliedClassType, so
           // the raw class has to be unwrapped or the subtype goes unregistered
           // and exhaustiveness silently passes any select over it (#311).
           sealedOwnerOf(superType).foreach(_.addSealedSubtype(definition_))

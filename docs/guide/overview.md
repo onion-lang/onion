@@ -74,7 +74,7 @@ class Animal {
     }
 }
 
-class Dog : Animal {
+class Dog extends Animal {
   public:
     def this(n: String): (n) {
     }

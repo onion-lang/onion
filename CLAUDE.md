@@ -214,7 +214,7 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
 
 ```onion
 // Class definition with inheritance and interface implementation
-class MyClass : ParentClass <: Interface1, Interface2 {
+class MyClass extends ParentClass conforms Interface1, Interface2 {
   val immutableField: String      // immutable field
   var mutableField: Int           // mutable field
 public:
@@ -436,12 +436,14 @@ These are frequently confused with other languages. **Always check these:**
 
 ### Inheritance & Interfaces
 
-| Wrong (Java/Scala style) | Correct (Onion) |
-|--------------------------|-----------------|
-| `class A extends B` | `class A : B` - colon for inheritance |
-| `class A implements I` | `class A <: I` - `<:` for interface |
-| `class A extends B implements I` | `class A : B <: I` - combine both |
-| `class A implements I, J` | `class A <: I, J` - comma-separated |
+| Wrong | Correct (Onion) |
+|-------|-----------------|
+| `class A : B` (Onion before this change) | `class A extends B` - `extends` for a superclass |
+| `class A <: I` (Onion before this change) | `class A conforms I` - `conforms` for interfaces |
+| `class A implements I` (Java) | `class A conforms I` |
+| `class A extends B implements I` (Java) | `class A extends B conforms I` - combine both |
+| `class A conforms I, J` | ✓ correct - comma-separated |
+| `def conforms(..)` rejected as a keyword? | ✓ correct - `conforms` is a **soft** keyword; only the supertype position treats it specially |
 
 ### Records
 
@@ -450,11 +452,11 @@ These are frequently confused with other languages. **Always check these:**
 | `record Point { int x; int y; }` | `record Point(x: Int, y: Int)` - constructor-style |
 | `point.x` for record field | `point.x()` - record fields are methods (need parens) |
 | `point.copy(y=9)` unsupported? | ✓ correct - named partial copy, `copy()` clone, positional all work |
-| record with methods? | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - a record may carry a `{ access-section* }` body (instance/static/operator methods, private helpers); methods see the generated accessors. Also works on a generic record implementing a generic interface (`record Foo[T](v: T) <: Bar[T]`) |
+| record with methods? | `record Fraction(num: Int, den: Int) { public: def plus(o: Fraction): Fraction = ...; static def of(...) ... }` - a record may carry a `{ access-section* }` body (instance/static/operator methods, private helpers); methods see the generated accessors. Also works on a generic record implementing a generic interface (`record Foo[T](v: T) conforms Bar[T]`) |
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
 | ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | generic ADT enum? | `enum Opt[T] { case Some(value: T); case Nothing }` - type parameters flow onto the generated sealed interface and each case record. A type pattern recovers the scrutinee's type argument, so matching `Some` out of an `Opt[String]` binds `Some[String]` and `s.value()` is a `String`. A *homogeneous* enum cannot take type parameters (it becomes a `java.lang.Enum`) |
-| derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `<:` |
+| derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
 | serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
 | test a record in a separate suite | `record R(...) law name(p: T) { boolExpr } example { boolExpr }` - the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
 

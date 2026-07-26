@@ -244,7 +244,7 @@ import {
   javax.swing.JButton;
 }
 
-class MyButtonHandler <: ActionListener {
+class MyButtonHandler conforms ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
       println("Button clicked!")
@@ -263,7 +263,7 @@ button.addActionListener(handler)
 ```onion
 import { java.lang.Runnable; }
 
-class MyTask <: Runnable {
+class MyTask conforms Runnable {
   val name: String
 
   public:
@@ -286,7 +286,7 @@ thread.start()
 ```onion
 import { java.lang.Comparable; }
 
-class Person <: Comparable[Object] {
+class Person conforms Comparable[Object] {
   val name: String
   val age: Int
 
@@ -314,7 +314,7 @@ import {
   java.awt.FlowLayout;
 }
 
-class MyWindow : JFrame {
+class MyWindow extends JFrame {
   public:
     def this {
       setTitle("My Window")
@@ -407,7 +407,7 @@ import {
   java.awt.event.ActionEvent;
 }
 
-class CalculatorApp : JFrame <: ActionListener {
+class CalculatorApp extends JFrame conforms ActionListener {
   val textField: JTextField
   var currentValue: Double
 

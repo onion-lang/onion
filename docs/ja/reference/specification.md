@@ -99,7 +99,7 @@ val         var         when        while
 契約とプリミティブ実装の間のブリッジを生成します。
 
 ```onion
-class IntComparator <: Comparator[Int] {
+class IntComparator conforms Comparator[Int] {
 public:
   def compare(a: Int, b: Int): Int {
     return a - b
@@ -158,7 +158,7 @@ def generic[T](x: T): T { ... }                     // メソッド型パラメ�
 ### クラス
 
 ```onion
-class Name [TypeParams] [(primary params)] [: Super[(args)]] [<: I1, I2] {
+class Name [TypeParams] [(primary params)] [extends Super[(args)]] [conforms I1, I2] {
   sections
 }
 ```
@@ -170,7 +170,7 @@ class Name [TypeParams] [(primary params)] [: Super[(args)]] [<: I1, I2] {
 
 ```onion
 class Point(val x: Int, val y: Int)
-class Dog(name: String, val breed: String) : Animal(name)
+class Dog(name: String, val breed: String) extends Animal(name)
 ```
 
 **クラシックなコンストラクタ**も利用可能です。
@@ -201,7 +201,7 @@ interface Greeter {
 
 ```onion
 record Point(x: Int, y: Int)
-record Pair[A, B](first: A, second: B) <: SomeInterface
+record Pair[A, B](first: A, second: B) conforms SomeInterface
 ```
 
 コンポーネントは private final フィールドになり、public アクセサ *メソッド* が
@@ -225,7 +225,7 @@ public:
 
 #### パターン付き records (`from re"..."`)
 
-record は、コンポーネントリストの直後（`<:` スーパータイプの前）に正規表現リテラルを
+record は、コンポーネントリストの直後（`conforms` スーパータイプの前）に正規表現リテラルを
 付けることで、その形状から型付きパーサーを導出できます。`from` はソフトキーワードで、
 直後に正規表現リテラルが続く場合にのみ認識されるため、通常の識別子としても使えます。
 
@@ -301,7 +301,7 @@ shape は呼び出しごとに再構築されるので、多くの入力を読�
 
 #### `derive!` — record serde 導出
 
-record のコンポーネントリストの後（または `from re"..."` 節の後、`<:` スーパータイプの前）に
+record のコンポーネントリストの後（または `from re"..."` 節の後、`conforms` スーパータイプの前）に
 `derive!(Format, ...)` を追加すると、コンパイラは record の形状からシリアライズメソッドを
 合成します。`!` 接尾辞は、型クラス制約ではなくマクロスタイルの展開を示します。
 
@@ -309,7 +309,7 @@ record のコンポーネントリストの後（または `from re"..."` 節の
 record User(name: String, age: Int) derive!(Json)
 record Config(host: String, port: Int, debug: Boolean) derive!(Json, Yaml)
 record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json, Yaml)
-  <: Printable
+  conforms Printable
 ```
 
 サポートされるマーカーは **`Json`** と **`Yaml`** です。認識できないマーカーは **E0063** です。
@@ -438,7 +438,7 @@ type Names = List[String]
 ### 委譲
 
 ```onion
-class MyClass <: Interface {
+class MyClass conforms Interface {
   forward val member: Interface
   ...
 }

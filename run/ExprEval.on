@@ -6,7 +6,7 @@ interface Expr {
   def show(): String
 }
 
-class Num <: Expr {
+class Num conforms Expr {
   val value: Int
 public:
   def this(v: Int) { this.value = v }
@@ -14,7 +14,7 @@ public:
   def show(): String { return "" + value }
 }
 
-class Add <: Expr {
+class Add conforms Expr {
   val left: Expr
   val right: Expr
 public:
@@ -23,7 +23,7 @@ public:
   def show(): String { return "(" + left.show() + " + " + right.show() + ")" }
 }
 
-class Sub <: Expr {
+class Sub conforms Expr {
   val left: Expr
   val right: Expr
 public:
@@ -32,7 +32,7 @@ public:
   def show(): String { return "(" + left.show() + " - " + right.show() + ")" }
 }
 
-class Mul <: Expr {
+class Mul conforms Expr {
   val left: Expr
   val right: Expr
 public:
@@ -41,7 +41,7 @@ public:
   def show(): String { return "(" + left.show() + " * " + right.show() + ")" }
 }
 
-class Neg <: Expr {
+class Neg conforms Expr {
   val arg: Expr
 public:
   def this(a: Expr) { this.arg = a }
@@ -67,7 +67,7 @@ val shownDesc = exprs
   .map { ex => (ex as Expr).show() }
 IO::println("byValueDesc: " + shownDesc.toString())
 
-class Div <: Expr {
+class Div conforms Expr {
   val left: Expr
   val right: Expr
 public:

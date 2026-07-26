@@ -211,7 +211,7 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 
 ```onion
 // 継承とインターフェース実装を伴うクラス定義
-class MyClass : ParentClass <: Interface1, Interface2 {
+class MyClass extends ParentClass conforms Interface1, Interface2 {
   val immutableField: String      // 不変フィールド
   var mutableField: Int           // 可変フィールド
 public:
@@ -380,12 +380,14 @@ try {
 
 ### 継承とインターフェース
 
-| 誤り（Java/Scala風） | 正しい（Onion） |
-|---------------------|----------------|
-| `class A extends B` | `class A : B` - 継承はコロン |
-| `class A implements I` | `class A <: I` - インターフェースは`<:` |
-| `class A extends B implements I` | `class A : B <: I` - 両方を組み合わせ |
-| `class A implements I, J` | `class A <: I, J` - カンマ区切り |
+| 誤り | 正しい（Onion） |
+|------|----------------|
+| `class A : B`（この変更以前のOnion） | `class A extends B` - 親クラスは `extends` |
+| `class A <: I`（この変更以前のOnion） | `class A conforms I` - インターフェースは `conforms` |
+| `class A implements I`（Java） | `class A conforms I` |
+| `class A extends B implements I`（Java） | `class A extends B conforms I` - 両方を組み合わせ |
+| `class A conforms I, J` | ✓ 正しい - カンマ区切り |
+| `def conforms(..)` はキーワードだから書けない？ | ✓ 書ける - `conforms` は**ソフトキーワード**で、スーパータイプ位置でのみ特別扱いされる |
 
 ### レコード
 

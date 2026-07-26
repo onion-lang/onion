@@ -62,7 +62,7 @@ class PrimaryConstructorSpec extends AbstractShellSpec {
           |public:
           |  def who(): String { return this.name }
           |}
-          |class Dog(name: String, val breed: String) : Animal(name)
+          |class Dog(name: String, val breed: String) extends Animal(name)
           |class Test {
           |public:
           |  static def main(args: String[]): String {

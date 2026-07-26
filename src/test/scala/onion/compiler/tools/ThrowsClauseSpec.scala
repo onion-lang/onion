@@ -48,7 +48,7 @@ class ThrowsClauseSpec extends AbstractShellSpec {
           |interface Processor {
           |  def process(): String throws Exception
           |}
-          |class SimpleProcessor <: Processor {
+          |class SimpleProcessor conforms Processor {
           |public:
           |  def process(): String throws Exception {
           |    return "processed";

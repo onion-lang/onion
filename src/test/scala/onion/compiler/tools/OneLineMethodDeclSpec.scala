@@ -13,16 +13,16 @@ class OneLineMethodDeclSpec extends AbstractShellSpec {
 
   describe("one-line method declarations") {
     it("one-line interface with an abstract method") {
-      ok("interface A { def f(): Int }\nclass C <: A { public: def this {} def f(): Int { return 5 } }\ndef main(args: String[]): Int { return new C().f() }", 5)
+      ok("interface A { def f(): Int }\nclass C conforms A { public: def this {} def f(): Int { return 5 } }\ndef main(args: String[]): Int { return new C().f() }", 5)
     }
     it("one-line interface with a = expr default method") {
-      ok("interface A { def f(): Int = 6 }\nclass C <: A { public: def this {} }\ndef main(args: String[]): Int { return new C().f() }", 6)
+      ok("interface A { def f(): Int = 6 }\nclass C conforms A { public: def this {} }\ndef main(args: String[]): Int { return new C().f() }", 6)
     }
     it("still parses the = expr method form (regression)") {
       ok("class C { public: def this {} def f(): Int = 42 }\ndef main(args: String[]): Int { return new C().f() }", 42)
     }
     it("still parses interface default methods with block bodies (regression)") {
-      ok("interface A {\n  def f(): Int { return 9 }\n}\nclass C <: A { public: def this {} }\ndef main(args: String[]): Int { return new C().f() }", 9)
+      ok("interface A {\n  def f(): Int { return 9 }\n}\nclass C conforms A { public: def this {} }\ndef main(args: String[]): Int { return new C().f() }", 9)
     }
   }
 }

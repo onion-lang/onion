@@ -253,8 +253,8 @@ Records destructure positionally (`_` ignores a component), and `when`
 adds a guard to any pattern:
 
 ```onion
-record Circle(r: Int) <: Shape
-record Rect(w: Int, h: Int) <: Shape
+record Circle(r: Int) conforms Shape
+record Rect(w: Int, h: Int) conforms Shape
 
 select shape {
   case Circle(r) when r > 10: println("big circle")
@@ -268,8 +268,8 @@ place and used at the narrowed type:
 
 ```onion
 sealed interface E {}
-record Num(v: Int) <: E
-record Add(l: E, r: E) <: E
+record Num(v: Int) conforms E
+record Add(l: E, r: E) conforms E
 record Wrap(x: Object)
 
 select e {

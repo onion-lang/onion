@@ -1000,6 +1000,10 @@ TOKEN : {
 | <DOTDOT:         ".."           >
 | <ARROW2:         "=>"           >
 | <LARROW:         "<-"           >
+// No longer part of any production: `class A <: I` became `class A conforms I`, and
+// `class A : B` became `class A extends B`. The token is kept so that old source still
+// lexes as one `<:` and reports `Encountered "<:"` rather than splitting into `<` and `:`
+// and pointing somewhere unhelpful.
 | <SUBTYPE:        "<:"           >
 | <NOT:            "!"            >
 | <AMP:            "&"            >
@@ -1440,13 +1444,15 @@ AST.ClassDeclaration class_decl(int mset) : {
     [ {kind = 0;} [ (pk="val" {kind = 1;} | pk="var" {kind = 2;}) ] pa=argument() {primaryParams.add(pa); primaryKinds.add(kind);}
       ("," {kind = 0;} [ (pk="val" {kind = 1;} | pk="var" {kind = 2;}) ] pa=argument() {primaryParams.add(pa); primaryKinds.add(kind);})*
     ] ")" ]
-  [":" ty1=type() [LOOKAHEAD(2) "(" superArgs=terms() ")"]]
-  ["<:" ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*]
+  [<K_EXTENDS> ty1=type() [LOOKAHEAD(2) "(" superArgs=terms() ")"]]
+  // `conforms` is a soft keyword: recognized only in this supertype position, so it
+  // stays usable as an ordinary identifier (a `def conforms(..)` still parses).
+  [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID> ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*]
   ( "{"
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
     "}" [";"]
-  | ";"   // body-less: class Dog(name: String, val breed: String) : Animal(name);
+  | ";"   // body-less: class Dog(name: String, val breed: String) extends Animal(name);
   | LOOKAHEAD({getToken(1).kind != LBRACE}) {}
   ) {
     if (sec3 == null) { sec3 = option(sec1); }
@@ -1542,7 +1548,7 @@ AST.RecordDeclaration record_decl(int mset) : {
           { append(shapeBuf, AST.formatShapeClause(p(st), c(st), c(srt))); }
       )
   )*
-  [ "<:"
+  [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID>
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ]
@@ -1568,7 +1574,7 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
   start = "interface" name = id() [tparams=type_params()]
-  [ "<:"
+  [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID>
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ]
@@ -1599,7 +1605,7 @@ AST.InterfaceDeclaration trait_decl(int mset) : {
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
 }{
   start = "trait" name = id() [tparams=type_params()]
-  [ "<:"
+  [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID>
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ] "{"

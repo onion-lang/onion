@@ -53,7 +53,7 @@ protected:
     def speak: String = this.name + " makes a sound"
 }
 
-class Dog : Animal {
+class Dog extends Animal {
   val breed: String
 
   public:
@@ -87,7 +87,7 @@ import {
   java.util.Arrays;
 }
 
-class Student <: Comparable[Object] {
+class Student conforms Comparable[Object] {
   val name: String
   val grade: Int
 
@@ -136,7 +136,7 @@ interface Logger {
   def count(): Int
 }
 
-class BasicLogger <: Logger {
+class BasicLogger conforms Logger {
   var n: Int
 
   public:
@@ -148,7 +148,7 @@ class BasicLogger <: Logger {
     def count(): Int = n
 }
 
-class Delegation <: Logger {
+class Delegation conforms Logger {
   forward val delegate: Logger
 
   public:
@@ -183,7 +183,7 @@ import {
   java.io.ByteArrayInputStream;
 }
 
-class ExampleBean <: Serializable {
+class ExampleBean conforms Serializable {
   var name: String
   var value: Int
 
@@ -257,7 +257,7 @@ import {
   java.awt.BorderLayout;
 }
 
-class Calculator : JFrame <: ActionListener {
+class Calculator extends JFrame conforms ActionListener {
   val text: JTextField
   var currentValue: Long
   var operator: String
@@ -351,7 +351,7 @@ class Calculator : JFrame <: ActionListener {
 ```
 
 **Topics:**
-- Multiple inheritance (extends JFrame, implements ActionListener)
+- Multiple inheritance (: JFrame, implements ActionListener)
 - Swing GUI components
 - Event handling
 - `self` reference

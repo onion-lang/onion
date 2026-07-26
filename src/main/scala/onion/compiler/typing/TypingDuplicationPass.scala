@@ -175,7 +175,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 
-  // A record can declare `<: Interface`, but its only methods are the synthesized
+  // A record can declare `conforms Interface`, but its only methods are the synthesized
   // accessors; an interface method with no matching accessor was previously
   // unchecked, so the record compiled and threw AbstractMethodError at runtime.
   //

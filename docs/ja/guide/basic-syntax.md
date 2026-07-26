@@ -239,7 +239,7 @@ class Person {
 ```onion
 interface Shape { def area(): Double }
 
-class Circle : Object <: Shape {
+class Circle extends Object conforms Shape {
   val r: Double
 public:
   def this(r: Double) { this.r = r }

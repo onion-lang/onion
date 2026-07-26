@@ -10,7 +10,7 @@ import onion.tools.Shell
  */
 class MapLiteralTargetTypeSpec extends AbstractShellSpec {
   private val shapes =
-    "sealed interface Shape\nrecord Circle(r: Int) <: Shape\nrecord Square(s: Int) <: Shape\n"
+    "sealed interface Shape\nrecord Circle(r: Int) conforms Shape\nrecord Square(s: Int) conforms Shape\n"
 
   it("target-types mixed-subtype values to the expected value supertype") {
     assert(Shell.Success(2) == shell.run(

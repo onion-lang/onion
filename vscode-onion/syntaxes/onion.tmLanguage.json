@@ -121,7 +121,7 @@
         },
         {
           "name": "keyword.other.onion",
-          "match": "\\b(extends|forward)\\b"
+          "match": "\\b(extends|conforms|forward)\\b"
         }
       ]
     },
@@ -179,10 +179,6 @@
     },
     "operators": {
       "patterns": [
-        {
-          "name": "keyword.operator.interface.onion",
-          "match": "<:"
-        },
         {
           "name": "keyword.operator.safe-access.onion",
           "match": "\\?\\.|\\?\\[|\\?:|!!"

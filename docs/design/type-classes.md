@@ -43,8 +43,8 @@ def sum[T: Numeric](xs: List[T]): T {
 
 - **`trait Name[T, …] { <sigs + optional default bodies> }`** — a near-clone of
   `interface_decl`, reusing `interface_method_decl` (which already parses both
-  abstract signatures and default-method bodies). Super-traits via `<:`
-  (`trait Ord[T] <: Eq[T]`), matching interface supertype syntax.
+  abstract signatures and default-method bodies). Super-traits via `conforms`
+  (`trait Ord[T] conforms Eq[T]`), matching interface supertype syntax.
 - **`instance TraitName[ConcreteType, …] { <method defs> }`** — body is a flat
   list of `method_decl` like `extension`; the head type list uses
   `type_arguments()` (so `instance Numeric[Int]`, `instance Show[List[String]]`
@@ -189,7 +189,7 @@ ground type.
 - **Stage 2 — `Eq`/`Ord`/`Show`.** Traits + instances; reframe `min`/`max`/`sort`
   on `Ord`; UFCS method-style calls for trait methods.
 - **Stage 3 — deriving.** `derive!(Eq, Ord, Show)` reusing the structural fold.
-- **Stage 4 — advanced.** Trait inheritance (`trait Ord[T] <: Eq[T]`), parametric/
+- **Stage 4 — advanced.** Trait inheritance (`trait Ord[T] conforms Eq[T]`), parametric/
   conditional instances (`instance [T: Numeric] Numeric[List[T]]`), full
   applied-type coherence keys, multi-parameter traits.
 

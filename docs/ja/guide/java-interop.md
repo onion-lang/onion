@@ -109,12 +109,12 @@ xs.add(abs(-5))
 
 ## Javaインターフェースの実装
 
-`<:` でJavaインターフェースを実装します：
+`conforms` でJavaインターフェースを実装します：
 
 ```onion
 import { java.lang.Runnable; }
 
-class MyTask <: Runnable {
+class MyTask conforms Runnable {
   val name: String
 
   public:
@@ -143,7 +143,7 @@ import {
   java.awt.FlowLayout;
 }
 
-class MyWindow : JFrame {
+class MyWindow extends JFrame {
   public:
     def this {
       setTitle("My Window")

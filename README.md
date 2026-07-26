@@ -155,8 +155,8 @@ public:
 }
 
 sealed interface Shape {}
-record Circle(r: Int) <: Shape
-record Rect(w: Int, h: Int) <: Shape
+record Circle(r: Int) conforms Shape
+record Rect(w: Int, h: Int) conforms Shape
 select shape {                                     // exhaustiveness-checked
   case Circle(r):  println("circle " + r)
   case Rect(w, h): println(w * h)

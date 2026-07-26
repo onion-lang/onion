@@ -10,7 +10,7 @@ import onion.tools.Shell
  */
 class MixedSubtypeListLiteralSpec extends AbstractShellSpec {
   private val decls =
-    "sealed interface Event\nrecord Click(x: Int, y: Int) <: Event\nrecord Key(code: Int) <: Event\n"
+    "sealed interface Event\nrecord Click(x: Int, y: Int) conforms Event\nrecord Key(code: Int) conforms Event\n"
 
   it("builds a List[Event] from mixed record subtypes") {
     assert(Shell.Success(3) == shell.run(

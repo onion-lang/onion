@@ -15,7 +15,7 @@ class AbstractMethodBodySpec extends AbstractShellSpec {
         | public:
         |   abstract def foo(): Int { return 99 }
         | }
-        | class I : B { public: override def foo(): Int = 1 }
+        | class I extends B { public: override def foo(): Int = 1 }
         | static def main(args: String[]): Int { return new I().foo() }
       """.stripMargin, "None", Array())
     assert(Shell.Failure(-1) == result)
@@ -28,7 +28,7 @@ class AbstractMethodBodySpec extends AbstractShellSpec {
         | public:
         |   abstract def foo(): Int
         | }
-        | class I : B { public: override def foo(): Int = 7 }
+        | class I extends B { public: override def foo(): Int = 7 }
         | static def main(args: String[]): Int { return new I().foo() }
       """.stripMargin, "None", Array())
     assert(Shell.Success(7) == result)
@@ -40,7 +40,7 @@ class AbstractMethodBodySpec extends AbstractShellSpec {
         | interface Greeter {
         |   def greet(): String { return "hi" }
         | }
-        | class G <: Greeter { }
+        | class G conforms Greeter { }
         | static def main(args: String[]): String { return (new G() as Greeter).greet() }
       """.stripMargin, "None", Array())
     assert(Shell.Success("hi") == result)

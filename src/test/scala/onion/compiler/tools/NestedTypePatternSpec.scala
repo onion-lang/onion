@@ -15,8 +15,8 @@ import onion.tools.Shell
 class NestedTypePatternSpec extends AbstractShellSpec {
   private val exprAdt =
     """sealed interface E {}
-      |record Num(v: Int) <: E
-      |record Add(l: E, r: E) <: E
+      |record Num(v: Int) conforms E
+      |record Add(l: E, r: E) conforms E
       |""".stripMargin
 
   it("matches a nested type pattern and binds it at the narrowed type") {

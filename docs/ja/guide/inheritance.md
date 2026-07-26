@@ -4,7 +4,7 @@ Onionはクラスの継承とインターフェースの実装をサポートし
 
 ## クラスの継承
 
-`:` で親クラスを継承します：
+`extends` で親クラスを継承します：
 
 ```onion
 class Animal {
@@ -18,7 +18,7 @@ class Animal {
     def speak: String = "Some sound"
 }
 
-class Dog : Animal {
+class Dog extends Animal {
   public:
     def this(n: String): (n) { }   // 親コンストラクタの呼び出し
 
@@ -41,7 +41,7 @@ class Vehicle {
     }
 }
 
-class Car : Vehicle {
+class Car extends Vehicle {
   val model: String
 
   public:
@@ -53,12 +53,12 @@ class Car : Vehicle {
 
 ## インターフェースの実装
 
-`<:` でインターフェースを実装します。複数のインターフェースはカンマ区切りで列挙します：
+`conforms` でインターフェースを実装します。複数のインターフェースはカンマ区切りで列挙します：
 
 ```onion
 import { java.lang.Comparable; }
 
-class Person <: Comparable[Object] {
+class Person conforms Comparable[Object] {
   val name: String
   val age: Int
 
@@ -85,7 +85,7 @@ interface Greeter {
   def greet(): String { return "Hello, " + this.name() }
 }
 
-class K <: Greeter {
+class K conforms Greeter {
 public:
   def this {}
   def name(): String { return "kota" }
@@ -96,11 +96,11 @@ println(new K().greet())   // Hello, kota（overrideなしで使える）
 
 ## 継承とインターフェースの組み合わせ
 
-`:` と `<:` を組み合わせて使えます：
+`extends` と `conforms` を組み合わせて使えます：
 
 ```onion
 // 構文
-class Child : ParentClass <: Interface1, Interface2 {
+class Child extends ParentClass conforms Interface1, Interface2 {
   // ...
 }
 ```
@@ -115,7 +115,7 @@ interface Logger {
   def count(): Int
 }
 
-class BasicLogger <: Logger {
+class BasicLogger conforms Logger {
   var n: Int
 
   public:
@@ -127,7 +127,7 @@ class BasicLogger <: Logger {
     def count(): Int = n
 }
 
-class PrefixLogger <: Logger {
+class PrefixLogger conforms Logger {
   forward val delegate: Logger
 
   public:
@@ -156,7 +156,7 @@ import {
   java.util.ArrayList;
 }
 
-class MyList <: List[String] {
+class MyList conforms List[String] {
   forward val backing: List[String]
 
   public:
@@ -186,14 +186,14 @@ interface Container[T] {
   def count(): Int
 }
 
-class IntBox <: Container[Int] {
+class IntBox conforms Container[Int] {
   public:
     def this {}
     def first(): Int { return 42 }
     def count(): Int { return 3 }
 }
 
-class Wrapper <: Container[Int] {
+class Wrapper conforms Container[Int] {
   forward val inner: Container[Int]
 
   public:
@@ -217,12 +217,12 @@ class Animal {
     def speak: String = "Generic sound"
 }
 
-class Dog : Animal {
+class Dog extends Animal {
   public:
     def speak: String = "Woof!"
 }
 
-class Cat : Animal {
+class Cat extends Animal {
   public:
     def speak: String = "Meow!"
 }
@@ -250,7 +250,7 @@ abstract class Shape {
     abstract def area(): Double;
 }
 
-class Circle : Shape {
+class Circle extends Shape {
   val radius: Double
 
   public:

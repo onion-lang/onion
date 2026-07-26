@@ -30,7 +30,7 @@ Describe a boundary once — a log format, a JSON document, a command line — a
 println("Hello, World!")
 
 // Class definition with inheritance
-class Calculator : JFrame <: ActionListener {
+class Calculator extends JFrame conforms ActionListener {
   var result: Long
 
   public:

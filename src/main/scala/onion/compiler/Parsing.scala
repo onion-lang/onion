@@ -177,6 +177,12 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * Add friendly hints for common syntax mistakes.
    */
   private def commonSyntaxHint(found: String, expected: String): String = found match {
+    // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
+    // `<:` no longer appears in any production, so meeting one can only be old source.
+    case "<:" =>
+      Message("error.parsing.hint.old_conforms")
+    case ":" if expected.contains("extends") =>
+      Message("error.parsing.hint.old_extends")
     case "in" =>
       "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
     case "else" =>

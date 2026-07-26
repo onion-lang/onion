@@ -14,7 +14,7 @@ import onion.tools.Shell
  */
 class FBoundedSelfTypeSpec extends AbstractShellSpec {
   describe("F-bounded self types (CRTP)") {
-    it("compiles and runs a bounded self-inheriting class: class Sub : Base[Sub]") {
+    it("compiles and runs a bounded self-inheriting class: class Sub extends Base[Sub]") {
       val result = shell.run(
         """
           | class Base[T extends Base[T]] {
@@ -22,7 +22,7 @@ class FBoundedSelfTypeSpec extends AbstractShellSpec {
           |   def this { }
           |   def who(): String { return "Base" }
           | }
-          | class Sub : Base[Sub] {
+          | class Sub extends Base[Sub] {
           | public:
           |   def this { }
           | }
@@ -46,7 +46,7 @@ class FBoundedSelfTypeSpec extends AbstractShellSpec {
           | interface Cmp[T extends Cmp[T]] {
           |   def to(o: T): Int
           | }
-          | class Item <: Cmp[Item] {
+          | class Item conforms Cmp[Item] {
           | public:
           |   def this { }
           |   def to(o: Item): Int = 0
@@ -66,14 +66,14 @@ class FBoundedSelfTypeSpec extends AbstractShellSpec {
       assert(Shell.Success("0") == result)
     }
 
-    it("rejects a bound-violating type argument: class Bad : Base[String]") {
+    it("rejects a bound-violating type argument: class Bad extends Base[String]") {
       val result = shell.run(
         """
           | class Base[T extends Base[T]] {
           | public:
           |   def this { }
           | }
-          | class Bad : Base[String] {
+          | class Bad extends Base[String] {
           | public:
           |   def this { }
           | }

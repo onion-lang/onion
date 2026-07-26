@@ -19,7 +19,7 @@ class GenericSuperConstructorPrimitiveSpec extends AbstractShellSpec {
   it("resolves the super constructor for a primitive type argument (Int)") {
     assert(Shell.Success(42) == shell.run(
       box +
-      "class IntBox(v: Int) : Box[Int](v) {\n" +
+      "class IntBox(v: Int) extends Box[Int](v) {\n" +
       "public: def unwrap(): Int { return (get() as Int) } }\n" +
       "class Main { public: static def main(args: String[]): Int { return new IntBox(42).unwrap() } }",
       "None", Array()))
@@ -28,7 +28,7 @@ class GenericSuperConstructorPrimitiveSpec extends AbstractShellSpec {
   it("resolves the super constructor for a primitive Double type argument") {
     assert(Shell.Success(3) == shell.run(
       box +
-      "class DBox(v: Double) : Box[Double](v) {\n" +
+      "class DBox(v: Double) extends Box[Double](v) {\n" +
       "public: def unwrap(): Int { return ((get() as Double) as Int) } }\n" +
       "class Main { public: static def main(args: String[]): Int { return new DBox(3.5).unwrap() } }",
       "None", Array()))
@@ -37,7 +37,7 @@ class GenericSuperConstructorPrimitiveSpec extends AbstractShellSpec {
   it("still resolves the super constructor for a reference type argument") {
     assert(Shell.Success("HI") == shell.run(
       box +
-      "class SBox(v: String) : Box[String](v) {\n" +
+      "class SBox(v: String) extends Box[String](v) {\n" +
       "public: def unwrap(): String { return (get() as String) } }\n" +
       "class Main { public: static def main(args: String[]): String { return new SBox(\"hi\").unwrap().toUpperCase() } }",
       "None", Array()))
@@ -48,7 +48,7 @@ class GenericSuperConstructorPrimitiveSpec extends AbstractShellSpec {
       "class Pair[A, B] { val a: A\n val b: B\n" +
       "public: def this(x: A, y: B) { a = x\n b = y }\n" +
       " def first(): A { return a } }\n" +
-      "class IntStr(x: Int, y: String) : Pair[Int, String](x, y) {\n" +
+      "class IntStr(x: Int, y: String) extends Pair[Int, String](x, y) {\n" +
       "public: def fst(): Int { return (first() as Int) } }\n" +
       "class Main { public: static def main(args: String[]): Int { return new IntStr(5, \"z\").fst() } }",
       "None", Array()))
@@ -57,7 +57,7 @@ class GenericSuperConstructorPrimitiveSpec extends AbstractShellSpec {
   it("rejects a super-init argument incompatible with the primitive type argument") {
     assert(Shell.Failure(-1) == shell.run(
       box +
-      "class BadBox(v: Boolean) : Box[Int](v) {\n" +
+      "class BadBox(v: Boolean) extends Box[Int](v) {\n" +
       "public: def u(): Int { return (get() as Int) } }\n" +
       "class Main { public: static def main(args: String[]): void { } }",
       "None", Array()))

@@ -264,7 +264,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |  def pick(x: T): String
           |}
           |
-          |class PickerImpl <: Picker[String] {
+          |class PickerImpl conforms Picker[String] {
           |public:
           |  def pick(x: String): String {
           |    return "ok"
@@ -291,7 +291,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
             |  def get(): T { return null }
             |}
             |
-            |class Sub : Base[String] {
+            |class Sub extends Base[String] {
             |public:
             |  def get(): Object { return new Object }
             |  static def main(args: String[]): Int { return 0 }
@@ -310,7 +310,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
             |  def id(x: T): T
             |}
             |
-            |class BadImpl <: Id[String] {
+            |class BadImpl conforms Id[String] {
             |public:
             |  def id(x: String): Object { return x }
             |  static def main(args: String[]): Int { return 0 }
@@ -328,7 +328,7 @@ class GenericsTypingSpec extends AbstractShellSpec {
           |  def id(x: T): T
           |}
           |
-          |class OkImpl <: Id2[String] {
+          |class OkImpl conforms Id2[String] {
           |public:
           |  def id(x: String): String {
           |    return x

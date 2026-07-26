@@ -80,6 +80,23 @@ class AdtEnumSpec extends AbstractShellSpec {
       assert(Shell.Success("red|custom") == r)
     }
 
+    it("accepts semicolon-separated case clauses on a single line (CLAUDE.md-documented form)") {
+      val r = shell.run(
+        """
+          |enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: c.radius() * c.radius() * 3.14; case s is Square: s.side() * s.side(); case o is Origin: 0.0 } }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a: Double = (new Circle(2.0) as Shape).area()
+          |    val b: Double = (new Square(3.0) as Shape).area()
+          |    val c: Double = (new Origin() as Shape).area()
+          |    return "" + a + "|" + b + "|" + c
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("12.56|9.0|0.0") == r)
+    }
+
     it("reports E0042 when a select over the ADT enum omits a case") {
       val r = shell.run(
         """

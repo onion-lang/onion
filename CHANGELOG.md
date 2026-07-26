@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-26
+
 - **docs(guide): sync `docs/ja/guide/basic-syntax.md` with the English guide.**
   The Japanese Basic Syntax guide had fallen behind its English counterpart: it was
   missing the Character/Boolean/Null Literals subsections, the underscore digit-grouping

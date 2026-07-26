@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Effect table, per-method effect inference, and `--effects` (#356).** The first layer
+  of the capability work: every method now has a statically computed *effect set* over
+  the vocabulary `read write net exec env clock rand console unknown` (empty prints as
+  `pure`). Facts about existing code live out of band in a shipped resource
+  (`onion/effect-table.txt`) — annotations cannot carry them here — with the whole
+  effectful stdlib surface classified, a pure JDK baseline, and the JDK's known effect
+  points. For methods defined in the program, the compiler joins the table's verdicts
+  transitively through user calls (fixed point over recursion; constructors and the
+  superclass chain included; a closure's body is charged to its creation site). An
+  unlisted Java call is `unknown` — not known pure — never silently dropped, and a
+  drift-guard spec fails the build if a typed-AST node exists that the effect walker
+  does not handle. `onionc --effects` / `onion --effects` print every compiled method's
+  set to stderr. Reference: `docs/reference/effects.md` (EN+JA).
+
 ## [0.9.0] - 2026-07-26
 
 - **docs(guide): sync `docs/ja/guide/basic-syntax.md` with the English guide.**

@@ -1375,6 +1375,22 @@ object TypedAST {
 
     def returnType: TypedAST.Type
 
+    /**
+     * Effects per the out-of-band effect table (issue #356); `None` when the table has
+     * no entry — an Onion-defined method whose effects are inferred from its body, or a
+     * Java method the table cannot vouch for.
+     */
+    def tableEffects: Option[scala.collection.immutable.Set[onion.compiler.effects.Effect]] =
+      onion.compiler.effects.EffectTable.lookup(affiliation.name, name)
+
+    /**
+     * The conservative per-method verdict: the table's effects, else not-known-pure.
+     * Body-based inference for Onion-defined methods lives in
+     * [[onion.compiler.effects.EffectInference]], not here.
+     */
+    def effects: scala.collection.immutable.Set[onion.compiler.effects.Effect] =
+      tableEffects.getOrElse(scala.collection.immutable.Set(onion.compiler.effects.Effect.Unknown))
+
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
 
     /** Whether this method accepts variable-length arguments (last parameter is vararg) */

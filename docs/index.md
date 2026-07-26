@@ -125,6 +125,7 @@ val display: String = name ?: "unknown"  // Elvis operator for default value
 - [Standard Library](reference/stdlib.md) - IO, Option, Result, Future, and more
 - [Compiler Architecture](reference/compiler-architecture.md) - How the compiler works
 - [Error Codes](reference/error-codes.md) - Common compilation errors and fixes
+- [Effects](reference/effects.md) - The effect vocabulary, the effect table, and `--effects`
 - [Compiler Internals](compiler/tail-call-optimization.md) - Tail call optimization
 
 ## Contributing

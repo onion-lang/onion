@@ -147,6 +147,7 @@ object ScriptRunner {
   private final val NO_CHECK_LAWS: String = "--no-check-laws"
   private final val LAW_SEED: String = "--law-seed"
   private final val LAW_SAMPLES: String = "--law-samples"
+  private final val SHOW_EFFECTS: String = "--effects"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_MAX_ERROR: Int = 10
@@ -174,7 +175,8 @@ class ScriptRunner {
     conf(SUPPRESS_WARNINGS, true),
     conf(NO_CHECK_LAWS, false),
     conf(LAW_SEED, true),
-    conf(LAW_SAMPLES, true)
+    conf(LAW_SAMPLES, true),
+    conf(SHOW_EFFECTS, false)
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -208,6 +210,12 @@ class ScriptRunner {
             val result = compile(config, Array(params.head))
             emitDiagnostics(result)
             emitProfile(config, result)
+            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) {
+              val typed = result.debugArtifacts.typedClasses.getOrElse(Seq.empty)
+              onion.compiler.effects.EffectInference.infer(typed).foreach { me =>
+                System.err.println(me.render)
+              }
+            }
             if (result.hasErrors) {
               -1
             } else {

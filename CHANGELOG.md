@@ -7,8 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Added regression test coverage for **E0007** (`DUPLICATE_LOCAL_VARIABLE`),
-  which previously had no dedicated test file.
+## [0.10.1] - 2026-07-27
+
+A quality release: the diagnostic surface is now covered code by code, and the sweep
+that built that coverage found and fixed three real defects.
+
+### Fixed
+
+- **Extending a final class crashed instead of erroring.** `class A extends
+  java.lang.String` escaped the type checker entirely; bytecode was generated and the
+  JVM rejected it at class-loading time (`IncompatibleClassChangeError` inside the
+  law-check phase). It is now a proper **E0018** at the supertype reference, and the
+  crash is pinned in the crash corpus (`030-final-superclass.on`).
+- **E0053/E0054 rendered as `Unknown error: <NAME>`.** Cyclic and duplicate type
+  aliases were reported through the normal reporter path but never wired to their
+  message definitions, so users saw the internal enum name instead of the message
+  (which existed, in both languages, all along). Both now render; the coverage spec
+  asserts `Unknown error` never comes back.
+- **Wrong type-argument arity was accepted in nullable annotations (#413).**
+  `val b: Box[String, String]? = null` compiled silently while the same arity failed
+  on `new` — the validator did not look through the nullable wrapper. Both now report
+  **E0031**.
+
+### Added
+
+- **Per-code diagnostic coverage** (continuing #407-#412, which covered E0036, E0016,
+  E0038, E0068, E0004 and E0007): `SemanticErrorCodeCoverageSpec` adds one trigger per
+  previously-unasserted reachable code — 27 more codes, from E0008 to E0076 — plus a
+  drift guard that scans the sources and fails when a code's report-site status
+  changes: the three genuinely dead codes (E0017, E0024, E0056) are registered as
+  dead, and a code losing its last report site is flagged instead of rotting silently.
+  E0043 is documented as shadowed by candidate filtering; E0075 as reachable only
+  through an environment failure.
+
+### Documentation
+
+- `docs/quality-bar.md` (EN+JA) re-measured: 2744 tests, 64/64 samples, 7 large
+  programs, 81 diagnostic codes.
+- `CLAUDE.md` catches up with v0.10: the narrowed default static imports (bare
+  `readText`/`get`/`now`/`exit` no longer resolve), `tool`/`requires`/`--contract`/
+  `--plan`, lossless `config` shapes and the lens, user-written `Shape` instances with
+  the E0080 law gate, and top-level `example`.
 
 ## [0.10.0] - 2026-07-26
 

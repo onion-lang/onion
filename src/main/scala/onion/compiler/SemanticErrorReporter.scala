@@ -438,6 +438,17 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.shapeInstanceWithoutLaw",
       Seq(items => asString(items(0)))
     ),
+    // Reported through the normal reporter path (NameResolution / TypingHeaderPass)
+    // but never wired here, so both rendered as "Unknown error: <NAME>" (found while
+    // sweeping E-code coverage for 0.10.1).
+    SemanticError.CYCLIC_TYPE_ALIAS -> ErrorDef(
+      "error.semantic.cyclicTypeAlias",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
+      "error.semantic.duplicateTypeAlias",
+      Seq(items => asString(items(0)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

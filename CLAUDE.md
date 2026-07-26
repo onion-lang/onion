@@ -490,6 +490,18 @@ These are frequently confused with other languages. **Always check these:**
 | `using r = expr { }` | `try (val r = expr) { }` - try-with-resources; multiple via `;`, closed in reverse order |
 | `catch (Type e)` | `catch e: Type` - no parens, type after colon |
 
+### Tools, capabilities and effects (v0.10)
+
+| Wrong | Correct (Onion) |
+|-------|-----------------|
+| bare `readText(p)` / `get(url)` / `now()` / `exit(1)` | **No longer resolve** — default static imports were narrowed to pure classes. Qualify (`Files::readText`) or import explicitly: `import { onion.Files::*; java.lang.System::exit }`. Bare `println` still works (`onion.IO` is the one exception) |
+| a CLI function with hand-rolled arg parsing | `tool name(args) [: T] [requires { caps }] { body }` — a top-level tool; a script whose top level declares tools (and has no `main`) IS a CLI: `--help`, `--contract` (machine-readable JSON), `--plan` (dry run showing bound effects, executing nothing) all derive from the declaration |
+| undeclared side effects in a tool | E0077 at the call site — the body's effects are inferred transitively and checked against `requires { read(src), write(dst), console, unknown }`. Overclaiming is E0078; a bad capability is E0079. An unlisted Java call is `unknown` and must be admitted explicitly |
+| `shape doc = json` when you need comments preserved | `shape doc = config` — a LOSSLESS shape over commented `key = value` files: `parseLossless` keeps a `Residue` (comments, spacing, key order, unknown keys, value spellings), `r.edit { v => v.copy(port = 9090) }.render()` rewrites exactly one value slot |
+| implementing a custom format ad hoc | `class MyShape conforms Shape[T]` — user-written shapes get the combinators and Outcome/Defect for free, but the file MUST assert a law (`example l1 { s.parse(s.print(v)).get() == v }`) or the class is E0080 |
+| a law only checkable inside a record | top-level `example [name] { boolExpr }` — runs at build time like a record example; false claim is E0065 |
+| `--effects` unknown | `onionc --effects` / `onion --effects file.on` prints every method's inferred effect set (`read write net exec env clock rand console unknown`; empty = `pure`) |
+
 ### Miscellaneous
 
 | Wrong | Correct (Onion) |

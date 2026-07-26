@@ -1,0 +1,110 @@
+// ToolDemo — one declaration, four artifacts (the "Contracts and capabilities" demo).
+//
+// The `tool` below is an ordinary function with a boundary. From its single
+// declaration the compiler derives:
+//
+//   1. a CLI          onion ToolDemo.on access.log report.txt --top 5 --loud
+//   2. --help         every argument with its type and default, plus the capability line
+//   3. --contract     machine-readable JSON: what an agent reads before calling
+//   4. --plan         what a run WOULD do, bound to the actual arguments, executing nothing
+//
+// The sequence an agent follows:
+//
+//   $ onion ToolDemo.on --contract
+//   [{"tool":"digest","params":[{"name":"src","type":"String","role":"positional"}, ...
+//   $ onion ToolDemo.on access.log report.txt --plan
+//   plan: `digest` would
+//     read    src = access.log
+//     write   out = report.txt
+//     console
+//   (nothing was executed)
+//   $ onion ToolDemo.on access.log report.txt
+//   digest: 6 lines read, 1 not read, report written
+//
+// And the boundary is checked, not decorative: delete `write(out)` from the
+// requires clause and this file stops compiling, with E0077 pointing at the
+// Files::writeText call.
+
+// The data side of the same thesis: a shape names the boundary between messy
+// text and typed values, and failure is a positioned defect, never a null.
+record Access(ip: String, method: String, path: String, status: Int)
+  shape common = re"(\S+) (\w+) (\S+) (\d+)"
+
+class ToolDemoSupport {
+public:
+  static def countByStatus(rows: List[Access], status: Int): Int {
+    var n = 0
+    foreach a: Access in rows {
+      if a.status() == status { n = n + 1 }
+    }
+    return n
+  }
+
+  static def topPaths(rows: List[Access], limit: Int): List[String] {
+    val counts = [:]
+    foreach a: Access in rows {
+      val key = a.path()
+      val seen = counts[key]
+      if seen == null { counts[key] = 1 } else { counts[key] = (seen as Int) + 1 }
+    }
+    // Selection by repeated maximum: small, dependency-free, good enough for a report.
+    val out = new java.util.ArrayList[String]()
+    var round = 0
+    while round < limit {
+      var bestPath: String? = null
+      var bestCount = -1
+      foreach (k, v) in counts {
+        val c = (v as Int)
+        if c > bestCount {
+          bestCount = c
+          bestPath = (k as String)
+        }
+      }
+      if bestPath == null { break }
+      out.add(bestPath + " (" + bestCount + ")")
+      counts.remove(bestPath)
+      round = round + 1
+    }
+    return out
+  }
+
+  static def buildReport(rows: List[Access], bad: List[Defect], top: Int): String {
+    val sb = new StringBuilder()
+    sb.append("access report\n")
+    sb.append("=============\n")
+    sb.append("lines read:    " + rows.size + "\n")
+    sb.append("lines skipped: " + bad.size + "\n")
+    foreach d: Defect in bad {
+      sb.append("  line " + d.origin().line() + ": " + d.expected() + "\n")
+    }
+    sb.append("status 200:    " + countByStatus(rows, 200) + "\n")
+    sb.append("status 404:    " + countByStatus(rows, 404) + "\n")
+    sb.append("top paths:\n")
+    foreach p: String in topPaths(rows, top) {
+      sb.append("  " + p + "\n")
+    }
+    return sb.toString()
+  }
+}
+
+// The boundary. `requires` is the whole promise: this tool can read the file you
+// name as `src`, write the file you name as `out`, and talk to the console —
+// and the compiler proved it cannot do anything else. `--plan` shows exactly
+// these three lines with your arguments bound in.
+tool digest(src: String, out: String, top: Int = 3, loud: Boolean = false): Int
+  requires { read(src), write(out), console }
+{
+  val origin = Origin::atLine(src, 1)
+  val outcomes = Access::common().eachLine(Files::readText(src), origin)
+  val rows = Outcome::values(outcomes)
+  val bad = Outcome::defects(outcomes)
+
+  val report = ToolDemoSupport::buildReport(rows, bad, top)
+  Files::writeText(out, report)
+
+  if loud {
+    IO::println(report)
+  }
+  IO::println("digest: " + rows.size + " lines read, " + bad.size + " not read, report written")
+  return 0
+}

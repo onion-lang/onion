@@ -92,6 +92,7 @@ nav:
           - 概要: ja/examples/index.md
           - 基本例: ja/examples/basic.md
           - オブジェクト指向の例: ja/examples/oop.md
+          - tool: ja/examples/tools.md
           - 関数型の例: ja/examples/functional.md
           - スクリプティングとCLI: ja/examples/scripting.md
           - JSONとHTTP: ja/examples/json-http.md
@@ -145,6 +146,7 @@ nav:
       - Overview: examples/overview.md
       - Basic Programs: examples/basic.md
       - Object-Oriented Examples: examples/oop.md
+      - Tools: examples/tools.md
       - Functional Programming: examples/functional.md
       - Scripting & CLI: examples/scripting.md
       - JSON & HTTP: examples/json-http.md

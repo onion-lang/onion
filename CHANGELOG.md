@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-25
+
+The v0.8.0 tag was moved after the fact. As first cut it promised `eachLine` on
+`http"…"` in the entry below without having implemented it, so the release documented an
+API it did not contain. Rather than leave the tag pointing at a tree its own changelog
+misdescribed, the tag was re-pointed and the artifacts rebuilt; the two corrections and
+the compiler fix that had landed in the meantime are folded in here.
+
 - **`http"…".eachLine(shape)` — v0.8.0 shipped only half of "the same on `http`".** The
   0.8.0 changelog entry for shape-applied resource reads promised `eachLine` on `http"…"`
   to match `file"…"`, but `HttpResource` only ever grew `read`; the line-oriented method
@@ -26,8 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there, so a literal that fits a narrow integral parameter's range is accepted at any call
   site, not just constructors. `docs/quality-bar.md` row 5 ("known usability bugs") is
   updated to reflect that #374's underlying gap is now fully closed.
-
-## [0.8.0] - 2026-07-25
 
 - **README rewritten around what Onion is for.** It opened with "an object-oriented and
   statically typed programming language" that "compiles into JVM class files" — a category

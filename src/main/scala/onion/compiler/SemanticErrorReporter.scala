@@ -422,6 +422,18 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.shapeFormatUnknown",
       Seq(items => asString(items(0)), items => asString(items(1)))
     ),
+    SemanticError.TOOL_UNDECLARED_EFFECT -> ErrorDef(
+      "error.semantic.toolUndeclaredEffect",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
+    SemanticError.TOOL_UNUSED_CAPABILITY -> ErrorDef(
+      "error.semantic.toolUnusedCapability",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.TOOL_BAD_CAPABILITY -> ErrorDef(
+      "error.semantic.toolBadCapability",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
+    ),
 
     // Other errors
     SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(

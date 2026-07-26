@@ -4285,11 +4285,11 @@ confidence, so it is a prerequisite rather than a cleanup.</p>
 </tr>
 <tr>
 <td><a href="https://github.com/onion-lang/onion/issues/351">#351</a></td>
-<td>Shape combinators — <code>lines</code>, <code>sepBy</code>, <code>xmap</code>, <code>zip</code>, <code>orElse</code></td>
+<td>Shape combinators — <code>lines</code>, <code>sepBy</code>, <code>xmap</code>, <code>orElse</code> (<code>zip</code> deliberately deferred — see below)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/onion-lang/onion/issues/352">#352</a></td>
-<td>json/yaml/csv shapes, retiring <code>derive!</code></td>
+<td>json/yaml shapes, retiring <code>derive!</code> (<code>csv</code> deliberately deferred — see below)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/onion-lang/onion/issues/353">#353</a></td>
@@ -4306,6 +4306,13 @@ confidence, so it is a prerequisite rather than a cleanup.</p>
 </tbody>
 </table>
 <p>Rough order: #346 → #347 → #348 → #349 → #350 → #351 → {#352, #353} → {#354, #355}.</p>
+<p>Both #351 and #352 shipped narrower than this table originally described, by deliberate
+choice made while implementing them, not by oversight: a shape-level <code>zip</code> over two <em>text</em>
+shapes has no rule for where one component's text ends and the next begins without a
+delimiter (<code>sepBy</code> is that rule; see typed-boundaries.md §5.3), and a <code>csv</code> shape is a
+<em>row</em> shape needing a decision about the header row that <code>json</code>/<code>yaml</code> do not, so it is
+better designed against a concrete demo than guessed at in isolation (PR #379). Neither
+has an open tracking issue as of this writing.</p>
 <p><strong>Demo:</strong> 1,000 access-log lines, 5 malformed. You get 995 typed values <em>and</em> 5 defects
 with line numbers. Today <code>parseAll</code> returns 995 values and no trace the other 5 existed.</p>
 <h2 id="v07-contracts-and-capabilities">v0.7 — Contracts and capabilities<a class="headerlink" href="#v07-contracts-and-capabilities" title="Permanent link">&para;</a></h2>

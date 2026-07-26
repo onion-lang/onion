@@ -4250,14 +4250,14 @@
 <td>1</td>
 <td>テストスイート</td>
 <td><code>sbt -batch -Duser.language=en test</code></td>
-<td>2445 pass / 0 fail / 1 cancelled</td>
+<td>2579 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
 <td>2</td>
 <td>サンプルの健全性</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
-<td>60 / 60 compile</td>
+<td>61 / 61 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
@@ -4278,7 +4278,7 @@
 <td>5</td>
 <td>既知の使い勝手バグ</td>
 <td>実装済みだが到達不能/壊れた機能として未解決のもの</td>
-<td>1（<a href="https://github.com/onion-lang/onion/issues/374">#374</a>）</td>
+<td>0</td>
 <td>0</td>
 </tr>
 <tr>
@@ -4326,17 +4326,17 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 大規模サンプルで使われる拡張メソッド（<code>StatsApp</code>、<code>ShapeProcessor</code>、<code>TextAnalyzer</code>、<code>TodoManager</code>）</li>
 </ul>
 <h2 id="5">行5 — 現在の未解決使い勝手バグ（追跡中）<a class="headerlink" href="#5" title="Permanent link">&para;</a></h2>
-<ol>
-<li><strong>定数ナローイングがコンストラクタ引数位置に届かない。</strong> <code>val b: Byte = 100</code> はナローイング
-   されますが、<code>Short</code> 成分に対する <code>new R(..., -3)</code> は <code>E0021</code>（"constructor applicable for
-   R(..., Int) is not found"）になり、<code>(-3 as Short)</code> が必要です。<code>ScalarConversionSpec</code> を
-   書いている最中に発見しました。パース結果からレコードを組み立てるものは今後も踏みます。
-   （<a href="https://github.com/onion-lang/onion/issues/374">#374</a>）</li>
-</ol>
+<p>未解決なし。</p>
 <p>以前追跡していて解決済みのもの:</p>
 <ol>
 <li><strong>プリミティブ型の拡張メソッド</strong> — 修正済み。<code>extension Int { def double(): Int = self * 2 }</code> と <code>(5).double()</code> が動作します。プリミティブ受信側の拡張メソッドはボックス化されたクラス名で登録され、呼び出し時にターゲットをアンボックスしてから静的メソッドを呼び出します。</li>
 <li><strong>クラスメソッドから呼ばれるトップレベル関数</strong> — 修正済み。トップレベルの <code>val</code>/<code>var</code> と関数は合成トップレベルクラスの static メンバーとして出力され、クラスメソッド内の裸識別子/修飾なし呼び出しはこれらの static メンバーにフォールバックします。</li>
+<li><strong>定数ナローイングがコンストラクタ引数位置に届かない。</strong> <code>val b: Byte = 100</code> はナローイング
+   されますが、<code>Short</code> 成分に対する <code>new R(..., -3)</code> は <code>E0021</code>（「constructor applicable for
+   R(..., Int) is not found」）になり、<code>(-3 as Short)</code> が必要でした。コンストラクタでは修正済み
+   （<a href="https://github.com/onion-lang/onion/issues/374">#374</a>）。同じ抜け穴が通常のメソッド/関数の
+   オーバーロード解決（<code>Short</code> 引数に対する <code>takesShort(-3)</code> が <code>E0005</code> になる）にもあることが
+   同時に見つかり、あわせて修正しました — どちらも <code>ConstantNarrowing</code> ヘルパーを共有します。</li>
 </ol>
 
 

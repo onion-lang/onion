@@ -29,6 +29,8 @@ val price: Double = 19.99
 val isActive: Boolean = true
 ```
 
+代入は既存の変数を更新するだけで、新しい変数を宣言するわけではありません。
+
 ### 命名規則
 
 - 変数名はキャメルケース: `firstName`, `totalCount`
@@ -65,10 +67,44 @@ val withQuotes: String = "She said \"Hello\""
 ```onion
 val decimal: Int = 42
 val hex: Int = 0xFF
+val binary: Int = 0b1010
+val octal: Int = 077
 val longValue: Long = 100L
+val byteValue: Byte = 5B
+val shortValue: Short = 5S
 val doubleValue: Double = 3.14
-val floatValue: Float = 2.5f       // f/F で Float、d/D で Double（大文字・小文字どちらも可）
+val floatValue: Float = 3.14f      // f/F で Float、d/D で Double（大文字・小文字どちらも可）
 val scientific: Double = 1.23e10
+```
+
+アンダースコアはどの数値リテラルでも桁区切りに使えます：
+
+```onion
+val million = 1_000_000
+val mask = 0xFF_FF
+val flags = 0b1010_1010
+val precise = 1_234.5
+```
+
+### 文字リテラル
+
+```onion
+val letter: Char = 'A'
+val newline: Char = '\n'
+val tab: Char = '\t'
+```
+
+### 真偽値リテラル
+
+```onion
+val isTrue: Boolean = true
+val isFalse: Boolean = false
+```
+
+### nullリテラル
+
+```onion
+val nullable: String? = null   // nullにはnullable型が必要（そうしないとW0012）
 ```
 
 ## 演算子
@@ -109,6 +145,27 @@ val b: Boolean = false
 a && b  // false（論理積）
 a || b  // true（論理和）
 !a      // false（論理否定）
+```
+
+### 代入演算子
+
+```onion
+var x: Int = 10
+
+x = 20       // 単純代入
+x = x + 5    // 加算して代入（+= 構文はまだ無い）
+x = x - 3    // 減算して代入
+x = x * 2    // 乗算して代入
+```
+
+### インクリメント/デクリメント
+
+```onion
+var count: Int = 0
+count = count + 1  // インクリメント
+// または後置インクリメントを使う（文脈による）
+count++
+count--
 ```
 
 ### 型キャスト演算子
@@ -187,6 +244,71 @@ val length: Int = buffer.length   // 配列は .size ではなく .length
 ```
 
 パイプラインを使いたくなったら `Colls::toList(args)` でリストに渡せます。
+
+## 式
+
+### 算術式
+
+```onion
+val result: Int = (10 + 5) * 2 - 3  // 27
+val average: Double = (10 + 20 + 30) / 3.0
+```
+
+### 文字列連結
+
+```onion
+val firstName: String = "Alice"
+val lastName: String = "Smith"
+val fullName: String = firstName + " " + lastName
+
+val age: Int = 30
+val message: String = "I am " + age + " years old"
+```
+
+### メソッド呼び出し
+
+```onion
+// 静的メソッド呼び出し
+println("Hello")
+
+// インスタンスメソッド呼び出し
+val text: String = "hello"
+val upper: String = text.toUpperCase()
+val len: Int = text.length
+```
+
+### オブジェクト生成
+
+```onion
+import { java.util.ArrayList; }
+
+val list: ArrayList[String] = new ArrayList[String]()
+val array: String[] = new String[10]
+```
+
+## ブロック要素
+
+### ブロック内の式
+
+任意の式はブロックの中に直接書けます：
+
+```onion
+println("Hello")
+var x: Int = 10
+x = x + 1
+```
+
+### ブロック式
+
+ブロックは波括弧で囲みます：
+
+```onion
+{
+  val temp: Int = 5
+  println(temp)
+  // tempはこのブロック内でのみ有効
+}
+```
 
 ## スコープと可視性
 
@@ -280,4 +402,6 @@ val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 
 ## 次のステップ
 
-- [標準ライブラリ](../reference/stdlib.md) - 組み込みモジュールとユーティリティ
+- [変数と型](variables-and-types.md) - 型システムを深く掘り下げる
+- [制御フロー](control-flow.md) - 条件分岐とループ
+- [関数](functions.md) - 関数定義とラムダ

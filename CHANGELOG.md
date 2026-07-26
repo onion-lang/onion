@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **docs(guide): sync `docs/ja/guide/basic-syntax.md` with the English guide.**
+  The Japanese Basic Syntax guide had fallen behind its English counterpart: it was
+  missing the Character/Boolean/Null Literals subsections, the underscore digit-grouping
+  note, binary/octal/byte/short numeric literal forms, the Assignment Operators and
+  Increment/Decrement subsections, the entire Expressions section (arithmetic, string
+  concatenation, method calls, object creation), and the entire Block Elements section —
+  and its "Next Steps" links still pointed at the stdlib reference instead of the
+  Variables and Types / Control Flow / Functions guides that now exist. Translated and
+  added all of it, matching the existing terminology and code-example style. No test
+  covers doc-file parity between languages, which is how it went stale silently.
+
 - **docs(grammar): sync `docs/grammar.txt` with the `extends`/`conforms` rewrite.**
   The `extends`/`conforms` change (below) updated the parser, the hint messages, the
   API-doc generator and the VS Code grammar, but missed the informal EBNF sketch in

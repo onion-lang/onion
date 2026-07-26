@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grammar. (Homogeneous, non-`case` enums are unaffected — they were never documented
   to accept `;` between constants and still don't.)
 
+### Documentation
+
+- **Tail call optimization docs (EN+JA) described a stale, pre-transformation state.**
+  Both `docs/compiler/tail-call-optimization.md` and its `ja` counterpart said
+  transformation was "planned" and showed a `--verbose` sample line that never
+  appears in the source; `TailCallOptimization.scala` has performed the full
+  `while(true)` rewrite (not just detection) for some time. Docs now describe the
+  actual pipeline, the private/static/final eligibility rule, the `@TailRecursive`
+  exclusion for mutual recursion, real trace output, and current file paths.
+
 ## [0.10.1] - 2026-07-27
 
 A quality release: the diagnostic surface is now covered code by code, and the sweep

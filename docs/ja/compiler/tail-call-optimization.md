@@ -1,21 +1,25 @@
 # 末尾呼び出し最適化
 
-## 現在の状態（2026-01-26）
+## 現在の状態
 
 **検出: ✅ 実装済み**
-**変換: 🚧 計画中**
+**変換: ✅ 実装済み**
 
-Onionコンパイラは、コンパイル時に末尾再帰メソッドを特定する末尾呼び出し検出システムを含んでいます。
+Onionコンパイラは、コンパイル時に末尾再帰メソッドを検出し、`while(true)` ループへと書き換えます。これにより、末尾位置での自己再帰呼び出しがJVMのコールスタックを消費しなくなり、深い再帰（例: 10,000回以上の呼び出し）による `StackOverflowError` を防ぎます。
+
+このフェーズが書き換えるのは**直接の自己再帰**のみです。複数のメソッド間で成立する相互再帰は、パイプライン上でこの直後に実行される `MutualRecursionOptimization` が別途扱います。
 
 ## 仕組み
 
 ### 検出フェーズ
 
-コンパイラはメソッドを分析して末尾再帰呼び出しを特定します。
+コンパイラは各メソッドを分析して末尾再帰呼び出しを特定します。
 
 1. **末尾位置の分析**: 最後の文（または制御フローの分岐内の文）が自己呼び出しかどうかを確認
 2. **再帰的探索**: `StatementBlock` と `IfStatement` ノードを再帰的に検索して末尾呼び出しを見つける
 3. **メソッド一致の確認**: 呼び出し対象が現在のメソッドと一致することを確認（同じ名前、クラス、パラメータ型）
+4. **ディスパッチ安全性**: オーバーライドされ得ないメソッド（private・static・final）のみが対象です。public なオーバーライド可能メソッド内の自己呼び出しは、実行時にサブクラスの override へ動的ディスパッチされる可能性があるため、本体をループへ書き換えると挙動が黙って変わってしまいます。そのため対象から除外されます。
+5. **相互再帰の除外**: `@TailRecursive` アノテーションが付いたメソッド（相互再帰の参加者を示す）はここではスキップされ、`MutualRecursionOptimization` に委ねられます。
 
 ### サポートされるパターン
 
@@ -32,22 +36,53 @@ def factorial(n: Int, acc: Int): Int {
   if (n <= 1) {
     return acc
   }
-  return factorial(n - 1, n * acc)  // ✅ 末尾呼び出しとして検出
+  return factorial(n - 1, n * acc)  // ✅ 検出され、変換される
 }
 ```
 
-## 検出された末尾呼び出しの表示
+### 変換フェーズ
 
-`--verbose` フラグを付けてコンパイルすると、どのメソッドが末尾再帰であるかを確認できます。
+末尾再帰かつ対象条件を満たすと確認されたメソッドは、以下のように書き換えられます。
+
+1. **ループ変数の割り当て**: 各パラメータに対応するループ変数を用意する
+2. **パラメータの書き換え**: メソッド本体内のパラメータ参照をすべて対応するループ変数の参照に書き換える
+3. **ループの構築**: （書き換え後の）本体を `while(true)` ループで囲む
+4. **末尾呼び出しの置換**: 各末尾呼び出しをループ変数への代入に置き換え、そのままループが継続する（`continue` キーワードは不要 — `while(true)` の本体末尾まで到達すると自然に再度ループへ入る）
+
+```onion
+// 変換前
+def factorial(n: Int, acc: Int): Int {
+  if (n <= 1) return acc
+  return factorial(n - 1, n * acc)
+}
+
+// 変換後（概念的には）
+def factorial(n: Int, acc: Int): Int {
+  while (true) {
+    if (n <= 1) return acc
+    val n_next = n - 1
+    val acc_next = n * acc
+    n = n_next
+    acc = acc_next
+    // ループ継続
+  }
+}
+```
+
+## 最適化の様子を確認する
+
+`--verbose` フラグを付けてコンパイルすると、どのメソッドが変換され、どのメソッドがなぜスキップされたかを追跡できます。
 
 ```bash
 sbt 'runScript --verbose your_program.on'
 ```
 
-出力:
+出力例:
 ```
-[TCO] Detected tail-recursive method: YourClass.factorial
-[TCO] Note: Tail call optimization is not yet fully implemented
+[TCO] Method YourClass.factorial: hasTailCall=true
+[TCO] Optimizing tail-recursive method: YourClass.factorial
+[TCO] Skipping overridable method: YourClass.someOverridableMethod
+[TCO] Skipping @TailRecursive annotated method: YourClass.mutuallyRecursiveMethod
 ```
 
 ## 実装の詳細
@@ -55,71 +90,18 @@ sbt 'runScript --verbose your_program.on'
 ### ファイルの場所
 
 - ソース: `src/main/scala/onion/compiler/optimization/TailCallOptimization.scala`
-- パイプライン統合: `Typing` フェーズと `CodeGeneration` フェーズの間に追加
+- パイプライン統合: `Typing` と `AsmCodeGeneration` の間、`MutualRecursionOptimization` の直前で実行される
 
 ### コンパイラパイプライン
 
 ```
-Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → TypedAstCodeGeneration
-```
-
-## 今後の作業
-
-### 計画中の変換
-
-変換フェーズ（末尾再帰をループに変換）には以下が必要です。
-
-1. **ローカル変数の割り当て**: `LocalFrame` を使った一時変数の適切な割り当て
-2. **パラメータの書き換え**: メソッド本体全体でパラメータ参照を一時変数参照に変換
-3. **ループの構築**: メソッド本体を `while(true)` ループで囲む
-4. **末尾呼び出しの置換**: 末尾呼び出しを変数の代入 + continue に置き換える
-
-### 変換の例（計画中）
-
-```onion
-// 元のコード
-def factorial(n: Int, acc: Int): Int {
-  if (n <= 1) {
-    return acc
-  }
-  return factorial(n - 1, n * acc)
-}
-```
-
-概念的には以下のように変換されます。
-
-```onion
-def factorial(n: Int, acc: Int): Int {
-  var n_temp: Int = n
-  var acc_temp: Int = acc
-  while (true) {
-    if (n_temp <= 1) {
-      return acc_temp
-    }
-    val n_next = n_temp - 1
-    val acc_next = n_temp * acc_temp
-    n_temp = n_next
-    acc_temp = acc_next
-    // ループ継続
-  }
-}
+Parsing → Rewriting → Typing → [TailCallOptimization] → MutualRecursionOptimization → AsmCodeGeneration
 ```
 
 ## テスト
 
-テストファイルは `src/test/run/` にあります。
-- `tail_recursion_factorial.on` - 末尾再帰による階乗
-- `tail_recursion_simple.on` - シンプルなカウントダウンの例
-- `tail_recursion_direct.on` - 直接の無限再帰（テスト用）
-
-## 貢献
-
-変換フェーズの実装に貢献したい場合:
-
-1. `TypedAST` ノード構造（特に `LocalFrame`、`RefLocal`、`SetLocal`）を理解する
-2. `src/main/scala/onion/compiler/backend/asm/LocalVarContext.scala` の `LocalVarContext` を学習する
-3. パラメータ参照を置き換える再帰的な文書き換えを実装する
-4. さまざまな末尾再帰パターンの包括的なテストを追加する
+- スペック: `src/test/scala/onion/compiler/tools/TailCallOptimizationSpec.scala`
+- `src/test/run/` 内のサンプルプログラム: `tail_recursion_factorial.on`、`tail_recursion_simple.on`、`tail_recursion_direct.on`、`tail_recursion_private.on`、`tail_recursion_public.on`、`tail_recursion_test.on`
 
 ## 参考
 

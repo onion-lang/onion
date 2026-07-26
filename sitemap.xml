@@ -85,6 +85,10 @@
          <lastmod>2026-07-26</lastmod>
     </url>
     <url>
+         <loc>https://onion-lang.org/examples/tools/</loc>
+         <lastmod>2026-07-26</lastmod>
+    </url>
+    <url>
          <loc>https://onion-lang.org/getting-started/hello-world/</loc>
          <lastmod>2026-07-26</lastmod>
     </url>
@@ -142,6 +146,10 @@
     </url>
     <url>
          <loc>https://onion-lang.org/guide/shapes/</loc>
+         <lastmod>2026-07-26</lastmod>
+    </url>
+    <url>
+         <loc>https://onion-lang.org/guide/tools/</loc>
          <lastmod>2026-07-26</lastmod>
     </url>
     <url>
@@ -221,6 +229,10 @@
          <lastmod>2026-07-26</lastmod>
     </url>
     <url>
+         <loc>https://onion-lang.org/ja/examples/tools/</loc>
+         <lastmod>2026-07-26</lastmod>
+    </url>
+    <url>
          <loc>https://onion-lang.org/ja/getting-started/hello-world/</loc>
          <lastmod>2026-07-26</lastmod>
     </url>
@@ -281,6 +293,10 @@
          <lastmod>2026-07-26</lastmod>
     </url>
     <url>
+         <loc>https://onion-lang.org/ja/guide/tools/</loc>
+         <lastmod>2026-07-26</lastmod>
+    </url>
+    <url>
          <loc>https://onion-lang.org/ja/guide/type-classes/</loc>
          <lastmod>2026-07-26</lastmod>
     </url>
@@ -290,6 +306,10 @@
     </url>
     <url>
          <loc>https://onion-lang.org/ja/reference/compiler-architecture/</loc>
+         <lastmod>2026-07-26</lastmod>
+    </url>
+    <url>
+         <loc>https://onion-lang.org/ja/reference/effects/</loc>
          <lastmod>2026-07-26</lastmod>
     </url>
     <url>
@@ -326,6 +346,10 @@
     </url>
     <url>
          <loc>https://onion-lang.org/reference/compiler-architecture/</loc>
+         <lastmod>2026-07-26</lastmod>
+    </url>
+    <url>
+         <loc>https://onion-lang.org/reference/effects/</loc>
          <lastmod>2026-07-26</lastmod>
     </url>
     <url>

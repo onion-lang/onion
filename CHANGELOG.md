@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-26
+
 - **`Shape` opened to user-written instances, with a law gate (#364).** A class
   conforming `onion.Shape[T]` now brings a format the compiler has never heard of —
   the demo is a fixed-width, COBOL-style record layout (`run/FixedWidthDemo.on`) —

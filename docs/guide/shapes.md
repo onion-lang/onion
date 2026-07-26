@@ -148,4 +148,4 @@ over a type you did not declare.
 
 - [Scripting](scripting.md) — scheme literals, `|>`, auto-CLI
 - [Language specification](../reference/specification.md#records)
-- `run/LogReport.on` — the whole thing in one program
+- `run/BrokenLogDemo.on` — the whole thing in one program

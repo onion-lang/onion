@@ -40,7 +40,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     }
 
     it("runs BrokenLogDemo.on") {
-      assert(Shell.Success(4) == runSample("run/BrokenLogDemo.on"))
+      // Returns the number of lines it refused to pretend it had read: a thousand-line
+      // log with every 200th line truncated.
+      assert(Shell.Success(5) == runSample("run/BrokenLogDemo.on"))
     }
   }
 }

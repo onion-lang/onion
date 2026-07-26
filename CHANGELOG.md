@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document's line number — mirroring the existing `BrokenLogDemo.on` pattern for the
   regex-shape form.
 
+- **docs(quality-bar): re-sync the test-suite count with develop HEAD.** Row 1 of
+  `docs/quality-bar.md` / `docs/ja/quality-bar.md` still read `2579 pass`, last measured
+  at commit `f6cf5e83`; `sbt -Duser.language=en test` at current HEAD reports `2590 pass /
+  0 fail / 1 cancelled` (the `extends`/`conforms` rewrite's new `InheritanceKeywordSpec`
+  and other tests landed since). Updated the figure and the baseline commit reference in
+  both languages; no other row's ground truth had drifted.
+
 - **docs(examples): fix a garbled "Multiple inheritance" bullet in `docs/examples/oop.md`.**
   The `extends`/`conforms` rewrite (#391) accidentally collapsed the English prose line
   to `Multiple inheritance (: JFrame, implements ActionListener)`, leaving a bare `:`

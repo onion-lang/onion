@@ -1,5 +1,8 @@
 package onion;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * A URL as a typed resource. Created by the {@code http"url"} literal (or
  * {@code http(url)}); the verb methods wrap {@link Http} so a fetch-and-parse
@@ -49,11 +52,31 @@ public final class HttpResource {
         try {
             body = get();
         } catch (Exception e) {
-            String m = e.getMessage();
-            return Outcome.bad(Defect.at(Origin.atLine(url, 1), "", "a successful response",
-                m == null || m.isEmpty() ? e.getClass().getSimpleName() : m));
+            return Outcome.bad(Defect.at(Origin.atLine(url, 1), "", "a successful response", describe(e)));
         }
         return shape.parse(body, Origin.atLine(url, 1));
+    }
+
+    /**
+     * One value per line of the response body, keeping both the lines that read and the
+     * reasons the rest did not -- see {@link Shape#eachLine}. Each defect is positioned on
+     * its line of the response. A transport failure is a single defect, not an exception.
+     */
+    public <T> List<Outcome<T>> eachLine(Shape<T> shape) {
+        String body;
+        try {
+            body = get();
+        } catch (Exception e) {
+            List<Outcome<T>> failed = new ArrayList<>();
+            failed.add(Outcome.bad(Defect.at(Origin.atLine(url, 1), "", "a successful response", describe(e))));
+            return failed;
+        }
+        return shape.eachLine(body, Origin.atLine(url, 1));
+    }
+
+    private static String describe(Exception e) {
+        String m = e.getMessage();
+        return m == null || m.isEmpty() ? e.getClass().getSimpleName() : m;
     }
 
     /** POST a body, returning the response body. */

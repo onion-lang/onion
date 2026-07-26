@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`http"…".eachLine(shape)` — v0.8.0 shipped only half of "the same on `http`".** The
+  0.8.0 changelog entry for shape-applied resource reads promised `eachLine` on `http"…"`
+  to match `file"…"`, but `HttpResource` only ever grew `read`; the line-oriented method
+  didn't exist, so calling it reported `E0005` ("method applicable ... is not found").
+  Added `HttpResource.eachLine(Shape[T])`, mirroring `FileResource.eachLine`: the response
+  body is split and parsed per line, keeping the lines that read and the defects for the
+  ones that didn't, each positioned by line number; a transport failure (bad URL, refused
+  connection, ...) is a single defect rather than a thrown exception, consistent with `read`.
+
 - **Constant narrowing now reaches ordinary method/function call arguments.** `val b: Byte = 100`
   and, since v0.7.0, `new R(..., -3)` against a `Short`/`Byte` component both narrow an
   in-range integer literal — but `takesShort(-3)` against a plain `def takesShort(x: Short)`

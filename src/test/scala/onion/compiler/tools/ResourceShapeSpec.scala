@@ -4,6 +4,8 @@ import onion.tools.Shell
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
+import java.net.InetSocketAddress
+import com.sun.net.httpserver.{HttpServer, HttpExchange, HttpHandler}
 
 /**
  * `file"…".read(shape)` and `http"…".read(shape)` replace a fixed method menu with an
@@ -98,6 +100,62 @@ class ResourceShapeSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "None", Array())
       assert(Shell.Success("a readable file") == r)
+    }
+  }
+
+  private def withHttpServer(body: String)(test: String => Unit): Unit = {
+    val server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0)
+    server.createContext("/", new HttpHandler {
+      override def handle(exchange: HttpExchange): Unit = {
+        val bytes = body.getBytes(StandardCharsets.UTF_8)
+        exchange.sendResponseHeaders(200, bytes.length)
+        val os = exchange.getResponseBody
+        try os.write(bytes) finally os.close()
+      }
+    })
+    server.start()
+    try {
+      test(s"http://127.0.0.1:${server.getAddress.getPort}/")
+    } finally server.stop(0)
+  }
+
+  describe("reading an http resource through a shape") {
+    it("reads line-oriented responses, keeping the lines it could not read") {
+      withHttpServer("1,2\nbroken\n3,4\n") { url =>
+        val r = shell.run(
+          s"""
+             |record Pt(x: Int, y: Int)
+             |  shape text = re"(-?\\d+),(-?\\d+)"
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    val each = http"$url".eachLine(Pt::text())
+             |    val bad = Outcome::defects(each)
+             |    return Outcome::values(each).size + "/" + bad.size + "/" +
+             |           (bad[0] as Defect).origin().line()
+             |  }
+             |}
+             |""".stripMargin, "None", Array())
+        assert(Shell.Success("2/1/2") == r)
+      }
+    }
+
+    it("reports a transport failure as a defect rather than throwing") {
+      val r = shell.run(
+        """
+          |record Pt(x: Int, y: Int)
+          |  shape text = re"(-?\d+),(-?\d+)"
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val each = http"not a valid url".eachLine(Pt::text())
+          |    val bad = Outcome::defects(each)
+          |    if bad.size != 1 { return "expected exactly one defect" }
+          |    return (bad[0] as Defect).expected()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("a successful response") == r)
     }
   }
 

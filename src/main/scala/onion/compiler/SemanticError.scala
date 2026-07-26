@@ -145,6 +145,7 @@ object SemanticError {
   case object TOOL_UNDECLARED_EFFECT extends SemanticError(77)
   case object TOOL_UNUSED_CAPABILITY extends SemanticError(78)
   case object TOOL_BAD_CAPABILITY extends SemanticError(79)
+  case object SHAPE_INSTANCE_WITHOUT_LAW extends SemanticError(80)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

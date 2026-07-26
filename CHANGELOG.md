@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`Shape` opened to user-written instances, with a law gate (#364).** A class
+  conforming `onion.Shape[T]` now brings a format the compiler has never heard of —
+  the demo is a fixed-width, COBOL-style record layout (`run/FixedWidthDemo.on`) —
+  and inherits the whole combinator vocabulary (`eachLine`, `sepBy`, `xmap`,
+  `orElse`) and the `Outcome`/`Defect` failure story. The deal that keeps the claim
+  honest: a derived shape's laws hold by construction, a user-written one must
+  *assert* them, so a concrete `Shape` implementation compiles only when its file
+  states a machine-checked `law` or `example` — new **E0080** otherwise. Top-level
+  `example [name] { expr }` is new too (the vehicle for those laws): it lowers to
+  the same build-time check a record example is, and a false claim is E0065.
+
 - **The lens: edit parsed data and write it back intact (#363).** `Lossless` carries
   its shape and becomes a lens — `edit { v => v.copy(port = 9090) }` focuses an
   update, `render()` reassembles the text through the residue — and

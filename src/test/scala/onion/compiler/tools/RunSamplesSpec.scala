@@ -79,6 +79,12 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(diff.toSeq == Seq(("port   =   8080", "port   =   9090")), diff.toSeq.toString)
     }
 
+    it("runs FixedWidthDemo.on") {
+      // A user-written Shape: prints the padded record, then eachLine splits
+      // 2 good rows from 1 bad one. Compiling at all proves the L1 example held.
+      assert(runSample("run/FixedWidthDemo.on").isInstanceOf[Shell.Success])
+    }
+
     it("runs BrokenLogDemo.on") {
       // Returns the number of lines it refused to pretend it had read: a thousand-line
       // log with every 200th line truncated.

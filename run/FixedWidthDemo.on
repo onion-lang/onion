@@ -1,0 +1,53 @@
+// FixedWidthDemo — a shape for a format the compiler has never heard of.
+//
+// `onion.Shape` opened to user-written instances (issue #364): this fixed-width,
+// COBOL-style record layout is parsed and printed entirely by user code, and gets the
+// whole shape vocabulary for free — Outcome/Defect failure reporting, eachLine and the
+// other combinators, and a place to state its laws.
+//
+// The deal that keeps the story honest: a class implementing Shape must assert its
+// laws. Delete the `example fixedWidthL1` below and this file stops compiling with
+// E0080 — a shape whose round-trip nobody checks is exactly the ad-hoc parser Shape
+// exists to replace. The example runs at build time; a false claim is E0065.
+
+record Person(name: String, amount: Int)
+
+class FixedWidth conforms Shape[Person] {
+public:
+  def this {}
+  def parse(text: String, origin: Origin): Outcome[Person] {
+    if text == null || text.length() != 16 {
+      val actual = if text == null { "null" } else { text.length() + " columns" }
+      return Outcome::bad(Defect::at(origin, "", "a 16-column record", actual))
+    }
+    val name = text.substring(0, 10).trim()
+    val amountRaw = text.substring(10, 16)
+    try {
+      return Outcome::ok(new Person(name, Integer::parseInt(amountRaw)))
+    } catch e: NumberFormatException {
+      return Outcome::bad(Defect::at(origin, "amount", "Int", amountRaw))
+    }
+  }
+  def canPrint(): Boolean = true
+  def print(v: Person): String {
+    val name = new StringBuilder(v.name())
+    while name.length() < 10 { name.append(" ") }
+    var amt = "" + v.amount()
+    while amt.length() < 6 { amt = "0" + amt }
+    return name.toString() + amt
+  }
+  def describe(): String = "fixed-width Person(name 0-9, amount 10-15)"
+}
+
+example fixedWidthL1 {
+  val s = new FixedWidth()
+  val v = new Person("KOTA", 42)
+  s.parse(s.print(v)).get() == v
+}
+
+def main(): void {
+  val s = new FixedWidth()
+  println(s.print(new Person("KOTA", 42)))
+  val each = s.eachLine("ALICE     000100\nbroken\nBOB       000205")
+  println(Outcome::values(each).size + " read, " + Outcome::defects(each).size + " rejected")
+}

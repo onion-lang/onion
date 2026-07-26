@@ -160,6 +160,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case _ => false
   }
 
+  private var topLevelExampleCount: Int = 0
+
   def rewrite(unit: AST.CompilationUnit): AST.CompilationUnit = {
     checkInstanceCoherence(unit.toplevels)
     val newToplevels = Buffer.empty[AST.Toplevel]
@@ -188,6 +190,16 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         throw new CompilationException(Seq(CompileError("", declaration.location,
           s"enum ${declaration.name} cannot take type parameters; only an ADT enum (one with `case` cases) is generic, " +
             "because a plain enum becomes a java.lang.Enum and the JVM forbids a generic enum")))
+      case ex: AST.TopLevelExample =>
+        // Top-level `example [name] { expr }` (issue #364): the same lowering a record
+        // example gets — a static boolean check method the LawCheckPhase runs at build
+        // time — hosted by the file class like any other top-level function.
+        val suffix = ex.name.getOrElse(topLevelExampleCount.toString)
+        topLevelExampleCount += 1
+        val boolType = AST.TypeNode(ex.location, AST.PrimitiveType(AST.KBoolean), false)
+        newToplevels += rewriteFunctionDeclaration(AST.FunctionDeclaration(
+          ex.location, AST.M_PUBLIC, "onion$$example$$" + suffix, Nil, boolType,
+          wrapReturningBoolean(ex.body), Nil, Nil, Nil))
       case element: AST.BlockElement =>
         // Top-level statements need desugaring too (do-notation et al.);
         // they previously passed through untouched, so a DoExpression

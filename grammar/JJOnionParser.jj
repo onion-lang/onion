@@ -1251,6 +1251,11 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
   // `tool` is a soft keyword: only `tool name(` opens a tool declaration, so it stays
   // usable as an ordinary identifier everywhere else.
   top=tool_decl()
+| LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || (getToken(2).kind == ID && getToken(3).kind == LBRACE))})
+  // Top-level `example [name] { expr }` (issue #364): the same build-time check a
+  // record example is, hosted by the file class — how a user-written Shape instance
+  // asserts its laws. `example` stays an ordinary identifier everywhere else.
+  top=top_level_example()
 | LOOKAHEAD(2)
   top=block_element()
 | LOOKAHEAD("extension")
@@ -1395,6 +1400,14 @@ AST.FunctionDeclaration tool_decl() : {
       scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty(),
       toList(anns));
   }
+}
+
+AST.TopLevelExample top_level_example() : {
+  Token t, n = null;
+  AST.BlockExpression b;
+}{
+  t=<ID> [ n=id() ] b=block()
+  { return AST.topLevelExample(p(t), n == null ? null : c(n), b); }
 }
 
 /** One capability in a requires clause: an effect name, optionally tied to a

@@ -158,6 +158,22 @@ losslessness は既定ではなく主張です：`isLossless()` は正直に答�
 空の residue でごまかす代わりに `parseLossless` を拒否し、residue はそれを生んだ shape
 だけが受け取ります。
 
+### レンズでファイルを編集する
+
+`Lossless` はレンズです。`edit` が値への更新を焦点に当て、`render` が residue を通して
+テキストを再組立てします。`file"..."` がバイト忠実な読み込みを提供するので、「設定の
+キーを1つ変える、ファイルを壊さずに」—— あらゆる即席設定エディタが失敗する仕事 ——
+は3行になり、`tool` の中に置けば書き戻しは宣言・検査された効果になります：
+
+```onion
+val lens = file(path).readLossless(Server::cfg()).get()
+val out  = lens.edit { v => v.copy(port = 9090) }.render()
+Files::writeText(path, out)
+```
+
+実行後の `diff` は変更行をちょうど1行だけ示します。デモ（`run/ConfigEditDemo.on`）は
+これを tool として実行するので、何かが起きる前に `--plan` が読み書きを見せてくれます。
+
 ## ビルド時に shape を検査する
 
 `law` はコンパイル時に実行されるので、往復の性質を機械検査できます。

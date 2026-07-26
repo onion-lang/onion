@@ -66,6 +66,25 @@ public final class FileResource {
      * <p>An unreadable file is a defect too, not an exception: reading a file that might
      * not be there is the ordinary case at a boundary.
      */
+    /**
+     * The file read through a lossless shape, keeping the residue — the read half of a
+     * config lens: {@code file"app.conf".readLossless(Server::cfg())}, then
+     * {@code .edit { ... }.render()} and write the result back.
+     */
+    public <T> Outcome<Lossless<T>> readLossless(Shape<T> shape) {
+        try {
+            // Byte-faithful on purpose: readText() reassembles lines through the
+            // platform separator and drops a trailing newline, either of which would
+            // silently break L2. A lossless read must see the file as it is.
+            String text = new String(
+                java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
+                java.nio.charset.StandardCharsets.UTF_8);
+            return shape.parseLossless(text, Origin.atLine(path, 1));
+        } catch (Exception e) {
+            return Outcome.bad(Defect.at(Origin.atLine(path, 1), "", "a readable file", describe(e)));
+        }
+    }
+
     public <T> Outcome<T> read(Shape<T> shape) {
         String content;
         try {

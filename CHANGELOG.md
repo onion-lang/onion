@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **The lens: edit parsed data and write it back intact (#363).** `Lossless` carries
+  its shape and becomes a lens — `edit { v => v.copy(port = 9090) }` focuses an
+  update, `render()` reassembles the text through the residue — and
+  `file(path).readLossless(shape)` supplies the byte-faithful read (`readText` was
+  never byte-faithful: it rebuilds lines through the platform separator and drops a
+  trailing newline, either of which would silently break L2). Editing one field
+  changes exactly one line: comments, spacing, key order, unknown keys, other values'
+  spellings, trailing-newline presence and CRLF terminators all survive, pinned by a
+  corpus spec and by `run/ConfigEditDemo.on`, which runs the edit as a tool — so
+  `--plan` shows the read and the write before anything happens, and the demo's own
+  `example` clauses machine-check L2 and the one-slot-edit law at build time.
+
 - **Lossless shapes and residue (#362).** L1 (`parse(print(v)) == Ok(v)`) is every
   printing shape's law; L2 (`print(parse(t)) == t`) is false in general — `"007"`
   prints back as `"7"` — and a shape satisfying it is *lossless*. `Shape` gains

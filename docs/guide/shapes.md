@@ -159,6 +159,23 @@ Losslessness is a claim, not a default: `isLossless()` answers honestly, a lossy
 refuses `parseLossless` instead of pretending with an empty residue, and a residue is
 only accepted by the shape that produced it.
 
+### Editing a file through the lens
+
+`Lossless` is a lens: `edit` focuses an update on the value, `render` reassembles the
+text through the residue. With `file"..."` supplying a byte-faithful read, "change one
+key in the config without destroying it" — the task every ad-hoc config editor gets
+wrong — is three lines, and the write-back is a declared, checked effect when it lives
+in a `tool`:
+
+```onion
+val lens = file(path).readLossless(Server::cfg()).get()
+val out  = lens.edit { v => v.copy(port = 9090) }.render()
+Files::writeText(path, out)
+```
+
+`diff` afterwards shows exactly one changed line. The demo (`run/ConfigEditDemo.on`)
+runs this as a tool, so `--plan` shows the read and the write before anything happens.
+
 ## Checking a shape at build time
 
 `law` runs at compile time, so the round-trip property can be machine-checked:

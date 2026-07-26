@@ -197,3 +197,26 @@ def main(): void {
   println(Access::common().print(first))
 }
 ```
+
+## 設定ファイルを壊さずに編集する
+
+**ConfigEdit.on**
+
+```onion
+record Server(host: String, port: Int, debug: Boolean)
+  shape cfg = config
+
+tool setport(path: String, port: Int): Int
+  requires { read(path), write(path), console }
+{
+  val read = file(path).readLossless(Server::cfg())
+  if read.isBad() { return 1 }
+  val out = read.get().edit { v => v.copy(port = port) }.render()
+  Files::writeText(path, out)
+  IO::println("port -> " + port)
+  return 0
+}
+```
+
+コメント・空行・キー順・スペーシング・未知キーはすべて生き残り、`diff` は1行だけを
+示します。`--plan` は実行前に読み書きを見せてくれます。

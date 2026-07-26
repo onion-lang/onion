@@ -197,3 +197,26 @@ def main(): void {
   println(Access::common().print(first))
 }
 ```
+
+## Editing a config without destroying it
+
+**ConfigEdit.on**
+
+```onion
+record Server(host: String, port: Int, debug: Boolean)
+  shape cfg = config
+
+tool setport(path: String, port: Int): Int
+  requires { read(path), write(path), console }
+{
+  val read = file(path).readLossless(Server::cfg())
+  if read.isBad() { return 1 }
+  val out = read.get().edit { v => v.copy(port = port) }.render()
+  Files::writeText(path, out)
+  IO::println("port -> " + port)
+  return 0
+}
+```
+
+Comments, blank lines, key order, spacing and unknown keys all survive; `diff` shows
+one line. `--plan` shows the read and the write before anything happens.

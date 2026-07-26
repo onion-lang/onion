@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`run/ToolDemo.on` — the "Contracts and capabilities" demo (#361).** One `tool`
+  declaration, four artifacts: CLI, `--help`, `--contract`, `--plan`. The demo digests
+  an access log through a `shape` boundary (bad lines become positioned defects, never
+  silence) inside a capability boundary (`requires { read(src), write(out), console }`
+  — checked, so deleting `write(out)` stops the build with E0077 at the
+  `Files::writeText` call). The spec runs the whole agent sequence: read the contract,
+  `--plan` and prove nothing was written, then execute and check the report. New
+  labeled examples page EN+JA (`docs/examples/tools.md`) with the three-command
+  transcript.
+
 - **BREAKING: the default static import set is narrowed to pure classes (#360).**
   `java.lang.System`, `java.lang.Runtime`, `onion.Files`, `onion.Http` and
   `onion.DateTime` are no longer imported into every file, so `readText(p)`,

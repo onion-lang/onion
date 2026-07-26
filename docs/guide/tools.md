@@ -100,3 +100,47 @@ can always see.
 And `tool` / `requires` are soft keywords: only `tool name(` opens a declaration and
 only `requires {` opens the clause, so both remain usable as ordinary identifiers in
 existing code.
+
+## From declaration to command line
+
+A script whose top level declares tools — and has neither its own `main` nor top-level
+statements — *is* a command-line program. The compiler derives everything from the
+declarations:
+
+```bash
+$ onion ingest.on --contract
+[{"tool":"ingest",
+  "params":[{"name":"src","type":"String","role":"positional"},
+            {"name":"dst","type":"String","role":"positional"},
+            {"name":"count","type":"Int","role":"flag","default":"3"},
+            {"name":"loud","type":"Boolean","role":"switch","default":"false"}],
+  "returns":"Int",
+  "capabilities":["read(src)","write(dst)","console"]}]
+
+$ onion ingest.on --help
+usage: ingest.on <src> <dst> [--count <Int>] [--loud]
+  <src>                   String
+  <dst>                   String
+  --count <int>           Int (default: 3)
+  --loud                  Boolean (default: false)
+  requires: read(src), write(dst), console
+```
+
+The contract is the single source. `--contract` prints it verbatim for an agent to
+read; `--help`, flag parsing, typed conversion and error messages are all derived from
+it at runtime, and the typed call into your tool is derived from the same declaration
+at compile time. Required parameters are positionals; defaulted parameters become
+`--name` flags (`--count 5` or `--count=5`); `Boolean` defaults become switches. A
+default that is absent on the command line is evaluated as the original expression, in
+the language — it is never round-tripped through a string.
+
+Failures are exit codes, not `System.exit`: a missing positional, a value that does not
+parse as its declared type, or an unknown option each print a message naming the
+argument and the expected type, then return `1` from `main`. When a script declares
+several tools, the first argument selects one by name, subcommand-style, and the
+contract carries one entry per tool.
+
+The capability line in `--help` and the `capabilities` field in the contract are not
+documentation — they are the checked declaration from the section above. What the
+contract says the tool may do is what the compiler proved it cannot exceed.
+

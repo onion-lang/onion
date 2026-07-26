@@ -93,3 +93,44 @@ tool が印字するラムダを作るなら、そのラムダが他所でしか
 
 そして `tool` / `requires` はソフトキーワードです。`tool name(` だけが宣言を開き、
 `requires {` だけが節を開くので、既存コードの識別子としては今までどおり使えます。
+
+## 宣言からコマンドラインへ
+
+トップレベルに tool を宣言していて、自前の `main` もトップレベル文もないスクリプトは、
+それ自体がコマンドラインプログラムです。コンパイラがすべてを宣言から導出します：
+
+```bash
+$ onion ingest.on --contract
+[{"tool":"ingest",
+  "params":[{"name":"src","type":"String","role":"positional"},
+            {"name":"dst","type":"String","role":"positional"},
+            {"name":"count","type":"Int","role":"flag","default":"3"},
+            {"name":"loud","type":"Boolean","role":"switch","default":"false"}],
+  "returns":"Int",
+  "capabilities":["read(src)","write(dst)","console"]}]
+
+$ onion ingest.on --help
+usage: ingest.on <src> <dst> [--count <Int>] [--loud]
+  <src>                   String
+  <dst>                   String
+  --count <int>           Int (default: 3)
+  --loud                  Boolean (default: false)
+  requires: read(src), write(dst), console
+```
+
+契約が唯一のソースです。`--contract` はそれをそのまま出力し（エージェントが読むのは
+これ）、`--help`・フラグ解析・型付き変換・エラーメッセージはすべて実行時にそこから
+導出され、あなたの tool への型付き呼び出しはコンパイル時に同じ宣言から導出されます。
+必須パラメータは位置引数、デフォルト付きパラメータは `--name` フラグ（`--count 5` /
+`--count=5`）、`Boolean` のデフォルトはスイッチになります。コマンドラインで省略された
+デフォルトは元の式として言語内で評価されます — 文字列を経由した往復はしません。
+
+失敗は `System.exit` ではなく終了コードです。位置引数の不足、宣言型として解析できない
+値、未知のオプションは、引数名と期待される型を名指しするメッセージを出して `main` から
+`1` を返します。スクリプトが複数の tool を宣言していれば、最初の引数がサブコマンド式に
+名前で選択し、契約には tool ごとのエントリが並びます。
+
+`--help` の capability 行と契約の `capabilities` フィールドはドキュメントではありません —
+上の節で検査された宣言そのものです。契約が「してよい」と言うことは、コンパイラが
+「それを超えられない」と証明したことです。
+

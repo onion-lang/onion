@@ -196,6 +196,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case otherwise =>
         newToplevels += otherwise
     }
+    appendToolCliMain(newToplevels)
     appendAutoCliCall(newToplevels)
     unit.copy(toplevels = newToplevels.toList)
   }
@@ -305,6 +306,115 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case AST.ArrayType(AST.ReferenceType("java.lang.String", _)) => true
       case _ => false
     })
+
+  /**
+   * Tool CLI synthesis (issue #358). A script whose top level declares `tool`s and has
+   * neither a user `main` nor executable top-level statements gets a synthesized
+   * `main(args: String[]): Int` that hands argv plus the tools' contract — a JSON
+   * string built here, from the declarations — to `onion.ToolCli.dispatch`. The
+   * contract is the single source: `--contract` prints it verbatim, `--help` and all
+   * parsing are derived from it at runtime, and this method derives the typed call
+   * from the same declarations. No spec string, no `System.exit` on this path.
+   */
+  private def appendToolCliMain(toplevels: Buffer[AST.Toplevel]): Unit = {
+    def isTool(f: AST.FunctionDeclaration): Boolean = f.annotations.exists(_.name == "onion.tool")
+    val tools = toplevels.collect { case f: AST.FunctionDeclaration if isTool(f) => f }.toList
+    if (tools.isEmpty) return
+    // A user main or a top-level statement keeps script semantics untouched.
+    if (toplevels.exists { case f: AST.FunctionDeclaration => f.name == "main"; case _ => false }) return
+    if (toplevels.exists(_.isInstanceOf[AST.BlockElement])) return
+    // Every parameter of every tool must be CLI-convertible, or the CLI cannot be
+    // derived; such a script keeps its tools as plain functions.
+    if (!tools.forall(_.args.forall(a => cliKindOf(a.typeRef).isDefined))) return
+
+    val loc = tools.head.location
+    val contractJson = tools.map(toolContractJson).mkString("[", ",", "]")
+
+    val toolCliType = AST.TypeNode(loc, AST.ReferenceType("onion.ToolCli", true), false)
+    val resVar = "__toolCli"
+    val res = AST.Id(loc, resVar)
+    val statements = Buffer[AST.BlockElement](
+      AST.LocalVariableDeclaration(loc, AST.M_FINAL, resVar, null,
+        AST.StaticMethodCall(loc, toolCliType, "dispatch",
+          List(AST.Id(loc, "args"), AST.StringLiteral(loc, contractJson)))),
+      AST.IfExpression(loc,
+        AST.MethodCall(loc, res, "isExit", Nil),
+        AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.MethodCall(loc, res, "exitCode", Nil)))),
+        null)
+    )
+    for ((tool, index) <- tools.zipWithIndex) {
+      val callArgs = tool.args.zipWithIndex.map { case (a, j) =>
+        val raw = AST.MethodCall(loc, res, "value", List(AST.IntegerLiteral(loc, j)))
+        val cast = AST.Cast(loc, raw, a.typeRef)
+        if (a.defaultValue == null) cast
+        else AST.IfExpression(loc,
+          AST.Equal(loc, raw, AST.NullLiteral(loc)),
+          AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+          AST.BlockExpression(loc, List(cast)))
+      }
+      val call = AST.UnqualifiedMethodCall(loc, tool.name, callArgs)
+      // An Int-returning tool's result is the exit code; anything else exits 0.
+      val body =
+        if (cliKindOf(tool.returnType).contains("Int"))
+          List(AST.ReturnExpression(loc, call))
+        else
+          List(call, AST.ReturnExpression(loc, AST.IntegerLiteral(loc, 0)))
+      statements += AST.IfExpression(loc,
+        AST.Equal(loc, AST.MethodCall(loc, res, "tool", Nil), AST.IntegerLiteral(loc, index)),
+        AST.BlockExpression(loc, body),
+        null)
+    }
+    statements += AST.ReturnExpression(loc, AST.IntegerLiteral(loc, 0))
+
+    toplevels += AST.FunctionDeclaration(
+      loc, 0, "main",
+      List(AST.Argument(loc, "args",
+        AST.TypeNode(loc, AST.ArrayType(AST.ReferenceType("String", false)), false))),
+      AST.TypeNode(loc, AST.PrimitiveType(AST.KInt), false),
+      AST.BlockExpression(loc, statements.toList),
+      Nil, Nil, Nil)
+  }
+
+  /** One tool's contract entry: everything an agent (or `--help`) needs to call it. */
+  private def toolContractJson(tool: AST.FunctionDeclaration): String = {
+    def esc(s: String): String =
+      s.flatMap {
+        case '"'  => "\\\""
+        case '\\' => "\\\\"
+        case '\n' => "\\n"
+        case '\r' => "\\r"
+        case '\t' => "\\t"
+        case c if c < ' ' => f"\\u${c.toInt}%04x"
+        case c    => c.toString
+      }
+    def defaultRendering(e: AST.Expression): Option[String] = e match {
+      case AST.IntegerLiteral(_, v)   => Some(v.toString)
+      case AST.LongLiteral(_, v)      => Some(v.toString)
+      case AST.DoubleLiteral(_, v)    => Some(v.toString)
+      case AST.FloatLiteral(_, v)     => Some(v.toString)
+      case AST.BooleanLiteral(_, v)   => Some(v.toString)
+      case AST.StringLiteral(_, v)    => Some(v)
+      case AST.CharacterLiteral(_, v) => Some(v.toString)
+      case _                          => Some("<computed>")
+    }
+    val params = tool.args.map { a =>
+      val kind = cliKindOf(a.typeRef).get
+      val role =
+        if (a.defaultValue == null) "positional"
+        else if (kind == "Boolean") "switch"
+        else "flag"
+      val dflt = Option(a.defaultValue).flatMap(defaultRendering)
+        .map(d => s""","default":"${esc(d)}"""").getOrElse("")
+      s"""{"name":"${esc(a.name)}","type":"$kind","role":"$role"$dflt}"""
+    }.mkString("[", ",", "]")
+    val returns = cliKindOf(tool.returnType).getOrElse(
+      if (tool.returnType == null) "void" else esc(tool.returnType.desc.toString))
+    val caps = tool.annotations.collect {
+      case AST.Annotation(_, name) if name.startsWith("requires:") =>
+        s""""${esc(name.stripPrefix("requires:"))}""""
+    }.mkString("[", ",", "]")
+    s"""{"tool":"${esc(tool.name)}","params":$params,"returns":"$returns","capabilities":$caps}"""
+  }
 
   private def appendAutoCliCall(toplevels: Buffer[AST.Toplevel]): Unit = {
     val allScalar = (f: AST.FunctionDeclaration) => f.args.forall(a => cliKindOf(a.typeRef).isDefined)

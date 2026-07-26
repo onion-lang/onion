@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Machine-readable tool contracts, and a CLI derived from them (#358).** A script
+  whose top level declares tools (and has no `main` of its own) is now a command-line
+  program: the compiler builds a JSON contract from the declarations — parameters with
+  types, roles and defaults, the return type, the checked capabilities — and a
+  synthesized `main` hands argv plus that contract to the new `onion.ToolCli`.
+  `--contract` prints the JSON verbatim (what an agent reads); `--help` describes every
+  argument with its type and default and shows the capability line; parsing, typed
+  conversion and error messages are all derived from the same contract, and failures
+  are exit codes — no `System.exit` anywhere on the tool path, which is what makes the
+  whole surface testable in-process. Several tools in one script dispatch
+  subcommand-style. Also fixed: `--help` on the `def main` rest-collector path used to
+  be silently consumed as a positional; `Cli.requireArgs` now recognizes it.
+
 - **`tool` declarations with checked capabilities (#357).** A tool is a function with a
   boundary: `tool ingest(src: String, dst: String) requires { read(src), write(dst) }
   { ... }`. The compiler infers the body's effects (transitively, through ordinary

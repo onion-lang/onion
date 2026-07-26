@@ -1,0 +1,56 @@
+// JsonYamlShapeDemo — `shape name = json` / `yaml`, the named boundary over a structured
+// document.
+//
+// `record R(...) shape doc = json` (or `= yaml`) gives a record a named parse/print pair
+// over that document format, the same way `shape name = re"..."` names one over a line of
+// text. Unlike `derive!(Json, Yaml)`, a missing or wrongly-typed key is reported as a
+// Defect rather than silently building a record with a null non-nullable field, and a
+// record can carry a shape per format at once.
+//
+//   onion JsonYamlShapeDemo.on
+
+record Person(name: String, age: Int)
+  shape doc = json
+
+record Config(host: String, port: Int)
+  shape doc = yaml
+
+class JsonYamlShapeDemo {
+public:
+  static def main(args: String[]): Int {
+    // A clean document reads straight into the record.
+    val ok = Person::doc().parse("{\"name\": \"Ada\", \"age\": 36}")
+    IO::println("ok:      " + ok.isOk() + " -> " + ok.get().name() + ", " + ok.get().age())
+
+    // parse(print(v)) == Ok(v) — the round-trip law every printing shape guarantees.
+    val original = new Person("Grace", 85)
+    val roundTripped = Person::doc().parse(Person::doc().print(original)).get()
+    IO::println("roundtrip ok: " + (roundTripped == original))
+
+    // A missing key is a Defect, not a record with a null field.
+    val missing = Person::doc().parse("{\"age\": 30}")
+    IO::println("missing: " + missing.isOk())
+    foreach d: Defect in missing.defects() {
+      IO::println("  " + d.describe())
+    }
+
+    // Every bad field is reported at once, not just the first.
+    val bothBad = Person::doc().parse("{\"name\": 7, \"age\": \"old\"}")
+    IO::println("both bad defect count: " + bothBad.defects().size)
+
+    // Malformed JSON carries the line it failed on.
+    val broken = Person::doc().parse("{\n  \"name\": \"Ada\",\n  oops\n}")
+    if broken.isBad() {
+      val first = broken.defects()[0] as Defect
+      IO::println("malformed at line: " + first.origin().line())
+    }
+
+    // A second record with a yaml shape, round-tripped the same way.
+    val cfg = new Config("example.com", 8080)
+    val cfgText = Config::doc().print(cfg)
+    val cfgBack = Config::doc().parse(cfgText).get()
+    IO::println("yaml roundtrip ok: " + (cfgBack == cfg))
+
+    return 0
+  }
+}

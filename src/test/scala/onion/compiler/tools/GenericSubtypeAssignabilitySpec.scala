@@ -21,7 +21,7 @@ class GenericSubtypeAssignabilitySpec extends AbstractShellSpec {
   }
   it("assigns a user generic subtype to its generic interface with a type variable") {
     assert(Shell.Success(2) == shell.run(
-      "interface Container[T] { def item(): T }\nclass BoxC[T] <: Container[T] { val v: T\npublic: def this(x: T) { this.v = x }\n def item(): T = v }\ndef wrap[T](x: T): Container[T] = new BoxC[T](x)\ndef main(args: String[]): Int = wrap(\"hi\").item().length()", "None", Array()))
+      "interface Container[T] { def item(): T }\nclass BoxC[T] conforms Container[T] { val v: T\npublic: def this(x: T) { this.v = x }\n def item(): T = v }\ndef wrap[T](x: T): Container[T] = new BoxC[T](x)\ndef main(args: String[]): Int = wrap(\"hi\").item().length()", "None", Array()))
   }
   it("still enforces invariant generics (List[String] is not List[Integer])") {
     assert(Shell.Failure(-1) == shell.run(

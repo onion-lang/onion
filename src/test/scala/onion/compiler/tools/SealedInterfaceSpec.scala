@@ -8,8 +8,8 @@ class SealedInterfaceSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Result {}
-          |record Success(value: String) <: Result;
-          |record Error(code: Int) <: Result;
+          |record Success(value: String) conforms Result;
+          |record Error(code: Int) conforms Result;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -29,8 +29,8 @@ class SealedInterfaceSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Shape {}
-          |record Circle(radius: Int) <: Shape;
-          |record Rectangle(width: Int, height: Int) <: Shape;
+          |record Circle(radius: Int) conforms Shape;
+          |record Rectangle(width: Int, height: Int) conforms Shape;
           |class Test {
           |public:
           |  static def process(s: Shape): String {
@@ -56,7 +56,7 @@ class SealedInterfaceSpec extends AbstractShellSpec {
         """
           |sealed interface Message {}
           |sealed interface Notification {}
-          |record Alert(text: String) <: Message, Notification;
+          |record Alert(text: String) conforms Message, Notification;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -77,7 +77,7 @@ class SealedInterfaceSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Result {}
-          |record Success(value: String) <: Result;
+          |record Success(value: String) conforms Result;
           |class Test {
           |public:
           |  static def main(args: String[]): String {

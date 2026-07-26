@@ -88,7 +88,7 @@ class BranchEmptyLiteralTargetTypeSpec extends AbstractShellSpec {
 
     it("exhaustive sealed select still type-checks") {
       assert(Shell.Success(13) == shell.run(
-        "sealed interface Shape\nrecord Circle(r: Int) <: Shape\nrecord Square(s: Int) <: Shape\n" +
+        "sealed interface Shape\nrecord Circle(r: Int) conforms Shape\nrecord Square(s: Int) conforms Shape\n" +
           "def area(sh: Shape): Int = select sh {\n" +
           "  case c is Circle: c.r() * c.r()\n" +
           "  case s is Square: s.s() * s.s()\n}\n" +
@@ -97,7 +97,7 @@ class BranchEmptyLiteralTargetTypeSpec extends AbstractShellSpec {
 
     it("non-exhaustive sealed select is still rejected (E0042)") {
       assert(Shell.Failure(-1) == shell.run(
-        "sealed interface Shape\nrecord Circle(r: Int) <: Shape\nrecord Square(s: Int) <: Shape\n" +
+        "sealed interface Shape\nrecord Circle(r: Int) conforms Shape\nrecord Square(s: Int) conforms Shape\n" +
           "def area(sh: Shape): Int = select sh {\n  case c is Circle: c.r()\n}\n" +
           "def main(args: String[]): Int { return area(new Circle(2)) }", "None", Array()))
     }

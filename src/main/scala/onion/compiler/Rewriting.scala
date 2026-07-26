@@ -224,11 +224,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * we generate:
    *   - `sealed interface Shape { <the enum body-section methods, verbatim, as
    *     default methods> }`
-   *   - `record Circle(radius: Double) <: Shape`  (one per product case)
-   *   - `record Square(side: Double) <: Shape`
-   *   - `record Origin() <: Shape`               (zero-field record per singleton)
+   *   - `record Circle(radius: Double) conforms Shape`  (one per product case)
+   *   - `record Square(side: Double) conforms Shape`
+   *   - `record Origin() conforms Shape`               (zero-field record per singleton)
    *
-   * A `sealed interface` + `record X <: Shape` + a `select` over `case x is X:`
+   * A `sealed interface` + `record X conforms Shape` + a `select` over `case x is X:`
    * gives exhaustiveness (E0042) for free. A singleton case is constructed as
    * `new Origin()` (first-cut form; see the singleton note below).
    */

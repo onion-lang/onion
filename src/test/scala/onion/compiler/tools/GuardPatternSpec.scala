@@ -50,9 +50,9 @@ class GuardPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Number {}
-          |record Positive(value: Int) <: Number;
-          |record Negative(value: Int) <: Number;
-          |record Zero() <: Number;
+          |record Positive(value: Int) conforms Number;
+          |record Negative(value: Int) conforms Number;
+          |record Zero() conforms Number;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -76,9 +76,9 @@ class GuardPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Number {}
-          |record Positive(value: Int) <: Number;
-          |record Negative(value: Int) <: Number;
-          |record Zero() <: Number;
+          |record Positive(value: Int) conforms Number;
+          |record Negative(value: Int) conforms Number;
+          |record Zero() conforms Number;
           |class Test {
           |public:
           |  static def main(args: String[]): String {

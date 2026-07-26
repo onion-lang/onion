@@ -85,7 +85,7 @@ class CastValidationSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |class Animal { }
-          |class Dog : Animal {
+          |class Dog extends Animal {
           |public:
           |  def bark(): Int = 1
           |}

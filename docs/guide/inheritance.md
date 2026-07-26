@@ -6,7 +6,7 @@ Onion supports both class inheritance and interface implementation, allowing you
 
 ### Basic Inheritance
 
-Use `:` to extend a parent class:
+Use `extends` to extend a parent class:
 
 ```onion
 class Animal {
@@ -21,7 +21,7 @@ protected:
     def speak: String = "Some sound"
 }
 
-class Dog : Animal {
+class Dog extends Animal {
   public:
     def this(n: String): (n) { }
 
@@ -46,7 +46,7 @@ class Vehicle {
     }
 }
 
-class Car : Vehicle {
+class Car extends Vehicle {
   val model: String
 
   public:
@@ -68,7 +68,7 @@ class Shape {
     def describe: String = "A shape"
 }
 
-class Circle : Shape {
+class Circle extends Shape {
   val radius: Double
 
   public:
@@ -86,12 +86,12 @@ class Circle : Shape {
 
 ### Single Interface
 
-Use `<:` to implement an interface:
+Use `conforms` to implement an interface:
 
 ```onion
 import { java.lang.Comparable; }
 
-class Person <: Comparable[Object] {
+class Person conforms Comparable[Object] {
   val name: String
   val age: Int
 
@@ -121,7 +121,7 @@ interface Greeter {
   def shout(): String = "HEY " + this.name()
 }
 
-class K <: Greeter {
+class K conforms Greeter {
 public:
   def this {}
   def name(): String { return "kota" }
@@ -140,7 +140,7 @@ import {
   java.lang.Comparable;
 }
 
-class Student <: Serializable, Comparable[Object] {
+class Student conforms Serializable, Comparable[Object] {
   val id: Int
   val name: String
 
@@ -159,7 +159,7 @@ class Student <: Serializable, Comparable[Object] {
 
 ## Combining Inheritance and Interfaces
 
-Use both `:` (extend class) and `<:` (implement interface):
+Use both `extends` (extend a class) and `conforms` (implement an interface):
 
 ```onion
 import {
@@ -168,7 +168,7 @@ import {
   java.awt.event.ActionEvent;
 }
 
-class Calculator : JFrame <: ActionListener {
+class Calculator extends JFrame conforms ActionListener {
   var result: Long
 
   public:
@@ -186,7 +186,7 @@ class Calculator : JFrame <: ActionListener {
 
 Syntax:
 ```onion
-class Child : ParentClass <: Interface1, Interface2 {
+class Child extends ParentClass conforms Interface1, Interface2 {
   // ...
 }
 ```
@@ -203,7 +203,7 @@ interface Logger {
   def count(): Int
 }
 
-class BasicLogger <: Logger {
+class BasicLogger conforms Logger {
   var n: Int
 
   public:
@@ -215,7 +215,7 @@ class BasicLogger <: Logger {
     def count(): Int = n
 }
 
-class PrefixLogger <: Logger {
+class PrefixLogger conforms Logger {
   forward val delegate: Logger
 
   public:
@@ -248,7 +248,7 @@ import {
   java.util.ArrayList;
 }
 
-class MyList <: List[String] {
+class MyList conforms List[String] {
   forward val backing: List[String]
 
   public:
@@ -278,14 +278,14 @@ interface Container[T] {
   def count(): Int
 }
 
-class IntBox <: Container[Int] {
+class IntBox conforms Container[Int] {
   public:
     def this {}
     def first(): Int { return 42 }
     def count(): Int { return 3 }
 }
 
-class Wrapper <: Container[Int] {
+class Wrapper conforms Container[Int] {
   forward val inner: Container[Int]
 
   public:
@@ -311,12 +311,12 @@ class Animal {
     def speak: String = "Generic sound"
 }
 
-class Dog : Animal {
+class Dog extends Animal {
   public:
     def speak: String = "Woof!"
 }
 
-class Cat : Animal {
+class Cat extends Animal {
   public:
     def speak: String = "Meow!"
 }
@@ -366,7 +366,7 @@ abstract class Shape {
     abstract def area(): Double;
 }
 
-class Circle : Shape {
+class Circle extends Shape {
   val radius: Double
 
   public:
@@ -391,10 +391,10 @@ interface Logger {
 }
 
 // Instead of inheriting from a concrete BasicLogger...
-// class PrefixLogger : BasicLogger { ... }
+// class PrefixLogger extends BasicLogger { ... }
 
 // ...prefer delegating to the Logger interface.
-class PrefixLogger <: Logger {
+class PrefixLogger conforms Logger {
   forward val delegate: Logger
 
   public:
@@ -437,7 +437,7 @@ class Parent {
     }
 }
 
-class Child : Parent {
+class Child extends Parent {
   public:
     def process(value :Int) :Int {
       // Maintain parent's behavior

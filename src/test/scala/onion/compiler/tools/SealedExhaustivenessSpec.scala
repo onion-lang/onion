@@ -13,8 +13,8 @@ class SealedExhaustivenessSpec extends AbstractShellSpec {
       val r = shell.run(
         """
           |sealed class Expr {}
-          |class Num : Expr { public: def this { } }
-          |class Add : Expr { public: def this { } }
+          |class Num extends Expr { public: def this { } }
+          |class Add extends Expr { public: def this { } }
           |def kind(e: Expr): String { return select e { case n is Num: "num" } }
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
@@ -23,8 +23,8 @@ class SealedExhaustivenessSpec extends AbstractShellSpec {
       val r = shell.run(
         """
           |sealed class Expr {}
-          |class Num : Expr { public: def this { } }
-          |class Add : Expr { public: def this { } }
+          |class Num extends Expr { public: def this { } }
+          |class Add extends Expr { public: def this { } }
           |def kind(e: Expr): String {
           |  return select e {
           |    case n is Num: "num"
@@ -39,8 +39,8 @@ class SealedExhaustivenessSpec extends AbstractShellSpec {
       val r = shell.run(
         """
           |sealed interface Shape {}
-          |class Circle <: Shape { public: def this { } }
-          |class Square <: Shape { public: def this { } }
+          |class Circle conforms Shape { public: def this { } }
+          |class Square conforms Shape { public: def this { } }
           |def name(s: Shape): String { return select s { case c is Circle: "circle" } }
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)

@@ -17,7 +17,7 @@ class InterfaceDefaultMethodSpec extends AbstractShellSpec {
           |  def name(): String
           |  def greet(): String { return "Hello, " + this.name() }
           |}
-          |class K <: Greeter {
+          |class K conforms Greeter {
           |public:
           |  def this {}
           |  def name(): String { return "kota" }
@@ -42,7 +42,7 @@ class InterfaceDefaultMethodSpec extends AbstractShellSpec {
           |  def name(): String
           |  def shout(): String = "HEY " + this.name()
           |}
-          |class K <: Greeter {
+          |class K conforms Greeter {
           |public:
           |  def this {}
           |  def name(): String { return "kota" }
@@ -67,7 +67,7 @@ class InterfaceDefaultMethodSpec extends AbstractShellSpec {
           |  def name(): String
           |  def greet(): String { return "Hello, " + this.name() }
           |}
-          |class Loud <: Greeter {
+          |class Loud conforms Greeter {
           |public:
           |  def this {}
           |  def name(): String { return "loud" }
@@ -94,7 +94,7 @@ class InterfaceDefaultMethodSpec extends AbstractShellSpec {
           |  def base(): Int
           |  def doubled(): Int { return this.base() * 2 }
           |}
-          |class Impl <: WithDefault {
+          |class Impl conforms WithDefault {
           |public:
           |  def this {}
           |  def base(): Int { return 21 }

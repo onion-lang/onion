@@ -8,8 +8,8 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Result {}
-          |record Success(value: String) <: Result;
-          |record Error(message: String) <: Result;
+          |record Success(value: String) conforms Result;
+          |record Error(message: String) conforms Result;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -32,8 +32,8 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Tree {}
-          |record Leaf(value: Int) <: Tree;
-          |record Node(left: Tree, right: Tree) <: Tree;
+          |record Leaf(value: Int) conforms Tree;
+          |record Node(left: Tree, right: Tree) conforms Tree;
           |class Test {
           |public:
           |  static def sum(t: Tree): Int {
@@ -59,9 +59,9 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Shape {}
-          |record Circle(radius: Int) <: Shape;
-          |record Square(side: Int) <: Shape;
-          |record Triangle(base: Int, height: Int) <: Shape;
+          |record Circle(radius: Int) conforms Shape;
+          |record Square(side: Int) conforms Shape;
+          |record Triangle(base: Int, height: Int) conforms Shape;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -84,8 +84,8 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Option {}
-          |record Some(value: String) <: Option;
-          |record None() <: Option;
+          |record Some(value: String) conforms Option;
+          |record None() conforms Option;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -107,9 +107,9 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Status {}
-          |record Active() <: Status;
-          |record Inactive() <: Status;
-          |record Pending() <: Status;
+          |record Active() conforms Status;
+          |record Inactive() conforms Status;
+          |record Pending() conforms Status;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -131,8 +131,8 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Status {}
-          |record Active() <: Status;
-          |record Inactive() <: Status;
+          |record Active() conforms Status;
+          |record Inactive() conforms Status;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -155,8 +155,8 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Option {}
-          |record Some(value: Int) <: Option;
-          |record None() <: Option;
+          |record Some(value: Int) conforms Option;
+          |record None() conforms Option;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -179,8 +179,8 @@ class TypePatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Tree {}
-          |record Leaf(value: Int) <: Tree;
-          |record Node(left: Tree, right: Tree) <: Tree;
+          |record Leaf(value: Int) conforms Tree;
+          |record Node(left: Tree, right: Tree) conforms Tree;
           |class Test {
           |public:
           |  static def main(args: String[]): String {

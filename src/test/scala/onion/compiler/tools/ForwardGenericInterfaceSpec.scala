@@ -18,10 +18,10 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
           |interface A[T] {
           |  def f(x: T): String
           |}
-          |interface B[T] <: A[T] {
+          |interface B[T] conforms A[T] {
           |  def f(x: T): String
           |}
-          |class Real <: B[String] {
+          |class Real conforms B[String] {
           |public:
           |  def this {}
           |  def f(x: String): String { return "f:" + x }
@@ -39,12 +39,12 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
           |interface Box[T] {
           |  def get(): T
           |}
-          |class RealBox <: Box[String] {
+          |class RealBox conforms Box[String] {
           |public:
           |  def this {}
           |  def get(): String { return "hello" }
           |}
-          |class Fwd <: Box[String] {
+          |class Fwd conforms Box[String] {
           |  forward val b: Box[String]
           |public:
           |  def this(x: Box[String]) { b = x }
@@ -61,14 +61,14 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
           |  def get(): T
           |  def put(x: T): void
           |}
-          |class IntBox <: Container[Int] {
+          |class IntBox conforms Container[Int] {
           |  var v: Int
           |public:
           |  def this { v = 0 }
           |  def get(): Int { return v }
           |  def put(x: Int): void { v = x }
           |}
-          |class Fwd <: Container[Int] {
+          |class Fwd conforms Container[Int] {
           |  forward val c: Container[Int]
           |public:
           |  def this(x: Container[Int]) { c = x }
@@ -85,7 +85,7 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
     it("java.util.List[String] (the issue example), usable as List[String]") {
       val r = shell.run(
         """
-          |class MyList <: List[String] {
+          |class MyList conforms List[String] {
           |  forward val backing: List[String]
           |public:
           |  def this(xs: List[String]) { backing = xs }
@@ -104,7 +104,7 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
     it("java.util.Map[String, Int]") {
       val r = shell.run(
         """
-          |class MyMap <: Map[String, Int] {
+          |class MyMap conforms Map[String, Int] {
           |  forward val backing: Map[String, Int]
           |public:
           |  def this(m: Map[String, Int]) { backing = m }
@@ -123,12 +123,12 @@ class ForwardGenericInterfaceSpec extends AbstractShellSpec {
           |interface Greeter {
           |  def greet(): String
           |}
-          |class Polite <: Greeter {
+          |class Polite conforms Greeter {
           |public:
           |  def this {}
           |  def greet(): String { return "Hi" }
           |}
-          |class D <: Greeter {
+          |class D conforms Greeter {
           |  forward val g: Greeter
           |public:
           |  def this(x: Greeter) { g = x }

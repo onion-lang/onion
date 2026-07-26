@@ -30,7 +30,7 @@
 println("Hello, World!")
 
 // 継承を伴うクラス定義
-class Calculator : JFrame <: ActionListener {
+class Calculator extends JFrame conforms ActionListener {
   var result: Long
 
   public:

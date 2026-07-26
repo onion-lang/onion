@@ -17,7 +17,7 @@ class SiblingInterfaceCastSpec extends AbstractShellSpec {
         """
           |interface Named { def name(): String }
           |interface Aged { def age(): Int }
-          |class Person <: Named, Aged {
+          |class Person conforms Named, Aged {
           |  var name_: String
           |  var age_: Int
           |public:

@@ -570,7 +570,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
     it("supports Comparator[Int] implemented with primitive Int parameters") {
       val result = shell.run(
         """
-          |class IntComparator <: Comparator[Int] {
+          |class IntComparator conforms Comparator[Int] {
           |public:
           |  def compare(a: Int, b: Int): Int {
           |    return a - b
@@ -598,7 +598,7 @@ class JavaGenericsInteropSpec extends AbstractShellSpec {
     it("supports Comparator[Double] implemented with primitive Double parameters") {
       val result = shell.run(
         """
-          |class DoubleComparator <: Comparator[Double] {
+          |class DoubleComparator conforms Comparator[Double] {
           |public:
           |  def compare(a: Double, b: Double): Int {
           |    if a < b { return -1 }

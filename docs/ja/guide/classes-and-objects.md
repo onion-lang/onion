@@ -41,7 +41,7 @@ public:
 class Conf(val host: String = "localhost", var port: Int = 8080)
 
 class Animal(val name: String)
-class Dog(name: String, val breed: String) : Animal(name)
+class Dog(name: String, val breed: String) extends Animal(name)
 
 val p = new Point(3, 4)        // p.x、p.y が使える
 val c = new Conf(port = 9090)  // host はデフォルト値 "localhost"

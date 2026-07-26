@@ -88,7 +88,7 @@ val x: Int = list.get(0)
 
 ```onion
 class Animal { public: def this {} }
-class Dog : Animal { public: def this {} }
+class Dog extends Animal { public: def this {} }
 
 class Box[T] {
   val v: T

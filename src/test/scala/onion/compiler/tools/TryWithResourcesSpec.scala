@@ -8,7 +8,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class SimpleResource <: AutoCloseable {
+          |class SimpleResource conforms AutoCloseable {
           |  var result: StringBuilder;
           |public:
           |  def this(r: StringBuilder) {
@@ -39,7 +39,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class MyCloseable <: AutoCloseable {
+          |class MyCloseable conforms AutoCloseable {
           |  var log: StringBuilder;
           |public:
           |  def this(l: StringBuilder) {
@@ -71,7 +71,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class MyCloseable <: AutoCloseable {
+          |class MyCloseable conforms AutoCloseable {
           |  var log: StringBuilder;
           |public:
           |  def this(l: StringBuilder) {
@@ -105,7 +105,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class MyCloseable <: AutoCloseable {
+          |class MyCloseable conforms AutoCloseable {
           |  var log: StringBuilder;
           |public:
           |  def this(l: StringBuilder) {
@@ -138,7 +138,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class MyCloseable <: AutoCloseable {
+          |class MyCloseable conforms AutoCloseable {
           |  var log: StringBuilder;
           |public:
           |  def this(l: StringBuilder) {
@@ -173,7 +173,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class MyResource <: AutoCloseable {
+          |class MyResource conforms AutoCloseable {
           |  var name: String;
           |public:
           |  def this(n: String) {
@@ -204,7 +204,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |import { java.lang.AutoCloseable; }
-          |class Resource1 <: AutoCloseable {
+          |class Resource1 conforms AutoCloseable {
           |  var log: StringBuilder;
           |public:
           |  def this(l: StringBuilder) {
@@ -214,7 +214,7 @@ class TryWithResourcesSpec extends AbstractShellSpec {
           |    this.log.append("1,");
           |  }
           |}
-          |class Resource2 <: AutoCloseable {
+          |class Resource2 conforms AutoCloseable {
           |  var log: StringBuilder;
           |public:
           |  def this(l: StringBuilder) {

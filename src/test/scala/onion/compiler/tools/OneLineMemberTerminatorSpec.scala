@@ -14,7 +14,7 @@ class OneLineMemberTerminatorSpec extends AbstractShellSpec {
   }
   it("allows a forward field on the closing-brace line") {
     assert(Shell.Success("hi") == shell.run(
-      "interface Greet { def hi(): String }\nclass Impl <: Greet { public: def this{}\n def hi(): String = \"hi\" }\nclass C <: Greet { public: def this{}\n forward val g: Greet = new Impl() }\ndef main(args: String[]): String { return new C().hi() }", "None", Array()))
+      "interface Greet { def hi(): String }\nclass Impl conforms Greet { public: def this{}\n def hi(): String = \"hi\" }\nclass C conforms Greet { public: def this{}\n forward val g: Greet = new Impl() }\ndef main(args: String[]): String { return new C().hi() }", "None", Array()))
   }
   it("still parses multi-line fields") {
     assert(Shell.Success(3) == shell.run(

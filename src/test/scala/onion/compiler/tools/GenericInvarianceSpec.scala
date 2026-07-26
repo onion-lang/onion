@@ -11,8 +11,8 @@ class GenericInvarianceSpec extends AbstractShellSpec {
   private val decls =
     """
       |class Animal { public: def this {} }
-      |class Dog : Animal { public: def this {} }
-      |class Cat : Animal { public: def this {} }
+      |class Dog extends Animal { public: def this {} }
+      |class Cat extends Animal { public: def this {} }
       |class Box[T] {
       |  var value: T
       |public:

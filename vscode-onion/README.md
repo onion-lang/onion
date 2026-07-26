@@ -6,7 +6,7 @@ Language support for the [Onion programming language](https://github.com/kmizu/o
 
 - **Syntax Highlighting** — Full TextMate-based highlighting for Onion source
   files (`.on`): keywords, types, strings with `#{}` interpolation, numbers,
-  operators (including `as`, `?.`, `?:`, `!!`, `<:`, ranges), `select`/`case
+  operators (including `as`, `?.`, `?:`, `!!`, ranges), `select`/`case
   is`/`when`, `do`/`ret` notation, records, enums, and more.
 - **Editor Configuration** — Comment toggling, bracket matching, auto-closing
   pairs, and indentation rules.

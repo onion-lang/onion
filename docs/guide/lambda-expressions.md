@@ -312,7 +312,7 @@ import {
   java.util.Comparator;
 }
 
-class LambdaComparator <: Comparator[Object] {
+class LambdaComparator conforms Comparator[Object] {
   val compareFunc: (Object, Object) -> Int
 
   public:
@@ -355,7 +355,7 @@ import {
   java.awt.event.ActionEvent;
 }
 
-class LambdaActionListener <: ActionListener {
+class LambdaActionListener conforms ActionListener {
   val handler: (ActionEvent) -> Int
 
   public:

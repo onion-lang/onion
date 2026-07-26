@@ -8,8 +8,8 @@ class NestedPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Tree {}
-          |record Leaf(value: Int) <: Tree;
-          |record Node(left: Tree, right: Tree) <: Tree;
+          |record Leaf(value: Int) conforms Tree;
+          |record Node(left: Tree, right: Tree) conforms Tree;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -31,8 +31,8 @@ class NestedPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Tree {}
-          |record Leaf(value: Int) <: Tree;
-          |record Node(left: Tree, right: Tree) <: Tree;
+          |record Leaf(value: Int) conforms Tree;
+          |record Node(left: Tree, right: Tree) conforms Tree;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -54,8 +54,8 @@ class NestedPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Tree {}
-          |record Leaf(value: Int) <: Tree;
-          |record Node(left: Tree, right: Tree) <: Tree;
+          |record Leaf(value: Int) conforms Tree;
+          |record Node(left: Tree, right: Tree) conforms Tree;
           |class Test {
           |public:
           |  static def main(args: String[]): String {
@@ -194,8 +194,8 @@ class NestedPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Data {}
-          |record Value(n: Int) <: Data;
-          |record Pair(a: Data, b: Data) <: Data;
+          |record Value(n: Int) conforms Data;
+          |record Pair(a: Data, b: Data) conforms Data;
           |record Container(data: Data);
           |class Test {
           |public:

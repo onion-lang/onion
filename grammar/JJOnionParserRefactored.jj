@@ -323,7 +323,7 @@ TOKEN : {
 | <GT:             ">"            >
 | <ARROW:          "->"           >
 | <ARROW2:         "=>"           >
-| <SUBTYPE:        "<:"           >
+| <K_CONFORMS:     "conforms"      >
 | <NOT:            "!"            >
 | <AMP:            "&"            >
 | <AND:            "&&"           >
@@ -475,7 +475,7 @@ AST.ClassDeclaration class_decl(int mset) : {
   ArrayBuffer<AST.AccessSection> sec2s = new ArrayBuffer<AST.AccessSection>();
 }{
   t1="class" t2=<ID> [":" ty1=class_type()]
-  ["<:" ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{"
+  [<K_CONFORMS> ty2=class_type() {append(ty2s, ty2);} ("," ty2=class_type() {append(ty2s, ty2);})*] "{"
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
   "}" {

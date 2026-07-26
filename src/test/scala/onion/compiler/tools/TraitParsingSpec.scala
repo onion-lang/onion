@@ -16,7 +16,7 @@ class TraitParsingSpec extends AbstractShellSpec {
           |  def zero(): T
           |  def plus(a: T, b: T): T
           |}
-          |class IntNum <: Numeric[Integer] {
+          |class IntNum conforms Numeric[Integer] {
           |public:
           |  def this {}
           |  def zero(): Integer = 0
@@ -36,7 +36,7 @@ class TraitParsingSpec extends AbstractShellSpec {
           |  def name(): String
           |  def greet(): String { return "Hi " + name() }
           |}
-          |class P <: Greeter { public: def this {}
+          |class P conforms Greeter { public: def this {}
           |  def name(): String { return "Ann" } }
           |def main(args: String[]): String { return new P().greet() }
           |""".stripMargin, "None", Array())

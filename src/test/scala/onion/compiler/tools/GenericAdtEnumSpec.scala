@@ -58,8 +58,8 @@ class GenericAdtEnumSpec extends AbstractShellSpec {
   it("recovers the type argument for a hand-written generic sealed hierarchy too") {
     assert(Shell.Success("hi") == shell.run(
       """sealed interface Box[T] {}
-        |record Full[T](value: T) <: Box[T]
-        |record Empty[T]() <: Box[T]
+        |record Full[T](value: T) conforms Box[T]
+        |record Empty[T]() conforms Box[T]
         |def get(b: Box[String]): String = select b {
         |  case f is Full: f.value()
         |  case e is Empty: "none"

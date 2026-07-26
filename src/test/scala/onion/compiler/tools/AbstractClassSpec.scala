@@ -11,7 +11,7 @@ class AbstractClassSpec extends AbstractShellSpec {
           |public:
           |  abstract def speak(): String;
           |}
-          |class Dog : Animal {
+          |class Dog extends Animal {
           |public:
           |  def speak(): String { return "Woof!"; }
           |}
@@ -36,7 +36,7 @@ class AbstractClassSpec extends AbstractShellSpec {
           |public:
           |  abstract def area(): Int;
           |}
-          |class Square : Shape {
+          |class Square extends Shape {
           |  var side: Int;
           |public:
           |  def this(s: Int) { this.side = s; }
@@ -63,11 +63,11 @@ class AbstractClassSpec extends AbstractShellSpec {
           |public:
           |  abstract def getValue(): Int;
           |}
-          |abstract class Middle : Base {
+          |abstract class Middle extends Base {
           |public:
           |  def getDoubleValue(): Int { return getValue() * 2; }
           |}
-          |class Concrete : Middle {
+          |class Concrete extends Middle {
           |public:
           |  def getValue(): Int { return 10; }
           |}

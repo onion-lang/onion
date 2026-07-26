@@ -86,7 +86,7 @@ class TryElvisEmptyLiteralTargetTypeSpec extends AbstractShellSpec {
 
     it("try-with-resources still works (e)") {
       assert(Shell.Success(42) == shell.run(
-        "class R <: java.lang.AutoCloseable {\n" +
+        "class R conforms java.lang.AutoCloseable {\n" +
           "public:\n" +
           "  def this { }\n" +
           "  def close(): void { }\n" +

@@ -18,12 +18,12 @@ class BranchLubCommonAncestorSpec extends AbstractShellSpec {
           |   def this {}
           |   def sound(): String = "..."
           | }
-          | class Dog : Animal {
+          | class Dog extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "woof"
           | }
-          | class Cat : Animal {
+          | class Cat extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "meow"
@@ -45,12 +45,12 @@ class BranchLubCommonAncestorSpec extends AbstractShellSpec {
           | interface Speaker {
           |   def speak(): String
           | }
-          | class A <: Speaker {
+          | class A conforms Speaker {
           | public:
           |   def this {}
           |   def speak(): String = "A"
           | }
-          | class B <: Speaker {
+          | class B conforms Speaker {
           | public:
           |   def this {}
           |   def speak(): String = "B"
@@ -74,7 +74,7 @@ class BranchLubCommonAncestorSpec extends AbstractShellSpec {
           |   def this {}
           |   def sound(): String = "animal"
           | }
-          | class Dog : Animal {
+          | class Dog extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "woof"
@@ -98,12 +98,12 @@ class BranchLubCommonAncestorSpec extends AbstractShellSpec {
           |   def this {}
           |   def sound(): String = "..."
           | }
-          | class Dog : Animal {
+          | class Dog extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "woof"
           | }
-          | class Cat : Animal {
+          | class Cat extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "meow"
@@ -130,13 +130,13 @@ class BranchLubCommonAncestorSpec extends AbstractShellSpec {
         """
           | interface I1 { def m1(): String }
           | interface I2 { def m2(): String }
-          | class P <: I1, I2 {
+          | class P conforms I1, I2 {
           | public:
           |   def this {}
           |   def m1(): String = "p1"
           |   def m2(): String = "p2"
           | }
-          | class Q <: I1, I2 {
+          | class Q conforms I1, I2 {
           | public:
           |   def this {}
           |   def m1(): String = "q1"

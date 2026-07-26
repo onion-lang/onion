@@ -27,7 +27,7 @@ public:
   }
 }
 
-class CircleShape : Shape {
+class CircleShape extends Shape {
 public:
   val data: Circle
 
@@ -42,7 +42,7 @@ public:
   }
 }
 
-class RectangleShape : Shape {
+class RectangleShape extends Shape {
 public:
   val data: Rectangle
 
@@ -57,7 +57,7 @@ public:
   }
 }
 
-class PointShape : Shape {
+class PointShape extends Shape {
 public:
   val data: Point
 

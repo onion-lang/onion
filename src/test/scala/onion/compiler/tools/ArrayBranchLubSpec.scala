@@ -19,12 +19,12 @@ class ArrayBranchLubSpec extends AbstractShellSpec {
           |   def this {}
           |   def sound(): String = "..."
           | }
-          | class Dog : Animal {
+          | class Dog extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "woof"
           | }
-          | class Cat : Animal {
+          | class Cat extends Animal {
           | public:
           |   def this {}
           |   override def sound(): String = "meow"
@@ -49,8 +49,8 @@ class ArrayBranchLubSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           | class Animal { public: def this {} }
-          | class Dog : Animal { public: def this {} }
-          | class Cat : Animal { public: def this {} }
+          | class Dog extends Animal { public: def this {} }
+          | class Cat extends Animal { public: def this {} }
           | static def main(args: String[]): Int {
           |   val n = 1
           |   val xs = select n {
@@ -71,12 +71,12 @@ class ArrayBranchLubSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           | interface Shape { def area(): Int }
-          | class Sq <: Shape {
+          | class Sq conforms Shape {
           | public:
           |   def this {}
           |   def area(): Int = 4
           | }
-          | class Ci <: Shape {
+          | class Ci conforms Shape {
           | public:
           |   def this {}
           |   def area(): Int = 3

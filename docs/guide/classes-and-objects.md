@@ -49,7 +49,7 @@ public:
 class Conf(val host: String = "localhost", var port: Int = 8080)
 
 class Animal(val name: String)
-class Dog(name: String, val breed: String) : Animal(name)   // body-less is fine
+class Dog(name: String, val breed: String) extends Animal(name)   // body-less is fine
 
 val p = new Point(3, 4)        // p.x, p.y readable; p.x = 9 is an error (val)
 val c = new Conf(port = 9090)  // host defaults to "localhost"
@@ -267,7 +267,7 @@ import {
   java.awt.event.ActionListener;
 }
 
-class ButtonHandler <: ActionListener {
+class ButtonHandler conforms ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
       val button: JButton = event.getSource() as JButton

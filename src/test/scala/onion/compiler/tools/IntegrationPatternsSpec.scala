@@ -10,7 +10,7 @@ import onion.tools.Shell
 class IntegrationPatternsSpec extends AbstractShellSpec {
   it("evaluates a recursive sealed-record expression tree") {
     val src =
-      "sealed interface Expr\nrecord Num(v: Int) <: Expr\nrecord Add(l: Expr, r: Expr) <: Expr\nrecord Mul(l: Expr, r: Expr) <: Expr\n" +
+      "sealed interface Expr\nrecord Num(v: Int) conforms Expr\nrecord Add(l: Expr, r: Expr) conforms Expr\nrecord Mul(l: Expr, r: Expr) conforms Expr\n" +
       "def eval(e: Expr): Int { return select e { case Num(v): v\n case Add(l, r): eval(l) + eval(r)\n case Mul(l, r): eval(l) * eval(r) } }\n" +
       "def main(args: String[]): Int { val e: Expr = new Add(new Num(3), new Mul(new Num(4), new Num(5)))\n return eval(e) }"
     assert(Shell.Success(23) == shell.run(src, "None", Array()))

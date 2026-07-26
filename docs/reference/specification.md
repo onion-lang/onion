@@ -104,7 +104,7 @@ Primitive types can be used as type arguments. They are boxed internally
 necessary bridges between the erased boxed contract and the primitive implementation.
 
 ```onion
-class IntComparator <: Comparator[Int] {
+class IntComparator conforms Comparator[Int] {
 public:
   def compare(a: Int, b: Int): Int {
     return a - b
@@ -164,7 +164,7 @@ support named arguments and defaults.
 ### Classes
 
 ```onion
-class Name [TypeParams] [(primary params)] [: Super[(args)]] [<: I1, I2] {
+class Name [TypeParams] [(primary params)] [extends Super[(args)]] [conforms I1, I2] {
   sections
 }
 ```
@@ -176,7 +176,7 @@ optional.
 
 ```onion
 class Point(val x: Int, val y: Int)
-class Dog(name: String, val breed: String) : Animal(name)
+class Dog(name: String, val breed: String) extends Animal(name)
 ```
 
 **Classic constructors** remain available:
@@ -208,7 +208,7 @@ exhaustiveness checking in `select`.
 
 ```onion
 record Point(x: Int, y: Int)
-record Pair[A, B](first: A, second: B) <: SomeInterface
+record Pair[A, B](first: A, second: B) conforms SomeInterface
 ```
 
 Components become private final fields with public accessor *methods*
@@ -233,7 +233,7 @@ public:
 #### Pattern-attached records (`from re"..."`)
 
 A record can derive a typed parser from its shape by attaching a regex
-literal right after the component list (before any `<:` supertypes). `from`
+literal right after the component list (before any `conforms` supertypes). `from`
 is a soft keyword, recognized only when immediately followed by a regex
 literal, so it stays usable as an ordinary identifier:
 
@@ -318,7 +318,7 @@ shape over a type you did not declare.
 #### `derive!` — record serde derivation
 
 Adding `derive!(Format, ...)` after a record's component list (or after a
-`from re"..."` clause, before any `<:` supertypes) instructs the compiler to
+`from re"..."` clause, before any `conforms` supertypes) instructs the compiler to
 synthesize serialization methods from the record's shape. The `!` suffix
 signals macro-style expansion rather than a type-class constraint.
 
@@ -326,7 +326,7 @@ signals macro-style expansion rather than a type-class constraint.
 record User(name: String, age: Int) derive!(Json)
 record Config(host: String, port: Int, debug: Boolean) derive!(Json, Yaml)
 record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json, Yaml)
-  <: Printable
+  conforms Printable
 ```
 
 Supported markers are **`Json`** and **`Yaml`**; an unrecognized marker is
@@ -462,7 +462,7 @@ type Names = List[String]
 ### Delegation
 
 ```onion
-class MyClass <: Interface {
+class MyClass conforms Interface {
   forward val member: Interface
   ...
 }

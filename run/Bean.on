@@ -3,7 +3,7 @@ import {
   java.beans.*;
 }
 
-class ExampleBean <: Serializable {
+class ExampleBean conforms Serializable {
   var name: String;
   var value: Int;
 

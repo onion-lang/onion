@@ -69,8 +69,8 @@ class WildcardPatternSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |sealed interface Result {}
-          |record Success(value: String) <: Result;
-          |record Error(message: String) <: Result;
+          |record Success(value: String) conforms Result;
+          |record Error(message: String) conforms Result;
           |class Test {
           |public:
           |  static def main(args: String[]): String {

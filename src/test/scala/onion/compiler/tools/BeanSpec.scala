@@ -7,7 +7,7 @@ class BeanSpec extends AbstractShellSpec {
     it("compiles") {
       val resultBean = shell.run(
         """
-          | class Bean <: Serializable {
+          | class Bean conforms Serializable {
           |   var value: Int
           | public:
           |   def this {

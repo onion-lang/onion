@@ -11,7 +11,7 @@ class OverrideCheckSpec extends AbstractShellSpec {
           |public:
           |  def foo(): Int { return 1 }
           |}
-          |class Derived : Base {
+          |class Derived extends Base {
           |public:
           |  override def bar(): Int { return 2 }
           |}
@@ -33,7 +33,7 @@ class OverrideCheckSpec extends AbstractShellSpec {
           |public:
           |  def foo(x: Int): Int { return x }
           |}
-          |class Derived : Base {
+          |class Derived extends Base {
           |public:
           |  override def foo(): Int { return 0 }
           |}
@@ -55,7 +55,7 @@ class OverrideCheckSpec extends AbstractShellSpec {
           |public:
           |  def foo(): Int { return 1 }
           |}
-          |class Derived : Base {
+          |class Derived extends Base {
           |public:
           |  override def foo(): Int { return 2 }
           |}
@@ -76,7 +76,7 @@ class OverrideCheckSpec extends AbstractShellSpec {
           |interface Greeter {
           |  def greet(): String
           |}
-          |class Hello <: Greeter {
+          |class Hello conforms Greeter {
           |public:
           |  override def greet(): String { return "hi" }
           |}
@@ -97,7 +97,7 @@ class OverrideCheckSpec extends AbstractShellSpec {
           |interface Box[T] {
           |  def get(): T
           |}
-          |class IntBox <: Box[Int] {
+          |class IntBox conforms Box[Int] {
           |public:
           |  override def get(): Int { return 42 }
           |}

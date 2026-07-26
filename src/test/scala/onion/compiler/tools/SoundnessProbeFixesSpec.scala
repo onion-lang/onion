@@ -18,11 +18,11 @@ class SoundnessProbeFixesSpec extends AbstractShellSpec {
   describe("record implementing an interface") {
     it("is rejected when an abstract method is unimplemented") {
       assert(Shell.Failure(-1) == shell.run(
-        "interface Describable { def describe(): String }\nrecord Point(x: Int, y: Int) <: Describable\ndef main(args: String[]): void { }", "None", Array()))
+        "interface Describable { def describe(): String }\nrecord Point(x: Int, y: Int) conforms Describable\ndef main(args: String[]): void { }", "None", Array()))
     }
     it("compiles when an accessor satisfies the interface method") {
       assert(Shell.Success("Alice") == shell.run(
-        "interface Named { def name(): String }\nrecord Person(name: String) <: Named\ndef main(args: String[]): String { val n: Named = new Person(\"Alice\")\n return n.name() }", "None", Array()))
+        "interface Named { def name(): String }\nrecord Person(name: String) conforms Named\ndef main(args: String[]): String { val n: Named = new Person(\"Alice\")\n return n.name() }", "None", Array()))
     }
   }
 }

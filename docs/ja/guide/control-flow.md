@@ -45,8 +45,8 @@ else: handleOther()
 
 ```onion
 sealed interface E {}
-record Num(v: Int) <: E
-record Add(l: E, r: E) <: E
+record Num(v: Int) conforms E
+record Add(l: E, r: E) conforms E
 record Wrap(x: Object)
 
 select e {

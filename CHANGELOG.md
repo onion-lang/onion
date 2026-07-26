@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **BREAKING: inheritance is spelled with words. `:` became `extends` and `<:` became
+  `conforms`.** `class Dog : Animal <: Greeter` is now
+  `class Dog extends Animal conforms Greeter`; the same change applies to `record`,
+  `interface` and `trait` declarations. A symbol cannot be searched for, read aloud, or
+  guessed at from the outside, and `:` in particular already meant three other things
+  (type annotations, record components, `select` cases), so the one position where it
+  meant inheritance was the odd one out. `conforms` is a **soft keyword** — recognized
+  only in the supertype position — so `def conforms(..)`, a field or a local of that name
+  all still parse. Old source gets a targeted hint naming the replacement rather than a
+  bare list of expected tokens; `<:` is still lexed as a single token purely so that
+  hint can fire. The generated API-doc signatures and the VS Code grammar follow.
+
 - **`run/JsonYamlShapeDemo.on` — a standalone example for `shape name = json`/`yaml`.**
   The v0.8.0 named document-boundary shape had unit-test coverage (`FormatShapeSpec.scala`)
   but no `run/` sample demonstrating it end-to-end. Added one covering parsing, the

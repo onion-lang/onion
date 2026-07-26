@@ -80,7 +80,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   def this(x: Int) { self.x = x }
           |   def getX(): Int { return x }
           | }
-          | class Sub : Base {
+          | class Sub extends Base {
           |   val y: Int
           | public:
           |   def this(x: Int, y: Int) : (x) { self.y = y }
@@ -123,7 +123,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   def this(name: String) { self.name = name }
           |   def getName(): String { return name }
           | }
-          | class Dog : Animal {
+          | class Dog extends Animal {
           | public:
           |   def this() : ("Rex") { }
           |   static def main(args: String[]): String { return new Dog().getName() }

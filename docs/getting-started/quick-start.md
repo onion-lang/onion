@@ -165,7 +165,7 @@ interface Logger {
   def count(): Int
 }
 
-class BasicLogger <: Logger {
+class BasicLogger conforms Logger {
   var n: Int
 
   public:
@@ -178,7 +178,7 @@ class BasicLogger <: Logger {
 }
 
 // `forward` auto-implements the Logger interface by delegating to `delegate`.
-class PrefixLogger <: Logger {
+class PrefixLogger conforms Logger {
   forward val delegate: Logger
 
   public:
@@ -189,9 +189,9 @@ class PrefixLogger <: Logger {
 ```
 
 Syntax:
-- `class Child : Parent` - extends a class
-- `class Impl <: Interface` - implements an interface
-- `class Multi : Parent <: Interface` - both
+- `class Child extends Parent` - extends a class
+- `class Impl conforms Interface` - implements an interface
+- `class Multi extends Parent conforms Interface` - both
 - `forward val m: Interface` - auto-implement `Interface` by delegating to `m`
 
 ## Java Interoperability

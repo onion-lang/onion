@@ -5,7 +5,7 @@ import {
 	java.lang.Long as JLong;
 }
 
-class Calculator : JFrame <: ActionListener {
+class Calculator extends JFrame conforms ActionListener {
 	val text: JTextField
 	var left: Long
 	var right: Long

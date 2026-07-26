@@ -87,7 +87,7 @@ class RecordMethodsSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |interface Named { def label(): String }
-          |record Person(name: String, age: Int) <: Named {
+          |record Person(name: String, age: Int) conforms Named {
           |public:
           |  def label(): String = name() + "(" + age() + ")"
           |  def older(): Person = self.copy(age = age() + 1)

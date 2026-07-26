@@ -313,8 +313,10 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     val (errorResult, errors) = build(errorProject)
 
     errorResult.isLeft shouldBe true
-    errors should include("src/main.on")
-    errors should include("errors are found")
+    // The `path:line:col:` prefix is structural; the message text and the closing
+    // "N errors are found." trailer are localized (error.count), so asserting on
+    // them passes in an English locale and fails only under -Duser.language=ja.
+    errors should include("src/main.on:1:10:")
     temporaryDirectories(errorProject.paths) shouldBe Vector.empty
 
   test("requires successful compiler results to contain parsed source units"):
@@ -335,7 +337,8 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     val (result, diagnostics) = build(reload(project.root))
 
     result.isLeft shouldBe true
-    diagnostics should include("error")
+    // Locale-agnostic: the diagnostic's position prefix, not its localized text.
+    diagnostics should include("src/main.on:1:10:")
     outputSnapshot(project.paths) shouldBe before
     temporaryDirectories(project.paths) shouldBe Vector.empty
 

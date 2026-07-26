@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Semicolon-separated ADT enum case clauses didn't parse (#415).** The single-line
+  form `enum Shape { case Circle(radius: Double); case Square(side: Double); ... }` is
+  CLAUDE.md's own documented form for a Scala-3-style `case` enum, but the grammar only
+  accepted a newline between `case` clauses. `;` is now accepted as a case-clause
+  separator, matching how it already works as a statement separator elsewhere in the
+  grammar. (Homogeneous, non-`case` enums are unaffected — they were never documented
+  to accept `;` between constants and still don't.)
+
 ## [0.10.1] - 2026-07-27
 
 A quality release: the diagnostic surface is now covered code by code, and the sweep

@@ -6,8 +6,6 @@ import java.nio.charset.StandardCharsets
 object DefaultStaticImports {
   private val ResourcePath = "onion/default-static-imports.txt"
   private val Fallback = Seq(
-    "java.lang.System",
-    "java.lang.Runtime",
     "java.lang.Math",
     "onion.IO"
   )

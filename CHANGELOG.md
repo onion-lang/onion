@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **BREAKING: the default static import set is narrowed to pure classes (#360).**
+  `java.lang.System`, `java.lang.Runtime`, `onion.Files`, `onion.Http` and
+  `onion.DateTime` are no longer imported into every file, so `readText(p)`,
+  `get(url)`, `now()`, `getenv(...)` and `exit(...)` stop resolving bare — an effectful
+  line now looks effectful, which is what makes `requires` clauses readable rather
+  than mysterious. Qualified calls (`Files::readText`) keep working with no import, as
+  before. `onion.IO` stays as the one pragmatic exception: a bare `println` is not
+  what anyone is guarding against. Migration: qualify the call, or use the new
+  explicit prelude import — `import { onion.Files::* }` brings back a whole class's
+  static members, `import { java.lang.System::exit }` a single one (`Class::*` in an
+  import clause is new in this release). No `run/` sample or compiled doc example
+  needed migration.
+
 - **`--plan`: a trustworthy dry run derived from the checked effect set (#359).**
   `onion tool.on <args> --plan` parses the arguments exactly as a real run would, then
   prints what that run *would* do — each declared capability instantiated with the

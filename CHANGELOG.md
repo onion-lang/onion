@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **docs(reference): document E0077/E0078/E0079, and re-sync the quality-bar baseline.**
+  The capability-checking pass (#357) added three diagnostic codes but
+  `docs/reference/error-codes.md` (EN+JA) still stopped at `E0076`, leaving the tool
+  boundary's own errors undocumented in the one place meant to explain every code. Also
+  re-measured `docs/quality-bar.md` (EN+JA): the effect-table / tool-capability /
+  tool-contracts work (#356-#358) had pushed the real numbers to 2644 tests (was 2590),
+  15/15 guides (was 14/14, `docs/guide/tools.md` shipped with #357), and 80 diagnostic
+  codes (was 77).
+
 - **Machine-readable tool contracts, and a CLI derived from them (#358).** A script
   whose top level declares tools (and has no `main` of its own) is now a command-line
   program: the compiler builds a JSON contract from the declarations — parameters with

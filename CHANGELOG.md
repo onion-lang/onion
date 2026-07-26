@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document's line number — mirroring the existing `BrokenLogDemo.on` pattern for the
   regex-shape form.
 
+- **docs(examples): fix a garbled "Multiple inheritance" bullet in `docs/examples/oop.md`.**
+  The `extends`/`conforms` rewrite (#391) accidentally collapsed the English prose line
+  to `Multiple inheritance (: JFrame, implements ActionListener)`, leaving a bare `:`
+  where `extends` belonged and disagreeing with the `class Calculator extends JFrame
+  conforms ActionListener` sample directly above it. The Japanese translation was
+  unaffected. Fixed to `Multiple inheritance (extends JFrame, conforms ActionListener)`.
+
 ## [0.8.0] - 2026-07-25
 
 The v0.8.0 tag was moved after the fact. As first cut it promised `eachLine` on

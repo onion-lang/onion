@@ -1,0 +1,13 @@
+// Extending a final class escaped the type checker entirely: bytecode was generated
+// and the JVM rejected it at class-loading time (IncompatibleClassChangeError inside
+// the law-check phase) — an uncaught crash instead of a diagnostic. It must be a
+// proper E0018 ILLEGAL_INHERITANCE at the supertype reference. (found by the 0.10.1
+// E-code coverage sweep)
+class A extends java.lang.String {
+public:
+  def this {}
+}
+
+def main(args: String[]): void {
+  IO::println("should not compile")
+}

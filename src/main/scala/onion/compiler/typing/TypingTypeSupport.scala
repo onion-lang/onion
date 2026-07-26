@@ -137,9 +137,21 @@ final class TypingTypeSupport(private val typing: Typing) {
   }
 
   private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {
-    typeNode.desc match {
+    // `Box[String, String]?` arrives as NullableType(ParameterizedType(..)) and used to
+    // fall through both matches below, so a wrong arity in a nullable annotation was
+    // accepted silently while the same arity failed on `new` (issue #413). Validate
+    // through the nullable wrapper.
+    val desc = typeNode.desc match {
+      case AST.NullableType(inner) => inner
+      case other                   => other
+    }
+    val mapped = mappedType match {
+      case n: TypedAST.NullableType => n.innerType
+      case other                    => other
+    }
+    desc match {
       case AST.ParameterizedType(_, _) | AST.FunctionType(_, _) =>
-        mappedType match {
+        mapped match {
           case applied: TypedAST.AppliedClassType =>
             val rawParams = applied.raw.typeParameters
             if (rawParams.isEmpty) {

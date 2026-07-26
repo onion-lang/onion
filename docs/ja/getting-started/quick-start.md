@@ -104,42 +104,30 @@ def multiply(a: Int, b: Int): Int = a * b
 println(multiply(6, 7))  // 42
 ```
 
-## 配列とコレクション
-
-### 配列
+## リストとマップ
 
 ```onion
-// 固定サイズ配列
-val numbers: Int[] = new Int[5]
-numbers[0] = 10
-numbers[1] = 20
+val colors = ["赤", "緑", "青"]
+val ages = ["alice": 30, "bob": 25]
 
-val colors: String[] = new String[3]
-colors[0] = "赤"
-colors[1] = "緑"
-colors[2] = "青"
+println(colors[0])        // "赤"
+println(colors.size)      // 3
+println(ages["alice"])    // 30
 
-// 配列のイテレーション
 foreach color: String in colors {
   println(color)
 }
 ```
 
-### リスト（ArrayList）
+パイプラインが組み込まれているので、添字を使う場面はほとんどありません。
 
 ```onion
-import {
-  java.util.ArrayList;
-}
-
-val list: ArrayList[String] = new ArrayList[String]()
-list << "最初"   // << は追加演算子
-list << "2番目"
-list << "3番目"
-
-println(list.size)  // 3
-println(list[0])     // "最初"
+val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
 ```
+
+標準ライブラリはリストを受け取り・返します。配列は Java と話すときのもので——
+`main(args: String[])`、`byte[]` など——リストの `.size` に対して `.length` を使います。
 
 ## クラスとオブジェクト
 
@@ -282,6 +270,39 @@ import {
 // インポートなしで完全修飾名を使用
 val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
+
+## Shape — 雑なデータを読む
+
+ここが、上に挙げた言語と違う部分です。`shape` 句はテキストとレコードの対応を記述し、
+その一つの記述から両方向が出てきます。
+
+```onion
+record Pt(x: Int, y: Int)
+  shape text = re"(-?\d+),(-?\d+)"
+  shape doc  = json
+  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+```
+
+読み取りは `Outcome` を返します。値か、値でない理由**すべて**です。
+
+```onion
+val o = Pt::text().parse("3,x")
+if o.isOk() { println(o.get().x()) }
+else        { println(o.describe()) }
+// <input>:1: : expected match of /(-?\d+),(-?\d+)/, found 3,x
+```
+
+失敗は、どこから来たか・何を期待したかを知っています。`null` はどちらも伝えられません。
+
+複数行を読むときは、失敗した行を捨てずに保持します。
+
+```onion
+val each = file"points.txt".eachLine(Pt::text())
+println(Outcome::values(each).size + " 行読めた, " + Outcome::defects(each).size + " 行読めなかった")
+```
+
+この `law` はコメントではありません。ビルド中にコンパイラが実行します。
+詳しくは [Shape ガイド](../guide/shapes.md) を参照してください。
 
 ## 次のステップ
 

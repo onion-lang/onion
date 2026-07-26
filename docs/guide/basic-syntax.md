@@ -197,40 +197,54 @@ list << "Second"
 list << "Third"
 ```
 
-## Arrays
+## Lists and Maps
 
-### Array Declaration
-
-```onion
-// Create array with size
-val numbers: Int[] = new Int[10]
-
-// Initialize elements
-val colors: String[] = new String[3]
-colors[0] = "red"
-colors[1] = "green"
-colors[2] = "blue"
-
-val scores: Double[] = new Double[5]
-scores[0] = 95.5
-scores[1] = 87.3
-```
-
-### Array Access
+Write a list between square brackets. This is what you will use most of the time — the
+standard library takes and returns lists, never arrays.
 
 ```onion
-val fruits: String[] = new String[3]
-fruits[0] = "apple"
-fruits[1] = "banana"
-fruits[2] = "orange"
-
-val first: String = fruits[0]     // "apple"
-val second: String = fruits[1]    // "banana"
-
-fruits[2] = "grape"  // Modify element
-
-val length: Int = fruits.length  // Array length
+val colors = ["red", "green", "blue"]
+val scores = [95.5, 87.3, 91.0]
+val empty: List[String] = []          // annotate when there is nothing to infer from
 ```
+
+Read and write elements with `[]`, and ask for the size with `.size`:
+
+```onion
+val first = colors[0]      // "red"
+val n = colors.size        // 3
+```
+
+A map literal pairs keys with values:
+
+```onion
+val ages = ["alice": 30, "bob": 25]
+val lookup = ages["alice"]            // 30
+val nothing: Map[String, Int] = [:]   // the empty map
+```
+
+Lists come with pipelines built in, so you rarely need an index at all:
+
+```onion
+val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
+```
+
+See [Collections](collections.md) for the full set.
+
+### Arrays
+
+Arrays exist, but you need them in one place: talking to Java. `main(args: String[])`,
+`byte[]` for binary I/O, and varargs are the usual cases.
+
+```onion
+val buffer: String[] = new String[3]
+buffer[0] = "a"
+val length: Int = buffer.length   // .length, not .size — arrays are the Java type
+```
+
+`Colls::toList(args)` crosses over from an array into list-land when you want the
+pipelines back.
 
 ## Expressions
 

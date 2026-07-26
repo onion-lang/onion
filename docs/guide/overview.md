@@ -1,16 +1,41 @@
 # Language Overview
 
-Onion is a statically-typed, object-oriented programming language designed for the Java Virtual Machine (JVM). This page provides an overview of the language's philosophy, design goals, and key characteristics.
+Onion is a statically typed language for turning messy external data into checked,
+reversible tools. It runs on the JVM and calls Java directly.
 
-## Design Philosophy
+If you have written Java, Kotlin or Scala, most of this page will feel familiar — classes,
+interfaces, generics, lambdas all work the way you expect. This page covers that ground
+quickly so you can get to the part that is different.
 
-Onion was created with several goals in mind:
+## What Onion is for
 
-1. **Static Type Safety** - Catch errors at compile time while maintaining expressiveness
-2. **Java Interoperability** - Seamless integration with existing Java libraries and frameworks
-3. **Concise Syntax** - Reduce boilerplate while keeping code readable
-4. **Familiar Concepts** - Build on established OOP and functional programming patterns
-5. **JVM Performance** - Leverage the mature JVM ecosystem and runtime optimizations
+Most languages hand you a `String` at the boundary — a log line, a JSON body, a
+command-line argument — and leave the rest to you. Onion asks you to describe that
+boundary once, and derives the reading, the writing, the failure reporting and the CLI
+from that one description.
+
+```onion
+record Access(ip: String, method: String, path: String, status: Int)
+  shape common = re"(\S+) (\w+) (\S+) (\d+)"
+
+val each = file"access.log".eachLine(Access::common())
+val rows = Outcome::values(each)      // the lines that read
+val bad  = Outcome::defects(each)     // the ones that didn't, with line numbers
+```
+
+A thousand-line log with five corrupted lines gives you 995 rows **and** the five you
+could not read. Most tools give you 995 rows and no sign the other five existed.
+
+That idea is covered in [Shapes](shapes.md). Everything below is the ordinary language
+those shapes are built out of.
+
+## Design goals
+
+1. **Honest boundaries** - a failure to read external data is a value that says where and why
+2. **Static type safety** - catch errors at compile time while staying concise
+3. **Java interoperability** - use any Java library without a wrapper
+4. **Checked at build time** - `law` and `example` clauses run during compilation
+5. **JVM performance** - a mature runtime, no separate VM to install
 
 ## Language Characteristics
 
@@ -19,9 +44,9 @@ Onion was created with several goals in mind:
 Every variable and expression has a type known at compile time:
 
 ```onion
-val name = "Alice"  // Inferred as String
+val name = "Alice"          // inferred as String
 val age: Int = 30
-val scores: Int[] = new Int[10]
+val scores = [95, 87, 91]   // inferred as List[Int]
 ```
 
 The type system includes:

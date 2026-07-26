@@ -104,42 +104,30 @@ def multiply(a: Int, b: Int): Int = a * b
 println(multiply(6, 7))  // 42
 ```
 
-## Arrays and Collections
-
-### Arrays
+## Lists and Maps
 
 ```onion
-// Fixed-size array
-val numbers: Int[] = new Int[5]
-numbers[0] = 10
-numbers[1] = 20
+val colors = ["red", "green", "blue"]
+val ages = ["alice": 30, "bob": 25]
 
-val colors: String[] = new String[3]
-colors[0] = "red"
-colors[1] = "green"
-colors[2] = "blue"
+println(colors[0])        // "red"
+println(colors.size)      // 3
+println(ages["alice"])    // 30
 
-// Iterate over array
-foreach color :String in colors {
+foreach color: String in colors {
   println(color)
 }
 ```
 
-### Lists (ArrayList)
+Pipelines are built in, so you rarely need an index:
 
 ```onion
-import {
-  java.util.ArrayList;
-}
-
-val list: ArrayList[String] = new ArrayList[String]()
-list << "First"   // << is the append operator
-list << "Second"
-list << "Third"
-
-println(list.size)  // 3
-println(list[0])     // "First"
+val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
 ```
+
+The standard library takes and returns lists. Arrays exist for talking to Java —
+`main(args: String[])`, `byte[]` — and use `.length` where a list uses `.size`.
 
 ## Classes and Objects
 
@@ -283,24 +271,43 @@ import {
 val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 ```
 
-## Bidirectional Records
+## Shapes — reading messy data
 
-A record can derive both directions of a boundary from a single declaration, and
-the compiler can check invariants at build time:
+This is the part of Onion that is not like the languages above. A `shape` clause
+describes how text and a record correspond, and both directions come from that one
+description:
 
 ```onion
-record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json)
-  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-  example { Pt::parse("3,4") == new Pt(3, 4) }
+record Pt(x: Int, y: Int)
+  shape text = re"(-?\d+),(-?\d+)"
+  shape doc  = json
+  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
 ```
 
-`from re"..."` derives `parse` / `format`, `derive!(Json, Yaml)` derives
-`fromJson` / `toJson` / `fromYaml` / `toYaml`, and the `law` / `example` clauses
-are executed by the compiler so a broken round-trip fails the build. See the
-[Scripting guide](../guide/scripting.md).
+Reading returns an `Outcome` — a value, or **every** reason there is not one:
+
+```onion
+val o = Pt::text().parse("3,x")
+if o.isOk() { println(o.get().x()) }
+else        { println(o.describe()) }
+// <input>:1: : expected match of /(-?\d+),(-?\d+)/, found 3,x
+```
+
+A failure knows where it came from and what it wanted. `null` cannot tell you either.
+
+And reading many lines keeps the ones that failed instead of dropping them:
+
+```onion
+val each = file"points.txt".eachLine(Pt::text())
+println(Outcome::values(each).size + " read, " + Outcome::defects(each).size + " not")
+```
+
+That `law` is not a comment — the compiler runs it during the build. See the
+[Shapes guide](../guide/shapes.md).
 
 ## Next Steps
 
+- [Shapes](../guide/shapes.md) - The part that is different: boundaries, `Outcome`, reversibility
 - [Language Guide](../guide/overview.md) - Deep dive into language features
 - [Examples](../examples/overview.md) - More complete program examples
 - [Tools Reference](../tools/compiler.md) - Learn about compiler options

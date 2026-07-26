@@ -2,7 +2,9 @@
 
 ![Build Status](https://github.com/onion-lang/onion/actions/workflows/scala.yml/badge.svg?branch=main)
 
-**Onion** is a statically-typed, object-oriented programming language that compiles to JVM bytecode. It combines the power of static typing with a concise, expressive syntax and seamless Java interoperability.
+**Onion** is a statically typed language for turning messy external data into checked, reversible tools. It runs on the JVM and calls Java directly.
+
+Describe a boundary once — a log format, a JSON document, a command line — and the reading, the writing, the failure reporting and the CLI all come from that one description. A thousand-line log with five corrupted lines gives you 995 rows *and* the five you could not read.
 
 ## Key Features
 

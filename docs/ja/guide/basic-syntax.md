@@ -140,36 +140,53 @@ list << "2番目"
 list << "3番目"
 ```
 
-## 配列
+## リストとマップ
 
-### 配列宣言
-
-```onion
-// サイズ指定で配列を作成
-val numbers: Int[] = new Int[10]
-
-// 要素の初期化
-val colors: String[] = new String[3]
-colors[0] = "赤"
-colors[1] = "緑"
-colors[2] = "青"
-```
-
-### 配列アクセス
+リストは角括弧で書きます。標準ライブラリはリストを受け取り・返すので、普段使うのは
+ほとんどこちらです。配列ではありません。
 
 ```onion
-val fruits: String[] = new String[3]
-fruits[0] = "りんご"
-fruits[1] = "バナナ"
-fruits[2] = "オレンジ"
-
-val first: String = fruits[0]     // "りんご"
-val second: String = fruits[1]    // "バナナ"
-
-fruits[2] = "ぶどう"  // 要素の変更
-
-val length: Int = fruits.length  // 配列の長さ
+val colors = ["赤", "緑", "青"]
+val scores = [95.5, 87.3, 91.0]
+val empty: List[String] = []          // 推論の手がかりが無いときは型を書く
 ```
+
+要素の読み書きは `[]`、要素数は `.size` です。
+
+```onion
+val first = colors[0]      // "赤"
+val n = colors.size        // 3
+```
+
+マップリテラルはキーと値を対にします。
+
+```onion
+val ages = ["alice": 30, "bob": 25]
+val lookup = ages["alice"]            // 30
+val nothing: Map[String, Int] = [:]   // 空のマップ
+```
+
+リストにはパイプラインが組み込まれているので、添字を使う場面はほとんどありません。
+
+```onion
+val odds = [1, 2, 3, 4, 5].filter { n => n % 2 == 1 }   // [1, 3, 5]
+val tens = odds.map { n => n * 10 }                     // [10, 30, 50]
+```
+
+全体は [コレクション](collections.md) を参照してください。
+
+### 配列
+
+配列もありますが、必要になるのは Java と話すときだけです。`main(args: String[])`、
+バイナリ I/O の `byte[]`、可変長引数がその典型です。
+
+```onion
+val buffer: String[] = new String[3]
+buffer[0] = "a"
+val length: Int = buffer.length   // 配列は .size ではなく .length
+```
+
+パイプラインを使いたくなったら `Colls::toList(args)` でリストに渡せます。
 
 ## スコープと可視性
 

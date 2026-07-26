@@ -65,18 +65,34 @@ import {
 val list: List[String] = new ArrayList[String]()  // Interface type
 ```
 
-### Array Types
+### List and Map Types
 
-Arrays are declared with `Type[]` syntax:
+`List[T]` and `Map[K, V]` are what you reach for, and both have a literal form so you
+rarely write the type at all:
 
 ```onion
-val integers: Int[] = new Int[10]
-val strings: String[] = new String[3]
-strings[0] = "a"
-strings[1] = "b"
-strings[2] = "c"
-val objects: Object[] = new Object[5]
+val names = ["ann", "bo"]              // List[String], inferred
+val ages  = ["ann": 30, "bo": 25]      // Map[String, Int], inferred
+
+val empty: List[String] = []           // annotate when there is nothing to infer from
+val blank: Map[String, Int] = [:]
 ```
+
+The standard library takes and returns lists, so these are the types that flow through
+your program.
+
+### Array Types
+
+Arrays are declared with `Type[]` and exist mainly for talking to Java — `main(args:
+String[])`, `byte[]` for binary I/O, varargs:
+
+```onion
+val buffer: String[] = new String[3]
+buffer[0] = "a"
+val n = buffer.length     // .length for an array, .size for a list
+```
+
+`Colls::toList(args)` converts one into a list when you want the pipelines back.
 
 ### Null Type and Nullable Types
 

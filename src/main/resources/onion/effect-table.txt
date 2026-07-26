@@ -280,3 +280,4 @@ java.lang.Class#getSimpleName=pure
 
 # System::out / System::err are PrintStreams
 java.io.PrintStream#*=console
+onion.ToolCli#*=console

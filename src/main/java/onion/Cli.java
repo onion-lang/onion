@@ -251,6 +251,15 @@ public final class Cli {
 
     public static void requireArgs(String[] args, int required, String usage) {
         int n = args == null ? 0 : args.length;
+        // `--help` used to be handled only on the all-scalar path, so on the
+        // rest-collector path it was silently consumed as a positional (#358).
+        // Recognize it here with the same behavior the scalar path has.
+        for (int i = 0; i < n; i++) {
+            if ("--help".equals(args[i]) || "-h".equals(args[i])) {
+                System.out.println("usage: " + scriptName() + " " + usage);
+                System.exit(0);
+            }
+        }
         if (n < required) {
             System.err.println("error: expected at least " + required + " argument(s)");
             System.err.println("usage: " + scriptName() + " " + usage);

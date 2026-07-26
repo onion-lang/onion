@@ -4210,7 +4210,7 @@
 <p>"Practical quality" is intentionally vague, so this file pins it to a set of
 <strong>objectively measurable indicators</strong>. Each row has a measurement you can run
 and a threshold; the language has reached the bar when <em>every</em> row passes.</p>
-<p>Baseline figures are the ground-truth values as of 2026-07-26 (develop @ f6cf5e83),
+<p>Baseline figures are the ground-truth values as of 2026-07-26 (develop @ 871fe5a1),
 <strong>re-measured</strong> rather than carried forward — the previous baseline (2026-06-26 @ 6a2d0e4)
 had drifted badly enough to be misleading: it recorded 1193 tests against an actual 2445,
 36 samples against 59, and ~24 diagnostic codes against 74.</p>
@@ -4229,7 +4229,7 @@ had drifted badly enough to be misleading: it recorded 1193 tests against an act
 <td>1</td>
 <td>Test suite</td>
 <td><code>sbt -batch -Duser.language=en test</code></td>
-<td>2579 pass / 0 fail / 1 cancelled</td>
+<td>2590 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
@@ -4243,7 +4243,7 @@ had drifted badly enough to be misleading: it recorded 1193 tests against an act
 <td>3</td>
 <td>Large programs</td>
 <td>count of <code>run/*.on</code> ≥ 100 lines that run end-to-end as-is</td>
-<td>6 (LogReport, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager)</td>
+<td>6 (BrokenLogDemo, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager)</td>
 <td>≥ 5</td>
 </tr>
 <tr>

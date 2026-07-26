@@ -4231,7 +4231,7 @@
 
 <h1 id="onion">Onion の実用的品質基準<a class="headerlink" href="#onion" title="Permanent link">&para;</a></h1>
 <p>「実用的品質」は意図的に曖昧な表現なので、このファイルではそれを<strong>客観的に測定可能な指標</strong>のセットに固定します。各行には実行可能な測定方法と閾値があり、すべての行が通過したときに言語は基準に達したとみなされます。</p>
-<p>ベースライン数値は 2026-07-26 時点（develop @ f6cf5e83）の実測値です。前回のベースライン
+<p>ベースライン数値は 2026-07-26 時点（develop @ 871fe5a1）の実測値です。前回のベースライン
 （2026-06-26 @ 6a2d0e4）は持ち越さず<strong>測り直しました</strong>。乖離が誤解を招く水準に達していた
 ためです——テスト数は 1193 と記録されていましたが実際は 2445、サンプルは 36 に対し 59、
 診断コードは ~24 に対し 74 でした。</p>
@@ -4250,7 +4250,7 @@
 <td>1</td>
 <td>テストスイート</td>
 <td><code>sbt -batch -Duser.language=en test</code></td>
-<td>2579 pass / 0 fail / 1 cancelled</td>
+<td>2590 pass / 0 fail / 1 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
@@ -4264,7 +4264,7 @@
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>6（LogReport、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager）</td>
+<td>6（BrokenLogDemo、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager）</td>
 <td>≥ 5</td>
 </tr>
 <tr>

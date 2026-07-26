@@ -33,11 +33,11 @@ array_suffix          ::= '[]'
 type_params           ::= '[' type_param (',' type_param)* ']'
 type_param            ::= id ['extends' type]
 
-class_decl            ::= modifiers 'class' id type_params? [':' type]
-                         ['<:' type (',' type)*]
+class_decl            ::= modifiers 'class' id type_params? ['extends' type]
+                         ['conforms' type (',' type)*]
                          '{' default_section? access_section* '}'
 interface_decl        ::= modifiers 'interface' id type_params?
-                         ['<:' type (',' type)*]
+                         ['conforms' type (',' type)*]
                          '{' interface_method_sig* '}'
 record_decl           ::= modifiers 'record' id '(' args? ')'
 

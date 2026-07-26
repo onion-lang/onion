@@ -5114,7 +5114,7 @@
 <h2 id="_11">言語構文<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <h3 id="_12">基本構文<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>// 継承とインターフェース実装を伴うクラス定義
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>class MyClass : ParentClass &lt;: Interface1, Interface2 {
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>class MyClass extends ParentClass conforms Interface1, Interface2 {
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  val immutableField: String      // 不変フィールド
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  var mutableField: Int           // 可変フィールド
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>public:
@@ -5413,26 +5413,34 @@
 <table>
 <thead>
 <tr>
-<th>誤り（Java/Scala風）</th>
+<th>誤り</th>
 <th>正しい（Onion）</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>class A extends B</code></td>
-<td><code>class A : B</code> - 継承はコロン</td>
+<td><code>class A : B</code>（この変更以前のOnion）</td>
+<td><code>class A extends B</code> - 親クラスは <code>extends</code></td>
 </tr>
 <tr>
-<td><code>class A implements I</code></td>
-<td><code>class A &lt;: I</code> - インターフェースは<code>&lt;:</code></td>
+<td><code>class A &lt;: I</code>（この変更以前のOnion）</td>
+<td><code>class A conforms I</code> - インターフェースは <code>conforms</code></td>
 </tr>
 <tr>
-<td><code>class A extends B implements I</code></td>
-<td><code>class A : B &lt;: I</code> - 両方を組み合わせ</td>
+<td><code>class A implements I</code>（Java）</td>
+<td><code>class A conforms I</code></td>
 </tr>
 <tr>
-<td><code>class A implements I, J</code></td>
-<td><code>class A &lt;: I, J</code> - カンマ区切り</td>
+<td><code>class A extends B implements I</code>（Java）</td>
+<td><code>class A extends B conforms I</code> - 両方を組み合わせ</td>
+</tr>
+<tr>
+<td><code>class A conforms I, J</code></td>
+<td>✓ 正しい - カンマ区切り</td>
+</tr>
+<tr>
+<td><code>def conforms(..)</code> はキーワードだから書けない？</td>
+<td>✓ 書ける - <code>conforms</code> は<strong>ソフトキーワード</strong>で、スーパータイプ位置でのみ特別扱いされる</td>
 </tr>
 </tbody>
 </table>

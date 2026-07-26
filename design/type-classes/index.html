@@ -4501,8 +4501,8 @@ derivation.</p>
 <ul>
 <li><strong><code>trait Name[T, …] { &lt;sigs + optional default bodies&gt; }</code></strong> — a near-clone of
   <code>interface_decl</code>, reusing <code>interface_method_decl</code> (which already parses both
-  abstract signatures and default-method bodies). Super-traits via <code>&lt;:</code>
-  (<code>trait Ord[T] &lt;: Eq[T]</code>), matching interface supertype syntax.</li>
+  abstract signatures and default-method bodies). Super-traits via <code>conforms</code>
+  (<code>trait Ord[T] conforms Eq[T]</code>), matching interface supertype syntax.</li>
 <li><strong><code>instance TraitName[ConcreteType, …] { &lt;method defs&gt; }</code></strong> — body is a flat
   list of <code>method_decl</code> like <code>extension</code>; the head type list uses
   <code>type_arguments()</code> (so <code>instance Numeric[Int]</code>, <code>instance Show[List[String]]</code>
@@ -4640,7 +4640,7 @@ ground type.</p>
 <li><strong>Stage 2 — <code>Eq</code>/<code>Ord</code>/<code>Show</code>.</strong> Traits + instances; reframe <code>min</code>/<code>max</code>/<code>sort</code>
   on <code>Ord</code>; UFCS method-style calls for trait methods.</li>
 <li><strong>Stage 3 — deriving.</strong> <code>derive!(Eq, Ord, Show)</code> reusing the structural fold.</li>
-<li><strong>Stage 4 — advanced.</strong> Trait inheritance (<code>trait Ord[T] &lt;: Eq[T]</code>), parametric/
+<li><strong>Stage 4 — advanced.</strong> Trait inheritance (<code>trait Ord[T] conforms Eq[T]</code>), parametric/
   conditional instances (<code>instance [T: Numeric] Numeric[List[T]]</code>), full
   applied-type coherence keys, multi-parameter traits.</li>
 </ul>

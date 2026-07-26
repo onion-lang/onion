@@ -5324,7 +5324,7 @@
 （<code>Int</code> -&gt; <code>Integer</code>）ので、<code>Comparator[Int]</code> のような Java 汎用インターフェースを
 プリミティブなパラメータ型で実装できます。コンパイラは消去されたボックス化された
 契約とプリミティブ実装の間のブリッジを生成します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>class IntComparator &lt;: Comparator[Int] {
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>class IntComparator conforms Comparator[Int] {
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>public:
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  def compare(a: Int, b: Int): Int {
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    return a - b
@@ -5367,7 +5367,7 @@
 デフォルトから埋められます。メソッド、コンストラクタ、records はすべて
 名前付き引数とデフォルトをサポートします。</p>
 <h3 id="_14">クラス<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>class Name [TypeParams] [(primary params)] [: Super[(args)]] [&lt;: I1, I2] {
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>class Name [TypeParams] [(primary params)] [extends Super[(args)]] [conforms I1, I2] {
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  sections
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>}
 </span></code></pre></div>
@@ -5376,7 +5376,7 @@
 コンストラクタ内でのみ存在します（例: <code>: Super(args)</code> に渡すため）。クラス本体は
 オプションです。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>class Point(val x: Int, val y: Int)
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>class Dog(name: String, val breed: String) : Animal(name)
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>class Dog(name: String, val breed: String) extends Animal(name)
 </span></code></pre></div>
 <p><strong>クラシックなコンストラクタ</strong>も利用可能です。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>def this(params) { body }
@@ -5396,7 +5396,7 @@
 実装をコンパイル単位内に制限し、<code>select</code> での網羅性チェックを有効にします。</p>
 <h3 id="records">Records<a class="headerlink" href="#records" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record Point(x: Int, y: Int)
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>record Pair[A, B](first: A, second: B) &lt;: SomeInterface
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>record Pair[A, B](first: A, second: B) conforms SomeInterface
 </span></code></pre></div>
 <p>コンポーネントは private final フィールドになり、public アクセサ <em>メソッド</em> が
 生成されます（<code>p.x()</code>）。<code>equals</code>/<code>hashCode</code>/<code>toString</code>/<code>copy</code> が生成されます。
@@ -5414,7 +5414,7 @@
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>}
 </span></code></pre></div>
 <h4 id="records-from-re">パターン付き records (<code>from re"..."</code>)<a class="headerlink" href="#records-from-re" title="Permanent link">&para;</a></h4>
-<p>record は、コンポーネントリストの直後（<code>&lt;:</code> スーパータイプの前）に正規表現リテラルを
+<p>record は、コンポーネントリストの直後（<code>conforms</code> スーパータイプの前）に正規表現リテラルを
 付けることで、その形状から型付きパーサーを導出できます。<code>from</code> はソフトキーワードで、
 直後に正規表現リテラルが続く場合にのみ認識されるため、通常の識別子としても使えます。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>record Access(time: String, method: String, path: String, status: Int)
@@ -5475,13 +5475,13 @@
 <p>shape は呼び出しごとに再構築されるので、多くの入力を読むときは <code>val</code> に束ねてください。
 自分で宣言していない型に対する shape は、同じ構築を <code>onion.Shapes::regex</code> で書けます。</p>
 <h4 id="derive-record-serde"><code>derive!</code> — record serde 導出<a class="headerlink" href="#derive-record-serde" title="Permanent link">&para;</a></h4>
-<p>record のコンポーネントリストの後（または <code>from re"..."</code> 節の後、<code>&lt;:</code> スーパータイプの前）に
+<p>record のコンポーネントリストの後（または <code>from re"..."</code> 節の後、<code>conforms</code> スーパータイプの前）に
 <code>derive!(Format, ...)</code> を追加すると、コンパイラは record の形状からシリアライズメソッドを
 合成します。<code>!</code> 接尾辞は、型クラス制約ではなくマクロスタイルの展開を示します。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>record User(name: String, age: Int) derive!(Json)
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>record Config(host: String, port: Int, debug: Boolean) derive!(Json, Yaml)
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>record Point(x: Int, y: Int) from re&quot;(-?\d+),(-?\d+)&quot; derive!(Json, Yaml)
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  &lt;: Printable
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  conforms Printable
 </span></code></pre></div>
 <p>サポートされるマーカーは <strong><code>Json</code></strong> と <strong><code>Yaml</code></strong> です。認識できないマーカーは <strong>E0063</strong> です。
 各マーカーについて、コンパイラは record に2つの static メソッドを合成します。</p>
@@ -5594,7 +5594,7 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>type Names = List[String]
 </span></code></pre></div>
 <h3 id="_18">委譲<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>class MyClass &lt;: Interface {
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>class MyClass conforms Interface {
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>  forward val member: Interface
 </span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>  ...
 </span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>}

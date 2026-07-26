@@ -4418,7 +4418,7 @@
 
 
 <h1 id="_1">クラスとオブジェクト<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>Onionはクラス、継承、インターフェースを完全にサポートするオブジェクト指向言語です。</p>
+<p>Onion はクラス、継承、インターフェースを完全にサポートします。Java や Kotlin を書いたことがあれば、ほぼそのままの感覚で使えます。</p>
 <h2 id="_2">クラス定義<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p><code>class</code> キーワードでクラスを定義します：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>class Person {
@@ -4448,7 +4448,7 @@
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>class Conf(val host: String = &quot;localhost&quot;, var port: Int = 8080)
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>class Animal(val name: String)
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>class Dog(name: String, val breed: String) : Animal(name)
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>class Dog(name: String, val breed: String) extends Animal(name)
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>val p = new Point(3, 4)        // p.x、p.y が使える
 </span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>val c = new Conf(port = 9090)  // host はデフォルト値 &quot;localhost&quot;

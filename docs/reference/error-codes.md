@@ -145,6 +145,62 @@ record Pt(x: Int, y: Int)
 
 For an inline pattern, write `shape name = re"..."`.
 
+## Capability errors
+
+A `tool` declaration draws a boundary with a `requires { ... }` clause; the compiler
+infers the whole body's effects (transitively, through ordinary functions) and checks
+the declaration against them.
+
+### `E0077` — Tool performs an undeclared effect
+
+The body performs an effect the `requires` clause does not cover. The diagnostic names
+the missing effect, the callee, and the call site.
+
+```onion
+tool sneaky(src: String, dst: String): void
+  requires { read(src) }
+{
+  Files::writeText(dst, Files::readText(src))   // E0077: performs `write` (writeText)
+}
+```
+
+Fix: add the missing capability — `requires { read(src), write(dst) }`.
+
+### `E0078` — Declared capability the body cannot perform
+
+A capability in `requires` is unused: nothing in the body performs it. An honest
+boundary lists only what actually happens.
+
+```onion
+tool overclaim(src: String): String
+  requires { read(src), net }   // E0078: `net` is unused
+{
+  return Files::readText(src)
+}
+```
+
+Fix: remove the unused capability.
+
+### `E0079` — Invalid capability entry
+
+A `requires` entry is not a valid capability: an unknown effect name, a parameter
+argument on an effect that is always ambient, or an argument that does not name one of
+the tool's parameters.
+
+```onion
+tool t(): Int requires { teleport } { return 0 }
+  // E0079: `teleport` is not an effect
+
+tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
+  // E0079: `console` does not take a parameter argument
+
+tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
+  // E0079: `nope` does not name a parameter
+```
+
+The effect vocabulary is `read write net exec env clock rand console unknown`; only
+`read`, `write`, `net`, and `exec` take a parameter argument.
+
 ## Null-safety errors
 
 ### `E0057` — Type parameter may be null

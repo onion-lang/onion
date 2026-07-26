@@ -145,6 +145,60 @@ record Pt(x: Int, y: Int)
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。
 
+## Capability エラー
+
+`tool` 宣言は `requires { ... }` 節で境界を引きます。コンパイラは本体全体の効果を
+（通常の関数を通じても推移的に）推論し、宣言をそれと突き合わせて検査します。
+
+### `E0077` — tool が未宣言の効果を実行している
+
+本体が `requires` 節でカバーされていない効果を実行しています。診断は不足している
+効果、呼び出し先、呼び出し箇所を示します。
+
+```onion
+tool sneaky(src: String, dst: String): void
+  requires { read(src) }
+{
+  Files::writeText(dst, Files::readText(src))   // E0077: `write` を実行 (writeText)
+}
+```
+
+修正方法: 不足している capability を追加する — `requires { read(src), write(dst) }`。
+
+### `E0078` — 本体が実行できない capability が宣言されている
+
+`requires` 内の capability が未使用です: 本体のどこもそれを実行していません。誠実な
+境界は、実際に起きることだけを列挙します。
+
+```onion
+tool overclaim(src: String): String
+  requires { read(src), net }   // E0078: `net` が未使用
+{
+  return Files::readText(src)
+}
+```
+
+修正方法: 未使用の capability を削除する。
+
+### `E0079` — 不正な capability エントリ
+
+`requires` のエントリが有効な capability ではありません: 未知の効果名、常に ambient な
+効果へのパラメータ引数、またはこの tool のパラメータ名を指していない引数です。
+
+```onion
+tool t(): Int requires { teleport } { return 0 }
+  // E0079: `teleport` は効果ではない
+
+tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
+  // E0079: `console` はパラメータ引数を取らない
+
+tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
+  // E0079: `nope` はパラメータ名ではない
+```
+
+効果の語彙は `read write net exec env clock rand console unknown` で、パラメータ引数
+を取るのは `read`, `write`, `net`, `exec` のみです。
+
 ## Null 安全エラー
 
 ### `E0057` — 型引数が null の可能性がある

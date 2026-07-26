@@ -4,20 +4,22 @@
 **objectively measurable indicators**. Each row has a measurement you can run
 and a threshold; the language has reached the bar when *every* row passes.
 
-Baseline figures are the ground-truth values as of 2026-07-26 (develop @ 871fe5a1),
-**re-measured** rather than carried forward — the previous baseline (2026-06-26 @ 6a2d0e4)
-had drifted badly enough to be misleading: it recorded 1193 tests against an actual 2445,
-36 samples against 59, and ~24 diagnostic codes against 74.
+Baseline figures are the ground-truth values as of 2026-07-26 (develop @ c2126299),
+**re-measured** rather than carried forward — the previous baseline (2026-07-26 @ 871fe5a1)
+had already drifted after the effect-table / tool-capability / tool-contracts work (#356,
+#357, #358) landed: it recorded 2590 tests against an actual 2644, 14/14 guides against
+15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
+(`E0077`–`E0079` added by the capability boundary).
 
 | # | Dimension | How to measure | Current (2026-07-26) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2590 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2655 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 61 / 61 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 6 (BrokenLogDemo, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
-| 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 14 / 14 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 77 | every common error has a dedicated code |
+| 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 80 | every common error has a dedicated code |
 
 **Do not set `SBT_OPTS`.** The previous version of this file recommended
 `SBT_OPTS="-Xmx2g"`, which now *lowers* the heap below the project's own default of 4g and

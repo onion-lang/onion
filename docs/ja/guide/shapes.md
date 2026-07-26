@@ -125,6 +125,39 @@ val api  = http"https://example.com/p".read(Person::doc())
 
 メソッド名が `as` ではなく `read` なのは、`as` がキャスト用のキーワードだからです。
 
+## lossless な shape：L1 と L2
+
+印字できる shape はすべて **L1**（round-trip 則）を保証します：`parse(print(v)) == Ok(v)`。
+逆向きの **L2** —— `print(parse(t)) == t` —— は一般には成り立ちません。理由はありふれて
+います。`"007"` は立派な `Int` ですが印字すると `"7"` になり、空白だけが違う2つの文書は
+同じ値に解析されます。L2 まで満たす shape が **lossless** であり、「編集して書き戻す」は
+その上に築かれます。
+
+`shape name = config` が最初の lossless な shape です：コメント付き `key = value` 文書。
+`parseLossless` は値と一緒に `Residue` を返します —— shape が値に消費しなかったすべて：
+コメント、空行、キーの順序、スペーシング、未知のキー、そして各値の元の綴り。
+`printLossless` が2つを再組立てします：
+
+```onion
+record Server(host: String, port: Int, debug: Boolean)
+  shape cfg = config
+  example l2 {
+    val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
+    val r = Server::cfg().parseLossless(t).get()
+    Server::cfg().printLossless(r.value(), r.residue()) == t
+  }
+```
+
+この `example` 節こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
+満たさなくなった shape はコンパイルが通らなくなります。編集も同じ対を通ります ——
+1つのコンポーネントを変えるとその値スロットだけが再描画され、*変えていない*
+コンポーネントは元の綴りを保ちます。プログラムが実際に port を変えない限り、`007` は
+`007` のままです。
+
+losslessness は既定ではなく主張です：`isLossless()` は正直に答え、lossy な shape は
+空の residue でごまかす代わりに `parseLossless` を拒否し、residue はそれを生んだ shape
+だけが受け取ります。
+
 ## ビルド時に shape を検査する
 
 `law` はコンパイル時に実行されるので、往復の性質を機械検査できます。

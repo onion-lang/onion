@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Lossless shapes and residue (#362).** L1 (`parse(print(v)) == Ok(v)`) is every
+  printing shape's law; L2 (`print(parse(t)) == t`) is false in general — `"007"`
+  prints back as `"7"` — and a shape satisfying it is *lossless*. `Shape` gains
+  `isLossless` / `parseLossless` / `printLossless` (a lossy shape refuses instead of
+  pretending with an empty residue), plus the `Lossless<T>` value+`Residue` pair. The
+  first lossless implementation is **`shape name = config`** over commented
+  `key = value` documents: comments, blank lines, key order, spacing, unknown keys and
+  every value's original spelling ride in the residue, so an unedited document
+  reproduces byte for byte, an edit re-renders only its own value slot, and an
+  unchanged `007` stays `007`. L2 is machine-checkable as an `example` clause on the
+  record (a false claim is E0065 at build time). Guide section EN+JA.
+
 - **`run/ToolDemo.on` — the "Contracts and capabilities" demo (#361).** One `tool`
   declaration, four artifacts: CLI, `--help`, `--contract`, `--plan`. The demo digests
   an access log through a `shape` boundary (bad lines become positioned defects, never

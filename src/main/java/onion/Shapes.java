@@ -53,6 +53,20 @@ public final class Shapes {
         return new MappedShape<>(JSON, names, tags, build, explode);
     }
 
+    /**
+     * A lossless shape over a commented {@code key = value} config document. Unlike
+     * {@link #json} and {@link #yaml} this one also supports
+     * {@link Shape#parseLossless}/{@link Shape#printLossless}: comments, blank lines,
+     * spacing, key order, unknown keys and unchanged values' spellings all survive a
+     * round trip (L2). See {@link ConfigShape}.
+     */
+    public static <T> Shape<T> config(
+        List<String> names, List<String> tags,
+        Function1<List<Object>, T> build, Function1<T, List<Object>> explode
+    ) {
+        return new ConfigShape<>(names, tags, build, explode);
+    }
+
     /** A shape over a flat YAML document. */
     public static <T> Shape<T> yaml(
         List<String> names, List<String> tags,

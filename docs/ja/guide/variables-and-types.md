@@ -27,13 +27,25 @@ val f: Float = 2.5f        // f/F 接尾辞（d/D も可）
 
 ### 参照型・配列型
 
-`String`、クラス型、インターフェース型、配列。
+`String`、クラス型、インターフェース型、そして `List[T]` / `Map[K, V]`。後の2つには
+リテラル形式があるので、型を書かずに済むことがほとんどです。
 
 ```onion
 val s: String = "hello"
+val names = ["ann", "bo"]              // List[String] と推論される
+val ages  = ["ann": 30, "bo": 25]      // Map[String, Int] と推論される
+val empty: List[String] = []           // 推論の手がかりが無いときは型を書く
+```
+
+標準ライブラリはリストを受け取り・返すので、プログラムを流れるのはこれらの型です。
+
+配列もありますが、使うのは Java と話すときです——`main(args: String[])`、バイナリ I/O の
+`byte[]`、可変長引数。
+
+```onion
 val arr: Int[] = new Int[5]
 arr[0] = 10
-val len = arr.length       // length はメソッドではなくプロパティ
+val len = arr.length       // 配列は .length、リストは .size
 ```
 
 ### Nullable型

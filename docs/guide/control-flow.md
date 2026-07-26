@@ -120,15 +120,12 @@ do {
 
 ### Foreach Loop
 
-Iterate over arrays and collections:
+Walk a list, an array, or anything with an `iterator()`:
 
 ```onion
-val fruits: String[] = new String[3]
-fruits[0] = "apple"
-fruits[1] = "banana"
-fruits[2] = "cherry"
+val fruits = ["apple", "banana", "cherry"]
 
-foreach fruit :String in fruits {
+foreach fruit: String in fruits {
   println("Fruit: " + fruit)
 }
 ```

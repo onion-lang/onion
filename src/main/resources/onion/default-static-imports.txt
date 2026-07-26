@@ -1,13 +1,17 @@
 # Default static import classes (one per line).
-java.lang.System
-java.lang.Runtime
+#
+# Narrowed to pure classes (#360): an effectful line should look effectful, so the
+# effectful stdlib surface (Files, Http, DateTime, System, Runtime) must be called
+# qualified — `Files::readText(p)` — or explicitly imported:
+#
+#   import { onion.Files::*; java.lang.System::exit }
+#
+# onion.IO is the one pragmatic exception: a bare `println` is not what anyone is
+# guarding against, and demanding an import for it would be pure friction.
 java.lang.Math
 onion.IO
 onion.Strings
-onion.Files
 onion.Iterables
 onion.Regex
-onion.DateTime
-onion.Http
 onion.Resources
 onion.Csv

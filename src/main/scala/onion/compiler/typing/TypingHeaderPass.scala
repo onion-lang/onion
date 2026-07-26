@@ -80,7 +80,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
         if (typing.table_.loadOrNull(className) == null) {
           typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, className)
         }
-        staticList.add(new StaticImportItem(className, true, methodName))
+        if (methodName == "*") staticList.add(new StaticImportItem(className, true))
+        else staticList.add(new StaticImportItem(className, true, methodName))
       }
     }
     staticList

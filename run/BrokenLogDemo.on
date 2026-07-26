@@ -7,7 +7,16 @@
 //
 //   onion BrokenLogDemo.on
 
-record AccessLine(time: String, method: String, path: String, status: Int)
+// A `shape` clause names the boundary, so a record can carry as many as it needs.
+// `parse` returns an Outcome rather than null, so "this line is not a log entry" and
+// "this line has a broken status" are different answers instead of the same one.
+record Access(ip: String, method: String, path: String, status: Int)
+  shape common  = re"(\S+) (\w+) (\S+) (\d+)"
+  // The same record, read leniently: the status group accepts any word, so a
+  // non-numeric status matches the line and then fails to convert. That is what
+  // makes the two kinds of failure distinguishable below -- with `common` alone,
+  // "status abc" simply fails to match and looks like any other junk line.
+  shape lenient = re"(\S+) (\w+) (\S+) (\w+)"
 
 // A record for a value produced by `xmap`: a distance that happens to be spelled
 // as a bare integer on the wire.
@@ -18,50 +27,109 @@ record Stamp(year: Int, month: Int, day: Int)
 
 class BrokenLogDemo {
 public:
-  static def main(args: String[]): Int {
-    val accessShape: Shape[AccessLine] = Shapes::regex(
-      "(\\S+) (\\w+) (\\S+) (\\d+)",
-      ["time", "method", "path", "status"],
-      ["String", "String", "String", "Int"],
-      (parts: List[Object]) -> new AccessLine(
-        (parts.get(0) as String), (parts.get(1) as String), (parts.get(2) as String), (parts.get(3) as Int)),
-      (a: AccessLine) -> a.time() + " " + a.method() + " " + a.path() + " " + a.status()
-    )
 
-    // Six lines, two broken: one that is not a log line at all, one whose status
-    // is not a number. Both are still worth reporting, not just discarding.
-    val log =
+  // A thousand lines, every two-hundredth one truncated by whatever wrote it.
+  // Generated rather than read from disk so the demo runs anywhere with no setup.
+  static def buildLog(count: Int): String {
+    val sb = new StringBuilder()
+    var i = 1
+    while i <= count {
+      if i % 200 == 0 {
+        sb.append("10.0.0." + (i % 255) + " GET")
+      } else {
+        val status = if i % 7 == 0 { 404 } else { 200 }
+        sb.append("10.0.0." + (i % 255) + " GET /page/" + i + " " + status)
+      }
+      if i < count { sb.append("\n") }
+      i = i + 1
+    }
+    return sb.toString()
+  }
+
+  static def countByStatus(rows: List[Access], status: Int): Int {
+    var n = 0
+    foreach a: Access in rows {
+      if a.status() == status { n = n + 1 }
+    }
+    return n
+  }
+
+  // The shape prints as well as parses, and the two agree on the data it can represent.
+  static def roundTrips(rows: List[Access], limit: Int): Boolean {
+    val shape = Access::common()
+    var ok = true
+    var checked = 0
+    foreach a: Access in rows {
+      if checked < limit {
+        val back = shape.parse(shape.print(a))
+        if back.isBad() { ok = false } else { if back.get() != a { ok = false } }
+        checked = checked + 1
+      }
+    }
+    return ok
+  }
+
+  static def main(args: String[]): Int {
+    val origin = Origin::atLine("access.log", 1)
+
+    // ---- at scale: the five lines every other reader would have dropped ----
+
+    val outcomes = Access::common().eachLine(buildLog(1000), origin)
+    val rows = Outcome::values(outcomes)
+    val bad = Outcome::defects(outcomes)
+
+    IO::println("access.log")
+    IO::println("  " + outcomes.size + " lines, " + rows.size + " read, " + bad.size + " not read")
+    var shown = 0
+    foreach d: Defect in bad {
+      if shown < 3 {
+        IO::println("  line " + d.origin().line() + ": " + d.expected())
+        shown = shown + 1
+      }
+    }
+    IO::println("  ... and " + (bad.size - shown) + " more")
+    IO::println("  200: " + countByStatus(rows, 200) + "   404: " + countByStatus(rows, 404))
+    IO::println("  round-trips: " + roundTrips(rows, 50))
+    IO::println("")
+
+    // ---- a small sample, so the two kinds of failure sit side by side ----
+
+    val sample =
       "127.0.0.1 GET /index 200\n" +
-      "127.0.0.1 POST /login 303\n" +
       "not a valid line at all\n" +
-      "127.0.0.1 GET /about 200\n" +
       "127.0.0.1 GET /missing abc\n" +
       "127.0.0.1 DELETE /item 204\n"
-
-    val origin = Origin::atLine("access.log", 1)
-    val outcomes: List[Outcome[AccessLine]] = accessShape.eachLine(log, origin)
-    val goodRows: List[AccessLine] = Outcome::values(outcomes)
-    val badLines: List[Defect] = Outcome::defects(outcomes)
-
-    IO::println("read " + goodRows.size + " of " + outcomes.size + " lines")
-    foreach row: AccessLine in goodRows {
-      IO::println("  ok:  " + row.method() + " " + row.path() + " -> " + row.status())
+    IO::println("a closer look (read leniently, so a bad status is a field, not junk):")
+    foreach o: Outcome[Access] in Access::lenient().eachLine(sample, origin) {
+      if o.isOk() {
+        IO::println("  ok:  " + o.get().method() + " " + o.get().path() + " -> " + o.get().status())
+      } else {
+        // A non-match carries an empty path (it belongs to the whole line); a broken
+        // field names the component ("status"). `from re"..."` returns null for both,
+        // so a caller cannot tell them apart at all.
+        IO::println("  bad: " + o.describe())
+      }
     }
-    foreach d: Defect in badLines {
-      IO::println("  bad: " + d.describe())
-    }
+    IO::println("")
 
-    // sepBy — a shape repeated with a literal separator, all or nothing.
+    // ---- combinators, on a shape built through the plain API ----
+    //
+    // Shapes::regex is the same construction as ordinary API, for a type you did not
+    // declare — here Int, which cannot carry a `shape` clause.
+
     val intShape: Shape[Int] = Shapes::regex(
       "(-?\\d+)", ["n"], ["Int"],
       (parts: List[Object]) -> (parts.get(0) as Int),
       (n: Int) -> n.toString()
     )
-    val intListShape: Shape[List[Int]] = intShape.sepBy(",")
-    val ints = intListShape.parse("1,2,3,4,5", origin)
-    IO::println("sepBy: " + intListShape.print(ints.get()) + " = " + ints.get().size + " values")
 
-    // xmap — the same boundary, carried along an isomorphism so `print` still works.
+    // sepBy — repetition with a literal separator, all or nothing.
+    val intList: Shape[List[Int]] = intShape.sepBy(",")
+    val ints = intList.parse("1,2,3,4,5", origin)
+    IO::println("sepBy: " + intList.print(ints.get()) + " = " + ints.get().size + " values")
+
+    // xmap — the same boundary along an isomorphism, so `print` survives. A one-way
+    // map would have destroyed it silently.
     val metersShape: Shape[Meters] = intShape.xmap(
       (n: Int) -> new Meters(n),
       (m: Meters) -> m.value()
@@ -69,7 +137,7 @@ public:
     val distance = metersShape.parse("42", origin)
     IO::println("xmap: " + distance.get().value() + "m, prints back as " + metersShape.print(distance.get()))
 
-    // orElse — two spellings of the same value; both sets of defects when neither reads.
+    // orElse — two spellings of one value; both sets of defects when neither reads.
     val isoStamp: Shape[Stamp] = Shapes::regex(
       "(\\d{4})-(\\d{2})-(\\d{2})", ["year", "month", "day"], ["Int", "Int", "Int"],
       (parts: List[Object]) -> new Stamp((parts.get(0) as Int), (parts.get(1) as Int), (parts.get(2) as Int)),
@@ -81,11 +149,12 @@ public:
       (s: Stamp) -> s.month() + "/" + s.day() + "/" + s.year()
     )
     val stamp: Shape[Stamp] = isoStamp.orElse(usStamp)
-    val fromIso = stamp.parse("2026-07-25", origin)
-    val fromUs = stamp.parse("07/25/2026", origin)
     val fromNeither = stamp.parse("not a date", origin)
-    IO::println("orElse: iso=" + fromIso.isOk() + " us=" + fromUs.isOk() + " neither ok=" + fromNeither.isOk() + " defects=" + fromNeither.defects().size)
+    IO::println("orElse: iso=" + stamp.parse("2026-07-25", origin).isOk() +
+                " us=" + stamp.parse("07/25/2026", origin).isOk() +
+                " neither ok=" + fromNeither.isOk() + " defects=" + fromNeither.defects().size)
 
-    return goodRows.size
+    // The count of lines this reader refused to pretend it had read.
+    return bad.size
   }
 }

@@ -11,7 +11,7 @@
 |---|-----------|----------------|----------------------|----------------|
 | 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2579 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 61 / 61 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 6（LogReport、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager） | ≥ 5 |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 6（BrokenLogDemo、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 14 / 14 | 対等性 + すべてのブロックを検証 |

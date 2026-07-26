@@ -147,4 +147,4 @@ record Pt(x: Int, y: Int)
 
 - [スクリプティング](scripting.md) — scheme リテラル、`|>`、auto-CLI
 - [言語仕様](../reference/specification.md#records)
-- `run/LogReport.on` — 全体を1つのプログラムにしたもの
+- `run/BrokenLogDemo.on` — 全体を1つのプログラムにしたもの

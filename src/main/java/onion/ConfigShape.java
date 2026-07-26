@@ -185,7 +185,7 @@ public final class ConfigShape<T> implements Shape<T> {
 
         T value = build.call(values);
         return Outcome.ok(new Lossless<>(value,
-            new ConfigResidue(lines, entryLines, values, trailingNewline)));
+            new ConfigResidue(lines, entryLines, values, trailingNewline), this));
     }
 
     @Override
@@ -221,7 +221,12 @@ public final class ConfigShape<T> implements Shape<T> {
             if (i > 0) sb.append('\n');
             String replacement = replacements.get(i);
             if (replacement == null) sb.append(line.raw);
-            else sb.append(line.prefix).append(replacement);
+            else {
+                sb.append(line.prefix).append(replacement);
+                // A CRLF document's lines keep their \r inside valueRaw; an edited
+                // line must keep its terminator style too.
+                if (line.valueRaw.endsWith("\r")) sb.append('\r');
+            }
         }
         if (r.trailingNewline) sb.append('\n');
         return sb.toString();

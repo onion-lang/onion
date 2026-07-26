@@ -1,0 +1,63 @@
+// ConfigEditDemo — edit one field of a commented config; everything else survives.
+//
+// The "Reversible" demo. Every "edit the config from a script" tool in existence
+// gets this wrong: it parses, re-serializes, and destroys comments, key order,
+// spacing and the harmless quirks of the file it did not mean to touch. The lens
+// below cannot destroy them, because printing goes through the residue — the parts
+// of the file the parse did not consume into the value.
+//
+//   $ onion ConfigEditDemo.on app.conf 9090 --plan     # what would happen
+//   $ onion ConfigEditDemo.on app.conf 9090            # one line changes
+//   $ diff app.conf.bak app.conf                       # ...provably one line
+//
+// The pieces, and where they came from:
+//   shape cfg = config      a lossless shape: parse keeps a Residue        (#362)
+//   .readLossless(...)      byte-faithful read of value + residue          (#363)
+//   .edit { ... }.render()  the lens: update the value, reassemble text    (#363)
+//   tool ... requires       the write-back is a declared, checked effect   (#357)
+
+record Server(host: String, port: Int, debug: Boolean)
+  shape cfg = config
+  // L2, machine-checked at build time: an unedited document reproduces byte for
+  // byte. If ConfigShape ever loses this property, this file stops compiling.
+  example l2 {
+    val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
+    val r = Server::cfg().parseLossless(t).get()
+    Server::cfg().printLossless(r.value(), r.residue()) == t
+  }
+  // And the law the lens adds on top: editing one field re-renders only that
+  // field's value slot. The 007 spelling of the untouched port survives.
+  example editTouchesOneSlot {
+    val t = "# prod\nhost = a.example\nport = 007\ndebug = false\n"
+    val r = Server::cfg().parseLossless(t).get()
+    val out = r.edit { v => v.copy(debug = true) }.render()
+    out == "# prod\nhost = a.example\nport = 007\ndebug = true\n"
+  }
+
+tool setport(path: String, port: Int, backup: Boolean = false): Int
+  requires { read(path), write(path), console }
+{
+  val read = file(path).readLossless(Server::cfg())
+  if read.isBad() {
+    IO::println("cannot edit " + path + ":")
+    foreach d: Defect in read.defects() {
+      IO::println("  " + d.describe())
+    }
+    return 1
+  }
+
+  val doc = read.get()
+  if doc.value().port() == port {
+    IO::println("setport: " + path + " already at " + port + "; not rewriting")
+    return 0
+  }
+
+  if backup {
+    Files::writeText(path + ".bak", Server::cfg().printLossless(doc.value(), doc.residue()))
+  }
+
+  val out = doc.edit { v => v.copy(port = port) }.render()
+  Files::writeText(path, out)
+  IO::println("setport: " + doc.value().port() + " -> " + port + "; comments, spacing and unknown keys untouched")
+  return 0
+}

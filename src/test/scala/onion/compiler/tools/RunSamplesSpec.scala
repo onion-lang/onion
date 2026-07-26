@@ -59,6 +59,26 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(report.contains("line 2"), report)
     }
 
+    it("runs ConfigEditDemo.on: the edit changes exactly one line") {
+      val dir = java.nio.file.Files.createTempDirectory("config-edit-spec")
+      val conf = dir.resolve("app.conf")
+      val original =
+        "# app config \u2014 do not commit secrets\nhost = prod.example.com\n\n" +
+        "# port history: 8080 until 2025\nport   =   8080\ndebug = false\nowner = kota\n"
+      java.nio.file.Files.writeString(conf, original)
+      def run(args: String*): Shell.Result =
+        shell.run(load("run/ConfigEditDemo.on"), "run/ConfigEditDemo.on", args.toArray)
+
+      // Plan first: nothing changes.
+      assert(Shell.Success(0) == run(conf.toString, "9090", "--plan"))
+      assert(java.nio.file.Files.readString(conf) == original, "--plan modified the file")
+      // The edit changes exactly the port line; every other byte survives.
+      assert(Shell.Success(0) == run(conf.toString, "9090"))
+      val edited = java.nio.file.Files.readString(conf)
+      val diff = original.split("\n", -1).zip(edited.split("\n", -1)).filter { case (a, b) => a != b }
+      assert(diff.toSeq == Seq(("port   =   8080", "port   =   9090")), diff.toSeq.toString)
+    }
+
     it("runs BrokenLogDemo.on") {
       // Returns the number of lines it refused to pretend it had read: a thousand-line
       // log with every 200th line truncated.

@@ -53,6 +53,7 @@ onion.FileResource#path=pure
 onion.FileResource#toString=pure
 onion.FileResource#exists=read
 onion.FileResource#read=read
+onion.FileResource#readLossless=read
 onion.FileResource#text=read
 onion.FileResource#lines=read
 onion.FileResource#eachLine=read

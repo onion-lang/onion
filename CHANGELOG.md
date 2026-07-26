@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **docs(grammar): sync `docs/grammar.txt` with the `extends`/`conforms` rewrite.**
+  The `extends`/`conforms` change (below) updated the parser, the hint messages, the
+  API-doc generator and the VS Code grammar, but missed the informal EBNF sketch in
+  `docs/grammar.txt`: `class_decl` and `interface_decl` still showed the old `[':' type]`
+  and `['<:' type (',' type)*]` productions, describing syntax the parser no longer
+  accepts. Updated both to `['extends' type]` / `['conforms' type (',' type)*]`. No test
+  covers this file's prose against the grammar, which is how it went stale silently.
+
 - **BREAKING: inheritance is spelled with words. `:` became `extends` and `<:` became
   `conforms`.** `class Dog : Animal <: Greeter` is now
   `class Dog extends Animal conforms Greeter`; the same change applies to `record`,

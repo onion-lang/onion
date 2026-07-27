@@ -208,6 +208,8 @@ class ScriptRunner {
           case Some(config) =>
             val scriptArgs = passThroughArgs
             val result = compile(config, Array(params.head))
+            if (config.dumpAst) result.debugArtifacts.parsedUnits.foreach(DiagnosticRenderer.dumpAst(_))
+            if (config.dumpTypedAst) result.debugArtifacts.typedClasses.foreach(DiagnosticRenderer.dumpTyped(_))
             emitDiagnostics(result)
             emitProfile(config, result)
             if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) {

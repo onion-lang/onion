@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--dump-ast` and `--dump-typed-ast` were silently no-ops.** Both flags parsed into
+  `CompilerConfig` in `onionc`/`onion`, but nothing ever read them back, so the
+  documented "print parsed/typed AST to stderr" behavior never happened — the compiler
+  ran normally and printed nothing extra. Both CLIs now render the AST captured in the
+  pipeline's debug artifacts (`--dump-ast` even when a later phase fails, since the
+  parsed AST is still available).
+
 ## [0.10.4] - 2026-07-27
 
 The five issues found in the post-0.10.3 audit (#436-#440), fixed across #441-#442.

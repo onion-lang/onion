@@ -115,6 +115,8 @@ class CompilerFrontend {
           case None => -1
           case Some(config) =>
             val result = compile(config, params)
+            if (config.dumpAst) emitAstDump(result)
+            if (config.dumpTypedAst) emitTypedAstDump(result)
             emitDiagnostics(result)
             emitProfile(config, result)
             if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(result)
@@ -270,6 +272,14 @@ class CompilerFrontend {
       System.err.println(me.render)
     }
   }
+
+  /** `--dump-ast`: the parsed AST, to stderr. Available even if a later phase fails. */
+  private def emitAstDump(result: CompilationResult): Unit =
+    result.debugArtifacts.parsedUnits.foreach(DiagnosticRenderer.dumpAst(_))
+
+  /** `--dump-typed-ast`: the typed AST summary, to stderr. */
+  private def emitTypedAstDump(result: CompilationResult): Unit =
+    result.debugArtifacts.typedClasses.foreach(DiagnosticRenderer.dumpTyped(_))
 
   private def emitProfile(config: CompilerConfig, result: CompilationResult): Unit = {
     if (config.verbose) {

@@ -18,6 +18,15 @@ import onion.tools.Shell
  *     filtering: an unknown argument name eliminates every candidate first, so the
  *     user sees not-found (with the named-arg spelled out in the message) before the
  *     dedicated check can run.
+ *   - E0032 TYPE_ARGUMENT_MUST_BE_REFERENCE — has live report sites (checked whenever
+ *     a *written* type argument maps to `void`), but is not registered dead here: the
+ *     drift guard below only asks whether a report call exists, and it does. What has
+ *     no honest in-process trigger is the *input*: `type()` in the grammar (used for
+ *     every type-argument and type-alias-target position) never routes through
+ *     `void_type()` — only `return_type()` does — so `void`/`Unit` cannot be written
+ *     as a type argument at all (`new Box[void]()`, `Box[void]`, `type T = void` are
+ *     all syntax errors, not E0032). The check appears to guard a substitution the
+ *     current grammar cannot produce.
  */
 class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
 

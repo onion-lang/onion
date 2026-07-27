@@ -2256,6 +2256,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0082-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0082 — tool 名の重複
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4944,6 +4955,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0082-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0082 — tool 名の重複
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5165,21 +5187,29 @@
 </span></code></pre></div>
 <p>以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、<code>main</code> のない何も実行
 しないプログラムがコンパイルされていました（issue #424）。</p>
+<h3 id="e0082-tool"><code>E0082</code> — tool 名の重複<a class="headerlink" href="#e0082-tool" title="Permanent link">&para;</a></h3>
+<p>2つの <code>tool</code> が同じ名前を持っています。関数のオーバーロード自体は正当ですが、コマンド
+ラインは<strong>名前だけ</strong>で tool を選ぶため、2つ目は決して呼び出せず、<code>--contract</code> にも同名
+で2件並んでどちらも指定できません。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>// E0082: tool 名 `same` が重複しています。
+</span></code></pre></div>
 <h2 id="_4">パターンマッチングエラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sealed interface Shape {}
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>select shape {
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sealed interface Shape {}
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>select shape {
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>}
 </span></code></pre></div>
 <h2 id="_5">パーサーエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="_6">関連項目<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>

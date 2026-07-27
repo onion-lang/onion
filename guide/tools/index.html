@@ -4592,6 +4592,11 @@ at compile time. Required parameters are positionals; defaulted parameters becom
 <code>--name</code> flags (<code>--count 5</code> or <code>--count=5</code>); <code>Boolean</code> defaults become switches. A
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.</p>
+<p>A bare <code>--</code> ends the options: everything after it is a value, however it is spelled, so
+a tool can be handed an argument that starts with <code>--</code>. The three mode flags
+(<code>--help</code>, <code>--contract</code>, <code>--plan</code>) are mutually exclusive and passing two is an error
+rather than a silent choice between them. Tool names must be distinct (<code>E0082</code>), since
+the name is the only selector a command line has.</p>
 <p>Failures are exit codes, not <code>System.exit</code>: a missing positional, a value that does not
 parse as its declared type, or an unknown option each print a message naming the
 argument and the expected type, then return <code>1</code> from <code>main</code>. When a script declares

@@ -480,6 +480,12 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |def main(): void { }
           |""".stripMargin)
     }
+    it("E0081 a tool parameter that cannot be read from the command line (#424)") {
+      failsWith("E0081",
+        """record P(x: Int)
+          |tool t(p: P): Int requires { console } { IO::println("" + p.x()); return 0 }
+          |""".stripMargin)
+    }
     it("E0076 unknown shape format") {
       failsWith("E0076",
         """record P(x: Int)

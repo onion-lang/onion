@@ -218,6 +218,22 @@ Fixes:
 - Use `?.` / `?:` / `if x != null`.
 - Declare a non-null bound: `class Box[T extends Object]`.
 
+### `E0081` — Tool parameter cannot be read from the command line
+
+A `tool`'s parameters must all be readable from a command-line argument, since the CLI
+is derived from them.
+
+```onion
+record P(x: Int)
+
+tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0 }
+// E0081: parameter `p` has type P, which cannot be read from an argument.
+//        Supported: String, Int, Long, Double, Float, Boolean, Short, Byte.
+```
+
+This used to be silent: CLI synthesis skipped such a script, which then compiled to a
+program with no `main` and nothing to run (issue #424).
+
 ## Pattern-matching errors
 
 ### `E0042` — Non-exhaustive pattern match

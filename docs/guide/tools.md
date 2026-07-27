@@ -140,6 +140,12 @@ argument and the expected type, then return `1` from `main`. When a script decla
 several tools, the first argument selects one by name, subcommand-style, and the
 contract carries one entry per tool.
 
+Every parameter of every `tool` must be one of the CLI-convertible types — `String`,
+`Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte` — since there is no general
+way to parse an arbitrary type from a command-line string. A `tool` with a parameter of
+any other type (a record, for instance) fails to compile, naming the offending tool and
+parameter, rather than silently compiling to a script that never calls it.
+
 The capability line in `--help` and the `capabilities` field in the contract are not
 documentation — they are the checked declaration from the section above. What the
 contract says the tool may do is what the compiler proved it cannot exceed.

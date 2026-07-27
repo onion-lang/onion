@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `tool` with a non-CLI-convertible parameter compiled to a silent no-op (#424).**
+  `tool`-only scripts have no `main` and no top-level statements, so when CLI
+  synthesis bailed out on a parameter it couldn't convert from a command-line string
+  (e.g. a record), nothing ever called the tool — the script just exited 0 having done
+  nothing, with no diagnostic. It is now a compile error naming the offending tool and
+  parameter, with the list of supported types (`String`, `Int`, `Long`, `Double`,
+  `Float`, `Boolean`, `Short`, `Byte`). Documented in `docs/guide/tools.md` (en/ja).
+
 ### Documentation
 
 - **Seven more `run/` examples (`Bidirectional.on`, `CsvProcessor.on`, `DataClass.on`,

@@ -61,15 +61,20 @@ java Hello
 | `LineFilter.on` | Lambda filtering | Lambdas, closures |
 | `LineCounter.on` | File processing | Recursion, I/O |
 | `Factorial.on` | Recursion | Recursive functions |
+| `Primes.on` | Sieve of Eratosthenes + factorization | Boolean arrays, for/while loops |
 | `Delegation.on` | Delegation pattern | Interfaces, forward |
 | `Calculator.on` | GUI calculator | Swing, event handling |
 | `Bean.on` | JavaBean pattern | Serialization, getters/setters |
 | `OrderReport.on` | Larger data pipeline | Records, enums, collection pipelines |
+| `DeptReport.on` | CSV group-by/aggregate pipeline | Csv, records, `Maps::groupBy`, Stats |
 | `ExprEval.on` | Expression evaluator | Interfaces, polymorphism |
+| `AdtExpr.on` | Expression evaluator, as an ADT enum | `enum` `case` cases, `select`, exhaustiveness |
 | `StatsApp.on` | Statistics processing | Generics, extension methods |
 | `TodoManager.on` | Task manager | Records, enums, extension methods |
 | `ShapeProcessor.on` | Geometry shapes | Inheritance, extension methods |
 | `TextAnalyzer.on` | Text statistics | String/List extension methods |
+| `WordStats.on` | Word-frequency text statistics | Strings, `Maps::countBy`, records |
+| `LogSummary.on` | Shape-first log analysis | `record ... from re"..."`, `Maps::countBy` |
 | `ConfigApp.on` | CLI + config file | Args, YAML, `derive!(Yaml)` |
 | `JsonApiClient.on` | JSON + HTTP client | Http, Json, records |
 | `AsyncDownloader.on` | Concurrent futures | Future, do-notation |

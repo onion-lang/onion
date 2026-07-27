@@ -14,10 +14,6 @@ import onion.tools.Shell
  *     below fails if one of them comes back to life (or dies) unnoticed.
  *   - E0075 LAW_CLASS_NOT_LOADABLE — reachable only through an environment failure
  *     (a compiled check class failing to load), which has no honest in-process trigger.
- *   - E0043 UNKNOWN_PARAMETER_NAME — its report sites are shadowed by candidate
- *     filtering: an unknown argument name eliminates every candidate first, so the
- *     user sees not-found (with the named-arg spelled out in the message) before the
- *     dedicated check can run.
  *   - E0032 TYPE_ARGUMENT_MUST_BE_REFERENCE — has live report sites (checked whenever
  *     a *written* type argument maps to `void`), but is not registered dead here: the
  *     drift guard below only asks whether a report call exists, and it does. What has
@@ -293,6 +289,56 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |public:
           |  static def f(x: Int, y: Int): Int = x + y
           |  static def main(args: String[]): Int { return f(x = 1, 2) }
+          |}
+          |""".stripMargin)
+    }
+    it("E0043 unknown named argument on a static call (#426)") {
+      failsWith("E0043",
+        """class T {
+          |public:
+          |  static def f(x: Int, y: Int): Int = x + y
+          |  static def main(args: String[]): Int { return f(x = 1, nope = 2) }
+          |}
+          |""".stripMargin)
+    }
+    it("E0043 unknown named argument on an instance call") {
+      failsWith("E0043",
+        """class T {
+          |public:
+          |  def this {}
+          |  def f(x: Int, y: Int): Int = x + y
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int { return new T().f(x = 1, nope = 2) }
+          |}
+          |""".stripMargin)
+    }
+    it("E0043 unknown named argument on an unqualified call") {
+      failsWith("E0043",
+        """class T {
+          |public:
+          |  def this {}
+          |  def f(x: Int, y: Int): Int = x + y
+          |  def g(): Int = f(x = 1, nope = 2)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int { return new T().g() }
+          |}
+          |""".stripMargin)
+    }
+    it("E0043 unknown named argument on a constructor call") {
+      failsWith("E0043",
+        """class P {
+          |  val x: Int
+          |  val y: Int
+          |public:
+          |  def this(x: Int, y: Int) { self.x = x; self.y = y }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int { val p = new P(x = 1, nope = 2); return 0 }
           |}
           |""".stripMargin)
     }

@@ -58,6 +58,29 @@ private[typing] object ArgumentHelpers {
     }.toList
 
   /**
+   * Find the first named argument whose name is not a parameter of any candidate.
+   *
+   * Candidate filtering (`filterByNamedArgs`) drops every overload as soon as one
+   * named argument doesn't match, so by the time the caller sees an empty result it
+   * no longer knows *why*. This re-checks the original (unfiltered) candidates to
+   * tell a genuine arity/type mismatch apart from a misspelled argument name, so the
+   * caller can report UNKNOWN_PARAMETER_NAME (E0043) instead of a generic not-found.
+   *
+   * @param candidates Original candidates, before named-argument filtering
+   * @param args Argument list as written at the call site
+   * @return The first offending named argument, if any
+   */
+  def findUnknownNamedArg(candidates: Iterable[Method], args: Seq[AST.Expression]): Option[AST.NamedArgument] = {
+    if (candidates.isEmpty) None
+    else {
+      val paramNameSets = candidates.map(_.argumentsWithDefaults.map(_.name).toSet)
+      args.collectFirst {
+        case named: AST.NamedArgument if !paramNameSets.exists(_.contains(named.name)) => named
+      }
+    }
+  }
+
+  /**
    * Fill missing arguments with default values.
    *
    * If params array is smaller than the method's parameter count,

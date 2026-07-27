@@ -491,11 +491,26 @@ final class ConstructionTyping(
     val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
 
     if (candidates.isEmpty) {
-      // Type the arguments anyway to provide better error messages
-      val parameters = typedTerms(node.args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
-      bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef,
-        if (parameters != null) types(parameters) else Array.empty[Type],
-        typeRef.constructors)
+      val unknownNamed = typeRef.constructors.collectFirst { case cd: ConstructorDefinition => cd } match {
+        case Some(_) =>
+          val paramNameSets = typeRef.constructors.collect {
+            case cd: ConstructorDefinition => cd.argumentsWithDefaults.map(_.name).toSet
+          }
+          node.args.collectFirst {
+            case named: AST.NamedArgument if !paramNameSets.exists(_.contains(named.name)) => named
+          }
+        case None => None
+      }
+      unknownNamed match {
+        case Some(named) =>
+          bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+        case None =>
+          // Type the arguments anyway to provide better error messages
+          val parameters = typedTerms(node.args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
+          bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef,
+            if (parameters != null) types(parameters) else Array.empty[Type],
+            typeRef.constructors)
+      }
       return None
     }
 

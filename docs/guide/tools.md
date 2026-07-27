@@ -165,7 +165,10 @@ plan: `ingest` would
 (nothing was executed)
 ```
 
-Arguments are parsed exactly as a real run would parse them — a bad value fails the
+A capability binds an effect to a *parameter*, so `write derived from dst = …` says the
+write goes through `dst` — not that the run touches exactly that path, since a body is
+free to build `dst + ".1"` out of it. Arguments are parsed exactly as a real run would
+parse them — a bad value fails the
 plan the same way it would fail the run — and an operand left to its default shows the
 default from the contract. The honesty rules are strict in both directions. An ambient
 effect (`console`, `clock`, `env`, `rand`) is named bare. An operand the analysis

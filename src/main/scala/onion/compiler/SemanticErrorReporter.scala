@@ -261,10 +261,6 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.cyclicInheritance",
       Seq(items => asString(items(0)))
     ),
-    SemanticError.CYCLIC_DELEGATION -> ErrorDef(
-      "error.semantic.cyclicDelegation",
-      Seq()
-    ),
     SemanticError.ILLEGAL_INHERITANCE -> ErrorDef(
       "error.semantic.illegalInheritance",
       Seq(items => asString(items(0)))
@@ -370,10 +366,6 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.functionBodyRequired",
       Seq(items => asString(items(0)))
     ),
-    SemanticError.ENUM_CONSTANT_ARGS_UNSUPPORTED -> ErrorDef(
-      "error.semantic.enumConstantArgsUnsupported",
-      Seq(items => asString(items(0)))
-    ),
     SemanticError.TYPE_PARAMETER_MAY_BE_NULL -> ErrorDef(
       "error.semantic.typeParameterMayBeNull",
       Seq(items => asString(items(0)))
@@ -448,12 +440,6 @@ class SemanticErrorReporter(threshold: Int) {
     SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
       "error.semantic.duplicateTypeAlias",
       Seq(items => asString(items(0)))
-    ),
-
-    // Other errors
-    SemanticError.UNIMPLEMENTED_FEATURE -> ErrorDef(
-      "error.semantic.unimplementedFeature",
-      Seq()
     )
   )
 

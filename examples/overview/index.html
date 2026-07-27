@@ -4797,6 +4797,11 @@
 <td>Recursive functions</td>
 </tr>
 <tr>
+<td><code>Primes.on</code></td>
+<td>Sieve of Eratosthenes + factorization</td>
+<td>Boolean arrays, for/while loops</td>
+</tr>
+<tr>
 <td><code>Delegation.on</code></td>
 <td>Delegation pattern</td>
 <td>Interfaces, forward</td>
@@ -4817,9 +4822,19 @@
 <td>Records, enums, collection pipelines</td>
 </tr>
 <tr>
+<td><code>DeptReport.on</code></td>
+<td>CSV group-by/aggregate pipeline</td>
+<td>Csv, records, <code>Maps::groupBy</code>, Stats</td>
+</tr>
+<tr>
 <td><code>ExprEval.on</code></td>
 <td>Expression evaluator</td>
 <td>Interfaces, polymorphism</td>
+</tr>
+<tr>
+<td><code>AdtExpr.on</code></td>
+<td>Expression evaluator, as an ADT enum</td>
+<td><code>enum</code> <code>case</code> cases, <code>select</code>, exhaustiveness</td>
 </tr>
 <tr>
 <td><code>StatsApp.on</code></td>
@@ -4840,6 +4855,16 @@
 <td><code>TextAnalyzer.on</code></td>
 <td>Text statistics</td>
 <td>String/List extension methods</td>
+</tr>
+<tr>
+<td><code>WordStats.on</code></td>
+<td>Word-frequency text statistics</td>
+<td>Strings, <code>Maps::countBy</code>, records</td>
+</tr>
+<tr>
+<td><code>LogSummary.on</code></td>
+<td>Shape-first log analysis</td>
+<td><code>record ... from re"..."</code>, <code>Maps::countBy</code></td>
 </tr>
 <tr>
 <td><code>ConfigApp.on</code></td>
@@ -4875,6 +4900,31 @@
 <td><code>UnitConverter.on</code></td>
 <td>CLI unit converter</td>
 <td>Extension methods, Args</td>
+</tr>
+<tr>
+<td><code>SetOperations.on</code></td>
+<td>Set algebra</td>
+<td><code>onion.Sets</code> (union, intersection, difference)</td>
+</tr>
+<tr>
+<td><code>PrimitivePredicate.on</code></td>
+<td>Filtering with a primitive predicate</td>
+<td><code>java.util.function.Predicate[Int]</code>, <code>removeIf</code></td>
+</tr>
+<tr>
+<td><code>PrimitiveFunctionalInterfaces.on</code></td>
+<td>Primitive-typed Java functional interfaces</td>
+<td><code>Predicate</code>, <code>Supplier</code>, <code>Function</code> with primitive type args</td>
+</tr>
+<tr>
+<td><code>SortWithPrimitiveComparator.on</code></td>
+<td>Sorting with a primitive comparator</td>
+<td><code>java.util.Comparator[Int]</code>, primitive lambda bridging</td>
+</tr>
+<tr>
+<td><code>CollectionUtilities.on</code></td>
+<td>Map/list utilities</td>
+<td><code>onion.Maps</code>, <code>onion.Iterables</code>, custom sort</td>
 </tr>
 </tbody>
 </table>

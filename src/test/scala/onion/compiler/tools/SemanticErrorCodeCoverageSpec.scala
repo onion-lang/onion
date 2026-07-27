@@ -30,7 +30,12 @@ import onion.tools.Shell
  */
 class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
 
-  private val deadCodes = Set("CYCLIC_DELEGATION", "UNIMPLEMENTED_FEATURE", "ENUM_CONSTANT_ARGS_UNSUPPORTED")
+  /** Codes declared but never reported. Empty since #427 deleted the three that were:
+   *  CYCLIC_DELEGATION (undecidable — the delegate is chosen at runtime),
+   *  UNIMPLEMENTED_FEATURE (leftover), ENUM_CONSTANT_ARGS_UNSUPPORTED (obsolete once
+   *  data-carrying enums shipped). Adding to this set is how a genuinely unreachable
+   *  code gets registered rather than rotting unnoticed. */
+  private val deadCodes = Set.empty[String]
 
   private def failsWith(code: String, source: String): Unit = {
     val buf = new java.io.ByteArrayOutputStream()
@@ -278,6 +283,15 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
     }
+    it("E0043 unknown parameter name (issue #426: was shadowed by candidate filtering)") {
+      failsWith("E0043",
+        """class Test {
+          |public:
+          |  static def f(x: Int, y: Int): Int = x + y
+          |  static def main(args: String[]): Int { return f(x = 1, nope = 2) }
+          |}
+          |""".stripMargin)
+    }
     it("E0044 duplicate named argument") {
       failsWith("E0044",
         """class Test {
@@ -430,6 +444,12 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
       failsWith("E0055",
         """def f(): Int;
           |def main(): void { }
+          |""".stripMargin)
+    }
+    it("E0081 a tool parameter that cannot be read from the command line (issue #424)") {
+      failsWith("E0081",
+        """record P(x: Int)
+          |tool t(p: P): Int requires { console } { IO::println("" + p.x()); return 0 }
           |""".stripMargin)
     }
     it("E0076 unknown shape format") {

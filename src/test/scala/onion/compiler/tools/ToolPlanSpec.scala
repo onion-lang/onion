@@ -27,9 +27,11 @@ class ToolPlanSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, src.toString, dst.toString, "--plan")
       assert(Shell.Success(0) == r, r.toString)
-      assert(out.contains("read") && out.contains(src.toString), out)
-      assert(out.contains("write") && out.contains(dst.toString), out)
-      assert(out.contains("(nothing was executed)"), out)
+      // Since #425 the operand is reported as derived-from rather than as an equality:
+      // the capability binds a parameter, not the path the body finally passes on.
+      assert(out.contains("read") && out.contains("derived from src = " + src.toString), out)
+      assert(out.contains("write") && out.contains("derived from dst = " + dst.toString), out)
+      assert(out.contains("nothing was executed"), out)
       // The plan performed nothing: the destination does not exist.
       assert(!java.nio.file.Files.exists(dst), s"--plan wrote $dst")
     }
@@ -71,7 +73,7 @@ class ToolPlanSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "--plan")
       assert(Shell.Success(0) == r, r.toString)
-      assert(out.contains("net") && out.contains("https://example.com") && out.contains("default"), out)
+      assert(out.contains("net") && out.contains("derived from url = https://example.com") && out.contains("default"), out)
       // Ambient effect: named bare, no bogus operand.
       assert(out.linesIterator.exists(_.trim == "console"), out)
       // And no network call happened — the body would have printed the response.

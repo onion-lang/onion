@@ -220,15 +220,26 @@ public final class ToolCli {
                 }
                 String operand;
                 if (idx < 0) operand = "(operand not statically known)";
-                else if (values[idx] != null) operand = paramName + " = " + values[idx];
                 else {
-                    Object dflt = params.get(idx).get("default");
-                    operand = paramName + " = " + (dflt == null ? "(unset)" : dflt + " (default)");
+                    String bound;
+                    if (values[idx] != null) bound = String.valueOf(values[idx]);
+                    else {
+                        Object dflt = params.get(idx).get("default");
+                        bound = dflt == null ? "(unset)" : dflt + " (default)";
+                    }
+                    // The capability ties the effect to a PARAMETER, not to the path the
+                    // body finally passes to the effectful call — a body is free to build
+                    // `dst + "." + i` out of it. Reporting `dst = out.txt` as if it were
+                    // the target read as a promise that the run touches exactly that path,
+                    // which is not something this analysis checked (issue #425). Say what
+                    // is actually known: the operand is derived from this argument.
+                    operand = "derived from " + paramName + " = " + bound;
                 }
                 sb.append("  ").append(pad(effect, 8)).append(operand).append('\n');
             }
         }
-        sb.append("(nothing was executed)\n");
+        sb.append("(nothing was executed; operands are the arguments the effects are\n");
+        sb.append(" derived from, not necessarily the exact paths or hosts touched)\n");
         return sb.toString();
     }
 

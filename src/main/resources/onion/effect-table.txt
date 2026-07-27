@@ -161,6 +161,7 @@ onion.Hash#*=pure
 onion.Iterables#*=pure
 onion.Json#*=pure
 onion.ConfigShape#*=pure
+onion.Residue#*=pure
 onion.Lossless#*=pure
 onion.LineShape#*=pure
 onion.MappedShape#*=pure

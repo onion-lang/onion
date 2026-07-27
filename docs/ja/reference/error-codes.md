@@ -216,6 +216,23 @@ public:
 - `?.` / `?:` / `if x != null` を使う。
 - 非 null 制限を宣言: `class Box[T extends Object]`。
 
+
+### `E0081` — tool のパラメータがコマンドラインから読めない
+
+CLI は `tool` のパラメータから導出されるので、パラメータはすべてコマンドライン引数から
+読める型でなければなりません。それ以外の型には引数表現がありません。
+
+```onion
+record P(x: Int)
+
+tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0 }
+// E0081: パラメータ `p` の型 P は引数から読み取れません。
+//        使える型: String, Int, Long, Double, Float, Boolean, Short, Byte。
+```
+
+以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、結果として `main` の
+ない、何も実行しないプログラムがコンパイルされていました（issue #424）。
+
 ## パターンマッチングエラー
 
 ### `E0042` — 網羅性のないパターンマッチング

@@ -129,7 +129,10 @@ usage: ingest.on <src> <dst> [--count <Int>] [--loud]
 The contract is the single source. `--contract` prints it verbatim for an agent to
 read; `--help`, flag parsing, typed conversion and error messages are all derived from
 it at runtime, and the typed call into your tool is derived from the same declaration
-at compile time. Required parameters are positionals; defaulted parameters become
+at compile time. Every parameter must be readable from a command-line argument —
+`String`, `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short` or `Byte`; a tool taking
+anything else says so (`E0081`) rather than compiling to a program that does nothing.
+Required parameters are positionals; defaulted parameters become
 `--name` flags (`--count 5` or `--count=5`); `Boolean` defaults become switches. A
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.
@@ -165,7 +168,10 @@ plan: `ingest` would
 (nothing was executed)
 ```
 
-Arguments are parsed exactly as a real run would parse them — a bad value fails the
+A capability binds an effect to a *parameter*, so `write derived from dst = …` says
+the write goes through `dst` — not that the run touches exactly that path, since a body
+is free to build `dst + ".1"` out of it. Arguments are parsed exactly as a real run
+would parse them — a bad value fails the
 plan the same way it would fail the run — and an operand left to its default shows the
 default from the contract. The honesty rules are strict in both directions. An ambient
 effect (`console`, `clock`, `env`, `rand`) is named bare. An operand the analysis

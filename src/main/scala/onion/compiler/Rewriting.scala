@@ -14,7 +14,7 @@ import _root_.onion.compiler.TypedAST.UnaryTerm.Kind._
 import _root_.onion.compiler.TypedAST._
 import _root_.onion.compiler.SemanticError._
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
+import _root_.onion.compiler.toolbox.{Boxing, Classes, Message, Paths, Systems}
 import onion.compiler.AST.{ClassDeclaration, InterfaceDeclaration, RecordDeclaration}
 
 import _root_.scala.jdk.CollectionConverters._
@@ -336,17 +336,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     if (toplevels.exists { case f: AST.FunctionDeclaration => f.name == "main"; case _ => false }) return
     if (toplevels.exists(_.isInstanceOf[AST.BlockElement])) return
     // Every parameter of every tool must be CLI-convertible, or the CLI cannot be
-    // derived. A `tool`-only script has no `main` and no top-level statements, so
-    // silently leaving the tools as uncalled plain functions would compile the
-    // whole script down to a no-op (issue #424); report the offending parameter
-    // instead.
-    tools.flatMap(t => t.args.filter(a => cliKindOf(a.typeRef).isEmpty).map(t -> _)).headOption.foreach {
-      case (tool, arg) =>
-        throw new CompilationException(Seq(CompileError("", arg.location,
-          s"tool '${tool.name}' has parameter '${arg.name}' of type ${arg.typeRef.desc} which cannot be " +
-          "derived into a CLI argument; tool parameters must be one of String, Int, Long, Double, Float, " +
-          "Boolean, Short, Byte.")))
-    }
+    // derived. This used to `return` silently, which left a script with tools, no
+    // main and no top-level statements compiling to a program that did nothing at
+    // all — no CLI, no diagnostic, exit 0 (issue #424). Say which parameter is the
+    // problem instead; one report per offending parameter, so fixing them is not a
+    // one-per-compile game.
+    val badParams = for {
+      t <- tools
+      a <- t.args
+      if cliKindOf(a.typeRef).isEmpty
+    } yield CompileError("", a.location,
+      Message("error.semantic.toolParameterNotCliConvertible",
+        Array[Any](t.name, a.name, typeNodeLabel(a.typeRef), ScalarConversions.supportedNames)),
+      Some(TOOL_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))
+    if (badParams.nonEmpty) throw new CompilationException(badParams)
 
     val loc = tools.head.location
     val contractJson = tools.map(toolContractJson).mkString("[", ",", "]")
@@ -527,6 +530,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
     }
   }
+
+  /** How a parameter's declared type reads in a diagnostic. */
+  private def typeNodeLabel(t: AST.TypeNode): String =
+    if (t == null) "(none)" else t.desc.toString
 
   /** The CLI conversion kind for a parameter type, or None when unsupported. */
   private def cliKindOf(typeRef: AST.TypeNode): Option[String] =

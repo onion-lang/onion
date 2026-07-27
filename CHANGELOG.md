@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A tool with a non-scalar parameter compiled to a silent no-op (#424).** CLI
+  synthesis skipped such a script without a word, so a script with tools, no `main`
+  and no top-level statements produced a program that did nothing — no CLI, no
+  diagnostic, exit 0 — and one offending tool took the CLI away from every other tool
+  in the file. Now **E0081** names the parameter, its type and the supported ones, one
+  report per offending parameter (the first cut of this fix reported only the first
+  one, with an uncoded English-only message).
+- **`--plan` reported the bound parameter value as if it were the path touched
+  (#425).** A capability binds an effect to a *parameter*, but a body may compute
+  `dst + "." + i` from it — the demo plan said `write dst = out.txt` while the run
+  created `out.txt.0` and `out.txt.1`. The operand now reads `derived from dst =
+  out.txt`, and the closing line says operands are the arguments the effects are
+  derived from, not necessarily the exact paths or hosts touched.
+- **E0043 (`UNKNOWN_PARAMETER_NAME`) was unreachable (#426).** A named argument
+  matching no parameter eliminated every overload candidate during filtering, so
+  `f(x = 1, nope = 2)` reported "method applicable for `T.f()` is not found" without
+  ever mentioning `nope`. The not-found path now checks for that case first and
+  reports E0043 on the offending argument.
+
+### Removed
+
+- **Three diagnostic codes that could never fire (#427):** `E0017 CYCLIC_DELEGATION`
+  (undecidable as designed — the delegate is chosen at runtime), `E0024
+  UNIMPLEMENTED_FEATURE` (leftover) and `E0056 ENUM_CONSTANT_ARGS_UNSUPPORTED`
+  (obsolete since data-carrying enums shipped), together with their EN+JA messages.
+  The coverage spec's dead-code registry is now empty and stays that way by test.
+
+### Added
+
+- **Drift guards for two files that kept going stale.** `QualityBarSpec` measures the
+  rows of `docs/quality-bar.md` that can be measured — sample count, large-program
+  count and names, guide parity, diagnostic-code count — against the tree, and checks
+  the JA copy agrees (#428; the file had drifted three times in three days, and this
+  spec immediately caught a fourth). `EffectTableStdlibCoverageSpec` gained the
+  other direction and the parse check: no entry may name a class that is gone, and the
+  whole table must parse (#429).
+
 - **The effect table had no drift guard, and `onion.Residue` was already missing from
   it (#429).** `onion.Residue` shipped in v0.10.0 (#362) but was never added to
   `effect-table.txt`; since it's a marker interface with no methods the omission was
@@ -18,14 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a new `EffectTableStdlibCoverageSpec` (modeled on the existing
   `EffectWalkerCompletenessSpec`) that fails the build if `src/main/java/onion/*.java`
   ever grows a class with no `effect-table.txt` entry.
-
-- **A `tool` with a non-CLI-convertible parameter compiled to a silent no-op (#424).**
-  `tool`-only scripts have no `main` and no top-level statements, so when CLI
-  synthesis bailed out on a parameter it couldn't convert from a command-line string
-  (e.g. a record), nothing ever called the tool — the script just exited 0 having done
-  nothing, with no diagnostic. It is now a compile error naming the offending tool and
-  parameter, with the list of supported types (`String`, `Int`, `Long`, `Double`,
-  `Float`, `Boolean`, `Short`, `Byte`). Documented in `docs/guide/tools.md` (en/ja).
 
 ### Documentation
 

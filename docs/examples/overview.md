@@ -87,6 +87,13 @@ java Hello
 | `PrimitiveFunctionalInterfaces.on` | Primitive-typed Java functional interfaces | `Predicate`, `Supplier`, `Function` with primitive type args |
 | `SortWithPrimitiveComparator.on` | Sorting with a primitive comparator | `java.util.Comparator[Int]`, primitive lambda bridging |
 | `CollectionUtilities.on` | Map/list utilities | `onion.Maps`, `onion.Iterables`, custom sort |
+| `FizzBuzz.on` | Classic FizzBuzz | Loops, modulo, conditionals |
+| `Fibonacci.on` | Recursive vs. iterative Fibonacci | Recursion, loops, `Timing` |
+| `DataClass.on` | Record `equals`/`hashCode`/`copy` demo | Records, `toString`, `copy` |
+| `Bidirectional.on` | One record, every direction | `from re"..."`, `derive!(Json, Yaml)`, `example` |
+| `CsvProcessor.on` | CSV header parsing + aggregation | `Csv::parseWithHeader` |
+| `CliArgsDemo.on` | Manual CLI argument parsing | `onion.Args` |
+| `FileWordCounter.on` | Word count from a file | File I/O, `BufferedReader` |
 
 ## Learning Path
 

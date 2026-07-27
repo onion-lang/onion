@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Seven more `run/` examples (`Bidirectional.on`, `CsvProcessor.on`, `DataClass.on`,
+  `Fibonacci.on`, `FizzBuzz.on`, `CliArgsDemo.on`, `FileWordCounter.on`) had the same
+  undocumented/untested gap as prior batches.** Added them to
+  `docs/examples/overview.md`'s Example Index table and to `RunSamplesSpec`, asserting
+  each script's actual return value. (`GuessNumber.on` was left out of this batch — it
+  reads interactively from stdin with a random target and needs a different test
+  strategy.)
+
 ## [0.10.2] - 2026-07-27
 
 ### Documentation

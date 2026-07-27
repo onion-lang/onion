@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added them to `docs/examples/overview.md`'s Example Index table and to
   `RunSamplesSpec` so drift between the docs and the scripts is caught automatically.
 
+- **Five more `run/` examples (`SetOperations.on`, `PrimitivePredicate.on`,
+  `PrimitiveFunctionalInterfaces.on`, `SortWithPrimitiveComparator.on`,
+  `CollectionUtilities.on`) had the same gap.** Same fix: added to the Examples
+  Overview index and to `RunSamplesSpec`, asserting each script's actual return
+  value.
+
 ### Fixed
 
 - **Semicolon-separated ADT enum case clauses didn't parse (#415).** The single-line

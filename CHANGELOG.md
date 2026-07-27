@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The effect table had no drift guard, and `onion.Residue` was already missing from
+  it (#429).** `onion.Residue` shipped in v0.10.0 (#362) but was never added to
+  `effect-table.txt`; since it's a marker interface with no methods the omission was
+  latent, but any unlisted stdlib class resolves to `Effect.Unknown`, which would make
+  a future class silently require `requires { unknown }` with no indication that the
+  real cause is a missing table row. Added the missing `onion.Residue#*=pure` entry
+  and a new `EffectTableStdlibCoverageSpec` (modeled on the existing
+  `EffectWalkerCompletenessSpec`) that fails the build if `src/main/java/onion/*.java`
+  ever grows a class with no `effect-table.txt` entry.
+
 - **A `tool` with a non-CLI-convertible parameter compiled to a silent no-op (#424).**
   `tool`-only scripts have no `main` and no top-level statements, so when CLI
   synthesis bailed out on a parameter it couldn't convert from a command-line string

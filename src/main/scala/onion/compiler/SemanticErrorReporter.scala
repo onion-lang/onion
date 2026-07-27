@@ -426,6 +426,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.toolBadCapability",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
     ),
+    SemanticError.DUPLICATE_TOOL_NAME -> ErrorDef(
+      "error.semantic.duplicateToolName",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.SHAPE_INSTANCE_WITHOUT_LAW -> ErrorDef(
       "error.semantic.shapeInstanceWithoutLaw",
       Seq(items => asString(items(0)))

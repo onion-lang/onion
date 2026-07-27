@@ -232,6 +232,18 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、`main` のない何も実行
 しないプログラムがコンパイルされていました（issue #424）。
 
+### `E0082` — tool 名の重複
+
+2つの `tool` が同じ名前を持っています。関数のオーバーロード自体は正当ですが、コマンド
+ラインは**名前だけ**で tool を選ぶため、2つ目は決して呼び出せず、`--contract` にも同名
+で2件並んでどちらも指定できません。
+
+```onion
+tool same(a: Int): Int requires { console } { IO::println("A"); return 0 }
+tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
+// E0082: tool 名 `same` が重複しています。
+```
+
 ## パターンマッチングエラー
 
 ### `E0042` — 網羅性のないパターンマッチング

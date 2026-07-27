@@ -486,6 +486,12 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |tool t(p: P): Int requires { console } { IO::println("" + p.x()); return 0 }
           |""".stripMargin)
     }
+    it("E0082 two tools with the same name (#436)") {
+      failsWith("E0082",
+        """tool same(a: Int): Int requires { console } { IO::println("A"); return 0 }
+          |tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
+          |""".stripMargin)
+    }
     it("E0076 unknown shape format") {
       failsWith("E0076",
         """record P(x: Int)

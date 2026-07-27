@@ -234,6 +234,18 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 This used to be silent: CLI synthesis skipped such a script, which then compiled to a
 program with no `main` and nothing to run (issue #424).
 
+### `E0082` — Duplicate tool name
+
+Two `tool`s share a name. Function overloading is fine, but the command line selects a
+tool **by name alone**, so the second one can never be invoked and `--contract` lists
+both under the same name with no way to address either.
+
+```onion
+tool same(a: Int): Int requires { console } { IO::println("A"); return 0 }
+tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
+// E0082: duplicate tool name `same`.
+```
+
 ## Pattern-matching errors
 
 ### `E0042` — Non-exhaustive pattern match

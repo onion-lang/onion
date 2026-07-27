@@ -340,6 +340,17 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // silently leaving the tools as uncalled plain functions would compile the
     // whole script down to a no-op (issue #424); report the offending parameter
     // instead.
+    // Overloading is fine for functions, but the CLI selects a tool by NAME alone, so a
+    // second tool with the same name is unreachable and the contract lists it twice
+    // with no way to address either (issue #436). Reject it here.
+    val duplicateNames = tools.groupBy(_.name).collect { case (n, ts) if ts.size > 1 => ts.tail }.flatten
+    if (duplicateNames.nonEmpty) {
+      throw new CompilationException(duplicateNames.toSeq.map { t =>
+        CompileError("", t.location,
+          Message("error.semantic.duplicateToolName", t.name),
+          Some(DUPLICATE_TOOL_NAME.errorCode))
+      })
+    }
     // One report per offending parameter, not just the first: fixing them should not
     // be a one-per-compile game. E0081 carries EN+JA messages like every other code.
     val badParams = for {

@@ -107,6 +107,104 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
   }
 
+  describe("basic type and name resolution") {
+    it("E0000 incompatible type in a val's declared type") {
+      failsWith("E0000",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x: Int = "a"
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0001 incompatible operand type for +") {
+      failsWith("E0001",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x = 1 + true
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0002 variable not found") {
+      failsWith("E0002",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int { return undefinedVar }
+          |}
+          |""".stripMargin)
+    }
+    it("E0003 class not found") {
+      failsWith("E0003",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val a: NoSuchClass = null
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0004 field not found") {
+      failsWith("E0004",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val s = "a".noSuchField
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0005 method not found") {
+      failsWith("E0005",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val s = "a".noSuchMethod()
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0007 duplicate local variable") {
+      failsWith("E0007",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x = 1
+          |    val x = 2
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+  }
+
+  describe("more declaration-level duplicates") {
+    it("E0010 duplicate method") {
+      failsWith("E0010",
+        """class Test {
+          |public:
+          |  def m(): Int = 1
+          |  def m(): Int = 2
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin)
+    }
+    it("E0012 duplicate top-level function") {
+      failsWith("E0012",
+        """def f(): Int = 1
+          |def f(): Int = 2
+          |def main(): void { }
+          |""".stripMargin)
+    }
+  }
+
   describe("inheritance and interfaces") {
     it("E0018 illegal inheritance (extending a final class)") {
       failsWith("E0018",

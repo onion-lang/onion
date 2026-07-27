@@ -132,5 +132,41 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs CollectionUtilities.on") {
       assert(Shell.Success("[Bob, Alice, Charlie]") == runSample("run/CollectionUtilities.on"))
     }
+
+    it("runs Bidirectional.on") {
+      assert(Shell.Success(null) == runSample("run/Bidirectional.on"))
+    }
+
+    it("runs CsvProcessor.on") {
+      assert(Shell.Success("Processed 4 rows, average score = 87") == runSample("run/CsvProcessor.on"))
+    }
+
+    it("runs DataClass.on") {
+      assert(Shell.Success(null) == runSample("run/DataClass.on"))
+    }
+
+    it("runs Fibonacci.on") {
+      assert(Shell.Success(null) == runSample("run/Fibonacci.on"))
+    }
+
+    it("runs FizzBuzz.on") {
+      assert(Shell.Success(null) == runSample("run/FizzBuzz.on"))
+    }
+
+    it("runs CliArgsDemo.on") {
+      def run(args: String*): Shell.Result =
+        shell.run(load("run/CliArgsDemo.on"), "run/CliArgsDemo.on", args.toArray)
+      assert(Shell.Success("output=out.txt, paths=[a.txt, b.txt], verbose=true") ==
+        run("--verbose", "--output=out.txt", "a.txt", "b.txt"))
+    }
+
+    it("runs FileWordCounter.on") {
+      val dir = java.nio.file.Files.createTempDirectory("file-word-counter-spec")
+      val f = dir.resolve("words.txt")
+      java.nio.file.Files.writeString(f, "hello world\nfoo bar baz\n\ngood day\n")
+      def run(args: String*): Shell.Result =
+        shell.run(load("run/FileWordCounter.on"), "run/FileWordCounter.on", args.toArray)
+      assert(Shell.Success("Total words: 7") == run(f.toString))
+    }
   }
 }

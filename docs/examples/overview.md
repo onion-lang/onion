@@ -82,6 +82,11 @@ java Hello
 | `ResultValidation.on` | Validation with errors | Option, Result |
 | `StaticImports.on` | Static method imports | `import { Class::method }` |
 | `UnitConverter.on` | CLI unit converter | Extension methods, Args |
+| `SetOperations.on` | Set algebra | `onion.Sets` (union, intersection, difference) |
+| `PrimitivePredicate.on` | Filtering with a primitive predicate | `java.util.function.Predicate[Int]`, `removeIf` |
+| `PrimitiveFunctionalInterfaces.on` | Primitive-typed Java functional interfaces | `Predicate`, `Supplier`, `Function` with primitive type args |
+| `SortWithPrimitiveComparator.on` | Sorting with a primitive comparator | `java.util.Comparator[Int]`, primitive lambda bridging |
+| `CollectionUtilities.on` | Map/list utilities | `onion.Maps`, `onion.Iterables`, custom sort |
 
 ## Learning Path
 

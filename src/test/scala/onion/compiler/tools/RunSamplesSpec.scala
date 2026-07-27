@@ -110,5 +110,27 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs AdtExpr.on") {
       assert(Shell.Success(null) == runSample("run/AdtExpr.on"))
     }
+
+    it("runs SetOperations.on") {
+      assert(Shell.Success("union=[apple, banana, cherry, date] intersection=[banana, cherry] diff=[apple]") ==
+        runSample("run/SetOperations.on"))
+    }
+
+    it("runs PrimitivePredicate.on") {
+      assert(Shell.Success("[1, 3, 5]") == runSample("run/PrimitivePredicate.on"))
+    }
+
+    it("runs PrimitiveFunctionalInterfaces.on") {
+      assert(Shell.Success("[isPositive(5) = true, answer.get() = 42, doubleIt(21) = 42]") ==
+        runSample("run/PrimitiveFunctionalInterfaces.on"))
+    }
+
+    it("runs SortWithPrimitiveComparator.on") {
+      assert(Shell.Success("[10, 20, 30] [10, 20, 30]") == runSample("run/SortWithPrimitiveComparator.on"))
+    }
+
+    it("runs CollectionUtilities.on") {
+      assert(Shell.Success("[Bob, Alice, Charlie]") == runSample("run/CollectionUtilities.on"))
+    }
   }
 }

@@ -350,7 +350,17 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     context: LocalContext
   ): Option[ActionStatement] = {
     if (node.init == null) return None
-    if (klass.field(node.name) != null) return None
+    if (klass.field(node.name) != null) {
+      // A second bare top-level `var`/`val` with this name (issue #445). It is just as
+      // global as a modifier-qualified one (both become a `public static` field of the
+      // script's synthetic class), so it's the same error, reported the same way here
+      // rather than falling through to `translate` — which would either silently
+      // introduce an unrelated shadowing local (when the first declaration was a `var`,
+      // so never bound a local itself) or misreport E0007 (when the first declaration
+      // was a `val`, so did bind one).
+      typing.report(DUPLICATE_GLOBAL_VARIABLE, node, node.name)
+      return Some(new StatementBlock(node.location))
+    }
     // A mutable top-level `var` must be single-storage: local-first promotion (below) gives a
     // `var` two backing stores — later top-level statements write the local, defs write the
     // field — which silently diverge. So for a `var` use FIELD-ONLY promotion (the pre-#165

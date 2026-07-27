@@ -8,10 +8,13 @@ import java.io.StringReader
  * `var`/`val` (no modifier) parses as a local variable of the synthesized script body
  * (`top_level()`'s `LOOKAHEAD(2) top=block_element()` alternative in
  * grammar/JJOnionParser.jj wins over `var_decl()` for that input), so it never reaches
- * `TypingDuplicationPass` and two bare `var x` lines are ordinary local redeclaration,
- * not a duplicate-global error. `var_decl()` — and this E0011 check — is only reachable
- * when a modifier keyword (`static`, `final`, `internal`, ...) precedes `var`/`val` at
- * top level.
+ * `TypingDuplicationPass` — that check only sees the `AST.GlobalVariableDeclaration`
+ * node produced by a modifier-qualified top-level `var`/`val`.
+ *
+ * A bare top-level `var`/`val` is instead promoted to a `public static` field of the
+ * script's synthetic class by `TypingBodyPass.processTopLevelVarDeclaration`, so it is
+ * just as global as the modifier-qualified form. That method reports the duplicate
+ * itself (reusing E0011) when the field already exists.
  */
 class DuplicateGlobalVariableSpec extends AbstractShellSpec {
   private def errors(src: String): Seq[(Option[String], String)] = {
@@ -37,7 +40,7 @@ class DuplicateGlobalVariableSpec extends AbstractShellSpec {
       assert(results.map(_._1).contains(Some("E0011")))
     }
 
-    it("does not report E0011 for two bare top-level vars (they are script-local, not global)") {
+    it("reports E0011 for two bare top-level vars with the same name") {
       val results = errors(
         """
           |var x: Int = 1
@@ -48,7 +51,21 @@ class DuplicateGlobalVariableSpec extends AbstractShellSpec {
           |}
           |""".stripMargin
       )
-      assert(!results.map(_._1).contains(Some("E0011")))
+      assert(results.map(_._1).contains(Some("E0011")))
+    }
+
+    it("reports E0011 for a bare top-level val re-declared as a var") {
+      val results = errors(
+        """
+          |val x: Int = 1
+          |var x: Int = 2
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ok" }
+          |}
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0011")))
     }
   }
 }

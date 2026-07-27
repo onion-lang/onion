@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A duplicate bare top-level `var`/`val` went completely unreported (#445).** A
+  modifier-qualified global (`static var x = ...` twice) already reported **E0011**, but
+  a *bare* top-level `var`/`val` — which is promoted to a `public static` field of the
+  script's synthetic class, so it's just as global — took a different code path that
+  silently swallowed the redeclaration. Depending on the mix of `var`/`val` this either
+  compiled clean with the second declaration quietly shadowing the first, or misreported
+  the unrelated **E0007** (duplicate local). Both now report **E0011**, consistent with
+  the modifier-qualified form.
 - **`--dump-ast` and `--dump-typed-ast` were silently no-ops.** Both flags parsed into
   `CompilerConfig` in `onionc`/`onion`, but nothing ever read them back, so the
   documented "print parsed/typed AST to stderr" behavior never happened — the compiler

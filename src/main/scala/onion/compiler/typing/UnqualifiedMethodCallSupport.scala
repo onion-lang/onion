@@ -1,10 +1,13 @@
 package onion.compiler.typing
 
 import onion.compiler.*
+import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 
 import java.util.{TreeSet => JTreeSet}
+
+import scala.jdk.CollectionConverters.*
 
 private[compiler] final class UnqualifiedMethodCallSupport(
   bodyContext: TypingBodyContext,
@@ -288,7 +291,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
 
     overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
       case CandidateSelection.NoMatch =>
-        calls.reportMethodNotFound(node, targetType, node.name, Array[Type]())
+        ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
+          case Some(named) => bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name)
+          case None => calls.reportMethodNotFound(node, targetType, node.name, Array[Type]())
+        }
         None
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousMethod(node, first, second, node.name)

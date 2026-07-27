@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`E0043 UNKNOWN_PARAMETER_NAME` never fired; a misspelled named argument was
+  reported as a generic not-found instead (#426).** Overload/constructor candidate
+  filtering dropped every candidate as soon as one named argument didn't match a
+  parameter, so by the time resolution gave up it had already lost track of *why* —
+  the user saw `method ... is not found` (or `constructor ... is not found`) without
+  the offending name called out. Static calls, instance calls, unqualified calls, and
+  constructor calls now re-check the original candidate list when resolution comes up
+  empty and report E0043 naming the bad argument when that's the actual cause,
+  falling back to the existing not-found diagnostic otherwise.
+
 - **The effect table had no drift guard, and `onion.Residue` was already missing from
   it (#429).** `onion.Residue` shipped in v0.10.0 (#362) but was never added to
   `effect-table.txt`; since it's a marker interface with no methods the omission was

@@ -90,5 +90,25 @@ class RunSamplesSpec extends AbstractShellSpec {
       // log with every 200th line truncated.
       assert(Shell.Success(5) == runSample("run/BrokenLogDemo.on"))
     }
+
+    it("runs Primes.on") {
+      assert(Shell.Success(null) == runSample("run/Primes.on"))
+    }
+
+    it("runs LogSummary.on") {
+      assert(Shell.Success(null) == runSample("run/LogSummary.on"))
+    }
+
+    it("runs DeptReport.on") {
+      assert(Shell.Success(null) == runSample("run/DeptReport.on"))
+    }
+
+    it("runs WordStats.on") {
+      assert(Shell.Success(null) == runSample("run/WordStats.on"))
+    }
+
+    it("runs AdtExpr.on") {
+      assert(Shell.Success(null) == runSample("run/AdtExpr.on"))
+    }
   }
 }

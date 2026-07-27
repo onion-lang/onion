@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Five `run/` examples (`Primes.on`, `LogSummary.on`, `DeptReport.on`, `WordStats.on`,
+  `AdtExpr.on`) were undocumented.** They existed in the repository but had no entry
+  in the Examples Overview index, and no regression coverage confirmed they still ran.
+  Added them to `docs/examples/overview.md`'s Example Index table and to
+  `RunSamplesSpec` so drift between the docs and the scripts is caught automatically.
+
 ### Fixed
 
 - **Semicolon-separated ADT enum case clauses didn't parse (#415).** The single-line

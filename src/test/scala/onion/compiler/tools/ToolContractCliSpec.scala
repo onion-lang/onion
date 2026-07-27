@@ -81,6 +81,20 @@ class ToolContractCliSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == r, r.toString)
       assert(out.contains("--nope"), out)
     }
+
+    it("rejects a flag given more than once instead of silently taking the last value") {
+      val (r, out) = run(script, "x", "--count", "1", "--count", "2")
+      assert(Shell.Success(1) == r, r.toString)
+      assert(out.contains("--count"), out)
+      assert(out.contains("more than once"), out)
+    }
+
+    it("rejects a switch given more than once") {
+      val (r, out) = run(script, "x", "--loud", "--loud")
+      assert(Shell.Success(1) == r, r.toString)
+      assert(out.contains("--loud"), out)
+      assert(out.contains("more than once"), out)
+    }
   }
 
   describe("several tools in one script") {

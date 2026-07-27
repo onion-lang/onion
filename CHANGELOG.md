@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A repeated tool CLI flag silently took the last value (#438).** `ToolCli.dispatch`
+  assigned into a flag's or switch's slot on every occurrence with no check for one
+  already filled, so `--n 2 --n 3` accepted `3` without comment — the same class of
+  mistake `E0044`/`DUPLICATE_ARGUMENT` already rejects for a named argument in source.
+  A flag or switch given more than once now reports `option `--name` was given more
+  than once` and exits 1.
+
 ## [0.10.3] - 2026-07-27
 
 The six issues found in the post-0.10.2 audit (#424-#429), fixed across #430-#434.

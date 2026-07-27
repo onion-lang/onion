@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.2] - 2026-07-27
+### Documentation
+
+- **Five `run/` examples (`Primes.on`, `LogSummary.on`, `DeptReport.on`, `WordStats.on`,
+  `AdtExpr.on`) were undocumented.** They existed in the repository but had no entry
+  in the Examples Overview index, and no regression coverage confirmed they still ran.
+  Added them to `docs/examples/overview.md`'s Example Index table and to
+  `RunSamplesSpec` so drift between the docs and the scripts is caught automatically.
 
 ### Fixed
 
@@ -21,11 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- **Five `run/` examples (`Primes.on`, `LogSummary.on`, `DeptReport.on`, `WordStats.on`,
-  `AdtExpr.on`) were undocumented.** They existed in the repository but had no entry
-  in the Examples Overview index, and no regression coverage confirmed they still ran.
-  Added them to `docs/examples/overview.md`'s Example Index table and to
-  `RunSamplesSpec` so drift between the docs and the scripts is caught automatically.
 - **Tail call optimization docs (EN+JA) described a stale, pre-transformation state.**
   Both `docs/compiler/tail-call-optimization.md` and its `ja` counterpart said
   transformation was "planned" and showed a `--verbose` sample line that never

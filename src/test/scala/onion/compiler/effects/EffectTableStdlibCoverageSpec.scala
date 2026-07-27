@@ -43,4 +43,28 @@ class EffectTableStdlibCoverageSpec extends AnyFunSpec {
     assert(missing.isEmpty,
       s"onion.* stdlib classes with no effect-table.txt entry (add a Class#*= or Class#method= row): ${missing.toSeq.sorted.mkString(", ")}")
   }
+
+  it("the table names no onion.* class that no longer exists") {
+    val table = java.nio.file.Files.readString(
+      java.nio.file.Path.of("src/main/resources/onion/effect-table.txt"))
+    val declared = """(?m)^onion\.([A-Za-z0-9_]+)#""".r
+      .findAllMatchIn(table).map(_.group(1)).toSet
+    val present = {
+      val out = scala.collection.mutable.Set[String]()
+      java.nio.file.Files.list(java.nio.file.Path.of("src/main/java/onion")).forEach { p =>
+        val n = p.getFileName.toString
+        if (n.endsWith(".java")) out += n.dropRight(5)
+      }
+      out.toSet
+    }
+    assert((declared -- present).isEmpty,
+      s"effect-table entries for classes that no longer exist: ${(declared -- present).mkString(", ")}")
+  }
+
+  it("the whole table parses, so a malformed edit fails here rather than at first use") {
+    import scala.jdk.CollectionConverters._
+    val lines = java.nio.file.Files.readAllLines(
+      java.nio.file.Path.of("src/main/resources/onion/effect-table.txt")).asScala
+    EffectTable.parseLines(lines.iterator)
+  }
 }

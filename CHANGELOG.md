@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`--plan` reported the bound parameter value as if it were the path touched
+  (#425).** A capability binds an effect to a *parameter*, but a body may compute
+  `dst + "." + i` from it — the shipped demo does exactly that, so the plan said
+  `write dst = out.txt` while the run created `out.txt.0` and `out.txt.1`. The operand
+  now reads `derived from dst = out.txt`, and the closing line says operands are the
+  arguments the effects are derived from, not necessarily the exact paths or hosts
+  touched. Guide updated EN+JA.
+
+### Removed
+
+- **Three diagnostic codes that could never fire (#427):** `E0017 CYCLIC_DELEGATION`
+  (undecidable as designed — the delegate is chosen at runtime), `E0024
+  UNIMPLEMENTED_FEATURE` (leftover) and `E0056 ENUM_CONSTANT_ARGS_UNSUPPORTED`
+  (obsolete since data-carrying enums shipped), with their EN+JA messages. The
+  coverage spec's dead-code registry is now empty and stays that way by test.
+
+### Added
+
+- **`QualityBarSpec` measures `docs/quality-bar.md` against the tree (#428).** Sample
+  count, large-program count *and names*, guide parity and diagnostic-code count are
+  checked against what is actually there, and the JA copy must agree. The file had
+  drifted three times in three days because every figure was transcribed by hand; the
+  spec caught two more stale figures on its first run.
+- **`EffectTableStdlibCoverageSpec` gains the other direction of the drift check
+  (#429 follow-up):** no table entry may name a class that no longer exists, and the
+  whole table must parse — so a malformed edit fails there rather than at first use.
+
+### Fixed
+
 - **`E0043 UNKNOWN_PARAMETER_NAME` never fired; a misspelled named argument was
   reported as a generic not-found instead (#426).** Overload/constructor candidate
   filtering dropped every candidate as soon as one named argument didn't match a

@@ -9,9 +9,6 @@ import onion.tools.Shell
  * locale-independent where message text is not.
  *
  * Deliberately absent:
- *   - E0017 CYCLIC_DELEGATION, E0024 UNIMPLEMENTED_FEATURE, E0056
- *     ENUM_CONSTANT_ARGS_UNSUPPORTED — dead: no report site exists. The drift guard
- *     below fails if one of them comes back to life (or dies) unnoticed.
  *   - E0075 LAW_CLASS_NOT_LOADABLE — reachable only through an environment failure
  *     (a compiled check class failing to load), which has no honest in-process trigger.
  *   - E0032 TYPE_ARGUMENT_MUST_BE_REFERENCE — has live report sites (checked whenever
@@ -26,7 +23,12 @@ import onion.tools.Shell
  */
 class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
 
-  private val deadCodes = Set("CYCLIC_DELEGATION", "UNIMPLEMENTED_FEATURE", "ENUM_CONSTANT_ARGS_UNSUPPORTED")
+  /** Codes declared but never reported. Empty since #427 deleted the three that were:
+   *  CYCLIC_DELEGATION (undecidable — the delegate is chosen at runtime),
+   *  UNIMPLEMENTED_FEATURE (leftover) and ENUM_CONSTANT_ARGS_UNSUPPORTED (obsolete
+   *  once data-carrying enums shipped). Registering a code here is how a genuinely
+   *  unreachable one gets acknowledged instead of rotting unnoticed. */
+  private val deadCodes = Set.empty[String]
 
   private def failsWith(code: String, source: String): Unit = {
     val buf = new java.io.ByteArrayOutputStream()

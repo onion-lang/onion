@@ -1267,6 +1267,12 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
     top=type_alias_decl(mset)
   | top=type_decl(mset)
   | top=fun_decl(mset)
+  // var_decl() (AST.GlobalVariableDeclaration) is only reachable through this
+  // modifier-gated branch: a bare top-level `var`/`val` (no `static`/`final`/...)
+  // is matched earlier by the LOOKAHEAD(2) block_element() alternative above and
+  // becomes a local variable of the synthesized script body instead. So E0011
+  // (duplicated global variable) only fires for modifier-qualified globals, e.g.
+  // two `static var x: Int = ...` -- see issue #445.
   | top=var_decl(mset)
   )
 ) {return top;}

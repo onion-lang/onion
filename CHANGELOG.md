@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-07-27
+
+The six issues found in the post-0.10.2 audit (#424-#429), fixed across #430-#434.
+
+Two of them were silent failures — a `tool` that compiled to a program doing nothing,
+and a dry run naming a path the run would not touch — and two were drift: documented
+figures and an effect table that nothing kept honest. Both kinds now fail the build.
+
 ### Fixed
 
+- **A `tool` with a non-CLI-convertible parameter compiled to a silent no-op (#424).**
+  A `tool`-only script has no `main` and no top-level statements, so when CLI synthesis
+  bailed out on a parameter it could not read from a command-line string (a record,
+  say), nothing ever called the tool — the script exited 0 having done nothing, with no
+  diagnostic at all. It is now a compile error naming the offending tool and parameter
+  and listing the supported types, as **E0081** with EN+JA messages and a reference
+  entry, one report per offending parameter. Documented in `docs/guide/tools.md`
+  (EN+JA).
 - **`--plan` reported the bound parameter value as if it were the path touched
   (#425).** A capability binds an effect to a *parameter*, but a body may compute
   `dst + "." + i` from it — the shipped demo does exactly that, so the plan said
@@ -16,65 +32,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now reads `derived from dst = out.txt`, and the closing line says operands are the
   arguments the effects are derived from, not necessarily the exact paths or hosts
   touched. Guide updated EN+JA.
+- **`E0043 UNKNOWN_PARAMETER_NAME` never fired; a misspelled named argument was
+  reported as a generic not-found instead (#426).** Candidate filtering dropped every
+  overload as soon as one named argument failed to match a parameter, so by the time
+  resolution gave up it had lost track of *why* — the user saw `method ... is not
+  found` without the offending name called out. Static, instance, unqualified and
+  constructor calls now re-check the original candidate list when resolution comes up
+  empty, and report E0043 naming the bad argument when that is the actual cause.
 
 ### Removed
 
-- **Three diagnostic codes that could never fire (#427):** `E0017 CYCLIC_DELEGATION`
-  (undecidable as designed — the delegate is chosen at runtime), `E0024
-  UNIMPLEMENTED_FEATURE` (leftover) and `E0056 ENUM_CONSTANT_ARGS_UNSUPPORTED`
-  (obsolete since data-carrying enums shipped), with their EN+JA messages. The
-  coverage spec's dead-code registry is now empty and stays that way by test.
+- **Three diagnostic codes that could never fire (#427),** with their EN+JA messages:
+  `E0017 CYCLIC_DELEGATION` (undecidable as designed — the delegate is chosen at
+  runtime, so no static check can see the cycle), `E0024 UNIMPLEMENTED_FEATURE`
+  (leftover) and `E0056 ENUM_CONSTANT_ARGS_UNSUPPORTED` (obsolete since data-carrying
+  enums shipped). The coverage spec's dead-code registry is now empty and stays that
+  way by test.
 
 ### Added
 
-- **`QualityBarSpec` measures `docs/quality-bar.md` against the tree (#428).** Sample
-  count, large-program count *and names*, guide parity and diagnostic-code count are
-  checked against what is actually there, and the JA copy must agree. The file had
-  drifted three times in three days because every figure was transcribed by hand; the
-  spec caught two more stale figures on its first run.
-- **`EffectTableStdlibCoverageSpec` gains the other direction of the drift check
-  (#429 follow-up):** no table entry may name a class that no longer exists, and the
-  whole table must parse — so a malformed edit fails there rather than at first use.
-
-### Fixed
-
-- **`E0043 UNKNOWN_PARAMETER_NAME` never fired; a misspelled named argument was
-  reported as a generic not-found instead (#426).** Overload/constructor candidate
-  filtering dropped every candidate as soon as one named argument didn't match a
-  parameter, so by the time resolution gave up it had already lost track of *why* —
-  the user saw `method ... is not found` (or `constructor ... is not found`) without
-  the offending name called out. Static calls, instance calls, unqualified calls, and
-  constructor calls now re-check the original candidate list when resolution comes up
-  empty and report E0043 naming the bad argument when that's the actual cause,
-  falling back to the existing not-found diagnostic otherwise.
-
-- **The effect table had no drift guard, and `onion.Residue` was already missing from
-  it (#429).** `onion.Residue` shipped in v0.10.0 (#362) but was never added to
-  `effect-table.txt`; since it's a marker interface with no methods the omission was
-  latent, but any unlisted stdlib class resolves to `Effect.Unknown`, which would make
-  a future class silently require `requires { unknown }` with no indication that the
-  real cause is a missing table row. Added the missing `onion.Residue#*=pure` entry
-  and a new `EffectTableStdlibCoverageSpec` (modeled on the existing
-  `EffectWalkerCompletenessSpec`) that fails the build if `src/main/java/onion/*.java`
-  ever grows a class with no `effect-table.txt` entry.
-
-- **A `tool` with a non-CLI-convertible parameter compiled to a silent no-op (#424).**
-  `tool`-only scripts have no `main` and no top-level statements, so when CLI
-  synthesis bailed out on a parameter it couldn't convert from a command-line string
-  (e.g. a record), nothing ever called the tool — the script just exited 0 having done
-  nothing, with no diagnostic. It is now a compile error naming the offending tool and
-  parameter, with the list of supported types (`String`, `Int`, `Long`, `Double`,
-  `Float`, `Boolean`, `Short`, `Byte`). Documented in `docs/guide/tools.md` (en/ja).
-
-### Documentation
-
-- **Seven more `run/` examples (`Bidirectional.on`, `CsvProcessor.on`, `DataClass.on`,
-  `Fibonacci.on`, `FizzBuzz.on`, `CliArgsDemo.on`, `FileWordCounter.on`) had the same
-  undocumented/untested gap as prior batches.** Added them to
-  `docs/examples/overview.md`'s Example Index table and to `RunSamplesSpec`, asserting
-  each script's actual return value. (`GuessNumber.on` was left out of this batch — it
-  reads interactively from stdin with a random target and needs a different test
-  strategy.)
+- **A drift guard for the effect table (#429).** `onion.Residue` shipped in v0.10.0 and
+  was never added to `effect-table.txt`; the omission was latent only because it is a
+  marker interface with no methods, but any unlisted stdlib class resolves to
+  `Effect.Unknown` — which would make a future class silently require
+  `requires { unknown }` with no indication that a missing table row, not unanalyzable
+  code, was the cause. Added the entry, plus `EffectTableStdlibCoverageSpec`: every
+  `onion.*` class must have an entry, no entry may name a class that is gone, and the
+  whole table must parse.
+- **A drift guard for the quality bar (#428).** `QualityBarSpec` measures the
+  measurable rows of `docs/quality-bar.md` against the tree — sample count,
+  large-program count *and names*, guide parity, diagnostic-code count — and checks the
+  JA copy agrees. The file had drifted three times in three days because every figure
+  was transcribed by hand; the spec caught two more stale figures on its first run.
 
 ## [0.10.2] - 2026-07-27
 

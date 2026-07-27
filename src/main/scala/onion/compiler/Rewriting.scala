@@ -14,7 +14,7 @@ import _root_.onion.compiler.TypedAST.UnaryTerm.Kind._
 import _root_.onion.compiler.TypedAST._
 import _root_.onion.compiler.SemanticError._
 import _root_.onion.compiler.exceptions.CompilationException
-import _root_.onion.compiler.toolbox.{Boxing, Classes, Paths, Systems}
+import _root_.onion.compiler.toolbox.{Boxing, Classes, Message, Paths, Systems}
 import onion.compiler.AST.{ClassDeclaration, InterfaceDeclaration, RecordDeclaration}
 
 import _root_.scala.jdk.CollectionConverters._
@@ -340,13 +340,19 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // silently leaving the tools as uncalled plain functions would compile the
     // whole script down to a no-op (issue #424); report the offending parameter
     // instead.
-    tools.flatMap(t => t.args.filter(a => cliKindOf(a.typeRef).isEmpty).map(t -> _)).headOption.foreach {
-      case (tool, arg) =>
-        throw new CompilationException(Seq(CompileError("", arg.location,
-          s"tool '${tool.name}' has parameter '${arg.name}' of type ${arg.typeRef.desc} which cannot be " +
-          "derived into a CLI argument; tool parameters must be one of String, Int, Long, Double, Float, " +
-          "Boolean, Short, Byte.")))
-    }
+    // One report per offending parameter, not just the first: fixing them should not
+    // be a one-per-compile game. E0081 carries EN+JA messages like every other code.
+    val badParams = for {
+      t <- tools
+      a <- t.args
+      if cliKindOf(a.typeRef).isEmpty
+    } yield CompileError("", a.location,
+      Message("error.semantic.toolParameterNotCliConvertible",
+        Array[Any](t.name, a.name,
+          if (a.typeRef == null) "(none)" else a.typeRef.desc.toString,
+          ScalarConversions.supportedNames)),
+      Some(TOOL_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))
+    if (badParams.nonEmpty) throw new CompilationException(badParams)
 
     val loc = tools.head.location
     val contractJson = tools.map(toolContractJson).mkString("[", ",", "]")

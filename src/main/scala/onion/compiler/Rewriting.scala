@@ -336,8 +336,17 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     if (toplevels.exists { case f: AST.FunctionDeclaration => f.name == "main"; case _ => false }) return
     if (toplevels.exists(_.isInstanceOf[AST.BlockElement])) return
     // Every parameter of every tool must be CLI-convertible, or the CLI cannot be
-    // derived; such a script keeps its tools as plain functions.
-    if (!tools.forall(_.args.forall(a => cliKindOf(a.typeRef).isDefined))) return
+    // derived. A `tool`-only script has no `main` and no top-level statements, so
+    // silently leaving the tools as uncalled plain functions would compile the
+    // whole script down to a no-op (issue #424); report the offending parameter
+    // instead.
+    tools.flatMap(t => t.args.filter(a => cliKindOf(a.typeRef).isEmpty).map(t -> _)).headOption.foreach {
+      case (tool, arg) =>
+        throw new CompilationException(Seq(CompileError("", arg.location,
+          s"tool '${tool.name}' has parameter '${arg.name}' of type ${arg.typeRef.desc} which cannot be " +
+          "derived into a CLI argument; tool parameters must be one of String, Int, Long, Double, Float, " +
+          "Boolean, Short, Byte.")))
+    }
 
     val loc = tools.head.location
     val contractJson = tools.map(toolContractJson).mkString("[", ",", "]")

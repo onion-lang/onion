@@ -4608,6 +4608,12 @@ tool が印字するラムダを作るなら、そのラムダが他所でしか
 値、未知のオプションは、引数名と期待される型を名指しするメッセージを出して <code>main</code> から
 <code>1</code> を返します。スクリプトが複数の tool を宣言していれば、最初の引数がサブコマンド式に
 名前で選択し、契約には tool ごとのエントリが並びます。</p>
+<p>すべての <code>tool</code> のすべてのパラメータは、CLI に変換可能な型 —
+<code>String</code>・<code>Int</code>・<code>Long</code>・<code>Double</code>・<code>Float</code>・<code>Boolean</code>・<code>Short</code>・<code>Byte</code> —
+のいずれかである必要があります。任意の型をコマンドライン文字列から一般的な方法で
+パースする手段は無いためです。それ以外の型（たとえば record）のパラメータを持つ
+<code>tool</code> はコンパイルエラーになり、問題の tool とパラメータを名指しします。呼び出されない
+まま黙ってコンパイルが通ってしまうことはありません。</p>
 <p><code>--help</code> の capability 行と契約の <code>capabilities</code> フィールドはドキュメントではありません —
 上の節で検査された宣言そのものです。契約が「してよい」と言うことは、コンパイラが
 「それを超えられない」と証明したことです。</p>
@@ -4622,7 +4628,9 @@ CLI は<em>この呼び出し</em>が何をするかを —— 宣言された�
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>console
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="o">(</span>nothing<span class="w"> </span>was<span class="w"> </span>executed<span class="o">)</span>
 </span></code></pre></div>
-<p>引数は本物の実行とまったく同じに解析されます —— 不正な値は実行が失敗するのと同じように
+<p>capability はエフェクトを<em>パラメータ</em>に結びつけるので、<code>write derived from dst = …</code> は
+「書き込みは <code>dst</code> を通る」という意味です。「実行がちょうどそのパスに触る」ではありません
+（本体はそこから <code>dst + ".1"</code> を作れます）。引数は本物の実行とまったく同じに解析されます —— 不正な値は実行が失敗するのと同じように
 プランも失敗させます。デフォルトに任せたオペランドは契約のデフォルトを表示します。
 正直さの規則は両方向に厳格です。ambient な効果（<code>console</code>、<code>clock</code>、<code>env</code>、<code>rand</code>）は
 名前だけで表示されます。解析がパラメータに結びつけられなかったオペランドは、推測される

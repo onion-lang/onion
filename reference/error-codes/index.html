@@ -4017,6 +4017,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0081-tool-parameter-cannot-be-read-from-the-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0081 — Tool parameter cannot be read from the command line
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4904,6 +4915,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0081-tool-parameter-cannot-be-read-from-the-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0081 — Tool parameter cannot be read from the command line
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5116,21 +5138,32 @@ the tool's parameters.</p>
 <p>Fixes:
 - Use <code>?.</code> / <code>?:</code> / <code>if x != null</code>.
 - Declare a non-null bound: <code>class Box[T extends Object]</code>.</p>
+<h3 id="e0081-tool-parameter-cannot-be-read-from-the-command-line"><code>E0081</code> — Tool parameter cannot be read from the command line<a class="headerlink" href="#e0081-tool-parameter-cannot-be-read-from-the-command-line" title="Permanent link">&para;</a></h3>
+<p>A <code>tool</code>'s parameters must all be readable from a command-line argument, since the CLI
+is derived from them.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>record P(x: Int)
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>// E0081: parameter `p` has type P, which cannot be read from an argument.
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>//        Supported: String, Int, Long, Double, Float, Boolean, Short, Byte.
+</span></code></pre></div>
+<p>This used to be silent: CLI synthesis skipped such a script, which then compiled to a
+program with no <code>main</code> and nothing to run (issue #424).</p>
 <h2 id="pattern-matching-errors">Pattern-matching errors<a class="headerlink" href="#pattern-matching-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0042-non-exhaustive-pattern-match"><code>E0042</code> — Non-exhaustive pattern match<a class="headerlink" href="#e0042-non-exhaustive-pattern-match" title="Permanent link">&para;</a></h3>
 <p>A <code>select</code> on a sealed type does not cover all cases.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>sealed interface Shape {}
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>select shape {
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>  // missing Rect case → E0042
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sealed interface Shape {}
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>select shape {
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  // missing Rect case → E0042
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>}
 </span></code></pre></div>
 <h2 id="parser-errors">Parser errors<a class="headerlink" href="#parser-errors" title="Permanent link">&para;</a></h2>
 <p>Parser errors do not carry <code>E</code> codes; they report the encountered token and the expected tokens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>

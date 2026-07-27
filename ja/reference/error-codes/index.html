@@ -2245,6 +2245,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0081-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0081 — tool のパラメータがコマンドラインから読めない
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4922,6 +4933,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0081-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0081 — tool のパラメータがコマンドラインから読めない
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5132,21 +5154,32 @@
 <p>修正方法:
 - <code>?.</code> / <code>?:</code> / <code>if x != null</code> を使う。
 - 非 null 制限を宣言: <code>class Box[T extends Object]</code>。</p>
+<h3 id="e0081-tool"><code>E0081</code> — tool のパラメータがコマンドラインから読めない<a class="headerlink" href="#e0081-tool" title="Permanent link">&para;</a></h3>
+<p>CLI は <code>tool</code> のパラメータから導出されるので、パラメータはすべてコマンドライン引数から
+読める型でなければなりません。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>record P(x: Int)
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>// E0081: パラメータ `p` の型 P は引数から読み取れません。
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>//        使える型: String, Int, Long, Double, Float, Boolean, Short, Byte。
+</span></code></pre></div>
+<p>以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、<code>main</code> のない何も実行
+しないプログラムがコンパイルされていました（issue #424）。</p>
 <h2 id="_4">パターンマッチングエラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>sealed interface Shape {}
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>select shape {
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sealed interface Shape {}
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>select shape {
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>}
 </span></code></pre></div>
 <h2 id="_5">パーサーエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="_6">関連項目<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>

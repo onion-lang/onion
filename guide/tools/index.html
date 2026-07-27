@@ -4597,6 +4597,11 @@ parse as its declared type, or an unknown option each print a message naming the
 argument and the expected type, then return <code>1</code> from <code>main</code>. When a script declares
 several tools, the first argument selects one by name, subcommand-style, and the
 contract carries one entry per tool.</p>
+<p>Every parameter of every <code>tool</code> must be one of the CLI-convertible types — <code>String</code>,
+<code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code> — since there is no general
+way to parse an arbitrary type from a command-line string. A <code>tool</code> with a parameter of
+any other type (a record, for instance) fails to compile, naming the offending tool and
+parameter, rather than silently compiling to a script that never calls it.</p>
 <p>The capability line in <code>--help</code> and the <code>capabilities</code> field in the contract are not
 documentation — they are the checked declaration from the section above. What the
 contract says the tool may do is what the compiler proved it cannot exceed.</p>
@@ -4611,7 +4616,10 @@ instantiated with the actual argument values — and exit without performing any
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>console
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="o">(</span>nothing<span class="w"> </span>was<span class="w"> </span>executed<span class="o">)</span>
 </span></code></pre></div>
-<p>Arguments are parsed exactly as a real run would parse them — a bad value fails the
+<p>A capability binds an effect to a <em>parameter</em>, so <code>write derived from dst = …</code> says the
+write goes through <code>dst</code> — not that the run touches exactly that path, since a body is
+free to build <code>dst + ".1"</code> out of it. Arguments are parsed exactly as a real run would
+parse them — a bad value fails the
 plan the same way it would fail the run — and an operand left to its default shows the
 default from the contract. The honesty rules are strict in both directions. An ambient
 effect (<code>console</code>, <code>clock</code>, <code>env</code>, <code>rand</code>) is named bare. An operand the analysis

@@ -97,6 +97,42 @@ class ToolContractCliSpec extends AbstractShellSpec {
     }
   }
 
+  describe("option-parsing edge cases") {
+    it("`--` ends the options, so a value may start with -- (#437)") {
+      val echo = """tool echo1(s: String): Int requires { console } { IO::println(s); return 0 }
+                   |""".stripMargin
+      val (r, out) = run(echo, "--", "--help")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(out.linesIterator.contains("--help"), s"expected the value to be printed:\n$out")
+      assert(!out.contains("usage:"), s"`-- --help` must not print help:\n$out")
+    }
+
+    it("`--` also protects a value that looks like a declared flag") {
+      val t = """tool t(s: String, n: Int = 1): Int requires { console } { IO::println(s + n); return 0 }
+                |""".stripMargin
+      val (r, out) = run(t, "--n", "5", "--", "--n")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(out.contains("--n5"), out)
+    }
+
+    it("rejects two mode flags rather than silently picking one (#439)") {
+      val t = """tool t(n: Int = 3): Int requires { console } { IO::println("" + n); return 0 }
+                |""".stripMargin
+      val (r, out) = run(t, "--plan", "--contract")
+      assert(Shell.Success(1) == r, r.toString)
+      assert(out.contains("only one of"), out)
+      assert(out.contains("--contract") && out.contains("--plan"), out)
+    }
+
+    it("still accepts each mode flag on its own") {
+      val t = """tool t(n: Int = 3): Int requires { console } { IO::println("" + n); return 0 }
+                |""".stripMargin
+      assert(Shell.Success(0) == run(t, "--contract")._1)
+      assert(Shell.Success(0) == run(t, "--help")._1)
+      assert(Shell.Success(0) == run(t, "--plan")._1)
+    }
+  }
+
   describe("several tools in one script") {
     val multi =
       """tool add(a: Int, b: Int): Int requires { console } { IO::println("" + (a + b)); return 0 }

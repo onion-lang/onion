@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two tools with the same name produced an unreachable second tool (#436).**
+  Overloading is legal for functions, but the CLI selects a tool by name alone, so the
+  second `tool same(...)` could never be invoked and `--contract` listed both under the
+  same name — the unknown-tool message even read `Tools: same, same`. Now **E0082** at
+  compile time, EN+JA.
+- **A tool CLI could not be passed a value starting with `--`, and ignored the
+  conventional `--` separator (#437).** `onion s.on -- --help` printed help instead of
+  passing `--help` as the value. A bare `--` now ends the options — including for the
+  built-in mode flags, whose pre-scan stops there too — so any string value is
+  reachable. Negative numbers already worked and still do.
+- **`--plan` and `--contract` together silently picked one (#439).** The precedence was
+  an artifact of the order the checks were written in. Passing more than one mode flag
+  is now an error naming the ones given.
+- **All dependabot alerts in `vscode-onion` cleared (#440).** Six advisories
+  (`brace-expansion`, `linkify-it`, `minimatch`, `markdown-it`) came in through the
+  extension's dev toolchain. Rather than `npm audit fix --force` — which would have
+  bumped four packages blind — the carriers were updated deliberately: eslint 8 → 10,
+  typescript-eslint 6 → 8, `@vscode/vsce` 2 → 3, and `vscode-languageclient` 9 → 10
+  (the only runtime dependency, and the last vulnerable path). **0 vulnerabilities.**
+
+  Two latent problems surfaced while doing it. `npm run lint` had *never worked* —
+  there was no ESLint configuration file at all, so the script always failed; a flat
+  config was added and the extension now lints clean. And `engines.vscode` claimed
+  `^1.75.0` while the shipped `vscode-languageclient` 9 already required `^1.82.0`; it
+  is now `^1.91.0`, matching what the code actually needs. `tsconfig.json` moves to
+  `Node16` module resolution, which languageclient 10 requires.
+
+### Fixed
+
 - **A repeated tool CLI flag silently took the last value (#438).** `ToolCli.dispatch`
   assigned into a flag's or switch's slot on every occurrence with no check for one
   already filled, so `--n 2 --n 3` accepted `3` without comment — the same class of

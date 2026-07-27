@@ -63,22 +63,48 @@ public final class ToolCli {
             return Result.exit(70); // EX_SOFTWARE
         }
 
-        for (String a : args) {
-            if (a.equals("--contract")) { System.out.println(contractJson); return Result.exit(0); }
+        // Everything after a bare `--` is a value, however it is spelled, so a tool can
+        // be handed an argument that starts with `--` (issue #437). The mode scan below
+        // must stop there too, or `-- --help` would still print help.
+        int endOfOptions = args.length;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("--")) { endOfOptions = i; break; }
         }
-        for (String a : args) {
-            if (a.equals("--help") || a.equals("-h")) { System.out.print(help(tools)); return Result.exit(0); }
+
+        // The three modes are mutually exclusive. Picking one by the order the checks
+        // happen to be written in silently discards the other flag the user passed
+        // (issue #439), so collect them and say when more than one arrived.
+        boolean wantContract = false, wantHelp = false, plan = false;
+        for (int i = 0; i < endOfOptions; i++) {
+            String a = args[i];
+            if (a.equals("--contract")) wantContract = true;
+            else if (a.equals("--help") || a.equals("-h")) wantHelp = true;
+            else if (a.equals("--plan")) plan = true;
         }
-        // --plan (issue #359): parse exactly as a real run would, then report what the
-        // run WOULD do — the declared-and-checked effect set instantiated with the
-        // bound argument values — and exit without performing any of it.
-        boolean plan = false;
+        int modes = (wantContract ? 1 : 0) + (wantHelp ? 1 : 0) + (plan ? 1 : 0);
+        if (modes > 1) {
+            List<String> given = new ArrayList<>();
+            if (wantHelp) given.add("--help");
+            if (wantContract) given.add("--contract");
+            if (plan) given.add("--plan");
+            System.err.println("only one of " + String.join(", ", given)
+                + " can be used at a time.");
+            return Result.exit(1);
+        }
+        if (wantContract) { System.out.println(contractJson); return Result.exit(0); }
+        if (wantHelp) { System.out.print(help(tools)); return Result.exit(0); }
+
+        // Strip `--plan` and the `--` marker. `optionCount` is how many of the surviving
+        // arguments precede the marker: those may be options, the rest are values.
+        int optionCount;
         {
-            List<String> stripped = new ArrayList<>();
-            for (String a : args) {
-                if (a.equals("--plan")) plan = true; else stripped.add(a);
+            List<String> kept = new ArrayList<>();
+            for (int i = 0; i < endOfOptions; i++) {
+                if (!args[i].equals("--plan")) kept.add(args[i]);
             }
-            if (plan) args = stripped.toArray(new String[0]);
+            optionCount = kept.size();
+            for (int i = endOfOptions + 1; i < args.length; i++) kept.add(args[i]);
+            args = kept.toArray(new String[0]);
         }
 
         int toolIndex = 0;
@@ -95,6 +121,7 @@ public final class ToolCli {
             }
             rest = new String[args.length - 1];
             System.arraycopy(args, 1, rest, 0, rest.length);
+            if (optionCount > 0) optionCount--;   // the subcommand was one of them
         }
 
         Map<String, Object> tool = tools.get(toolIndex);
@@ -113,7 +140,9 @@ public final class ToolCli {
         int nextPositional = 0;
         for (int a = 0; a < rest.length; a++) {
             String arg = rest[a];
-            if (arg.startsWith("--")) {
+            // Past the `--` marker every token is a value, even one spelled like an
+            // option — that is the whole point of the marker (issue #437).
+            if (a < optionCount && arg.startsWith("--")) {
                 String key = arg;
                 String inline = null;
                 int eq = arg.indexOf('=');

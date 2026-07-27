@@ -134,6 +134,12 @@ at compile time. Required parameters are positionals; defaulted parameters becom
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.
 
+A bare `--` ends the options: everything after it is a value, however it is spelled, so
+a tool can be handed an argument that starts with `--`. The three mode flags
+(`--help`, `--contract`, `--plan`) are mutually exclusive and passing two is an error
+rather than a silent choice between them. Tool names must be distinct (`E0082`), since
+the name is the only selector a command line has.
+
 Failures are exit codes, not `System.exit`: a missing positional, a value that does not
 parse as its declared type, or an unknown option each print a message naming the
 argument and the expected type, then return `1` from `main`. When a script declares

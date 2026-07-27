@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-07-27
+
+The five issues found in the post-0.10.3 audit (#436-#440), fixed across #441-#442.
+
 ### Fixed
 
 - **Two tools with the same name produced an unreachable second tool (#436).**
@@ -35,9 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `^1.75.0` while the shipped `vscode-languageclient` 9 already required `^1.82.0`; it
   is now `^1.91.0`, matching what the code actually needs. `tsconfig.json` moves to
   `Node16` module resolution, which languageclient 10 requires.
-
-### Fixed
-
 - **A repeated tool CLI flag silently took the last value (#438).** `ToolCli.dispatch`
   assigned into a flag's or switch's slot on every occurrence with no check for one
   already filled, so `--n 2 --n 3` accepted `3` without comment — the same class of

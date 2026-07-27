@@ -124,6 +124,10 @@ public final class ToolCli {
                     return Result.exit(1);
                 }
                 Map<String, Object> p = params.get(idx);
+                if (values[idx] != null) {
+                    System.err.println("option `" + key + "` was given more than once.");
+                    return Result.exit(1);
+                }
                 if (str(p, "role").equals("switch")) {
                     if (inline != null) {
                         System.err.println("switch `" + key + "` does not take a value.");

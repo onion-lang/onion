@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Swing UI or `Select.on`'s `Math::random()`), so `RunSamplesSpec` now runs each
   and asserts on `Shell.Success`.
 
+- **Execution coverage for 3 more `run/` examples: `SchemePrefix.on`,
+  `TextAnalyzer.on`, `StatsApp.on`.** Same treatment as above, for the next batch
+  of deterministic, no-stdin/file/network/GUI examples that were previously
+  untested by `RunSamplesSpec`.
+
 ### Fixed
 
 - **A later `catch` clause already covered by an earlier one compiled silently and

@@ -240,5 +240,17 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs RegexLogParser.on") {
       assert(Shell.Success("Average response time: 65ms") == runSample("run/RegexLogParser.on"))
     }
+
+    it("runs SchemePrefix.on") {
+      assert(Shell.Success(null) == runSample("run/SchemePrefix.on"))
+    }
+
+    it("runs TextAnalyzer.on") {
+      assert(Shell.Success(null) == runSample("run/TextAnalyzer.on"))
+    }
+
+    it("runs StatsApp.on") {
+      assert(Shell.Success(null) == runSample("run/StatsApp.on"))
+    }
   }
 }

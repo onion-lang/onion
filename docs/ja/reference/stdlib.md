@@ -315,17 +315,17 @@ Rand::shuffle(list)  // その場でシャッフル
 ### 基本アサーション
 
 ```onion
-Assert::assertTrue(x > 0)
-Assert::assertFalse(list.isEmpty())
-Assert::assertEquals(expected, actual)
-Assert::assertNotEquals(a, b)
+Assert::isTrue(x > 0)
+Assert::isFalse(list.isEmpty())
+Assert::equals(expected, actual)
+Assert::notEquals(a, b)
 ```
 
 ### Nullアサーション
 
 ```onion
-Assert::assertNotNull(result)
-Assert::assertNull(errorMessage)
+Assert::notNull(result)
+Assert::isNull(errorMessage)
 ```
 
 ### 明示的な失敗

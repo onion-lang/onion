@@ -152,7 +152,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `IO` - Console I/O (println, readLine)
 - `Strings` - String utilities
 - `Rand` - Random number generation (int, long, double, boolean, nextInt, shuffle)
-- `Assert` - Testing assertions (assertTrue, assertEquals, assertNotNull, fail)
+- `Assert` - Testing assertions (isTrue, equals, notNull, fail)
 - `Timing` - Time measurement (nanos, millis, measure, time, sleep)
 - `Files` - File operations
 - `DateTime` - Date/time utilities

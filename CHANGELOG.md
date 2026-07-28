@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/reference/stdlib.md` (EN+JA) and `CLAUDE.md` documented `Assert` methods that
+  do not exist (#449).** `Assert::assertTrue`/`assertFalse`/`assertEquals`/`assertNotEquals`/
+  `assertNotNull`/`assertNull` were never the real API — copying the example straight out
+  of the reference failed to compile with **E0005**. The real names (`isTrue`, `isFalse`,
+  `equals`, `notEquals`, `notNull`, `isNull`) are used everywhere else in the codebase; the
+  docs now match, and a new drift-guard spec (`AssertStdlibDocSpec`) checks the documented
+  names against `onion.Assert` via reflection so this can't rot silently again. Also
+  renamed the `Yaml` module's example record from `Config` to `ServerConfig` in
+  `stdlib.md`, since it shadowed the unrelated `onion.Config` module documented later in
+  the same file and was a likely source of the confusion.
 - **A duplicate bare top-level `var`/`val` went completely unreported (#445).** A
   modifier-qualified global (`static var x = ...` twice) already reported **E0011**, but
   a *bare* top-level `var`/`val` — which is promoted to a `public static` field of the

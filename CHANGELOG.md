@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A generic ADT enum's singleton case rejected the expected-type constructor
+  diamond.** `val o: Opt[String] = new Nothing()` reported `Nothing` as a raw
+  type (`E0066`) even though the declared type fully determines its type
+  argument — `Nothing` conforms to `Opt[T]` in `enum Opt[T] { case Some(value:
+  T); case Nothing }` by passing its own type parameter straight through. The
+  existing constructor-diamond inference (`val b: Box[String] = new Box("x")`)
+  only matched when the constructed class was exactly the expected type's
+  class, not a subtype of it, so any zero-arg case of a generic sum type
+  needed explicit type arguments (`new Nothing[String]()`) even when the
+  target's declared type already pinned them. The same gap applied to a
+  hand-written `record Empty[T]() conforms Box[T]`.
+
 ## [0.10.5] - 2026-07-28
 
 ### Changed

@@ -43,6 +43,37 @@ class GenericAdtEnumSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array()))
   }
 
+  it("infers the singleton case's type argument from the expected type (constructor diamond)") {
+    // `Nothing` conforms to `Opt[T]` by passing its own type parameter straight
+    // through, so `val o: Opt[String] = new Nothing()` should pin T the same way
+    // `val b: Box[String] = new Box(...)` already does for a same-class
+    // constructor (ConstructorDiamondSpec) -- just via a supertype instead of
+    // an exact class match.
+    assert(Shell.Success("none") == shell.run(
+      optEnum +
+        """def describe(o: Opt[String]): String = select o {
+          |  case s is Some: "some:" + s.value()
+          |  case n is Nothing: "none"
+          |}
+          |def main(args: String[]): String { val o: Opt[String] = new Nothing()
+          |  return describe(o) }
+          |""".stripMargin, "None", Array()))
+  }
+
+  it("infers a hand-written generic sealed hierarchy's singleton case the same way") {
+    assert(Shell.Success("none") == shell.run(
+      """sealed interface Box[T] {}
+        |record Full[T](value: T) conforms Box[T]
+        |record Empty[T]() conforms Box[T]
+        |def get(b: Box[String]): String = select b {
+        |  case f is Full: f.value()
+        |  case e is Empty: "none"
+        |}
+        |def main(args: String[]): String { val b: Box[String] = new Empty()
+        |  return get(b) }
+        |""".stripMargin, "None", Array()))
+  }
+
   it("checks exhaustiveness over a generic sealed hierarchy") {
     // Before, the parameterized scrutinee skipped the sealed check entirely and
     // a missing case compiled, then returned null at runtime.

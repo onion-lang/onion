@@ -37,6 +37,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
 - `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)
 - `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
+- `--stacktrace` - Print the raw JVM trace for an uncaught runtime error (the default is a diagnostic-style report with the script's own frames only)
 
 ## High-Level Architecture
 
@@ -151,7 +152,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 **Standard Library** (`src/main/java/onion/`):
 - `IO` - Console I/O (println, readLine)
 - `Strings` - String utilities
-- `Rand` - Random number generation (int, long, double, boolean, nextInt, shuffle)
+- `Rand` - Random number generation (nextInt, nextLong, nextDouble, nextBoolean, shuffle, uuid)
 - `Assert` - Testing assertions (isTrue, equals, notNull, fail)
 - `Timing` - Time measurement (nanos, millis, measure, time, sleep)
 - `Files` - File operations

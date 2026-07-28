@@ -274,18 +274,18 @@ val result: Int = add.call(3, 7)
 
 `onion.Rand`による乱数生成ユーティリティ。
 
-### Rand::int / Rand::long / Rand::double
+### Rand::nextInt / nextLong / nextDouble / nextBoolean
 
 乱数を生成：
 
 ```onion
-val randomInt: Int = Rand::int()           // ランダムなInt
-val randomLong: Long = Rand::long()        // ランダムなLong
-val randomDouble: Double = Rand::double()  // 0.0から1.0
-val randomBool: Boolean = Rand::boolean()  // ランダムなBoolean
+val randomInt: Int = Rand::nextInt()            // ランダムなInt
+val randomLong: Long = Rand::nextLong()         // ランダムなLong
+val randomDouble: Double = Rand::nextDouble()   // 0.0から1.0
+val randomBool: Boolean = Rand::nextBoolean()   // ランダムなBoolean
 ```
 
-### Rand::nextInt
+### Rand::nextInt（範囲指定）
 
 範囲内の乱数整数を生成：
 

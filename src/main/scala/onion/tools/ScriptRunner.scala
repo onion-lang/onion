@@ -69,13 +69,21 @@ object ScriptRunner {
       runWatching(filteredArgs, verbose)
       return 0
     }
+    // An uncaught runtime error used to be rethrown so the JVM's default handler
+    // printed it, which meant synthesized wrappers and launcher frames the user never
+    // wrote (issue #450). Render it like a diagnostic instead; --stacktrace keeps the
+    // untouched trace for when the JVM detail is the point.
+    val wantTrace = prefix.exists(_ == STACKTRACE)
     try {
-      new ScriptRunner().run(filteredArgs, verbose)
+      new ScriptRunner().run(filteredArgs.filterNot(_ == STACKTRACE), verbose)
     }
     catch {
-      case e: ScriptException => {
-        throw e.getCause
-      }
+      case e: ScriptException =>
+        val cause = e.getCause
+        if (wantTrace) throw cause
+        val script = args.lift(scriptIndex(args)).getOrElse("<script>")
+        System.err.print(RuntimeErrorReporter.render(cause, script))
+        1
     }
   }
 
@@ -148,6 +156,7 @@ object ScriptRunner {
   private final val LAW_SEED: String = "--law-seed"
   private final val LAW_SAMPLES: String = "--law-samples"
   private final val SHOW_EFFECTS: String = "--effects"
+  private final val STACKTRACE: String = "--stacktrace"
   private final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
   private final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
   private final val DEFAULT_MAX_ERROR: Int = 10

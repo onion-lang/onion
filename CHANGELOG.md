@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **An uncaught runtime error is now presented like a diagnostic (#450).** It used to
+  reach the JVM's default handler, which printed the synthesized `start`/`main`
+  wrappers, the reflective launcher, and — for a `StackOverflowError` — thousands of
+  identical frames. A script error now reads:
+
+  ```
+  a.on:2: error: division by zero
+    (run with --stacktrace for the full JVM trace)
+  ```
+
+  Frames the user did not write are dropped, the failure is named in the language's own
+  vocabulary where there is one (`division by zero`, `array index out of range`, `null
+  value used`), the call path is shown but capped with a count of what was elided, and a
+  stack overflow explains what it usually means (non-terminating recursion, or recursion
+  deeper than the JVM stack — TCO covers direct and mutual self-calls only). The exit
+  code is unchanged, and **`--stacktrace`** restores the untouched trace.
+
+### Fixed
+
+- **`Rand`'s methods were documented under old names in the Japanese reference and in
+  `CLAUDE.md` (#449 follow-up):** `Rand::int`/`long`/`double`/`boolean` do not exist —
+  the names are `nextInt`, `nextLong`, `nextDouble`, `nextBoolean`, as the English
+  reference already said.
+
+### Added
+
+- **A drift guard for the whole standard-library reference (#449).**
+  `AssertStdlibDocSpec` covered `Assert` after every documented name on that class
+  turned out to be wrong; `StdlibDocDriftSpec` now checks *every* `Class::method` in
+  both copies of `stdlib.md`, and the module list in `CLAUDE.md`, against the real
+  classes by reflection. It found the `Rand` drift above on its first run. Aliases
+  (`JInteger`, …), JDK types and example-local record types are excluded by an explicit
+  list, since those are the false positives that made the original `Assert` breakage
+  hard to see.
+
 ### Fixed
 
 - **`docs/reference/stdlib.md` (EN+JA) and `CLAUDE.md` documented `Assert` methods that

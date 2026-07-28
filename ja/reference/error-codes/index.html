@@ -2284,6 +2284,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#trycatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        try/catch エラー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="try/catch エラー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#e0083-catch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0083 — 到達不能な catch 節
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5005,6 +5033,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#trycatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        try/catch エラー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="try/catch エラー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#e0083-catch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0083 — 到達不能な catch 節
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5264,21 +5320,36 @@
 </span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
 </span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>// E0082: tool 名 `same` が重複しています。
 </span></code></pre></div>
+<h2 id="trycatch">try/catch エラー<a class="headerlink" href="#trycatch" title="Permanent link">&para;</a></h2>
+<h3 id="e0083-catch"><code>E0083</code> — 到達不能な catch 節<a class="headerlink" href="#e0083-catch" title="Permanent link">&para;</a></h3>
+<p>後ろにある <code>catch</code> 節の例外型が、手前の節の型のサブタイプ（または同じ型）である場合、
+その節には決して到達できません。手前の節が先に処理してしまうためです。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>try {
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>  risky()
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>} catch e: RuntimeException {
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>  handle(e)
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>} catch e: IllegalArgumentException {
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>  // E0083: IllegalArgumentException は RuntimeException のサブタイプで、
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>  //        すでに手前の節が処理してしまう
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>}
+</span></code></pre></div>
+<p>より具体的な型を先に書くよう並べ替えるか、到達不能な節を削除してください。1つの
+multi-catch 節（<code>catch e: A | B</code>）の候補同士は互いにチェックされません。</p>
 <h2 id="_4">パターンマッチングエラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sealed interface Shape {}
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>select shape {
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sealed interface Shape {}
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>select shape {
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>}
 </span></code></pre></div>
 <h2 id="_5">パーサーエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
 <h2 id="_6">診断コード一覧<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>上の各節は遭遇しやすいコードを例つきで説明しています。この表は全コードの一覧なので、
@@ -5614,6 +5685,10 @@
 <tr>
 <td><code>E0082</code></td>
 <td>duplicate tool name <code>…</code></td>
+</tr>
+<tr>
+<td><code>E0083</code></td>
+<td>this catch clause for … can never be reached: an earlier catch clause for … already handles it</td>
 </tr>
 </tbody>
 </table>

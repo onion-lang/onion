@@ -174,6 +174,39 @@ private[compiler] object DuplicationChecks {
     }
   }
 
+  /**
+   * Reports E0083 when catch clause `index`'s exception type is already covered by an
+   * earlier clause in the same `try`, making it unreachable. Alternatives of the same
+   * `catch e: A | B` clause are exempt from shadowing each other: the grammar desugars
+   * them to entries sharing one body, but `block.copy(...)` in Rewriting gives each a
+   * fresh object, so `eq` cannot tell them apart post-rewrite — compare the
+   * (structurally-equal) source location instead, which `.copy` preserves. Shared by
+   * both places a `try`/`catch` is typed: `TryExpressionTyping` (try-as-expression) and
+   * `BlockElementLowering` (try-as-statement).
+   */
+  def checkUnreachableCatchClause(
+    bodyContext: onion.compiler.typing.session.TypingBodyContext,
+    recClauses: List[(AST.Argument, AST.BlockExpression)],
+    catchTypes: Array[Type],
+    index: Int,
+    argument: AST.Argument,
+    argType: Type,
+    catchBody: AST.BlockExpression
+  ): Unit = {
+    var j = 0
+    var shadowedBy: Type = null
+    while (j < index && shadowedBy == null) {
+      val earlierBody = recClauses(j)._2
+      if (earlierBody.location != catchBody.location && TypeRules.isSuperType(catchTypes(j), argType)) {
+        shadowedBy = catchTypes(j)
+      }
+      j += 1
+    }
+    if (shadowedBy != null) {
+      bodyContext.report(SemanticError.UNREACHABLE_CATCH_CLAUSE, argument, argType, shadowedBy)
+    }
+  }
+
   def checkErasureSignatureCollisions(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     val seen = mutable.HashMap[(String, String), Method]()
     for m <- clazz.methods do

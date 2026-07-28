@@ -216,5 +216,29 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs ExprEval.on") {
       assert(Shell.Success(null) == runSample("run/ExprEval.on"))
     }
+
+    it("runs JavaGenerics.on") {
+      assert(Shell.Success(null) == runSample("run/JavaGenerics.on"))
+    }
+
+    it("runs Bean.on") {
+      assert(Shell.Success(null) == runSample("run/Bean.on"))
+    }
+
+    it("runs ResultValidation.on") {
+      assert(Shell.Success(null) == runSample("run/ResultValidation.on"))
+    }
+
+    it("runs ShapeProcessor.on") {
+      assert(Shell.Success(null) == runSample("run/ShapeProcessor.on"))
+    }
+
+    it("runs OrderReport.on") {
+      assert(Shell.Success(null) == runSample("run/OrderReport.on"))
+    }
+
+    it("runs RegexLogParser.on") {
+      assert(Shell.Success("Average response time: 65ms") == runSample("run/RegexLogParser.on"))
+    }
   }
 }

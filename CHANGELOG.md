@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for 6 more `run/` examples that were compile-checked only.**
+  `RunSamplesSpec` covered a first batch of previously compile-only examples in
+  0.10.6, but `Bean.on`, `JavaGenerics.on`, `OrderReport.on`, `RegexLogParser.on`,
+  `ResultValidation.on`, and `ShapeProcessor.on` were still only checked for
+  successful compilation, not for correct runtime behavior. All six are
+  deterministic with no stdin/file/network/GUI dependency (unlike `Calculator.on`'s
+  Swing UI or `Select.on`'s `Math::random()`), so `RunSamplesSpec` now runs each
+  and asserts on `Shell.Success`.
+
 ## [0.10.6] - 2026-07-28
 
 Documentation and coverage: every diagnostic code is now looked-up-able, twelve more

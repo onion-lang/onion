@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for `AsyncDownloader.on`.** Its futures aggregate via
+  `Future::all`, which preserves input order regardless of completion
+  timing, so the concurrent-download output is deterministic; now asserted
+  on by `RunSamplesSpec` instead of only compile-checked by
+  `SampleCompilesSpec`.
+
 ### Fixed
 
 - **`break`/`continue` inside a lambda body crashed the compiler instead of

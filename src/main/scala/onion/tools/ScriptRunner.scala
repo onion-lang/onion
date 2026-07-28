@@ -45,8 +45,30 @@ object ScriptRunner {
   }
 
   def main(args: Array[String]): Unit = {
-    val exitCode = runMain(args)
+    val exitCode = runMainCatching(args, err)
     if (exitCode != 0) System.exit(exitCode)
+  }
+
+  /**
+   * Same as `runMain`, except an exception thrown by the running script is
+   * caught and reported the way a user reads it — a friendly one-line
+   * header plus the script's own frames, no compiler/JDK plumbing (#450) —
+   * instead of propagating to the caller as a raw Throwable. `--stacktrace`
+   * opts back into the original behavior (rethrows, letting the caller print
+   * the full Java trace).
+   */
+  private[tools] def runMainCatching(args: Array[String], err: java.io.PrintStream): Int = {
+    val prefix = args.take(scriptIndex(args))
+    val rawStacktrace = prefix.exists(_ == "--stacktrace")
+    try {
+      runMain(args)
+    } catch {
+      case e: Throwable if !rawStacktrace =>
+        val si = scriptIndex(args)
+        val scriptFile = if (si < args.length) new java.io.File(args(si)).getName else ""
+        RuntimeErrorReporter.report(e, scriptFile, err)
+        1
+    }
   }
 
   def runMain(args: Array[String]): Int = {
@@ -64,7 +86,7 @@ object ScriptRunner {
     val verbose = prefix.exists(_ == "--verbose")
     val watch = prefix.exists(_ == "--watch")
     val si = scriptIndex(args)
-    val filteredArgs = args.take(si).filterNot(a => a == "--verbose" || a == "--watch") ++ args.drop(si)
+    val filteredArgs = args.take(si).filterNot(a => a == "--verbose" || a == "--watch" || a == "--stacktrace") ++ args.drop(si)
     if (watch) {
       runWatching(filteredArgs, verbose)
       return 0
@@ -256,6 +278,7 @@ class ScriptRunner {
          |  --no-check-laws             Do not execute record `law`/`example` clauses
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
+         |  --stacktrace                Show the full Java stack trace on an uncaught error
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
          |

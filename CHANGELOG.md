@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A `--stacktrace` flag for `onion`** falls back to the full raw Java stack trace on
+  an uncaught runtime error, for when the JVM detail is what you actually want.
+
 ### Fixed
+
+- **An uncaught runtime error printed a raw Java stack trace, compiler internals
+  included (#450).** `println("" + (1 / 0))` used to surface as a bare
+  `ArithmeticException` with `aMain.start`/`aMain.main` wrapper frames the user never
+  wrote, a `jdk.internal.reflect` launcher chain, and even `onion.tools.Shell`/
+  `ScriptRunner` frames from the runner itself. `onion` now reports the error the way
+  its own diagnostics read: a friendly one-line header naming the failure in the
+  language's own vocabulary (division by zero, index out of range, null reference,
+  invalid type cast, ...), followed only by the script's own `file:line` frames — no
+  compiler or JDK plumbing. `StackOverflowError` gets a short explanatory note instead
+  of thousands of repeated frames (TCO covers only direct and mutual self-recursion, so
+  this is usually the cause). The full trace is one `--stacktrace` away.
 
 - **`docs/reference/stdlib.md` (EN+JA) and `CLAUDE.md` documented `Assert` methods that
   do not exist (#449).** `Assert::assertTrue`/`assertFalse`/`assertEquals`/`assertNotEquals`/

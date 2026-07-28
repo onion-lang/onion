@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-07-28
+
 ### Changed
 
 - **An uncaught runtime error is now presented like a diagnostic (#450).** It used to

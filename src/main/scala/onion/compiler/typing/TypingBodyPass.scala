@@ -84,7 +84,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
       // A flow-sensitive var narrowing (issues #288/#289) is only valid on the
       // straight-line path that installed it; a closure may run later, after the
       // captured var has been reassigned, so suppress them inside the body.
-      context.withoutFlowNarrowings(block)
+      context.withoutFlowNarrowings(context.withoutLoopContext(block))
     }finally{
       if (collecting) context.popReturnTypeCollectionDepth()
       context.setClosure(wasInClosure)

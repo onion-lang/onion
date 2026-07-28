@@ -31,5 +31,35 @@ class BreakContinueDiagnosticSpec extends AbstractShellSpec {
     it("reports E0048 for a labeled break at top level") {
       assert(errorCodes("break outer\nIO::println(\"end\")\n").contains("E0048"))
     }
+    it("reports E0048 for a break inside a closure body nested in a for loop") {
+      val src =
+        """class C {
+          |public:
+          |  static def main(args: String[]): void {
+          |    for var i: Int = 0; i < 3; i = i + 1 {
+          |      val f: () -> Int = () -> { break; return 0 }
+          |      IO::println("" + f.call())
+          |    }
+          |  }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).contains("E0048"))
+    }
+    it("reports E0049 for a continue inside a closure body nested in a while loop") {
+      val src =
+        """class C {
+          |public:
+          |  static def main(args: String[]): void {
+          |    var i: Int = 0;
+          |    while i < 3 {
+          |      val f: () -> Int = () -> { continue; return 0 }
+          |      IO::println("" + f.call())
+          |      i = i + 1
+          |    }
+          |  }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).contains("E0049"))
+    }
   }
 }

@@ -81,25 +81,7 @@ final class TryExpressionTyping(
           if (!TypeRules.isSuperType(expected, argType)) {
             bodyContext.report(INCOMPATIBLE_TYPE, argument, expected, argType)
           }
-          // A later clause whose type is already a subtype of (or equal to) an
-          // earlier clause's type can never run. Alternatives of the same
-          // `catch e: A | B` clause are exempt from shadowing each other: the
-          // grammar desugars them to entries sharing one body, but Rewriting's
-          // `block.copy(...)` gives each a fresh object, so `eq` cannot tell them
-          // apart post-rewrite — compare the (structurally-equal) source location
-          // instead, which `.copy` preserves.
-          var j = 0
-          var shadowedBy: Type = null
-          while (j < i && shadowedBy == null) {
-            val earlierBody = node.recClauses(j)._2
-            if (earlierBody.location != catchBody.location && TypeRules.isSuperType(catchTypes(j), argType)) {
-              shadowedBy = catchTypes(j)
-            }
-            j += 1
-          }
-          if (shadowedBy != null) {
-            bodyContext.report(UNREACHABLE_CATCH_CLAUSE, argument, argType, shadowedBy)
-          }
+          DuplicationChecks.checkUnreachableCatchClause(bodyContext, node.recClauses, catchTypes, i, argument, argType, catchBody)
           binds(i) = context.lookupOnlyCurrentScope(argument.name)
           typeBlockExpression(catchBody, context, branchExpected) match {
             case Some(term) => catchTerms(i) = term

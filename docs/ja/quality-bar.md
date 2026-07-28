@@ -10,7 +10,7 @@
 
 | # | 次元 | 測定方法 | 現在値（2026-07-27） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2800 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2832 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 64 / 64 compile | すべてコンパイル、rot なし |
 | 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 7（BrokenLogDemo、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager、ToolDemo） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |

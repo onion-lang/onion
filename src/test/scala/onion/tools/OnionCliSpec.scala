@@ -319,7 +319,7 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
     stdout.toString(StandardCharsets.UTF_8) should include("Usage: onion [options] <source_file>")
     stdout.toString(StandardCharsets.UTF_8) should include(s"Onion Script Runner version ${ScriptRunner.VERSION}")
 
-  test("ScriptRunner runMain unwraps exceptions thrown by a script"):
+  test("ScriptRunner runMain reports a script's exception instead of rethrowing it"):
     val source = Files.createTempFile("onion-cli-throws", ".on")
     Files.writeString(
       source,
@@ -333,8 +333,24 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
       StandardCharsets.UTF_8
     )
 
-    val thrown = intercept[RuntimeException] {
-      ScriptRunner.runMain(Array("--verbose", "--Wno", "unused-parameter", source.toString))
-    }
+    // Since #450 an uncaught runtime error is rendered like a diagnostic and the exit
+    // code carries the failure; rethrowing it made the JVM print synthesized wrappers
+    // and launcher frames the user never wrote. `--stacktrace` keeps the old behavior.
+    val err = new java.io.ByteArrayOutputStream()
+    val savedErr = System.err
+    val exit =
+      try {
+        System.setErr(new java.io.PrintStream(err, true, "UTF-8"))
+        ScriptRunner.runMain(Array("--verbose", "--Wno", "unused-parameter", source.toString))
+      } finally System.setErr(savedErr)
 
-    thrown.getMessage shouldBe "boom"
+    exit shouldBe 1
+    val text = new String(err.toByteArray, StandardCharsets.UTF_8)
+    text should include("boom")
+    text should include("--stacktrace")
+
+    val rethrown = intercept[RuntimeException] {
+      ScriptRunner.runMain(
+        Array("--verbose", "--stacktrace", "--Wno", "unused-parameter", source.toString))
+    }
+    rethrown.getMessage shouldBe "boom"

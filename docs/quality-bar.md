@@ -13,7 +13,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 
 | # | Dimension | How to measure | Current (2026-07-27) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2832 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2848 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 64 / 64 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 7 (BrokenLogDemo, OrderReport, ShapeProcessor, StatsApp, TextAnalyzer, TodoManager, ToolDemo) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |

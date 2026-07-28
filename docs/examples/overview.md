@@ -94,6 +94,27 @@ java Hello
 | `CsvProcessor.on` | CSV header parsing + aggregation | `Csv::parseWithHeader` |
 | `CliArgsDemo.on` | Manual CLI argument parsing | `onion.Args` |
 | `FileWordCounter.on` | Word count from a file | File I/O, `BufferedReader` |
+| `Generics.on` | Generic box class | Generic classes, type parameters |
+| `PairSample.on` | Generic pair class | Generic classes, multiple type parameters |
+| `Extension.on` | Extension methods on a built-in type | `extension` blocks |
+| `NullSafety.on` | Nullable types and safe navigation | `T?`, `?.` safe call operator |
+| `ValVarInference.on` | `val`/`var` type inference | Local type inference, mutable vs. immutable |
+| `PrimitivePrint.on` | Printing primitives | `IO::println`/`IO::print` |
+| `FunctionTypesSample.on` | Function-typed parameters | Function types, lambdas |
+| `JavaCollectionsSample.on` | Java collections interop | `java.util.ArrayList`, `Collections` |
+| `JavaGenerics.on` | Java generics interop | `java.util.ArrayList[String]` |
+| `GuessNumber.on` | Number-guessing game | `BufferedReader`, control flow |
+| `TodoApp.on` | Interactive CLI todo list | `ArrayList`, console I/O |
+| `HttpJsonClient.on` | HTTP + JSON client | `onion.Http` |
+| `RegexLogParser.on` | Log line parsing | `re"..."` regex select patterns |
+| `RecordLaws.on` | Record `law`/`example` clauses | `law`, `example`, compile-time checking |
+| `SchemePrefix.on` | User-definable scheme-prefixed literals | `prefix"..."` raw string literals |
+| `ShapeFirst.on` | Shape-first scripting tour | `re"..."`, pipelines, do-notation, auto-CLI |
+| `FixedWidthDemo.on` | User-written `Shape` instance | `onion.Shape`, Outcome/Defect, `law` |
+| `JsonYamlShapeDemo.on` | Named JSON/YAML shape on a record | `shape name = json`/`yaml` |
+| `ConfigEditDemo.on` | Lossless config editing | Lens, `Residue`, comment/order preservation |
+| `BrokenLogDemo.on` | Partial-failure log parsing | `onion.Shape`, `Outcome::values`/`defects` |
+| `ToolDemo.on` | CLI derived from a `tool` declaration | `tool`, capabilities, `--help`/`--contract`/`--plan` |
 
 ## Learning Path
 

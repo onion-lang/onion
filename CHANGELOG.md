@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`break`/`continue` inside a lambda body crashed the compiler instead of
+  reporting E0048/E0049.** A closure body is compiled into its own
+  synthesized method with no enclosing loop, so a `break`/`continue`
+  lexically inside a lambda that merely sits inside a loop in the source
+  cannot actually reach that loop. Typing tracked loop/label nesting with a
+  plain counter and label stack that a closure body never reset, so the
+  check wrongly treated the lambda as being inside the loop; the program
+  passed typing and only blew up later in codegen with a raw
+  `[I0000] Internal compiler error ... Break statement outside of loop`.
+  `break`/`continue` inside a closure now correctly report E0048/E0049 at
+  the closure body, matching top-level break/continue diagnostics.
+
 ## [0.10.8] - 2026-07-28
 
 ### Added

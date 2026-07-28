@@ -405,6 +405,26 @@ class LocalContext {
     finally flowNarrowings = saved
   }
 
+  /**
+   * A closure body is compiled into its own synthesized method with no
+   * enclosing loop, so a `break`/`continue` lexically inside a lambda cannot
+   * reach a loop that merely encloses the lambda expression in the source.
+   * Suppress the surrounding loop/label context for the dynamic extent of
+   * typing the closure body, so `break`/`continue` there is correctly flagged
+   * as outside a loop (E0048/E0049) instead of reaching codegen and crashing.
+   */
+  def withoutLoopContext[A](block: => A): A = {
+    val savedDepth = loopDepth
+    val savedLabels = labelStack
+    loopDepth = 0
+    labelStack = Nil
+    try block
+    finally {
+      loopDepth = savedDepth
+      labelStack = savedLabels
+    }
+  }
+
   /** Snapshot of both narrowing maps, used to bound narrowings to a region. */
   final case class NarrowingSnapshot(
     narrowings: Map[String, TypedAST.Type],

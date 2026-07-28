@@ -260,5 +260,17 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs UnitConverter.on") {
       assert(Shell.Success(null) == runSample("run/UnitConverter.on"))
     }
+
+    it("runs ConfigApp.on") {
+      assert(Shell.Success(null) == runSample("run/ConfigApp.on"))
+    }
+
+    it("runs JsonYamlShapeDemo.on") {
+      assert(Shell.Success(0) == runSample("run/JsonYamlShapeDemo.on"))
+    }
+
+    it("runs ShapeFirst.on") {
+      assert(Shell.Success(null) == runSample("run/ShapeFirst.on"))
+    }
   }
 }

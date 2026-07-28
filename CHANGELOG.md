@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no-stdin/file/network/GUI examples that were previously only compile-checked
   by `SampleCompilesSpec`, not asserted on runtime output by `RunSamplesSpec`.
 
+- **Execution coverage for 3 more `run/` examples: `ConfigApp.on`,
+  `JsonYamlShapeDemo.on`, `ShapeFirst.on`.** Same treatment as above, for the
+  next batch of deterministic, no-stdin/file/network/GUI examples.
+
 ## [0.10.7] - 2026-07-28
 
 New diagnostic E0083 catches a shadowed `catch` clause that previously compiled

@@ -274,8 +274,11 @@ class ScriptRunner {
   }
 
   private def printFailure(failure: ParseFailure): Unit = {
-    failure.lackedOptions.zipWithIndex.foreach{ case (lackedOption, i) =>
-      err.println(Message("error.command.noArgument", lackedOption))
+    failure.invalidOptions.foreach { invalidOption =>
+      err.println(Message("error.command.invalidArgument", invalidOption.value))
+    }
+    failure.lackedOptions.foreach { lackedOption =>
+      err.println(Message("error.command.noArgument", lackedOption.value))
     }
   }
 

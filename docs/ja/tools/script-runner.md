@@ -26,12 +26,12 @@ onion -classpath lib/mylib.jar MyScript.on
 onion -encoding UTF-8 MyScript.on
 ```
 
-### `-maxErrorReports <count>`
+### `-maxErrorReport <count>`
 
 報告するコンパイルエラーの最大数を制限します。
 
 ```bash
-onion -maxErrorReports 10 MyScript.on
+onion -maxErrorReport 10 MyScript.on
 ```
 
 ### `--dump-ast`

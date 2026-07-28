@@ -38,12 +38,12 @@ Class files are organized by module name:
 - Unix-like: `org/onion_lang/MyClass.class`
 - Windows: `org\onion_lang\MyClass.class`
 
-### `-maxErrorReports <count>`
+### `-maxErrorReport <count>`
 
 Limit the number of compilation errors reported. Useful for large projects with many errors.
 
 ```bash
-onionc -maxErrorReports 10 MyProgram.on
+onionc -maxErrorReport 10 MyProgram.on
 ```
 
 ### `--dump-ast`
@@ -173,7 +173,7 @@ onionc \
   -d build/classes \
   -classpath lib/external.jar \
   -encoding UTF-8 \
-  -maxErrorReports 20 \
+  -maxErrorReport 20 \
   src/*.on
 ```
 

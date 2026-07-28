@@ -26,12 +26,12 @@ Specify the character encoding of source files.
 onion -encoding UTF-8 MyScript.on
 ```
 
-### `-maxErrorReports <count>`
+### `-maxErrorReport <count>`
 
 Limit the number of compilation errors reported.
 
 ```bash
-onion -maxErrorReports 10 MyScript.on
+onion -maxErrorReport 10 MyScript.on
 ```
 
 ### `--dump-ast`

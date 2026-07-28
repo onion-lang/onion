@@ -170,8 +170,8 @@ class CompilerFrontend {
       case failure: ParseFailure =>
         val lackedOptions = failure.lackedOptions
         val invalidOptions = failure.invalidOptions
-        invalidOptions.foreach{opt => printError(Message.apply("error.command.invalidArgument", opt)) }
-        lackedOptions.foreach{opt => printError(Message.apply("error.command..noArgument", opt)) }
+        invalidOptions.foreach{opt => printError(Message.apply("error.command.invalidArgument", opt.value)) }
+        lackedOptions.foreach{opt => printError(Message.apply("error.command.noArgument", opt.value)) }
         None
     }
   }

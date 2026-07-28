@@ -30,7 +30,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `-classpath <path>` - Set classpath for compilation
 - `-encoding <encoding>` - Set source file encoding
 - `-d <dir>` - Set output directory for class files
-- `-maxErrorReports <n>` - Limit number of errors reported
+- `-maxErrorReport <n>` - Limit number of errors reported
 - `--dump-ast` - Print parsed AST to stderr
 - `--dump-typed-ast` - Print typed AST summary to stderr
 - `--warn <off|on|error>` - Set warning level

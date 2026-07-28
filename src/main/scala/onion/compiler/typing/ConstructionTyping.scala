@@ -137,16 +137,53 @@ final class ConstructionTyping(
     expected match {
       case exp: AppliedClassType =>
         typing.mapFrom(node.typeRef) match {
-          case Some(raw: ClassType)
-            if !raw.isInstanceOf[AppliedClassType]
-              && raw.typeParameters.nonEmpty
-              && TypeRelations.sameClass(raw, exp.raw)
-              && exp.typeArguments.length == raw.typeParameters.length =>
-            Some(AppliedClassType(raw, exp.typeArguments.toList))
+          case Some(raw: ClassType) if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty =>
+            if (TypeRelations.sameClass(raw, exp.raw) && exp.typeArguments.length == raw.typeParameters.length)
+              Some(AppliedClassType(raw, exp.typeArguments.toList))
+            else
+              diamondTypeFromSupertype(raw, exp)
           case _ => None
         }
       case _ => None
     }
+
+  /**
+   * `new C(...)` where `C` conforms to the expected applied type through a
+   * supertype/interface rather than being that exact class -- e.g. a generic
+   * ADT enum's singleton case, `Nothing` in `enum Opt[T] { case Some(value: T);
+   * case Nothing }`, constructed as `val o: Opt[String] = new Nothing()`.
+   * `Nothing` passes its own type parameter straight through to `Opt[T]`, so
+   * `T` can be recovered from `exp`'s arguments the same way [[diamondType]]
+   * already does for an exact-class match.
+   *
+   * Only that exact shape is trusted: `raw`'s conforms/extends clause must
+   * name `exp`'s class with each argument a bare, distinct reference to one
+   * of `raw`'s own type parameters. A concrete type, a nested application, or
+   * a dropped/repeated parameter falls through to `None`, leaving the
+   * existing raw-type diagnostic in place rather than guessing.
+   */
+  private def diamondTypeFromSupertype(raw: ClassType, exp: AppliedClassType): Option[ClassType] = {
+    def rawOf(ct: ClassType): ClassType = ct match {
+      case a: AppliedClassType => a.raw
+      case c => c
+    }
+    val parents = Option(raw.superClass).toSeq ++ raw.interfaces
+    parents.collectFirst {
+      case p: AppliedClassType
+        if TypeRelations.sameClass(rawOf(p), exp.raw) && p.typeArguments.length == exp.typeArguments.length => p
+    }.flatMap { parent =>
+      val bindings = parent.typeArguments.zip(exp.typeArguments).foldLeft(Option(Map.empty[String, Type])) {
+        case (Some(acc), (tv: TypeVariableType, arg)) if raw.typeParameters.exists(_.name == tv.name) && !acc.contains(tv.name) =>
+          Some(acc + (tv.name -> arg))
+        case _ => None
+      }
+      bindings.flatMap { b =>
+        if (raw.typeParameters.forall(tp => b.contains(tp.name)))
+          Some(AppliedClassType(raw, raw.typeParameters.map(tp => b(tp.name)).toList))
+        else None
+      }
+    }
+  }
 
   /**
    * The bare generic class named by `new C(...)`, or None when `C` is not a

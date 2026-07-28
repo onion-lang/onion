@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-07-28
+
+Documentation and coverage: every diagnostic code is now looked-up-able, twelve more
+`run/` examples are executed rather than only compiled, and a generic ADT enum's
+singleton case accepts the expected-type constructor.
+
 ### Added
 
 - **Every diagnostic code is now listed in the reference (EN+JA).** The page explained

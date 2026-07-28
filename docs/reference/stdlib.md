@@ -737,17 +737,17 @@ Testing assertions via `onion.Assert`. Throws `AssertionError` on failure.
 ### Basic Assertions
 
 ```onion
-Assert::assertTrue(x > 0)
-Assert::assertFalse(list.isEmpty())
-Assert::assertEquals(expected, actual)
-Assert::assertNotEquals(a, b)
+Assert::isTrue(x > 0)
+Assert::isFalse(list.isEmpty())
+Assert::equals(expected, actual)
+Assert::notEquals(a, b)
 ```
 
 ### Null Assertions
 
 ```onion
-Assert::assertNotNull(result)
-Assert::assertNull(errorMessage)
+Assert::notNull(result)
+Assert::isNull(errorMessage)
 ```
 
 ### Explicit Failure
@@ -953,13 +953,13 @@ record; see [Records — derive!](specification.md#derive-record-serde-derivatio
 for the full contract.
 
 ```onion
-record Config(host: String, port: Int, debug: Boolean) derive!(Yaml)
+record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
 
-val cfg = new Config("localhost", 8080, false)
-val yaml = Config::toYaml(cfg)
+val cfg = new ServerConfig("localhost", 8080, false)
+val yaml = ServerConfig::toYaml(cfg)
 // "host: localhost\nport: 8080\ndebug: false\n"
 
-val cfg2 = Config::fromYaml(yaml)   // Config? — null on parse/convert failure
+val cfg2 = ServerConfig::fromYaml(yaml)   // ServerConfig? — null on parse/convert failure
 ```
 
 `derive!(Json, Yaml)` is also valid; both formats share the internal

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-07-28
+
+New diagnostic E0083 catches a shadowed `catch` clause that previously compiled
+silently and could never run, plus 9 more `run/` examples get execution coverage
+instead of compile-checking only.
+
 ### Added
 
 - **Execution coverage for 6 more `run/` examples that were compile-checked only.**

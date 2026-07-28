@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on by `RunSamplesSpec` instead of only compile-checked by
   `SampleCompilesSpec`.
 
+- **Execution coverage for `ShellPipeline.on`.** Its `Proc::capture`/`Proc::run`
+  calls (`wc`, `sort | head` via `sh -c`, `echo`) only ever hit standard
+  POSIX utilities present on the CI runner and act on a fixed, already
+  alphabetically-sorted input list, so the output is deterministic; now
+  asserted on by `RunSamplesSpec` instead of only compile-checked by
+  `SampleCompilesSpec`.
+
 ### Fixed
 
 - **`break`/`continue` inside a lambda body crashed the compiler instead of

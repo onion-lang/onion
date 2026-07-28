@@ -304,6 +304,95 @@ Parser errors do not carry `E` codes; they report the encountered token and the 
 Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 ```
 
+## Every diagnostic code
+
+The sections above explain the codes you are most likely to meet, with examples. This
+table lists all of them, so a code seen in a build log can always be looked up.
+
+| Code | Meaning |
+|------|---------|
+| `I0000` | internal compiler error — a bug in the compiler, not your program |
+| `E0000` | type … is expected, but type … is used |
+| `E0001` | operator … is not applicable for type … |
+| `E0002` | variable not found |
+| `E0003` | class not found |
+| `E0004` | field ….… is not found |
+| `E0005` | method applicable for ….…(…) is not found |
+| `E0006` | ambiguous method |
+| `E0007` | duplicated local variable definition … |
+| `E0008` | duplicated class definition … |
+| `E0009` | duplicated field definition ….… |
+| `E0010` | duplicated method definition ….…(…) |
+| `E0011` | duplicated global variable definition … |
+| `E0012` | duplicated function definition …(…) |
+| `E0013` | method ….…(…) is not accessible from class … |
+| `E0014` | field ….… is not accessible from class … |
+| `E0015` | class … is not accessible from class … |
+| `E0016` | inheritance relations which includes … have cyclicity |
+| `E0018` | class … do inheritance illegally |
+| `E0019` | method ….… cannot be called |
+| `E0020` | this method cannot return value |
+| `E0021` | constructor not found |
+| `E0022` | ambiguous constructor |
+| `E0023` | interface required, but type … is used |
+| `E0025` | duplicated constructor definition …(…) |
+| `E0026` | duplicated generated method ….…(…) |
+| `E0027` | type … is not boxable type |
+| `E0028` | lvalue is required |
+| `E0029` | duplicated type parameter definition … |
+| `E0030` | type … does not take type arguments |
+| `E0031` | type … expects … type arguments, but … are supplied |
+| `E0032` | type argument … must be a reference type |
+| `E0033` | method ….… does not take type arguments |
+| `E0034` | method ….… expects … type arguments, but … are supplied |
+| `E0035` | Erased JVM signature collision: ….…… |
+| `E0036` | cannot assign to val … |
+| `E0037` | class … must implement abstract method …(…) or be declared abstract |
+| `E0038` | cannot instantiate abstract class … |
+| `E0039` | method …(…) cannot override final method in … |
+| `E0040` | cannot call method … on primitive type … |
+| `E0041` | type … is not a valid method call target |
+| `E0042` | non exhaustive pattern match |
+| `E0043` | unknown parameter name: … |
+| `E0044` | duplicate argument: … |
+| `E0045` | positional argument after named argument is not allowed |
+| `E0046` | wrong number of bindings in destructuring pattern |
+| `E0047` | … is not a record type or does not exist |
+| `E0048` | break is only allowed inside a loop |
+| `E0049` | continue is only allowed inside a loop |
+| `E0050` | current instance is not available in static context |
+| `E0051` | return type is required for method … |
+| `E0052` | lambda parameter … must specify a type |
+| `E0053` | cyclic type alias detected: … |
+| `E0054` | duplicate type alias: … |
+| `E0055` | function … requires a body |
+| `E0057` | value of type parameter … may be null and cannot be dereferenced directly |
+| `E0058` | label … is not defined on any enclosing loop |
+| `E0059` | invalid regular expression literal: … |
+| `E0060` | the regex pattern has … capture group(s) but … binding(s) were given |
+| `E0061` | record component … has type …, which cannot be derived from a `from re"..."` clause |
+| `E0062` | record component … has type …, which derive! cannot serialize |
+| `E0063` | unknown derive! marker `…` |
+| `E0064` | law violation |
+| `E0065` | example failed |
+| `E0066` | raw type … is not allowed; supply type arguments (e.g |
+| `E0067` | method … may reach the end of its body without returning a … |
+| `E0068` | method …(…) is marked override but does not override any method in a base class or interface of … |
+| `E0069` | local val … must be initialized at its declaration |
+| `E0070` | value of type … may be null and cannot be dereferenced directly |
+| `E0071` | … is a variable, not a type |
+| `E0072` | abstract method … cannot have a body (the body would be silently ignored) |
+| `E0073` | a Map (…) cannot be iterated directly by foreach |
+| `E0074` | law parameter not generatable |
+| `E0075` | law class not loadable |
+| `E0076` | unknown shape format `…` |
+| `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
+| `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
+| `E0079` | tool `…` has an invalid capability `…`: … |
+| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
+| `E0081` | tool parameter not cli convertible |
+| `E0082` | duplicate tool name `…` |
+
 ## See also
 
 - [Language specification](specification.md)

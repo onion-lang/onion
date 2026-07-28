@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every diagnostic code is now listed in the reference (EN+JA).** The page explained
+  the common codes in prose and stopped there, so 59 of the 80 could not be looked up at
+  all — including several added during the past week. A complete table was generated
+  from `SemanticError` and its message bundle, and `ErrorCodeDocCoverageSpec` now fails
+  the build when a code is declared without being documented, or documented after being
+  retired.
+
 - **Execution coverage for 12 `run/` examples that were compile-checked only.**
   `SampleCompilesSpec`/`SampleProgramsSpec` compile every file in `run/`, but
   `RunSamplesSpec` only *executes* a subset of them with an asserted result — a

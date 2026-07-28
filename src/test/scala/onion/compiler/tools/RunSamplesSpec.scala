@@ -280,5 +280,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs AsyncDownloader.on") {
       assert(Shell.Success(null) == runSample("run/AsyncDownloader.on"))
     }
+
+    it("runs ShellPipeline.on") {
+      assert(Shell.Success(null) == runSample("run/ShellPipeline.on"))
+    }
   }
 }

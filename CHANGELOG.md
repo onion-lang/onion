@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `JsonYamlShapeDemo.on`, `ShapeFirst.on`.** Same treatment as above, for the
   next batch of deterministic, no-stdin/file/network/GUI examples.
 
+- **Execution coverage for `HttpJsonClient.on`.** Its no-args invocation hits
+  the early usage-message return before any network call, so it is
+  deterministic and now asserted on by `RunSamplesSpec` instead of only
+  compile-checked by `SampleCompilesSpec`.
+
 ### Fixed
 
 - **A malformed `onionc`/`onion` command line either crashed with a raw stack

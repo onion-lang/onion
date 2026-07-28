@@ -272,5 +272,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs ShapeFirst.on") {
       assert(Shell.Success(null) == runSample("run/ShapeFirst.on"))
     }
+
+    it("runs HttpJsonClient.on with no args (usage message, no network call)") {
+      assert(Shell.Success("Usage: HttpJsonClient <url>") == runSample("run/HttpJsonClient.on"))
+    }
   }
 }

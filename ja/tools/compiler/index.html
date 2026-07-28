@@ -1690,10 +1690,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#-maxerrorreports-count" class="md-nav__link">
+  <a href="#-maxerrorreport-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -maxErrorReports &lt;count&gt;
+        -maxErrorReport &lt;count&gt;
       
     </span>
   </a>
@@ -4794,10 +4794,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#-maxerrorreports-count" class="md-nav__link">
+  <a href="#-maxerrorreport-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -maxErrorReports &lt;count&gt;
+        -maxErrorReport &lt;count&gt;
       
     </span>
   </a>
@@ -5182,9 +5182,9 @@
 <p>クラスファイルはモジュール名に応じて整理されます。
 - Unix系: <code>org/onion_lang/MyClass.class</code>
 - Windows: <code>org\onion_lang\MyClass.class</code></p>
-<h3 id="-maxerrorreports-count"><code>-maxErrorReports &lt;count&gt;</code><a class="headerlink" href="#-maxerrorreports-count" title="Permanent link">&para;</a></h3>
+<h3 id="-maxerrorreport-count"><code>-maxErrorReport &lt;count&gt;</code><a class="headerlink" href="#-maxerrorreport-count" title="Permanent link">&para;</a></h3>
 <p>報告するコンパイルエラーの最大数を制限します。大量のエラーがある大規模プロジェクトで便利です。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>onionc<span class="w"> </span>-maxErrorReports<span class="w"> </span><span class="m">10</span><span class="w"> </span>MyProgram.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>onionc<span class="w"> </span>-maxErrorReport<span class="w"> </span><span class="m">10</span><span class="w"> </span>MyProgram.on
 </span></code></pre></div>
 <h3 id="-dump-ast"><code>--dump-ast</code><a class="headerlink" href="#-dump-ast" title="Permanent link">&para;</a></h3>
 <p>構文解析後のASTを標準エラー出力に出力します。構文やパースのデバッグに便利です。</p>
@@ -5254,7 +5254,7 @@
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span>-d<span class="w"> </span>build/classes<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span>-classpath<span class="w"> </span>lib/external.jar<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span>-encoding<span class="w"> </span>UTF-8<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span>-maxErrorReports<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span>-maxErrorReport<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span>src/*.on
 </span></code></pre></div>
 <h2 id="_9">コンパイル後の実行<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>

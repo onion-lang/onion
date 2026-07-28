@@ -1,5 +1,7 @@
 package onion.tools
 
+import onion.compiler.toolbox.Message
+
 /**
  * Presents an uncaught runtime error the way the compiler presents a diagnostic
  * (issue #450).
@@ -25,33 +27,41 @@ object RuntimeErrorReporter {
    * better name than its own. Kept deliberately small: a wrong friendly name is worse
    * than a class name the user can search for.
    */
-  private def friendlyName(t: Throwable): Option[String] = t match {
-    case _: ArithmeticException if isDivideByZero(t) => Some("division by zero")
-    case _: ArrayIndexOutOfBoundsException           => Some("array index out of range")
-    case _: StringIndexOutOfBoundsException          => Some("string index out of range")
-    case _: IndexOutOfBoundsException                => Some("index out of range")
-    case _: NullPointerException                     => Some("null value used")
-    case _: ClassCastException                       => Some("invalid cast")
-    case _: NumberFormatException                    => Some("malformed number")
-    case _: StackOverflowError                       => Some("stack overflow")
-    case _: OutOfMemoryError                         => Some("out of memory")
+  private def friendlyName(t: Throwable): Option[String] = (t match {
+    case _: ArithmeticException if isDivideByZero(t) => Some("runtime.divisionByZero")
+    case _: ArrayIndexOutOfBoundsException           => Some("runtime.arrayIndexOutOfRange")
+    case _: StringIndexOutOfBoundsException          => Some("runtime.stringIndexOutOfRange")
+    case _: NegativeArraySizeException               => Some("runtime.negativeArraySize")
+    case _: IndexOutOfBoundsException                => Some("runtime.indexOutOfRange")
+    case _: NullPointerException                     => Some("runtime.nullReference")
+    case _: ClassCastException                       => Some("runtime.invalidCast")
+    case _: NumberFormatException                    => Some("runtime.invalidNumberFormat")
+    case _: StackOverflowError                       => Some("runtime.stackOverflow")
+    case _: OutOfMemoryError                         => Some("runtime.outOfMemory")
     case _                                           => None
-  }
+  }).map(Message.apply)
 
   private def isDivideByZero(t: Throwable): Boolean =
     Option(t.getMessage).exists(_.contains("zero"))
 
-  /** Extra context worth saying once, where the plain message leaves a user stuck. */
-  private def note(t: Throwable): Option[String] = t match {
-    case _: StackOverflowError =>
-      Some("this usually means recursion that does not terminate, or recursion too " +
-           "deep to run on the JVM stack. Tail-call optimization applies to direct " +
-           "and mutual self-recursion only.")
-    case _: NullPointerException =>
-      Some("a nullable value (`T?`) was used without a null check, or a Java method " +
-           "returned null where a value was expected.")
-    case _ => None
+  /**
+   * Whether the JVM's message would only restate the headline. `/ by zero` after
+   * "division by zero" is the clearest case; an index message ("Index 5 out of bounds
+   * for length 2") genuinely adds the numbers, so it is kept.
+   */
+  private def messageIsRedundant(t: Throwable): Boolean = t match {
+    case _: ArithmeticException if isDivideByZero(t) => true
+    case _: StackOverflowError                       => true
+    case _: OutOfMemoryError                         => true
+    case _                                           => false
   }
+
+  /** Extra context worth saying once, where the plain message leaves a user stuck. */
+  private def note(t: Throwable): Option[String] = (t match {
+    case _: StackOverflowError   => Some("runtime.stackOverflowNote")
+    case _: NullPointerException => Some("runtime.nullReferenceNote")
+    case _                       => None
+  }).map(Message.apply)
 
   /**
    * Whether a stack frame is one the user's own source produced.
@@ -89,13 +99,11 @@ object RuntimeErrorReporter {
       .getOrElse(scriptName)
 
     sb.append(s"$where: error: $headline")
-    // Only add the JVM's own message when it says something the headline does not —
-    // "division by zero: / by zero" helps nobody.
-    message.foreach { m =>
-      val normalized = m.toLowerCase.replace("/", "").trim
-      val covered = friendlyName(t).exists(n => normalized.split("\\s+").forall(n.contains))
-      if (!covered) sb.append(s": $m")
-    }
+    // Only add the JVM's own message when it carries information the headline does not.
+    // Comparing the two strings cannot work — the headline is localized while the JVM
+    // message is always English ("ゼロ除算: / by zero"). Decide per exception type
+    // instead: for these, the class alone says everything and the message is noise.
+    if (!messageIsRedundant(t)) message.foreach(m => sb.append(s": $m"))
     sb.append('\n')
 
     // The frames below the first are the call path that reached it; a stack overflow
@@ -103,18 +111,19 @@ object RuntimeErrorReporter {
     val rest = frames.drop(1)
     val shown = rest.take(10)
     shown.foreach { f =>
-      sb.append(s"  called from ${f.getFileName}:${f.getLineNumber} (${f.getMethodName})\n")
+      sb.append("  " + Message("runtime.calledFrom",
+        Array[Any](f.getFileName, Integer.valueOf(f.getLineNumber), f.getMethodName)) + "\n")
     }
     if (rest.length > shown.length) {
-      sb.append(s"  ... and ${rest.length - shown.length} more frames\n")
+      sb.append("  " + Message("runtime.moreFrames",
+        Integer.valueOf(rest.length - shown.length)) + "\n")
     }
 
     note(t).foreach(n => sb.append(s"  note: $n\n"))
     if (frames.isEmpty) {
-      sb.append("  note: the failure happened outside the script's own code; " +
-                "run with --stacktrace for the full trace.\n")
+      sb.append("  note: " + Message("runtime.noUserFrames") + "\n")
     } else {
-      sb.append("  (run with --stacktrace for the full JVM trace)\n")
+      sb.append("  " + Message("runtime.stacktraceHint") + "\n")
     }
     sb.toString
   }

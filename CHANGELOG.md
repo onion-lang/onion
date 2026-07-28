@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value used`), the call path is shown but capped with a count of what was elided, and a
   stack overflow explains what it usually means (non-terminating recursion, or recursion
   deeper than the JVM stack — TCO covers direct and mutual self-calls only). The exit
-  code is unchanged, and **`--stacktrace`** restores the untouched trace.
+  code is unchanged, and **`--stacktrace`** restores the untouched trace. The error
+  names and notes are localized (EN+JA) like every other diagnostic; which JVM messages
+  are redundant is decided per exception type rather than by matching the headline text,
+  since the headline is translated and the JVM message never is.
 
 ### Fixed
 

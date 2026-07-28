@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asserted on by `RunSamplesSpec` instead of only compile-checked by
   `SampleCompilesSpec`.
 
+- **Execution coverage for `Select.on` and `LineCounter.on`.** `Shell.run`
+  reports `Success` on the reflected return value of `main`, not captured
+  stdout, so both samples are deterministic to assert on (`Success(null)`)
+  even though `Select.on` branches on `Math::random()` and `LineCounter.on`'s
+  printed count depends on the current repo tree; now asserted on by
+  `RunSamplesSpec` instead of only compile-checked by `SampleCompilesSpec`.
+
 ### Fixed
 
 - **`break`/`continue` inside a lambda body crashed the compiler instead of

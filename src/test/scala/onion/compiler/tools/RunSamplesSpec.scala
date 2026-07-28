@@ -284,5 +284,13 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs ShellPipeline.on") {
       assert(Shell.Success(null) == runSample("run/ShellPipeline.on"))
     }
+
+    it("runs Select.on") {
+      assert(Shell.Success(null) == runSample("run/Select.on"))
+    }
+
+    it("runs LineCounter.on") {
+      assert(Shell.Success(null) == runSample("run/LineCounter.on"))
+    }
   }
 }

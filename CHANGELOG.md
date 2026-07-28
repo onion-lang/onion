@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for 2 more `run/` examples: `TodoManager.on`,
+  `UnitConverter.on`.** Same treatment as prior batches — deterministic,
+  no-stdin/file/network/GUI examples that were previously only compile-checked
+  by `SampleCompilesSpec`, not asserted on runtime output by `RunSamplesSpec`.
+
 ## [0.10.7] - 2026-07-28
 
 New diagnostic E0083 catches a shadowed `catch` clause that previously compiled

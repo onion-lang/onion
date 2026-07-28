@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Swing UI or `Select.on`'s `Math::random()`), so `RunSamplesSpec` now runs each
   and asserts on `Shell.Success`.
 
+### Fixed
+
+- **A later `catch` clause already covered by an earlier one compiled silently and
+  could never run.** `catch e: RuntimeException { ... } catch e: IllegalArgumentException
+  { ... }` accepted the program and ran only the first clause for every exception,
+  since `IllegalArgumentException` is a `RuntimeException`. javac rejects this at
+  compile time; Onion had no equivalent check. Now **E0083**, EN+JA, naming both the
+  unreachable type and the earlier clause that shadows it. The alternatives of a single
+  multi-catch clause (`catch e: A | B`) are exempt from shadowing each other. Found and
+  fixed in both places `try`/`catch` is typed (`TryExpressionTyping` for try-as-expression,
+  `BlockElementLowering` for try-as-statement — the two paths duplicate this logic today).
+
 ## [0.10.6] - 2026-07-28
 
 Documentation and coverage: every diagnostic code is now looked-up-able, twelve more

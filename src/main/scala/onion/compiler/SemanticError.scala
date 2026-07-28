@@ -145,6 +145,7 @@ object SemanticError {
   case object SHAPE_INSTANCE_WITHOUT_LAW extends SemanticError(80)
   case object TOOL_PARAMETER_NOT_CLI_CONVERTIBLE extends SemanticError(81)
   case object DUPLICATE_TOOL_NAME extends SemanticError(82)
+  case object UNREACHABLE_CATCH_CLAUSE extends SemanticError(83)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

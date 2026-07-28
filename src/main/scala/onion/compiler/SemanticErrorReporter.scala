@@ -430,6 +430,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.duplicateToolName",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.UNREACHABLE_CATCH_CLAUSE -> ErrorDef(
+      "error.semantic.unreachableCatchClause",
+      Seq(items => typeName(items(0)), items => typeName(items(1)))
+    ),
     SemanticError.SHAPE_INSTANCE_WITHOUT_LAW -> ErrorDef(
       "error.semantic.shapeInstanceWithoutLaw",
       Seq(items => asString(items(0)))

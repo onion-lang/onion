@@ -279,6 +279,27 @@ tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
 // E0082: duplicate tool name `same`.
 ```
 
+## Try/catch errors
+
+### `E0083` — Unreachable catch clause
+
+A later `catch` clause whose exception type is already a subtype of (or the same as)
+an earlier clause's type can never run — the earlier clause handles it first.
+
+```onion
+try {
+  risky()
+} catch e: RuntimeException {
+  handle(e)
+} catch e: IllegalArgumentException {
+  // E0083: IllegalArgumentException is a RuntimeException, already caught above
+}
+```
+
+Reorder so the more specific type comes first, or remove the unreachable clause. The
+alternatives of a single multi-catch clause (`catch e: A | B`) are not checked against
+each other.
+
 ## Pattern-matching errors
 
 ### `E0042` — Non-exhaustive pattern match
@@ -392,6 +413,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
+| `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 
 ## See also
 

@@ -277,6 +277,27 @@ tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
 // E0082: tool 名 `same` が重複しています。
 ```
 
+## try/catch エラー
+
+### `E0083` — 到達不能な catch 節
+
+後ろにある `catch` 節の例外型が、手前の節の型のサブタイプ（または同じ型）である場合、
+その節には決して到達できません。手前の節が先に処理してしまうためです。
+
+```onion
+try {
+  risky()
+} catch e: RuntimeException {
+  handle(e)
+} catch e: IllegalArgumentException {
+  // E0083: IllegalArgumentException は RuntimeException のサブタイプで、
+  //        すでに手前の節が処理してしまう
+}
+```
+
+より具体的な型を先に書くよう並べ替えるか、到達不能な節を削除してください。1つの
+multi-catch 節（`catch e: A | B`）の候補同士は互いにチェックされません。
+
 ## パターンマッチングエラー
 
 ### `E0042` — 網羅性のないパターンマッチング
@@ -390,6 +411,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
+| `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 
 ## 関連項目
 

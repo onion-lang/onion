@@ -7967,14 +7967,14 @@ rather than polling <code>isFailure()</code>.</p>
 <h2 id="assert-module">Assert Module<a class="headerlink" href="#assert-module" title="Permanent link">&para;</a></h2>
 <p>Testing assertions via <code>onion.Assert</code>. Throws <code>AssertionError</code> on failure.</p>
 <h3 id="basic-assertions">Basic Assertions<a class="headerlink" href="#basic-assertions" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>Assert::assertTrue(x &gt; 0)
-</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>Assert::assertFalse(list.isEmpty())
-</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>Assert::assertEquals(expected, actual)
-</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>Assert::assertNotEquals(a, b)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>Assert::isTrue(x &gt; 0)
+</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>Assert::isFalse(list.isEmpty())
+</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>Assert::equals(expected, actual)
+</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>Assert::notEquals(a, b)
 </span></code></pre></div>
 <h3 id="null-assertions">Null Assertions<a class="headerlink" href="#null-assertions" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>Assert::assertNotNull(result)
-</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>Assert::assertNull(errorMessage)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>Assert::notNull(result)
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>Assert::isNull(errorMessage)
 </span></code></pre></div>
 <h3 id="explicit-failure">Explicit Failure<a class="headerlink" href="#explicit-failure" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>if invalidState {
@@ -8113,13 +8113,13 @@ values.</p>
 <p><code>derive!(Yaml)</code> synthesizes <code>fromYaml</code> and <code>toYaml</code> on any scalar-component
 record; see <a href="../specification/#derive-record-serde-derivation">Records — derive!</a>
 for the full contract.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>record Config(host: String, port: Int, debug: Boolean) derive!(Yaml)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
 </span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>
-</span><span id="__span-69-3"><a id="__codelineno-69-3" name="__codelineno-69-3" href="#__codelineno-69-3"></a>val cfg = new Config(&quot;localhost&quot;, 8080, false)
-</span><span id="__span-69-4"><a id="__codelineno-69-4" name="__codelineno-69-4" href="#__codelineno-69-4"></a>val yaml = Config::toYaml(cfg)
+</span><span id="__span-69-3"><a id="__codelineno-69-3" name="__codelineno-69-3" href="#__codelineno-69-3"></a>val cfg = new ServerConfig(&quot;localhost&quot;, 8080, false)
+</span><span id="__span-69-4"><a id="__codelineno-69-4" name="__codelineno-69-4" href="#__codelineno-69-4"></a>val yaml = ServerConfig::toYaml(cfg)
 </span><span id="__span-69-5"><a id="__codelineno-69-5" name="__codelineno-69-5" href="#__codelineno-69-5"></a>// &quot;host: localhost\nport: 8080\ndebug: false\n&quot;
 </span><span id="__span-69-6"><a id="__codelineno-69-6" name="__codelineno-69-6" href="#__codelineno-69-6"></a>
-</span><span id="__span-69-7"><a id="__codelineno-69-7" name="__codelineno-69-7" href="#__codelineno-69-7"></a>val cfg2 = Config::fromYaml(yaml)   // Config? — null on parse/convert failure
+</span><span id="__span-69-7"><a id="__codelineno-69-7" name="__codelineno-69-7" href="#__codelineno-69-7"></a>val cfg2 = ServerConfig::fromYaml(yaml)   // ServerConfig? — null on parse/convert failure
 </span></code></pre></div>
 <p><code>derive!(Json, Yaml)</code> is also valid; both formats share the internal
 <code>toMap</code> / <code>fromMap</code> core, so there is no duplication:</p>

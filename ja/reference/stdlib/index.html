@@ -2212,10 +2212,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#randint-randlong-randdouble" class="md-nav__link">
+  <a href="#randnextint-nextlong-nextdouble-nextboolean" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rand::int / Rand::long / Rand::double
+        Rand::nextInt / nextLong / nextDouble / nextBoolean
       
     </span>
   </a>
@@ -2226,7 +2226,7 @@
   <a href="#randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rand::nextInt
+        Rand::nextInt（範囲指定）
       
     </span>
   </a>
@@ -5842,10 +5842,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#randint-randlong-randdouble" class="md-nav__link">
+  <a href="#randnextint-nextlong-nextdouble-nextboolean" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rand::int / Rand::long / Rand::double
+        Rand::nextInt / nextLong / nextDouble / nextBoolean
       
     </span>
   </a>
@@ -5856,7 +5856,7 @@
   <a href="#randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rand::nextInt
+        Rand::nextInt（範囲指定）
       
     </span>
   </a>
@@ -6894,14 +6894,14 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 </span></code></pre></div>
 <h2 id="rand">Rand モジュール<a class="headerlink" href="#rand" title="Permanent link">&para;</a></h2>
 <p><code>onion.Rand</code>による乱数生成ユーティリティ。</p>
-<h3 id="randint-randlong-randdouble">Rand::int / Rand::long / Rand::double<a class="headerlink" href="#randint-randlong-randdouble" title="Permanent link">&para;</a></h3>
+<h3 id="randnextint-nextlong-nextdouble-nextboolean">Rand::nextInt / nextLong / nextDouble / nextBoolean<a class="headerlink" href="#randnextint-nextlong-nextdouble-nextboolean" title="Permanent link">&para;</a></h3>
 <p>乱数を生成：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>val randomInt: Int = Rand::int()           // ランダムなInt
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>val randomLong: Long = Rand::long()        // ランダムなLong
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>val randomDouble: Double = Rand::double()  // 0.0から1.0
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>val randomBool: Boolean = Rand::boolean()  // ランダムなBoolean
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>val randomInt: Int = Rand::nextInt()            // ランダムなInt
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>val randomLong: Long = Rand::nextLong()         // ランダムなLong
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>val randomDouble: Double = Rand::nextDouble()   // 0.0から1.0
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>val randomBool: Boolean = Rand::nextBoolean()   // ランダムなBoolean
 </span></code></pre></div>
-<h3 id="randnextint">Rand::nextInt<a class="headerlink" href="#randnextint" title="Permanent link">&para;</a></h3>
+<h3 id="randnextint">Rand::nextInt（範囲指定）<a class="headerlink" href="#randnextint" title="Permanent link">&para;</a></h3>
 <p>範囲内の乱数整数を生成：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>val dice: Int = Rand::nextInt(6) + 1      // 1から6
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>val percent: Int = Rand::nextInt(100)     // 0から99
@@ -6919,14 +6919,14 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 <h2 id="assert">Assert モジュール<a class="headerlink" href="#assert" title="Permanent link">&para;</a></h2>
 <p><code>onion.Assert</code>によるテストアサーション。失敗時に<code>AssertionError</code>をスロー。</p>
 <h3 id="_7">基本アサーション<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>Assert::assertTrue(x &gt; 0)
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>Assert::assertFalse(list.isEmpty())
-</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>Assert::assertEquals(expected, actual)
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>Assert::assertNotEquals(a, b)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>Assert::isTrue(x &gt; 0)
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>Assert::isFalse(list.isEmpty())
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>Assert::equals(expected, actual)
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>Assert::notEquals(a, b)
 </span></code></pre></div>
 <h3 id="null">Nullアサーション<a class="headerlink" href="#null" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>Assert::assertNotNull(result)
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>Assert::assertNull(errorMessage)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>Assert::notNull(result)
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>Assert::isNull(errorMessage)
 </span></code></pre></div>
 <h3 id="_8">明示的な失敗<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>if invalidState {

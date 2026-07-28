@@ -18,6 +18,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `JsonYamlShapeDemo.on`, `ShapeFirst.on`.** Same treatment as above, for the
   next batch of deterministic, no-stdin/file/network/GUI examples.
 
+### Fixed
+
+- **A malformed `onionc`/`onion` command line either crashed with a raw stack
+  trace or failed with no message at all, instead of reporting the bad
+  option.** `onionc` looked up the message key `error.command..noArgument`
+  (a stray extra dot) for an option missing its required argument, so
+  `Message.apply` threw an uncaught `MissingResourceException` — e.g.
+  `onionc -classpath` with nothing after it crashed instead of printing a
+  diagnostic. Separately, `onion`'s failure reporting only ever inspected
+  lacked-argument options, never unrecognized ones, so a typo'd flag (e.g.
+  `-maxErrorReports`, the exact misspelling this project's own docs used to
+  carry — see below) failed silently with exit code -1 and empty stderr. Both
+  frontends also leaked the option wrapper's `toString` into the message
+  (`ValuedParam(-foo) is invalid argument.`) instead of the bare flag name.
+  Fixed all three: the typo'd resource key, `onion` now reports unrecognized
+  options the same way `onionc` does, and both print the plain flag name.
+
+- **Docs and README documented a CLI flag that doesn't exist.** `-maxErrorReports`
+  (plural) was never a real option — the actual flag is `-maxErrorReport`
+  (singular) — so following the docs literally tripped the silent-failure bug
+  above. Corrected in `CLAUDE.md`, `docs/ja/CLAUDE_ja.md`,
+  `docs/tools/compiler.md`, `docs/ja/tools/compiler.md`,
+  `docs/tools/script-runner.md`, `docs/ja/tools/script-runner.md`, and
+  `README.md` (which also had "comiplation" for "compilation").
+
 ## [0.10.7] - 2026-07-28
 
 New diagnostic E0083 catches a shadowed `catch` clause that previously compiled

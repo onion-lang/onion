@@ -38,12 +38,12 @@ onionc -d build/classes MyProgram.on
 - Unix系: `org/onion_lang/MyClass.class`
 - Windows: `org\onion_lang\MyClass.class`
 
-### `-maxErrorReports <count>`
+### `-maxErrorReport <count>`
 
 報告するコンパイルエラーの最大数を制限します。大量のエラーがある大規模プロジェクトで便利です。
 
 ```bash
-onionc -maxErrorReports 10 MyProgram.on
+onionc -maxErrorReport 10 MyProgram.on
 ```
 
 ### `--dump-ast`
@@ -172,7 +172,7 @@ onionc \
   -d build/classes \
   -classpath lib/external.jar \
   -encoding UTF-8 \
-  -maxErrorReports 20 \
+  -maxErrorReport 20 \
   src/*.on
 ```
 

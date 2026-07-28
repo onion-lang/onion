@@ -30,7 +30,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `-classpath <path>` - コンパイル用のクラスパスを設定
 - `-encoding <encoding>` - ソースファイルのエンコーディングを設定
 - `-d <dir>` - クラスファイルの出力ディレクトリを設定
-- `-maxErrorReports <n>` - 報告するエラーの数を制限
+- `-maxErrorReport <n>` - 報告するエラーの数を制限
 - `--dump-ast` - パースされたASTを標準エラー出力に表示
 - `--dump-typed-ast` - 型付けされたASTの概要を標準エラー出力に表示
 - `--warn <off|on|error>` - 警告レベルを設定

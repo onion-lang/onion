@@ -298,7 +298,7 @@ onionc [options] source files...
 * -classpath <classpath> Set classpath of source files in compilation.
 * -encoding <encoding> Set encoding of source files.
 * -d <output directory> Set output directory of results.
-* -maxErrorReports <error count> Set the maximum number of comiplation errors reported.
+* -maxErrorReport <error count> Set the maximum number of compilation errors reported.
 * --dump-ast Print parsed AST to stderr.
 * --dump-typed-ast Print typed AST summary to stderr.
 * --profile-compile Emit a phase-by-phase compile profile.
@@ -326,7 +326,7 @@ For example, if source files which module name is "org.onion_lang" is compiled, 
 #### Available options
 * -classpath <classpath> classpath of source files in compilation.
 * -encoding <encoding> encoding of source files.
-* -maxErrorReports <error count> the maximum number of comiplation errors reported.
+* -maxErrorReport <error count> the maximum number of compilation errors reported.
 * --dump-ast Print parsed AST to stderr.
 * --dump-typed-ast Print typed AST summary to stderr.
 * --profile-compile Emit a phase-by-phase compile profile.

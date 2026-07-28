@@ -168,5 +168,53 @@ class RunSamplesSpec extends AbstractShellSpec {
         shell.run(load("run/FileWordCounter.on"), "run/FileWordCounter.on", args.toArray)
       assert(Shell.Success("Total words: 7") == run(f.toString))
     }
+
+    it("runs Factorial.on") {
+      assert(Shell.Success(null) == runSample("run/Factorial.on"))
+    }
+
+    it("runs Generics.on") {
+      assert(Shell.Success(null) == runSample("run/Generics.on"))
+    }
+
+    it("runs List.on") {
+      assert(Shell.Success(null) == runSample("run/List.on"))
+    }
+
+    it("runs Array.on") {
+      assert(Shell.Success(null) == runSample("run/Array.on"))
+    }
+
+    it("runs StringCat.on") {
+      assert(Shell.Success(null) == runSample("run/StringCat.on"))
+    }
+
+    it("runs Foreach.on") {
+      assert(Shell.Success(null) == runSample("run/Foreach.on"))
+    }
+
+    it("runs Hello.on") {
+      assert(Shell.Success(null) == runSample("run/Hello.on"))
+    }
+
+    it("runs NullSafety.on") {
+      assert(Shell.Success(null) == runSample("run/NullSafety.on"))
+    }
+
+    it("runs StaticImports.on") {
+      assert(Shell.Success(null) == runSample("run/StaticImports.on"))
+    }
+
+    it("runs Delegation.on") {
+      assert(Shell.Success(null) == runSample("run/Delegation.on"))
+    }
+
+    it("runs Extension.on") {
+      assert(Shell.Success(null) == runSample("run/Extension.on"))
+    }
+
+    it("runs ExprEval.on") {
+      assert(Shell.Success(null) == runSample("run/ExprEval.on"))
+    }
   }
 }

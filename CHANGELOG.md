@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for 12 `run/` examples that were compile-checked only.**
+  `SampleCompilesSpec`/`SampleProgramsSpec` compile every file in `run/`, but
+  `RunSamplesSpec` only *executes* a subset of them with an asserted result — a
+  runtime regression (wrong output, an exception) in an example outside that
+  subset could land undetected even though the file still compiled. `Factorial.on`,
+  `Generics.on`, `List.on`, `Array.on`, `StringCat.on`, `Foreach.on`, `Hello.on`,
+  `NullSafety.on`, `StaticImports.on`, `Delegation.on`, `Extension.on`, and
+  `ExprEval.on` are deterministic and have no stdin/file/network dependency, so
+  `RunSamplesSpec` now runs each and asserts `Shell.Success(null)`.
+
 ### Fixed
 
 - **A generic ADT enum's singleton case rejected the expected-type constructor

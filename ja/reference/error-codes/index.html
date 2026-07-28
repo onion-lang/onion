@@ -2167,6 +2167,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0080-shape-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0080 — 自作の Shape に law がない
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2313,6 +2324,17 @@
       
         <li class="md-nav__item">
   <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        診断コード一覧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         関連項目
@@ -4866,6 +4888,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0080-shape-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0080 — 自作の Shape に law がない
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5014,6 +5047,17 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
+        診断コード一覧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         関連項目
       
     </span>
@@ -5128,50 +5172,75 @@
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  shape doc = toml     // E0076: サポートしているのは json, yaml
 </span></code></pre></div>
 <p>インラインのパターンを書く場合は <code>shape name = re"..."</code> としてください。</p>
+<h3 id="e0080-shape-law"><code>E0080</code> — 自作の <code>Shape</code> に law がない<a class="headerlink" href="#e0080-shape-law" title="Permanent link">&para;</a></h3>
+<p><code>onion.Shape[T]</code> を（<code>shape</code>/<code>from re"..."</code> による導出ではなく）直接実装した具象クラスは、
+そのファイル内で機械検査される <code>law</code> か <code>example</code> を最低1つ主張しなければなりません。
+導出された shape は round-trip が構造的に保証されますが、手書きのものは<strong>主張するだけ</strong>
+なので、その主張を検査する必要があります。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>class FixedWidth conforms Shape[Person] {
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>public:
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  def this {}
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>  def canPrint(): Boolean = true
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  def print(v: Person): String { ... }
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>}
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>// E0080: FixedWidth の law を主張している箇所がこのファイルにない
+</span></code></pre></div>
+<p>対処: トップレベルの <code>example</code>（またはクラス自身の <code>law</code>）を追加してください——代表的な
+主張は round-trip <code>s.parse(s.print(v)).get() == v</code> です。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>example fixedWidthL1 {
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  val s = new FixedWidth()
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  val v = new Person(&quot;KOTA&quot;, 42)
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  s.parse(s.print(v)).get() == v
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>}
+</span></code></pre></div>
+<p>パース専用の shape（<code>canPrint(): false</code>）は、読み取り方向にある law を代わりに主張します。
+主張が偽であれば、他の <code>example</code> と同様に <code>E0065</code> になります。</p>
 <h2 id="capability">Capability エラー<a class="headerlink" href="#capability" title="Permanent link">&para;</a></h2>
 <p><code>tool</code> 宣言は <code>requires { ... }</code> 節で境界を引きます。コンパイラは本体全体の効果を
 （通常の関数を通じても推移的に）推論し、宣言をそれと突き合わせて検査します。</p>
 <h3 id="e0077-tool"><code>E0077</code> — tool が未宣言の効果を実行している<a class="headerlink" href="#e0077-tool" title="Permanent link">&para;</a></h3>
 <p>本体が <code>requires</code> 節でカバーされていない効果を実行しています。診断は不足している
 効果、呼び出し先、呼び出し箇所を示します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tool sneaky(src: String, dst: String): void
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  requires { read(src) }
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>{
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: `write` を実行 (writeText)
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>tool sneaky(src: String, dst: String): void
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  requires { read(src) }
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>{
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: `write` を実行 (writeText)
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>}
 </span></code></pre></div>
 <p>修正方法: 不足している capability を追加する — <code>requires { read(src), write(dst) }</code>。</p>
 <h3 id="e0078-capability"><code>E0078</code> — 本体が実行できない capability が宣言されている<a class="headerlink" href="#e0078-capability" title="Permanent link">&para;</a></h3>
 <p><code>requires</code> 内の capability が未使用です: 本体のどこもそれを実行していません。誠実な
 境界は、実際に起きることだけを列挙します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>tool overclaim(src: String): String
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  requires { read(src), net }   // E0078: `net` が未使用
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>{
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  return Files::readText(src)
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>tool overclaim(src: String): String
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>  requires { read(src), net }   // E0078: `net` が未使用
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>{
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>  return Files::readText(src)
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>}
 </span></code></pre></div>
 <p>修正方法: 未使用の capability を削除する。</p>
 <h3 id="e0079-capability"><code>E0079</code> — 不正な capability エントリ<a class="headerlink" href="#e0079-capability" title="Permanent link">&para;</a></h3>
 <p><code>requires</code> のエントリが有効な capability ではありません: 未知の効果名、常に ambient な
 効果へのパラメータ引数、またはこの tool のパラメータ名を指していない引数です。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>tool t(): Int requires { teleport } { return 0 }
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  // E0079: `teleport` は効果ではない
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  // E0079: `console` はパラメータ引数を取らない
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>  // E0079: `nope` はパラメータ名ではない
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>tool t(): Int requires { teleport } { return 0 }
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  // E0079: `teleport` は効果ではない
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  // E0079: `console` はパラメータ引数を取らない
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>  // E0079: `nope` はパラメータ名ではない
 </span></code></pre></div>
 <p>効果の語彙は <code>read write net exec env clock rand console unknown</code> で、パラメータ引数
 を取るのは <code>read</code>, <code>write</code>, <code>net</code>, <code>exec</code> のみです。</p>
 <h2 id="null">Null 安全エラー<a class="headerlink" href="#null" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-null"><code>E0057</code> — 型引数が null の可能性がある<a class="headerlink" href="#e0057-null" title="Permanent link">&para;</a></h3>
 <p>裸の型引数 <code>[T]</code> は nullable な型で実体化される可能性があるため、null チェックまたは非 null 制限なしには直接デリファレンスできません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>class Box[T] {
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>public:
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>class Box[T] {
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>public:
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>}
 </span></code></pre></div>
 <p>修正方法:
 - <code>?.</code> / <code>?:</code> / <code>if x != null</code> を使う。
@@ -5179,11 +5248,11 @@
 <h3 id="e0081-tool"><code>E0081</code> — tool のパラメータがコマンドラインから読めない<a class="headerlink" href="#e0081-tool" title="Permanent link">&para;</a></h3>
 <p>CLI は <code>tool</code> のパラメータから導出されるので、パラメータはすべてコマンドライン引数から
 読める型でなければなりません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>record P(x: Int)
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>// E0081: パラメータ `p` の型 P は引数から読み取れません。
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>//        使える型: String, Int, Long, Double, Float, Boolean, Short, Byte。
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>record P(x: Int)
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>// E0081: パラメータ `p` の型 P は引数から読み取れません。
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>//        使える型: String, Int, Long, Double, Float, Boolean, Short, Byte。
 </span></code></pre></div>
 <p>以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、<code>main</code> のない何も実行
 しないプログラムがコンパイルされていました（issue #424）。</p>
@@ -5191,27 +5260,364 @@
 <p>2つの <code>tool</code> が同じ名前を持っています。関数のオーバーロード自体は正当ですが、コマンド
 ラインは<strong>名前だけ</strong>で tool を選ぶため、2つ目は決して呼び出せず、<code>--contract</code> にも同名
 で2件並んでどちらも指定できません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>// E0082: tool 名 `same` が重複しています。
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>// E0082: tool 名 `same` が重複しています。
 </span></code></pre></div>
 <h2 id="_4">パターンマッチングエラー<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sealed interface Shape {}
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>select shape {
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>  // Rect ケースが欠けている → E0042
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sealed interface Shape {}
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>select shape {
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>  // Rect ケースが欠けている → E0042
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>}
 </span></code></pre></div>
 <h2 id="_5">パーサーエラー<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
-<h2 id="_6">関連項目<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="_6">診断コード一覧<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>上の各節は遭遇しやすいコードを例つきで説明しています。この表は全コードの一覧なので、
+ビルドログで見たコードは必ずここで引けます。</p>
+<table>
+<thead>
+<tr>
+<th>コード</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>I0000</code></td>
+<td>コンパイラ内部エラー — あなたのプログラムではなくコンパイラのバグです</td>
+</tr>
+<tr>
+<td><code>E0000</code></td>
+<td>type … is expected, but type … is used</td>
+</tr>
+<tr>
+<td><code>E0001</code></td>
+<td>operator … is not applicable for type …</td>
+</tr>
+<tr>
+<td><code>E0002</code></td>
+<td>variable not found</td>
+</tr>
+<tr>
+<td><code>E0003</code></td>
+<td>class not found</td>
+</tr>
+<tr>
+<td><code>E0004</code></td>
+<td>field ….… is not found</td>
+</tr>
+<tr>
+<td><code>E0005</code></td>
+<td>method applicable for ….…(…) is not found</td>
+</tr>
+<tr>
+<td><code>E0006</code></td>
+<td>ambiguous method</td>
+</tr>
+<tr>
+<td><code>E0007</code></td>
+<td>duplicated local variable definition …</td>
+</tr>
+<tr>
+<td><code>E0008</code></td>
+<td>duplicated class definition …</td>
+</tr>
+<tr>
+<td><code>E0009</code></td>
+<td>duplicated field definition ….…</td>
+</tr>
+<tr>
+<td><code>E0010</code></td>
+<td>duplicated method definition ….…(…)</td>
+</tr>
+<tr>
+<td><code>E0011</code></td>
+<td>duplicated global variable definition …</td>
+</tr>
+<tr>
+<td><code>E0012</code></td>
+<td>duplicated function definition …(…)</td>
+</tr>
+<tr>
+<td><code>E0013</code></td>
+<td>method ….…(…) is not accessible from class …</td>
+</tr>
+<tr>
+<td><code>E0014</code></td>
+<td>field ….… is not accessible from class …</td>
+</tr>
+<tr>
+<td><code>E0015</code></td>
+<td>class … is not accessible from class …</td>
+</tr>
+<tr>
+<td><code>E0016</code></td>
+<td>inheritance relations which includes … have cyclicity</td>
+</tr>
+<tr>
+<td><code>E0018</code></td>
+<td>class … do inheritance illegally</td>
+</tr>
+<tr>
+<td><code>E0019</code></td>
+<td>method ….… cannot be called</td>
+</tr>
+<tr>
+<td><code>E0020</code></td>
+<td>this method cannot return value</td>
+</tr>
+<tr>
+<td><code>E0021</code></td>
+<td>constructor not found</td>
+</tr>
+<tr>
+<td><code>E0022</code></td>
+<td>ambiguous constructor</td>
+</tr>
+<tr>
+<td><code>E0023</code></td>
+<td>interface required, but type … is used</td>
+</tr>
+<tr>
+<td><code>E0025</code></td>
+<td>duplicated constructor definition …(…)</td>
+</tr>
+<tr>
+<td><code>E0026</code></td>
+<td>duplicated generated method ….…(…)</td>
+</tr>
+<tr>
+<td><code>E0027</code></td>
+<td>type … is not boxable type</td>
+</tr>
+<tr>
+<td><code>E0028</code></td>
+<td>lvalue is required</td>
+</tr>
+<tr>
+<td><code>E0029</code></td>
+<td>duplicated type parameter definition …</td>
+</tr>
+<tr>
+<td><code>E0030</code></td>
+<td>type … does not take type arguments</td>
+</tr>
+<tr>
+<td><code>E0031</code></td>
+<td>type … expects … type arguments, but … are supplied</td>
+</tr>
+<tr>
+<td><code>E0032</code></td>
+<td>type argument … must be a reference type</td>
+</tr>
+<tr>
+<td><code>E0033</code></td>
+<td>method ….… does not take type arguments</td>
+</tr>
+<tr>
+<td><code>E0034</code></td>
+<td>method ….… expects … type arguments, but … are supplied</td>
+</tr>
+<tr>
+<td><code>E0035</code></td>
+<td>Erased JVM signature collision: ….……</td>
+</tr>
+<tr>
+<td><code>E0036</code></td>
+<td>cannot assign to val …</td>
+</tr>
+<tr>
+<td><code>E0037</code></td>
+<td>class … must implement abstract method …(…) or be declared abstract</td>
+</tr>
+<tr>
+<td><code>E0038</code></td>
+<td>cannot instantiate abstract class …</td>
+</tr>
+<tr>
+<td><code>E0039</code></td>
+<td>method …(…) cannot override final method in …</td>
+</tr>
+<tr>
+<td><code>E0040</code></td>
+<td>cannot call method … on primitive type …</td>
+</tr>
+<tr>
+<td><code>E0041</code></td>
+<td>type … is not a valid method call target</td>
+</tr>
+<tr>
+<td><code>E0042</code></td>
+<td>non exhaustive pattern match</td>
+</tr>
+<tr>
+<td><code>E0043</code></td>
+<td>unknown parameter name: …</td>
+</tr>
+<tr>
+<td><code>E0044</code></td>
+<td>duplicate argument: …</td>
+</tr>
+<tr>
+<td><code>E0045</code></td>
+<td>positional argument after named argument is not allowed</td>
+</tr>
+<tr>
+<td><code>E0046</code></td>
+<td>wrong number of bindings in destructuring pattern</td>
+</tr>
+<tr>
+<td><code>E0047</code></td>
+<td>… is not a record type or does not exist</td>
+</tr>
+<tr>
+<td><code>E0048</code></td>
+<td>break is only allowed inside a loop</td>
+</tr>
+<tr>
+<td><code>E0049</code></td>
+<td>continue is only allowed inside a loop</td>
+</tr>
+<tr>
+<td><code>E0050</code></td>
+<td>current instance is not available in static context</td>
+</tr>
+<tr>
+<td><code>E0051</code></td>
+<td>return type is required for method …</td>
+</tr>
+<tr>
+<td><code>E0052</code></td>
+<td>lambda parameter … must specify a type</td>
+</tr>
+<tr>
+<td><code>E0053</code></td>
+<td>cyclic type alias detected: …</td>
+</tr>
+<tr>
+<td><code>E0054</code></td>
+<td>duplicate type alias: …</td>
+</tr>
+<tr>
+<td><code>E0055</code></td>
+<td>function … requires a body</td>
+</tr>
+<tr>
+<td><code>E0057</code></td>
+<td>value of type parameter … may be null and cannot be dereferenced directly</td>
+</tr>
+<tr>
+<td><code>E0058</code></td>
+<td>label … is not defined on any enclosing loop</td>
+</tr>
+<tr>
+<td><code>E0059</code></td>
+<td>invalid regular expression literal: …</td>
+</tr>
+<tr>
+<td><code>E0060</code></td>
+<td>the regex pattern has … capture group(s) but … binding(s) were given</td>
+</tr>
+<tr>
+<td><code>E0061</code></td>
+<td>record component … has type …, which cannot be derived from a <code>from re"..."</code> clause</td>
+</tr>
+<tr>
+<td><code>E0062</code></td>
+<td>record component … has type …, which derive! cannot serialize</td>
+</tr>
+<tr>
+<td><code>E0063</code></td>
+<td>unknown derive! marker <code>…</code></td>
+</tr>
+<tr>
+<td><code>E0064</code></td>
+<td>law violation</td>
+</tr>
+<tr>
+<td><code>E0065</code></td>
+<td>example failed</td>
+</tr>
+<tr>
+<td><code>E0066</code></td>
+<td>raw type … is not allowed; supply type arguments (e.g</td>
+</tr>
+<tr>
+<td><code>E0067</code></td>
+<td>method … may reach the end of its body without returning a …</td>
+</tr>
+<tr>
+<td><code>E0068</code></td>
+<td>method …(…) is marked override but does not override any method in a base class or interface of …</td>
+</tr>
+<tr>
+<td><code>E0069</code></td>
+<td>local val … must be initialized at its declaration</td>
+</tr>
+<tr>
+<td><code>E0070</code></td>
+<td>value of type … may be null and cannot be dereferenced directly</td>
+</tr>
+<tr>
+<td><code>E0071</code></td>
+<td>… is a variable, not a type</td>
+</tr>
+<tr>
+<td><code>E0072</code></td>
+<td>abstract method … cannot have a body (the body would be silently ignored)</td>
+</tr>
+<tr>
+<td><code>E0073</code></td>
+<td>a Map (…) cannot be iterated directly by foreach</td>
+</tr>
+<tr>
+<td><code>E0074</code></td>
+<td>law parameter not generatable</td>
+</tr>
+<tr>
+<td><code>E0075</code></td>
+<td>law class not loadable</td>
+</tr>
+<tr>
+<td><code>E0076</code></td>
+<td>unknown shape format <code>…</code></td>
+</tr>
+<tr>
+<td><code>E0077</code></td>
+<td>tool <code>…</code> performs <code>…</code> here (calling …) but does not declare it</td>
+</tr>
+<tr>
+<td><code>E0078</code></td>
+<td>tool <code>…</code> declares capability <code>…</code> but nothing in its body can perform it</td>
+</tr>
+<tr>
+<td><code>E0079</code></td>
+<td>tool <code>…</code> has an invalid capability <code>…</code>: …</td>
+</tr>
+<tr>
+<td><code>E0080</code></td>
+<td>class <code>…</code> implements onion.Shape but nothing in its file asserts a law</td>
+</tr>
+<tr>
+<td><code>E0081</code></td>
+<td>tool parameter not cli convertible</td>
+</tr>
+<tr>
+<td><code>E0082</code></td>
+<td>duplicate tool name <code>…</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="_7">関連項目<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../specification/">言語仕様</a></li>
 <li><a href="../stdlib/">標準ライブラリ</a></li>

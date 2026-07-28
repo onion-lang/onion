@@ -3939,6 +3939,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0080-a-user-written-shape-asserts-no-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0080 — A user-written Shape asserts no law
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4077,6 +4088,17 @@
     <span class="md-ellipsis">
       
         Parser errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-diagnostic-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every diagnostic code
       
     </span>
   </a>
@@ -4848,6 +4870,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#e0080-a-user-written-shape-asserts-no-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0080 — A user-written Shape asserts no law
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4993,6 +5026,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#every-diagnostic-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every diagnostic code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5110,6 +5154,31 @@ what is supported.</p>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  shape doc = toml     // E0076: supported formats are json, yaml
 </span></code></pre></div>
 <p>For an inline pattern, write <code>shape name = re"..."</code>.</p>
+<h3 id="e0080-a-user-written-shape-asserts-no-law"><code>E0080</code> — A user-written <code>Shape</code> asserts no law<a class="headerlink" href="#e0080-a-user-written-shape-asserts-no-law" title="Permanent link">&para;</a></h3>
+<p>A concrete class implementing <code>onion.Shape[T]</code> directly (rather than deriving one via
+<code>shape</code>/<code>from re"..."</code>) must assert at least one machine-checked <code>law</code> or <code>example</code> in
+its file. A derived shape's round-trip is guaranteed by construction; a hand-written
+one only <em>claims</em> it, so the claim must be checked.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>class FixedWidth conforms Shape[Person] {
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>public:
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  def this {}
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>  def canPrint(): Boolean = true
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  def print(v: Person): String { ... }
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>}
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>// E0080: nothing in this file asserts a law for FixedWidth
+</span></code></pre></div>
+<p>Fix: add a top-level <code>example</code> (or the class's own <code>law</code>) — the canonical claim is the
+round-trip <code>s.parse(s.print(v)).get() == v</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>example fixedWidthL1 {
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  val s = new FixedWidth()
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  val v = new Person(&quot;KOTA&quot;, 42)
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  s.parse(s.print(v)).get() == v
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>}
+</span></code></pre></div>
+<p>A parse-only shape (<code>canPrint(): false</code>) instead asserts whatever laws its reading
+direction has. A false claim is <code>E0065</code>, the same as any other falsified <code>example</code>.</p>
 <h2 id="capability-errors">Capability errors<a class="headerlink" href="#capability-errors" title="Permanent link">&para;</a></h2>
 <p>A <code>tool</code> declaration draws a boundary with a <code>requires { ... }</code> clause; the compiler
 infers the whole body's effects (transitively, through ordinary functions) and checks
@@ -5117,45 +5186,45 @@ the declaration against them.</p>
 <h3 id="e0077-tool-performs-an-undeclared-effect"><code>E0077</code> — Tool performs an undeclared effect<a class="headerlink" href="#e0077-tool-performs-an-undeclared-effect" title="Permanent link">&para;</a></h3>
 <p>The body performs an effect the <code>requires</code> clause does not cover. The diagnostic names
 the missing effect, the callee, and the call site.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tool sneaky(src: String, dst: String): void
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  requires { read(src) }
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>{
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: performs `write` (writeText)
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>tool sneaky(src: String, dst: String): void
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  requires { read(src) }
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>{
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  Files::writeText(dst, Files::readText(src))   // E0077: performs `write` (writeText)
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>}
 </span></code></pre></div>
 <p>Fix: add the missing capability — <code>requires { read(src), write(dst) }</code>.</p>
 <h3 id="e0078-declared-capability-the-body-cannot-perform"><code>E0078</code> — Declared capability the body cannot perform<a class="headerlink" href="#e0078-declared-capability-the-body-cannot-perform" title="Permanent link">&para;</a></h3>
 <p>A capability in <code>requires</code> is unused: nothing in the body performs it. An honest
 boundary lists only what actually happens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>tool overclaim(src: String): String
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  requires { read(src), net }   // E0078: `net` is unused
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>{
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  return Files::readText(src)
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>tool overclaim(src: String): String
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>  requires { read(src), net }   // E0078: `net` is unused
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>{
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>  return Files::readText(src)
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>}
 </span></code></pre></div>
 <p>Fix: remove the unused capability.</p>
 <h3 id="e0079-invalid-capability-entry"><code>E0079</code> — Invalid capability entry<a class="headerlink" href="#e0079-invalid-capability-entry" title="Permanent link">&para;</a></h3>
 <p>A <code>requires</code> entry is not a valid capability: an unknown effect name, a parameter
 argument on an effect that is always ambient, or an argument that does not name one of
 the tool's parameters.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>tool t(): Int requires { teleport } { return 0 }
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  // E0079: `teleport` is not an effect
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  // E0079: `console` does not take a parameter argument
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>  // E0079: `nope` does not name a parameter
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>tool t(): Int requires { teleport } { return 0 }
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  // E0079: `teleport` is not an effect
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>tool t2(x: String): Int requires { console(x) } { IO::println(x); return 0 }
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  // E0079: `console` does not take a parameter argument
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>tool t3(src: String): String requires { read(nope) } { return Files::readText(src) }
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>  // E0079: `nope` does not name a parameter
 </span></code></pre></div>
 <p>The effect vocabulary is <code>read write net exec env clock rand console unknown</code>; only
 <code>read</code>, <code>write</code>, <code>net</code>, and <code>exec</code> take a parameter argument.</p>
 <h2 id="null-safety-errors">Null-safety errors<a class="headerlink" href="#null-safety-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0057-type-parameter-may-be-null"><code>E0057</code> — Type parameter may be null<a class="headerlink" href="#e0057-type-parameter-may-be-null" title="Permanent link">&para;</a></h3>
 <p>A bare type parameter <code>[T]</code> can be instantiated with a nullable type, so direct dereference is not allowed without a null-check or a non-null bound.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>class Box[T] {
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>public:
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>class Box[T] {
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>public:
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  def size(x: T): Int = x.toString().length()   // E0057
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>}
 </span></code></pre></div>
 <p>Fixes:
 - Use <code>?.</code> / <code>?:</code> / <code>if x != null</code>.
@@ -5163,11 +5232,11 @@ the tool's parameters.</p>
 <h3 id="e0081-tool-parameter-cannot-be-read-from-the-command-line"><code>E0081</code> — Tool parameter cannot be read from the command line<a class="headerlink" href="#e0081-tool-parameter-cannot-be-read-from-the-command-line" title="Permanent link">&para;</a></h3>
 <p>A <code>tool</code>'s parameters must all be readable from a command-line argument, since the CLI
 is derived from them.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>record P(x: Int)
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>// E0081: parameter `p` has type P, which cannot be read from an argument.
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>//        Supported: String, Int, Long, Double, Float, Boolean, Short, Byte.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>record P(x: Int)
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>tool takeRec(p: P): Int requires { console } { IO::println(&quot;&quot; + p.x()); return 0 }
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>// E0081: parameter `p` has type P, which cannot be read from an argument.
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>//        Supported: String, Int, Long, Double, Float, Boolean, Short, Byte.
 </span></code></pre></div>
 <p>This used to be silent: CLI synthesis skipped such a script, which then compiled to a
 program with no <code>main</code> and nothing to run (issue #424).</p>
@@ -5175,26 +5244,363 @@ program with no <code>main</code> and nothing to run (issue #424).</p>
 <p>Two <code>tool</code>s share a name. Function overloading is fine, but the command line selects a
 tool <strong>by name alone</strong>, so the second one can never be invoked and <code>--contract</code> lists
 both under the same name with no way to address either.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>// E0082: duplicate tool name `same`.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>tool same(a: Int): Int requires { console } { IO::println(&quot;A&quot;); return 0 }
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>tool same(b: String): Int requires { console } { IO::println(&quot;B&quot;); return 0 }
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>// E0082: duplicate tool name `same`.
 </span></code></pre></div>
 <h2 id="pattern-matching-errors">Pattern-matching errors<a class="headerlink" href="#pattern-matching-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0042-non-exhaustive-pattern-match"><code>E0042</code> — Non-exhaustive pattern match<a class="headerlink" href="#e0042-non-exhaustive-pattern-match" title="Permanent link">&para;</a></h3>
 <p>A <code>select</code> on a sealed type does not cover all cases.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sealed interface Shape {}
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>record Circle(r: Int) conforms Shape
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>record Rect(w: Int, h: Int) conforms Shape
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>select shape {
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>  case Circle(r): println(&quot;circle&quot;)
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>  // missing Rect case → E0042
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sealed interface Shape {}
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>record Circle(r: Int) conforms Shape
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>record Rect(w: Int, h: Int) conforms Shape
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>select shape {
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>  case Circle(r): println(&quot;circle&quot;)
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>  // missing Rect case → E0042
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>}
 </span></code></pre></div>
 <h2 id="parser-errors">Parser errors<a class="headerlink" href="#parser-errors" title="Permanent link">&para;</a></h2>
 <p>Parser errors do not carry <code>E</code> codes; they report the encountered token and the expected tokens.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Test.on:2:10: Syntax error. Encountered &quot;{&quot;, but expecting &quot;;&quot;
 </span></code></pre></div>
+<h2 id="every-diagnostic-code">Every diagnostic code<a class="headerlink" href="#every-diagnostic-code" title="Permanent link">&para;</a></h2>
+<p>The sections above explain the codes you are most likely to meet, with examples. This
+table lists all of them, so a code seen in a build log can always be looked up.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>I0000</code></td>
+<td>internal compiler error — a bug in the compiler, not your program</td>
+</tr>
+<tr>
+<td><code>E0000</code></td>
+<td>type … is expected, but type … is used</td>
+</tr>
+<tr>
+<td><code>E0001</code></td>
+<td>operator … is not applicable for type …</td>
+</tr>
+<tr>
+<td><code>E0002</code></td>
+<td>variable not found</td>
+</tr>
+<tr>
+<td><code>E0003</code></td>
+<td>class not found</td>
+</tr>
+<tr>
+<td><code>E0004</code></td>
+<td>field ….… is not found</td>
+</tr>
+<tr>
+<td><code>E0005</code></td>
+<td>method applicable for ….…(…) is not found</td>
+</tr>
+<tr>
+<td><code>E0006</code></td>
+<td>ambiguous method</td>
+</tr>
+<tr>
+<td><code>E0007</code></td>
+<td>duplicated local variable definition …</td>
+</tr>
+<tr>
+<td><code>E0008</code></td>
+<td>duplicated class definition …</td>
+</tr>
+<tr>
+<td><code>E0009</code></td>
+<td>duplicated field definition ….…</td>
+</tr>
+<tr>
+<td><code>E0010</code></td>
+<td>duplicated method definition ….…(…)</td>
+</tr>
+<tr>
+<td><code>E0011</code></td>
+<td>duplicated global variable definition …</td>
+</tr>
+<tr>
+<td><code>E0012</code></td>
+<td>duplicated function definition …(…)</td>
+</tr>
+<tr>
+<td><code>E0013</code></td>
+<td>method ….…(…) is not accessible from class …</td>
+</tr>
+<tr>
+<td><code>E0014</code></td>
+<td>field ….… is not accessible from class …</td>
+</tr>
+<tr>
+<td><code>E0015</code></td>
+<td>class … is not accessible from class …</td>
+</tr>
+<tr>
+<td><code>E0016</code></td>
+<td>inheritance relations which includes … have cyclicity</td>
+</tr>
+<tr>
+<td><code>E0018</code></td>
+<td>class … do inheritance illegally</td>
+</tr>
+<tr>
+<td><code>E0019</code></td>
+<td>method ….… cannot be called</td>
+</tr>
+<tr>
+<td><code>E0020</code></td>
+<td>this method cannot return value</td>
+</tr>
+<tr>
+<td><code>E0021</code></td>
+<td>constructor not found</td>
+</tr>
+<tr>
+<td><code>E0022</code></td>
+<td>ambiguous constructor</td>
+</tr>
+<tr>
+<td><code>E0023</code></td>
+<td>interface required, but type … is used</td>
+</tr>
+<tr>
+<td><code>E0025</code></td>
+<td>duplicated constructor definition …(…)</td>
+</tr>
+<tr>
+<td><code>E0026</code></td>
+<td>duplicated generated method ….…(…)</td>
+</tr>
+<tr>
+<td><code>E0027</code></td>
+<td>type … is not boxable type</td>
+</tr>
+<tr>
+<td><code>E0028</code></td>
+<td>lvalue is required</td>
+</tr>
+<tr>
+<td><code>E0029</code></td>
+<td>duplicated type parameter definition …</td>
+</tr>
+<tr>
+<td><code>E0030</code></td>
+<td>type … does not take type arguments</td>
+</tr>
+<tr>
+<td><code>E0031</code></td>
+<td>type … expects … type arguments, but … are supplied</td>
+</tr>
+<tr>
+<td><code>E0032</code></td>
+<td>type argument … must be a reference type</td>
+</tr>
+<tr>
+<td><code>E0033</code></td>
+<td>method ….… does not take type arguments</td>
+</tr>
+<tr>
+<td><code>E0034</code></td>
+<td>method ….… expects … type arguments, but … are supplied</td>
+</tr>
+<tr>
+<td><code>E0035</code></td>
+<td>Erased JVM signature collision: ….……</td>
+</tr>
+<tr>
+<td><code>E0036</code></td>
+<td>cannot assign to val …</td>
+</tr>
+<tr>
+<td><code>E0037</code></td>
+<td>class … must implement abstract method …(…) or be declared abstract</td>
+</tr>
+<tr>
+<td><code>E0038</code></td>
+<td>cannot instantiate abstract class …</td>
+</tr>
+<tr>
+<td><code>E0039</code></td>
+<td>method …(…) cannot override final method in …</td>
+</tr>
+<tr>
+<td><code>E0040</code></td>
+<td>cannot call method … on primitive type …</td>
+</tr>
+<tr>
+<td><code>E0041</code></td>
+<td>type … is not a valid method call target</td>
+</tr>
+<tr>
+<td><code>E0042</code></td>
+<td>non exhaustive pattern match</td>
+</tr>
+<tr>
+<td><code>E0043</code></td>
+<td>unknown parameter name: …</td>
+</tr>
+<tr>
+<td><code>E0044</code></td>
+<td>duplicate argument: …</td>
+</tr>
+<tr>
+<td><code>E0045</code></td>
+<td>positional argument after named argument is not allowed</td>
+</tr>
+<tr>
+<td><code>E0046</code></td>
+<td>wrong number of bindings in destructuring pattern</td>
+</tr>
+<tr>
+<td><code>E0047</code></td>
+<td>… is not a record type or does not exist</td>
+</tr>
+<tr>
+<td><code>E0048</code></td>
+<td>break is only allowed inside a loop</td>
+</tr>
+<tr>
+<td><code>E0049</code></td>
+<td>continue is only allowed inside a loop</td>
+</tr>
+<tr>
+<td><code>E0050</code></td>
+<td>current instance is not available in static context</td>
+</tr>
+<tr>
+<td><code>E0051</code></td>
+<td>return type is required for method …</td>
+</tr>
+<tr>
+<td><code>E0052</code></td>
+<td>lambda parameter … must specify a type</td>
+</tr>
+<tr>
+<td><code>E0053</code></td>
+<td>cyclic type alias detected: …</td>
+</tr>
+<tr>
+<td><code>E0054</code></td>
+<td>duplicate type alias: …</td>
+</tr>
+<tr>
+<td><code>E0055</code></td>
+<td>function … requires a body</td>
+</tr>
+<tr>
+<td><code>E0057</code></td>
+<td>value of type parameter … may be null and cannot be dereferenced directly</td>
+</tr>
+<tr>
+<td><code>E0058</code></td>
+<td>label … is not defined on any enclosing loop</td>
+</tr>
+<tr>
+<td><code>E0059</code></td>
+<td>invalid regular expression literal: …</td>
+</tr>
+<tr>
+<td><code>E0060</code></td>
+<td>the regex pattern has … capture group(s) but … binding(s) were given</td>
+</tr>
+<tr>
+<td><code>E0061</code></td>
+<td>record component … has type …, which cannot be derived from a <code>from re"..."</code> clause</td>
+</tr>
+<tr>
+<td><code>E0062</code></td>
+<td>record component … has type …, which derive! cannot serialize</td>
+</tr>
+<tr>
+<td><code>E0063</code></td>
+<td>unknown derive! marker <code>…</code></td>
+</tr>
+<tr>
+<td><code>E0064</code></td>
+<td>law violation</td>
+</tr>
+<tr>
+<td><code>E0065</code></td>
+<td>example failed</td>
+</tr>
+<tr>
+<td><code>E0066</code></td>
+<td>raw type … is not allowed; supply type arguments (e.g</td>
+</tr>
+<tr>
+<td><code>E0067</code></td>
+<td>method … may reach the end of its body without returning a …</td>
+</tr>
+<tr>
+<td><code>E0068</code></td>
+<td>method …(…) is marked override but does not override any method in a base class or interface of …</td>
+</tr>
+<tr>
+<td><code>E0069</code></td>
+<td>local val … must be initialized at its declaration</td>
+</tr>
+<tr>
+<td><code>E0070</code></td>
+<td>value of type … may be null and cannot be dereferenced directly</td>
+</tr>
+<tr>
+<td><code>E0071</code></td>
+<td>… is a variable, not a type</td>
+</tr>
+<tr>
+<td><code>E0072</code></td>
+<td>abstract method … cannot have a body (the body would be silently ignored)</td>
+</tr>
+<tr>
+<td><code>E0073</code></td>
+<td>a Map (…) cannot be iterated directly by foreach</td>
+</tr>
+<tr>
+<td><code>E0074</code></td>
+<td>law parameter not generatable</td>
+</tr>
+<tr>
+<td><code>E0075</code></td>
+<td>law class not loadable</td>
+</tr>
+<tr>
+<td><code>E0076</code></td>
+<td>unknown shape format <code>…</code></td>
+</tr>
+<tr>
+<td><code>E0077</code></td>
+<td>tool <code>…</code> performs <code>…</code> here (calling …) but does not declare it</td>
+</tr>
+<tr>
+<td><code>E0078</code></td>
+<td>tool <code>…</code> declares capability <code>…</code> but nothing in its body can perform it</td>
+</tr>
+<tr>
+<td><code>E0079</code></td>
+<td>tool <code>…</code> has an invalid capability <code>…</code>: …</td>
+</tr>
+<tr>
+<td><code>E0080</code></td>
+<td>class <code>…</code> implements onion.Shape but nothing in its file asserts a law</td>
+</tr>
+<tr>
+<td><code>E0081</code></td>
+<td>tool parameter not cli convertible</td>
+</tr>
+<tr>
+<td><code>E0082</code></td>
+<td>duplicate tool name <code>…</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../specification/">Language specification</a></li>

@@ -145,6 +145,39 @@ record Pt(x: Int, y: Int)
 
 For an inline pattern, write `shape name = re"..."`.
 
+### `E0080` — A user-written `Shape` asserts no law
+
+A concrete class implementing `onion.Shape[T]` directly (rather than deriving one via
+`shape`/`from re"..."`) must assert at least one machine-checked `law` or `example` in
+its file. A derived shape's round-trip is guaranteed by construction; a hand-written
+one only *claims* it, so the claim must be checked.
+
+```onion
+class FixedWidth conforms Shape[Person] {
+public:
+  def this {}
+  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+  def canPrint(): Boolean = true
+  def print(v: Person): String { ... }
+  def describe(): String = "fixed-width Person"
+}
+// E0080: nothing in this file asserts a law for FixedWidth
+```
+
+Fix: add a top-level `example` (or the class's own `law`) — the canonical claim is the
+round-trip `s.parse(s.print(v)).get() == v`:
+
+```onion
+example fixedWidthL1 {
+  val s = new FixedWidth()
+  val v = new Person("KOTA", 42)
+  s.parse(s.print(v)).get() == v
+}
+```
+
+A parse-only shape (`canPrint(): false`) instead asserts whatever laws its reading
+direction has. A false claim is `E0065`, the same as any other falsified `example`.
+
 ## Capability errors
 
 A `tool` declaration draws a boundary with a `requires { ... }` clause; the compiler

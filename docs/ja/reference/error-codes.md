@@ -145,6 +145,39 @@ record Pt(x: Int, y: Int)
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。
 
+### `E0080` — 自作の `Shape` に law がない
+
+`onion.Shape[T]` を（`shape`/`from re"..."` による導出ではなく）直接実装した具象クラスは、
+そのファイル内で機械検査される `law` か `example` を最低1つ主張しなければなりません。
+導出された shape は round-trip が構造的に保証されますが、手書きのものは**主張するだけ**
+なので、その主張を検査する必要があります。
+
+```onion
+class FixedWidth conforms Shape[Person] {
+public:
+  def this {}
+  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+  def canPrint(): Boolean = true
+  def print(v: Person): String { ... }
+  def describe(): String = "fixed-width Person"
+}
+// E0080: FixedWidth の law を主張している箇所がこのファイルにない
+```
+
+対処: トップレベルの `example`（またはクラス自身の `law`）を追加してください——代表的な
+主張は round-trip `s.parse(s.print(v)).get() == v` です。
+
+```onion
+example fixedWidthL1 {
+  val s = new FixedWidth()
+  val v = new Person("KOTA", 42)
+  s.parse(s.print(v)).get() == v
+}
+```
+
+パース専用の shape（`canPrint(): false`）は、読み取り方向にある law を代わりに主張します。
+主張が偽であれば、他の `example` と同様に `E0065` になります。
+
 ## Capability エラー
 
 `tool` 宣言は `requires { ... }` 節で境界を引きます。コンパイラは本体全体の効果を

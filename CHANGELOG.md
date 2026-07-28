@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   target's declared type already pinned them. The same gap applied to a
   hand-written `record Empty[T]() conforms Box[T]`.
 
+### Documentation
+
+- **`E0080` (a user-written `Shape` asserting no law) had no entry in
+  `docs/reference/error-codes.md` / `docs/ja/reference/error-codes.md`.** The
+  code has been implemented, tested, and referenced by name from
+  `docs/guide/shapes.md` since issue #364, but the reference page jumped from
+  `E0079` straight to `E0057`/`E0081`/`E0082` with no `E0080` section. Added it
+  (EN + JA) next to the other shape/law codes (`E0074`-`E0076`), with the
+  fixed-width `Shape[Person]` example already used in the guide and test suite.
+
 ## [0.10.5] - 2026-07-28
 
 ### Changed

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `config` lossless shape (`shape name = config`) silently corrupted a document
+  when a printed or edited value's text contained a line break.** `key = value` lines
+  run to the end of the line, so rendering such a value split it into a bogus extra
+  line indistinguishable from a real entry — e.g. editing a `String` field to
+  `"evil\nport = 9999"` injected a fake `port` entry that a later `parseLossless`
+  either read back with the wrong value or rejected as a duplicate, with no error at
+  the point of corruption. `ConfigShape.print` and `.printLossless` now throw
+  `IllegalArgumentException` naming the offending field instead of misrendering,
+  consistent with the shape's documented L1 guarantee (`parse(print(v)) == Ok(v)`)
+  and the "refuse rather than pretend" handling already used for a foreign residue.
+
 ## [0.10.11] - 2026-07-29
 
 ### Fixed

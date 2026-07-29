@@ -535,8 +535,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       val argsOption = typesOf(node.args)
       val returnTypeOption =
         if (node.returnType == null) {
-          report(SemanticError.RETURN_TYPE_REQUIRED, node, node.name)
-          None
+          // A `tool` declaration's return type is genuinely optional, both in the
+          // grammar (`tool_decl`'s `[":" ty=return_type()]`) and in the documented
+          // syntax (`tool name(args) [: T] ...`); an omitted one defaults to void,
+          // same as writing `: void` explicitly. Every other top-level function still
+          // requires an explicit return type.
+          if (node.annotations.exists(_.name == "onion.tool")) Some(BasicType.VOID)
+          else {
+            report(SemanticError.RETURN_TYPE_REQUIRED, node, node.name)
+            None
+          }
         } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
         loadTopClass match {

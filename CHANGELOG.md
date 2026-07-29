@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IllegalArgumentException` these shapes throw when a value's own rendering would be
   indistinguishable from a real delimiter on read-back — behavior shipped by the two
   fixes above. Added a short explanation with an example to both language versions.
+- **`docs/ja/CLAUDE_ja.md`'s "テスト" (Testing) section was missing the
+  "Locale-independence (IMPORTANT)" paragraph present in `CLAUDE.md`.** The paragraph
+  warns that error messages are bilingual and release CI runs in an English locale, so
+  its absence left Japanese-reading contributors without the one warning most likely to
+  save them from a test that passes locally but fails only in CI. Added the translation
+  and a new `ClaudeMdTestingLocaleIndependenceParitySpec` drift guard so a future
+  omission fails the build instead of silently rotting.
 
 ## [0.10.11] - 2026-07-29
 

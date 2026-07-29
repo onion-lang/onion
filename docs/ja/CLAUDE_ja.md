@@ -421,7 +421,20 @@ try {
 |---------------|----------------|
 | `throw new Exception();` | `throw new Exception("msg")` - 同じ構文 |
 | `try { } catch { } finally { }` | ✓ 正しい - finallyサポートあり |
+| `using r = expr { }` | `try (val r = expr) { }` - try-with-resources。複数のリソースは`;`で区切り、逆順にクローズされる |
 | `catch (Type e)` | `catch e: Type` - 括弧なし、コロンの後に型 |
+
+### ツール、capability、と効果 (v0.10)
+
+| 誤り | 正しい（Onion） |
+|-----|----------------|
+| 裸の`readText(p)` / `get(url)` / `now()` / `exit(1)` | **もう解決しない** — デフォルトの静的インポートが純粋なクラスに限定された。`Files::readText`のように修飾するか、明示的にインポートする: `import { onion.Files::*; java.lang.System::exit }`。裸の`println`だけは引き続き使用可能（`onion.IO`が唯一の例外） |
+| 手書きの引数解析を行うCLI関数 | `tool name(args) [: T] [requires { caps }] { body }` — トップレベルのtool宣言。トップレベルでtoolを宣言し（`main`を持たない）スクリプトはCLIそのものになる: `--help`、`--contract`（機械可読なJSON）、`--plan`（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される |
+| tool内の未宣言の副作用 | 呼び出し箇所でE0077 — 本体の効果は推移的に推論され、`requires { read(src), write(dst), console, unknown }`と照合される。過剰申告はE0078、不正なcapabilityはE0079。リストにないJava呼び出しは`unknown`として明示的に許可する必要がある |
+| コメントを保持したい場合の`shape doc = json` | `shape doc = config` — コメント付きの`key = value`形式ファイル向けのLOSSLESSなshape。`parseLossless`は`Residue`（コメント、空白、キー順序、未知キー、値の表記）を保持し、`r.edit { v => v.copy(port = 9090) }.render()`は該当する値のスロットだけを書き換える |
+| その場しのぎのカスタムフォーマット実装 | `class MyShape conforms Shape[T]` — ユーザー定義のshapeはコンビネータとOutcome/Defectを無償で得られるが、そのファイルは法則を主張しなければならない（`example l1 { s.parse(s.print(v)).get() == v }`）。さもなければそのクラスはE0080になる |
+| recordの中でしかチェックできない法則 | トップレベルの`example [name] { boolExpr }` — recordのexampleと同様にビルド時に実行される。偽の主張はE0065 |
+| 未知の`--effects` | `onionc --effects` / `onion --effects file.on`は各メソッドの推論された効果集合を表示する（`read write net exec env clock rand console unknown`。空なら`pure`） |
 
 ### その他
 

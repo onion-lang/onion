@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   defaults a `tool`'s omitted return type to `void`, same as writing `: void`
   explicitly — matching how the parser already accepted the form.
 
+- **`Deploy MkDocs to GitHub Pages` logged a warning on every build for the seven
+  files under `docs/superpowers/**`** (agent-facing planning material, never part
+  of the public site), because nothing told mkdocs they weren't meant to be in
+  `nav`. `mkdocs.yml` now excludes `superpowers/` via `exclude_docs`, and a new
+  `MkDocsNavCoverageSpec` fails the build if a future doc under `docs/` goes
+  unreferenced by `nav` again without being excluded on purpose. (#486)
+
 ## [0.10.12] - 2026-07-29
 
 ### Fixed

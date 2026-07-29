@@ -299,6 +299,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/AsyncDownloader.on"))
     }
 
+    it("runs JsonApiClient.on (network call falls back gracefully when unreachable)") {
+      assert(Shell.Success(null) == runSample("run/JsonApiClient.on"))
+    }
+
     it("runs ShellPipeline.on") {
       assert(Shell.Success(null) == runSample("run/ShellPipeline.on"))
     }

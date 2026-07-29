@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via `IO::readln`, unlike the samples that build their own reader — is now
   asserted on by `RunSamplesSpec` with a redirected stdin.
 
+### Added
+
+- **Execution coverage for `JsonApiClient.on`.** The only remaining `run/`
+  sample that was compile-checked only (besides the Swing GUI `Calculator.on`,
+  which needs a display); its `Http::get` call against a live URL falls back
+  gracefully when the network is unreachable, so it is now asserted on by
+  `RunSamplesSpec` alongside the other network-calling samples.
+
 ## [0.10.10] - 2026-07-29
 
 ### Added

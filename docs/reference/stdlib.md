@@ -937,7 +937,10 @@ val yaml = Yaml::stringify(m)
 
 String values that would be misread on parse-back (those containing `:`,
 `#`, newlines, or that look like numbers or booleans) are automatically
-double-quoted. Numbers and booleans are rendered verbatim.
+double-quoted. Numbers and booleans are rendered verbatim. Map **keys** are
+quoted under the same rule — a key containing `:` or leading/trailing
+whitespace is double-quoted so it doesn't collide with the `key: value`
+separator on parse-back.
 
 ### Round-trip guarantee
 

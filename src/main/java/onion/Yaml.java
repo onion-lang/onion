@@ -49,7 +49,11 @@ public final class Yaml {
 
     /**
      * Convert a Java object (Map or scalar) to YAML flat block mapping text.
-     * Each map entry is rendered as {@code key: value\n}.
+     * Each map entry is rendered as {@code key: value\n}. Keys go through the same
+     * quoting rule as string values ({@link #needsQuoting}), so a key containing
+     * {@code :}, {@code #}, whitespace at either end, or a newline round-trips
+     * through {@link #parse} instead of colliding with the {@code key: value}
+     * separator.
      *
      * @param obj Object to serialize. Must be a Map&lt;?,?&gt; or a scalar
      *            (String/Long/Double/Float/Integer/Short/Byte/Boolean/null).
@@ -62,7 +66,7 @@ public final class Yaml {
         if (obj instanceof Map<?, ?> map) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
-                String key = entry.getKey().toString();
+                String key = renderString(entry.getKey().toString());
                 sb.append(key);
                 sb.append(": ");
                 sb.append(renderScalar(entry.getValue()));

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/design/roadmap.md` still read as an open plan for v0.6-v0.8**, describing
+  `Shape[T]`, `Outcome`/`Defect`, `tool` declarations, effects, and lossless shapes as
+  future work with links to open issues — but all 19 tracking issues (#346-#364) are
+  closed and every item already ships in v0.10.9 (see `CLAUDE.md`'s "Tools, capabilities
+  and effects" section). Marked the page as a shipped historical record, pointing readers
+  at `CLAUDE.md` and `docs/reference/stdlib.md` for the current syntax; updated the
+  mkdocs nav label to match.
+
 ## [0.10.9] - 2026-07-28
 
 ### Added

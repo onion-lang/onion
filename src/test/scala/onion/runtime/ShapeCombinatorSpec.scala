@@ -31,6 +31,15 @@ class ShapeCombinatorSpec extends AnyFunSpec {
 
   private val src = Origin.atLine("points.txt", 1)
 
+  private def withPrinter(printer: Pt => String): Shape[Pt] = Shapes.regex(
+    "(-?\\d+),(-?\\d+)",
+    jlist(Seq("x", "y")),
+    jlist(Seq("Int", "Int")),
+    ((parts: java.util.List[Object]) =>
+      Pt(parts.get(0).asInstanceOf[Int], parts.get(1).asInstanceOf[Int])): Function1[java.util.List[Object], Pt],
+    new Function1[Pt, String] { def call(p: Pt): String = printer(p) }
+  )
+
   describe("eachLine — the good rows and the bad ones, both") {
     val text = "1,2\nbroken\n3,4\nalso bad\n5,6"
 
@@ -84,6 +93,17 @@ class ShapeCombinatorSpec extends AnyFunSpec {
       val vs = jlist(Seq(Pt(0, 0), Pt(-1, 2), Pt(30, -40)))
       assert(point.lines.parse(point.lines.print(vs), src).get == vs)
     }
+
+    it("refuses to print an element whose rendering embeds a newline") {
+      // A `\n` inside a printed element is indistinguishable from a real line break,
+      // so printing it would silently split one element into two bogus lines instead
+      // of merely failing L1 (the same corruption `ConfigShape.print` refuses, #478).
+      val evil = withPrinter(p => s"${p.x}\n${p.y}")
+      val ex = intercept[IllegalArgumentException] {
+        evil.lines.print(jlist(Seq(Pt(1, 2))))
+      }
+      assert(ex.getMessage.contains("\\n") || ex.getMessage.toLowerCase.contains("line"))
+    }
   }
 
   describe("sepBy — repetition with a literal separator") {
@@ -109,6 +129,17 @@ class ShapeCombinatorSpec extends AnyFunSpec {
       val r = point.sepBy(",,").parse("bad,,1,2,,worse", src)
       assert(r.isBad)
       assert(r.defects.size == 2, r.describe)
+    }
+
+    it("refuses to print an element whose rendering embeds the separator") {
+      // An element rendering that contains the separator is indistinguishable from a
+      // real boundary on reparse, so printing it would silently split one element into
+      // two on read-back instead of merely failing L1.
+      val evil = withPrinter(p => s"${p.x} | ${p.y}")
+      val ex = intercept[IllegalArgumentException] {
+        evil.sepBy(" | ").print(jlist(Seq(Pt(1, 2))))
+      }
+      assert(ex.getMessage.contains("|"))
     }
   }
 

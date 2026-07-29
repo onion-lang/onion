@@ -149,7 +149,9 @@ public interface Shape<T> {
      * One value per line, all or nothing — every bad line's defect is reported together.
      *
      * <p>Prints one value per line, so L1 holds for the list as long as it holds for the
-     * element and no printed element contains a newline.
+     * element. An element whose rendering contains a newline cannot be represented at
+     * all — it would split into a bogus extra line — so {@link #print} refuses
+     * ({@link IllegalArgumentException}) rather than corrupt the document.
      */
     default Shape<java.util.List<T>> lines() {
         return new LineShape<>(this);
@@ -161,7 +163,10 @@ public interface Shape<T> {
      * <p>The separator is literal text, not a pattern: a shape describes a correspondence
      * and a regex separator would have no unique rendering, so {@link #print} could not
      * exist. Defects are positioned on the element they came from by index rather than by
-     * line, since a separated list need not be laid out one per line.
+     * line, since a separated list need not be laid out one per line. An element whose
+     * rendering contains the separator is indistinguishable from a real boundary on
+     * reparse, so {@link #print} refuses ({@link IllegalArgumentException}) rather than
+     * corrupt the document.
      */
     default Shape<java.util.List<T>> sepBy(String separator) {
         return new SepByShape<>(this, separator);

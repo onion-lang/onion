@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IllegalArgumentException` naming the offending field instead of misrendering,
   consistent with the shape's documented L1 guarantee (`parse(print(v)) == Ok(v)`)
   and the "refuse rather than pretend" handling already used for a foreign residue.
+- **`Shape#lines()` and `Shape#sepBy(separator)` had the same silent-corruption bug as
+  the `config` shape, one level down.** Printing a list where an element's own rendering
+  contained a newline (`lines()`) or the separator text (`sepBy`) split that one element
+  into two on read-back, indistinguishable from a real boundary — the shapes' own
+  Javadoc already warned L1 depended on this not happening, but nothing enforced it.
+  `LineShape.print` and `SepByShape.print` now throw `IllegalArgumentException` naming
+  the offending element's index instead of misrendering.
 
 ## [0.10.11] - 2026-07-29
 

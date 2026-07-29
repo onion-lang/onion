@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.12] - 2026-07-29
+
 ### Fixed
 
 - **The `config` lossless shape (`shape name = config`) silently corrupted a document

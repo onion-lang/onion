@@ -97,6 +97,22 @@ Pt::loose().canPrint()     // false
 
 「メソッドが黙って存在しない」ではなく、**問い合わせられる**という点が違います。
 
+書き戻しができる shape でも、往復性を壊す値は拒否することがあります。`lines()` と
+`sepBy(separator)` は各要素の書き戻し結果を区切り文字（改行、または区切り文字列）で
+つなぎますが、これは読み戻すときに「本物の境界」と「要素自身の内容」を区別するための
+ものです。要素の書き戻し結果がすでにその区切り文字を含んでいると、つなぐ際に黙って
+偽の要素へ分裂してしまいます。両者とも誤った結果を返す代わりに、問題の要素の
+インデックスを添えて `IllegalArgumentException` を投げます。
+
+```onion
+val intList: Shape[List[Int]] = intShape.sepBy(",")
+intList.print(evilInts)   // throws: element at index 1 contains the separator, ...
+```
+
+`shape name = config` も一段下で同じ保護を持ちます。`key = value` は行末までが値なので、
+改行を含む値も同様に表現できません —— `print` と `printLossless` は、偽のエントリを
+挿入する代わりに、問題のフィールド名を添えて例外を投げます。
+
 ## 文書を読む
 
 パターンの代わりにフォーマット名を書くと、成分名をキーとして構造化文書を読みます。

@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LineShape.print` and `SepByShape.print` now throw `IllegalArgumentException` naming
   the offending element's index instead of misrendering.
 
+### Documentation
+
+- **`docs/guide/shapes.md` (en/ja) never documented the "refuse rather than corrupt"
+  behavior of `lines()`, `sepBy(separator)`, and `shape name = config`.** The guide's
+  "Writing" section described the L1 round-trip guarantee but said nothing about the
+  `IllegalArgumentException` these shapes throw when a value's own rendering would be
+  indistinguishable from a real delimiter on read-back — behavior shipped by the two
+  fixes above. Added a short explanation with an example to both language versions.
+
 ## [0.10.11] - 2026-07-29
 
 ### Fixed

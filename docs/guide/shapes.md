@@ -97,6 +97,23 @@ Pt::loose().canPrint()     // false
 
 This is a question you can ask, rather than a method that silently does not exist.
 
+Some shapes can print but still refuse a particular value, when printing it would break
+the round-trip. `lines()` and `sepBy(separator)` join each element's rendering with a
+delimiter — a newline, or the separator text — so a real boundary can be told apart from
+an element's own content on read-back. If an element's rendering already contains that
+delimiter, joining would silently split it into a bogus extra element instead. Both throw
+`IllegalArgumentException` naming the offending element's index rather than misrender:
+
+```onion
+val intList: Shape[List[Int]] = intShape.sepBy(",")
+intList.print(evilInts)   // throws: element at index 1 contains the separator, ...
+```
+
+`shape name = config` has the same protection one level up: a `key = value` line runs to
+the end of the line, so a value whose text contains a line break cannot be represented
+either — `print` and `printLossless` throw naming the offending field instead of
+injecting a fake extra entry.
+
 ## Documents
 
 Naming a format instead of a pattern reads a structured document, with the component names

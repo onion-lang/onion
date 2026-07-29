@@ -34,11 +34,28 @@ final class SepByShape<T> implements Shape<List<T>> {
     @Override
     public String print(List<T> values) {
         StringBuilder sb = new StringBuilder();
+        int i = 0;
         for (T v : values) {
+            String rendered = element.print(v);
+            requireRenderable(i, rendered);
             if (sb.length() > 0) sb.append(separator);
-            sb.append(element.print(v));
+            sb.append(rendered);
+            i++;
         }
         return sb.toString();
+    }
+
+    /**
+     * An element rendering that contains the separator is indistinguishable from a real
+     * boundary on reparse, so printing it would silently split one element into two
+     * instead of merely failing L1. Refuse rather than misrender.
+     */
+    private void requireRenderable(int index, String rendered) {
+        if (rendered.contains(separator)) {
+            throw new IllegalArgumentException(
+                "element at index " + index + " contains the separator '" + separator
+                    + "', which this sepBy shape cannot represent: " + rendered);
+        }
     }
 
     @Override

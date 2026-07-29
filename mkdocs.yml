@@ -64,6 +64,11 @@ markdown_extensions:
   - toc:
       permalink: true
 
+# Agent-facing planning material, not part of the public site — kept out of the
+# nav-coverage check (mkdocs --strict otherwise warns on every orphaned file).
+exclude_docs: |
+  superpowers/
+
 nav:
   - Home: index.md
   - 日本語:

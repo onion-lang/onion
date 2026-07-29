@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Deploy MkDocs to GitHub Pages` failed on every push since before v0.10.11.**
+  `docs/design/roadmap.md` linked to `../../CLAUDE.md` — a real repo-root file,
+  but one that lives outside mkdocs' `docs_dir` (`docs/`), so `mkdocs build
+  --strict` reported it as broken and aborted the deploy even though the link
+  resolved fine on GitHub. The link now points at the GitHub blob URL instead,
+  which isn't subject to mkdocs' local-file link resolution. (#486)
+
 ## [0.10.12] - 2026-07-29
 
 ### Fixed

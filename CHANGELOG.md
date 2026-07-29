@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/ja/CLAUDE_ja.md`'s "既知の制限" (Known Limitations) section was missing
+  the bullet about local (left-to-right) type inference that exists in the
+  English `CLAUDE.md`.** Added a new `ClaudeMdKnownLimitationsParitySpec` drift
+  guard that asserts the bullet counts match between the two files, so a future
+  translation omission fails the build instead of silently rotting.
 - **`onion.IO`'s stdin readers (`readLine`, `readln`, `readInt`, `readLines`,
   `eachLine`, ...) ignored a `System.setIn` swap made after the class had
   already loaded.** The reader was a `BufferedReader` cached once in a static

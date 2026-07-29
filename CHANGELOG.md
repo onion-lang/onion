@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for `GuessNumber.on`, `LineFilter.on`, and `TodoApp.on`.**
+  These samples build their own `BufferedReader` over `System::in` at execution
+  time (unlike `onion.IO`'s stdin reader, a static field bound to whatever
+  `System.in` was when that class first loaded), so feeding a fixed
+  `System.setIn` stream before each run makes them deterministic to assert on;
+  now asserted on by `RunSamplesSpec` instead of only compile-checked by
+  `SampleCompilesSpec`.
+
 ### Fixed
 
 - **`docs/design/roadmap.md` still read as an open plan for v0.6-v0.8**, describing

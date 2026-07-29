@@ -121,9 +121,25 @@ public final class ConfigShape<T> implements Shape<T> {
         List<Object> parts = explode.call(value);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < names.size(); i++) {
-            sb.append(names.get(i)).append(" = ").append(render(parts.get(i))).append('\n');
+            String rendered = render(parts.get(i));
+            requireRenderable(names.get(i), rendered);
+            sb.append(names.get(i)).append(" = ").append(rendered).append('\n');
         }
         return sb.toString();
+    }
+
+    /**
+     * A `key = value` line runs to the end of the line, so a value whose rendered form
+     * contains a line break cannot be represented at all: printing it would silently
+     * split into an extra line indistinguishable from a real entry, corrupting the
+     * document instead of merely failing L2. Refuse rather than misrender.
+     */
+    private static void requireRenderable(String name, String rendered) {
+        if (rendered.indexOf('\n') >= 0 || rendered.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException(
+                "config value for '" + name + "' contains a line break, which the line-based "
+                    + "`key = value` format cannot represent: " + rendered);
+        }
     }
 
     @Override
@@ -211,7 +227,9 @@ public final class ConfigShape<T> implements Shape<T> {
             Object now = parts.get(c);
             Object was = r.parsedValues.get(c);
             if (!java.util.Objects.equals(now, was)) {
-                replacements.put(at, render(now));
+                String rendered = render(now);
+                requireRenderable(names.get(c), rendered);
+                replacements.put(at, rendered);
             }
         }
 

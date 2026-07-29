@@ -139,6 +139,46 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a value that the line-based format cannot represent") {
+    it("print refuses rather than silently splitting a value containing a newline into a bogus extra line") {
+      val r = shell.run(decl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v = new Server("evil\nport = 9999", 8080, true)
+          |    try {
+          |      Server::cfg().print(v)
+          |      return "no exception"
+          |    } catch e: IllegalArgumentException {
+          |      return "refused"
+          |    }
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("refused") == r, r.toString)
+    }
+
+    it("printLossless refuses the same way, instead of injecting an indistinguishable extra entry") {
+      val r = shell.run(decl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "host = h\nport = 8080\ndebug = true\n"
+          |    val got = Server::cfg().parseLossless(text).get()
+          |    val edited = got.value().copy(host = "evil\nport = 9999")
+          |    try {
+          |      Server::cfg().printLossless(edited, got.residue())
+          |      return "no exception"
+          |    } catch e: IllegalArgumentException {
+          |      return "refused"
+          |    }
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("refused") == r, r.toString)
+    }
+  }
+
   describe("losslessness is a claim, not a default") {
     it("a lossy shape refuses parseLossless instead of pretending") {
       val r = shell.run(

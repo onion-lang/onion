@@ -234,6 +234,10 @@ class ScriptRunner {
               // `usage: myscript.on <arg>` instead of the literal `<script>`.
               System.setProperty("onion.cli.script", new java.io.File(params.head).getName)
               new Shell(classOf[OnionClassLoader].getClassLoader, config.classPath).run(result.classes, scriptArgs) match {
+                // main's returned Int is the documented exit code (docs/guide/tools.md's
+                // "Failures are exit codes ... return 1 from main"); a void main (or any
+                // other return type) has no such meaning, so it keeps exiting 0.
+                case Shell.Success(value: java.lang.Integer) => value.intValue()
                 case Shell.Success(_) => 0
                 case Shell.Failure(code) => code
               }

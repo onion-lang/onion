@@ -270,6 +270,169 @@ val add: Function2[Int, Int, Int] = (x: Int, y: Int) -> { return x + y; }
 val result: Int = add.call(3, 7)
 ```
 
+## ラッパークラス
+
+プリミティブ型に対応するJavaのラッパークラス（文脈によっては`J`接頭辞でアクセス）。
+
+### JInteger
+
+Integer操作:
+
+```onion
+val i: Int = JInteger::parseInt("42")
+val s: String = JInteger::toString(42)
+val max: Int = JInteger::MAX_VALUE
+val min: Int = JInteger::MIN_VALUE
+```
+
+### JLong
+
+Long操作:
+
+```onion
+val l: Long = JLong::parseLong("1234567890")
+val s: String = JLong::toString(1234567890L)
+```
+
+### JDouble
+
+Double操作:
+
+```onion
+val d: Double = JDouble::parseDouble("3.14")
+val s: String = JDouble::toString(3.14)
+```
+
+### JBoolean
+
+Boolean操作:
+
+```onion
+val b: Boolean = JBoolean::parseBoolean("true")
+val s: String = JBoolean::toString(true)
+```
+
+## よく使うJavaクラス
+
+よく使われるJava標準ライブラリのクラス。
+
+### String
+
+文字列操作（自動的に利用可能）:
+
+```onion
+val text: String = "Hello, World!"
+val upper: String = text.toUpperCase()
+val lower: String = text.toLowerCase()
+val length: Int = text.length()
+val sub: String = text.substring(0, 5)
+val contains: Boolean = text.contains("World")
+val starts: Boolean = text.startsWith("Hello")
+val ends: Boolean = text.endsWith("!")
+```
+
+### StringBuilder
+
+効率的な文字列構築:
+
+```onion
+import { java.lang.StringBuilder; }
+
+val builder: StringBuilder = new StringBuilder()
+builder.append("Hello")
+builder.append(" ")
+builder.append("World")
+val result: String = builder.toString()
+```
+
+### ArrayList
+
+動的配列:
+
+```onion
+import { java.util.ArrayList; }
+
+val list: ArrayList[String] = new ArrayList[String]
+list.add("First")
+list << "Second"  // <<演算子を使用
+val size: Int = list.size()
+val item: Object = list.get(0)
+list.remove(0)
+val empty: Boolean = list.isEmpty()
+```
+
+### HashMap
+
+キーバリューマップ:
+
+```onion
+import { java.util.HashMap; }
+
+val map: HashMap[String, String] = new HashMap[String, String]
+map.put("key1", "value1")
+map.put("key2", "value2")
+val value: Object = map.get("key1")
+val has: Boolean = map.containsKey("key1")
+val size: Int = map.size()
+```
+
+### File
+
+ファイル操作:
+
+```onion
+import { java.io.File; }
+
+val file: File = new File("data.txt")
+val exists: Boolean = file.exists()
+val isFile: Boolean = file.isFile()
+val isDir: Boolean = file.isDirectory()
+val name: String = file.getName()
+val path: String = file.getPath()
+val length: Long = file.length()
+```
+
+### BufferedReader
+
+テキストの読み取り:
+
+```onion
+import {
+  java.io.BufferedReader;
+  java.io.FileReader;
+}
+
+val reader: BufferedReader = new BufferedReader(
+  new FileReader("file.txt")
+)
+
+var line: String = null
+while (line = reader.readLine()) != null {
+  IO::println(line)
+}
+
+reader.close()
+```
+
+### BufferedWriter
+
+テキストの書き込み:
+
+```onion
+import {
+  java.io.BufferedWriter;
+  java.io.FileWriter;
+}
+
+val writer: BufferedWriter = new BufferedWriter(
+  new FileWriter("output.txt")
+)
+
+writer.write("Hello, World!")
+writer.newLine()
+writer.close()
+```
+
 ## Rand モジュール
 
 `onion.Rand`による乱数生成ユーティリティ。

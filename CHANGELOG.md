@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   save them from a test that passes locally but fails only in CI. Added the translation
   and a new `ClaudeMdTestingLocaleIndependenceParitySpec` drift guard so a future
   omission fails the build instead of silently rotting.
+- **`docs/ja/reference/stdlib.md` was missing the "Wrapper Classes" (`JInteger`,
+  `JLong`, `JDouble`, `JBoolean`) and "Common Java Classes" (`String`,
+  `StringBuilder`, `ArrayList`, `HashMap`, `File`, `BufferedReader`,
+  `BufferedWriter`) sections present in `docs/reference/stdlib.md`, even though
+  both languages' "at a glance" tables promise this coverage. `StdlibDocDriftSpec`
+  couldn't catch it — those names are deliberately excluded there as JDK types /
+  import aliases rather than `onion.*` stdlib classes. Added the translation and a
+  new `StdlibDocWrapperAndCommonJavaClassesParitySpec` drift guard.
 
 ## [0.10.11] - 2026-07-29
 

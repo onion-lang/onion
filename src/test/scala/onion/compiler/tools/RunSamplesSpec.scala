@@ -24,6 +24,14 @@ class RunSamplesSpec extends AbstractShellSpec {
     finally System.setIn(originalIn)
   }
 
+  private def runSampleWithStdinCapturingStdout(path: String, stdin: String): (Shell.Result, String) = {
+    val originalOut = System.out
+    val buffer = new java.io.ByteArrayOutputStream()
+    System.setOut(new java.io.PrintStream(buffer, true, "UTF-8"))
+    try (runSampleWithStdin(path, stdin), buffer.toString("UTF-8"))
+    finally System.setOut(originalOut)
+  }
+
   describe("run/ samples") {
     it("runs ValVarInference.on") {
       assert(Shell.Success(60) == runSample("run/ValVarInference.on"))
@@ -314,6 +322,12 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs TodoApp.on: add, list, done, then quit") {
       assert(Shell.Success(null) ==
         runSampleWithStdin("run/TodoApp.on", "add buy milk\nlist\ndone 1\nlist\nquit\n"))
+    }
+
+    it("runs ReadLine.on, reading its answer via onion.IO from the redirected stdin") {
+      val (result, output) = runSampleWithStdinCapturingStdout("run/ReadLine.on", "hello there\n")
+      assert(Shell.Success(null) == result)
+      assert(output.contains("You input: hello there"))
     }
   }
 }

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`onion.IO`'s stdin readers (`readLine`, `readln`, `readInt`, `readLines`,
+  `eachLine`, ...) ignored a `System.setIn` swap made after the class had
+  already loaded.** The reader was a `BufferedReader` cached once in a static
+  field over whatever `System.in` was at class-init time, so redirecting
+  stdin afterwards (embedding hosts, REPLs, or tests) silently kept reading
+  from the original stream. It now re-wraps `System.in` whenever the current
+  stream differs from the one last wrapped. `run/ReadLine.on` — which reads
+  via `IO::readln`, unlike the samples that build their own reader — is now
+  asserted on by `RunSamplesSpec` with a redirected stdin.
+
 ## [0.10.10] - 2026-07-29
 
 ### Added

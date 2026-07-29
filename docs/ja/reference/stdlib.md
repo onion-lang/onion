@@ -668,7 +668,7 @@ val obj = Yaml::parse("name: ko\nage: 3")    // Object（実体は Map）
 val text = Yaml::stringify(obj)               // "name: ko\nage: 3\n"
 ```
 
-scalar の型推論は Json と一致します（`3`→Long、`3.5`→Double、`true`→Boolean、`null`→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、`record ... derive!(Yaml)` の土台になっています。
+scalar の型推論は Json と一致します（`3`→Long、`3.5`→Double、`true`→Boolean、`null`→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、`record ... derive!(Yaml)` の土台になっています。`:` や前後の空白を含むキーは `key: value` の区切りと衝突しないよう自動的にダブルクォートされます(値側の quoting ルールと同じ)。
 
 ## Config モジュール
 

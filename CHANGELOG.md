@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved fine on GitHub. The link now points at the GitHub blob URL instead,
   which isn't subject to mkdocs' local-file link resolution. (#486)
 
+- **`Yaml::stringify` silently corrupted a map whose key contained `: ` (or
+  leading/trailing whitespace) instead of failing.** The value side already
+  double-quoted a string that would be misread on parse-back (containing `:`,
+  `#`, a newline, or looking like a number/boolean — the `[0.10.12]` fixes
+  below hardened the same hazard for `lines()`/`sepBy()`/`config` shapes), but
+  the *key* was written raw. A key like `"a: b"` rendered as `a: b: 1`, which
+  `Yaml::parse` read back as key `"a"` with value `"b: 1"` (a String) — the
+  original key silently disappeared with no exception. `Yaml::stringify` now
+  quotes the key under the same rule it already applies to values, symmetric
+  with how `Json::stringify` has always quoted keys; the parser already
+  supported reading a quoted key, so no parser change was needed.
+
 ## [0.10.12] - 2026-07-29
 
 ### Fixed

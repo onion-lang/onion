@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with how `Json::stringify` has always quoted keys; the parser already
   supported reading a quoted key, so no parser change was needed.
 
+- **A `tool` declaration with no explicit return type failed to compile with
+  `[E0051] return type is required`,** even though the grammar and the
+  documented syntax (`tool name(args) [: T] [requires { caps }] { body }`)
+  both treat the return type as optional. `TypingOutlinePass` required an
+  explicit return type on every top-level function unconditionally; it now
+  defaults a `tool`'s omitted return type to `void`, same as writing `: void`
+  explicitly — matching how the parser already accepted the form.
+
 ## [0.10.12] - 2026-07-29
 
 ### Fixed

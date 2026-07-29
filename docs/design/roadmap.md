@@ -1,8 +1,17 @@
 # Roadmap — v0.6 to v0.8
 
-Status: **index.** The roadmap itself lives on GitHub, because a roadmap in a file goes
-stale the moment work starts. This page exists so a reader who is not looking at the
-issue tracker can see the shape of the plan and follow it to the detail.
+Status: **shipped.** Every issue below (#346-#364) is closed, and the current release
+(v0.10.9) already implements `Shape[T]`, `Outcome`/`Defect`, `tool` declarations with
+effect inference and `--plan`, and lossless shapes with `edit`/`render` — see
+[CLAUDE.md](../../CLAUDE.md) ("Tools, capabilities and effects") and
+[docs/reference/stdlib.md](../reference/stdlib.md) for the syntax as it exists today.
+This page is kept as a historical record of the plan and its rationale; a few line
+items shipped with different scope than originally planned (e.g. #351's `zip` combinator
+was not deferred after all — see its issue for what changed).
+
+The roadmap itself used to live on GitHub, updated as work landed; this page exists so a
+reader not looking at the issue tracker can see the shape of the plan and follow it to
+the detail.
 
 - Why: [onion-v0.5-audit.md](onion-v0.5-audit.md) — what v0.5 is, with citations
 - What: [typed-boundaries.md](typed-boundaries.md) — the design thesis

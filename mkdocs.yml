@@ -174,7 +174,7 @@ nav:
   - Design Notes:
       - "Typed Boundaries (thesis)": design/typed-boundaries.md
       - v0.5 Audit: design/onion-v0.5-audit.md
-      - "Roadmap: v0.6-v0.8": design/roadmap.md
+      - "Roadmap: v0.6-v0.8 (shipped)": design/roadmap.md
       - README Rewrite Proposal: design/readme-rewrite-proposal.md
       - Type Classes: design/type-classes.md
       - Generics Design: GENERICS_DESIGN.md

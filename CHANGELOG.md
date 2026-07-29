@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `tool` CLI's own validation failures (missing argument, unknown option, a
+  value that fails to parse) printed the right message but exited 0 instead of
+  1**, so a shell script checking `$?` after a misused tool CLI saw success.
+  `docs/guide/tools.md` documents these failures as returning `1` from `main`,
+  and `ToolCli.dispatch` did return that `1` — but `ScriptRunner.run`, the real
+  `onion` command-line entry point, discarded every script's returned `Int` and
+  always reported exit code 0 for a successful (non-throwing) run
+  (`case Shell.Success(_) => 0`). Any script using the `args: String[]` main
+  shape to signal a specific exit code via its return value hit the same gap.
+  `ScriptRunner` now uses `main`'s returned `Int` as the process exit code when
+  one is returned, and still exits 0 for a `void` main.
+
 - **`docs/design/roadmap.md` still read as an open plan for v0.6-v0.8**, describing
   `Shape[T]`, `Outcome`/`Defect`, `tool` declarations, effects, and lossless shapes as
   future work with links to open issues — but all 19 tracking issues (#346-#364) are

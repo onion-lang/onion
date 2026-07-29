@@ -14,6 +14,16 @@ class RunSamplesSpec extends AbstractShellSpec {
   private def runSample(path: String): Shell.Result =
     shell.run(load(path), path, Array())
 
+  // Only for samples that build their own `BufferedReader` over `System::in` at
+  // execution time (not `onion.IO`, whose stdin reader is a static field bound to
+  // whatever `System.in` was when that class first loaded).
+  private def runSampleWithStdin(path: String, stdin: String): Shell.Result = {
+    val originalIn = System.in
+    System.setIn(new java.io.ByteArrayInputStream(stdin.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+    try runSample(path)
+    finally System.setIn(originalIn)
+  }
+
   describe("run/ samples") {
     it("runs ValVarInference.on") {
       assert(Shell.Success(60) == runSample("run/ValVarInference.on"))
@@ -291,6 +301,19 @@ class RunSamplesSpec extends AbstractShellSpec {
 
     it("runs LineCounter.on") {
       assert(Shell.Success(null) == runSample("run/LineCounter.on"))
+    }
+
+    it("runs GuessNumber.on: EOF on the first prompt exits immediately regardless of the random answer") {
+      assert(Shell.Success(null) == runSampleWithStdin("run/GuessNumber.on", ""))
+    }
+
+    it("runs LineFilter.on") {
+      assert(Shell.Success(null) == runSampleWithStdin("run/LineFilter.on", "hello\nworld\n"))
+    }
+
+    it("runs TodoApp.on: add, list, done, then quit") {
+      assert(Shell.Success(null) ==
+        runSampleWithStdin("run/TodoApp.on", "add buy milk\nlist\ndone 1\nlist\nquit\n"))
     }
   }
 }

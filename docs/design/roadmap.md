@@ -3,7 +3,7 @@
 Status: **shipped.** Every issue below (#346-#364) is closed, and the current release
 (v0.10.9) already implements `Shape[T]`, `Outcome`/`Defect`, `tool` declarations with
 effect inference and `--plan`, and lossless shapes with `edit`/`render` — see
-[CLAUDE.md](../../CLAUDE.md) ("Tools, capabilities and effects") and
+[CLAUDE.md](https://github.com/onion-lang/onion/blob/main/CLAUDE.md) ("Tools, capabilities and effects") and
 [docs/reference/stdlib.md](../reference/stdlib.md) for the syntax as it exists today.
 This page is kept as a historical record of the plan and its rationale; a few line
 items shipped with different scope than originally planned (e.g. #351's `zip` combinator

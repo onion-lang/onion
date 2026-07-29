@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.11] - 2026-07-29
+
 ### Fixed
 
 - **`docs/ja/CLAUDE_ja.md`'s "既知の制限" (Known Limitations) section was missing

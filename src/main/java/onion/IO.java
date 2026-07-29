@@ -6,7 +6,20 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 
 public class IO {
-    private static final BufferedReader STDIN = new BufferedReader(new InputStreamReader(System.in));
+    private static java.io.InputStream stdinSource;
+    private static BufferedReader stdinReader;
+
+    // Re-wraps System.in when it has been swapped out (e.g. System.setIn in a test
+    // or an embedding host) since the last read, instead of latching onto whatever
+    // System.in was the first time this class happened to load.
+    private static synchronized BufferedReader stdin() {
+        java.io.InputStream current = System.in;
+        if (stdinReader == null || stdinSource != current) {
+            stdinSource = current;
+            stdinReader = new BufferedReader(new InputStreamReader(current));
+        }
+        return stdinReader;
+    }
 
     public static void print(Object o) {
         System.out.print(o);
@@ -18,7 +31,7 @@ public class IO {
 
     public static String readLine() {
         try {
-            return STDIN.readLine();
+            return stdin().readLine();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -35,7 +48,7 @@ public class IO {
     public static String input(String prompt) {
         System.out.print(prompt);
         try {
-            return STDIN.readLine();
+            return stdin().readLine();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -73,7 +86,7 @@ public class IO {
     // Type-safe input methods
     public static int readInt() {
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) throw new UncheckedIOException(new IOException("End of input"));
             return Integer.parseInt(line.trim());
         } catch (IOException e) {
@@ -90,7 +103,7 @@ public class IO {
 
     public static long readLong() {
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) throw new UncheckedIOException(new IOException("End of input"));
             return Long.parseLong(line.trim());
         } catch (IOException e) {
@@ -107,7 +120,7 @@ public class IO {
 
     public static double readDouble() {
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) throw new UncheckedIOException(new IOException("End of input"));
             return Double.parseDouble(line.trim());
         } catch (IOException e) {
@@ -124,7 +137,7 @@ public class IO {
 
     public static boolean readBoolean() {
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) throw new UncheckedIOException(new IOException("End of input"));
             String trimmed = line.trim().toLowerCase();
             if (trimmed.equals("true") || trimmed.equals("yes") || trimmed.equals("1")) {
@@ -148,7 +161,7 @@ public class IO {
     public static Integer tryReadInt(String prompt) {
         System.out.print(prompt);
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) return null;
             return Integer.parseInt(line.trim());
         } catch (IOException | NumberFormatException e) {
@@ -159,7 +172,7 @@ public class IO {
     public static Double tryReadDouble(String prompt) {
         System.out.print(prompt);
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) return null;
             return Double.parseDouble(line.trim());
         } catch (IOException | NumberFormatException e) {
@@ -170,7 +183,7 @@ public class IO {
     public static Long tryReadLong(String prompt) {
         System.out.print(prompt);
         try {
-            String line = STDIN.readLine();
+            String line = stdin().readLine();
             if (line == null) return null;
             return Long.parseLong(line.trim());
         } catch (IOException | NumberFormatException e) {
@@ -184,7 +197,7 @@ public class IO {
         java.util.List<String> lines = new java.util.ArrayList<>();
         try {
             String line;
-            while ((line = STDIN.readLine()) != null) {
+            while ((line = stdin().readLine()) != null) {
                 lines.add(line);
             }
         } catch (IOException e) {
@@ -197,7 +210,7 @@ public class IO {
     public static void eachLine(Function1<String, ?> action) {
         try {
             String line;
-            while ((line = STDIN.readLine()) != null) {
+            while ((line = stdin().readLine()) != null) {
                 action.call(line);
             }
         } catch (IOException e) {

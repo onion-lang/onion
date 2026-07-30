@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   methods had a `shell.run` case. Added one per method, following the
   existing pattern.
 
+- **Execution coverage for 10 `onion.DateTime` members that were never run
+  through the compiler/shell.** `addHours`/`addMinutes`/`addSeconds`,
+  `diff`/`diffSeconds`, `dayOfYear`, `startOfDay`/`endOfDay`, and both
+  `nowString` overloads had no `shell.run` case across `DateTimeSpec`,
+  `DateTimeParseSpec`, or `DateTimeExtraSpec` — `DateTimeExtraSpec`'s
+  docstring even claimed to cover `diffSeconds` without actually calling it.
+  Added `DateTimeCoverageSpec` with one case per method, using fixed
+  timestamps for determinism.
+
 ### Fixed
 
 - **A `val (a, b) = expr` destructuring declaration as the trailing element of

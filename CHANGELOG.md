@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`onion.OnionMath` — a genuine, default-imported stdlib module with 41 public
+  members (`sin`/`cos`/`tan`, hyperbolic trig, `clamp`/`clampInt`, `hypot`,
+  bounded `randomInt`, ...) — had no documentation in `docs/reference/stdlib.md`
+  or `docs/ja/reference/stdlib.md`,** unlike every other stdlib module. Added an
+  "OnionMath Module" section to both files (mirroring the existing "Math
+  Module" style) and a row in "Modules at a glance", plus
+  `OnionMathDocCoverageSpec` so a future addition to `onion.OnionMath` fails
+  the build instead of silently staying undocumented.
+
 - **`docs/ja/examples/basic.md` was missing the "CSV Processing" and "Regex Log
   Parsing" sections** present in the English `docs/examples/basic.md`.
   Translated the missing sections and added `BasicExamplesDocParitySpec` so a

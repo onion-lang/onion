@@ -9,7 +9,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **I/O・システム** | `IO`（コンソール）, `Files`（ファイル・パス）, `System`, `Proc`（サブプロセス）, `Args`（CLI）, `Http`（HTTPクライアント） |
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets` |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
-| **数値** | `Math`, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
+| **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`, 範囲付き`randomInt`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
 | **データ形式** | `Json`, `Yaml`, `Csv`, `Config`（ドット記法での設定値アクセス） |
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
 | **関数型** | `Option`, `Result`, `Future`, `Outcome`・`Defect`（外部データの読み取り） |
@@ -127,6 +127,130 @@ val tangent: Double = Math::tan(Math::PI / 4) // 1.0
 ```onion
 val pi: Double = Math::PI       // 3.14159...
 val e: Double = Math::E         // 2.71828...
+```
+
+## OnionMath モジュール
+
+JDKの`Math`とは別の`onion.*`数値モジュールで、双曲線関数、安全な丸め・クランプ、範囲付きの
+乱数整数を提供します。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
+明示的なインポートは不要です。
+
+### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2
+
+三角関数と逆三角関数（ラジアン）：
+
+```onion
+val sine: Double = OnionMath::sin(OnionMath::PI / 2)     // 1.0
+val angle: Double = OnionMath::atan2(1.0, 1.0)           // pi/4
+```
+
+### OnionMath::sinh / OnionMath::cosh / OnionMath::tanh
+
+双曲線関数：
+
+```onion
+val h: Double = OnionMath::sinh(1.0)
+```
+
+### OnionMath::exp / OnionMath::log / OnionMath::log10
+
+指数関数と対数関数：
+
+```onion
+val e2: Double = OnionMath::exp(1.0)     // e
+val l: Double = OnionMath::log(OnionMath::E)   // 1.0
+val l10: Double = OnionMath::log10(100.0)      // 2.0
+```
+
+### OnionMath::pow / OnionMath::sqrt / OnionMath::cbrt
+
+累乗と平方根・立方根：
+
+```onion
+val cube: Double = OnionMath::pow(2.0, 3.0)  // 8.0
+val root: Double = OnionMath::sqrt(16.0)     // 4.0
+val croot: Double = OnionMath::cbrt(27.0)    // 3.0
+```
+
+### OnionMath::abs / OnionMath::absFloat / OnionMath::absInt / OnionMath::absLong
+
+プリミティブ型ごとの絶対値：
+
+```onion
+val a1: Double = OnionMath::abs(-3.14)
+val a2: Int = OnionMath::absInt(-10)      // 10
+val a3: Long = OnionMath::absLong(-10L)   // 10
+```
+
+### OnionMath::min / OnionMath::minInt / OnionMath::minLong / OnionMath::max / OnionMath::maxInt / OnionMath::maxLong
+
+プリミティブ型ごとの最小値・最大値：
+
+```onion
+val lo: Int = OnionMath::minInt(10, 20)   // 10
+val hi: Int = OnionMath::maxInt(10, 20)   // 20
+```
+
+### OnionMath::floor / OnionMath::ceil / OnionMath::round / OnionMath::roundFloat
+
+丸め処理：
+
+```onion
+val f: Double = OnionMath::floor(3.7)     // 3.0
+val c: Double = OnionMath::ceil(3.2)      // 4.0
+val r: Long = OnionMath::round(3.5)       // 4
+val rf: Int = OnionMath::roundFloat(3.5f) // 4
+```
+
+### OnionMath::random / OnionMath::randomInt
+
+乱数生成。`Math::random`と異なり、`randomInt`は範囲を直接指定でき、エフェクトチェッカーに
+よって`Rand`エフェクトとして追跡されます：
+
+```onion
+val r: Double = OnionMath::random()          // [0.0, 1.0)
+val n: Int = OnionMath::randomInt(1, 10)     // [1, 10]（両端含む）
+```
+
+### OnionMath::signum / OnionMath::signumFloat
+
+数値の符号（`-1.0`、`0.0`、または`1.0`）：
+
+```onion
+val s: Double = OnionMath::signum(-5.0)   // -1.0
+```
+
+### OnionMath::toRadians / OnionMath::toDegrees
+
+角度単位の変換：
+
+```onion
+val rad: Double = OnionMath::toRadians(180.0)  // pi
+val deg: Double = OnionMath::toDegrees(OnionMath::PI)  // 180.0
+```
+
+### OnionMath::clamp / OnionMath::clampInt
+
+値を範囲内に収める：
+
+```onion
+val c1: Double = OnionMath::clamp(15.0, 0.0, 10.0)  // 10.0
+val c2: Int = OnionMath::clampInt(-5, 0, 10)        // 0
+```
+
+### OnionMath::hypot
+
+オーバーフロー・アンダーフローを避けた斜辺の長さ：
+
+```onion
+val h: Double = OnionMath::hypot(3.0, 4.0)  // 5.0
+```
+
+### OnionMath Constants
+
+```onion
+val pi: Double = OnionMath::PI  // 3.14159...
+val e: Double = OnionMath::E    // 2.71828...
 ```
 
 ## Origin

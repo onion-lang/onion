@@ -1,6 +1,73 @@
 # スクリプティング
 
-Onion は bash を超えたスクリプトを書くための機能を備えています。
+Onion は bash では手に負えなくなったシェルスクリプトを置き換えるために作られています。
+このページではスクリプティング用の機能を一通り紹介します。
+
+## スクリプトの実行
+
+```bash
+onion script.on arg1 arg2     # メモリ上でコンパイルして実行
+onion --watch script.on       # 保存のたびに再実行
+onion repl                    # 対話的な REPL
+```
+
+スクリプトは shebang を使えます。
+
+```onion
+#!/usr/bin/env onion
+println("hello")
+```
+
+トップレベルの文は上から順に実行され、`args` にコマンドライン引数が入ります。
+コンパイルエラーが起きると非ゼロの終了ステータスで終了します。
+
+## コマンドライン引数
+
+```onion
+val opts = Args::parse(args)
+
+if opts.flag("verbose") { ... }          // --verbose または -v
+val out = opts.option("output", "a.txt") // --output=x または --output x
+val n = opts.intOption("count", 1)       // デフォルト付きの数値
+val files = opts.positional()            // それ以外すべて
+```
+
+## 外部コマンドの実行
+
+```onion
+val branch = Proc::run("git", "branch", "--show-current")  // 標準出力を取得、失敗時は例外
+
+val r = Proc::capture("sh", "-c", "ls missing")            // 例外を投げない
+if r.failed() { println(r.stderr()) }
+
+val code = Proc::exec("make", "build")                     // コンソールを継承、終了コードを返す
+```
+
+`Proc::runIn(dir, ...)` は作業ディレクトリを指定できるバリアントです。
+
+## ファイルと glob
+
+```onion
+val text = Files::readText("config.txt")
+Files::writeText("out.txt", text.toUpperCase())
+
+foreach f: String in Files::glob(".", "*.on") {
+  println(f)
+}
+Files::glob("src", "**/*.java")    // 再帰的に検索
+```
+
+## JSON と HTTP
+
+```onion
+val body = Http::get("https://api.github.com/repos/onion-lang/onion")
+val v = Json::value(body)
+println(v["name"].asString() + " stars=" + v["stargazers_count"].asInt())
+```
+
+`Json::value` はナビゲート可能な値を返します。オブジェクトや配列を添字アクセスした上で、
+`asString` / `asInt` / `asDouble` / `asBoolean` で変換します。存在しないパスは例外ではなく
+`isNull()` で判定できます。
 
 ## スキームプレフィックス付きリテラル
 
@@ -89,6 +156,22 @@ def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 ```
 
 フラグは `--name value` と `--name=value` の両形式を受け付けます。`--help`（または `-h`）で生成された usage を表示して終了します。
+
+## まとめて使う
+
+```onion
+#!/usr/bin/env onion
+record Hit(ip: String, method: String, path: String, status: Int)
+  from re"(\S+) (\w+) (\S+) (\d+)"
+
+def main(log: String, minStatus: Int = 500): void {
+  Hit::parseAll(file(log).text())
+    .filter { h => h.status() >= minStatus }
+    .groupBy { h => h.path() }
+    .mapValues { xs => xs.size }
+    |> println
+}
+```
 
 ## 次のステップ
 

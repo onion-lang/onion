@@ -57,6 +57,120 @@ class MathSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(1.0))
       }
+
+      it("computes asin correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::asin(1.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.asin(1.0)))
+      }
+
+      it("computes acos correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::acos(0.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.acos(0.0)))
+      }
+
+      it("computes atan correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::atan(1.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.atan(1.0)))
+      }
+
+      it("computes atan2 correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::atan2(1.0, 1.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.atan2(1.0, 1.0)))
+      }
+    }
+
+    describe("hyperbolic functions") {
+      it("computes sinh(0) correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::sinh(0.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(0.0))
+      }
+
+      it("computes cosh(0) correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::cosh(0.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(1.0))
+      }
+
+      it("computes tanh(0) correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::tanh(0.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(0.0))
+      }
     }
 
     describe("exponential and logarithmic functions") {
@@ -123,6 +237,38 @@ class MathSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(1.0))
       }
+
+      it("computes log10 correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::log10(100.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(2.0))
+      }
+
+      it("computes cbrt correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::cbrt(27.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.cbrt(27.0)))
+      }
     }
 
     describe("absolute value") {
@@ -156,6 +302,38 @@ class MathSpec extends AbstractShellSpec {
           Array()
         )
         assert(result == Shell.Success(42))
+      }
+
+      it("computes absFloat of negative float") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Float {
+            |    return OnionMath::absFloat(-3.5f)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(3.5f))
+      }
+
+      it("computes absLong of negative long") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Long {
+            |    return OnionMath::absLong(-100L)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(100L))
       }
     }
 
@@ -223,6 +401,38 @@ class MathSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(20))
       }
+
+      it("computes minLong correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Long {
+            |    return OnionMath::minLong(10L, 20L)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(10L))
+      }
+
+      it("computes maxLong correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Long {
+            |    return OnionMath::maxLong(10L, 20L)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(20L))
+      }
     }
 
     describe("rounding functions") {
@@ -273,6 +483,108 @@ class MathSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(4L))
       }
+
+      it("computes roundFloat correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    return OnionMath::roundFloat(3.5f)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(4))
+      }
+    }
+
+    describe("sign functions") {
+      it("computes signum of a negative double") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::signum(-5.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(-1.0))
+      }
+
+      it("computes signumFloat of a positive float") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Float {
+            |    return OnionMath::signumFloat(5.0f)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(1.0f))
+      }
+    }
+
+    describe("angle conversion") {
+      it("converts degrees to radians correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::toRadians(180.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.toRadians(180.0)))
+      }
+
+      it("converts radians to degrees correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::toDegrees(OnionMath::PI)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(java.lang.Math.toDegrees(java.lang.Math.PI)))
+      }
+    }
+
+    describe("hypotenuse") {
+      it("computes hypot correctly") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Double {
+            |    return OnionMath::hypot(3.0, 4.0)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(5.0))
+      }
     }
 
     describe("clamp") {
@@ -322,6 +634,54 @@ class MathSpec extends AbstractShellSpec {
           Array()
         )
         assert(result == Shell.Success(10.0))
+      }
+
+      it("clampInt clamps an int value within range") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    return OnionMath::clampInt(5, 0, 10)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(5))
+      }
+
+      it("clampInt clamps an int value below min") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    return OnionMath::clampInt(-5, 0, 10)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(0))
+      }
+
+      it("clampInt clamps an int value above max") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    return OnionMath::clampInt(15, 0, 10)
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(10))
       }
     }
 

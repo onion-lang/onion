@@ -9,7 +9,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **I/O & system** | `IO` (console), `Files` (files + paths), `System`, `Proc` (subprocesses), `Args` (CLI), `Http` (HTTP client) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets` |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
-| **Numbers** | `Math`, `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
+| **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`, bounded `randomInt`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
 | **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future`, `Outcome` + `Defect` (reading external data) |
@@ -183,6 +183,130 @@ val tangent: Double = Math::tan(Math::PI / 4) // 1.0
 ```onion
 val pi: Double = Math::PI       // 3.14159...
 val e: Double = Math::E         // 2.71828...
+```
+
+## OnionMath Module
+
+An `onion.*` numeric module, distinct from the JDK's `Math`, covering hyperbolic
+trig, safe rounding/clamping, and a bounded random integer. It is default-imported
+like the rest of the standard library, so no explicit import is needed.
+
+### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2
+
+Trigonometric and inverse trigonometric functions (radians):
+
+```onion
+val sine: Double = OnionMath::sin(OnionMath::PI / 2)     // 1.0
+val angle: Double = OnionMath::atan2(1.0, 1.0)           // pi/4
+```
+
+### OnionMath::sinh / OnionMath::cosh / OnionMath::tanh
+
+Hyperbolic trigonometric functions:
+
+```onion
+val h: Double = OnionMath::sinh(1.0)
+```
+
+### OnionMath::exp / OnionMath::log / OnionMath::log10
+
+Exponential and logarithms:
+
+```onion
+val e2: Double = OnionMath::exp(1.0)     // e
+val l: Double = OnionMath::log(OnionMath::E)   // 1.0
+val l10: Double = OnionMath::log10(100.0)      // 2.0
+```
+
+### OnionMath::pow / OnionMath::sqrt / OnionMath::cbrt
+
+Powers and roots:
+
+```onion
+val cube: Double = OnionMath::pow(2.0, 3.0)  // 8.0
+val root: Double = OnionMath::sqrt(16.0)     // 4.0
+val croot: Double = OnionMath::cbrt(27.0)    // 3.0
+```
+
+### OnionMath::abs / OnionMath::absFloat / OnionMath::absInt / OnionMath::absLong
+
+Absolute value, by primitive type:
+
+```onion
+val a1: Double = OnionMath::abs(-3.14)
+val a2: Int = OnionMath::absInt(-10)      // 10
+val a3: Long = OnionMath::absLong(-10L)   // 10
+```
+
+### OnionMath::min / OnionMath::minInt / OnionMath::minLong / OnionMath::max / OnionMath::maxInt / OnionMath::maxLong
+
+Minimum and maximum, by primitive type:
+
+```onion
+val lo: Int = OnionMath::minInt(10, 20)   // 10
+val hi: Int = OnionMath::maxInt(10, 20)   // 20
+```
+
+### OnionMath::floor / OnionMath::ceil / OnionMath::round / OnionMath::roundFloat
+
+Rounding functions:
+
+```onion
+val f: Double = OnionMath::floor(3.7)     // 3.0
+val c: Double = OnionMath::ceil(3.2)      // 4.0
+val r: Long = OnionMath::round(3.5)       // 4
+val rf: Int = OnionMath::roundFloat(3.5f) // 4
+```
+
+### OnionMath::random / OnionMath::randomInt
+
+Random number generation. Unlike `Math::random`, `randomInt` takes bounds directly
+and is tracked by the effect checker as a `Rand` effect:
+
+```onion
+val r: Double = OnionMath::random()          // [0.0, 1.0)
+val n: Int = OnionMath::randomInt(1, 10)     // [1, 10], inclusive
+```
+
+### OnionMath::signum / OnionMath::signumFloat
+
+Sign of a number (`-1.0`, `0.0`, or `1.0`):
+
+```onion
+val s: Double = OnionMath::signum(-5.0)   // -1.0
+```
+
+### OnionMath::toRadians / OnionMath::toDegrees
+
+Angle unit conversion:
+
+```onion
+val rad: Double = OnionMath::toRadians(180.0)  // pi
+val deg: Double = OnionMath::toDegrees(OnionMath::PI)  // 180.0
+```
+
+### OnionMath::clamp / OnionMath::clampInt
+
+Constrain a value to a range:
+
+```onion
+val c1: Double = OnionMath::clamp(15.0, 0.0, 10.0)  // 10.0
+val c2: Int = OnionMath::clampInt(-5, 0, 10)        // 0
+```
+
+### OnionMath::hypot
+
+Hypotenuse without intermediate overflow/underflow:
+
+```onion
+val h: Double = OnionMath::hypot(3.0, 4.0)  // 5.0
+```
+
+### OnionMath Constants
+
+```onion
+val pi: Double = OnionMath::PI  // 3.14159...
+val e: Double = OnionMath::E    // 2.71828...
 ```
 
 ## Origin

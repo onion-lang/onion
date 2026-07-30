@@ -85,6 +85,21 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("2.0"))
     }
 
+    it("variance of a known sample") {
+      runStr(
+        "import { onion.Stats }",
+        "return Double::toString(Stats::variance([2, 4, 4, 4, 5, 5, 7, 9]))",
+        Shell.Success("4.0"))
+    }
+
+    it("sums a Long list exactly") {
+      runStr(
+        "import { onion.Stats }",
+        "val xs: List[Long] = [10L, 20L, 30L]\n" +
+        "return Long::toString(Stats::sumLong(xs))",
+        Shell.Success("60"))
+    }
+
     it("works on a Double list too") {
       runStr(
         "import { onion.Stats }",

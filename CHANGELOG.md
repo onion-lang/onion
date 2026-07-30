@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.13] - 2026-07-30
+
 ### Fixed
 
 - **`docs/ja/reference/stdlib.md` trailed off partway through the "Math Module"

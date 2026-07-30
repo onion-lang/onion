@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/ja/examples/index.md` was a stale 38-line stub that predated most of
+  the "Example Index" table in `docs/examples/overview.md`,** missing 64 of
+  the `run/*.on` example entries (and the Learning Path section) entirely.
+  Brought it to full parity with the English overview, and added
+  `ExamplesOverviewDocParitySpec` so a future example added only in English
+  fails the build instead of silently widening the gap again.
+
 - **`Deploy MkDocs to GitHub Pages` failed on every push since before v0.10.11.**
   `docs/design/roadmap.md` linked to `../../CLAUDE.md` — a real repo-root file,
   but one that lives outside mkdocs' `docs_dir` (`docs/`), so `mkdocs build

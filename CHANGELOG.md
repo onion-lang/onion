@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.14] - 2026-07-30
-
 ### Added
 
 - **Execution coverage for 8 `onion.Json` accessor methods that were

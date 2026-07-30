@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/ja/reference/stdlib.md` trailed off partway through the "Math Module"
+  and "Function Interfaces" sections,** missing `Math::floor`/`Math::ceil`/
+  `Math::round`, `Math::sin`/`Math::cos`/`Math::tan`, the Math Constants
+  subsection, and `Function3` through `Function10` — all present in the
+  English `docs/reference/stdlib.md`. Translated the missing subsections and
+  added `StdlibDocMathAndFunctionInterfacesParitySpec` so a future subsection
+  added only in English fails the build instead of silently widening the gap
+  again.
+
 - **`docs/ja/examples/index.md` was a stale 38-line stub that predated most of
   the "Example Index" table in `docs/examples/overview.md`,** missing 64 of
   the `run/*.on` example entries (and the Learning Path section) entirely.

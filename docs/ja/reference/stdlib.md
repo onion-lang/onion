@@ -102,6 +102,33 @@ val max: Int = Math::max(10, 20)    // 20
 val min: Int = Math::min(10, 20)    // 10
 ```
 
+### Math::floor / Math::ceil / Math::round
+
+丸め処理：
+
+```onion
+val floor: Double = Math::floor(3.7)  // 3.0
+val ceil: Double = Math::ceil(3.2)    // 4.0
+val round: Long = Math::round(3.5)    // 4
+```
+
+### Math::sin / Math::cos / Math::tan
+
+三角関数（ラジアン）：
+
+```onion
+val sine: Double = Math::sin(Math::PI / 2)    // 1.0
+val cosine: Double = Math::cos(0.0)           // 1.0
+val tangent: Double = Math::tan(Math::PI / 4) // 1.0
+```
+
+### Math Constants
+
+```onion
+val pi: Double = Math::PI       // 3.14159...
+val e: Double = Math::E         // 2.71828...
+```
+
 ## Origin
 
 値がどのテキストのどこから来たかを表します。コンパイラが持つソース位置の、実行時版です。
@@ -269,6 +296,10 @@ val result: Int = double.call(5)
 val add: Function2[Int, Int, Int] = (x: Int, y: Int) -> { return x + y; }
 val result: Int = add.call(3, 7)
 ```
+
+### Function3 から Function10 まで
+
+3〜10パラメータの関数も同じパターンです。
 
 ## ラッパークラス
 

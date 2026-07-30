@@ -29,7 +29,7 @@
     
     
       
-        <title>Roadmap: v0.6-v0.8 - Onion Programming Language</title>
+        <title>Roadmap: v0.6-v0.8 (shipped) - Onion Programming Language</title>
       
     
     
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Roadmap: v0.6-v0.8
+              Roadmap: v0.6-v0.8 (shipped)
             
           </span>
         </div>
@@ -4087,7 +4087,7 @@
   <span class="md-ellipsis">
     
   
-    Roadmap: v0.6-v0.8
+    Roadmap: v0.6-v0.8 (shipped)
   
 
     
@@ -4105,7 +4105,7 @@
   <span class="md-ellipsis">
     
   
-    Roadmap: v0.6-v0.8
+    Roadmap: v0.6-v0.8 (shipped)
   
 
     
@@ -4377,9 +4377,17 @@
 
 
 <h1 id="roadmap-v06-to-v08">Roadmap — v0.6 to v0.8<a class="headerlink" href="#roadmap-v06-to-v08" title="Permanent link">&para;</a></h1>
-<p>Status: <strong>index.</strong> The roadmap itself lives on GitHub, because a roadmap in a file goes
-stale the moment work starts. This page exists so a reader who is not looking at the
-issue tracker can see the shape of the plan and follow it to the detail.</p>
+<p>Status: <strong>shipped.</strong> Every issue below (#346-#364) is closed, and the current release
+(v0.10.9) already implements <code>Shape[T]</code>, <code>Outcome</code>/<code>Defect</code>, <code>tool</code> declarations with
+effect inference and <code>--plan</code>, and lossless shapes with <code>edit</code>/<code>render</code> — see
+<a href="https://github.com/onion-lang/onion/blob/main/CLAUDE.md">CLAUDE.md</a> ("Tools, capabilities and effects") and
+<a href="../../reference/stdlib/">docs/reference/stdlib.md</a> for the syntax as it exists today.
+This page is kept as a historical record of the plan and its rationale; a few line
+items shipped with different scope than originally planned (e.g. #351's <code>zip</code> combinator
+was not deferred after all — see its issue for what changed).</p>
+<p>The roadmap itself used to live on GitHub, updated as work landed; this page exists so a
+reader not looking at the issue tracker can see the shape of the plan and follow it to
+the detail.</p>
 <ul>
 <li>Why: <a href="../onion-v0.5-audit/">onion-v0.5-audit.md</a> — what v0.5 is, with citations</li>
 <li>What: <a href="../typed-boundaries/">typed-boundaries.md</a> — the design thesis</li>

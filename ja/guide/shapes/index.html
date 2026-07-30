@@ -4295,7 +4295,7 @@
   <span class="md-ellipsis">
     
   
-    Roadmap: v0.6-v0.8
+    Roadmap: v0.6-v0.8 (shipped)
   
 
     
@@ -4716,19 +4716,31 @@ defect をすべてまとめて報告します。</p>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>Pt::loose().canPrint()     // false
 </span></code></pre></div>
 <p>「メソッドが黙って存在しない」ではなく、<strong>問い合わせられる</strong>という点が違います。</p>
+<p>書き戻しができる shape でも、往復性を壊す値は拒否することがあります。<code>lines()</code> と
+<code>sepBy(separator)</code> は各要素の書き戻し結果を区切り文字（改行、または区切り文字列）で
+つなぎますが、これは読み戻すときに「本物の境界」と「要素自身の内容」を区別するための
+ものです。要素の書き戻し結果がすでにその区切り文字を含んでいると、つなぐ際に黙って
+偽の要素へ分裂してしまいます。両者とも誤った結果を返す代わりに、問題の要素の
+インデックスを添えて <code>IllegalArgumentException</code> を投げます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>val intList: Shape[List[Int]] = intShape.sepBy(&quot;,&quot;)
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>intList.print(evilInts)   // throws: element at index 1 contains the separator, ...
+</span></code></pre></div>
+<p><code>shape name = config</code> も一段下で同じ保護を持ちます。<code>key = value</code> は行末までが値なので、
+改行を含む値も同様に表現できません —— <code>print</code> と <code>printLossless</code> は、偽のエントリを
+挿入する代わりに、問題のフィールド名を添えて例外を投げます。</p>
 <h2 id="_5">文書を読む<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>パターンの代わりにフォーマット名を書くと、成分名をキーとして構造化文書を読みます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>record Person(name: String, age: Int)
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  shape doc = json
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>Person::doc().parse(&quot;{\&quot;age\&quot;: 30}&quot;)
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>//   name: expected String, found absent
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record Person(name: String, age: Int)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  shape doc = json
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>Person::doc().parse(&quot;{\&quot;age\&quot;: 30}&quot;)
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>//   name: expected String, found absent
 </span></code></pre></div>
 <p>サポートしているのは <code>json</code> と <code>yaml</code> です。未知の名前はコンパイルエラー（E0076）です。</p>
 <h2 id="url">ファイルと URL<a class="headerlink" href="#url" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>val one  = file&quot;person.json&quot;.read(Person::doc())
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>val many = file&quot;access.log&quot;.eachLine(Access::common())
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>val api  = http&quot;https://example.com/p&quot;.read(Person::doc())
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>val one  = file&quot;person.json&quot;.read(Person::doc())
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>val many = file&quot;access.log&quot;.eachLine(Access::common())
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>val api  = http&quot;https://example.com/p&quot;.read(Person::doc())
 </span></code></pre></div>
 <p>すべての defect がパスまたは URL を持つので、失敗が<em>どの</em>リソースのものか分かります。
 読めないファイルも例外ではなく defect です。存在しないかもしれないものを読むのは、
@@ -4744,13 +4756,13 @@ defect をすべてまとめて報告します。</p>
 <code>parseLossless</code> は値と一緒に <code>Residue</code> を返します —— shape が値に消費しなかったすべて：
 コメント、空行、キーの順序、スペーシング、未知のキー、そして各値の元の綴り。
 <code>printLossless</code> が2つを再組立てします：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Server(host: String, port: Int, debug: Boolean)
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  shape cfg = config
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  example l2 {
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    val t = &quot;# prod\nhost = h\nport = 007\ndebug = true\n&quot;
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    val r = Server::cfg().parseLossless(t).get()
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    Server::cfg().printLossless(r.value(), r.residue()) == t
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>  }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>record Server(host: String, port: Int, debug: Boolean)
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  shape cfg = config
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  example l2 {
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    val t = &quot;# prod\nhost = h\nport = 007\ndebug = true\n&quot;
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    val r = Server::cfg().parseLossless(t).get()
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    Server::cfg().printLossless(r.value(), r.residue()) == t
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>  }
 </span></code></pre></div>
 <p>この <code>example</code> 節こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
 満たさなくなった shape はコンパイルが通らなくなります。編集も同じ対を通ります ——
@@ -4765,17 +4777,17 @@ defect をすべてまとめて報告します。</p>
 テキストを再組立てします。<code>file"..."</code> がバイト忠実な読み込みを提供するので、「設定の
 キーを1つ変える、ファイルを壊さずに」—— あらゆる即席設定エディタが失敗する仕事 ——
 は3行になり、<code>tool</code> の中に置けば書き戻しは宣言・検査された効果になります：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>val lens = file(path).readLossless(Server::cfg()).get()
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>val out  = lens.edit { v =&gt; v.copy(port = 9090) }.render()
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>Files::writeText(path, out)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>val lens = file(path).readLossless(Server::cfg()).get()
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>val out  = lens.edit { v =&gt; v.copy(port = 9090) }.render()
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>Files::writeText(path, out)
 </span></code></pre></div>
 <p>実行後の <code>diff</code> は変更行をちょうど1行だけ示します。デモ（<code>run/ConfigEditDemo.on</code>）は
 これを tool として実行するので、何かが起きる前に <code>--plan</code> が読み書きを見せてくれます。</p>
 <h2 id="shape_2">ビルド時に shape を検査する<a class="headerlink" href="#shape_2" title="Permanent link">&para;</a></h2>
 <p><code>law</code> はコンパイル時に実行されるので、往復の性質を機械検査できます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  shape text = re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  shape text = re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
 </span></code></pre></div>
 <p>引数の型からサンプルを生成できない law はエラー（E0074）になります。読み飛ばしません。
 実行されない検査が「通った検査」に見えてはいけないからです。</p>
@@ -4783,20 +4795,20 @@ defect をすべてまとめて報告します。</p>
 <p>同梱の導出（<code>re""</code>、<code>json</code>、<code>yaml</code>、<code>config</code>）は意図的に閉じた集合です —— 法則が
 導出と一緒に付いてくるからです。コンパイラが知らないフォーマット —— 固定幅レコード、
 バイナリフレーミング、独自ワイヤプロトコル —— には <code>onion.Shape[T]</code> を直接実装します：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>class FixedWidth conforms Shape[Person] {
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>public:
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  def this {}
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>  def canPrint(): Boolean = true
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  def print(v: Person): String { ... }
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>}
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>example fixedWidthL1 {
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>  val s = new FixedWidth()
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>  val v = new Person(&quot;KOTA&quot;, 42)
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>  s.parse(s.print(v)).get() == v
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>class FixedWidth conforms Shape[Person] {
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>public:
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  def this {}
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  def canPrint(): Boolean = true
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>  def print(v: Person): String { ... }
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>}
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>example fixedWidthL1 {
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>  val s = new FixedWidth()
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>  val v = new Person(&quot;KOTA&quot;, 42)
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>  s.parse(s.print(v)).get() == v
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>}
 </span></code></pre></div>
 <p>コンビネータ —— <code>eachLine</code>、<code>sepBy</code>、<code>xmap</code>、<code>orElse</code> —— は無償で付いてきて、失敗は
 同梱 shape と同じ <code>Outcome</code>/<code>Defect</code> の語彙で語られます。</p>

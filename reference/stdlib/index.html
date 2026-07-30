@@ -5672,7 +5672,7 @@
   <span class="md-ellipsis">
     
   
-    Roadmap: v0.6-v0.8
+    Roadmap: v0.6-v0.8 (shipped)
   
 
     
@@ -8103,7 +8103,10 @@ the same <code>toMap</code> / <code>fromMap</code> core as <code>derive!(Json)</
 </span></code></pre></div>
 <p>String values that would be misread on parse-back (those containing <code>:</code>,
 <code>#</code>, newlines, or that look like numbers or booleans) are automatically
-double-quoted. Numbers and booleans are rendered verbatim.</p>
+double-quoted. Numbers and booleans are rendered verbatim. Map <strong>keys</strong> are
+quoted under the same rule — a key containing <code>:</code> or leading/trailing
+whitespace is double-quoted so it doesn't collide with the <code>key: value</code>
+separator on parse-back.</p>
 <h3 id="round-trip-guarantee">Round-trip guarantee<a class="headerlink" href="#round-trip-guarantee" title="Permanent link">&para;</a></h3>
 <p>For any <code>Map</code> produced by <code>Yaml::parse</code>, <code>Yaml::parse(Yaml::stringify(m))</code>
 returns an equal map. Equivalently, for any record annotated with

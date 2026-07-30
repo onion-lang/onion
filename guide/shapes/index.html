@@ -4274,7 +4274,7 @@
   <span class="md-ellipsis">
     
   
-    Roadmap: v0.6-v0.8
+    Roadmap: v0.6-v0.8 (shipped)
   
 
     
@@ -4695,20 +4695,33 @@ spaces? — so such a shape is read-only and says so:</p>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>Pt::loose().canPrint()     // false
 </span></code></pre></div>
 <p>This is a question you can ask, rather than a method that silently does not exist.</p>
+<p>Some shapes can print but still refuse a particular value, when printing it would break
+the round-trip. <code>lines()</code> and <code>sepBy(separator)</code> join each element's rendering with a
+delimiter — a newline, or the separator text — so a real boundary can be told apart from
+an element's own content on read-back. If an element's rendering already contains that
+delimiter, joining would silently split it into a bogus extra element instead. Both throw
+<code>IllegalArgumentException</code> naming the offending element's index rather than misrender:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>val intList: Shape[List[Int]] = intShape.sepBy(&quot;,&quot;)
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>intList.print(evilInts)   // throws: element at index 1 contains the separator, ...
+</span></code></pre></div>
+<p><code>shape name = config</code> has the same protection one level up: a <code>key = value</code> line runs to
+the end of the line, so a value whose text contains a line break cannot be represented
+either — <code>print</code> and <code>printLossless</code> throw naming the offending field instead of
+injecting a fake extra entry.</p>
 <h2 id="documents">Documents<a class="headerlink" href="#documents" title="Permanent link">&para;</a></h2>
 <p>Naming a format instead of a pattern reads a structured document, with the component names
 as keys:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>record Person(name: String, age: Int)
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  shape doc = json
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>Person::doc().parse(&quot;{\&quot;age\&quot;: 30}&quot;)
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>//   name: expected String, found absent
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>record Person(name: String, age: Int)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  shape doc = json
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>Person::doc().parse(&quot;{\&quot;age\&quot;: 30}&quot;)
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>//   name: expected String, found absent
 </span></code></pre></div>
 <p>Supported formats are <code>json</code> and <code>yaml</code>. An unrecognised name is a compile error (E0076).</p>
 <h2 id="files-and-urls">Files and URLs<a class="headerlink" href="#files-and-urls" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>val one  = file&quot;person.json&quot;.read(Person::doc())
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>val many = file&quot;access.log&quot;.eachLine(Access::common())
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>val api  = http&quot;https://example.com/p&quot;.read(Person::doc())
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>val one  = file&quot;person.json&quot;.read(Person::doc())
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>val many = file&quot;access.log&quot;.eachLine(Access::common())
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>val api  = http&quot;https://example.com/p&quot;.read(Person::doc())
 </span></code></pre></div>
 <p>Every defect carries the path or URL, so a failure says <em>which</em> resource. An unreadable
 file is a defect too, not an exception — reading something that might not be there is the
@@ -4724,13 +4737,13 @@ that differ only in whitespace parse alike. A shape that satisfies L2 as well is
 <code>parseLossless</code> returns the value together with a <code>Residue</code> — everything the shape did
 not consume: comments, blank lines, key order, spacing, unknown keys, and the original
 spelling of every value. <code>printLossless</code> reassembles the two:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>record Server(host: String, port: Int, debug: Boolean)
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  shape cfg = config
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  example l2 {
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    val t = &quot;# prod\nhost = h\nport = 007\ndebug = true\n&quot;
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    val r = Server::cfg().parseLossless(t).get()
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    Server::cfg().printLossless(r.value(), r.residue()) == t
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>  }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>record Server(host: String, port: Int, debug: Boolean)
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  shape cfg = config
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  example l2 {
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    val t = &quot;# prod\nhost = h\nport = 007\ndebug = true\n&quot;
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    val r = Server::cfg().parseLossless(t).get()
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    Server::cfg().printLossless(r.value(), r.residue()) == t
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>  }
 </span></code></pre></div>
 <p>The <code>example</code> clause is the point: L2 is not a comment, it is machine-checked at build
 time, and a shape that stopped satisfying it would stop compiling. Editing goes through
@@ -4746,17 +4759,17 @@ text through the residue. With <code>file"..."</code> supplying a byte-faithful 
 key in the config without destroying it" — the task every ad-hoc config editor gets
 wrong — is three lines, and the write-back is a declared, checked effect when it lives
 in a <code>tool</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>val lens = file(path).readLossless(Server::cfg()).get()
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>val out  = lens.edit { v =&gt; v.copy(port = 9090) }.render()
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>Files::writeText(path, out)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>val lens = file(path).readLossless(Server::cfg()).get()
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>val out  = lens.edit { v =&gt; v.copy(port = 9090) }.render()
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>Files::writeText(path, out)
 </span></code></pre></div>
 <p><code>diff</code> afterwards shows exactly one changed line. The demo (<code>run/ConfigEditDemo.on</code>)
 runs this as a tool, so <code>--plan</code> shows the read and the write before anything happens.</p>
 <h2 id="checking-a-shape-at-build-time">Checking a shape at build time<a class="headerlink" href="#checking-a-shape-at-build-time" title="Permanent link">&para;</a></h2>
 <p><code>law</code> runs at compile time, so the round-trip property can be machine-checked:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>record Pt(x: Int, y: Int)
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  shape text = re&quot;(-?\d+),(-?\d+)&quot;
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>record Pt(x: Int, y: Int)
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  shape text = re&quot;(-?\d+),(-?\d+)&quot;
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
 </span></code></pre></div>
 <p>A law whose parameter type cannot be sampled is an error (E0074), not a silent skip — a
 check that does not run must not look like one that passed.</p>
@@ -4764,20 +4777,20 @@ check that does not run must not look like one that passed.</p>
 <p>The shipped derivations (<code>re""</code>, <code>json</code>, <code>yaml</code>, <code>config</code>) are a closed set on purpose —
 their laws come with them. For a format the compiler has never heard of — fixed-width
 records, binary framing, a bespoke wire protocol — implement <code>onion.Shape[T]</code> directly:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>class FixedWidth conforms Shape[Person] {
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>public:
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  def this {}
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>  def canPrint(): Boolean = true
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  def print(v: Person): String { ... }
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>}
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>example fixedWidthL1 {
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>  val s = new FixedWidth()
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>  val v = new Person(&quot;KOTA&quot;, 42)
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>  s.parse(s.print(v)).get() == v
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>}
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>class FixedWidth conforms Shape[Person] {
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>public:
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  def this {}
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  def parse(text: String, origin: Origin): Outcome[Person] { ... }
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  def canPrint(): Boolean = true
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>  def print(v: Person): String { ... }
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>  def describe(): String = &quot;fixed-width Person&quot;
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>}
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>example fixedWidthL1 {
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>  val s = new FixedWidth()
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>  val v = new Person(&quot;KOTA&quot;, 42)
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>  s.parse(s.print(v)).get() == v
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>}
 </span></code></pre></div>
 <p>The combinators — <code>eachLine</code>, <code>sepBy</code>, <code>xmap</code>, <code>orElse</code> — come for free, and failures
 speak the same <code>Outcome</code>/<code>Defect</code> vocabulary as every shipped shape.</p>

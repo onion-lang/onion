@@ -2573,6 +2573,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#capability-v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ツール、capability、と効果 (v0.10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_28" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4511,7 +4522,7 @@
   <span class="md-ellipsis">
     
   
-    Roadmap: v0.6-v0.8
+    Roadmap: v0.6-v0.8 (shipped)
   
 
     
@@ -5026,6 +5037,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#capability-v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ツール、capability、と効果 (v0.10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_28" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5244,6 +5266,7 @@
 <p><strong>フレームワーク:</strong> ScalaTest 3.2.19</p>
 <p><strong>テストの場所:</strong> <code>src/test/scala/onion/compiler/tools/</code></p>
 <p><strong>基底クラス:</strong> テストは統合テスト用に <code>AbstractShellSpec</code> を継承</p>
+<p><strong>ロケール非依存性（重要）:</strong> エラーメッセージは日英バイリンガル（<code>errorMessage.properties</code> / <code>errorMessage_ja.properties</code>）で、JVM のデフォルトロケールから解決されます。リリース CI は<strong>英語</strong>ロケールで実行されますが、ローカル開発環境はしばしば <code>ja_JP</code> です。エラー<strong>コード</strong>（<code>E0002</code>、<code>E0069</code> など）、<code>Shell.Failure(-1)</code>、またはロケールに依存しない部分文字列でアサートしてください — <code>"重複"</code> のようなローカライズされたメッセージ本文だけでアサートしないこと。さもないとローカルでは通ってもCIでのみ失敗します。リリース前に <code>sbt -Duser.language=en test</code> を実行してこれを検出してください。</p>
 <p><strong>テストスイート:</strong>
 - <code>HelloWorldSpec.scala</code> - 基本出力
 - <code>FactorialSpec.scala</code> - 再帰
@@ -5707,8 +5730,51 @@
 <td>✓ 正しい - finallyサポートあり</td>
 </tr>
 <tr>
+<td><code>using r = expr { }</code></td>
+<td><code>try (val r = expr) { }</code> - try-with-resources。複数のリソースは<code>;</code>で区切り、逆順にクローズされる</td>
+</tr>
+<tr>
 <td><code>catch (Type e)</code></td>
 <td><code>catch e: Type</code> - 括弧なし、コロンの後に型</td>
+</tr>
+</tbody>
+</table>
+<h3 id="capability-v010">ツール、capability、と効果 (v0.10)<a class="headerlink" href="#capability-v010" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>誤り</th>
+<th>正しい（Onion）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>裸の<code>readText(p)</code> / <code>get(url)</code> / <code>now()</code> / <code>exit(1)</code></td>
+<td><strong>もう解決しない</strong> — デフォルトの静的インポートが純粋なクラスに限定された。<code>Files::readText</code>のように修飾するか、明示的にインポートする: <code>import { onion.Files::*; java.lang.System::exit }</code>。裸の<code>println</code>だけは引き続き使用可能（<code>onion.IO</code>が唯一の例外）</td>
+</tr>
+<tr>
+<td>手書きの引数解析を行うCLI関数</td>
+<td><code>tool name(args) [: T] [requires { caps }] { body }</code> — トップレベルのtool宣言。トップレベルでtoolを宣言し（<code>main</code>を持たない）スクリプトはCLIそのものになる: <code>--help</code>、<code>--contract</code>（機械可読なJSON）、<code>--plan</code>（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される</td>
+</tr>
+<tr>
+<td>tool内の未宣言の副作用</td>
+<td>呼び出し箇所でE0077 — 本体の効果は推移的に推論され、<code>requires { read(src), write(dst), console, unknown }</code>と照合される。過剰申告はE0078、不正なcapabilityはE0079。リストにないJava呼び出しは<code>unknown</code>として明示的に許可する必要がある</td>
+</tr>
+<tr>
+<td>コメントを保持したい場合の<code>shape doc = json</code></td>
+<td><code>shape doc = config</code> — コメント付きの<code>key = value</code>形式ファイル向けのLOSSLESSなshape。<code>parseLossless</code>は<code>Residue</code>（コメント、空白、キー順序、未知キー、値の表記）を保持し、<code>r.edit { v =&gt; v.copy(port = 9090) }.render()</code>は該当する値のスロットだけを書き換える</td>
+</tr>
+<tr>
+<td>その場しのぎのカスタムフォーマット実装</td>
+<td><code>class MyShape conforms Shape[T]</code> — ユーザー定義のshapeはコンビネータとOutcome/Defectを無償で得られるが、そのファイルは法則を主張しなければならない（<code>example l1 { s.parse(s.print(v)).get() == v }</code>）。さもなければそのクラスはE0080になる</td>
+</tr>
+<tr>
+<td>recordの中でしかチェックできない法則</td>
+<td>トップレベルの<code>example [name] { boolExpr }</code> — recordのexampleと同様にビルド時に実行される。偽の主張はE0065</td>
+</tr>
+<tr>
+<td>未知の<code>--effects</code></td>
+<td><code>onionc --effects</code> / <code>onion --effects file.on</code>は各メソッドの推論された効果集合を表示する（<code>read write net exec env clock rand console unknown</code>。空なら<code>pure</code>）</td>
 </tr>
 </tbody>
 </table>
@@ -5761,6 +5827,7 @@
 <li>ジェネリクスは型消去ベース（具象化された型情報なし。型引数は不変で、変性やワイルドカードはなし）；型パラメータの null 性はコンパイル時に追跡される（裸の <code>[T]</code> は nullable、<code>[T extends B]</code> は非 null、Java の型変数は platform）</li>
 <li>診断機能は改善中；一部のエラーは理想よりパイプラインの後半で報告される場合があります</li>
 <li>末尾呼び出し最適化は直接の自己再帰と相互自己再帰をカバー（一般的な継続渡しスタイルは非対応）</li>
+<li>型推論はローカル（左から右への一方向で、遅延／大域的な単一化は行わない）；型引数はその左側に書かれた内容によって確定するため、後続の式で型を決めたい場合は対象に型注釈を付ける</li>
 </ul>
 <h2 id="_30">実行のエントリーポイント<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h2>
 <p><code>onion</code> コマンド（または <code>sbt runScript</code>）を使用する場合、エントリーポイントは以下の順で決定されます：

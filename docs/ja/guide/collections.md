@@ -99,15 +99,15 @@ Collections::sort(xs, (a, b) -> (a as Int) - (b as Int))
 
 ## マップのイテレーション
 
-エントリの分割代入と明示的なエントリ型の両方が使えます：
+入れ子のクラス名は型位置で使えます：
 
 ```onion
-foreach (name, age) in ages {          // エントリ分割代入
+foreach (name, age) in ages {            // エントリ分割代入
   println(name + " is " + age)
 }
 
 import { java.util.Map }
-foreach e: Map.Entry in ages.entrySet() {  // 明示的エントリ形式
+foreach e: Map.Entry[String, Integer] in ages.entrySet() { // 明示的エントリ形式
   println(e.getKey() + " is " + e.getValue())
 }
 ```

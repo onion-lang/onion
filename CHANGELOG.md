@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`errorMessage_ja.properties` had two diagnostics that were untranslated or
+  half-translated English prose instead of Japanese text**: `error.parsing.syntax_error`
+  (the most common parse-error message of all — only the "syntax error" lead-in was
+  translated, with "Encountered ..., but expecting ..." left as raw English) and
+  `error.semantic.lValueRequired` (E0028, entirely untranslated: "lvalue required.").
+  `LawCheckMessageI18nSpec` only asserted that a key *resolves* in both locales, not
+  that the Japanese text is actually Japanese, so this slipped through untested.
+  Translated both messages and added `ErrorMessageJapaneseTranslationSpec` so a
+  future untranslated/half-translated entry fails the build instead of shipping
+  silently.
+
 ### Added
 
 - **Execution coverage for `onion.Sets::newSet`, `Sets::containsAll`, and

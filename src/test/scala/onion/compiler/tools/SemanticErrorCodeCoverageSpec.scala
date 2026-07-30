@@ -169,6 +169,21 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
     }
+    it("E0006 ambiguous method (null argument fits two unrelated overloads equally)") {
+      failsWith("E0006",
+        """class A {}
+          |class B {}
+          |class Test {
+          |public:
+          |  static def foo(x: A): Int = 1
+          |  static def foo(x: B): Int = 2
+          |  static def main(args: String[]): Int {
+          |    foo(null)
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
     it("E0007 duplicate local variable") {
       failsWith("E0007",
         """class Test {

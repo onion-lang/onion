@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Stats::variance` and `onion.Stats::sumLong`.**
+  Both members were implemented and documented but, unlike every other
+  `Stats` method, never invoked by a `shell.run` test case in
+  `HashCodecStatsSpec`. Added one case per method.
+
 - **Execution coverage for the 20 `onion.OnionMath` members `MathSpec` never
   exercised.** `asin`/`acos`/`atan`/`atan2`, `sinh`/`cosh`/`tanh`, `log10`/
   `cbrt`, `absFloat`/`absLong`, `minLong`/`maxLong`, `roundFloat`, `signum`/

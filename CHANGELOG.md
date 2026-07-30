@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/ja/guide/collections.md`'s "Map Iteration" section had an untranslated
+  intro sentence and was missing the `[String, Integer]` generic type arguments
+  on `Map.Entry`** that the English version's example uses, under-demonstrating
+  nested-class-with-type-parameters usage in a `foreach` type position. Added a
+  `CollectionsDocMapIterationParitySpec` drift guard.
+
 ## [0.10.13] - 2026-07-30
 
 ### Fixed

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Sets::newSet`, `Sets::containsAll`, and
+  `Sets::forEach`.** All three were implemented and documented in
+  `docs/reference/stdlib.md`, but unlike every other `Sets` method, never
+  invoked by a `shell.run` test case (`isSubsetOf`/`isSupersetOf` exercise
+  `containsAll` only transitively, not as a direct call). Added one case per
+  method to `SetsEnrichedSpec`.
+
 - **Execution coverage for `onion.Csv::stringify`.** It was implemented and
   documented (the direct inverse of `Csv::parse`) but, unlike its sibling
   `stringifyWithHeader`, never invoked by a `shell.run` test case in

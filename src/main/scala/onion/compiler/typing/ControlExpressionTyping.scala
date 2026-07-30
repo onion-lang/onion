@@ -60,7 +60,7 @@ final class ControlExpressionTyping(
             terms += statementTerm(stmt, BasicType.VOID, element.location)
           } else {
             element match {
-              case _: AST.LocalVariableDeclaration =>
+              case _: AST.LocalVariableDeclaration | _: AST.DestructuringDeclaration =>
                 val stmt = translate(element, context)
                 terms += statementTerm(stmt, BasicType.VOID, element.location)
               case expr: AST.Expression =>

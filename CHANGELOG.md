@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for 8 `onion.Json` accessor methods that were
+  documented in `docs/reference/stdlib.md` but never invoked by a
+  `shell.run` test case.** `getLong`, `getFloat`, `getShort`, `getByte`
+  (the boxed, null-on-missing accessors) and `getLongOr`, `getDoubleOr`,
+  `getFloatOr`, `getBooleanOr` (the defaulted variants) had no coverage,
+  unlike their siblings `getInt`/`getDouble`/`getBoolean`/`getIntOr`/
+  `getStringOr`. Added `JsonAccessorCoverageSpec` with one case per method.
+
 - **Execution coverage for `onion.Stats::variance` and `onion.Stats::sumLong`.**
   Both members were implemented and documented but, unlike every other
   `Stats` method, never invoked by a `shell.run` test case in

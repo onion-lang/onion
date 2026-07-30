@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added `DateTimeCoverageSpec` with one case per method, using fixed
   timestamps for determinism.
 
+- **Execution coverage for `onion.Regex::groupsAll`** (both the `String`
+  pattern and `re"..."`/`Pattern` overloads). It was documented and
+  implemented but, unlike every other `Regex` method, never invoked by a
+  `shell.run` test case. Added multi-match, no-match, and `re"..."` literal
+  cases to `RegexSpec` and `RegexPatternInteropSpec`.
+
 ### Fixed
 
 - **A `val (a, b) = expr` destructuring declaration as the trailing element of

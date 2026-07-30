@@ -144,6 +144,46 @@ class RegexSpec extends AbstractShellSpec {
         )
         assert(Shell.Success("John-25") == result)
       }
+
+      it("extracts capturing groups from every match") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val all: List[List[String]] = Regex::groupsAll("a1b2c3", "([a-z])([0-9])");
+            |    var result: String = "";
+            |    foreach g: List[String] in all {
+            |      result = result + g[0] + "=" + g[1] + "+" + g[2] + ";";
+            |    }
+            |    return result;
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("a1=a+1;b2=b+2;c3=c+3;") == result)
+      }
+
+      it("returns an empty list when groupsAll finds no match") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val all: List[List[String]] = Regex::groupsAll("no digits here", "([0-9]+)");
+            |    return all.size;
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success(0) == result)
+      }
     }
 
     describe("replacement") {

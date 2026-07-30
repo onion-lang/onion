@@ -27,5 +27,9 @@ class RegexPatternInteropSpec extends AbstractShellSpec {
       assert(Shell.Success(true) == shell.run(
         "def main(args: String[]): Boolean { return Regex::matches(\"abc\", \"[a-z]+\") }", "None", Array()))
     }
+    it("groupsAll with a re literal") {
+      assert(Shell.Success(2) == shell.run(
+        "def main(args: String[]): Int { return Regex::groupsAll(\"a1b2\", re\"([a-z])(\\d)\").size }", "None", Array()))
+    }
   }
 }

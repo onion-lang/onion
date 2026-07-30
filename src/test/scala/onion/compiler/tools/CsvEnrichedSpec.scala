@@ -38,6 +38,23 @@ class CsvEnrichedSpec extends AbstractShellSpec {
         Shell.Success(3))
     }
 
+    it("stringify closes the parse round-trip") {
+      runStr(
+        "val rows = Csv::parse(\"name,age\\nAlice,30\\nBob,25\")\n" +
+        "val out = Csv::stringify(rows)\n" +
+        "val back = Csv::parse(out)\n" +
+        "return back.get(2).get(0) + \":\" + back.get(2).get(1)",
+        Shell.Success("Bob:25"))
+    }
+
+    it("stringify quotes fields with commas") {
+      runStr(
+        "val rows = Csv::parse(\"a,b\\n\\\"x,y\\\",z\")\n" +
+        "val out = Csv::stringify(rows)\n" +
+        "return Csv::parse(out).get(1).get(0)",
+        Shell.Success("x,y"))
+    }
+
     it("stringifyWithHeader closes the parseWithHeader round-trip") {
       runStr(
         "val recs = Csv::parseWithHeader(\"name,age\\nAlice,30\\nBob,25\")\n" +

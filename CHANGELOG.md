@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Csv::stringify`.** It was implemented and
+  documented (the direct inverse of `Csv::parse`) but, unlike its sibling
+  `stringifyWithHeader`, never invoked by a `shell.run` test case in
+  `CsvEnrichedSpec`. Added a round-trip case and a comma-quoting case.
+
 - **Execution coverage for 8 `onion.Json` accessor methods that were
   documented in `docs/reference/stdlib.md` but never invoked by a
   `shell.run` test case.** `getLong`, `getFloat`, `getShort`, `getByte`

@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Maps::filterKeys` and `Maps::forEach`.**
+  Both were implemented and documented in `docs/reference/stdlib.md`, but
+  unlike every other `Maps` method, never invoked by a `shell.run` test
+  case — `MapsEnrichedSpec`'s own docstring claimed to cover `forEach`
+  without actually calling it, and `filterKeys` wasn't mentioned at all.
+  Added one case per method to `MapsEnrichedSpec`.
+
 - **Execution coverage for `onion.Sets::newSet`, `Sets::containsAll`, and
   `Sets::forEach`.** All three were implemented and documented in
   `docs/reference/stdlib.md`, but unlike every other `Sets` method, never

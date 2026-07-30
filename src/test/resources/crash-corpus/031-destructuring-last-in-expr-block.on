@@ -1,0 +1,15 @@
+// A destructuring declaration (`val (a, b) = expr`) as the trailing element of
+// a block used in expression position (here, a val initializer) hit an
+// unhandled case in ControlExpressionTyping.typeBlockExpression's last-element
+// match — which only special-cased LocalVariableDeclaration and Expression —
+// raising a raw Scala MatchError as an [I0000] internal compiler error instead
+// of the same clean void-vs-expected-type diagnostic a plain `val` declaration
+// gets in that position.
+record Point(x: Int, y: Int)
+class Test {
+public:
+  static def main(args: String[]): void {
+    val x = { val (a, b) = new Point(1, 2) }
+    IO::println("should not compile")
+  }
+}

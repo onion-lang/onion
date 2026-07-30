@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `val (a, b) = expr` destructuring declaration as the trailing element of
+  a block used in expression position (e.g. `val x = { val (a, b) = expr }`)
+  crashed the compiler with a raw `MatchError`**, reported as an `[I0000]`
+  internal compiler error instead of a clean diagnostic. `typeBlockExpression`
+  only special-cased `LocalVariableDeclaration` for a block's last element;
+  `DestructuringDeclaration` now follows the same path and reports the same
+  clean type diagnostic a plain `val` declaration gets there. Added a
+  crash-corpus regression (`031-destructuring-last-in-expr-block.on`).
+
 - **`onion.OnionMath` — a genuine, default-imported stdlib module with 41 public
   members (`sin`/`cos`/`tan`, hyperbolic trig, `clamp`/`clampInt`, `hypot`,
   bounded `randomInt`, ...) — had no documentation in `docs/reference/stdlib.md`

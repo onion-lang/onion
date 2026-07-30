@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docs/ja/examples/basic.md` was missing the "CSV Processing" and "Regex Log
+  Parsing" sections** present in the English `docs/examples/basic.md`.
+  Translated the missing sections and added `BasicExamplesDocParitySpec` so a
+  future stdlib call added only to the English doc fails the build instead of
+  silently widening the gap again.
+
 - **`docs/ja/guide/collections.md`'s "Map Iteration" section had an untranslated
   intro sentence and was missing the `[String, Integer]` generic type arguments
   on `Map.Entry`** that the English version's example uses, under-demonstrating

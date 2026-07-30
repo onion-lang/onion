@@ -224,6 +224,95 @@ Division: 3
 Modulo: 1
 ```
 
+## CSV処理
+
+CSVデータをパースして簡単な集計を行う:
+
+**ファイル: `CsvProcessor.on`**
+```onion
+import {
+  java.lang.Integer as JInt;
+}
+
+class CsvProcessor {
+public:
+  static def main(args: String[]): String {
+    val input = "name,score\nAlice,85\nBob,92\nCharlie,78\nDiana,95\n"
+    val rows = Csv::parseWithHeader(input)
+
+    var total: Int = 0
+    var count: Int = 0
+    for var i: Int = 0; i < rows.size(); i = i + 1 {
+      val row = rows.get(i)
+      val scoreText = row.get("score")
+      if (scoreText != null) {
+        total = total + JInt::parseInt(scoreText)
+        count = count + 1
+      }
+    }
+
+    var average: Int = 0
+    if (count > 0) {
+      average = total / count
+    }
+    return "Processed " + count.toString() + " rows, average score = " + average.toString()
+  }
+}
+```
+
+**トピック:**
+- `Csv::parseWithHeader` によるCSVパース
+- `List<Map<String, String>>` の反復
+- `JInt::parseInt` による文字列から整数への変換
+- null安全なフィールドアクセス
+
+## 正規表現によるログ解析
+
+正規表現でテキストから数値を抽出する:
+
+**ファイル: `RegexLogParser.on`**
+```onion
+import {
+  java.lang.Integer as JInt;
+}
+
+class RegexLogParser {
+public:
+  static def main(args: String[]): String {
+    val logs = Colls::mutableListOf(
+      "[INFO] request took 45ms",
+      "[WARN] request took 120ms",
+      "[INFO] request took 30ms"
+    )
+
+    val pattern = "\\d+ms"
+    var total: Int = 0
+    var count: Int = 0
+
+    for var i: Int = 0; i < logs.size(); i = i + 1 {
+      val line = logs.get(i)
+      val match = Regex::findFirst(line, pattern)
+      if (match.length() > 0) {
+        val msText = match.substring(0, match.length() - 2)
+        total = total + JInt::parseInt(msText)
+        count = count + 1
+      }
+    }
+
+    var average: Int = 0
+    if (count > 0) {
+      average = total / count
+    }
+    return "Average response time: " + average.toString() + "ms"
+  }
+}
+```
+
+**トピック:**
+- パターンマッチングのための `Regex::findFirst`
+- `substring` による文字列のスライス
+- リストの値の集計
+
 ## 次のステップ
 
 - [オブジェクト指向の例](oop.md) - オブジェクト指向プログラム

@@ -51,7 +51,8 @@ val scores = [95, 87, 91]   // List[Int] と推論される
 - プリミティブ型：`Int`、`Long`、`Double`、`Float`、`Boolean`、`Byte`、`Short`、`Char`
 - 参照型：クラス・インターフェース
 - 配列型：`Type[]`
-- Nullable型：`Type?`
+- Null型：`null` 値の特別な扱い
+- ボトム型：値を返さない式のための `Nothing`
 
 ### オブジェクト指向
 
@@ -93,7 +94,40 @@ def makeCounter(): () -> Int {
 }
 ```
 
-### コンパイルモデル
+### JVMターゲット
+
+Onion は JVM バイトコードに直接コンパイルされます：
+
+- コンパイルされた `.class` ファイルは標準的な JVM クラスです
+- Java のクラスと一緒に JAR にまとめられます
+- JVM の性能特性を引き継ぎます
+- Java エコシステム全体にアクセスできます
+
+### Javaとの相互運用
+
+Java へ直接、シームレスにアクセスできます：
+
+```onion
+import {
+  java.util.ArrayList;
+  java.util.HashMap;
+  javax.swing.JFrame;
+}
+
+val list: ArrayList[String] = new ArrayList[String]()
+val map: HashMap[String, String] = new HashMap[String, String]()
+val window: JFrame = new JFrame("Title")
+```
+
+ポイント：
+- `import { }` で Java のクラスをインポートする
+- `new` で Java のオブジェクトを生成する
+- Java のメソッドを普通に呼び出せる
+- Java のインターフェースを実装できる
+- Java のクラスを継承できる
+- 静的メソッドへのアクセスには `::` を使う
+
+## コンパイルモデル
 
 ```
 ソースファイル (.on)
@@ -111,6 +145,78 @@ def makeCounter(): () -> Int {
 - `onionc` — `.class` ファイルにコンパイル
 - `onion` — インメモリでコンパイルしてすぐ実行
 - `Shell` — インタラクティブREPL
+
+## 構文のハイライト
+
+### `val` / `var` によるフィールド
+
+フィールドは `val`（不変）または `var`（可変）で宣言し、`this.field` でアクセスします：
+
+```onion
+class Counter {
+  var count: Int
+
+  public:
+    def increment {
+      this.count = this.count + 1
+    }
+}
+```
+
+### `:` による型注釈
+
+型はコロンの後に指定します。ローカル宣言は初期化子があれば型を省略できます：
+
+```onion
+val variable: Type = value
+val inferred = value
+def method(param: Type): ReturnType { }
+```
+
+### `::` による静的アクセス
+
+静的メソッド・静的フィールドには `::` を使います：
+
+```onion
+println("Hello")
+Math::random()
+System::out.println("Java style")
+```
+
+デフォルトの静的インポートにより、一部のクラスメンバーは `::` なしで使えます（例えば
+`onion.IO` の `println("Hello")`）。このデフォルトの集合は意図的に狭く、純粋なヘルパー群と
+コンソール用の例外である `onion.IO` だけに絞られています——そのため副作用のある行は見た目にも
+副作用があるとわかります。`Files::readText`、`Http::get`、`DateTime::now`、`System::exit` は
+修飾して書くか、`import { onion.Files::* }`（クラス全体）や `import { java.lang.System::exit }`
+（メンバー1つ）で明示的にインポートする必要があります。一覧は
+`src/main/resources/onion/default-static-imports.txt` にあります。
+
+### `as` による型キャスト
+
+キャスト式には `as` 演算子を使います：
+
+```onion
+val x: Double = 3.14
+val y: Int = (x as Int)  // Int にキャスト
+
+val obj: Object = "string"
+val str: String = (obj as String)  // String にキャスト
+```
+
+### `select` によるパターンマッチング
+
+switch 風のパターンマッチングです：
+
+```onion
+select value {
+  case 1, 2, 3:
+    println("Small")
+  case 4, 5, 6:
+    println("Medium")
+  else:
+    println("Large")
+}
+```
 
 ## Javaとの主な違い
 

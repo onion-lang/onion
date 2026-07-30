@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for the 20 `onion.OnionMath` members `MathSpec` never
+  exercised.** `asin`/`acos`/`atan`/`atan2`, `sinh`/`cosh`/`tanh`, `log10`/
+  `cbrt`, `absFloat`/`absLong`, `minLong`/`maxLong`, `roundFloat`, `signum`/
+  `signumFloat`, `toRadians`/`toDegrees`, `clampInt`, and `hypot` had never
+  been run through the compiler/shell — only 18 of the module's 39 public
+  methods had a `shell.run` case. Added one per method, following the
+  existing pattern.
+
 ### Fixed
 
 - **A `val (a, b) = expr` destructuring declaration as the trailing element of

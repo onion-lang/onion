@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nested-class-with-type-parameters usage in a `foreach` type position. Added a
   `CollectionsDocMapIterationParitySpec` drift guard.
 
+- **`docs/ja/guide/scripting.md` only translated the back half of
+  `docs/guide/scripting.md`,** missing the "Running Scripts", "Command-Line
+  Arguments", "Running External Commands", "Files and Globs", and "JSON and
+  HTTP" sections at the top, and the "Putting It Together" section at the
+  end. Translated the missing sections and added `ScriptingDocParitySpec` so
+  a future stdlib call added only to the English guide fails the build
+  instead of silently widening the gap again.
+
 ## [0.10.13] - 2026-07-30
 
 ### Fixed

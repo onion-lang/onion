@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StdlibDocFutureModuleParitySpec` so a future addition to the English
   section fails the build instead of silently widening the gap again.
 
+- **`docs/ja/guide/overview.md` only translated the first three "Language
+  Characteristics" subsections**, missing "JVM Target" and "Java
+  Interoperability" entirely, and never translated the "Syntax Highlights"
+  section (`val`/`var` fields, type annotations, `::` static access, `as`
+  casting, `select` pattern matching) at all. Translated the missing
+  subsections and added `OverviewDocParitySpec` so a future subsection added
+  only in English fails the build instead of silently widening the gap
+  again.
+
 ## [0.10.13] - 2026-07-30
 
 ### Fixed

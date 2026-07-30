@@ -3,10 +3,11 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 /**
- * Tests for the practical Set operations added to `onion.Sets`: fromList/toList,
- * symmetricDifference, isSubsetOf/isSupersetOf/isDisjoint, map, filter, forEach,
- * count, any, all, and find. Null-safety of union/intersection/difference is
- * exercised indirectly via the composed operations.
+ * Tests for the practical Set operations added to `onion.Sets`: newSet,
+ * fromList/toList, symmetricDifference, containsAll, isSubsetOf/isSupersetOf/
+ * isDisjoint, map, filter, forEach, count, any, all, and find. Null-safety of
+ * union/intersection/difference is exercised indirectly via the composed
+ * operations.
  */
 class SetsEnrichedSpec extends AbstractShellSpec {
 
@@ -65,6 +66,35 @@ class SetsEnrichedSpec extends AbstractShellSpec {
         "val f = Sets::find(a, (x: Int) -> x > 2)\n" +
         "return if f != null { f!! as Int } else { -1 }",
         Shell.Success(3))
+    }
+
+    it("newSet creates an empty, mutable set") {
+      run(
+        "val s = Sets::newSet[Int]()\n" +
+        "val before = s.size()\n" +
+        "s.add(1)\n" +
+        "s.add(2)\n" +
+        "s.add(1)\n" +
+        "return before * 100 + s.size()",
+        Shell.Success(2))
+    }
+
+    it("containsAll answers whether every element of subset is in container") {
+      run(
+        "val a = Sets::of(1, 2, 3, 4)\n" +
+        "val yes = if Sets::containsAll(a, Sets::of(2, 3)) { 1 } else { 0 }\n" +
+        "val no = if Sets::containsAll(a, Sets::of(3, 9)) { 10 } else { 0 }\n" +
+        "return yes + no",
+        Shell.Success(1))
+    }
+
+    it("forEach applies the action to every element in iteration order") {
+      run(
+        "val a = Sets::of(1, 2, 3)\n" +
+        "var total = 0\n" +
+        "Sets::forEach(a, (x: Int) -> { total = total + x })\n" +
+        "return total",
+        Shell.Success(6))
     }
   }
 }

@@ -615,6 +615,11 @@ val fail: Future[Int] = Future::failed(new RuntimeException("error"))
 // バックグラウンドスレッドで非同期実行
 val async: Future[String] = Future::async(() -> { return compute(); })
 
+// 例外処理付きの非同期実行
+val safe: Future[Int] = Future::asyncThrowing(() -> {
+  return riskyOperation();
+})
+
 // 遅延
 val delayed: Future[Void] = Future::delay(1000L)  // 1秒
 ```
@@ -629,6 +634,27 @@ f.map((x: Int) -> { return x * 2; })  // Future[Int] = 20
 
 // 非同期操作をチェイン
 f.flatMap((x: Int) -> { return Future::successful(x + 1); })
+
+// フィルタ（述語が false なら失敗）
+f.filter((x: Int) -> { return x > 0; })
+
+// flatMap の別名（do記法が使用）
+f.bind((x: Int) -> { return Future::successful(x); })
+```
+
+### エラーハンドリング
+
+```onion
+val f: Future[Int] = Future::failed(new RuntimeException("oops"))
+
+// 値で回復
+f.recover((e: Throwable) -> { return 0; })
+
+// 別の Future で回復
+f.recoverWith((e: Throwable) -> { return Future::successful(42); })
+
+// エラーを変換
+f.mapError((e: Throwable) -> { return new CustomException(e); })
 ```
 
 ### コールバック
@@ -638,6 +664,10 @@ val f: Future[String] = Future::async(() -> { return "result"; })
 
 f.onSuccess((value: String) -> { IO::println(value); })
 f.onFailure((error: Throwable) -> { IO::println(error); })
+f.onComplete(
+  (value: String) -> { IO::println("ok: " + value); },
+  (error: Throwable) -> { IO::println("err: " + error); }
+)
 ```
 
 ### ブロッキング操作
@@ -648,6 +678,48 @@ val f: Future[Int] = Future::successful(42)
 f.await()              // ブロックして結果を取得（失敗時は例外）
 f.awaitTimeout(5000L)  // タイムアウト付きでブロック（ミリ秒）
 f.getOrElse(0)         // 結果を取得、失敗時はデフォルト値
+```
+
+### ステータス照会
+
+```onion
+f.isCompleted()  // 完了していれば true（成功・失敗いずれも）
+f.isSuccess()    // 成功で完了していれば true
+f.isFailure()    // エラーで完了していれば true
+```
+
+これらは**非ブロッキング**です——future の*現在の*状態を報告するだけなので、まだ実行中の
+future は `isSuccess()` と `isFailure()` の両方が `false` を返します。結果を待ちたい場合は、
+`isFailure()` をポーリングするのではなく `await()`/`getOrElse()`（あるいは
+`onSuccess`/`onFailure`/`recover`）を使ってください。
+
+### Futureの結合
+
+```onion
+val f1: Future[Int] = Future::successful(1)
+val f2: Future[Int] = Future::successful(2)
+
+// タプルのような配列へまとめる
+f1.zip(f2)  // Future[List[Object]] = [1, 2]
+
+// レース: 先に完了した方が勝つ
+f1.race(f2)
+
+// すべての完了を待つ
+Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+
+// 最初に完了したもの
+Future::first(f1, f2, f3)
+```
+
+### 変換
+
+```onion
+val f: Future[Int] = Future::successful(42)
+
+f.toOption()   // Option[Int] - Some(42) または None（ブロックする）
+f.toResult()   // Result[Int, Throwable]（ブロックする）
+f.underlying() // 相互運用のための Java CompletableFuture
 ```
 
 ### Do記法サポート

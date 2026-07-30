@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a future stdlib call added only to the English guide fails the build
   instead of silently widening the gap again.
 
+- **`docs/ja/reference/stdlib.md`'s "Future Module" section trailed off partway
+  through**, missing the "Error Handling", "Status Queries", "Combining
+  Futures", and "Conversions" subsections entirely, plus the `asyncThrowing`,
+  `filter`/`bind`, and `onComplete` calls documented within its existing
+  subsections. Translated the missing content and added
+  `StdlibDocFutureModuleParitySpec` so a future addition to the English
+  section fails the build instead of silently widening the gap again.
+
 ## [0.10.13] - 2026-07-30
 
 ### Fixed

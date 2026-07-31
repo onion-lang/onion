@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   but unlike `replace`, never invoked by a `shell.run` test case in
   `StringsSpec.scala`. Added one case.
 
+- **Execution coverage for `onion.Files::list`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Files::glob`, but
+  unlike `glob`, never invoked by a `shell.run` test case anywhere in the
+  suite. Added `FilesListSpec` with one case.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

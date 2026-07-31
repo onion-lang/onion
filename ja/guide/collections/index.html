@@ -4596,13 +4596,13 @@
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Collections::sort(xs, (a, b) -&gt; (a as Int) - (b as Int))
 </span></code></pre></div>
 <h2 id="_7">マップのイテレーション<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
-<p>エントリの分割代入と明示的なエントリ型の両方が使えます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>foreach (name, age) in ages {          // エントリ分割代入
+<p>入れ子のクラス名は型位置で使えます：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>foreach (name, age) in ages {            // エントリ分割代入
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  println(name + &quot; is &quot; + age)
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>}
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>import { java.util.Map }
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>foreach e: Map.Entry in ages.entrySet() {  // 明示的エントリ形式
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>foreach e: Map.Entry[String, Integer] in ages.entrySet() { // 明示的エントリ形式
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>  println(e.getKey() + &quot; is &quot; + e.getValue())
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>}
 </span></code></pre></div>

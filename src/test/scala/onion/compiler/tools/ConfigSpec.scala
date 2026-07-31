@@ -42,6 +42,65 @@ class ConfigSpec extends AbstractShellSpec {
       }
     }
 
+    describe("raw get") {
+      it("returns the raw value at an existing path") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"database\": {\"host\": \"localhost\"}}";
+            |    val config = Config::parseJson(json);
+            |    val value = Config::get(config, "database.host");
+            |    return value.toString();
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("localhost") == result)
+      }
+
+      it("returns null for a missing path") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"a\": 1}";
+            |    val config = Config::parseJson(json);
+            |    val value = Config::get(config, "missing.path");
+            |    return "" + (value == null);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
+      }
+
+      it("indexes into an array by numeric path segment") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"items\": [\"first\", \"second\"]}";
+            |    val config = Config::parseJson(json);
+            |    val value = Config::get(config, "items.0");
+            |    return value.toString();
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("first") == result)
+      }
+    }
+
     describe("default values") {
       it("returns default value when path not found") {
         val result = shell.run(

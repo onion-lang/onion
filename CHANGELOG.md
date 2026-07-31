@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Config::get`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to the typed accessors
+  (`getString`/`getInt`/`getLong`/`getDouble`/`getBoolean`) that all delegate
+  to it, but unlike those, never invoked directly by a `shell.run` test case
+  in `ConfigSpec.scala`. Added three cases: an existing dot-notation path, a
+  missing path returning `null`, and a numeric path segment indexing into an
+  array.
+
 - **Execution coverage for `onion.Iterables::exists`, `forAll`, and `listOf`.**
   All three were implemented and documented in `docs/reference/stdlib.md`
   right next to `map`/`filter`/`foldl`/`sort`, but unlike those, never

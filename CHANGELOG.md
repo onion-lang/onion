@@ -70,6 +70,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ConfigSpec.scala`. Added two cases per method (value found / falls back to
   default).
 
+- **Execution coverage for `onion.Option::orNull` and `onion.Result::orNull`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `getOrElse`/`orElseGet`, and even name-checked in
+  `OptionResultEnrichedSpec`'s own doc comment as covered, but unlike their
+  siblings, never actually invoked by a `shell.run` test case. Extended the
+  existing "orElseGet, orNull and orElse" (Option) and "orElseGet, exists and
+  toList" (Result) cases to also assert `.orNull()` on both the
+  present/`Ok` and absent/`Err` sides.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

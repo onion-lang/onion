@@ -123,6 +123,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already-completed futures holding the same value so the winner is
   deterministic regardless of which completes first.
 
+- **Execution coverage for `onion.Result::ofNullable` and `Result::trying`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `Result::ok`/`Result::err`, but unlike those, never invoked by a
+  `shell.run` test case in `OptionResultEnrichedSpec.scala`. Added a case
+  covering `ofNullable`'s non-null/null branches and `trying`'s
+  success/throw branches.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

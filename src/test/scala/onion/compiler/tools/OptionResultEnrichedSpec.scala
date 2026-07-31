@@ -112,5 +112,16 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "return a + b + c + fv + gv",
         Shell.Success(11))
     }
+
+    it("ofNullable and trying wrap nullable values and throwing operations") {
+      run(
+        "val a: Result[String, String] = Result::ofNullable(\"v\", \"boom\")\n" +
+        "val b: Result[String, String] = Result::ofNullable(null, \"boom\")\n" +
+        "val c: Result[String, Throwable] = Result::trying(() -> \"ok\")\n" +
+        "val d: Result[String, Throwable] = Result::trying(() -> { throw new RuntimeException(\"bad\") })\n" +
+        "return a.getOrElse(\"X\") + \"|\" + a.isOk() + \"|\" + b.getError() + \"|\" + b.isErr() + \"|\" + " +
+        "c.getOrElse(\"X\") + \"|\" + c.isOk() + \"|\" + d.getError().getMessage() + \"|\" + d.isErr()",
+        Shell.Success("v|true|boom|true|ok|true|bad|true"))
+    }
   }
 }

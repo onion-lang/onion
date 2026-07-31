@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case in `OriginSpec.scala`. Added a case covering the normal span and one
   covering the `Math.max(1, span)` clamp for a non-positive span.
 
+- **Execution coverage for the generic static `onion.Stats::sum`.** It was
+  implemented and documented in `docs/reference/stdlib.md` as the first
+  example in the Stats module section, but unlike `sumInt`/`sumLong` and the
+  other aggregates, never invoked directly by a `shell.run` test case in
+  `HashCodecStatsSpec.scala` (only reached transitively through
+  `xs.sum()`). Added a case to `HashCodecStatsSpec`.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

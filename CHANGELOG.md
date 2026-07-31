@@ -87,6 +87,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   toList" (Result) cases to also assert `.orNull()` on both the
   present/`Ok` and absent/`Err` sides.
 
+- **Execution coverage for `onion.Future::race`.** It was implemented and
+  documented in `docs/reference/stdlib.md` under "Combining Futures", but
+  unlike `zip`, never invoked by a `shell.run` test case in `FutureSpec.scala`
+  — the file had no "combining futures" block at all. Added one, racing two
+  already-completed futures holding the same value so the winner is
+  deterministic regardless of which completes first.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

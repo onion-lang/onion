@@ -599,5 +599,27 @@ class FutureSpec extends AbstractShellSpec {
         assert(result == Shell.Success("hi there"))
       }
     }
+
+    describe("combining futures") {
+      it("race returns the value shared by both completed futures") {
+        val result = shell.run(
+          """
+            |import { onion.Future; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val f1 = Future::successful[Int](42);
+            |    val f2 = Future::successful[Int](42);
+            |    val raced = f1.race(f2);
+            |    return raced.await()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(42))
+      }
+    }
   }
 }

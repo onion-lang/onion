@@ -95,5 +95,38 @@ class ProcSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("/tmp") == result)
     }
+
+    it("captures status, stdout and stderr from a given working directory") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r = Proc::captureIn("/tmp", "sh", "-c", "pwd 1>&2; exit 5")
+          |    return r.status() + ":" + r.stderr().strip()
+          |  }
+          |}
+          |""".stripMargin,
+        "ProcCaptureIn.on",
+        Array()
+      )
+      assert(Shell.Success("5:/tmp") == result)
+    }
+
+    it("returns the exit status from exec in a given working directory") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return Proc::execIn("/tmp", "sh", "-c", "[ \"$(pwd)\" = \"/tmp\" ]")
+          |  }
+          |}
+          |""".stripMargin,
+        "ProcExecIn.on",
+        Array()
+      )
+      assert(Shell.Success(0) == result)
+    }
   }
 }

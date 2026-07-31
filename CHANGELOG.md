@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Proc::captureIn` and `Proc::execIn`.** Both
+  were implemented and documented in `docs/reference/stdlib.md` right next to
+  `runIn`, but unlike `runIn`, never invoked by a `shell.run` test case in
+  `ProcSpec.scala`. Added one case each, exercising the working-directory
+  behavior via the process's own exit status/stderr.
+
 - **Execution coverage for `onion.Json::stringifyPretty`.** It was implemented
   and documented in `docs/reference/stdlib.md` right next to `Json::stringify`,
   but unlike `stringify`, never invoked by a `shell.run` test case in

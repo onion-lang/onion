@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Http::put`/`Http::delete`.** Both were
+  implemented and documented in `docs/reference/stdlib.md`'s Http "Other
+  Methods" section, but unlike `get`/`post`, never invoked by a `shell.run`
+  test case in `HttpSpec.scala`. Added cases against a local echo server
+  covering `put`'s body passthrough, `put`'s null-body-becomes-empty
+  behavior, and `delete`'s method/empty-body request.
+
 - **Execution coverage for `onion.Future::all`/`Future::first`.** Both were
   implemented and documented in `docs/reference/stdlib.md`'s "Combining
   Futures" section right next to `zip`/`race`, but unlike those, never

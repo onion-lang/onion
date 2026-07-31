@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shell.run` test case anywhere in the suite. Added `FilesBytesSpec` with a
   round-trip case.
 
+- **Execution coverage for `onion.Rand::nextInt()` / `Rand::nextLong()`
+  (no-arg overloads).** Both were implemented and documented in
+  `docs/reference/stdlib.md` right next to their bounded counterparts, but
+  unlike those, never invoked by a `shell.run` test case in `RandomSpec.scala`.
+  Added one case each.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

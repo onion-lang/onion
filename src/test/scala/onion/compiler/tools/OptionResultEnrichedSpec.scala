@@ -78,6 +78,16 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         Shell.Success(11))
     }
 
+    it("mapError transforms an Err and passes through an Ok") {
+      run(
+        "val ok: Result[Int, String] = Result::ok(10)\n" +
+        "val er: Result[Int, String] = Result::err(\"boom\")\n" +
+        "val a = ok.mapError((e: String) -> e.toUpperCase())\n" +
+        "val b = er.mapError((e: String) -> e.toUpperCase())\n" +
+        "return a.getOrElse(-1) + \"|\" + a.isOk() + \"|\" + b.getError() + \"|\" + b.isErr()",
+        Shell.Success("10|true|BOOM|true"))
+    }
+
     it("orElseGet, exists and toList work on Ok/Err") {
       runInt(
         "val ok: Result[Int, String] = Result::ok(10)\n" +

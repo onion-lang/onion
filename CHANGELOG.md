@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `JInteger`/`JLong`/`JDouble`/`JBoolean` static
+  methods.** `JInteger::parseInt`, `JInteger::MAX_VALUE`/`MIN_VALUE`,
+  `JLong::parseLong`, `JLong::toString`, `JDouble::parseDouble`,
+  `JDouble::toString`, `JBoolean::parseBoolean`, and `JBoolean::toString`
+  were all implemented and documented in `docs/reference/stdlib.md`'s
+  Wrapper Classes section, but — unlike `JInteger::toString`, which is
+  exercised incidentally by unrelated specs — none were ever invoked
+  directly by a `shell.run` test case anywhere in the suite. Added
+  `WrapperClassesSpec` with one case per method.
+
 - **Execution coverage for `onion.Config::get`.** It was implemented and
   documented in `docs/reference/stdlib.md` right next to the typed accessors
   (`getString`/`getInt`/`getLong`/`getDouble`/`getBoolean`) that all delegate

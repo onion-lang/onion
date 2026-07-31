@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Iterables::exists`, `forAll`, and `listOf`.**
+  All three were implemented and documented in `docs/reference/stdlib.md`
+  right next to `map`/`filter`/`foldl`/`sort`, but unlike those, never
+  invoked by a `shell.run` test case in `IterablesSpec.scala`. Added cases
+  covering `exists`/`forAll` in both the matching and non-matching case, and
+  `listOf`'s varargs construction.
+
 - **Execution coverage for `onion.Proc::captureIn` and `Proc::execIn`.** Both
   were implemented and documented in `docs/reference/stdlib.md` right next to
   `runIn`, but unlike `runIn`, never invoked by a `shell.run` test case in

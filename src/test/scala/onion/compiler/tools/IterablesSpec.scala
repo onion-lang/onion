@@ -86,5 +86,95 @@ class IterablesSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[1, 1, 2, 3, 4, 5, 6, 9]") == result)
     }
+
+    it("exists returns true when a predicate matches at least one element") {
+      val result = shell.run(
+        """
+          |import { onion.Iterables }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val xs = Colls::listOf(1, 3, 4, 7)
+          |    return Iterables::exists(xs, (x: Int) -> x % 2 == 0)
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesExists.on",
+        Array()
+      )
+      assert(Shell.Success(true) == result)
+    }
+
+    it("exists returns false when no element matches the predicate") {
+      val result = shell.run(
+        """
+          |import { onion.Iterables }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val xs = Colls::listOf(1, 3, 5, 7)
+          |    return Iterables::exists(xs, (x: Int) -> x % 2 == 0)
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesExistsFalse.on",
+        Array()
+      )
+      assert(Shell.Success(false) == result)
+    }
+
+    it("forAll returns true when every element matches the predicate") {
+      val result = shell.run(
+        """
+          |import { onion.Iterables }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val xs = Colls::listOf(2, 4, 6, 8)
+          |    return Iterables::forAll(xs, (x: Int) -> x % 2 == 0)
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesForAll.on",
+        Array()
+      )
+      assert(Shell.Success(true) == result)
+    }
+
+    it("forAll returns false when one element fails the predicate") {
+      val result = shell.run(
+        """
+          |import { onion.Iterables }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val xs = Colls::listOf(2, 4, 5, 8)
+          |    return Iterables::forAll(xs, (x: Int) -> x % 2 == 0)
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesForAllFalse.on",
+        Array()
+      )
+      assert(Shell.Success(false) == result)
+    }
+
+    it("listOf builds a list from varargs") {
+      val result = shell.run(
+        """
+          |import { onion.Iterables }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs = Iterables::listOf(3, 1, 4, 1, 5)
+          |    return xs.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesListOf.on",
+        Array()
+      )
+      assert(Shell.Success("[3, 1, 4, 1, 5]") == result)
+    }
   }
 }

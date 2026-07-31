@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HashCodecStatsSpec.scala` (only reached transitively through
   `xs.sum()`). Added a case to `HashCodecStatsSpec`.
 
+- **Execution coverage for `onion.Config::getLong` and
+  `Config::getWithEnvOverride`.** Both were implemented and documented in
+  `docs/reference/stdlib.md` right next to `getInt`/`getDouble`/`getBoolean`
+  and `getEnv`, but unlike those, never invoked by a `shell.run` test case in
+  `ConfigSpec.scala`. Added two cases per method (value found / falls back to
+  default).
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

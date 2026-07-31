@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Json::stringifyPretty`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `Json::stringify`,
+  but unlike `stringify`, never invoked by a `shell.run` test case in
+  `JsonSpec.scala`. Added two cases covering object indentation and a nested
+  array inside an object.
+
 - **Execution coverage for `onion.Strings::replaceRegex`.** It was implemented
   and documented in `docs/reference/stdlib.md` right next to `Strings::replace`,
   but unlike `replace`, never invoked by a `shell.run` test case in

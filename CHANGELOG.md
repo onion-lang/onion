@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Future::all`/`Future::first`.** Both were
+  implemented and documented in `docs/reference/stdlib.md`'s "Combining
+  Futures" section right next to `zip`/`race`, but unlike those, never
+  invoked by a `shell.run` test case in `FutureSpec.scala`. Added cases
+  covering `all`'s in-order result list and `first`'s first-completed value.
+
 - **Execution coverage for `onion.Option::of`.** It was implemented and
   documented in `docs/reference/stdlib.md` right next to `Option::some`/
   `Option::none`, but unlike those, never invoked by a `shell.run` test case

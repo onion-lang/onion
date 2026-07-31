@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unlike those, never invoked by a `shell.run` test case in `RandomSpec.scala`.
   Added one case each.
 
+- **Execution coverage for `onion.Origin::spanning`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Origin::at` and
+  `Origin::atLine`, but unlike those, never invoked by a `shell.run` test
+  case in `OriginSpec.scala`. Added a case covering the normal span and one
+  covering the `Math.max(1, span)` clamp for a non-positive span.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

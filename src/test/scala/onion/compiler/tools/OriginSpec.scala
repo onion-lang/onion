@@ -83,6 +83,35 @@ class OriginSpec extends AbstractShellSpec {
       assert(Shell.Success(true) == result)
     }
 
+    it("covers a span of characters via spanning()") {
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Origin::spanning("a.on", 3, 8, 4)
+          |    return o.source() + "|" + o.line() + "|" + o.column() + "|" + o.span()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("a.on|3|8|4") == result)
+    }
+
+    it("clamps a non-positive span to at least one character via spanning()") {
+      // Origin.spanning(..., span) takes Math.max(1, span); a parser that computed a
+      // zero-or-negative span (e.g. an empty match) must still get a valid Origin.
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return Origin::spanning("a.on", 3, 8, 0).span()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == result)
+    }
+
     it("shifts to a line within an enclosing text, for per-line parsing") {
       // `S.lines` parses each line separately; each sub-parse reports positions relative
       // to its own line and has to be lifted back into the whole document.

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for `onion.Strings::replaceRegex`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `Strings::replace`,
+  but unlike `replace`, never invoked by a `shell.run` test case in
+  `StringsSpec.scala`. Added one case.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

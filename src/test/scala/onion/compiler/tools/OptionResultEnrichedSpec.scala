@@ -31,8 +31,12 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "val a = some.orElseGet(() -> -1)\n" +
         "val b = non.orElseGet(() -> -1)\n" +
         "val c = non.orElse(some).getOrElse(0)\n" +
-        "return a + b + c",
-        Shell.Success(83))
+        "val d = some.orNull()\n" +
+        "val e = non.orNull()\n" +
+        "val dv = d ?: -1\n" +
+        "val ev = e ?: -1\n" +
+        "return a + b + c + dv + ev",
+        Shell.Success(124))
     }
 
     it("contains, exists and fold inspect the value") {
@@ -81,8 +85,12 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "val a = er.orElseGet(() -> -99)\n" +
         "val b = if ok.exists((v: Int) -> v > 5) { 100 } else { 0 }\n" +
         "val c = ok.toList().size() + er.toList().size()\n" +
-        "return a + b + c",
-        Shell.Success(2))
+        "val f = ok.orNull()\n" +
+        "val g = er.orNull()\n" +
+        "val fv = f ?: -1\n" +
+        "val gv = g ?: -1\n" +
+        "return a + b + c + fv + gv",
+        Shell.Success(11))
     }
   }
 }

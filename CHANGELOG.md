@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unlike `glob`, never invoked by a `shell.run` test case anywhere in the
   suite. Added `FilesListSpec` with one case.
 
+- **Execution coverage for `onion.Files::readBytes` / `Files::writeBytes`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `readText`/`writeText`, but unlike those, never invoked by a
+  `shell.run` test case anywhere in the suite. Added `FilesBytesSpec` with a
+  round-trip case.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

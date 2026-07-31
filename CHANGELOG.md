@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Result::mapError`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `map`/`flatMap`/
+  `fold`/`recover`, but unlike those, never invoked by a `shell.run` test
+  case in `OptionResultEnrichedSpec.scala`. Added a case covering the `Err`
+  transform and the `Ok` passthrough.
+
 - **Execution coverage for `JInteger`/`JLong`/`JDouble`/`JBoolean` static
   methods.** `JInteger::parseInt`, `JInteger::MAX_VALUE`/`MIN_VALUE`,
   `JLong::parseLong`, `JLong::toString`, `JDouble::parseDouble`,

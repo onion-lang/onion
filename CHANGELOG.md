@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Option::of`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Option::some`/
+  `Option::none`, but unlike those, never invoked by a `shell.run` test case
+  in `OptionResultEnrichedSpec.scala`. Added a case covering both the
+  non-null wrap and the null-collapses-to-`none` behavior that distinguishes
+  it from `Option::some`.
+
 - **Execution coverage for `onion.Result::mapError`.** It was implemented
   and documented in `docs/reference/stdlib.md` right next to `map`/`flatMap`/
   `fold`/`recover`, but unlike those, never invoked by a `shell.run` test

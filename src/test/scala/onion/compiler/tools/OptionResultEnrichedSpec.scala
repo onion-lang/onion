@@ -56,6 +56,16 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "return some.toList().size() + non.toList().size()",
         Shell.Success(1))
     }
+
+    it("of wraps a non-null value and collapses null to none") {
+      runInt(
+        "val present: Option[Int] = Option::of(42)\n" +
+        "val absent: Option[Int] = Option::of(null)\n" +
+        "val a = present.isDefined()\n" +
+        "val b = absent.isDefined()\n" +
+        "return present.getOrElse(-1) + absent.getOrElse(-1) + (if a { 100 } else { 0 }) + (if b { 100 } else { 0 })",
+        Shell.Success(141))
+    }
   }
 
   describe("enriched Result") {

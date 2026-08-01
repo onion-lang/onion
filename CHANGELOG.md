@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.18] - 2026-08-01
-
 ### Fixed
 
 - **Tail-call optimization miscompiled recursive functions that declared

@@ -28,6 +28,24 @@ class RandomSpec extends AbstractShellSpec {
         assert(Shell.Success("true") == result)
       }
 
+      it("generates random int without bound") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val a = Rand::nextInt();
+            |    val b = Rand::nextInt();
+            |    return "" + (a != b);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
+      }
+
       it("generates random int in range with min and max") {
         val result = shell.run(
           """
@@ -261,6 +279,24 @@ class RandomSpec extends AbstractShellSpec {
     }
 
     describe("long random") {
+      it("generates random long without bound") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val a = Rand::nextLong();
+            |    val b = Rand::nextLong();
+            |    return "" + (a != b);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
+      }
+
       it("generates random long with bound") {
         val result = shell.run(
           """

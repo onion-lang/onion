@@ -599,5 +599,68 @@ class FutureSpec extends AbstractShellSpec {
         assert(result == Shell.Success("hi there"))
       }
     }
+
+    describe("combining futures") {
+      it("race returns the value shared by both completed futures") {
+        val result = shell.run(
+          """
+            |import { onion.Future; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val f1 = Future::successful[Int](42);
+            |    val f2 = Future::successful[Int](42);
+            |    val raced = f1.race(f2);
+            |    return raced.await()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(42))
+      }
+
+      it("all combines multiple futures into a List of results in order") {
+        val result = shell.run(
+          """
+            |import { onion.Future; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val f1 = Future::successful[Int](1);
+            |    val f2 = Future::successful[Int](2);
+            |    val f3 = Future::successful[Int](3);
+            |    val combined = Future::all(f1, f2, f3);
+            |    return combined.await().toString()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success("[1, 2, 3]"))
+      }
+
+      it("first returns the value shared by both completed futures") {
+        val result = shell.run(
+          """
+            |import { onion.Future; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val f1 = Future::successful[Int](42);
+            |    val f2 = Future::successful[Int](42);
+            |    val firstDone = Future::first(f1, f2);
+            |    return firstDone.await()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(42))
+      }
+    }
   }
 }

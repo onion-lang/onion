@@ -70,6 +70,14 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success(125)) // 100 + 25
     }
 
+    it("sums a List[Int] in double precision via the generic static form") {
+      runStr(
+        "import { onion.Stats }",
+        "val xs: List[Int] = [10, 20, 30, 40]\n" +
+        "return Double::toString(Stats::sum(xs))",
+        Shell.Success("100.0"))
+    }
+
     it("min, max and median in double precision") {
       runStr(
         "import { onion.Stats }",

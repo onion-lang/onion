@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/LibraryCatalog.on`, a 329-line library management sample.** Adds a
+  large end-to-end program to the corpus (12th at ≥100 lines), combining
+  interfaces (`Lendable`, `Describable`) with `conforms`, class inheritance
+  via primary-constructor super-args (`RareBook extends Book`), an ADT enum
+  (`LoanStatus`) matched with `select`/type patterns, a homogeneous enum
+  with an extension method, records, mutable class state, collection
+  pipelines (`map`/`filter`/`sortedBy`/`groupBy`/`partition`/`distinct`/
+  `zip`/`reduce`), `try`/`catch`, and recursion in one coherent scenario.
+
 - **Execution coverage for `onion.Config::loadJson`.** It was implemented and
   documented in `docs/reference/stdlib.md` as the canonical entry point for
   loading a config file, but unlike `parseJson` and the accessors, never

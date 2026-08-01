@@ -1,0 +1,366 @@
+// Gradebook — student grade management
+// Exercises: records, enums, extension methods on String/Int/Double,
+// collection iteration with casts, nullable returns, closures,
+// insertion sort, string interpolation, and pattern matching with select.
+
+// ---- Records ----------------------------------------------------------------
+record Student(id: Int, name: String)
+record Course(code: String, name: String, credits: Int)
+record Enrollment(studentId: Int, courseCode: String, score: Double)
+
+// ---- Enums ------------------------------------------------------------------
+enum Semester {
+  FALL, SPRING, SUMMER
+}
+
+extension Semester {
+  def label(): String {
+    select self {
+      case Semester::FALL:   return "Fall"
+      case Semester::SPRING: return "Spring"
+      case Semester::SUMMER: return "Summer"
+    }
+    return "Unknown"
+  }
+}
+
+// ---- Extension methods ------------------------------------------------------
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width {
+      s = s + " "
+    }
+    return s
+  }
+}
+
+extension Int {
+  def ordinal(): String {
+    val n = self
+    if n % 10 == 1 && n % 100 != 11 { return "" + n + "st" }
+    if n % 10 == 2 && n % 100 != 12 { return "" + n + "nd" }
+    if n % 10 == 3 && n % 100 != 13 { return "" + n + "rd" }
+    return "" + n + "th"
+  }
+}
+
+extension Double {
+  def clamp(lo: Double, hi: Double): Double {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+// ---- Grade helper functions -------------------------------------------------
+def scoreLetter(score: Double): String {
+  if score >= 93.0 { return "A"  }
+  if score >= 90.0 { return "A-" }
+  if score >= 87.0 { return "B+" }
+  if score >= 83.0 { return "B"  }
+  if score >= 80.0 { return "B-" }
+  if score >= 77.0 { return "C+" }
+  if score >= 73.0 { return "C"  }
+  if score >= 70.0 { return "C-" }
+  if score >= 60.0 { return "D"  }
+  return "F"
+}
+
+def scoreToGPA(score: Double): Double {
+  if score >= 93.0 { return 4.0 }
+  if score >= 90.0 { return 3.7 }
+  if score >= 87.0 { return 3.3 }
+  if score >= 83.0 { return 3.0 }
+  if score >= 80.0 { return 2.7 }
+  if score >= 77.0 { return 2.3 }
+  if score >= 73.0 { return 2.0 }
+  if score >= 70.0 { return 1.7 }
+  if score >= 60.0 { return 1.0 }
+  return 0.0
+}
+
+// Classify a GPA into a standing label
+def standingLabel(gpa: Double): String {
+  if gpa >= 3.9 { return "Summa Cum Laude" }
+  if gpa >= 3.7 { return "Magna Cum Laude" }
+  if gpa >= 3.5 { return "Cum Laude" }
+  if gpa >= 2.0 { return "Good Standing" }
+  return "Academic Probation"
+}
+
+// ---- Gradebook class --------------------------------------------------------
+class Gradebook {
+  val students:    List[Student]
+  val courses:     List[Course]
+  val enrollments: List[Enrollment]
+
+public:
+  def this {
+    val ss: List[Student]    = []
+    val cs: List[Course]     = []
+    val es: List[Enrollment] = []
+    this.students    = ss
+    this.courses     = cs
+    this.enrollments = es
+  }
+
+  def addStudent(s: Student): void {
+    this.students << s
+  }
+
+  def addCourse(c: Course): void {
+    this.courses << c
+  }
+
+  def enroll(studentId: Int, courseCode: String, score: Double): void {
+    this.enrollments << new Enrollment(studentId, courseCode, score.clamp(0.0, 100.0))
+  }
+
+  // Nullable lookup — returns null if not found
+  def findStudent(id: Int): Student? {
+    foreach s: Object in this.students {
+      val st = s as Student
+      if st.id() == id { return st }
+    }
+    return null
+  }
+
+  // All enrollments for one student
+  def studentEnrollments(studentId: Int): List[Enrollment] {
+    val result: List[Enrollment] = []
+    foreach e: Object in this.enrollments {
+      val enr = e as Enrollment
+      if enr.studentId() == studentId { result << enr }
+    }
+    return result
+  }
+
+  // Credits for a given course code (defaults to 3)
+  def creditsFor(courseCode: String): Int {
+    foreach c: Object in this.courses {
+      val course = c as Course
+      if course.code() == courseCode { return course.credits() }
+    }
+    return 3
+  }
+
+  // Weighted GPA across all enrolled courses
+  def gpaFor(studentId: Int): Double {
+    val enrs = this.studentEnrollments(studentId)
+    if enrs.size == 0 { return 0.0 }
+    var totalPoints:  Double = 0.0
+    var totalCredits: Int    = 0
+    foreach e: Object in enrs {
+      val enr     = e as Enrollment
+      val credits = this.creditsFor(enr.courseCode())
+      totalPoints  = totalPoints + scoreToGPA(enr.score()) * (credits as Double)
+      totalCredits = totalCredits + credits
+    }
+    if totalCredits == 0 { return 0.0 }
+    return totalPoints / (totalCredits as Double)
+  }
+
+  // Average score for one course across all enrolled students
+  def courseAverage(courseCode: String): Double {
+    var total: Double = 0.0
+    var count: Int    = 0
+    foreach e: Object in this.enrollments {
+      val enr = e as Enrollment
+      if enr.courseCode() == courseCode {
+        total = total + enr.score()
+        count = count + 1
+      }
+    }
+    if count == 0 { return 0.0 }
+    return total / (count as Double)
+  }
+
+  // Insertion sort — produces a new list ordered by GPA descending
+  def rankedStudents(): List[Student] {
+    val sorted: List[Student] = []
+    foreach s: Object in this.students {
+      sorted << (s as Student)
+    }
+    var i: Int = 1
+    while i < sorted.size {
+      val cur    = sorted[i] as Student
+      val curGPA = this.gpaFor(cur.id())
+      var j: Int = i - 1
+      while j >= 0 {
+        val prev = sorted[j] as Student
+        if this.gpaFor(prev.id()) < curGPA {
+          sorted[j + 1] = prev
+          j = j - 1
+        } else {
+          break
+        }
+      }
+      sorted[j + 1] = cur
+      i = i + 1
+    }
+    return sorted
+  }
+
+  // Count students satisfying a closure predicate
+  def countWhere(pred: (Student) -> Boolean): Int {
+    var n: Int = 0
+    foreach s: Object in this.students {
+      val st = s as Student
+      if pred.call(st) { n = n + 1 }
+    }
+    return n
+  }
+
+  def allStudents(): List[Student] { return this.students }
+  def allCourses():  List[Course]  { return this.courses  }
+
+  // ---- Reports ---------------------------------------------------------------
+  def printReport(semester: Semester): void {
+    println("=== #{semester.label().toUpperCase()} GRADEBOOK REPORT ===")
+    println("")
+
+    // Course averages
+    println("-- COURSE AVERAGES --")
+    foreach c: Object in this.courses {
+      val course  = c as Course
+      val avg     = this.courseAverage(course.code())
+      val letter  = scoreLetter(avg)
+      println("  #{course.code().padRight(9)} #{course.name().padRight(24)} avg=#{avg}  #{letter}")
+    }
+    println("")
+
+    // Student rankings
+    println("-- STUDENT RANKINGS (GPA descending) --")
+    val ranked = this.rankedStudents()
+    var rank: Int = 1
+    foreach s: Object in ranked {
+      val student = s as Student
+      val gpa     = this.gpaFor(student.id())
+      val enrs    = this.studentEnrollments(student.id())
+      val standing = standingLabel(gpa)
+      println("  #{rank.ordinal().padRight(5)} #{student.name().padRight(16)} GPA=#{gpa}  #{standing}")
+      rank = rank + 1
+    }
+    println("")
+
+    // Individual transcripts
+    println("-- TRANSCRIPTS --")
+    foreach s: Object in this.students {
+      val student = s as Student
+      val gpa     = this.gpaFor(student.id())
+      println("  #{student.name()} (GPA: #{gpa}, #{standingLabel(gpa)})")
+      val enrs = this.studentEnrollments(student.id())
+      foreach e: Object in enrs {
+        val enr    = e as Enrollment
+        val letter = scoreLetter(enr.score())
+        val cr     = this.creditsFor(enr.courseCode())
+        println("    #{enr.courseCode().padRight(9)} score=#{enr.score()}  #{letter}  (#{cr} cr)")
+      }
+    }
+    println("")
+  }
+}
+
+// ---- Main program -----------------------------------------------------------
+val gb = new Gradebook()
+
+// Register courses
+gb.addCourse(new Course("CS101",   "Intro to Programming",   4))
+gb.addCourse(new Course("MATH201", "Calculus I",             3))
+gb.addCourse(new Course("ENG101",  "English Composition",    3))
+gb.addCourse(new Course("PHYS101", "Physics I",              4))
+
+// Register students
+gb.addStudent(new Student(1, "Alice Chen"))
+gb.addStudent(new Student(2, "Bob Smith"))
+gb.addStudent(new Student(3, "Carol Davis"))
+gb.addStudent(new Student(4, "Dave Wilson"))
+gb.addStudent(new Student(5, "Eve Martinez"))
+
+// Enroll students (student id, course code, score)
+gb.enroll(1, "CS101",   95.0)
+gb.enroll(1, "MATH201", 88.5)
+gb.enroll(1, "ENG101",  91.0)
+gb.enroll(1, "PHYS101", 84.0)
+
+gb.enroll(2, "CS101",   72.0)
+gb.enroll(2, "MATH201", 65.0)
+gb.enroll(2, "PHYS101", 78.0)
+
+gb.enroll(3, "CS101",   98.0)
+gb.enroll(3, "MATH201", 96.0)
+gb.enroll(3, "ENG101",  94.0)
+gb.enroll(3, "PHYS101", 99.0)
+
+gb.enroll(4, "ENG101",  82.0)
+gb.enroll(4, "MATH201", 79.0)
+
+gb.enroll(5, "CS101",   88.0)
+gb.enroll(5, "ENG101",  90.0)
+gb.enroll(5, "PHYS101", 85.0)
+
+// Print the semester report
+gb.printReport(Semester::FALL)
+
+// Nullable lookup demo
+val found = gb.findStudent(3)
+if found != null {
+  println("Found: #{found.name()}")
+} else {
+  println("Student 3 not found")
+}
+
+val missing = gb.findStudent(99)
+if missing == null {
+  println("Student 99: not found (as expected)")
+}
+
+// Closure: count students with GPA >= 3.5 (honor roll)
+val honorCount = gb.countWhere((st: Student) -> gb.gpaFor(st.id()) >= 3.5)
+println("Honor roll (GPA >= 3.5): #{honorCount} student(s)")
+
+// Ordinal extension on Int
+println("")
+println("-- YEAR STANDINGS --")
+var yr: Int = 1
+while yr <= 4 {
+  println("  #{yr.ordinal()} year")
+  yr = yr + 1
+}
+
+// Score-range distribution across all enrollments
+println("")
+println("-- GRADE DISTRIBUTION --")
+var countA: Int = 0
+var countB: Int = 0
+var countC: Int = 0
+var countD: Int = 0
+var countF: Int = 0
+foreach e: Object in gb.allCourses() {
+  val course = e as Course
+  foreach en: Object in gb.allStudents() {
+    val student = en as Student
+    var found2: Enrollment? = null
+    foreach ee: Object in gb.studentEnrollments(student.id()) {
+      val enr2 = ee as Enrollment
+      if enr2.courseCode() == course.code() {
+        found2 = enr2
+      }
+    }
+    if found2 != null {
+      val sc = found2.score()
+      val letter = scoreLetter(sc)
+      if letter == "A" || letter == "A-" { countA = countA + 1 }
+      if letter == "B+" || letter == "B" || letter == "B-" { countB = countB + 1 }
+      if letter == "C+" || letter == "C" || letter == "C-" { countC = countC + 1 }
+      if letter == "D" { countD = countD + 1 }
+      if letter == "F" { countF = countF + 1 }
+    }
+  }
+}
+println("  A grades: #{countA}")
+println("  B grades: #{countB}")
+println("  C grades: #{countC}")
+println("  D grades: #{countD}")
+println("  F grades: #{countF}")

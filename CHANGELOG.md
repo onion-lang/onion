@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.15] - 2026-08-01
-
 ### Added
 
 - **Execution coverage for `onion.Http::put`/`Http::delete`.** Both were

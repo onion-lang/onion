@@ -109,6 +109,30 @@ produced its counterexample.
 onion --law-samples 500 MyScript.on
 ```
 
+### `--effects`
+
+Print each compiled method's inferred effect set (`read write net exec env clock rand console unknown`; empty means pure) to stderr.
+
+```bash
+onion --effects MyScript.on
+```
+
+### `--stacktrace`
+
+Print the raw JVM trace for an uncaught runtime error instead of the rendered diagnostic report.
+
+```bash
+onion --stacktrace MyScript.on
+```
+
+### `--watch`
+
+Run the script, then re-run it automatically whenever its file changes. Compile errors and runtime exceptions are printed without stopping the watch loop; press Ctrl-C to stop.
+
+```bash
+onion --watch MyScript.on
+```
+
 ## Program Arguments
 
 Arguments after the source file(s) are passed to your program:

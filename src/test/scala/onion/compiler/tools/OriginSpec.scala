@@ -126,5 +126,34 @@ class OriginSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success("log.txt:40:3") == result)
     }
+
+    it("knows whether a column is present, as opposed to only a line") {
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return Origin::at("x.on", 1, 3).hasColumn() + "|" + Origin::atLine("x.on", 1).hasColumn()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("true|false") == result)
+    }
+
+    it("retargets to a different source via inSource(), keeping line, column and span") {
+      // A sub-parse may only learn which document it came from after the fact (e.g. an
+      // included file); inSource() moves an already-built Origin without re-deriving it.
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Origin::at("a.on", 3, 8).inSource("b.on")
+          |    return o.source() + "|" + o.line() + "|" + o.column()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("b.on|3|8") == result)
+    }
   }
 }

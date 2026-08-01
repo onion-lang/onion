@@ -389,6 +389,50 @@ class ConfigSpec extends AbstractShellSpec {
       }
     }
 
+    describe("loadJson") {
+      it("reads and parses a JSON file from disk") {
+        val path = System.getProperty("java.io.tmpdir") + "/onion-config-loadjson-test.json"
+        val result = shell.run(
+          s"""
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    Files::writeText("$path", "{\\"database\\": {\\"host\\": \\"localhost\\", \\"port\\": 5432}}");
+            |    val config = Config::loadJson("$path");
+            |    Files::delete("$path");
+            |    return Config::getString(config, "database.host", "default") + ":" + Config::getInt(config, "database.port", 0);
+            |  }
+            |}
+            |""".stripMargin,
+          "ConfigLoadJsonBasic.on",
+          Array()
+        )
+        assert(Shell.Success("localhost:5432") == result)
+      }
+
+      it("propagates an error for a missing file") {
+        val path = System.getProperty("java.io.tmpdir") + "/onion-config-loadjson-missing.json"
+        val result = shell.run(
+          s"""
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Config::loadJson("$path");
+            |      return "no_error";
+            |    } catch e: Exception {
+            |      return "error";
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "ConfigLoadJsonMissing.on",
+          Array()
+        )
+        assert(Shell.Success("error") == result)
+      }
+    }
+
     describe("hasPath") {
       it("returns true for existing path") {
         val result = shell.run(

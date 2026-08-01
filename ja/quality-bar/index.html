@@ -4399,8 +4399,8 @@
 
 <h1 id="onion">Onion の実用的品質基準<a class="headerlink" href="#onion" title="Permanent link">&para;</a></h1>
 <p>「実用的品質」は意図的に曖昧な表現なので、このファイルではそれを<strong>客観的に測定可能な指標</strong>のセットに固定します。各行には実行可能な測定方法と閾値があり、すべての行が通過したときに言語は基準に達したとみなされます。</p>
-<p>ベースライン数値は 2026-07-27 時点（develop @ c2126299）の実測値です。前回のベースライン
-（2026-07-27 @ 871fe5a1）は、effect-table / tool-capability / tool-contracts の作業
+<p>ベースライン数値は 2026-07-26 時点（develop @ c2126299）の実測値です。前回のベースライン
+（2026-07-26 @ 871fe5a1）は、effect-table / tool-capability / tool-contracts の作業
 （#356、#357、#358）が入った後にはすでに乖離していました——テスト数は 2590 と記録されて
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（<code>docs/guide/tools.md</code> が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した <code>E0077</code>–<code>E0079</code>）でした。</p>
@@ -4426,14 +4426,14 @@
 <td>2</td>
 <td>サンプルの健全性</td>
 <td><code>SampleCompilesSpec</code> / <code>SampleProgramsSpec</code>（どちらも <code>run/*.on</code> 全件をコンパイル）</td>
-<td>72 / 72 compile</td>
+<td>74 / 74 compile</td>
 <td>すべてコンパイル、rot なし</td>
 </tr>
 <tr>
 <td>3</td>
 <td>大規模プログラム</td>
 <td>100行以上の <code>run/*.on</code> をそのまま end-to-end で実行できる数</td>
-<td>15（Blackjack、BrokenLogDemo、BudgetTracker、GradeBook、LibraryCatalog、LibrarySystem、MiniRpg、OrderReport、PayrollReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker）</td>
+<td>17（Blackjack、BrokenLogDemo、BudgetTracker、GradeBook、GraphSearch、Inventory、LibraryCatalog、LibrarySystem、MiniRpg、OrderReport、PayrollReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker）</td>
 <td>≥ 5</td>
 </tr>
 <tr>

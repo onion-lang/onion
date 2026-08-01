@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/PlaylistManager.on`, a 502-line music playlist manager sample.** Adds a
+  large end-to-end program to the corpus (18th at ≥100 lines), combining an
+  ADT case-enum (`Genre`, 8 cases) and a plain enum with methods
+  (`PlaybackMode`), records with `example` clauses, a class implementing an
+  interface via `conforms`, `ArrayList[T]` generics, collection pipelines
+  (`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`find`/`zip`/`map`/
+  `distinct`), `foreach (k, v)` map iteration, range `foreach`, exhaustive
+  `select` type-pattern matching, nullable types, extension methods on `Int`
+  and `String`, closures, string interpolation, and `try`/`catch` in one
+  coherent scenario.
+
+### Fixed
+
+- **CI's `Build and Test` job could hit a real JVM `OutOfMemoryError`** on the
+  GitHub Actions runner as the `run/` corpus and test count grew, then wedge
+  for several minutes with dying background threads before being reported as
+  stuck rather than failing cleanly. Raised the job's heap headroom
+  (`SBT_OPTS=-Xmx6G`, up from the `.jvmopts` default of 4g) to give the
+  growing suite room to run without GC thrashing.
+
 ## [0.10.17] - 2026-08-01
 
 ### Fixed

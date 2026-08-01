@@ -145,6 +145,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   covering `ofNullable`'s non-null/null branches and `trying`'s
   success/throw branches.
 
+- **`run/LibrarySystem.on`, a 374-line library management sample.** Adds a
+  large end-to-end program to the corpus (10th at ≥100 lines), combining a
+  plain enum matched via `select`, four records, a class with mutable `List`
+  fields, `String`/`Int` extension methods, method chaining, string
+  interpolation, bubble sort, and recursion in one coherent scenario.
+
 ## [0.10.14] - 2026-07-31
 
 ### Fixed

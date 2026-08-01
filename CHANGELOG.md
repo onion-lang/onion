@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tail-call optimization miscompiled recursive functions that declared
+  body-local variables** (e.g. `val x = items[idx] as Item`), either
+  crashing with `I0000 BytecodeGeneration` or silently producing wrong
+  results (an accumulator parameter would read the same element every
+  iteration). Three related bugs in `TailCallOptimization`: the loop-variable
+  offset fallback for top-level/synthetic methods collided with body-local
+  slots, the temp-variable offset assumed loop variables always started at
+  `paramCount`, and the parameter-reference rewrite pass didn't recurse into
+  several compound AST node types (`AsInstanceOf`, `RefArray`, `RefField`,
+  `NewObject`, `ListLiteral`, and others), so `RefLocal` nodes nested inside
+  them kept reading stale JVM slots. Added `run/RecipeManager.on` (365
+  lines, 19th large sample) as additional end-to-end coverage.
+
 - **`onion --help` silently omitted three working script-runner flags** —
   `--effects`, `--stacktrace`, and `--watch` were all parsed and honored by
   `ScriptRunner.runMain`/`run`, but `printUsage()` never listed them, so

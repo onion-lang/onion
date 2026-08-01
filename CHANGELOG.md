@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`onion --help` silently omitted three working script-runner flags** —
+  `--effects`, `--stacktrace`, and `--watch` were all parsed and honored by
+  `ScriptRunner.runMain`/`run`, but `printUsage()` never listed them, so
+  they were undiscoverable outside reading the source. Added them to the
+  help text, documented them in `docs/tools/script-runner.md` and its ja
+  counterpart, and extended `OnionCliSpec`'s help-text assertion so the gap
+  can't silently reopen.
+
 - **Writing `{ (k, v) => ... }` for a trailing lambda produced a bare
   "Encountered `{`, but expecting..." token dump**, with no indication that
   the actual mistake was the parentheses. Trailing lambdas (`m.filter { k, v

@@ -107,6 +107,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HashCodecStatsSpec.scala` (only reached transitively through
   `xs.sum()`). Added a case to `HashCodecStatsSpec`.
 
+- **Execution coverage for `onion.Origin::hasColumn` and `Origin::inSource`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `onLine` (`inSource` in the same subsection, `hasColumn` in the
+  module's intro example), but unlike `onLine`, never invoked by a
+  `shell.run` test case in `OriginSpec.scala`. Added a case for
+  `hasColumn()` distinguishing `at()` from `atLine()`, and a case for
+  `inSource()` retargeting an Origin's source while keeping line/column.
+
 - **Execution coverage for `onion.Config::getLong` and
   `Config::getWithEnvOverride`.** Both were implemented and documented in
   `docs/reference/stdlib.md` right next to `getInt`/`getDouble`/`getBoolean`

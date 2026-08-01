@@ -1,0 +1,319 @@
+// LibraryCatalog.on — a 200+ line end-to-end sample exercising:
+// ADT enums (case hierarchy), records with method bodies, interfaces,
+// extension methods on primitives and String, collection pipelines
+// (groupBy, filter, map, sortedBy, partition, fold, distinct, find, count, any),
+// pattern matching with select/is, string interpolation, nullable,
+// foreach over map (k,v), closures, and recursion.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Book(isbn: String, title: String, author: String, year: Int,
+            pages: Int, genre: String) {
+public:
+  def shortTitle(): String {
+    if title().length() <= 22 { return title() }
+    return title().substring(0, 19) + "..."
+  }
+  def describe(): String =
+    "\"#{title()}\" by #{author()} (#{year()}, #{pages()}pp)"
+}
+
+record Patron(id: String, name: String) {
+public:
+  def greeting(): String = "Welcome, #{name()}!"
+}
+
+// ── ADT enum: book availability ───────────────────────────────────────────────
+
+enum Availability {
+  case InStock
+  case Loaned(patronName: String, daysLeft: Int)
+  case Reserved(patronName: String)
+
+public:
+  def inStock(): Boolean = select this {
+    case s is InStock: true
+    else: false
+  }
+
+  def label(): String = select this {
+    case s is InStock:    "in-stock"
+    case l is Loaned:     "on loan to #{l.patronName()} (#{l.daysLeft()}d)"
+    case r is Reserved:   "reserved for #{r.patronName()}"
+  }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension String {
+  def hasSubstr(sub: String): Boolean =
+    this.toLowerCase().contains(sub.toLowerCase())
+
+  def padRight(width: Int): String {
+    var s = this
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+extension Int {
+  def between(lo: Int, hi: Int): Boolean = self >= lo && self <= hi
+}
+
+// ── Catalog class ─────────────────────────────────────────────────────────────
+
+class LibraryCatalog conforms Summarizable {
+  var books: List[Object]
+  var patrons: List[Object]
+  var loans: Map[String, Object]    // isbn -> Availability
+
+public:
+  def this {
+    books = []
+    patrons = []
+    loans = [:]
+  }
+
+  def addBook(b: Book): void {
+    books.add(b)
+    loans.put(b.isbn(), new InStock())
+  }
+
+  def registerPatron(p: Patron): void {
+    patrons.add(p)
+  }
+
+  def checkOut(isbn: String, patron: String, days: Int): Boolean {
+    val s = loans.get(isbn)
+    if s == null { return false }
+    if !(s as Availability).inStock() { return false }
+    loans.put(isbn, new Loaned(patron, days))
+    return true
+  }
+
+  def returnBook(isbn: String): Boolean {
+    val s = loans.get(isbn)
+    if s == null { return false }
+    loans.put(isbn, new InStock())
+    return true
+  }
+
+  def reserve(isbn: String, patron: String): void {
+    loans.put(isbn, new Reserved(patron))
+  }
+
+  def statusOf(isbn: String): Availability? {
+    val s = loans.get(isbn)
+    if s == null { return null }
+    return s as Availability
+  }
+
+  def allBooks(): List[Object] = books
+
+  def allPatrons(): List[Object] = patrons
+
+  def available(): List[Object] {
+    return books.filter { b =>
+      val s = loans.get((b as Book).isbn())
+      s != null && (s as Availability).inStock()
+    }
+  }
+
+  def searchByGenre(genre: String): List[Object] =
+    books.filter { b => (b as Book).genre().hasSubstr(genre) }
+
+  def searchByAuthor(name: String): List[Object] =
+    books.filter { b => (b as Book).author().hasSubstr(name) }
+
+  def searchByYearRange(from: Int, to: Int): List[Object] =
+    books.filter { b => (b as Book).year().between(from, to) }
+
+  def findByIsbn(isbn: String): Book? {
+    val found = books.find { b => (b as Book).isbn() == isbn }
+    if found == null { return null }
+    return found as Book
+  }
+
+  def totalPages(): Int =
+    books.fold(0) { acc, b => (acc as Int) + (b as Book).pages() }
+
+  def distinctAuthors(): List[Object] =
+    books.map { b => ((b as Book).author() as Object) }.distinct()
+
+  def printGroupedByGenre(): void {
+    val byGenre = books.groupBy { b => (b as Book).genre() }
+    foreach (genre, genreBooks) in byGenre {
+      println("  " + (genre as String).padRight(18) + " " + (genreBooks as List).size)
+    }
+  }
+
+  def summary(): String {
+    val total   = books.size
+    val avail   = available().size
+    val loaned  = total - avail
+    val pages   = totalPages()
+    val authors = distinctAuthors().size
+    return "#{total} books | #{avail} available | #{loaned} out | #{authors} authors | #{pages} total pages"
+  }
+
+  def printLoanStatus(): void {
+    foreach b: Object in books {
+      val book  = b as Book
+      val s     = loans.get(book.isbn())
+      val label = if s == null { "unknown" } else { (s as Availability).label() }
+      println("  " + book.shortTitle().padRight(26) + " " + label)
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def printBooks(label: String, list: List[Object]): void {
+  println("#{label} (#{list.size}):")
+  foreach b: Object in list {
+    val book = b as Book
+    println("  " + book.shortTitle().padRight(26) + " " + book.author() + " (#{book.year()})")
+  }
+}
+
+// Recursive: nth triangular number  T(n) = 1 + 2 + ... + n
+def triangular(n: Int): Int =
+  if n <= 0 { 0 } else { n + triangular(n - 1) }
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val catalog = new LibraryCatalog()
+
+catalog.addBook(new Book("B001", "The C Programming Language",  "Brian Kernighan",     1978, 272,  "Programming"))
+catalog.addBook(new Book("B002", "Introduction to Algorithms",  "Thomas Cormen",       2009, 1292, "Computer Science"))
+catalog.addBook(new Book("B003", "The Great Gatsby",            "F. Scott Fitzgerald", 1925, 180,  "Fiction"))
+catalog.addBook(new Book("B004", "1984",                        "George Orwell",       1949, 328,  "Fiction"))
+catalog.addBook(new Book("B005", "To Kill a Mockingbird",       "Harper Lee",          1960, 336,  "Fiction"))
+catalog.addBook(new Book("B006", "A Brief History of Time",     "Stephen Hawking",     1988, 212,  "Science"))
+catalog.addBook(new Book("B007", "Sapiens",                     "Yuval Harari",        2011, 464,  "History"))
+catalog.addBook(new Book("B008", "Clean Code",                  "Robert Martin",       2008, 431,  "Programming"))
+catalog.addBook(new Book("B009", "The Pragmatic Programmer",    "David Thomas",        1999, 352,  "Programming"))
+
+catalog.registerPatron(new Patron("P1", "Alice Johnson"))
+catalog.registerPatron(new Patron("P2", "Bob Smith"))
+
+// Check out and reserve some books
+val r1 = catalog.checkOut("B001", "Alice Johnson", 14)
+val r2 = catalog.checkOut("B004", "Bob Smith", 7)
+val r3 = catalog.checkOut("B004", "Carol",  3)    // fails: already loaned
+catalog.reserve("B007", "Bob Smith")
+
+println(catalog.summary())
+println("checkout B001 (Alice):  " + r1)
+println("checkout B004 (Bob):    " + r2)
+println("checkout B004 (Carol):  " + r3)
+println("")
+
+// Loan status for every book
+println("=== Loan Status ===")
+catalog.printLoanStatus()
+println("")
+
+// Available books
+printBooks("Available", catalog.available())
+println("")
+
+// Group by genre
+println("=== By Genre ===")
+catalog.printGroupedByGenre()
+println("")
+
+// Partition: short (<300pp) vs long (>=300pp)
+val allBooks = catalog.allBooks()
+val parts     = allBooks.partition { b => (b as Book).pages() < 300 }
+val shortBooks = parts[0] as List
+val longBooks  = parts[1] as List
+println("Short books (<300pp): #{shortBooks.size}")
+foreach b: Object in shortBooks {
+  val book = b as Book
+  println("  #{book.shortTitle()} (#{book.pages()}pp)")
+}
+println("Long books (>=300pp): #{longBooks.size}")
+foreach b: Object in longBooks {
+  val book = b as Book
+  println("  #{book.shortTitle()} (#{book.pages()}pp)")
+}
+println("")
+
+// Sorted chronologically
+println("=== Chronological ===")
+val byYear = catalog.allBooks().sortedBy { b => (b as Book).year() }
+foreach b: Object in byYear {
+  val book = b as Book
+  println("  #{book.year()} — #{book.title()}")
+}
+println("")
+
+// Genre searches
+printBooks("Fiction books", catalog.searchByGenre("Fiction"))
+println("")
+printBooks("Classics 1900-1975", catalog.searchByYearRange(1900, 1975))
+println("")
+
+// Distinct authors
+val authors = catalog.distinctAuthors()
+println("Authors (#{authors.size}): " + authors.mkString(", "))
+println("")
+
+// count / any / all
+val bigCount = catalog.allBooks().count { b => (b as Book).pages() > 400 }
+val anyScience = catalog.allBooks().any { b => (b as Book).genre() == "Science" }
+val allModern  = catalog.allBooks().all { b => (b as Book).year() >= 1900 }
+println("Books over 400pp: #{bigCount}")
+println("Any science: #{anyScience}")
+println("All after 1900: #{allModern}")
+println("")
+
+// Find by ISBN
+val found = catalog.findByIsbn("B006")
+if found != null {
+  println("Found B006: " + found.describe())
+} else {
+  println("B006 not found")
+}
+println("")
+
+// Extension methods on String
+val longTitle = "Introduction to Algorithms"
+println("padRight(30): \"" + longTitle.padRight(30) + "\" len=" + longTitle.padRight(30).length())
+println("hasSubstr(ALGORITHM): " + longTitle.hasSubstr("ALGORITHM"))
+println("")
+
+// Extension methods on Int
+foreach yr: Int in [1950, 1975, 1990, 2005, 2010] {
+  println("#{yr}.between(1980,2000) = " + yr.between(1980, 2000))
+}
+println("")
+
+// String interpolation with arithmetic
+val totalPg = catalog.totalPages()
+val bookCnt  = catalog.allBooks().size
+println("Total pages: #{totalPg}, avg per book: #{totalPg / bookCnt}")
+
+// Return a book and re-check
+catalog.returnBook("B001")
+val retSt = catalog.statusOf("B001")
+if retSt != null {
+  println("After returning B001: " + retSt.label())
+}
+println("")
+
+// Recursion
+println("triangular(#{bookCnt}) = #{triangular(bookCnt)}")
+println("")
+
+// Patron greetings
+foreach p: Object in catalog.allPatrons() {
+  println((p as Patron).greeting())
+}

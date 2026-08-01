@@ -333,5 +333,9 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == result)
       assert(output.contains("You input: hello there"))
     }
+
+    it("runs LibraryCatalog.on") {
+      assert(Shell.Success(null) == runSample("run/LibraryCatalog.on"))
+    }
   }
 }

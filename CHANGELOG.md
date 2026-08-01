@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/PayrollReport.on`, a 274-line employee payroll report sample.** Adds
+  a large end-to-end program to the corpus (14th at ≥100 lines), combining an
+  ADT case-enum (`ContractType` with `Permanent`/`Hourly`/`Freelance` cases)
+  matched via `select`/type patterns, an interface (`PayrollItem`) implemented
+  by a class, collection pipelines (`partition`/`zip`/`any`/`all`/`count`/
+  `distinct`/`flatMap`/`sortedByDescending`/`groupBy`), `foreach (k, v)` map
+  iteration, extension methods on `Int` and `String`, a recursive salary
+  projection, and `try`/`catch` in one coherent scenario.
+
 ## [0.10.15] - 2026-08-01
 
 ### Added

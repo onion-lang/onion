@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Writing `{ (k, v) => ... }` for a trailing lambda produced a bare
+  "Encountered `{`, but expecting..." token dump**, with no indication that
+  the actual mistake was the parentheses. Trailing lambdas (`m.filter { k, v
+  => ... }`) never take parenthesized parameters — that syntax is reserved
+  for the non-trailing `(k, v) -> ...` form — and it's an easy slip since
+  both forms are documented side by side. The parser now recognizes this
+  specific shape and names the fix directly: "Hint: a trailing lambda's
+  parameters aren't parenthesized — write `{ k, v => ... }`, not `{ (k, v)
+  => ... }`."
+
 ### Added
 
 - **`run/PlaylistManager.on`, a 502-line music playlist manager sample.** Adds a

@@ -1,0 +1,319 @@
+// Blackjack.on — a Blackjack card-game simulation.
+// Exercises: homogeneous enums with methods, data-carrying case-enums, records
+// with methods, interfaces, classes with inheritance, generic class, extension
+// methods on primitives, closures, collection pipelines (map/filter/sortedBy/
+// fold/groupBy), select pattern matching with type patterns, string interpolation,
+// nullable types, while/foreach/for loops, and statistics accumulation.
+
+import { java.util.ArrayList }
+
+// ── Suit enum ──────────────────────────────────────────────────────────────
+
+enum Suit {
+  HEARTS, DIAMONDS, CLUBS, SPADES
+public:
+  def symbol(): String = select this {
+    case Suit::HEARTS:   "♥"
+    case Suit::DIAMONDS: "♦"
+    case Suit::CLUBS:    "♣"
+    case Suit::SPADES:   "♠"
+    else: "?"
+  }
+  def isRed(): Boolean {
+    select this {
+      case Suit::HEARTS, Suit::DIAMONDS: return true
+      else: return false
+    }
+  }
+}
+
+// ── Card record ────────────────────────────────────────────────────────────
+
+// rank: 1=Ace, 2-10=pip, 11=Jack, 12=Queen, 13=King
+record Card(suit: Suit, rank: Int) {
+public:
+  def rankName(): String {
+    if rank() == 1  { return "A" }
+    if rank() == 11 { return "J" }
+    if rank() == 12 { return "Q" }
+    if rank() == 13 { return "K" }
+    return "" + rank()
+  }
+  def show(): String = rankName() + suit().symbol()
+  def blackjackValue(): Int {
+    if rank() == 1  { return 11 }
+    if rank() >= 10 { return 10 }
+    return rank()
+  }
+  def isAce(): Boolean = rank() == 1
+  def isFace(): Boolean = rank() >= 10
+}
+
+// ── GameResult (case-enum / ADT) ───────────────────────────────────────────
+
+enum GameResult {
+  case PlayerWin(playerTotal: Int, dealerTotal: Int)
+  case DealerWin(playerTotal: Int, dealerTotal: Int)
+  case Push(total: Int)
+public:
+  def describe(): String = select this {
+    case r is PlayerWin: "Player wins " + r.playerTotal() + " vs " + r.dealerTotal()
+    case r is DealerWin: "Dealer wins " + r.dealerTotal() + " vs " + r.playerTotal()
+    case r is Push:      "Push at " + r.total()
+  }
+  def isPlayerWin(): Boolean = select this {
+    case pw is PlayerWin: true
+    else: false
+  }
+  def isDealerWin(): Boolean = select this {
+    case dw is DealerWin: true
+    else: false
+  }
+  def isPush(): Boolean = select this {
+    case p is Push: true
+    else: false
+  }
+}
+
+// ── Strategy interface ─────────────────────────────────────────────────────
+
+interface Strategy {
+  def shouldHit(total: Int): Boolean
+  def name(): String
+}
+
+class ConservativeStrategy conforms Strategy {
+public:
+  def shouldHit(total: Int): Boolean = total < 16
+  def name(): String = "Conservative(hit<16)"
+}
+
+class StandardStrategy conforms Strategy {
+public:
+  def shouldHit(total: Int): Boolean = total < 17
+  def name(): String = "Standard(hit<17)"
+}
+
+class AggressiveStrategy conforms Strategy {
+public:
+  def shouldHit(total: Int): Boolean = total < 19
+  def name(): String = "Aggressive(hit<19)"
+}
+
+// Dealer hits on soft 17 (same rule as Standard)
+class DealerStrategy conforms Strategy {
+public:
+  def shouldHit(total: Int): Boolean = total < 17
+  def name(): String = "Dealer(hit<17)"
+}
+
+// ── Statistics record ──────────────────────────────────────────────────────
+
+record Stats(wins: Int, losses: Int, pushes: Int) {
+public:
+  def total(): Int = wins() + losses() + pushes()
+  def winRate(): Double {
+    if total() == 0 { return 0.0 }
+    return (wins() as Double) / (total() as Double) * 100.0
+  }
+  def lossRate(): Double {
+    if total() == 0 { return 0.0 }
+    return (losses() as Double) / (total() as Double) * 100.0
+  }
+  def describe(stratName: String): String {
+    return "#{stratName}: #{wins()}W #{losses()}L #{pushes()}P / #{total()} games (#{winRate()}% win)"
+  }
+}
+
+// ── Generic accumulator ────────────────────────────────────────────────────
+
+class Accumulator[T extends Object] {
+  val items: ArrayList[T]
+public:
+  def this {
+    this.items = new ArrayList[T]()
+  }
+  def add(item: T): void { items.add(item) }
+  def size(): Int = items.size
+  def getAll(): List[T] = items
+  def get(i: Int): T = items[i] as T
+}
+
+// ── Extension methods ──────────────────────────────────────────────────────
+
+extension Int {
+  def pct(of: Int): String {
+    if of == 0 { return "0%" }
+    val v: Int = (self * 100) / of
+    return "" + v + "%"
+  }
+  def pad(width: Int): String {
+    val s: String = "" + self
+    var result: String = s
+    while result.length() < width {
+      result = " " + result
+    }
+    return result
+  }
+}
+
+extension Double {
+  def fmt1(): String {
+    val whole: Int = self as Int
+    val frac: Int = ((self - (whole as Double)) * 10.0) as Int
+    return "" + whole + "." + frac
+  }
+}
+
+// ── Deck utilities ─────────────────────────────────────────────────────────
+
+def buildDeck(): List[Card] {
+  val deck = new ArrayList[Card]()
+  foreach s: Suit in Suit::values() {
+    foreach r: Int in 1..13 {
+      deck.add(new Card(s, r))
+    }
+  }
+  return deck
+}
+
+def handTotal(cards: List[Card]): Int {
+  var total: Int = 0
+  var aces: Int = 0
+  foreach c: Object in cards {
+    val card = c as Card
+    total = total + card.blackjackValue()
+    if card.isAce() { aces = aces + 1 }
+  }
+  while total > 21 && aces > 0 {
+    total = total - 10
+    aces = aces - 1
+  }
+  return total
+}
+
+def showHand(cards: List[Card]): String {
+  var s: String = ""
+  foreach c: Object in cards {
+    if s.length() > 0 { s = s + " " }
+    s = s + (c as Card).show()
+  }
+  return s + " [" + handTotal(cards) + "]"
+}
+
+// ── Game round ─────────────────────────────────────────────────────────────
+
+def playRound(deck: List[Card], start: Int, playerStrat: Strategy, dealerStrat: Strategy): GameResult {
+  var pos: Int = start
+  val playerHand = new ArrayList[Card]()
+  val dealerHand = new ArrayList[Card]()
+
+  playerHand.add(deck[pos] as Card); pos = pos + 1
+  dealerHand.add(deck[pos] as Card); pos = pos + 1
+  playerHand.add(deck[pos] as Card); pos = pos + 1
+  dealerHand.add(deck[pos] as Card); pos = pos + 1
+
+  while handTotal(playerHand) < 21 && playerStrat.shouldHit(handTotal(playerHand)) && pos < deck.size {
+    playerHand.add(deck[pos] as Card); pos = pos + 1
+  }
+  val pTotal = handTotal(playerHand)
+  if pTotal > 21 { return new DealerWin(pTotal, handTotal(dealerHand)) }
+
+  while handTotal(dealerHand) < 21 && dealerStrat.shouldHit(handTotal(dealerHand)) && pos < deck.size {
+    dealerHand.add(deck[pos] as Card); pos = pos + 1
+  }
+  val dTotal = handTotal(dealerHand)
+  if dTotal > 21 { return new PlayerWin(pTotal, dTotal) }
+  if pTotal > dTotal { return new PlayerWin(pTotal, dTotal) }
+  if dTotal > pTotal { return new DealerWin(pTotal, dTotal) }
+  return new Push(pTotal)
+}
+
+// ── Simulation ─────────────────────────────────────────────────────────────
+
+def simulate(playerStrat: Strategy, rounds: Int): Stats {
+  val dealerStrat: Strategy = new DealerStrategy()
+  var wins: Int = 0
+  var losses: Int = 0
+  var pushes: Int = 0
+  val baseDeck = buildDeck()
+  var gameNum: Int = 0
+
+  while gameNum < rounds {
+    // Reshuffle every 4 rounds to keep deck from running short
+    val deck = Rand::shuffle(baseDeck)
+    foreach startPos: Int in [0, 10, 20, 30] {
+      val result = playRound(deck, startPos, playerStrat, dealerStrat)
+      if result.isPlayerWin() { wins = wins + 1 }
+      else if result.isDealerWin() { losses = losses + 1 }
+      else { pushes = pushes + 1 }
+      gameNum = gameNum + 1
+      if gameNum >= rounds { return new Stats(wins, losses, pushes) }
+    }
+  }
+  return new Stats(wins, losses, pushes)
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+IO::println("=== Blackjack Strategy Comparison ===")
+IO::println("")
+
+// Show deck composition
+val fullDeck = buildDeck()
+val faceCount = fullDeck.filter { c => (c as Card).isFace() }.size
+val aceCount  = fullDeck.filter { c => (c as Card).isAce() }.size
+val redCount  = fullDeck.filter { c => (c as Card).suit().isRed() }.size
+IO::println("Deck: #{fullDeck.size} cards  Aces=#{aceCount}  Face=#{faceCount}  Red=#{redCount}")
+IO::println("")
+
+// Demo: single verbose hand
+IO::println("--- Sample Hand ---")
+val demoDeck = Rand::shuffle(buildDeck())
+val demoP = new ArrayList[Card]()
+val demoD = new ArrayList[Card]()
+demoP.add(demoDeck[0] as Card)
+demoD.add(demoDeck[1] as Card)
+demoP.add(demoDeck[2] as Card)
+demoD.add(demoDeck[3] as Card)
+IO::println("Player: " + showHand(demoP))
+IO::println("Dealer: " + showHand(demoD))
+IO::println("")
+
+// Simulate 100 rounds per strategy
+val strategies: List[Strategy] = [new ConservativeStrategy(), new StandardStrategy(), new AggressiveStrategy()]
+val acc: Accumulator[Stats] = new Accumulator[Stats]()
+
+foreach s: Object in strategies {
+  val strat = s as Strategy
+  val stats = simulate(strat, 100)
+  acc.add(stats)
+  IO::println(stats.describe(strat.name()))
+}
+
+IO::println("")
+IO::println("--- Totals across all strategies ---")
+var totalWins: Int = 0
+var totalGames: Int = 0
+foreach i: Int in 0..<acc.size() {
+  val st = acc.get(i)
+  totalWins  = totalWins  + st.wins()
+  totalGames = totalGames + st.total()
+}
+IO::println("Overall win rate: " + totalWins.pct(totalGames) + " (" + totalWins + "/" + totalGames + ")")
+
+// Rank strategies by win rate
+IO::println("")
+IO::println("--- Ranked by win rate ---")
+val ranked = acc.getAll()
+  .sortedBy { st => 0 - (st as Stats).wins() }
+  .map { st => (st as Stats).winRate().fmt1() + "%" }
+IO::println("Best to worst: " + ranked.toString())
+
+// Card value distribution: groupBy Blackjack point value
+IO::println("")
+IO::println("--- Card point distribution (full deck) ---")
+val byValue = fullDeck.groupBy { c => "" + (c as Card).blackjackValue() }
+foreach (pts, cards) in byValue {
+  IO::println("  " + pts + " pts: " + (cards as List[Card]).size + " cards")
+}

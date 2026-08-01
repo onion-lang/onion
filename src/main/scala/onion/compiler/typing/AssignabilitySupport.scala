@@ -47,6 +47,12 @@ private[compiler] final class AssignabilitySupport(
     val retyped = retypeEmptyCollectionLiteral(expected, actual)
     if (retyped ne actual) return processAssignable(node, expected, retyped)
     if (actual.`type`.isBottomType) {
+      // A StatementTerm transfers control (return/throw/break/continue) on every
+      // path and leaves nothing on the operand stack; unboxing it would generate
+      // dead code whose checkcast pops an empty stack (issue #returnInSelect).
+      // Return the term unchanged so emitReturn can recognise it and skip the
+      // redundant gen.returnValue().
+      if (actual.isInstanceOf[StatementTerm]) return actual
       // A bottom-typed value never actually materializes (the expression throws
       // or otherwise never completes), but the bytecode path still has to
       // verify. When it came from an erased generic call -- `f.await()` on a

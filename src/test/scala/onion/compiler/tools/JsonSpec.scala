@@ -479,6 +479,51 @@ class JsonSpec extends AbstractShellSpec {
       }
     }
 
+    describe("stringifyPretty()") {
+      it("pretty-prints an object with indentation") {
+        val result = shell.run(
+          """
+            |import { onion.Json; java.util.Map; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val obj: Map[String, Object] = Json::object()
+            |    obj.put("name", "John")
+            |    obj.put("age", new Integer(30))
+            |    return Json::stringifyPretty(obj)
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("{\n  \"name\": \"John\",\n  \"age\": 30\n}") == result)
+      }
+
+      it("pretty-prints a nested array inside an object") {
+        val result = shell.run(
+          """
+            |import { onion.Json; java.util.Map; java.util.List; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val arr: List[Object] = Json::array()
+            |    arr.add(new Integer(2))
+            |    arr.add(new Integer(3))
+            |    val obj: Map[String, Object] = Json::object()
+            |    obj.put("a", new Integer(1))
+            |    obj.put("b", arr)
+            |    return Json::stringifyPretty(obj)
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("{\n  \"a\": 1,\n  \"b\": [\n    2,\n    3\n  ]\n}") == result)
+      }
+    }
+
     describe("round-trip parse and stringify") {
       it("round-trips simple object") {
         val result = shell.run(

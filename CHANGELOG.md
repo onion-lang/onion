@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/Inventory.on`, a 279-line shop inventory manager sample.** Adds a
+  large end-to-end program to the corpus (16th at ≥100 lines), combining
+  data-carrying ADT enums (`Category` and `TxKind`, four cases each),
+  records with compiler-verified `example` clauses (`Item`, `Transaction`,
+  `StockAlert`), extension methods on `String` and `Double`, `select` with
+  type-pattern exhaustiveness, a nullable `Item?` lookup, collection
+  pipelines (`filter`/`map`/`groupBy`/`sortedBy`/`find`), `foreach (k, v)`
+  map iteration, closures, string interpolation, and graceful
+  exception-free failure returns.
+
 ## [0.10.16] - 2026-08-01
 
 ### Added

@@ -162,6 +162,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   covering `ofNullable`'s non-null/null branches and `trying`'s
   success/throw branches.
 
+- **Execution coverage for `onion.Http::post` and `Http::postJson`.** Both
+  were implemented and documented in `docs/reference/stdlib.md`'s Http "POST
+  Requests" subsection, but unlike `put`/`delete`, never invoked by a
+  `shell.run` test case in `HttpSpec.scala`. Added cases against the local
+  echo server covering `post`'s body passthrough, `post`'s null-body-becomes-
+  empty behavior, `postJson`'s body passthrough, and `postJson`'s
+  null-body-becomes-`"{}"` behavior.
+
 - **`run/LibrarySystem.on`, a 374-line library management sample.** Adds a
   large end-to-end program to the corpus (10th at ≥100 lines), combining a
   plain enum matched via `select`, four records, a class with mutable `List`

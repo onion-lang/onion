@@ -255,6 +255,88 @@ class HttpSpec extends AbstractShellSpec {
       }
     }
 
+    describe("POST requests") {
+      it("sends a POST request with a body") {
+        withEchoServer() { (url, seen) =>
+          val result = shell.run(
+            s"""
+               |import { onion.Http; }
+               |class Test {
+               |public:
+               |  static def main(args: String[]): String {
+               |    return Http::post("$url", "new content");
+               |  }
+               |}
+               |""".stripMargin,
+            "None",
+            Array()
+          )
+          assert(Shell.Success("POST:new content") == result)
+          assert(("POST", "new content") == seen())
+        }
+      }
+
+      it("sends a POST request with a null body as empty") {
+        withEchoServer() { (url, seen) =>
+          val result = shell.run(
+            s"""
+               |import { onion.Http; }
+               |class Test {
+               |public:
+               |  static def main(args: String[]): String {
+               |    return Http::post("$url", null);
+               |  }
+               |}
+               |""".stripMargin,
+            "None",
+            Array()
+          )
+          assert(Shell.Success("POST:") == result)
+          assert(("POST", "") == seen())
+        }
+      }
+
+      it("sends a POST request with a JSON body") {
+        withEchoServer() { (url, seen) =>
+          val result = shell.run(
+            s"""
+               |import { onion.Http; }
+               |class Test {
+               |public:
+               |  static def main(args: String[]): String {
+               |    return Http::postJson("$url", "{\\"a\\":1}");
+               |  }
+               |}
+               |""".stripMargin,
+            "None",
+            Array()
+          )
+          assert(Shell.Success("POST:{\"a\":1}") == result)
+          assert(("POST", "{\"a\":1}") == seen())
+        }
+      }
+
+      it("sends a POST request with a null JSON body defaulting to an empty object") {
+        withEchoServer() { (url, seen) =>
+          val result = shell.run(
+            s"""
+               |import { onion.Http; }
+               |class Test {
+               |public:
+               |  static def main(args: String[]): String {
+               |    return Http::postJson("$url", null);
+               |  }
+               |}
+               |""".stripMargin,
+            "None",
+            Array()
+          )
+          assert(Shell.Success("POST:{}") == result)
+          assert(("POST", "{}") == seen())
+        }
+      }
+    }
+
     describe("null handling") {
       it("handles null URL in encodeUrl") {
         val result = shell.run(

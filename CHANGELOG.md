@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/BudgetTracker.on`, a 308-line personal finance tracker sample.** Adds
+  a large end-to-end program to the corpus (13th at ≥100 lines), combining an
+  ADT case-enum (`TransactionKind` with `Income`/`Expense` cases) matched via
+  `select`/type patterns, a homogeneous enum (`Month`) with methods, three
+  records with methods (`Transaction`, `Category`, `MonthSummary`), a class
+  with a `List[Transaction]` field, collection pipelines (`groupBy`/
+  `sortedBy`/`filter`/`map`/`fold`/`partition`/`reverse`/`take`/`distinct`),
+  `foreach (k, v)` map iteration, nullable-map-lookup null guards, and a
+  tail-recursive compound-interest helper in one coherent scenario.
+
 - **`run/LibraryCatalog.on`, a 329-line library management sample.** Adds a
   large end-to-end program to the corpus (12th at ≥100 lines), combining
   interfaces (`Lendable`, `Describable`) with `conforms`, class inheritance

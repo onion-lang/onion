@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Internal compiler error (operand-stack underflow) when an ADT-enum method
+  body used an explicit `return` in every branch of a `select this`
+  expression**, e.g. `def describe(): String = select this { case f is Found:
+  return "found"; case n is None: return "none" }`. The typed AST collapses
+  such a select into a `StatementTerm(BottomType)` once every branch already
+  transfers control via an inner `Return`; codegen then emitted dead
+  unboxing/return bytecode on an empty operand stack, which the JVM verifier
+  rejected as `[I0000]`. Fixed in `AssignabilitySupport.processAssignable`
+  and `ControlFlowEmitter.emitReturn` to recognize a bottom-typed
+  `StatementTerm` and skip the redundant instructions.
+
 ### Added
 
 - **`run/Inventory.on`, a 279-line shop inventory manager sample.** Adds a

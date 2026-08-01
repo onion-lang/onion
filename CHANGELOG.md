@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/TournamentTracker.on`, a 473-line football world-cup simulator
+  sample.** Adds a large end-to-end program to the corpus (15th at ≥100
+  lines), combining an ADT case-enum (`Phase` with a data-carrying
+  `GroupStage(round: Int)` case and singleton `Quarterfinal`/`Semifinal`/
+  `Final` cases) matched via `select`/type patterns, plain enums with
+  methods (`Division`, `SportType`), an interface (`Printable`) implemented
+  through `conforms`, records with methods (`Player`, `MatchResult`,
+  `Standing`), extension methods on `String` and `Int`, collection
+  pipelines (`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`/`partition`/
+  `distinct`/`zip`), `foreach (k, v)` map iteration, range `foreach`, and
+  `try`/`catch` in one coherent scenario.
+
 - **`run/PayrollReport.on`, a 274-line employee payroll report sample.** Adds
   a large end-to-end program to the corpus (14th at ≥100 lines), combining an
   ADT case-enum (`ContractType` with `Permanent`/`Hourly`/`Freelance` cases)

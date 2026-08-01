@@ -7,6 +7,146 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Execution coverage for `onion.Http::put`/`Http::delete`.** Both were
+  implemented and documented in `docs/reference/stdlib.md`'s Http "Other
+  Methods" section, but unlike `get`/`post`, never invoked by a `shell.run`
+  test case in `HttpSpec.scala`. Added cases against a local echo server
+  covering `put`'s body passthrough, `put`'s null-body-becomes-empty
+  behavior, and `delete`'s method/empty-body request.
+
+- **Execution coverage for `onion.Future::all`/`Future::first`.** Both were
+  implemented and documented in `docs/reference/stdlib.md`'s "Combining
+  Futures" section right next to `zip`/`race`, but unlike those, never
+  invoked by a `shell.run` test case in `FutureSpec.scala`. Added cases
+  covering `all`'s in-order result list and `first`'s first-completed value.
+
+- **Execution coverage for `onion.Option::of`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Option::some`/
+  `Option::none`, but unlike those, never invoked by a `shell.run` test case
+  in `OptionResultEnrichedSpec.scala`. Added a case covering both the
+  non-null wrap and the null-collapses-to-`none` behavior that distinguishes
+  it from `Option::some`.
+
+- **Execution coverage for `onion.Result::mapError`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `map`/`flatMap`/
+  `fold`/`recover`, but unlike those, never invoked by a `shell.run` test
+  case in `OptionResultEnrichedSpec.scala`. Added a case covering the `Err`
+  transform and the `Ok` passthrough.
+
+- **Execution coverage for `JInteger`/`JLong`/`JDouble`/`JBoolean` static
+  methods.** `JInteger::parseInt`, `JInteger::MAX_VALUE`/`MIN_VALUE`,
+  `JLong::parseLong`, `JLong::toString`, `JDouble::parseDouble`,
+  `JDouble::toString`, `JBoolean::parseBoolean`, and `JBoolean::toString`
+  were all implemented and documented in `docs/reference/stdlib.md`'s
+  Wrapper Classes section, but — unlike `JInteger::toString`, which is
+  exercised incidentally by unrelated specs — none were ever invoked
+  directly by a `shell.run` test case anywhere in the suite. Added
+  `WrapperClassesSpec` with one case per method.
+
+- **Execution coverage for `onion.Config::get`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to the typed accessors
+  (`getString`/`getInt`/`getLong`/`getDouble`/`getBoolean`) that all delegate
+  to it, but unlike those, never invoked directly by a `shell.run` test case
+  in `ConfigSpec.scala`. Added three cases: an existing dot-notation path, a
+  missing path returning `null`, and a numeric path segment indexing into an
+  array.
+
+- **Execution coverage for `onion.Iterables::exists`, `forAll`, and `listOf`.**
+  All three were implemented and documented in `docs/reference/stdlib.md`
+  right next to `map`/`filter`/`foldl`/`sort`, but unlike those, never
+  invoked by a `shell.run` test case in `IterablesSpec.scala`. Added cases
+  covering `exists`/`forAll` in both the matching and non-matching case, and
+  `listOf`'s varargs construction.
+
+- **Execution coverage for `onion.Proc::captureIn` and `Proc::execIn`.** Both
+  were implemented and documented in `docs/reference/stdlib.md` right next to
+  `runIn`, but unlike `runIn`, never invoked by a `shell.run` test case in
+  `ProcSpec.scala`. Added one case each, exercising the working-directory
+  behavior via the process's own exit status/stderr.
+
+- **Execution coverage for `onion.Json::stringifyPretty`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `Json::stringify`,
+  but unlike `stringify`, never invoked by a `shell.run` test case in
+  `JsonSpec.scala`. Added two cases covering object indentation and a nested
+  array inside an object.
+
+- **Execution coverage for `onion.Strings::replaceRegex`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `Strings::replace`,
+  but unlike `replace`, never invoked by a `shell.run` test case in
+  `StringsSpec.scala`. Added one case.
+
+- **Execution coverage for `onion.Files::list`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Files::glob`, but
+  unlike `glob`, never invoked by a `shell.run` test case anywhere in the
+  suite. Added `FilesListSpec` with one case.
+
+- **Execution coverage for `onion.Files::readBytes` / `Files::writeBytes`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `readText`/`writeText`, but unlike those, never invoked by a
+  `shell.run` test case anywhere in the suite. Added `FilesBytesSpec` with a
+  round-trip case.
+
+- **Execution coverage for `onion.Rand::nextInt()` / `Rand::nextLong()`
+  (no-arg overloads).** Both were implemented and documented in
+  `docs/reference/stdlib.md` right next to their bounded counterparts, but
+  unlike those, never invoked by a `shell.run` test case in `RandomSpec.scala`.
+  Added one case each.
+
+- **Execution coverage for `onion.Origin::spanning`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Origin::at` and
+  `Origin::atLine`, but unlike those, never invoked by a `shell.run` test
+  case in `OriginSpec.scala`. Added a case covering the normal span and one
+  covering the `Math.max(1, span)` clamp for a non-positive span.
+
+- **Execution coverage for the generic static `onion.Stats::sum`.** It was
+  implemented and documented in `docs/reference/stdlib.md` as the first
+  example in the Stats module section, but unlike `sumInt`/`sumLong` and the
+  other aggregates, never invoked directly by a `shell.run` test case in
+  `HashCodecStatsSpec.scala` (only reached transitively through
+  `xs.sum()`). Added a case to `HashCodecStatsSpec`.
+
+- **Execution coverage for `onion.Origin::hasColumn` and `Origin::inSource`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `onLine` (`inSource` in the same subsection, `hasColumn` in the
+  module's intro example), but unlike `onLine`, never invoked by a
+  `shell.run` test case in `OriginSpec.scala`. Added a case for
+  `hasColumn()` distinguishing `at()` from `atLine()`, and a case for
+  `inSource()` retargeting an Origin's source while keeping line/column.
+
+- **Execution coverage for `onion.Config::getLong` and
+  `Config::getWithEnvOverride`.** Both were implemented and documented in
+  `docs/reference/stdlib.md` right next to `getInt`/`getDouble`/`getBoolean`
+  and `getEnv`, but unlike those, never invoked by a `shell.run` test case in
+  `ConfigSpec.scala`. Added two cases per method (value found / falls back to
+  default).
+
+- **Execution coverage for `onion.Option::orNull` and `onion.Result::orNull`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `getOrElse`/`orElseGet`, and even name-checked in
+  `OptionResultEnrichedSpec`'s own doc comment as covered, but unlike their
+  siblings, never actually invoked by a `shell.run` test case. Extended the
+  existing "orElseGet, orNull and orElse" (Option) and "orElseGet, exists and
+  toList" (Result) cases to also assert `.orNull()` on both the
+  present/`Ok` and absent/`Err` sides.
+
+- **Execution coverage for `onion.Future::race`.** It was implemented and
+  documented in `docs/reference/stdlib.md` under "Combining Futures", but
+  unlike `zip`, never invoked by a `shell.run` test case in `FutureSpec.scala`
+  — the file had no "combining futures" block at all. Added one, racing two
+  already-completed futures holding the same value so the winner is
+  deterministic regardless of which completes first.
+
+- **Execution coverage for `onion.Result::ofNullable` and `Result::trying`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `Result::ok`/`Result::err`, but unlike those, never invoked by a
+  `shell.run` test case in `OptionResultEnrichedSpec.scala`. Added a case
+  covering `ofNullable`'s non-null/null branches and `trying`'s
+  success/throw branches.
+
+## [0.10.14] - 2026-07-31
+
 ### Fixed
 
 - **`errorMessage_ja.properties` had two diagnostics that were untranslated or
@@ -21,6 +161,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently.
 
 ### Added
+
+- **Execution coverage for `onion.Maps::filterKeys` and `Maps::forEach`.**
+  Both were implemented and documented in `docs/reference/stdlib.md`, but
+  unlike every other `Maps` method, never invoked by a `shell.run` test
+  case — `MapsEnrichedSpec`'s own docstring claimed to cover `forEach`
+  without actually calling it, and `filterKeys` wasn't mentioned at all.
+  Added one case per method to `MapsEnrichedSpec`.
 
 - **Execution coverage for `onion.Sets::newSet`, `Sets::containsAll`, and
   `Sets::forEach`.** All three were implemented and documented in

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.15] - 2026-08-01
+
 ### Added
 
 - **`run/BudgetTracker.on`, a 308-line personal finance tracker sample.** Adds

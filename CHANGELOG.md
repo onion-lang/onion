@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution coverage for `onion.Config::loadJson`.** It was implemented and
+  documented in `docs/reference/stdlib.md` as the canonical entry point for
+  loading a config file, but unlike `parseJson` and the accessors, never
+  invoked by a `shell.run` test case in `ConfigSpec.scala` (only reached by
+  an effect-table metadata assertion, never actually executed). Added a case
+  covering the read-file-then-parse round trip and a case covering the
+  missing-file error path.
+
 - **Execution coverage for `onion.Http::put`/`Http::delete`.** Both were
   implemented and documented in `docs/reference/stdlib.md`'s Http "Other
   Methods" section, but unlike `get`/`post`, never invoked by a `shell.run`

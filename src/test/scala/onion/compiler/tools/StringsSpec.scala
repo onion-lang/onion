@@ -111,6 +111,23 @@ class StringsSpec extends AbstractShellSpec {
         assert(Shell.Success("hello onion") == result)
       }
 
+      it("replaces substring matching a regex") {
+        val result = shell.run(
+          """
+            |import { onion.Strings; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    return Strings::replaceRegex("a1b22c333", "[0-9]+", "#");
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("a#b#c#") == result)
+      }
+
       it("reverses string") {
         val result = shell.run(
           """

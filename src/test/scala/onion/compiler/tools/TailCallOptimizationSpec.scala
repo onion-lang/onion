@@ -42,6 +42,34 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Success])
     }
 
+    it("does not crash on a recursive function with a typed-List parameter and indexed access") {
+      // Regression: TCO placed loop variables at TypedAST indices paramCount..2*paramCount-1,
+      // but those slots are already taken by body-local variables (val x, val next, ...).
+      // The resulting slot collision caused an internal BytecodeGeneration error.
+      val result = shell.run(
+        """
+          |record Item(value: Int)
+          |
+          |def sumValues(items: List[Item], idx: Int, acc: Int): Int {
+          |  if idx >= items.size { return acc }
+          |  val x = items[idx] as Item
+          |  return sumValues(items, idx + 1, acc + x.value())
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val list: List[Item] = [new Item(1), new Item(2), new Item(3)]
+          |    return "" + sumValues(list, 0, 0)
+          |  }
+          |}
+          |""".stripMargin,
+        "TcoTypedListIndex.on",
+        Array()
+      )
+      assert(Shell.Success("6") == result)
+    }
+
     it("optimizes a zero-argument static method without crashing") {
       val result = shell.run(
         """

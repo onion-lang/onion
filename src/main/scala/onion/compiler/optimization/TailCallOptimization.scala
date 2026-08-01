@@ -251,6 +251,63 @@ class TailCallOptimization(config: CompilerConfig)
   }
 
   /**
+   * Scans an entire method body for the highest SetLocal/RefLocal index, giving
+   * the upper bound of already-allocated TypedAST local variable slots.  Used as
+   * a fallback when method.getFrame() is null (e.g. top-level synthetic methods).
+   */
+  private def findMaxLocalIndexInBody(block: StatementBlock): Int = {
+    def inTerms(ts: Array[Term]): Int =
+      if (ts.isEmpty) -1 else ts.toSeq.map(inTerm).max
+    def inTerm(t: Term): Int = t match {
+      case ref: RefLocal    => ref.index
+      case set: SetLocal    => Math.max(set.index, inTerm(set.value))
+      case call: Call       => Math.max(inTerm(call.target), inTerms(call.parameters))
+      case call: CallStatic => inTerms(call.parameters)
+      case safeCall: SafeCall => Math.max(inTerm(safeCall.target), inTerms(safeCall.parameters))
+      case superCall: CallSuper => inTerms(superCall.params)
+      case bin: BinaryTerm  => Math.max(inTerm(bin.lhs), inTerm(bin.rhs))
+      case un: UnaryTerm    => inTerm(un.operand)
+      case begin: Begin     => if (begin.terms.isEmpty) -1 else begin.terms.toSeq.map(inTerm).max
+      case st: StatementTerm => inStmt(st.statement)
+      case cast: AsInstanceOf => inTerm(cast.target)
+      case refArr: RefArray => Math.max(inTerm(refArr.target), inTerm(refArr.index))
+      case safeArr: SafeRefArray => Math.max(inTerm(safeArr.target), inTerm(safeArr.index))
+      case setArr: SetArray => Math.max(inTerm(setArr.target), Math.max(inTerm(setArr.index), inTerm(setArr.value)))
+      case refField: RefField => inTerm(refField.target)
+      case safeField: SafeFieldAccess => inTerm(safeField.target)
+      case setField: SetField => Math.max(inTerm(setField.target), inTerm(setField.value))
+      case arrLen: ArrayLength => inTerm(arrLen.target)
+      case inst: InstanceOf => inTerm(inst.target)
+      case nonNull: NonNullAssert => inTerm(nonNull.target)
+      case newObj: NewObject => inTerms(newObj.parameters)
+      case newArr: NewArray => inTerms(newArr.parameters)
+      case newArrVals: NewArrayWithValues => inTerms(newArrVals.values)
+      case listLit: ListLiteral => inTerms(listLit.elements)
+      case mapLit: MapLiteral => Math.max(inTerms(mapLit.keys), inTerms(mapLit.values))
+      case _ => -1
+    }
+    def inStmt(s: ActionStatement): Int = s match {
+      case ret: Return  => if (ret.term != null) inTerm(ret.term) else -1
+      case sb: StatementBlock =>
+        if (sb.statements.isEmpty) -1 else sb.statements.toSeq.map(inStmt).max
+      case ifStmt: IfStatement =>
+        val maxCond = inTerm(ifStmt.condition)
+        val maxThen = inStmt(ifStmt.thenStatement)
+        val maxElse = if (ifStmt.elseStatement != null) inStmt(ifStmt.elseStatement) else -1
+        Math.max(maxCond, Math.max(maxThen, maxElse))
+      case loop: ConditionalLoop =>
+        val maxCond = inTerm(loop.condition)
+        val maxBody = inStmt(loop.stmt)
+        val maxUpd  = if (loop.update != null) inStmt(loop.update) else -1
+        Math.max(maxCond, Math.max(maxBody, maxUpd))
+      case exprStmt: ExpressionActionStatement => inTerm(exprStmt.term)
+      case _ => -1
+    }
+    if (block.statements.isEmpty) -1
+    else block.statements.toSeq.map(inStmt).max
+  }
+
+  /**
    * Optimizes a tail-recursive method by converting it to a loop.
    */
   private def optimizeMethod(method: MethodDefinition): Unit = {
@@ -261,12 +318,24 @@ class TailCallOptimization(config: CompilerConfig)
     // The 'this' reference is not part of the LocalFrame indexing
     // JVM bytecode generation (LocalVarContext) handles the this/parameter slot mapping
 
-    // Loop variable indices come after parameters
-    // For method countdown(n: Int):
-    //   TypedAST locals[0]: n (parameter)
-    //   TypedAST locals[1]: n_loop (loop variable)
-    //   TypedAST locals[2]: n_temp (temporary variable)
-    val loopVarOffset = paramCount
+    // Loop variable indices must come after ALL locals already in the method's frame
+    // (parameters + any body-declared locals like `val x`, `val next`, …).
+    // Using just paramCount is incorrect when the body declares locals: those are
+    // allocated starting at index paramCount, so placing loop vars there collides
+    // with them and causes a bytecode-generation crash (slot conflict).
+    //
+    // For regular class methods the LocalFrame is populated during type-checking and
+    // getFrame() returns it. For top-level (synthetic) functions the frame may be null;
+    // in that case we scan the method body AST to find the highest SetLocal/RefLocal
+    // index actually used.
+    val maxLocalIndex: Int =
+      Option(method.getFrame).map(_.entries) match {
+        case Some(entries) if entries.nonEmpty => entries.map(_.index).max
+        case _ =>
+          val bodyMax = findMaxLocalIndexInBody(block)
+          Math.max(bodyMax, paramCount - 1)
+      }
+    val loopVarOffset = maxLocalIndex + 1
     val loopVarMapping = (0 until paramCount).map { i =>
       val paramIndex = i
       val loopVarIndex = loopVarOffset + i
@@ -480,8 +549,67 @@ class TailCallOptimization(config: CompilerConfig)
         val rewrittenStmt = rewriteStatementRefs(stmtTerm.statement, loopVarMapping)
         new StatementTerm(stmtTerm.location, rewrittenStmt, stmtTerm.termType)
 
+      case cast: AsInstanceOf =>
+        new AsInstanceOf(cast.location, rewriteTermRefs(cast.target, loopVarMapping), cast.destination)
+
+      case refArr: RefArray =>
+        new RefArray(refArr.location, rewriteTermRefs(refArr.target, loopVarMapping), rewriteTermRefs(refArr.index, loopVarMapping))
+
+      case safeArr: SafeRefArray =>
+        new SafeRefArray(safeArr.location, rewriteTermRefs(safeArr.target, loopVarMapping), rewriteTermRefs(safeArr.index, loopVarMapping), safeArr.arrayType)
+
+      case setArr: SetArray =>
+        new SetArray(setArr.location, rewriteTermRefs(setArr.target, loopVarMapping), rewriteTermRefs(setArr.index, loopVarMapping), rewriteTermRefs(setArr.value, loopVarMapping))
+
+      case refField: RefField =>
+        new RefField(refField.location, rewriteTermRefs(refField.target, loopVarMapping), refField.field)
+
+      case safeField: SafeFieldAccess =>
+        new SafeFieldAccess(safeField.location, rewriteTermRefs(safeField.target, loopVarMapping), safeField.field)
+
+      case setField: SetField =>
+        new SetField(setField.location, rewriteTermRefs(setField.target, loopVarMapping), setField.field, rewriteTermRefs(setField.value, loopVarMapping))
+
+      case safeCall: SafeCall =>
+        val rewrittenTarget = rewriteTermRefs(safeCall.target, loopVarMapping)
+        val rewrittenParams = safeCall.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
+        new SafeCall(safeCall.location, rewrittenTarget, safeCall.method, rewrittenParams)
+
+      case superCall: CallSuper =>
+        val rewrittenParams = superCall.params.map(p => rewriteTermRefs(p, loopVarMapping))
+        new CallSuper(superCall.location, superCall.target, superCall.method, rewrittenParams)
+
+      case newObj: NewObject =>
+        val rewrittenParams = newObj.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
+        new NewObject(newObj.location, newObj.constructor, rewrittenParams)
+
+      case newArr: NewArray =>
+        val rewrittenParams = newArr.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
+        new NewArray(newArr.location, newArr.arrayType, rewrittenParams)
+
+      case newArrVals: NewArrayWithValues =>
+        val rewrittenVals = newArrVals.values.map(v => rewriteTermRefs(v, loopVarMapping))
+        new NewArrayWithValues(newArrVals.location, newArrVals.arrayType, rewrittenVals)
+
+      case arrLen: ArrayLength =>
+        new ArrayLength(arrLen.location, rewriteTermRefs(arrLen.target, loopVarMapping))
+
+      case inst: InstanceOf =>
+        new InstanceOf(inst.location, rewriteTermRefs(inst.target, loopVarMapping), inst.checked)
+
+      case nonNull: NonNullAssert =>
+        new NonNullAssert(nonNull.location, rewriteTermRefs(nonNull.target, loopVarMapping), nonNull.`type`)
+
+      case listLit: ListLiteral =>
+        new ListLiteral(listLit.location, listLit.elements.map(e => rewriteTermRefs(e, loopVarMapping)), listLit.`type`)
+
+      case mapLit: MapLiteral =>
+        val rewrittenKeys = mapLit.keys.map(k => rewriteTermRefs(k, loopVarMapping))
+        val rewrittenVals = mapLit.values.map(v => rewriteTermRefs(v, loopVarMapping))
+        new MapLiteral(mapLit.location, rewrittenKeys, rewrittenVals, mapLit.`type`)
+
       case _ =>
-        // For literals and other terms, return as-is
+        // Literals and other leaf terms (BoolValue, IntValue, RefThis, Null, etc.)
         term
     }
   }
@@ -792,7 +920,10 @@ class TailCallOptimization(config: CompilerConfig)
       //   loopVarMapping(1) = (1, 3, Int)  // acc -> acc_loop
       //   tempVarIndex(0) = 4  // temp0
       //   tempVarIndex(1) = 5  // temp1
-      val tempVarOffset = loopVarMapping.length + loopVarMapping.length  // paramCount + paramCount
+      // Temp vars live immediately after the last loop variable, regardless of where
+      // loopVarOffset landed. Using 2*paramCount was only correct when loopVarOffset==paramCount;
+      // now that loopVarOffset accounts for body-declared locals the correct base is last_loop+1.
+      val tempVarOffset = loopVarMapping.last._2 + 1
 
       // Step 1: Evaluate all arguments and assign to temp variables
       // This ensures correct evaluation order (all args use old parameter values)

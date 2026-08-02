@@ -53,6 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `String`, closures, string interpolation, and `try`/`catch` in one
   coherent scenario.
 
+- **`run/BankLedger.on`, a 299-line bank account ledger sample.** Combines an
+  ADT case-enum (`TxKind`: `Deposit`/`Withdrawal`/`Transfer`), a record with
+  `example` laws, `extension Int` for currency formatting, nullable-safe
+  account lookups, `Map`-backed accounts with `foreach (k, v)` iteration,
+  collection pipelines (`sortedBy`/`filter`/`map`/`fold`/`partition`), and
+  `try`/`catch` in one end-to-end scenario (21st large sample, 78 total
+  corpus programs).
+
 ### Fixed
 
 - **CI's `Build and Test` job could hit a real JVM `OutOfMemoryError`** on the

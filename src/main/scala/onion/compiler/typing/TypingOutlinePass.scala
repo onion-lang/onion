@@ -620,8 +620,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           None
         } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
-        // A body makes this a default method (non-abstract)
-        val modifier = if (node.block == null) AST.M_PUBLIC | AST.M_ABSTRACT else AST.M_PUBLIC
+        // A body makes this a default (non-abstract) method.  Preserve the
+        // static modifier when present: ADT case-enum static factory methods
+        // (e.g. `static def fromScore(...)`) arrive here via desugarAdtEnum
+        // and must retain M_STATIC so collectMethodsMatching(isStaticMethod)
+        // can find them for a `Grade::fromScore(x)` call site.
+        val isStatic = (node.modifiers & AST.M_STATIC) != 0
+        val modifier =
+          if (isStatic) AST.M_PUBLIC | AST.M_STATIC
+          else if (node.block == null) AST.M_PUBLIC | AST.M_ABSTRACT
+          else AST.M_PUBLIC
         val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
         val method = new MethodDefinition(

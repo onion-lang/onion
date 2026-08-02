@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/MathParser.on`, a 413-line recursive-descent arithmetic expression
+  parser and evaluator sample.** Exercises an ADT enum (`Expr` with 7
+  cases: `Lit`/`Var`/`BinOp`/`Neg`/`Cmp`/`IfExpr`/`Let`) dispatched via
+  `select this { case x is T: ... }` with E0042 exhaustiveness, a
+  homogeneous enum (`TokKind`, 20 variants), records with body methods
+  (`Tok`, `EvalResult` with nullable fields), a hand-written `Lexer` and
+  recursive-descent `Parser` class, `HashMap[String, Object]` scope
+  chaining for `let` binding, `if/then/else` as an expression, collection
+  pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`), and `try/catch`
+  for parse/runtime errors (32nd large sample, 89 total corpus programs).
+
+- **`run/FleetManager.on`, a 364-line vehicle fleet management sample.**
+  Exercises classes implementing an interface (`Vehicle`, `Car`, `Truck`),
+  a data-carrying ADT enum (`VehicleStatus`), a plain enum with a method
+  (`FuelType`), records with `example` (`TripEntry`, `MaintenanceEntry`,
+  `FleetStats`), extension methods on `String`/`Double`/`Int`, collection
+  pipelines (`filter`/`fold`/`groupBy`/`sortedBy`/`partition`/`distinct`),
+  `foreach (k, v)` map iteration, `select` type-pattern dispatch, nullable
+  `String?`, `try/catch`, and the `|>` pipeline operator (33rd large
+  sample, 90 total corpus programs).
+
 ## [0.10.19] - 2026-08-02
 
 ### Fixed

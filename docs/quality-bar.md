@@ -14,8 +14,8 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 | # | Dimension | How to measure | Current (2026-08-02) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | Test suite | `sbt -batch -Duser.language=en test` | 3108 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 91 / 91 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 34 (AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, EventTicketing, FitnessTracker, FleetManager, GameStore, GradeBook, GraphSearch, HotelReservation, Inventory, InventoryManager, LibraryCatalog, LibrarySystem, MathParser, MiniRpg, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, RecipeManager, ShapeProcessor, ShoppingCart, StatsApp, StockPortfolio, TaskPlanner, TextAnalyzer, TodoManager, ToolDemo, TournamentTracker) | ≥ 5 |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 92 / 92 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 35 (AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, BugTracker, EventTicketing, FitnessTracker, FleetManager, GameStore, GradeBook, GraphSearch, HotelReservation, Inventory, InventoryManager, LibraryCatalog, LibrarySystem, MathParser, MiniRpg, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, RecipeManager, ShapeProcessor, ShoppingCart, StatsApp, StockPortfolio, TaskPlanner, TextAnalyzer, TodoManager, ToolDemo, TournamentTracker) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |

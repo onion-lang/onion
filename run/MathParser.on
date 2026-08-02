@@ -1,0 +1,413 @@
+// MathParser.on — A recursive-descent arithmetic expression parser and evaluator.
+//
+// Exercises: ADT enum (Lit/Var/BinOp/Neg/Cmp/IfExpr/Let) with dispatch methods,
+// homogeneous enum for token kinds, records for tokens, classes for Lexer and
+// Parser, HashMap environments for variable binding, collection pipelines
+// (filter/map/fold/sortedBy/groupBy), closures, nullable, try/catch, string
+// interpolation, recursion, while and foreach.
+//
+// Grammar supported:
+//   expr     ::= let_expr
+//   let_expr ::= "let" IDENT "=" add_expr "in" let_expr  |  if_expr
+//   if_expr  ::= "if" cmp_expr "then" let_expr "else" let_expr  |  cmp_expr
+//   cmp_expr ::= add_expr ( ("<"|">"|"<="|">="|"=="|"!=") add_expr )?
+//   add_expr ::= mul_expr ( ("+"|"-") mul_expr )*
+//   mul_expr ::= unary   ( ("*"|"/"|"%") unary )*
+//   unary    ::= "-" unary  |  primary
+//   primary  ::= NUMBER | IDENT | "(" expr ")"
+
+import {
+  java.lang.Integer as JInteger;
+  java.util.ArrayList;
+  java.util.HashMap;
+}
+
+// ── Token kinds ──────────────────────────────────────────────────────────────
+enum TokKind {
+  NUM, IDENT,
+  PLUS, MINUS, STAR, SLASH, PERCENT,
+  EQ, EQEQ, NEQ, LT, GT, LEQ, GEQ,
+  LPAREN, RPAREN,
+  KW_LET, KW_IN, KW_IF, KW_THEN, KW_ELSE,
+  EOF
+}
+
+record Tok(kind: TokKind, text: String) {
+public:
+  def show(): String = kind.name() + "(\"" + text + "\")"
+}
+
+// ── AST as a data-carrying ADT enum ─────────────────────────────────────────
+enum Expr {
+  case Lit(n: Int)
+  case Var(name: String)
+  case BinOp(op: String, left: Expr, right: Expr)
+  case Neg(arg: Expr)
+  case Cmp(op: String, left: Expr, right: Expr)
+  case IfExpr(cond: Expr, thenBranch: Expr, elseBranch: Expr)
+  case Let(name: String, value: Expr, body: Expr)
+
+public:
+  def eval(env: HashMap[String, Object]): Int = select this {
+    case lit is Lit: lit.n()
+    case v is Var: {
+      val found = env.get(v.name())
+      if found == null { throw new Exception("Unbound variable: " + v.name()) }
+      found as Int
+    }
+    case b is BinOp: {
+      val l = b.left().eval(env)
+      val r = b.right().eval(env)
+      select b.op() {
+        case "+": l + r
+        case "-": l - r
+        case "*": l * r
+        case "/": {
+          if r == 0 { throw new Exception("Division by zero") }
+          l / r
+        }
+        case "%": {
+          if r == 0 { throw new Exception("Modulo by zero") }
+          l % r
+        }
+        else: throw new Exception("Unknown binary op: " + b.op())
+      }
+    }
+    case u is Neg: 0 - u.arg().eval(env)
+    case c is Cmp: {
+      val l = c.left().eval(env)
+      val r = c.right().eval(env)
+      val res = select c.op() {
+        case "<":  l < r
+        case ">":  l > r
+        case "<=": l <= r
+        case ">=": l >= r
+        case "==": l == r
+        case "!=": l != r
+        else: throw new Exception("Unknown comparison: " + c.op())
+      }
+      if res { 1 } else { 0 }
+    }
+    case i is IfExpr: {
+      if i.cond().eval(env) != 0 { i.thenBranch().eval(env) } else { i.elseBranch().eval(env) }
+    }
+    case l is Let: {
+      val inner: HashMap[String, Object] = new HashMap[String, Object](env)
+      inner.put(l.name(), l.value().eval(env))
+      l.body().eval(inner)
+    }
+  }
+
+  def show(): String = select this {
+    case lit is Lit: "" + lit.n()
+    case v is Var: v.name()
+    case b is BinOp: "(" + b.left().show() + " " + b.op() + " " + b.right().show() + ")"
+    case u is Neg: "(-" + u.arg().show() + ")"
+    case c is Cmp: "(" + c.left().show() + " " + c.op() + " " + c.right().show() + ")"
+    case i is IfExpr:
+      "if " + i.cond().show() + " then " + i.thenBranch().show() + " else " + i.elseBranch().show()
+    case l is Let:
+      "let " + l.name() + " = " + l.value().show() + " in " + l.body().show()
+  }
+}
+
+// ── Lexer ─────────────────────────────────────────────────────────────────────
+class Lexer {
+  val src: String
+  var pos: Int
+  val toks: ArrayList[Tok]
+
+public:
+  def this(s: String) {
+    this.src = s; this.pos = 0; this.toks = new ArrayList[Tok]()
+    this.scan()
+  }
+
+  def addTok(k: TokKind, t: String): void { toks.add(new Tok(k, t)) }
+
+  def scan(): void {
+    while pos < src.length() {
+      val ch = src.substring(pos, pos + 1)
+      if ch == " " || ch == "\t" || ch == "\n" {
+        pos = pos + 1
+      } else if ch == "+" { addTok(TokKind::PLUS,    ch); pos = pos + 1
+      } else if ch == "*" { addTok(TokKind::STAR,    ch); pos = pos + 1
+      } else if ch == "/" { addTok(TokKind::SLASH,   ch); pos = pos + 1
+      } else if ch == "%" { addTok(TokKind::PERCENT, ch); pos = pos + 1
+      } else if ch == "(" { addTok(TokKind::LPAREN,  ch); pos = pos + 1
+      } else if ch == ")" { addTok(TokKind::RPAREN,  ch); pos = pos + 1
+      } else if ch == "-" { addTok(TokKind::MINUS,   ch); pos = pos + 1
+      } else if ch == "<" {
+        if pos + 1 < src.length() && src.substring(pos+1, pos+2) == "=" {
+          addTok(TokKind::LEQ, "<="); pos = pos + 2
+        } else { addTok(TokKind::LT, ch); pos = pos + 1 }
+      } else if ch == ">" {
+        if pos + 1 < src.length() && src.substring(pos+1, pos+2) == "=" {
+          addTok(TokKind::GEQ, ">="); pos = pos + 2
+        } else { addTok(TokKind::GT, ch); pos = pos + 1 }
+      } else if ch == "=" {
+        if pos + 1 < src.length() && src.substring(pos+1, pos+2) == "=" {
+          addTok(TokKind::EQEQ, "=="); pos = pos + 2
+        } else { addTok(TokKind::EQ, ch); pos = pos + 1 }
+      } else if ch == "!" {
+        if pos + 1 < src.length() && src.substring(pos+1, pos+2) == "=" {
+          addTok(TokKind::NEQ, "!="); pos = pos + 2
+        } else { throw new Exception("Expected '!='") }
+      } else if Regex::matches(ch, "\\d") {
+        var j: Int = pos + 1
+        while j < src.length() && Regex::matches(src.substring(j, j+1), "\\d") { j = j + 1 }
+        addTok(TokKind::NUM, src.substring(pos, j)); pos = j
+      } else if Regex::matches(ch, "[a-zA-Z_]") {
+        var j: Int = pos + 1
+        while j < src.length() && Regex::matches(src.substring(j, j+1), "[a-zA-Z0-9_]") { j = j + 1 }
+        val word = src.substring(pos, j)
+        if      word == "let"  { addTok(TokKind::KW_LET,  word) }
+        else if word == "in"   { addTok(TokKind::KW_IN,   word) }
+        else if word == "if"   { addTok(TokKind::KW_IF,   word) }
+        else if word == "then" { addTok(TokKind::KW_THEN, word) }
+        else if word == "else" { addTok(TokKind::KW_ELSE, word) }
+        else                   { addTok(TokKind::IDENT,   word) }
+        pos = j
+      } else { throw new Exception("Unexpected character: '" + ch + "'") }
+    }
+    addTok(TokKind::EOF, "")
+  }
+
+  def tokens(): ArrayList[Tok] = toks
+}
+
+// ── Recursive-descent parser ──────────────────────────────────────────────────
+class Parser {
+  val tokens: ArrayList[Tok]
+  var cur: Int
+
+public:
+  def this(toks: ArrayList[Tok]) { this.tokens = toks; this.cur = 0 }
+
+  def peek(): Tok = tokens.get(cur)
+  def advance(): Tok { val t = tokens.get(cur); cur = cur + 1; return t }
+  def expect(k: TokKind): Tok {
+    val t = advance()
+    if t.kind() != k {
+      throw new Exception("Expected " + k.name() + " but got '" + t.text() + "'")
+    }
+    return t
+  }
+  def check(k: TokKind): Boolean = peek().kind() == k
+
+  def parseExpr(): Expr = parseLetExpr()
+
+  def parseLetExpr(): Expr {
+    if check(TokKind::KW_LET) {
+      advance()
+      val name = expect(TokKind::IDENT).text()
+      expect(TokKind::EQ)
+      val value = parseAddExpr()
+      expect(TokKind::KW_IN)
+      val body = parseLetExpr()
+      return new Let(name, value, body)
+    }
+    return parseIfExpr()
+  }
+
+  def parseIfExpr(): Expr {
+    if check(TokKind::KW_IF) {
+      advance()
+      val cond = parseCmpExpr()
+      expect(TokKind::KW_THEN)
+      val t = parseLetExpr()
+      expect(TokKind::KW_ELSE)
+      val f = parseLetExpr()
+      return new IfExpr(cond, t, f)
+    }
+    return parseCmpExpr()
+  }
+
+  def parseCmpExpr(): Expr {
+    val left = parseAddExpr()
+    if check(TokKind::LT)   { advance(); return new Cmp("<",  left, parseAddExpr()) }
+    if check(TokKind::GT)   { advance(); return new Cmp(">",  left, parseAddExpr()) }
+    if check(TokKind::LEQ)  { advance(); return new Cmp("<=", left, parseAddExpr()) }
+    if check(TokKind::GEQ)  { advance(); return new Cmp(">=", left, parseAddExpr()) }
+    if check(TokKind::EQEQ) { advance(); return new Cmp("==", left, parseAddExpr()) }
+    if check(TokKind::NEQ)  { advance(); return new Cmp("!=", left, parseAddExpr()) }
+    return left
+  }
+
+  def parseAddExpr(): Expr {
+    var left = parseMulExpr()
+    while check(TokKind::PLUS) || check(TokKind::MINUS) {
+      val op = advance().text()
+      left = new BinOp(op, left, parseMulExpr())
+    }
+    return left
+  }
+
+  def parseMulExpr(): Expr {
+    var left = parseUnary()
+    while check(TokKind::STAR) || check(TokKind::SLASH) || check(TokKind::PERCENT) {
+      val op = advance().text()
+      left = new BinOp(op, left, parseUnary())
+    }
+    return left
+  }
+
+  def parseUnary(): Expr {
+    if check(TokKind::MINUS) { advance(); return new Neg(parseUnary()) }
+    return parsePrimary()
+  }
+
+  def parsePrimary(): Expr {
+    val t = advance()
+    if t.kind() == TokKind::NUM   { return new Lit(JInteger::parseInt(t.text())) }
+    if t.kind() == TokKind::IDENT { return new Var(t.text()) }
+    if t.kind() == TokKind::LPAREN {
+      val e = parseExpr(); expect(TokKind::RPAREN); return e
+    }
+    throw new Exception("Unexpected token: '" + t.text() + "'")
+  }
+}
+
+// ── Helper: parse and evaluate a source string ────────────────────────────────
+record EvalResult(src: String, result: Int?, error: String?) {
+public:
+  def ok(): Boolean = error == null
+  def display(): String {
+    if ok() { return "  #{src}  =>  #{result}" }
+    return "  #{src}  =>  ERROR: #{error}"
+  }
+}
+
+def tryEval(src: String, env: HashMap[String, Object]): EvalResult {
+  try {
+    val lexer  = new Lexer(src)
+    val parser = new Parser(lexer.tokens())
+    val expr   = parser.parseExpr()
+    return new EvalResult(src, expr.eval(env), null)
+  } catch e: Exception {
+    return new EvalResult(src, null, e.message())
+  }
+}
+
+def run(src: String): EvalResult {
+  val env: HashMap[String, Object] = new HashMap[String, Object]()
+  return tryEval(src, env)
+}
+
+// ── Main demo ─────────────────────────────────────────────────────────────────
+val sep = "─────────────────────────────────────────"
+
+IO::println("=== MathParser — recursive-descent arithmetic evaluator ===")
+IO::println("")
+
+// Section 1: basic arithmetic
+IO::println("Basic arithmetic (respects precedence and parentheses):")
+val basics: List[String] = [
+  "1 + 2",
+  "3 * 4 + 5",
+  "3 * (4 + 5)",
+  "100 / 4 - 10",
+  "17 % 5",
+  "-7 + 3",
+  "-(3 + 4) * 2"
+]
+foreach src: String in basics { IO::println(run(src).display()) }
+
+IO::println("")
+IO::println(sep)
+IO::println("Variable binding with  let ... in  (lexically scoped):")
+val letExprs: List[String] = [
+  "let x = 5 in x + x",
+  "let x = 3 in let y = 4 in x * x + y * y",
+  "let n = 12 in (n + 1) * (n - 1)",
+  "let a = 10 in let b = a + 5 in b * b - a",
+  "let half = 100 / 2 in half * half + half"
+]
+foreach src: String in letExprs { IO::println(run(src).display()) }
+
+IO::println("")
+IO::println(sep)
+IO::println("Conditionals:  if cond then t else f  (0 = false, non-zero = true):")
+val condExprs: List[String] = [
+  "if 1 < 2 then 100 else 200",
+  "if 5 == 5 then 42 else 0",
+  "if 3 > 7 then 1 else -1",
+  "let x = 8 in if x % 2 == 0 then 1 else 0",
+  "let a = 3 in let b = 4 in let c = 5 in if a*a + b*b == c*c then 1 else 0"
+]
+foreach src: String in condExprs { IO::println(run(src).display()) }
+
+IO::println("")
+IO::println(sep)
+IO::println("Error handling (unbound variable, division by zero):")
+val errorExprs: List[String] = [
+  "x + 1",
+  "let y = 0 in 10 / y",
+  "let z = 5 in z % 0"
+]
+foreach src: String in errorExprs { IO::println(run(src).display()) }
+
+IO::println("")
+IO::println(sep)
+
+// Section 2: batch evaluation and statistics using collection pipelines
+IO::println("Statistics over a batch of expressions (pipelines):")
+
+val batch: List[String] = [
+  "1 + 1",
+  "2 * 3",
+  "10 - 4",
+  "let k = 7 in k * k",
+  "100 / 5 + 3",
+  "let x = 4 in let y = 3 in x * x - y * y",
+  "2 * 2 * 2 * 2 * 2",
+  "let n = 6 in n * (n + 1) / 2",
+  "99 % 7",
+  "-(5 * 5) + 100"
+]
+
+val env0: HashMap[String, Object] = new HashMap[String, Object]()
+val results = batch.map { src => tryEval(src as String, env0) }
+
+val successes = results.filter { r => (r as EvalResult).ok() }
+val failures  = results.filter { r => !(r as EvalResult).ok() }
+
+IO::println("  Total expressions : #{batch.size}")
+IO::println("  Successful        : #{successes.size}")
+IO::println("  Errors            : #{failures.size}")
+
+val values: List[Int] = successes.map { r => (r as EvalResult).result() as Int }
+val total = values.fold(0) { acc, v => (acc as Int) + (v as Int) } as Int
+val minV  = values.fold(values.get(0) as Int) { acc, v =>
+  if (v as Int) < (acc as Int) { v as Int } else { acc as Int }
+} as Int
+val maxV  = values.fold(values.get(0) as Int) { acc, v =>
+  if (v as Int) > (acc as Int) { v as Int } else { acc as Int }
+} as Int
+val avg = total / successes.size
+
+IO::println("  Sum               : #{total}")
+IO::println("  Min               : #{minV}")
+IO::println("  Max               : #{maxV}")
+IO::println("  Average (int div) : #{avg}")
+
+IO::println("")
+IO::println("  Sorted by value descending:")
+val sorted = successes.sortedBy { r => 0 - ((r as EvalResult).result() as Int) }
+foreach r: Object in sorted {
+  IO::println("   " + (r as EvalResult).display())
+}
+
+IO::println("")
+IO::println(sep)
+IO::println("Grouped by sign (positive / negative / zero):")
+val grouped = successes.groupBy { r =>
+  val v = (r as EvalResult).result() as Int
+  if v > 0 { "positive" } else if v < 0 { "negative" } else { "zero" }
+}
+foreach (label, grp) in grouped {
+  IO::println("  [#{label}] #{(grp as List[Object]).size} expression(s)")
+}
+
+IO::println("")
+IO::println("Done.")

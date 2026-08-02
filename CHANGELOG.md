@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.20] - 2026-08-02
+
 ### Added
 
 - **`run/MathParser.on`, a 413-line recursive-descent arithmetic expression

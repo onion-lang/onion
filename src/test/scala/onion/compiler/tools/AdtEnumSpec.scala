@@ -117,5 +117,46 @@ class AdtEnumSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+
+    it("resolves a static method declared in the ADT enum's public section") {
+      // Regression: static methods in an ADT case-enum's `public:` block were
+      // registered in the sealed-interface ClassDefinition WITHOUT the M_STATIC
+      // modifier (processInterfaceMethodDeclaration hard-coded M_PUBLIC only).
+      // collectMethodsMatching(filter = isStaticMethod) then found nothing, and
+      // Grade::fromScore(score()) raised E0005 even though the signature matched.
+      val r = shell.run(
+        """
+          |enum Grade {
+          |  case A()
+          |  case B()
+          |  case F()
+          |public:
+          |  def label(): String = select this {
+          |    case g is A: "A"
+          |    case g is B: "B"
+          |    case g is F: "F"
+          |  }
+          |  static def fromScore(s: Double): Grade {
+          |    if s >= 80.0 { return new A() }
+          |    if s >= 60.0 { return new B() }
+          |    return new F()
+          |  }
+          |}
+          |record Result(score: Double) {
+          |public:
+          |  def grade(): Grade = Grade::fromScore(score())
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r1 = new Result(90.0)
+          |    val r2 = new Result(70.0)
+          |    val r3 = new Result(50.0)
+          |    return r1.grade().label() + r2.grade().label() + r3.grade().label()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("ABF") == r)
+    }
   }
 }

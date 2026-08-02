@@ -1,0 +1,317 @@
+// GradeBook.on — Student grade management system exercising many Onion features:
+// ADT enums, records, classes+inheritance+interfaces, generics, extension
+// methods, collection pipelines, do[Option] notation, pattern matching,
+// string interpolation, nullable, try/catch, foreach (ranges, lists, maps).
+
+// ─── ADT enum: sealed hierarchy for letter grades ───────────────────────────
+enum LetterGrade {
+  case A(gpa: Double)
+  case B(gpa: Double)
+  case C(gpa: Double)
+  case D(gpa: Double)
+  case F(gpa: Double)
+public:
+  def label(): String = select this {
+    case g is A: "A"
+    case g is B: "B"
+    case g is C: "C"
+    case g is D: "D"
+    case g is F: "F"
+  }
+  def points(): Double = select this {
+    case g is A: g.gpa()
+    case g is B: g.gpa()
+    case g is C: g.gpa()
+    case g is D: g.gpa()
+    case g is F: g.gpa()
+  }
+  def isPassing(): Boolean = select this {
+    case g is F: false
+    else: true
+  }
+  static def fromScore(score: Double): LetterGrade {
+    if score >= 90.0 { return new A(4.0) }
+    if score >= 80.0 { return new B(3.0) }
+    if score >= 70.0 { return new C(2.0) }
+    if score >= 60.0 { return new D(1.0) }
+    return new F(0.0)
+  }
+}
+
+// ─── Regular enum: academic departments ─────────────────────────────────────
+enum Department {
+  CS, MATH, ENGLISH, HISTORY, SCIENCE
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+record Student(id: Int, name: String, dept: Department)
+
+record CourseResult(course: String, score: Double) {
+public:
+  def grade(): LetterGrade = LetterGrade::fromScore(score())
+  def passed(): Boolean = grade().isPassing()
+  def describe(): String = "#{course()} #{score()} (#{grade().label()})"
+}
+
+record Transcript(student: Student, results: List[CourseResult]) {
+public:
+  def gpa(): Double {
+    val rs = results()
+    if rs.size == 0 { return 0.0 }
+    val total = rs.fold(0.0) { acc, r => (acc as Double) + (r as CourseResult).grade().points() }
+    return (total as Double) / (rs.size as Double)
+  }
+  def passed(): Boolean = results().find { r => !(r as CourseResult).passed() } == null
+  def courseCount(): Int = results().size
+}
+
+// ─── Extension methods ───────────────────────────────────────────────────────
+extension Department {
+  def fullName(): String {
+    select self {
+      case Department::CS: return "Computer Science"
+      case Department::MATH: return "Mathematics"
+      case Department::ENGLISH: return "English"
+      case Department::HISTORY: return "History"
+      case Department::SCIENCE: return "Natural Science"
+    }
+    return "Unknown"
+  }
+}
+
+extension Double {
+  def rounded2(): Double {
+    val factor = 100.0
+    val shifted = self * factor
+    val truncated = (shifted as Int) as Double
+    return truncated / factor
+  }
+}
+
+extension List {
+  def averageScore(): Double {
+    if self.size == 0 { return 0.0 }
+    val total = self.fold(0.0) { acc, item =>
+      (acc as Double) + (item as CourseResult).score()
+    }
+    return (total as Double) / (self.size as Double)
+  }
+}
+
+// ─── Interface ───────────────────────────────────────────────────────────────
+interface Summarizable {
+  def summary(): String
+}
+
+// ─── GradeBook class ─────────────────────────────────────────────────────────
+class GradeBook conforms Summarizable {
+  val transcripts: List[Transcript]
+  var studentCount: Int
+public:
+  def this {
+    val empty: List[Transcript] = []
+    this.transcripts = empty
+    this.studentCount = 0
+  }
+  def enroll(t: Transcript): void {
+    this.transcripts << t
+    this.studentCount = this.studentCount + 1
+  }
+  def allTranscripts(): List[Transcript] = this.transcripts
+  def size(): Int = this.studentCount
+  def summary(): String {
+    val n = this.studentCount
+    val passing = this.passing().size
+    return "#{n} students enrolled, #{passing} passing"
+  }
+  def passing(): List[Transcript] {
+    return this.transcripts.filter { t => (t as Transcript).passed() }
+  }
+  def failing(): List[Transcript] {
+    return this.transcripts.filter { t => !(t as Transcript).passed() }
+  }
+  def byDept(dept: Department): List[Transcript] {
+    return this.transcripts.filter { t => (t as Transcript).student().dept() == dept }
+  }
+  def topN(n: Int): List[Transcript] {
+    return this.transcripts.sortedBy { t => 0.0 - (t as Transcript).gpa() }.take(n)
+  }
+  def honorRoll(): List[Transcript] {
+    return this.transcripts.filter { t => (t as Transcript).gpa() >= 3.5 }
+  }
+  def findById(id: Int): Transcript? {
+    val found = this.transcripts.find { t => (t as Transcript).student().id() == id }
+    if found == null { return null }
+    return found as Transcript
+  }
+}
+
+// ─── do[Option] helper ───────────────────────────────────────────────────────
+def lookupAndGpa(book: GradeBook, id: Int): Option[Double] {
+  val t = book.findById(id)
+  if t == null { return Option::none() }
+  return Option::some(t.gpa())
+}
+
+def compareGpas(book: GradeBook, id1: Int, id2: Int): Option[String] {
+  return do[Option] {
+    g1 <- lookupAndGpa(book, id1)
+    g2 <- lookupAndGpa(book, id2)
+    ret "student #{id1} GPA=#{(g1 as Double).rounded2()} vs student #{id2} GPA=#{(g2 as Double).rounded2()}"
+  }
+}
+
+// ─── Recursive helper ────────────────────────────────────────────────────────
+def letterFrequency(results: List[CourseResult], grade: String, idx: Int): Int {
+  if idx >= results.size { return 0 }
+  val r = results[idx] as CourseResult
+  val count = if r.grade().label() == grade { 1 } else { 0 }
+  return count + letterFrequency(results, grade, idx + 1)
+}
+
+// ─── Build course data ───────────────────────────────────────────────────────
+val alice = new Student(1, "Alice", Department::CS)
+val bob   = new Student(2, "Bob",   Department::MATH)
+val carol = new Student(3, "Carol", Department::CS)
+val dave  = new Student(4, "Dave",  Department::HISTORY)
+val eve   = new Student(5, "Eve",   Department::SCIENCE)
+
+val aliceResults: List[CourseResult] = [
+  new CourseResult("Algorithms", 95.0),
+  new CourseResult("OS", 88.0),
+  new CourseResult("Calculus", 72.0),
+  new CourseResult("English", 91.0)
+]
+val bobResults: List[CourseResult] = [
+  new CourseResult("LinearAlgebra", 78.0),
+  new CourseResult("Calculus", 83.0),
+  new CourseResult("Statistics", 55.0)
+]
+val carolResults: List[CourseResult] = [
+  new CourseResult("Algorithms", 62.0),
+  new CourseResult("Networks", 71.0),
+  new CourseResult("Databases", 68.0),
+  new CourseResult("AI", 74.0)
+]
+val daveResults: List[CourseResult] = [
+  new CourseResult("WorldHistory", 90.0),
+  new CourseResult("Literature", 85.0),
+  new CourseResult("Philosophy", 92.0)
+]
+val eveResults: List[CourseResult] = [
+  new CourseResult("Biology", 48.0),
+  new CourseResult("Chemistry", 55.0),
+  new CourseResult("Physics", 60.0)
+]
+
+val book = new GradeBook
+book.enroll(new Transcript(alice, aliceResults))
+book.enroll(new Transcript(bob,   bobResults))
+book.enroll(new Transcript(carol, carolResults))
+book.enroll(new Transcript(dave,  daveResults))
+book.enroll(new Transcript(eve,   eveResults))
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+println("=== GradeBook Summary ===")
+println(book.summary())
+
+println("\n--- All Transcripts ---")
+foreach t: Object in book.allTranscripts() {
+  val tr = t as Transcript
+  val gpa = tr.gpa().rounded2()
+  val status = if tr.passed() { "PASS" } else { "FAIL" }
+  println("#{tr.student().name()} [#{tr.student().dept().fullName()}] GPA=#{gpa} #{status}")
+}
+
+println("\n--- Honor Roll (GPA >= 3.5) ---")
+foreach t: Object in book.honorRoll() {
+  val tr = t as Transcript
+  println("  #{tr.student().name()} GPA=#{tr.gpa().rounded2()}")
+}
+
+println("\n--- Failing Students ---")
+foreach t: Object in book.failing() {
+  val tr = t as Transcript
+  println("  #{tr.student().name()} (#{tr.student().dept().fullName()})")
+  foreach r: Object in tr.results() {
+    val cr = r as CourseResult
+    if !cr.passed() {
+      println("    FAIL: #{cr.describe()}")
+    }
+  }
+}
+
+println("\n--- Top 3 by GPA ---")
+var rank = 1
+foreach t: Object in book.topN(3) {
+  val tr = t as Transcript
+  println("  ##{rank}: #{tr.student().name()} #{tr.gpa().rounded2()}")
+  rank = rank + 1
+}
+
+println("\n--- CS Department ---")
+foreach t: Object in book.byDept(Department::CS) {
+  val tr = t as Transcript
+  println("  #{tr.student().name()}: avg score #{tr.results().averageScore().rounded2()}")
+}
+
+println("\n--- GPA Comparison (do[Option]) ---")
+val cmp1 = compareGpas(book, 1, 4)
+val cmp2 = compareGpas(book, 1, 99)
+if !cmp1.isEmpty() { println(cmp1.get()) }
+if !cmp2.isEmpty() { println(cmp2.get()) } else { println("one student not found") }
+
+println("\n--- Grade Distribution for Alice ---")
+val labels: List[String] = ["A", "B", "C", "D", "F"]
+foreach lbl: Object in labels {
+  val label = lbl as String
+  val count = letterFrequency(aliceResults, label, 0)
+  if count > 0 {
+    println("  #{label}: #{count} course(s)")
+  }
+}
+
+println("\n--- Passing vs Failing Course Counts ---")
+val parts = book.allTranscripts().partition { t => (t as Transcript).passed() }
+val passingList = parts[0] as List
+val failingList = parts[1] as List
+println("  passing students: #{passingList.size}")
+println("  failing students: #{failingList.size}")
+
+println("\n--- do[List] all (student, course) pairs for CS dept ---")
+val csPairs = do[List] {
+  t <- book.byDept(Department::CS)
+  r <- (t as Transcript).results()
+  ret (t as Transcript).student().name() + "/" + (r as CourseResult).course()
+}
+foreach pair: Object in csPairs {
+  println("  " + pair)
+}
+
+println("\n--- try/catch: safe score parse ---")
+def parseScore(s: String): Double {
+  try {
+    val d: Double = JDouble::parseDouble(s)
+    return d
+  } catch e: NumberFormatException {
+    return 0.0 - 1.0
+  }
+}
+println("  parse '87.5' -> #{parseScore("87.5")}")
+println("  parse 'oops' -> #{parseScore("oops")}")
+
+println("\n--- Range and while ---")
+var sumGrades = 0
+foreach i: Int in 1..5 {
+  sumGrades = sumGrades + i
+}
+println("  sum 1..5 = #{sumGrades}")
+
+var count = 0
+var idx = 0
+while idx < aliceResults.size {
+  val r = aliceResults[idx] as CourseResult
+  if r.score() >= 90.0 { count = count + 1 }
+  idx = idx + 1
+}
+println("  Alice's A-range courses: #{count}")

@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was registered without the static modifier, and
   `collectMethodsMatching(isStaticMethod)` could no longer find it.
 
+### Added
+
+- **`run/MusicLibrary.on`, a 274-line music library catalog sample.**
+  Exercises a simple enum (`Genre`), records with a nullable field
+  (`Entry(song, rating: Rating?)`), a generic class (`Catalog[T extends
+  Object]`), extension methods on `Int`/`String`, collection pipelines
+  (`fold`/`filter`/`map`/`groupBy`/`sortedBy`/`sortedByDescending`/
+  `distinct`), `select`/enum pattern matching, string interpolation, and
+  `foreach` over typed lists and maps (28th large sample, 85 total corpus
+  programs).
+
 ## [0.10.18] - 2026-08-02
 
 ### Fixed

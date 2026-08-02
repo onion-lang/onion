@@ -8,9 +8,9 @@
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（`docs/guide/tools.md` が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した `E0077`–`E0079`）でした。
 
-| # | 次元 | 測定方法 | 現在値（2026-07-27） | 合格閾値 |
+| # | 次元 | 測定方法 | 現在値（2026-08-02） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2848 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3096 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 84 / 84 compile | すべてコンパイル、rot なし |
 | 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 27（AuctionHouse、BankLedger、BankSystem、Blackjack、BrokenLogDemo、BudgetTracker、FitnessTracker、GradeBook、GraphSearch、HotelReservation、Inventory、LibraryCatalog、LibrarySystem、MiniRpg、OrderReport、PayrollReport、PlaylistManager、RecipeManager、ShapeProcessor、ShoppingCart、StatsApp、StockPortfolio、TaskPlanner、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |

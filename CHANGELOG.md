@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sections and mutable state (29th large sample, 86 total corpus
   programs).
 
+- **`run/EventTicketing.on`, a 279-line event ticketing system sample.**
+  Exercises homogeneous enums with methods (`TicketTier`, `EventStatus`),
+  an ADT enum (`BookingResult { case Ok(...); case Refused(...) }`) matched
+  with `case r is Ok:` / `case r is Refused:`, records (`Venue`, `Event`,
+  `Order`, `CustomerSpend`), typed collections (`List[Event]`,
+  `List[Order]`, `Map[String, Double]`), collection pipelines
+  (`filter`/`sortedBy`), `foreach (k, v)` map iteration, `foreach` over a
+  range, nullable handling with null-guards, and string interpolation
+  (30th large sample, 87 total corpus programs).
+
 ## [0.10.18] - 2026-08-02
 
 ### Fixed

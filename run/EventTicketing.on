@@ -1,0 +1,279 @@
+// EventTicketing.on — Event ticketing system (~240 lines)
+// Exercises: homogeneous enums with methods, ADT enums, records, classes,
+// closures, collection pipelines (filter/map/sortedBy/groupBy/fold),
+// foreach on ranges and maps, pattern matching, nullable, string interpolation.
+
+// ── Homogeneous enums ────────────────────────────────────────────────────────
+
+enum TicketTier {
+  VIP, REGULAR, STUDENT
+public:
+  def price(): Double = select this {
+    case TicketTier::VIP:     120.0d
+    case TicketTier::REGULAR:  45.0d
+    case TicketTier::STUDENT:  20.0d
+  }
+  def label(): String = select this {
+    case TicketTier::VIP:     "VIP"
+    case TicketTier::REGULAR: "Regular"
+    case TicketTier::STUDENT: "Student"
+  }
+}
+
+enum EventStatus {
+  UPCOMING, ON_SALE, SOLD_OUT, CANCELLED, COMPLETED
+}
+
+// ── ADT enum for booking result ───────────────────────────────────────────────
+
+enum BookingResult {
+  case Ok(orderId: String, quantity: Int, total: Double)
+  case Refused(reason: String)
+public:
+  def isOk(): Boolean {
+    select this {
+      case r is Ok:      return true
+      case r is Refused: return false
+    }
+  }
+  def describe(): String {
+    select this {
+      case r is Ok:
+        return "Order #{r.orderId()} — #{r.quantity()} ticket(s), total $#{r.total()}"
+      case r is Refused:
+        return "Refused: #{r.reason()}"
+    }
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Venue(name: String, city: String, capacity: Int)
+
+record Event(
+  id: String,
+  title: String,
+  venue: Venue,
+  date: String,
+  tier: TicketTier
+) {
+public:
+  def basePrice(): Double = tier.price()
+  def header(): String = "#{title} @ #{venue.name()}, #{venue.city()} on #{date}"
+}
+
+record Order(
+  orderId: String,
+  eventId: String,
+  customerName: String,
+  tier: TicketTier,
+  quantity: Int,
+  unitPrice: Double
+) {
+public:
+  def total(): Double = unitPrice * quantity
+  def summary(): String =
+    "[#{orderId}] #{customerName}: #{quantity}x #{tier.label()} @ $#{unitPrice} = $#{total()}"
+}
+
+record CustomerSpend(name: String, total: Double)
+
+// ── Ticketing system class ────────────────────────────────────────────────────
+
+class TicketingSystem {
+  var events: List[Event] = []
+  var orders: List[Order] = []
+  var nextId: Int = 1
+
+public:
+  def addEvent(event: Event): void {
+    events.add(event)
+  }
+
+  def soldCount(eventId: String): Int {
+    var count: Int = 0
+    foreach o: Order in orders {
+      if o.eventId() == eventId { count = count + o.quantity() }
+    }
+    return count
+  }
+
+  def availableSeats(event: Event): Int = event.venue().capacity() - soldCount(event.id())
+
+  def findEvent(eventId: String): Event? {
+    foreach e: Event in events {
+      if e.id() == eventId { return e }
+    }
+    return null
+  }
+
+  def book(eventId: String, customer: String, tier: TicketTier, qty: Int): BookingResult {
+    val event: Event? = findEvent(eventId)
+    if event == null { return new Refused("unknown event: #{eventId}") }
+    val ev: Event = event as Event
+    val avail: Int = availableSeats(ev)
+    if qty > avail {
+      return new Refused("only #{avail} seat(s) left for '#{ev.title()}'")
+    }
+    val oid: String = "ORD-#{nextId}"
+    nextId = nextId + 1
+    val price: Double = tier.price()
+    orders.add(new Order(oid, eventId, customer, tier, qty, price))
+    return new Ok(oid, qty, price * qty)
+  }
+
+  def cancelOrder(orderId: String): Boolean {
+    val before: Int = orders.size
+    orders = orders.filter { o => (o as Order).orderId() != orderId }
+    return orders.size < before
+  }
+
+  def totalRevenue(): Double {
+    var sum: Double = 0.0d
+    foreach o: Order in orders { sum = sum + o.total() }
+    return sum
+  }
+
+  def revenueByEvent(): Map[String, Double] {
+    val rev: Map[String, Double] = [:]
+    foreach o: Order in orders {
+      val key: String = o.eventId()
+      val cur: Double = rev.getOrDefault(key, 0.0d)
+      rev.put(key, cur + o.total())
+    }
+    return rev
+  }
+
+  def topCustomers(n: Int): List[CustomerSpend] {
+    val spend: Map[String, Double] = [:]
+    foreach o: Order in orders {
+      val key: String = o.customerName()
+      val cur: Double = spend.getOrDefault(key, 0.0d)
+      spend.put(key, cur + o.total())
+    }
+    val spends: List[CustomerSpend] = []
+    foreach (name, total) in spend {
+      spends.add(new CustomerSpend(name, total))
+    }
+    val sorted: List[CustomerSpend] = spends.sortedBy { cs => 0.0d - (cs as CustomerSpend).total() }
+    return sorted.subList(0, if n < sorted.size { n } else { sorted.size })
+  }
+
+  def printEventReport(eventId: String): void {
+    val event: Event? = findEvent(eventId)
+    if event == null { IO::println("Event '#{eventId}' not found."); return }
+    val ev: Event = event as Event
+    IO::println("  #{ev.header()}")
+    IO::println("  Tier: #{ev.tier().label()}  Base price: $#{ev.basePrice()}")
+    IO::println("  Capacity: #{ev.venue().capacity()}  Sold: #{soldCount(eventId)}  Available: #{availableSeats(ev)}")
+    var rev: Double = 0.0d
+    var cnt: Int = 0
+    foreach o: Order in orders {
+      if o.eventId() == eventId {
+        rev = rev + o.total()
+        cnt = cnt + o.quantity()
+      }
+    }
+    IO::println("  Tickets sold: #{cnt}  Revenue: $#{rev}")
+  }
+
+  def orderCount(): Int = orders.size
+
+  def eventCount(): Int = events.size
+
+  def printAllOrders(): void {
+    if orders.size == 0 { IO::println("  (no orders)"); return }
+    foreach o: Order in orders { IO::println("  #{o.summary()}") }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def printResult(result: BookingResult): void {
+  select result {
+    case r is Ok:
+      IO::println("  OK   #{r.orderId()}: #{r.quantity()}x  total=$#{r.total()}")
+    case r is Refused:
+      IO::println("  FAIL #{r.reason()}")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val system: TicketingSystem = new TicketingSystem()
+
+// Venues
+val arena:   Venue = new Venue("City Arena",    "Springfield", 200)
+val theatre: Venue = new Venue("Grand Theatre", "Shelbyville",  80)
+val club:    Venue = new Venue("Jazz Club",     "Springfield",  50)
+
+// Events
+system.addEvent(new Event("E001", "Rock Night",        arena,   "2026-09-05", TicketTier::REGULAR))
+system.addEvent(new Event("E002", "Classical Evening", theatre, "2026-09-12", TicketTier::VIP))
+system.addEvent(new Event("E003", "Jazz Jam",          club,    "2026-09-20", TicketTier::STUDENT))
+system.addEvent(new Event("E004", "Pop Gala",          arena,   "2026-10-03", TicketTier::REGULAR))
+
+// ── Bookings ──────────────────────────────────────────────────────────────────
+
+IO::println("=== Booking tickets ===")
+printResult(system.book("E001", "Alice",   TicketTier::REGULAR, 4))
+printResult(system.book("E001", "Bob",     TicketTier::REGULAR, 2))
+printResult(system.book("E002", "Charlie", TicketTier::VIP,     3))
+printResult(system.book("E003", "Diana",   TicketTier::STUDENT, 5))
+printResult(system.book("E003", "Eve",     TicketTier::STUDENT, 10))
+printResult(system.book("E004", "Frank",   TicketTier::REGULAR, 50))
+printResult(system.book("E004", "Alice",   TicketTier::REGULAR, 30))
+
+IO::println("")
+IO::println("--- Edge cases ---")
+printResult(system.book("E003", "Grace", TicketTier::STUDENT, 40))   // oversell
+printResult(system.book("E999", "Hank",  TicketTier::REGULAR, 1))    // unknown event
+
+// ── Order listing ──────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== All orders ===")
+system.printAllOrders()
+
+// ── Cancellation ─────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Cancel ORD-3 ===")
+IO::println("Cancelled: #{system.cancelOrder("ORD-3")}")
+IO::println("E002 after cancellation:")
+system.printEventReport("E002")
+
+// ── Event reports ─────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Event reports ===")
+foreach i: Int in 1..4 {
+  system.printEventReport("E00#{i}")
+}
+
+// ── Revenue summary ───────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("=== Revenue by event ===")
+val rev: Map[String, Double] = system.revenueByEvent()
+foreach (k, v) in rev {
+  IO::println("  #{k}: $#{v}")
+}
+
+IO::println("")
+IO::println("=== Top 3 customers ===")
+val top: List[CustomerSpend] = system.topCustomers(3)
+foreach cs: CustomerSpend in top {
+  IO::println("  #{cs.name()}: $#{cs.total()}")
+}
+
+IO::println("")
+IO::println("=== Overall stats ===")
+IO::println("Total revenue: $#{system.totalRevenue()}")
+IO::println("Orders placed: #{system.orderCount()}")
+
+IO::println("")
+IO::println("=== Tier catalogue ===")
+foreach t: TicketTier in TicketTier::values() {
+  IO::println("  #{t.label()}: $#{t.price()}")
+}

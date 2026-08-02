@@ -1,0 +1,364 @@
+// FleetManager.on — A vehicle fleet management system.
+// Exercises: classes + inheritance + interfaces; records with example;
+// ADT and data-carrying enums; collection pipelines (map/filter/fold/groupBy/
+// sortedBy/partition/find/distinct); foreach on Map (k,v); extension methods
+// on Int/Double/String; nullable types; string interpolation; try/catch; select
+// pattern matching with type patterns; closures; range foreach; |> pipeline.
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def dabs(): Double = if self < 0.0 { 0.0 - self } else { self }
+  def fmt2(): String {
+    val w: Int = self.intValue()
+    val frac: Int = ((self.dabs() - (w.dabs() as Double)) * 100.0 + 0.5).intValue()
+    val fs: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return "" + w + "." + fs
+  }
+}
+
+extension Int {
+  def dabs(): Int = if self < 0 { 0 - self } else { self }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum VehicleStatus {
+  case Active
+  case InMaintenance(reason: String)
+  case Retired(odometer: Int)
+}
+
+enum FuelType {
+  Gasoline, Diesel, Electric, Hybrid
+public:
+  def label(): String = select this {
+    case FuelType::Gasoline: "Gasoline"
+    case FuelType::Diesel:   "Diesel  "
+    case FuelType::Electric: "Electric"
+    case FuelType::Hybrid:   "Hybrid  "
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record TripEntry(vehicleId: String, distanceKm: Double, fuelUsedL: Double, driver: String)
+  example { new TripEntry("X", 10.0, 1.0, "A").distanceKm() > 0.0 }
+
+record MaintenanceEntry(vehicleId: String, description: String, costUsd: Double, mileage: Int)
+  example { new MaintenanceEntry("X", "Oil", 50.0, 1000).costUsd() >= 0.0 }
+
+record FleetStats(totalVehicles: Int, activeCount: Int, totalDistanceKm: Double,
+                  avgFuelEffKmL: Double, totalMaintenanceCost: Double)
+
+// ─── Interfaces & Classes ─────────────────────────────────────────────────────
+
+interface Vehicle {
+  def id(): String
+  def make(): String
+  def model(): String
+  def year(): Int
+  def fuelType(): FuelType
+  def status(): VehicleStatus
+  def capacity(): Int
+  def describe(): String
+}
+
+class Car conforms Vehicle {
+  val _id: String
+  val _make: String
+  val _model: String
+  val _year: Int
+  val _fuelType: FuelType
+  var _status: VehicleStatus
+  val _seats: Int
+
+public:
+  def this(id: String, make: String, model: String, year: Int,
+           ft: FuelType, seats: Int) {
+    _id = id; _make = make; _model = model; _year = year
+    _fuelType = ft; _status = new Active(); _seats = seats
+  }
+  def id(): String = _id
+  def make(): String = _make
+  def model(): String = _model
+  def year(): Int = _year
+  def fuelType(): FuelType = _fuelType
+  def status(): VehicleStatus = _status
+  def capacity(): Int = _seats
+  def setStatus(s: VehicleStatus): void { _status = s }
+  def describe(): String =
+    "Car    [#{_id}] #{_year} #{_make} #{_model} (#{_seats} seats)"
+}
+
+class Truck conforms Vehicle {
+  val _id: String
+  val _make: String
+  val _model: String
+  val _year: Int
+  val _fuelType: FuelType
+  var _status: VehicleStatus
+  val _payloadTons: Double
+
+public:
+  def this(id: String, make: String, model: String, year: Int,
+           ft: FuelType, payloadTons: Double) {
+    _id = id; _make = make; _model = model; _year = year
+    _fuelType = ft; _status = new Active(); _payloadTons = payloadTons
+  }
+  def id(): String = _id
+  def make(): String = _make
+  def model(): String = _model
+  def year(): Int = _year
+  def fuelType(): FuelType = _fuelType
+  def status(): VehicleStatus = _status
+  def capacity(): Int = (_payloadTons * 1000.0).intValue()
+  def setStatus(s: VehicleStatus): void { _status = s }
+  def describe(): String =
+    "Truck  [#{_id}] #{_year} #{_make} #{_model} (#{_payloadTons.fmt2()} t payload)"
+}
+
+// ─── Fleet Manager ────────────────────────────────────────────────────────────
+
+class FleetManager {
+  val _vehicles: List[Object]
+  val _trips: List[Object]
+  val _maintenance: List[Object]
+
+public:
+  def this() {
+    _vehicles = []
+    _trips = []
+    _maintenance = []
+  }
+
+  def addVehicle(v: Vehicle): void { _vehicles.add(v) }
+  def logTrip(t: TripEntry): void  { _trips.add(t) }
+  def logMaintenance(m: MaintenanceEntry): void { _maintenance.add(m) }
+
+  def allVehicles(): List[Object] = _vehicles
+  def allTrips(): List[Object]    = _trips
+  def allMaintenance(): List[Object] = _maintenance
+
+  def activeVehicles(): List[Object] {
+    return _vehicles.filter { v =>
+      select (v as Vehicle).status() {
+        case s is Active: true
+        else: false
+      }
+    }
+  }
+
+  def tripsFor(vid: String): List[Object] {
+    return _trips.filter { t => (t as TripEntry).vehicleId() == vid }
+  }
+
+  def totalDistanceFor(vid: String): Double {
+    return tripsFor(vid).fold(0.0) { acc, t => acc + (t as TripEntry).distanceKm() }
+  }
+
+  def fuelEfficiencyFor(vid: String): Double {
+    val ts: List[Object] = tripsFor(vid)
+    val dist: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).distanceKm() }
+    val fuel: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).fuelUsedL() }
+    if fuel <= 0.0 { return 0.0 }
+    return dist / fuel
+  }
+
+  def maintenanceCostFor(vid: String): Double {
+    return _maintenance
+      .filter { m => (m as MaintenanceEntry).vehicleId() == vid }
+      .fold(0.0) { acc, m => acc + (m as MaintenanceEntry).costUsd() }
+  }
+
+  def topDriver(): String? {
+    if _trips.size == 0 { return null }
+    val byDriver = _trips.groupBy { t => (t as TripEntry).driver() }
+    var bestDriver: String? = null
+    var bestDist: Double = 0.0
+    foreach (driver, driverTrips) in byDriver {
+      val dist: Double = (driverTrips as List[Object]).fold(0.0) { acc, t =>
+        acc + (t as TripEntry).distanceKm()
+      }
+      if dist > bestDist { bestDist = dist; bestDriver = driver as String }
+    }
+    return bestDriver
+  }
+
+  def stats(): FleetStats {
+    val active: List[Object] = activeVehicles()
+    val totalDist: Double = _vehicles.fold(0.0) { acc, v =>
+      acc + totalDistanceFor((v as Vehicle).id())
+    }
+    var effSum: Double = 0.0
+    var effCount: Int = 0
+    foreach v: Vehicle in active {
+      val eff: Double = fuelEfficiencyFor(v.id())
+      if eff > 0.0 { effSum = effSum + eff; effCount = effCount + 1 }
+    }
+    val avgEff: Double = if effCount == 0 { 0.0 } else { effSum / (effCount as Double) }
+    val totalMaint: Double = _vehicles.fold(0.0) { acc, v =>
+      acc + maintenanceCostFor((v as Vehicle).id())
+    }
+    return new FleetStats(_vehicles.size, active.size, totalDist, avgEff, totalMaint)
+  }
+}
+
+// ─── Reporting Helpers ────────────────────────────────────────────────────────
+
+def hr(n: Int): void {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "-"; i = i + 1 }
+  IO::println(s)
+}
+
+def printVehicleReport(fm: FleetManager): void {
+  IO::println("VEHICLE ROSTER")
+  hr(74)
+  foreach v: Vehicle in fm.allVehicles() {
+    val statusStr: String = select v.status() {
+      case a is Active:        "Active"
+      case m is InMaintenance: "Maint(#{m.reason()})"
+      case r is Retired:       "Retired @#{r.odometer()} km"
+    }
+    val dist: Double = fm.totalDistanceFor(v.id())
+    val eff: Double  = fm.fuelEfficiencyFor(v.id())
+    val cost: Double = fm.maintenanceCostFor(v.id())
+    IO::println("#{v.describe().padRight(44)} | #{statusStr.padRight(18)} | #{dist.fmt2()} km | #{eff.fmt2()} km/L | $#{cost.fmt2()}")
+  }
+  hr(74)
+}
+
+def printTripSummary(fm: FleetManager): void {
+  IO::println("")
+  IO::println("TRIP LOG BY DRIVER")
+  hr(60)
+  val byDriver = fm.allTrips().groupBy { t => (t as TripEntry).driver() }
+  foreach (driver, driverTrips) in byDriver {
+    val ts: List[Object] = driverTrips as List[Object]
+    val totalDist: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).distanceKm() }
+    val totalFuel: Double = ts.fold(0.0) { acc, t => acc + (t as TripEntry).fuelUsedL() }
+    val eff: Double = if totalFuel > 0.0 { totalDist / totalFuel } else { 0.0 }
+    IO::println("#{(driver as String).padRight(10)} trips=#{ts.size}  dist=#{totalDist.fmt2()} km  fuel=#{totalFuel.fmt2()} L  eff=#{eff.fmt2()} km/L")
+  }
+  hr(60)
+}
+
+def printFuelBreakdown(fm: FleetManager): void {
+  IO::println("")
+  IO::println("FLEET BY FUEL TYPE")
+  hr(40)
+  val byFuel = fm.allVehicles().groupBy { v => (v as Vehicle).fuelType().label() }
+  foreach (ft, vs) in byFuel {
+    IO::println("  #{(ft as String).padRight(12)}: #{(vs as List[Object]).size} vehicle(s)")
+  }
+  hr(40)
+}
+
+def printFleetStats(fm: FleetManager): void {
+  IO::println("")
+  IO::println("FLEET SUMMARY")
+  hr(40)
+  val s: FleetStats = fm.stats()
+  IO::println("Total vehicles   : #{s.totalVehicles()}")
+  IO::println("Active           : #{s.activeCount()}")
+  IO::println("Total distance   : #{s.totalDistanceKm().fmt2()} km")
+  IO::println("Avg fuel eff     : #{s.avgFuelEffKmL().fmt2()} km/L")
+  IO::println("Total maint cost : $#{s.totalMaintenanceCost().fmt2()}")
+  val top: String? = fm.topDriver()
+  if top != null { IO::println("Top driver       : #{top}") }
+  hr(40)
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val fm: FleetManager = new FleetManager()
+
+val c1: Car   = new Car("C-001", "Toyota", "Camry",   2021, FuelType::Gasoline, 5)
+val c2: Car   = new Car("C-002", "Tesla",  "Model 3", 2023, FuelType::Electric, 5)
+val c3: Car   = new Car("C-003", "Honda",  "Civic",   2020, FuelType::Hybrid,   5)
+val t1: Truck = new Truck("T-001", "Ford",  "F-150", 2019, FuelType::Gasoline, 1.5)
+val t2: Truck = new Truck("T-002", "Volvo", "FH16",  2022, FuelType::Diesel,   25.0)
+
+fm.addVehicle(c1); fm.addVehicle(c2); fm.addVehicle(c3)
+fm.addVehicle(t1); fm.addVehicle(t2)
+
+c3.setStatus(new InMaintenance("Brake service"))
+t1.setStatus(new Retired(148000))
+
+fm.logTrip(new TripEntry("C-001", 120.5,  9.2, "Alice"))
+fm.logTrip(new TripEntry("C-001",  88.0,  6.8, "Alice"))
+fm.logTrip(new TripEntry("C-002", 200.0, 15.0, "Bob"))
+fm.logTrip(new TripEntry("C-002",  95.5,  7.1, "Bob"))
+fm.logTrip(new TripEntry("C-003",  45.0,  3.8, "Carol"))
+fm.logTrip(new TripEntry("T-001", 320.0, 52.0, "Dave"))
+fm.logTrip(new TripEntry("T-002", 850.0,120.0, "Dave"))
+fm.logTrip(new TripEntry("T-002", 430.0, 62.5, "Alice"))
+fm.logTrip(new TripEntry("C-001",  55.0,  4.3, "Carol"))
+
+fm.logMaintenance(new MaintenanceEntry("C-001", "Oil change",      85.0,  45200))
+fm.logMaintenance(new MaintenanceEntry("C-002", "Tire rotation",   60.0,  22100))
+fm.logMaintenance(new MaintenanceEntry("C-003", "Brake service",  320.0,  67800))
+fm.logMaintenance(new MaintenanceEntry("T-001", "Engine overhaul",4500.0, 148000))
+fm.logMaintenance(new MaintenanceEntry("T-002", "Filter change",  150.0,  91400))
+fm.logMaintenance(new MaintenanceEntry("T-002", "Oil change",     220.0,  99800))
+
+printVehicleReport(fm)
+printTripSummary(fm)
+printFuelBreakdown(fm)
+printFleetStats(fm)
+
+// Efficiency ranking for active vehicles
+IO::println("")
+IO::println("ACTIVE VEHICLE EFFICIENCY RANKING")
+hr(44)
+val active: List[Object] = fm.activeVehicles()
+val ranked: List[Object] = active.sortedBy { v =>
+  0.0 - fm.fuelEfficiencyFor((v as Vehicle).id())
+}
+var rank: Int = 1
+foreach v: Vehicle in ranked {
+  val eff: Double = fm.fuelEfficiencyFor(v.id())
+  IO::println("  #{rank}. #{v.id()}  #{(v.make() + " " + v.model()).padRight(18)}  #{eff.fmt2()} km/L  (#{v.fuelType().label().trim()})")
+  rank = rank + 1
+}
+hr(44)
+
+// try/catch demo: parse an integer from a string, handle failure
+IO::println("")
+try {
+  val parsed: Int = Integer::parseInt("not-a-number")
+  IO::println("parsed: #{parsed}")
+} catch e: Exception {
+  IO::println("Parse failed (expected): #{e.message()}")
+}
+
+// Partition vehicles by active / not active
+val parts = fm.allVehicles().partition { v =>
+  select (v as Vehicle).status() { case a is Active: true; else: false }
+}
+val operational: List[Object] = parts[0] as List[Object]
+val offline: List[Object]     = parts[1] as List[Object]
+IO::println("")
+IO::println("Operational: #{operational.size}  Offline: #{offline.size}")
+
+// Distinct fuel types used
+val usedFuels = fm.allVehicles()
+  .map { v => (v as Vehicle).fuelType().label() }
+  .distinct()
+IO::println("Fuel types in fleet: #{usedFuels.size}")
+foreach ft: Object in usedFuels { IO::println("  - #{(ft as String).trim()}") }

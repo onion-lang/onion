@@ -1,0 +1,308 @@
+// BudgetTracker.on — personal finance tracker.
+// Exercises: ADT case-enum (TransactionKind), homogeneous enum (Month),
+// records with methods (Transaction, Category, MonthSummary), class with
+// ArrayList (Account), collection pipelines (groupBy/sortedBy/filter/map/
+// fold/partition/reverse/take/distinct), select with type patterns,
+// string interpolation, foreach on map (k,v), nullable map lookup,
+// tail-recursive compound-interest helper, range-based foreach.
+
+import { java.util.ArrayList }
+
+// ─────────────────────────── enums ────────────────────────────────────────
+
+enum Month {
+  Jan, Feb, Mar, Apr, May, Jun,
+  Jul, Aug, Sep, Oct, Nov, Dec
+public:
+  def label(): String = select this {
+    case Month::Jan: "January"
+    case Month::Feb: "February"
+    case Month::Mar: "March"
+    case Month::Apr: "April"
+    case Month::May: "May"
+    case Month::Jun: "June"
+    case Month::Jul: "July"
+    case Month::Aug: "August"
+    case Month::Sep: "September"
+    case Month::Oct: "October"
+    case Month::Nov: "November"
+    case Month::Dec: "December"
+    else: "Unknown"
+  }
+  def quarter(): Int = select this {
+    case Month::Jan: 1
+    case Month::Feb: 1
+    case Month::Mar: 1
+    case Month::Apr: 2
+    case Month::May: 2
+    case Month::Jun: 2
+    case Month::Jul: 3
+    case Month::Aug: 3
+    case Month::Sep: 3
+    case Month::Oct: 4
+    case Month::Nov: 4
+    case Month::Dec: 4
+    else: 0
+  }
+}
+
+// ADT: either income (with source label) or expense (with category name).
+enum TransactionKind {
+  case Income(source: String)
+  case Expense(category: String)
+public:
+  def label(): String = select this {
+    case k is Income:  "Income[#{k.source()}]"
+    case k is Expense: "Expense[#{k.category()}]"
+  }
+  def isExpense(): Boolean = select this {
+    case k is Expense: true
+    else: false
+  }
+  def isIncome(): Boolean = !this.isExpense()
+}
+
+// ─────────────────────────── records ──────────────────────────────────────
+
+record Transaction(id: Int, month: Month, amount: Double, kind: TransactionKind, note: String) {
+public:
+  def sign(): Double = if kind.isExpense() { -amount } else { amount }
+  def display(): String =
+    "  [#{id}] #{month.label()} #{kind.label()} $#{String::format("%.2f", amount)} — #{note}"
+}
+
+record Category(name: String, budget: Double) {
+public:
+  def isOverBudget(spent: Double): Boolean = spent > budget
+}
+
+record MonthSummary(month: Month, income: Double, expenses: Double) {
+public:
+  def net(): Double = income - expenses
+  def savingsRate(): Double {
+    if income <= 0.0 { return 0.0 }
+    return (income - expenses) / income * 100.0
+  }
+  def display(): String =
+    "#{month.label()}: income=$#{String::format("%.2f", income)} " +
+    "expenses=$#{String::format("%.2f", expenses)} " +
+    "net=$#{String::format("%.2f", net())} " +
+    "savings=#{String::format("%.1f", savingsRate())}%"
+}
+
+// ─────────────────────────── Account class ────────────────────────────────
+
+class Account {
+  val accountName: String
+  val rows: ArrayList[Transaction]
+  var nextId: Int
+public:
+  def this(name: String) {
+    this.accountName = name
+    this.rows = new ArrayList[Transaction]()
+    this.nextId = 1
+  }
+  def name(): String = accountName
+  def log(month: Month, amount: Double, kind: TransactionKind, note: String): Transaction {
+    val t = new Transaction(nextId, month, amount, kind, note)
+    rows.add(t)
+    nextId = nextId + 1
+    return t
+  }
+  def addIncome(month: Month, amount: Double, source: String, note: String): Transaction =
+    this.log(month, amount, new Income(source), note)
+  def addExpense(month: Month, amount: Double, cat: String, note: String): Transaction =
+    this.log(month, amount, new Expense(cat), note)
+  def all(): List[Transaction] {
+    val result: List[Transaction] = []
+    foreach t: Transaction in rows { result << t }
+    return result
+  }
+  def size(): Int = rows.size()
+}
+
+// ─────────────────────────── helper functions ─────────────────────────────
+
+def catName(t: Transaction): String {
+  return select t.kind() {
+    case k is Expense: k.category()
+    else: "Other"
+  }
+}
+
+def totalAmt(txs: List[Transaction]): Double {
+  return txs.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+}
+
+def netAmt(txs: List[Transaction]): Double {
+  return txs.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).sign() } as Double
+}
+
+def monthSummaries(txs: List[Transaction]): List[MonthSummary] {
+  val byMonth = txs.groupBy { t => (t as Transaction).month() }
+  val result: List[MonthSummary] = []
+  foreach (m, grp) in byMonth {
+    val group = grp as List[Object]
+    val inc = group.filter { t => (t as Transaction).kind().isIncome()  }
+                   .fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+    val exp = group.filter { t => (t as Transaction).kind().isExpense() }
+                   .fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+    result << new MonthSummary(m as Month, inc, exp)
+  }
+  return result
+}
+
+def catSpend(txs: List[Transaction]): Map[Object, Object] {
+  val exps = txs.filter { t => (t as Transaction).kind().isExpense() }
+  val bycat = exps.groupBy { t => catName(t as Transaction) }
+  val out: Map[Object, Object] = [:]
+  foreach (cat, grp) in bycat {
+    val total = (grp as List[Object])
+                  .fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+    out[cat] = total
+  }
+  return out
+}
+
+// tail-recursive: compound interest from initial principal
+def compound(principal: Double, ratePerMonth: Double, months: Int): Double {
+  if months <= 0 { return principal }
+  return compound(principal * (1.0 + ratePerMonth), ratePerMonth, months - 1)
+}
+
+// ─────────────────────────── data ─────────────────────────────────────────
+
+val acct = new Account("Personal 2024")
+
+// January
+acct.addIncome( Month::Jan, 4200.0, "Salary",    "January pay")
+acct.addExpense(Month::Jan,  950.0, "Rent",      "January rent")
+acct.addExpense(Month::Jan,  320.0, "Food",      "Groceries + eating out")
+acct.addExpense(Month::Jan,   80.0, "Transport", "Bus pass")
+acct.addExpense(Month::Jan,  150.0, "Utilities", "Electric + gas")
+acct.addExpense(Month::Jan,   60.0, "Fun",       "Cinema tickets")
+
+// February
+acct.addIncome( Month::Feb, 4200.0, "Salary",    "February pay")
+acct.addIncome( Month::Feb,  200.0, "Freelance", "Side project")
+acct.addExpense(Month::Feb,  950.0, "Rent",      "February rent")
+acct.addExpense(Month::Feb,  290.0, "Food",      "Groceries")
+acct.addExpense(Month::Feb,   80.0, "Transport", "Bus pass")
+acct.addExpense(Month::Feb,  200.0, "Health",    "Dentist")
+acct.addExpense(Month::Feb,  400.0, "Fun",       "Valentine's weekend")
+
+// March
+acct.addIncome( Month::Mar, 4200.0, "Salary",    "March pay")
+acct.addIncome( Month::Mar,  350.0, "Freelance", "Another project")
+acct.addExpense(Month::Mar,  950.0, "Rent",      "March rent")
+acct.addExpense(Month::Mar,  310.0, "Food",      "Groceries")
+acct.addExpense(Month::Mar,   80.0, "Transport", "Bus pass")
+acct.addExpense(Month::Mar,  100.0, "Utilities", "Electric")
+acct.addExpense(Month::Mar,  250.0, "Savings",   "Emergency fund")
+acct.addExpense(Month::Mar,   90.0, "Fun",       "Concert")
+
+val all = acct.all()
+
+// ── Overview ──────────────────────────────────────────────────────────────
+IO::println("Account: #{acct.name()}")
+IO::println("Transactions: #{acct.size()}")
+IO::println("")
+
+// ── Monthly summaries ─────────────────────────────────────────────────────
+IO::println("─── Monthly Summaries ───")
+foreach s: MonthSummary in monthSummaries(all) {
+  IO::println(s.display())
+}
+IO::println("")
+
+// ── Category breakdown ────────────────────────────────────────────────────
+IO::println("─── Spending by Category ───")
+val spend = catSpend(all)
+val cats = all.filter { t => t.kind().isExpense() }
+              .map    { t => catName(t) }
+              .distinct()
+              .sortedBy { c => c as String }
+foreach cat: Object in cats {
+  val spentObj = spend[cat]
+  val spent: Double = if spentObj == null { 0.0 } else { spentObj as Double }
+  IO::println("  #{cat}: $#{String::format("%.2f", spent)}")
+}
+IO::println("")
+
+// ── Top 5 expenses ────────────────────────────────────────────────────────
+IO::println("─── Top 5 Expenses ───")
+val topExp = all.filter  { t => t.kind().isExpense() }
+                .sortedBy{ t => t.amount() }
+                .reverse()
+                .take(5)
+foreach t: Transaction in topExp {
+  IO::println(t.display())
+}
+IO::println("")
+
+// ── Income vs expenses (partition) ────────────────────────────────────────
+val parts    = all.partition { t => t.kind().isIncome() }
+val incList  = parts[0] as List[Object]
+val expList  = parts[1] as List[Object]
+val totInc   = incList.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+val totExp   = expList.fold(0.0) { acc, t => (acc as Double) + (t as Transaction).amount() } as Double
+IO::println("─── Totals ───")
+IO::println("  Total income:   $#{String::format("%.2f", totInc)}")
+IO::println("  Total expenses: $#{String::format("%.2f", totExp)}")
+IO::println("  Net:            $#{String::format("%.2f", totInc - totExp)}")
+IO::println("")
+
+// ── Budget check ──────────────────────────────────────────────────────────
+IO::println("─── Budget Check (3-month totals) ───")
+val catList: List[Category] = [
+  new Category("Rent",      3000.0),
+  new Category("Food",      1050.0),
+  new Category("Transport",  300.0),
+  new Category("Fun",        600.0),
+  new Category("Utilities",  600.0),
+  new Category("Health",     600.0)
+]
+foreach c: Category in catList {
+  val spentObj = spend[c.name()]
+  val spent: Double = if spentObj == null { 0.0 } else { spentObj as Double }
+  val status = if c.isOverBudget(spent) { "OVER" } else { "ok" }
+  IO::println("  #{c.name()}: $#{String::format("%.2f", spent)} / $#{String::format("%.2f", c.budget())} [#{status}]")
+}
+IO::println("")
+
+// ── Freelance income ──────────────────────────────────────────────────────
+IO::println("─── Freelance Income ───")
+val freelance = all.filter { t =>
+  select t.kind() {
+    case k is Income: k.source() == "Freelance"
+    else: false
+  }
+}
+IO::println("  Count: #{freelance.size}")
+IO::println("  Total: $#{String::format("%.2f", totalAmt(freelance))}")
+IO::println("")
+
+// ── Savings projection (tail-recursive compound interest) ─────────────────
+val net3 = netAmt(all)
+IO::println("─── Savings Projection ───")
+IO::println("  Net savings so far: $#{String::format("%.2f", net3)}")
+IO::println("  At 6%/yr after 9 more months: $#{String::format("%.2f", compound(net3, 0.005, 9))}")
+IO::println("")
+
+// ── Quarter distribution (groupBy on Int key) ─────────────────────────────
+IO::println("─── Quarter Distribution ───")
+val byQ = all.groupBy { t => t.month().quarter() }
+foreach (q, grp) in byQ {
+  val group = grp as List[Object]
+  val nExp = group.filter { t => (t as Transaction).kind().isExpense() }.size
+  IO::println("  Q#{q}: #{group.size} transactions (#{nExp} expenses)")
+}
+IO::println("")
+
+// ── Running balance across first 8 entries ────────────────────────────────
+IO::println("─── Running Balance (first 8 transactions) ───")
+var balance: Double = 0.0
+foreach tx: Transaction in all.take(8) {
+  balance = balance + tx.sign()
+  IO::println("  After [#{tx.id()}] #{tx.note()}: $#{String::format("%.2f", balance)}")
+}

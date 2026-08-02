@@ -414,6 +414,7 @@ table lists all of them, so a code seen in a build log can always be looked up.
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
+| `E0084` | duplicated extension method …(…) on … |
 
 ## See also
 

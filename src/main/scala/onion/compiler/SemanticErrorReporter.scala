@@ -236,6 +236,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.duplicateGeneratedMethod",
       Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
     ),
+    SemanticError.DUPLICATE_EXTENSION_METHOD -> ErrorDef(
+      "error.semantic.duplicateExtensionMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
 
     // Access errors
     SemanticError.METHOD_NOT_ACCESSIBLE -> ErrorDef(

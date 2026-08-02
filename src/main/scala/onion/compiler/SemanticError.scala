@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0083) for identification
+ * type checking. Each error has a unique code (E0000-E0084) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -164,6 +164,7 @@ object SemanticError {
   case object TOOL_PARAMETER_NOT_CLI_CONVERTIBLE extends SemanticError(81)
   case object DUPLICATE_TOOL_NAME extends SemanticError(82)
   case object UNREACHABLE_CATCH_CLAUSE extends SemanticError(83)
+  case object DUPLICATE_EXTENSION_METHOD extends SemanticError(84)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

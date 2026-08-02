@@ -318,6 +318,11 @@ class OnionCliSpec extends AnyFunSuite with Matchers:
     watchExit shouldBe 0
     stdout.toString(StandardCharsets.UTF_8) should include("Usage: onion [options] <source_file>")
     stdout.toString(StandardCharsets.UTF_8) should include(s"Onion Script Runner version ${ScriptRunner.VERSION}")
+    // These three runner options are recognized by runMain/run (see ScriptRunner.scala)
+    // but had silently drifted out of printUsage's help text.
+    stdout.toString(StandardCharsets.UTF_8) should include("--effects")
+    stdout.toString(StandardCharsets.UTF_8) should include("--stacktrace")
+    stdout.toString(StandardCharsets.UTF_8) should include("--watch")
 
   test("ScriptRunner runMain reports a script's exception instead of rethrowing it"):
     val source = Files.createTempFile("onion-cli-throws", ".on")

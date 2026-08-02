@@ -2,21 +2,21 @@
 
 「実用的品質」は意図的に曖昧な表現なので、このファイルではそれを**客観的に測定可能な指標**のセットに固定します。各行には実行可能な測定方法と閾値があり、すべての行が通過したときに言語は基準に達したとみなされます。
 
-ベースライン数値は 2026-07-27 時点（develop @ c2126299）の実測値です。前回のベースライン
-（2026-07-27 @ 871fe5a1）は、effect-table / tool-capability / tool-contracts の作業
+ベースライン数値は 2026-07-26 時点（develop @ c2126299）の実測値です。前回のベースライン
+（2026-07-26 @ 871fe5a1）は、effect-table / tool-capability / tool-contracts の作業
 （#356、#357、#358）が入った後にはすでに乖離していました——テスト数は 2590 と記録されて
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（`docs/guide/tools.md` が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した `E0077`–`E0079`）でした。
 
-| # | 次元 | 測定方法 | 現在値（2026-07-27） | 合格閾値 |
+| # | 次元 | 測定方法 | 現在値（2026-08-02） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2848 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 65 / 65 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 8（BrokenLogDemo、InventoryManager、OrderReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager、ToolDemo） | ≥ 5 |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3108 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 91 / 91 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 34（AuctionHouse、BankLedger、BankSystem、Blackjack、BrokenLogDemo、BudgetTracker、EventTicketing、FitnessTracker、FleetManager、GameStore、GradeBook、GraphSearch、HotelReservation、Inventory、InventoryManager、LibraryCatalog、LibrarySystem、MathParser、MiniRpg、MusicLibrary、OrderReport、ParkingGarage、PayrollReport、PlaylistManager、RecipeManager、ShapeProcessor、ShoppingCart、StatsApp、StockPortfolio、TaskPlanner、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
-| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 81 | よくあるエラーごとに専用コード |
+| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 82 | よくあるエラーごとに専用コード |
 
 **`SBT_OPTS` は設定しないでください。** 以前のこのファイルは `SBT_OPTS="-Xmx2g"` を薦めて
 いましたが、これは現在プロジェクト既定の 4g を*下げて*しまい、スイートの途中で

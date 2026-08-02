@@ -1,0 +1,308 @@
+// ShoppingCart.on — An online shopping cart with validation, discounts, and reports.
+//
+// Exercises: generic ADT enum (Validation[T]), data-carrying ADT enum (Discount),
+// plain enum (Category), records with methods and example clauses, extension methods
+// on Int/Double/String, collection pipelines (map/filter/fold/groupBy/sortedBy/
+// partition/find), select type patterns with exhaustiveness, foreach (k,v)
+// on Map, string interpolation, closures, try/catch, while loops, nullable types.
+
+import { java.util.ArrayList }
+
+// ── Extension methods ──────────────────────────────────────────────────────────
+
+extension Int {
+  def formatCents(): String {
+    val dollars: Int = self / 100
+    val cents: Int = self % 100
+    val centsStr: String = if cents < 10 { "0" + cents } else { "" + cents }
+    return "$#{dollars}.#{centsStr}"
+  }
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "*"; i = i + 1 }
+    return s
+  }
+}
+
+extension Double {
+  def fmtPct(): String = (self * 100.0).intValue() + "%"
+  def roundCents(): Int = (self + 0.5).intValue()
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ── Category (plain enum) ─────────────────────────────────────────────────────
+
+enum Category {
+  ELECTRONICS, CLOTHING, FOOD, BOOKS, TOYS
+public:
+  def label(): String = select this {
+    case e when e == Category::ELECTRONICS: "Electronics"
+    case c when c == Category::CLOTHING:    "Clothing"
+    case f when f == Category::FOOD:        "Food & Grocery"
+    case b when b == Category::BOOKS:       "Books"
+    else: "Toys & Games"
+  }
+  def taxRate(): Double = select this {
+    case f when f == Category::FOOD:  0.0
+    case b when b == Category::BOOKS: 0.05
+    else: 0.10
+  }
+}
+
+// ── Product record ────────────────────────────────────────────────────────────
+
+record Product(
+  sku: String,
+  name: String,
+  priceCents: Int,
+  category: Category,
+  stock: Int
+) {
+public:
+  def priceStr(): String = priceCents().formatCents()
+  def isAvailable(): Boolean = stock() > 0
+  def isLowStock(): Boolean = stock() > 0 && stock() <= 5
+}
+
+example { new Product("X", "Test", 100, Category::FOOD, 5).priceStr() == "$1.00" }
+example { new Product("X", "T", 100, Category::ELECTRONICS, 5).isLowStock() }
+example { !new Product("X", "T", 100, Category::FOOD, 0).isAvailable() }
+
+// ── CartItem record ───────────────────────────────────────────────────────────
+
+record CartItem(product: Product, qty: Int) {
+public:
+  def subtotalCents(): Int = product().priceCents() * qty()
+  def subtotalStr(): String = subtotalCents().formatCents()
+  def lineStr(): String =
+    "#{qty()}x #{product().name().padRight(24)} #{product().priceStr().padLeft(10)} = #{subtotalStr().padLeft(10)}"
+}
+
+example { new CartItem(new Product("X","Y",1000,Category::FOOD,1), 3).subtotalCents() == 3000 }
+
+// ── Discount (ADT enum) ───────────────────────────────────────────────────────
+
+enum Discount {
+  case Percentage(pct: Double)
+  case FixedAmount(cents: Int)
+  case CategoryDiscount(cat: Category, pct: Double)
+public:
+  def apply(subtotalCents: Int, items: List[CartItem]): Int = select this {
+    case p is Percentage:
+      (subtotalCents as Double * p.pct()).roundCents()
+    case f is FixedAmount:
+      if f.cents() <= subtotalCents { f.cents() } else { subtotalCents }
+    case c is CategoryDiscount:
+      var catTotal: Int = 0
+      foreach it: CartItem in items { if it.product().category() == c.cat() { catTotal = catTotal + it.subtotalCents() } }
+      (catTotal as Double * c.pct()).roundCents()
+  }
+  def describe(): String = select this {
+    case p is Percentage:       p.pct().fmtPct() + " off entire order"
+    case f is FixedAmount:      f.cents().formatCents() + " off order"
+    case c is CategoryDiscount: c.pct().fmtPct() + " off " + c.cat().label()
+  }
+}
+
+// ── Validation (generic ADT enum) ────────────────────────────────────────────
+
+enum Validation[T] {
+  case Ok(value: T)
+  case Fail(errors: List[String])
+public:
+  def isOk(): Boolean = select this { case ok is Ok: true; else: false }
+  def isFail(): Boolean = select this { case err is Fail: true; else: false }
+  def toStr(): String = select this {
+    case ok is Ok:    "Ok(" + ok.value() + ")"
+    case err is Fail: "Fail: " + err.errors()
+  }
+}
+
+// ── Product catalog ───────────────────────────────────────────────────────────
+
+val catalog: List[Product] = [
+  new Product("E001", "Wireless Headphones", 7999, Category::ELECTRONICS, 12),
+  new Product("E002", "USB-C Hub",           2499, Category::ELECTRONICS, 3),
+  new Product("E003", "Mechanical Keyboard", 8999, Category::ELECTRONICS, 0),
+  new Product("C001", "Cotton T-Shirt",      1599, Category::CLOTHING,    25),
+  new Product("C002", "Denim Jeans",         4999, Category::CLOTHING,    8),
+  new Product("C003", "Running Shoes",       9999, Category::CLOTHING,    2),
+  new Product("F001", "Organic Coffee",       899, Category::FOOD,        50),
+  new Product("F002", "Dark Chocolate",       349, Category::FOOD,        30),
+  new Product("B001", "Design Patterns",     3999, Category::BOOKS,       15),
+  new Product("B002", "Clean Code",          3499, Category::BOOKS,       7),
+  new Product("T001", "LEGO Set",            5999, Category::TOYS,        4)
+]
+
+def findProduct(sku: String): Product? {
+  val found = catalog.find { p => (p as Product).sku() == sku }
+  return if found != null { found as Product } else { null }
+}
+
+// ── Validate and build cart ───────────────────────────────────────────────────
+
+def validateAddToCart(sku: String, qty: Int): Validation[CartItem] {
+  val errors: ArrayList[String] = new ArrayList[String]()
+  if qty <= 0 { errors.add("Quantity must be positive, got " + qty) }
+  val p: Product? = findProduct(sku)
+  if p == null {
+    errors.add("Unknown SKU: " + sku)
+    return new Fail[CartItem](errors)
+  }
+  if !p.isAvailable() {
+    errors.add(p.name() + " is out of stock")
+  } else if qty > p.stock() {
+    errors.add("Only #{p.stock()} of #{p.name()} in stock; requested #{qty}")
+  }
+  if errors.size() > 0 { return new Fail[CartItem](errors) }
+  return new Ok[CartItem](new CartItem(p, qty))
+}
+
+IO::println("=== Online Shopping Cart ===")
+IO::println("")
+
+val itemRequests: List[Object] = [
+  ["E001", 2], ["E002", 1], ["C001", 3], ["F001", 1],
+  ["B001", 1], ["B002", 1], ["T001", 1],
+  ["E003", 1], ["FAKE", 1], ["C003", 10]
+]
+
+val cart: ArrayList[CartItem] = new ArrayList[CartItem]()
+val rejected: ArrayList[String] = new ArrayList[String]()
+
+IO::println("── Validation Results ─────────────────────────────────────────────")
+foreach req: Object in itemRequests {
+  val pair: List[Object] = req as List[Object]
+  val sku: String = pair[0] as String
+  val qty: Int = pair[1] as Int
+  val result: Validation[CartItem] = validateAddToCart(sku, qty)
+  select result {
+    case ok is Ok:
+      cart.add(ok.value())
+      IO::println("  [OK]   #{qty}x #{ok.value().product().name()} @ #{ok.value().product().priceStr()}")
+    case err is Fail:
+      rejected.add(sku)
+      IO::println("  [FAIL] #{sku}: " + (err.errors() as List[String])[0])
+  }
+}
+IO::println("  #{cart.size()} added, #{rejected.size()} rejected")
+IO::println("")
+
+// ── Cart contents ─────────────────────────────────────────────────────────────
+
+IO::println("── Cart Contents ──────────────────────────────────────────────────")
+val sep57: String = "-".rep(57)
+IO::println("  " + "Item".padRight(32) + "  Unit price  Subtotal")
+IO::println("  " + sep57)
+var subtotal: Int = 0
+val cartItems: List[CartItem] = cart
+foreach item: CartItem in cartItems {
+  IO::println("  " + item.lineStr())
+  subtotal = subtotal + item.subtotalCents()
+}
+IO::println("  " + sep57)
+IO::println("  " + "Subtotal".padRight(48) + subtotal.formatCents().padLeft(10))
+IO::println("")
+
+// ── Discounts ─────────────────────────────────────────────────────────────────
+
+val discounts: List[Discount] = [
+  new Percentage(0.10),
+  new FixedAmount(500),
+  new CategoryDiscount(Category::ELECTRONICS, 0.15)
+]
+
+IO::println("── Discount Options ───────────────────────────────────────────────")
+var bestDiscount: Discount? = null
+var bestSaving: Int = 0
+foreach d: Discount in discounts {
+  val saving: Int = d.apply(subtotal, cartItems)
+  IO::println("  #{d.describe().padRight(34)}: saves #{saving.formatCents()}")
+  if saving > bestSaving {
+    bestSaving = saving
+    bestDiscount = d
+  }
+}
+IO::println("")
+
+// ── Compute tax per category ──────────────────────────────────────────────────
+
+var taxTotal: Int = 0
+foreach item: CartItem in cartItems {
+  taxTotal = taxTotal + (item.subtotalCents() as Double * item.product().category().taxRate()).roundCents()
+}
+
+// ── Order summary ─────────────────────────────────────────────────────────────
+
+val discountAmt: Int = if bestDiscount != null { bestSaving } else { 0 }
+val discountDesc: String = if bestDiscount != null { (bestDiscount as Discount).describe() } else { "none" }
+val afterDiscount: Int = subtotal - discountAmt
+val grandTotal: Int = afterDiscount + taxTotal
+
+IO::println("── Order Summary ──────────────────────────────────────────────────")
+IO::println("  Subtotal:           " + subtotal.formatCents().padLeft(10))
+IO::println("  Best discount:      #{discountDesc}")
+IO::println("  Discount:          -" + discountAmt.formatCents().padLeft(9))
+IO::println("  Tax (by category): +" + taxTotal.formatCents().padLeft(9))
+IO::println("  " + "-".rep(34))
+IO::println("  GRAND TOTAL:        " + grandTotal.formatCents().padLeft(10))
+IO::println("")
+
+// ── Category breakdown ────────────────────────────────────────────────────────
+
+IO::println("── Spending by Category ───────────────────────────────────────────")
+val byCategory = cartItems.groupBy { i => (i as CartItem).product().category().label() }
+foreach (catLabel, catItems) in byCategory {
+  val ps = catItems as List[CartItem]
+  var catTotal: Int = 0
+  foreach ci: CartItem in ps { catTotal = catTotal + ci.subtotalCents() }
+  val catTax: Int = (catTotal as Double * (ps[0] as CartItem).product().category().taxRate()).roundCents()
+  val share: Int = (catTotal as Double / subtotal as Double * 100.0).roundCents()
+  IO::println("  #{catLabel.padRight(16)} #{catTotal.formatCents().padLeft(10)}  tax: #{catTax.formatCents().padLeft(8)}  #{share}% of cart")
+}
+IO::println("")
+
+// ── Cart statistics ───────────────────────────────────────────────────────────
+
+IO::println("── Cart Statistics ────────────────────────────────────────────────")
+var totalQty: Int = 0
+foreach item: CartItem in cartItems { totalQty = totalQty + item.qty() }
+val sortedByPrice = cartItems.sortedBy { i => 0 - (i as CartItem).product().priceCents() }
+val mostExpensive: CartItem = sortedByPrice[0] as CartItem
+val cheapest: CartItem = cartItems.sortedBy { i => (i as CartItem).product().priceCents() }[0] as CartItem
+
+IO::println("  Total quantity:       #{totalQty} items")
+IO::println("  Most expensive unit:  #{mostExpensive.product().name()} (#{mostExpensive.product().priceStr()})")
+IO::println("  Cheapest unit:        #{cheapest.product().name()} (#{cheapest.product().priceStr()})")
+
+val stockParts = catalog.partition { p => (p as Product).isAvailable() }
+val inStock: List[Product] = stockParts[0] as List[Product]
+val outOfStock: List[Product] = stockParts[1] as List[Product]
+IO::println("  Catalog in-stock:     #{(inStock as List[Product]).size()} / #{catalog.size()} products")
+
+val lowStock = catalog.filter { p => (p as Product).isLowStock() }
+IO::println("  Low-stock items:      #{(lowStock as List[Product]).size()}")
+foreach p: Product in lowStock {
+  IO::println("    #{p.sku()} #{p.name()} — only #{p.stock()} left!")
+}
+IO::println("")
+IO::println("=== Report Complete ===")

@@ -1,0 +1,320 @@
+// FitnessTracker.on -- a fitness tracking system
+// Exercises: data-carrying enums, records, classes, interfaces, inheritance,
+// generics, collection pipelines (map/filter/fold/reduce/groupBy/sortedBy/
+// distinct/find/partition/zip), select/pattern matching, nullable types,
+// closures, string interpolation, try/catch, recursion, foreach on ranges/maps.
+
+// ── Exercise category (plain enum) ───────────────────────────────────────────
+enum ExerciseKind {
+  case Cardio
+  case Strength
+  case Flexibility
+  case Balance
+}
+
+// ── Intensity level (data-carrying enum) ─────────────────────────────────────
+enum Intensity {
+  case Light(metsMultiplier: Double)
+  case Moderate(metsMultiplier: Double)
+  case Vigorous(metsMultiplier: Double)
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+record Exercise(name: String, kind: ExerciseKind, baseMets: Double)
+record WorkoutEntry(exercise: Exercise, durationMin: Int, intensity: Intensity)
+record DailyLog(date: String, entries: List[WorkoutEntry])
+
+// ── Helper: compute calories burned (MET formula) ────────────────────────────
+def caloriesBurned(entry: WorkoutEntry, weightKg: Double): Double {
+  val mets = select entry.intensity() {
+    case l is Light:    entry.exercise().baseMets() * l.metsMultiplier()
+    case m is Moderate: entry.exercise().baseMets() * m.metsMultiplier()
+    case v is Vigorous: entry.exercise().baseMets() * v.metsMultiplier()
+  }
+  return mets * weightKg * (entry.durationMin() / 60.0)
+}
+
+def intensityLabel(i: Intensity): String = select i {
+  case x is Light:    "light"
+  case x is Moderate: "moderate"
+  case x is Vigorous: "vigorous"
+}
+
+def kindLabel(k: ExerciseKind): String = select k {
+  case x is Cardio:      "Cardio"
+  case x is Strength:    "Strength"
+  case x is Flexibility: "Flexibility"
+  case x is Balance:     "Balance"
+}
+
+// ── Interfaces ───────────────────────────────────────────────────────────────
+interface Reportable {
+  def summary(): String
+}
+
+// ── Athlete class ─────────────────────────────────────────────────────────────
+class Athlete conforms Reportable {
+  val name: String
+  val weightKg: Double
+  val logs: List[DailyLog]
+  val goals: Map[String, Int]
+
+public:
+  def this(name: String, weightKg: Double) {
+    this.name = name
+    this.weightKg = weightKg
+    logs = []
+    goals = [:]
+  }
+
+  def addLog(log: DailyLog): void {
+    logs.add(log)
+  }
+
+  def setGoal(kind: String, minutesPerWeek: Int): void {
+    goals[kind] = minutesPerWeek
+  }
+
+  def allEntries(): List[WorkoutEntry] {
+    return logs.flatMap { log => log.entries() }
+  }
+
+  def totalCalories(): Double {
+    return allEntries().fold(0.0) { acc, e => acc + caloriesBurned(e, weightKg) }
+  }
+
+  def totalMinutes(): Int {
+    return allEntries().fold(0) { acc, e => acc + e.durationMin() }
+  }
+
+  def getLogs(): List[DailyLog] = logs
+  def getWeightKg(): Double = weightKg
+  def getGoals(): Map[String, Int] = goals
+
+  def summary(): String {
+    val cals = totalCalories()
+    val mins = totalMinutes()
+    val sessions = logs.size
+    return "#{name}: #{sessions} sessions, #{mins} min, #{cals} kcal"
+  }
+}
+
+IO::println("=== Fitness Tracker ===")
+
+// ── Define exercises ──────────────────────────────────────────────────────────
+val running = new Exercise("Running", new Cardio(), 8.0)
+val cycling = new Exercise("Cycling", new Cardio(), 6.0)
+val squats  = new Exercise("Squats",  new Strength(), 5.0)
+val yoga    = new Exercise("Yoga",    new Flexibility(), 3.0)
+val plank   = new Exercise("Plank",   new Balance(), 4.0)
+val hiit    = new Exercise("HIIT",    new Cardio(), 10.0)
+
+IO::println("Exercises defined: #{[running, cycling, squats, yoga, plank, hiit].size}")
+
+// ── Create athletes ───────────────────────────────────────────────────────────
+val alice = new Athlete("Alice", 65.0)
+val bob   = new Athlete("Bob",   80.0)
+
+alice.setGoal("Cardio",    150)
+alice.setGoal("Strength",   60)
+bob.setGoal("Cardio",      200)
+bob.setGoal("Balance",      30)
+
+// ── Build Alice's logs (Mon-Fri of one week) ──────────────────────────────────
+val mon = new DailyLog("Mon", [
+  new WorkoutEntry(running, 30, new Moderate(1.0)),
+  new WorkoutEntry(yoga,    20, new Light(0.7))
+])
+val tue = new DailyLog("Tue", [
+  new WorkoutEntry(squats, 45, new Vigorous(1.4)),
+  new WorkoutEntry(plank,  10, new Moderate(1.0))
+])
+val wed = new DailyLog("Wed", [
+  new WorkoutEntry(cycling, 60, new Moderate(1.0))
+])
+val thu = new DailyLog("Thu", [
+  new WorkoutEntry(hiit,    25, new Vigorous(1.4)),
+  new WorkoutEntry(yoga,    15, new Light(0.7))
+])
+val fri = new DailyLog("Fri", [
+  new WorkoutEntry(running, 35, new Vigorous(1.4)),
+  new WorkoutEntry(squats,  30, new Moderate(1.0))
+])
+
+alice.addLog(mon)
+alice.addLog(tue)
+alice.addLog(wed)
+alice.addLog(thu)
+alice.addLog(fri)
+
+// ── Build Bob's logs ──────────────────────────────────────────────────────────
+val bobMon = new DailyLog("Mon", [
+  new WorkoutEntry(cycling, 45, new Vigorous(1.4)),
+  new WorkoutEntry(plank,   15, new Moderate(1.0))
+])
+val bobWed = new DailyLog("Wed", [
+  new WorkoutEntry(running, 50, new Moderate(1.0)),
+  new WorkoutEntry(yoga,    30, new Light(0.7))
+])
+val bobFri = new DailyLog("Fri", [
+  new WorkoutEntry(hiit, 30, new Vigorous(1.4))
+])
+
+bob.addLog(bobMon)
+bob.addLog(bobWed)
+bob.addLog(bobFri)
+
+IO::println("")
+IO::println("── Summaries ────────────────────────────────────────────────────────")
+IO::println(alice.summary())
+IO::println(bob.summary())
+
+// ── Collection pipelines: group by kind, count minutes per category ───────────
+IO::println("")
+IO::println("── Alice's minutes by kind ───────────────────────────────────────────")
+val byKind = alice.allEntries().groupBy { e => kindLabel(e.exercise().kind()) }
+foreach (kind, entries) in byKind {
+  val mins = entries.fold(0) { acc, e => acc + (e as WorkoutEntry).durationMin() }
+  IO::println("  #{kind}: #{mins} min")
+}
+
+// ── Find hardest workout (highest intensity × duration) ───────────────────────
+IO::println("")
+IO::println("── Hardest entries (vigorous) ───────────────────────────────────────")
+val vigorous = alice.allEntries().filter { e =>
+  select e.intensity() {
+    case x is Vigorous: true
+    else: false
+  }
+}
+val sorted = vigorous.sortedBy { e => -(e as WorkoutEntry).durationMin() }
+foreach e: WorkoutEntry in sorted {
+  IO::println("  #{e.exercise().name()}: #{e.durationMin()} min (vigorous)")
+}
+
+// ── Partition: over/under 30 min sessions ────────────────────────────────────
+IO::println("")
+IO::println("── Session length split (>30 vs ≤30 min) ───────────────────────────")
+val partitioned = alice.allEntries().partition { e => (e as WorkoutEntry).durationMin() > 30 }
+IO::println("  Long (>30 min): #{(partitioned[0] as List[WorkoutEntry]).size} entries")
+IO::println("  Short (≤30 min): #{(partitioned[1] as List[WorkoutEntry]).size} entries")
+
+// ── Extension methods on Double for formatting ────────────────────────────────
+extension Double {
+  def twoDecimals(): String {
+    val scaled = (self * 100.0 + 0.5) as Int
+    val cents = scaled % 100
+    val centStr = if cents < 10 { "0" + cents } else { "" + cents }
+    return (scaled / 100) + "." + centStr
+  }
+}
+
+extension Int {
+  def bar(max: Int): String {
+    val filled = (self * 20) / max
+    var s = ""
+    var i = 0
+    while i < 20 {
+      s = s + (if i < filled { "#" } else { "-" })
+      i++
+    }
+    return s
+  }
+}
+
+// ── Calorie breakdown per session ────────────────────────────────────────────
+IO::println("")
+IO::println("── Alice's calories per session ─────────────────────────────────────")
+foreach log: DailyLog in alice.getLogs() {
+  val dayCals = log.entries().fold(0.0) { acc, e =>
+    acc + caloriesBurned(e as WorkoutEntry, alice.getWeightKg())
+  }
+  val mins = log.entries().fold(0) { acc, e => acc + (e as WorkoutEntry).durationMin() }
+  IO::println("  #{log.date()}: #{dayCals.twoDecimals()} kcal, #{mins} min")
+}
+
+// ── Recursive streak calculation ──────────────────────────────────────────────
+def streakFrom(logs: List[DailyLog], idx: Int): Int {
+  if idx >= logs.size { return 0 }
+  val log = logs[idx] as DailyLog
+  if log.entries().size == 0 { return 0 }
+  return 1 + streakFrom(logs, idx + 1)
+}
+
+IO::println("")
+val aliceStreak = streakFrom(alice.getLogs(), 0)
+val bobStreak   = streakFrom(bob.getLogs(), 0)
+IO::println("── Streaks ──────────────────────────────────────────────────────────")
+IO::println("  Alice: #{aliceStreak}-day streak")
+IO::println("  Bob:   #{bobStreak}-day streak")
+
+// ── Range foreach: print a per-exercise summary ───────────────────────────────
+IO::println("")
+IO::println("── Exercise index ───────────────────────────────────────────────────")
+val exercises: List[Exercise] = [running, cycling, squats, yoga, plank, hiit]
+foreach i: Int in 0..<exercises.size {
+  val ex = exercises[i] as Exercise
+  IO::println("  #{i + 1}. #{ex.name()} (#{kindLabel(ex.kind())}, #{ex.baseMets()} METs)")
+}
+
+// ── Goal tracking with map iteration ─────────────────────────────────────────
+IO::println("")
+IO::println("── Alice's goal progress ────────────────────────────────────────────")
+val aliceByKind = alice.allEntries().groupBy { e => kindLabel(e.exercise().kind()) }
+foreach (goalKind, targetMins) in alice.getGoals() {
+  val entries = aliceByKind[goalKind]
+  val actual = if entries == null { 0 } else {
+    (entries as List[WorkoutEntry]).fold(0) { acc, e => acc + e.durationMin() }
+  }
+  val pct = if targetMins == 0 { 100 } else { (actual * 100) / targetMins }
+  val status = if actual >= targetMins { "DONE" } else { "#{pct}%" }
+  IO::println("  #{goalKind}: #{actual}/#{targetMins} min [#{status}]")
+}
+
+// ── Distinct exercise names used this week ────────────────────────────────────
+IO::println("")
+IO::println("── Distinct exercises this week ─────────────────────────────────────")
+val distinctNames = alice.allEntries()
+  .map { e => (e as WorkoutEntry).exercise().name() }
+  .distinct()
+  .sortedBy { n => n as String }
+IO::println("  #{distinctNames}")
+
+// ── Zip: pair exercise with calorie estimates ─────────────────────────────────
+IO::println("")
+IO::println("── 30-min calorie guide (Alice's weight) ────────────────────────────")
+val exList:   List[Exercise] = [running, cycling, squats, yoga, plank, hiit]
+val demoEntry = exList.map { ex =>
+  val e = new WorkoutEntry(ex as Exercise, 30, new Moderate(1.0))
+  val cal = caloriesBurned(e, alice.getWeightKg())
+  "#{(ex as Exercise).name()}: #{cal.twoDecimals()} kcal"
+}
+foreach line: String in demoEntry {
+  IO::println("  #{line}")
+}
+
+// ── Try/catch: invalid cast guard ────────────────────────────────────────────
+IO::println("")
+IO::println("── Error handling demo ──────────────────────────────────────────────")
+try {
+  val first = alice.allEntries().find { entry => (entry as WorkoutEntry).durationMin() > 100 }
+  if first == null {
+    IO::println("  No session over 100 min found (expected)")
+  } else {
+    IO::println("  Found: #{(first as WorkoutEntry).exercise().name()}")
+  }
+} catch ex: Exception {
+  IO::println("  Unexpected error: #{ex.message()}")
+}
+
+// ── Reduce: total calorie sum across all athletes ─────────────────────────────
+IO::println("")
+val athletes: List[Athlete] = [alice, bob]
+val totalCals = athletes.map { a => (a as Athlete).totalCalories() }
+  .reduce { a, b => a + b }
+IO::println("── Grand total across all athletes ──────────────────────────────────")
+IO::println("  Combined calories burned: #{totalCals.twoDecimals()} kcal")
+IO::println("  Sessions: #{athletes.map { a => (a as Athlete).getLogs().size }.reduce { a, b => a + b }}")
+
+IO::println("")
+IO::println("=== Done ===")

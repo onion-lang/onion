@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `foreach` over typed lists and maps (28th large sample, 85 total corpus
   programs).
 
+- **`run/GameStore.on`, a 292-line game store inventory and sales
+  reporting sample.** Exercises homogeneous enums (`Genre`, `Platform`),
+  records with methods (`Game`, `Sale`), typed generics (`List[Game]`,
+  `Map[String, Double]`), collection pipelines (`groupBy`/`sortedBy`/
+  `fold`/`filter`/`find`/`indexOf`), nullable types with null-guards,
+  string interpolation, extension methods on `Int`/`Double`/`String`,
+  `foreach (k, v)` map iteration, closures, and a class with access
+  sections and mutable state (29th large sample, 86 total corpus
+  programs).
+
 ## [0.10.18] - 2026-08-02
 
 ### Fixed

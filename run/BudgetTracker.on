@@ -1,0 +1,349 @@
+// BudgetTracker.on — a personal finance tracker exercising records,
+// data-carrying enums, class inheritance, interface conforms,
+// collection pipelines (map/filter/fold/reduce/groupBy/sortedBy/
+// partition/zip/distinct/find), closures, pattern matching,
+// nullable, try/catch, and recursion.
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum TxKind(sign: Int) {
+  INCOME(1), EXPENSE(-1)
+}
+
+enum Month {
+  JAN, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP, OCT, NOV, DEC
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Transaction(month: Month, amount: Double, desc: String, kind: TxKind)
+
+record MonthSummary(month: Month, income: Double, expense: Double)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def rounded2(): Double = Math::round(self * 100.0D) / 100.0D
+  def absVal(): Double {
+    if self < 0.0D { return 0.0D - self }
+    return self
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
+
+def monthName(m: Month): String {
+  select m {
+    case Month::JAN: return "Jan"
+    case Month::FEB: return "Feb"
+    case Month::MAR: return "Mar"
+    case Month::APR: return "Apr"
+    case Month::MAY: return "May"
+    case Month::JUN: return "Jun"
+    case Month::JUL: return "Jul"
+    case Month::AUG: return "Aug"
+    case Month::SEP: return "Sep"
+    case Month::OCT: return "Oct"
+    case Month::NOV: return "Nov"
+    else:            return "Dec"
+  }
+}
+
+// Recursive compound-interest: P*(1+r)^n.
+def compound(principal: Double, ratePerPeriod: Double, periods: Int): Double {
+  if periods == 0 { return principal }
+  return compound(principal * (1.0D + ratePerPeriod), ratePerPeriod, periods - 1)
+}
+
+// Signed value of a transaction (positive for income, negative for expense).
+def signedAmount(tx: Transaction): Double = tx.amount() * tx.kind().sign()
+
+// Safe Double parser (try/catch).
+def parseAmount(s: String): Double {
+  try {
+    return Double::parseDouble(s)
+  } catch e: Exception {
+    return 0.0D
+  }
+}
+
+// ─── Account class (conforms Reportable) ─────────────────────────────────────
+
+class Account conforms Reportable {
+public:
+  val owner: String
+  var balance: Double
+
+  def this(owner: String, initial: Double) {
+    this.owner = owner
+    this.balance = initial
+  }
+
+  def deposit(amount: Double): void {
+    this.balance = this.balance + amount
+  }
+
+  def withdraw(amount: Double): Boolean {
+    if amount > this.balance { return false }
+    this.balance = this.balance - amount
+    return true
+  }
+
+  def report(): String = "Account[#{owner}] balance: $#{balance.rounded2()}"
+}
+
+// ─── SavingsAccount extends Account ──────────────────────────────────────────
+
+class SavingsAccount extends Account {
+  val annualRate: Double
+
+public:
+  def this(owner: String, initial: Double, rate: Double): (owner, initial) {
+    this.annualRate = rate
+  }
+
+  def applyMonthlyInterest(): void {
+    this.balance = (this.balance * (1.0D + this.annualRate / 12.0D)).rounded2()
+  }
+
+  override def report(): String =
+    "Savings[#{owner}] balance: $#{balance.rounded2()} @ #{annualRate * 100.0D}% p.a."
+}
+
+// ─── Ledger class ────────────────────────────────────────────────────────────
+
+class Ledger {
+  var transactions: List[Transaction]
+
+public:
+  def this {
+    this.transactions = []
+  }
+
+  def add(tx: Transaction): void {
+    transactions.add(tx)
+  }
+
+  def size(): Int = transactions.size
+
+  // Net flow: sum of signed amounts.
+  def netFlow(): Double {
+    var net = 0.0D
+    foreach tx: Transaction in transactions {
+      net = net + signedAmount(tx)
+    }
+    return net.rounded2()
+  }
+
+  // Total income only.
+  def totalIncome(): Double {
+    val income: List[Transaction] = transactions.filter { tx => tx.kind() == TxKind::INCOME }
+    var sum = 0.0D
+    foreach tx: Transaction in income {
+      sum = sum + tx.amount()
+    }
+    return sum.rounded2()
+  }
+
+  // Total expense only.
+  def totalExpense(): Double {
+    val expenses: List[Transaction] = transactions.filter { tx => tx.kind() == TxKind::EXPENSE }
+    var sum = 0.0D
+    foreach tx: Transaction in expenses {
+      sum = sum + tx.amount()
+    }
+    return sum.rounded2()
+  }
+
+  // Partition into [income-txs, expense-txs].
+  def split(): List[List[Transaction]] {
+    return transactions.partition { tx => tx.kind() == TxKind::INCOME }
+  }
+
+  // Group by month.
+  def byMonth(): Map[Month, List[Transaction]] {
+    return transactions.groupBy { tx => tx.month() }
+  }
+
+  // Largest expense (or null).
+  def largestExpense(): Transaction? {
+    val expenses: List[Transaction] = transactions.filter { tx => tx.kind() == TxKind::EXPENSE }
+    val sorted: List[Transaction] = expenses.sortedBy { tx => 0.0D - tx.amount() }
+    if sorted.size == 0 { return null }
+    return sorted[0]
+  }
+
+  // Distinct months that have at least one transaction.
+  def activeMonths(): List[Month] {
+    return transactions.map { tx => tx.month() }.distinct()
+  }
+
+  // Descriptions of transactions above a threshold.
+  def largeTransactions(threshold: Double): List[String] {
+    return transactions
+      .filter { tx => tx.amount() >= threshold }
+      .map { tx => "#{monthName(tx.month())} #{tx.desc()} $#{tx.amount()}" }
+  }
+}
+
+// ─── Data setup ──────────────────────────────────────────────────────────────
+
+val ledger = new Ledger()
+ledger.add(new Transaction(Month::JAN, 3500.0D, "Salary",       TxKind::INCOME))
+ledger.add(new Transaction(Month::JAN,  800.0D, "Rent",         TxKind::EXPENSE))
+ledger.add(new Transaction(Month::JAN,  250.0D, "Groceries",    TxKind::EXPENSE))
+ledger.add(new Transaction(Month::FEB, 3500.0D, "Salary",       TxKind::INCOME))
+ledger.add(new Transaction(Month::FEB,  800.0D, "Rent",         TxKind::EXPENSE))
+ledger.add(new Transaction(Month::FEB,  180.0D, "Utilities",    TxKind::EXPENSE))
+ledger.add(new Transaction(Month::FEB,  120.0D, "Phone",        TxKind::EXPENSE))
+ledger.add(new Transaction(Month::MAR, 3500.0D, "Salary",       TxKind::INCOME))
+ledger.add(new Transaction(Month::MAR,  500.0D, "Freelance",    TxKind::INCOME))
+ledger.add(new Transaction(Month::MAR,  800.0D, "Rent",         TxKind::EXPENSE))
+ledger.add(new Transaction(Month::MAR, 1200.0D, "New Laptop",   TxKind::EXPENSE))
+ledger.add(new Transaction(Month::MAR,  300.0D, "Groceries",    TxKind::EXPENSE))
+
+// Accounts demo.
+val checking = new Account("Alice", 1000.0D)
+checking.deposit(3500.0D)
+checking.withdraw(800.0D)
+
+val savings  = new SavingsAccount("Alice", 5000.0D, 0.04D)
+savings.applyMonthlyInterest()
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+println("=== Budget Tracker (#{ledger.size()} transactions) ===")
+println("")
+
+// Account reports (interface method).
+println("-- Accounts --")
+val accounts: List[Reportable] = [checking, savings]
+foreach acc: Reportable in accounts {
+  println("  " + acc.report())
+}
+println("")
+
+// Ledger summary.
+println("-- Ledger Summary --")
+println("  Income:  $#{ledger.totalIncome()}")
+println("  Expense: $#{ledger.totalExpense()}")
+println("  Net:     $#{ledger.netFlow()}")
+println("")
+
+// Pass/fail split (income vs expense).
+val parts = ledger.split()
+val incomePart  = parts[0]
+val expensePart = parts[1]
+println("-- Transaction Split --")
+println("  Income transactions:  " + incomePart.size)
+println("  Expense transactions: " + expensePart.size)
+println("")
+
+// Largest expense (nullable).
+val bigTx = ledger.largestExpense()
+if bigTx != null {
+  println("-- Largest Expense --")
+  println("  #{monthName(bigTx.month())} — #{bigTx.desc()}: $#{bigTx.amount()}")
+  println("")
+}
+
+// Transactions >= $500.
+println("-- Large Transactions (>= $500) --")
+foreach s: String in ledger.largeTransactions(500.0D) {
+  println("  " + s)
+}
+println("")
+
+// Active months (distinct).
+println("-- Active Months --")
+foreach m: Month in ledger.activeMonths() {
+  println("  " + monthName(m))
+}
+println("")
+
+// Monthly breakdown via groupBy + foreach (k,v).
+println("-- Monthly Breakdown --")
+val byMonth = ledger.byMonth()
+foreach (m, txs) in byMonth {
+  var inc  = 0.0D
+  var exp  = 0.0D
+  foreach tx: Transaction in (txs as List[Transaction]) {
+    if tx.kind() == TxKind::INCOME { inc = inc + tx.amount() }
+    else { exp = exp + tx.amount() }
+  }
+  val net = (inc - exp).rounded2()
+  println("  #{monthName(m as Month)}: income=$#{inc} expense=$#{exp} net=$#{net}")
+}
+println("")
+
+// zip: pair month-names with their summary (two parallel lists).
+val monthLabels: List[String]  = [monthName(Month::JAN), monthName(Month::FEB), monthName(Month::MAR)]
+val monthNets: List[Double]    = [2450.0D, 2400.0D, 1700.0D]
+println("-- Zipped Month/Net --")
+val zipped = monthLabels.zip(monthNets)
+foreach pair: Object in zipped {
+  val p   = pair as List[Object]
+  val mon = p[0] as String
+  val net = p[1] as Double
+  println("  #{mon}: net $#{net}")
+}
+println("")
+
+// reduce: find the worst (smallest) monthly net from the list of Doubles.
+val nets: List[Double] = [2450.0D, 2400.0D, 1700.0D]
+val worstNet = nets.reduce { a, b =>
+  if (a as Double) <= (b as Double) { a } else { b }
+}
+println("-- Worst Monthly Net (reduce) --")
+println("  $#{(worstNet as Double).rounded2()}")
+println("")
+
+// Recursive compound interest.
+println("-- Compound Interest (recursive) --")
+val p = 1000.0D
+val r = 0.05D
+var yr = 1
+while yr <= 5 {
+  val future = compound(p, r, yr).rounded2()
+  println("  $#{p} @ 5% for #{yr} year(s) = $#{future}")
+  yr = yr + 1
+}
+println("")
+
+// parseAmount (try/catch).
+println("-- parseAmount (try/catch) --")
+println("  \"123.45\" -> " + parseAmount("123.45"))
+println("  \"abc\"    -> " + parseAmount("abc"))
+println("")
+
+// Closure: net after flat tax.
+val afterTax = (gross: Double, taxPct: Int) -> gross * (1.0D - taxPct / 100.0D)
+println("-- After-Tax Net (closure) --")
+println("  $3500 at 25% = $#{afterTax(3500.0D, 25).rounded2()}")
+println("")
+
+// Foreach over inclusive range.
+var budgetSum = 0
+foreach i: Int in 1..12 {
+  budgetSum = budgetSum + i * 100
+}
+println("Sum of monthly budgets $100..$1200: $#{budgetSum}")
+println("")
+
+// String interpolation summary.
+val txCount = ledger.size()
+println("Tracker complete: #{txCount} transactions reviewed.")

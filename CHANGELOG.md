@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.19] - 2026-08-02
+
 ### Fixed
 
 - **A `static def` in an ADT case-enum's `public:` section could not be

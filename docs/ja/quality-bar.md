@@ -10,7 +10,7 @@
 
 | # | 次元 | 測定方法 | 現在値（2026-08-02） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3108 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3120 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 92 / 92 compile | すべてコンパイル、rot なし |
 | 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 35（AuctionHouse、BankLedger、BankSystem、Blackjack、BrokenLogDemo、BudgetTracker、EventTicketing、FitnessTracker、FleetManager、GameStore、GradeBook、GraphAlgorithms、GraphSearch、HotelReservation、Inventory、InventoryManager、LibraryCatalog、LibrarySystem、MathParser、MiniRpg、MusicLibrary、OrderReport、ParkingGarage、PayrollReport、PlaylistManager、RecipeManager、ShapeProcessor、ShoppingCart、StatsApp、StockPortfolio、TaskPlanner、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |

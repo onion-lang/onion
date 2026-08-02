@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `static def` in an ADT case-enum's `public:` section could not be
+  called** — `Grade::fromScore(x)` raised `E0005: method ... is not found`
+  even when the signature matched exactly, because
+  `TypingOutlinePass.processInterfaceMethodDeclaration` hard-coded
+  `M_PUBLIC` for every interface method declaration, silently dropping
+  `M_STATIC`. ADT case-enums desugar to a sealed interface + one record per
+  case, so a static factory method declared in the enum's `public:` section
+  was registered without the static modifier, and
+  `collectMethodsMatching(isStaticMethod)` could no longer find it.
+
 ## [0.10.18] - 2026-08-02
 
 ### Fixed

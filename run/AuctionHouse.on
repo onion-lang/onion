@@ -1,0 +1,365 @@
+// AuctionHouse.on — online auction simulation
+// Exercises: ADT enum (LotStatus: Open/Sold/ReserveNotMet/Withdrawn),
+// records with example laws, plain enum (Category), classes (Lot, AuctionHouse),
+// extension Int for currency, collection pipelines (sortedBy/filter/map/fold/
+// groupBy/find), select type patterns with exhaustiveness, nullable types,
+// closures, string interpolation, try/catch, recursion, while/foreach.
+
+// ── Category (plain enum) ─────────────────────────────────────────────────────
+
+enum Category {
+  ART, JEWELRY, COLLECTIBLE, VINTAGE, ELECTRONICS, OTHER
+}
+
+// ── Lot outcome (ADT enum) ────────────────────────────────────────────────────
+
+enum LotStatus {
+  case Open
+  case Sold(winner: String, price: Int)
+  case ReserveNotMet(topBid: Int)
+  case Withdrawn
+}
+
+// ── Bid record ────────────────────────────────────────────────────────────────
+
+record Bid(bidder: String, amount: Int)
+  example { new Bid("alice", 500).amount() == 500 }
+  example { new Bid("bob", 300).bidder() == "bob" }
+
+// ── Int extension for currency display ───────────────────────────────────────
+
+extension Int {
+  def currency(): String {
+    if self < 0 { return "-$" + (0 - self) }
+    return "$" + self
+  }
+  def max(other: Int): Int = if self >= other { self } else { other }
+  def min(other: Int): Int = if self <= other { self } else { other }
+}
+
+// ── Lot class ─────────────────────────────────────────────────────────────────
+
+class Lot {
+  val lotId: Int
+  val title: String
+  val category: Category
+  val reservePrice: Int
+  val bids: List[Bid]
+  var status: LotStatus
+
+public:
+  def this(id: Int, title: String, cat: Category, reserve: Int) {
+    this.lotId       = id
+    this.title       = title
+    this.category    = cat
+    this.reservePrice = reserve
+    val empty: List[Bid] = []
+    this.bids        = empty
+    this.status      = new Open()
+  }
+
+  def getId(): Int = lotId
+  def getTitle(): String = title
+  def getCategory(): Category = category
+  def getReserve(): Int = reservePrice
+  def getBids(): List[Bid] = bids
+  def getStatus(): LotStatus = status
+
+  def isOpen(): Boolean {
+    select status {
+      case s is Open: return true
+      case s is Sold: return false
+      case s is ReserveNotMet: return false
+      case s is Withdrawn: return false
+    }
+    return false
+  }
+
+  def isSold(): Boolean {
+    select status {
+      case s is Sold: return true
+      case s is Open: return false
+      case s is ReserveNotMet: return false
+      case s is Withdrawn: return false
+    }
+    return false
+  }
+
+  def placeBid(bidder: String, amount: Int): void {
+    if !isOpen() {
+      throw new Exception("Lot " + lotId + " is not open for bidding")
+    }
+    if amount <= 0 {
+      throw new Exception("Bid amount must be positive")
+    }
+    val top = topBid()
+    if top != null && amount <= (top as Bid).amount() {
+      throw new Exception("Bid " + amount.currency() + " must exceed current top " + (top as Bid).amount().currency())
+    }
+    bids << new Bid(bidder, amount)
+  }
+
+  def topBid(): Bid? {
+    if bids.size == 0 { return null }
+    var best: Bid? = null
+    foreach b: Object in bids {
+      val bid = b as Bid
+      if best == null || bid.amount() > (best as Bid).amount() {
+        best = bid
+      }
+    }
+    return best
+  }
+
+  def close(): void {
+    if !isOpen() { return }
+    val top = topBid()
+    if top == null {
+      status = new Withdrawn()
+    } else {
+      val winning = top as Bid
+      if winning.amount() >= reservePrice {
+        status = new Sold(winning.bidder(), winning.amount())
+      } else {
+        status = new ReserveNotMet(winning.amount())
+      }
+    }
+  }
+
+  def bidCount(): Int = bids.size
+
+  def statusLine(): String {
+    select status {
+      case s is Open:           return "OPEN  (reserve: " + reservePrice.currency() + ", bids: " + bidCount() + ")"
+      case s is Sold:           return "SOLD  to " + s.winner() + " for " + s.price().currency()
+      case s is ReserveNotMet:  return "UNSOLD (top bid " + s.topBid().currency() + " < reserve " + reservePrice.currency() + ")"
+      case s is Withdrawn:      return "WITHDRAWN"
+    }
+    return "?"
+  }
+}
+
+// ── AuctionHouse ──────────────────────────────────────────────────────────────
+
+class AuctionHouse {
+  var nextId: Int
+
+public:
+  val name: String
+  val lots: List[Lot]
+
+  def this(name: String) {
+    this.name   = name
+    val empty: List[Lot] = []
+    this.lots   = empty
+    this.nextId = 1
+  }
+
+  def addLot(title: String, cat: Category, reserve: Int): Lot {
+    val lot = new Lot(nextId, title, cat, reserve)
+    lots << lot
+    nextId = nextId + 1
+    return lot
+  }
+
+  def findLot(id: Int): Lot? {
+    foreach l: Object in lots {
+      val lot = l as Lot
+      if lot.getId() == id { return lot }
+    }
+    return null
+  }
+
+  def bid(lotId: Int, bidder: String, amount: Int): void {
+    val lot = findLot(lotId)
+    if lot == null {
+      IO::println("  [ERROR] Lot " + lotId + " not found")
+      return
+    }
+    try {
+      (lot as Lot).placeBid(bidder, amount)
+      IO::println("  [OK]    Lot " + lotId + " — " + bidder + " bids " + amount.currency())
+    } catch e: Exception {
+      IO::println("  [FAIL]  " + e.message())
+    }
+  }
+
+  def closeAll(): void {
+    foreach l: Object in lots {
+      (l as Lot).close()
+    }
+  }
+
+  def openLots(): List[Lot] {
+    return lots.filter { l => (l as Lot).isOpen() }
+  }
+
+  def soldLots(): List[Lot] {
+    return lots.filter { l => (l as Lot).isSold() }
+  }
+
+  def lotsByCategory(cat: Category): List[Lot] {
+    return lots.filter { l => (l as Lot).getCategory() == cat }
+  }
+
+  def totalRevenue(): Int {
+    var total: Int = 0
+    foreach l: Object in soldLots() {
+      val lot = l as Lot
+      select lot.getStatus() {
+        case s is Sold: total = total + s.price()
+        case s is Open: {}
+        case s is ReserveNotMet: {}
+        case s is Withdrawn: {}
+      }
+    }
+    return total
+  }
+
+  def allBids(): List[Bid] {
+    val result: List[Bid] = []
+    foreach l: Object in lots {
+      val lot = l as Lot
+      foreach b: Object in lot.getBids() {
+        result << (b as Bid)
+      }
+    }
+    return result
+  }
+}
+
+// ── Bidder analytics ─────────────────────────────────────────────────────────
+
+// Compute total amount bid by each bidder (using closures and pipelines).
+def bidderTotals(house: AuctionHouse): Map[String, Int] {
+  val totals: Map[String, Int] = [:]
+  foreach b: Object in house.allBids() {
+    val bid = b as Bid
+    val prev: Int? = totals.get(bid.bidder())
+    val prevInt: Int = if prev == null { 0 } else { prev as Int }
+    totals.put(bid.bidder(), prevInt + bid.amount())
+  }
+  return totals
+}
+
+// Recursive: count total bids across lots up to index n.
+def countBidsUpTo(lots: List[Lot], n: Int): Int {
+  if n < 0 { return 0 }
+  val lot = lots[n] as Lot
+  return lot.bidCount() + countBidsUpTo(lots, n - 1)
+}
+
+// ── Main script ───────────────────────────────────────────────────────────────
+
+val house = new AuctionHouse("Onion Auction House")
+
+// Add lots across categories.
+val l1 = house.addLot("Vintage Pocket Watch",     Category::VINTAGE,     1500)
+val l2 = house.addLot("Impressionist Painting",   Category::ART,         8000)
+val l3 = house.addLot("Diamond Brooch",           Category::JEWELRY,     3000)
+val l4 = house.addLot("First-edition Novel",      Category::COLLECTIBLE, 2000)
+val l5 = house.addLot("Antique Radio",            Category::VINTAGE,      500)
+val l6 = house.addLot("Signed Baseball Card",     Category::COLLECTIBLE, 4000)
+
+IO::println("=== Bidding Session ===")
+house.bid(1, "alice",  1600)
+house.bid(1, "bob",    1550)   // should fail — below alice's bid
+house.bid(1, "bob",    1800)
+house.bid(1, "carol",  2100)
+
+house.bid(2, "dave",   7000)   // below reserve — should close as ReserveNotMet
+house.bid(2, "alice",  8500)
+
+house.bid(3, "eve",    3100)
+house.bid(3, "frank",  3500)
+house.bid(3, "eve",    3600)
+
+house.bid(4, "alice",  1800)   // below reserve 2000 — ReserveNotMet
+house.bid(4, "bob",    1900)
+
+house.bid(5, "carol",   600)
+house.bid(5, "dave",    750)
+
+// Lot 6 receives no bids — will be Withdrawn.
+
+IO::println("\n=== Closing All Lots ===")
+house.closeAll()
+
+IO::println("\n=== Lot Results ===")
+foreach l: Object in house.lots {
+  val lot = l as Lot
+  IO::println("  Lot #{lot.getId()} — #{lot.getTitle()}: #{lot.statusLine()}")
+}
+
+IO::println("\n=== Sold Lots ===")
+val sold = house.soldLots()
+foreach l: Object in sold {
+  val lot = l as Lot
+  select lot.getStatus() {
+    case s is Sold:
+      IO::println("  #{lot.getTitle()} → #{s.winner()} for #{s.price().currency()}")
+    else: IO::println("  (unexpected)")
+  }
+}
+
+val revenue = house.totalRevenue()
+IO::println("Total revenue: " + revenue.currency())
+
+IO::println("\n=== Lots by Category ===")
+val byCategory = house.lots.groupBy { l => "" + (l as Lot).getCategory() }
+foreach (cat, catLots) in byCategory {
+  IO::println("  " + cat + ": " + (catLots as List).size + " lot(s)")
+}
+
+IO::println("\n=== Top Bids (sorted descending) ===")
+val allBids = house.allBids().sortedBy { b => 0 - (b as Bid).amount() }
+var shown: Int = 0
+foreach b: Object in allBids {
+  if shown >= 5 { break }
+  val bid = b as Bid
+  IO::println("  " + bid.bidder() + ": " + bid.amount().currency())
+  shown = shown + 1
+}
+
+IO::println("\n=== Bidder Totals ===")
+val totals = bidderTotals(house)
+foreach (bidder, total) in totals {
+  IO::println("  " + bidder + ": " + (total as Int).currency() + " total committed")
+}
+
+IO::println("\n=== Vintage Lots ===")
+val vintage = house.lotsByCategory(Category::VINTAGE)
+foreach l: Object in vintage {
+  val lot = l as Lot
+  IO::println("  " + lot.getTitle() + " — " + lot.statusLine())
+}
+
+// Recursive bid counter.
+val allLots = house.lots
+val totalBids = countBidsUpTo(allLots, allLots.size - 1)
+IO::println("\nTotal bids placed across all lots: " + totalBids)
+
+// Closures stored in vals.
+val isPricey: (Object) -> Boolean = (x: Object) -> (x as Lot).getReserve() >= 2000
+val priceyLots = house.lots.filter { l => isPricey.call(l) }
+IO::println("Lots with reserve >= $2000: " + priceyLots.size)
+
+// Pipeline: get winning prices and sum them.
+val soldPrices: List[Int] = []
+foreach l: Object in house.soldLots() {
+  val lot = l as Lot
+  select lot.getStatus() {
+    case s is Sold: soldPrices << s.price()
+    case s is Open: {}
+    case s is ReserveNotMet: {}
+    case s is Withdrawn: {}
+  }
+}
+IO::println("Sold prices: " + soldPrices.toString())
+val soldTotal = soldPrices.fold(0) { acc, x => (acc as Int) + (x as Int) }
+IO::println("Confirmed sold total: " + soldTotal.currency())
+
+// String interpolation summary.
+val numLots = house.lots.size
+val numSold = house.soldLots().size
+IO::println("\n'#{house.name}' ran #{numLots} lots, #{numSold} sold, revenue #{revenue.currency()}")

@@ -108,6 +108,30 @@ onion --no-check-laws MyScript.on
 onion --law-samples 500 MyScript.on
 ```
 
+### `--effects`
+
+コンパイルされた各メソッドの推論済みエフェクト集合（`read write net exec env clock rand console unknown`。空はpureを意味する）を標準エラー出力に表示します。
+
+```bash
+onion --effects MyScript.on
+```
+
+### `--stacktrace`
+
+未捕捉のランタイムエラーについて、整形された診断レポートの代わりに生のJVMスタックトレースを表示します。
+
+```bash
+onion --stacktrace MyScript.on
+```
+
+### `--watch`
+
+スクリプトを実行した後、ファイルが変更されるたびに自動的に再実行します。コンパイルエラーやランタイム例外が発生してもウォッチループは止まりません。Ctrl-Cで停止します。
+
+```bash
+onion --watch MyScript.on
+```
+
 ## プログラム引数
 
 ソースファイルの後ろに指定した引数は、プログラムに渡されます。

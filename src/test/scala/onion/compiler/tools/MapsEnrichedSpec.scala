@@ -4,8 +4,8 @@ import onion.tools.Shell
 
 /**
  * Tests for the practical Map operations added to `onion.Maps`: keys/values,
- * mapKeys, filter/count/anyEntry/allEntries (key+value predicates), forEach,
- * toList, invert, groupBy, countBy, update, mergeWith, and getOrElse.
+ * mapKeys, filter/filterKeys/count/anyEntry/allEntries (key+value predicates),
+ * forEach, toList, invert, groupBy, countBy, update, mergeWith, and getOrElse.
  */
 class MapsEnrichedSpec extends AbstractShellSpec {
 
@@ -37,6 +37,22 @@ class MapsEnrichedSpec extends AbstractShellSpec {
         "val m: Map[String, Int] = [\"a\": 1, \"b\": 20, \"c\": 3]\n" +
         "return Maps::filter(m, (k: String, v: Int) -> v >= 10).size()",
         Shell.Success(1))
+    }
+
+    it("filterKeys keeps entries whose key matches a predicate") {
+      run(
+        "val m: Map[String, Int] = [\"apple\": 1, \"banana\": 2, \"avocado\": 3]\n" +
+        "return Maps::filterKeys(m, (k: String) -> k.startsWith(\"a\")).size()",
+        Shell.Success(2))
+    }
+
+    it("forEach visits every key/value pair") {
+      run(
+        "val m: Map[String, Int] = [\"a\": 1, \"b\": 2, \"c\": 3]\n" +
+        "var total = 0\n" +
+        "Maps::forEach(m, (k: String, v: Int) -> { total = total + v })\n" +
+        "return total",
+        Shell.Success(6))
     }
 
     it("count/anyEntry/allEntries take key+value predicates") {

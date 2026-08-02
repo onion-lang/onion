@@ -1,0 +1,425 @@
+// TaskPlanner.on — a sprint task planner demonstrating ADT enums, records with
+// example/law clauses, extension methods on Int/Double/String, collection
+// pipelines (map/filter/fold/sortedBy/groupBy/partition/find/distinct/any/
+// count/take/zip), select/type-pattern matching with exhaustiveness, nullable,
+// closures, string interpolation, do[Option], foreach on Map (k,v), and
+// while loops.
+
+import { java.util.ArrayList }
+
+// ─── Priority ADT enum ────────────────────────────────────────────────────────
+enum Priority {
+  case Critical
+  case High
+  case Medium
+  case Low
+public:
+  def order(): Int = select this {
+    case p is Critical: 0
+    case p is High:     1
+    case p is Medium:   2
+    case p is Low:      3
+  }
+  def label(): String = select this {
+    case p is Critical: "CRITICAL"
+    case p is High:     "HIGH    "
+    case p is Medium:   "MEDIUM  "
+    case p is Low:      "LOW     "
+  }
+  def isCriticalOrHigh(): Boolean = select this {
+    case p is Critical: true
+    case p is High:     true
+    else:               false
+  }
+}
+
+// ─── TaskStatus ADT enum ──────────────────────────────────────────────────────
+enum TaskStatus {
+  case Todo
+  case InProgress
+  case Done
+  case Blocked
+public:
+  def label(): String = select this {
+    case s is Todo:       "TODO      "
+    case s is InProgress: "IN PROGRESS"
+    case s is Done:       "DONE      "
+    case s is Blocked:    "BLOCKED   "
+  }
+  def isComplete(): Boolean = select this {
+    case s is Done: true
+    else:           false
+  }
+  def isBlocked(): Boolean = select this {
+    case s is Blocked: true
+    else:              false
+  }
+  def isInProgress(): Boolean = select this {
+    case s is InProgress: true
+    else:                 false
+  }
+  def isTodo(): Boolean = select this {
+    case s is Todo: true
+    else:           false
+  }
+}
+
+// ─── Tag plain enum ───────────────────────────────────────────────────────────
+enum Tag {
+  Feature, Bug, Fix, Docs, Test
+public:
+  def label(): String = select this {
+    case Tag::Feature: "feature"
+    case Tag::Bug:     "bug"
+    case Tag::Fix:     "fix"
+    case Tag::Docs:    "docs"
+    case Tag::Test:    "test"
+    else:              "?"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+record Task(
+  id: Int,
+  title: String,
+  priority: Priority,
+  status: TaskStatus,
+  assignee: String?,
+  estimatedHours: Double,
+  tag: Tag
+)
+  example { new Task(1, "Fix login", new Critical(), new Blocked(), "Alice", 2.0, Tag::Bug).id() == 1 }
+  example { new Task(2, "Write docs", new Low(), new Todo(), null, 1.0, Tag::Docs).assignee() == null }
+  example { new Task(3, "Add feature", new High(), new Todo(), "Bob", 3.5, Tag::Feature).estimatedHours() == 3.5 }
+
+record SprintSummary(
+  totalTasks: Int,
+  doneTasks: Int,
+  blockedTasks: Int,
+  inProgressTasks: Int,
+  todoTasks: Int,
+  estimatedHours: Double,
+  completedHours: Double,
+  velocity: Double
+)
+  example { new SprintSummary(10, 7, 1, 1, 1, 40.0, 28.0, 70.0).velocity() == 70.0 }
+  example { new SprintSummary(10, 7, 1, 1, 1, 40.0, 28.0, 70.0).doneTasks() + 3 == 10 }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+extension Int {
+  def plural(word: String): String {
+    if self == 1 { return "1 " + word }
+    return "" + self + " " + word + "s"
+  }
+}
+
+extension Double {
+  def round1(): Double = (self * 10.0 + 0.5) as Long / 10.0
+  def pct(): String = "" + ((self * 100.0 + 0.5) as Long) + "%"
+  def fmtHrs(): String {
+    val h = self as Int
+    val frac = self - (h as Double)
+    val m = (frac * 60.0 + 0.5) as Int
+    if m == 0 { return "" + h + "h" }
+    return "" + h + "h " + m + "m"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = this
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s = this
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String {
+    if this.length() <= n { return this }
+    return this.substring(0, n - 2) + ".."
+  }
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+def line(c: String, n: Int): String {
+  var s = ""
+  var i = 0
+  while i < n { s = s + c; i++ }
+  return s
+}
+
+// ─── TaskBoard class ──────────────────────────────────────────────────────────
+class TaskBoard {
+  var tasks: ArrayList[Task] = new ArrayList[Task]()
+
+public:
+  def this { tasks = new ArrayList[Task]() }
+
+  def addTask(t: Task): void { tasks.add(t) }
+
+  def allTasks(): List[Task] {
+    val list: List[Task] = []
+    foreach t: Task in tasks { list << t }
+    return list
+  }
+
+  def findById(id: Int): Task? {
+    val found = allTasks().find { t => t.id() == id }
+    if found == null { return null }
+    return found as Task
+  }
+
+  def findByAssignee(name: String): List[Task] {
+    return allTasks().filter { t =>
+      val a = t.assignee()
+      return a != null && a == name
+    }
+  }
+
+  def byPriority(): List[Task] {
+    return allTasks().sortedBy { t => t.priority().order() }
+  }
+
+  def pending(): List[Task] {
+    return allTasks().filter { t => !t.status().isComplete() }
+  }
+
+  def blockedTasks(): List[Task] {
+    return allTasks().filter { t => t.status().isBlocked() }
+  }
+
+  def criticalOrHigh(): List[Task] {
+    return allTasks().filter { t => t.priority().isCriticalOrHigh() }
+  }
+
+  def totalEstimatedHours(): Double {
+    return allTasks().fold(0.0) { acc, t =>
+      (acc as Double) + t.estimatedHours()
+    } as Double
+  }
+
+  def completedHours(): Double {
+    return allTasks()
+      .filter { t => t.status().isComplete() }
+      .fold(0.0) { acc, t => (acc as Double) + t.estimatedHours() } as Double
+  }
+
+  def hasAnyBlocked(): Boolean {
+    return allTasks().any { t => t.status().isBlocked() }
+  }
+
+  def summary(): SprintSummary {
+    val total  = allTasks().size
+    val done   = allTasks().filter { t => t.status().isComplete() }.size
+    val blk    = blockedTasks().size
+    val inProg = allTasks().filter { t => t.status().isInProgress() }.size
+    val todo   = allTasks().filter { t => t.status().isTodo() }.size
+    val est    = totalEstimatedHours()
+    val comp   = completedHours()
+    val vel    = if total == 0 { 0.0 } else { comp / est * 100.0 }
+    return new SprintSummary(total, done, blk, inProg, todo, est, comp, vel)
+  }
+}
+
+// ─── Report printing ──────────────────────────────────────────────────────────
+def printHeader(title: String): void {
+  IO::println(line("─", 66))
+  IO::println("  " + title)
+  IO::println(line("─", 66))
+}
+
+def printTask(t: Task, rank: Int): void {
+  val idStr    = ("#" + t.id()).padLeft(4)
+  val rankStr  = ("" + rank + ".").padLeft(3)
+  val pri      = t.priority().label()
+  val status   = t.status().label()
+  val title    = t.title().truncate(22).padRight(22)
+  val assignee = (t.assignee() ?: "—").padRight(8)
+  val hrs      = t.estimatedHours().fmtHrs().padLeft(5)
+  IO::println("#{rankStr} #{idStr}  #{pri}  #{status}  #{title}  #{assignee}  #{hrs}")
+}
+
+def printSummary(board: TaskBoard): void {
+  val s = board.summary()
+  IO::println("")
+  printHeader("Sprint Summary")
+  IO::println("  Total tasks     : #{s.totalTasks()}")
+  IO::println("  Done            : #{s.doneTasks()}  (#{s.completedHours().fmtHrs()} / #{s.estimatedHours().fmtHrs()})")
+  IO::println("  In Progress     : #{s.inProgressTasks()}")
+  IO::println("  Todo            : #{s.todoTasks()}")
+  IO::println("  Blocked         : #{s.blockedTasks()}")
+  IO::println("  Velocity        : #{s.velocity().round1()}%")
+  val warnMsg = if board.hasAnyBlocked() {
+    "  *** " + s.blockedTasks().plural("task") + " blocked — needs attention ***"
+  } else { "" }
+  if warnMsg.length() > 0 { IO::println(warnMsg) }
+  IO::println("")
+}
+
+def printByPriority(board: TaskBoard): void {
+  printHeader("Tasks by Priority")
+  val sorted = board.byPriority()
+  var rank = 1
+  foreach t: Task in sorted {
+    printTask(t, rank)
+    rank++
+  }
+  IO::println("")
+}
+
+def printByAssignee(board: TaskBoard): void {
+  printHeader("Tasks by Assignee")
+  val grouped = board.allTasks().groupBy { t => t.assignee() ?: "[unassigned]" }
+  foreach (name, tlist) in grouped {
+    val grp      = tlist as List[Object]
+    val total    = grp.size
+    val doneHrs  = grp.filter  { t => (t as Task).status().isComplete() }
+                      .fold(0.0) { acc, t => (acc as Double) + (t as Task).estimatedHours() } as Double
+    val totalHrs = grp.fold(0.0) { acc, t => (acc as Double) + (t as Task).estimatedHours() } as Double
+    IO::println("  #{name} (#{total.plural("task")}, #{doneHrs.fmtHrs()} / #{totalHrs.fmtHrs()})")
+    val byPri = grp.sortedBy { t => (t as Task).priority().order() }
+    foreach t: Object in byPri {
+      val tk = t as Task
+      IO::println("    [#{tk.priority().label().trim()}]  #{tk.title().truncate(28)}  #{tk.status().label().trim()}")
+    }
+    IO::println("")
+  }
+}
+
+def printBlockers(board: TaskBoard): void {
+  val blk = board.blockedTasks()
+  if blk.size == 0 { return }
+  printHeader("Blocked Tasks — Action Required")
+  var i = 1
+  foreach t: Task in blk {
+    IO::println("  #{i}. [#{t.priority().label().trim()}] ##{t.id()} #{t.title()}")
+    IO::println("     Assignee: #{t.assignee() ?: "—"}  Estimate: #{t.estimatedHours().fmtHrs()}")
+    i++
+  }
+  IO::println("")
+}
+
+def printTagDistribution(board: TaskBoard): void {
+  printHeader("Tag Distribution")
+  val byTag = board.allTasks().groupBy { t => t.tag().label() }
+  foreach (tagLabel, tlist) in byTag {
+    val grp   = tlist as List[Object]
+    val total = grp.size
+    val hrs   = grp.fold(0.0) { acc, t => (acc as Double) + (t as Task).estimatedHours() } as Double
+    IO::println("  [#{tagLabel}]  #{total.plural("task")}, #{hrs.fmtHrs()} estimated")
+  }
+  IO::println("")
+}
+
+def printTopN(board: TaskBoard, n: Int): void {
+  printHeader("Top #{n} Critical/High Priority Tasks")
+  val top   = board.criticalOrHigh().sortedBy { t => t.priority().order() }.take(n)
+  val ranks: List[Int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  val pairs = top.zip(ranks)
+  foreach pair: Object in pairs {
+    val p  = pair as List[Object]
+    val tk = p[0] as Task
+    val rk = p[1] as Int
+    IO::println("  #{rk}. [#{tk.priority().label().trim()}] ##{tk.id()} — #{tk.title()}")
+  }
+  IO::println("")
+}
+
+// ─── do[Option] lookup helper ─────────────────────────────────────────────────
+def findTask(board: TaskBoard, id: Int): Option[Task] {
+  val found = board.allTasks().find { t => t.id() == id }
+  if found == null { return Option::none() }
+  return Option::some(found as Task)
+}
+
+def lookupTask(board: TaskBoard, id: Int): void {
+  val opt = findTask(board, id)
+  if opt.isEmpty() {
+    IO::println("  Task ##{id}: not found")
+  } else {
+    val t = opt.get() as Task
+    IO::println("  Task ##{id}: \"#{t.title()}\" [#{t.priority().label().trim()}] #{t.status().label().trim()}")
+  }
+}
+
+// do[Option]: chain — find a task, then compute its priority label
+def taskPriorityLabel(board: TaskBoard, id: Int): Option[String] {
+  return do[Option] {
+    t <- findTask(board, id)
+    ret t.priority().label().trim()
+  }
+}
+
+// ─── Main: build demo board and print reports ─────────────────────────────────
+val board = new TaskBoard()
+
+board.addTask(new Task(1,  "Fix authentication bypass",       new Critical(), new InProgress(), "Alice",   4.0,  Tag::Bug))
+board.addTask(new Task(2,  "Add user profile page",           new High(),     new Todo(),       "Bob",     6.0,  Tag::Feature))
+board.addTask(new Task(3,  "Write API documentation",         new Medium(),   new InProgress(), "Carol",   3.0,  Tag::Docs))
+board.addTask(new Task(4,  "Upgrade dependency logging",      new Low(),      new Done(),       "Alice",   1.5,  Tag::Fix))
+board.addTask(new Task(5,  "Implement search autocomplete",   new High(),     new Todo(),       "Bob",     8.0,  Tag::Feature))
+board.addTask(new Task(6,  "Fix memory leak in cache",        new Critical(), new Blocked(),    "Carol",   5.0,  Tag::Bug))
+board.addTask(new Task(7,  "Add unit tests for auth module",  new High(),     new Todo(),       "Alice",   4.0,  Tag::Test))
+board.addTask(new Task(8,  "Refactor data access layer",      new Medium(),   new Done(),       "Dave",    5.5,  Tag::Fix))
+board.addTask(new Task(9,  "Create onboarding tutorial",      new Low(),      new Done(),       null,      2.0,  Tag::Docs))
+board.addTask(new Task(10, "Fix pagination on listings",      new High(),     new Blocked(),    "Dave",    3.0,  Tag::Bug))
+board.addTask(new Task(11, "Add dark mode support",           new Medium(),   new Todo(),       "Bob",     6.0,  Tag::Feature))
+board.addTask(new Task(12, "Perf test suite for API",         new Medium(),   new Done(),       "Carol",   3.5,  Tag::Test))
+board.addTask(new Task(13, "Update CHANGELOG for v2.0",       new Low(),      new Done(),       "Alice",   0.5,  Tag::Docs))
+board.addTask(new Task(14, "Fix CSV export encoding",         new High(),     new InProgress(), "Dave",    2.5,  Tag::Bug))
+board.addTask(new Task(15, "Add rate limiting middleware",    new Critical(), new Todo(),       null,      7.0,  Tag::Feature))
+
+IO::println(line("═", 66))
+IO::println("  SPRINT TASK PLANNER — Sprint #7  (2026-Q3-W1)")
+IO::println(line("═", 66))
+IO::println("")
+
+printSummary(board)
+printByPriority(board)
+printBlockers(board)
+printByAssignee(board)
+printTagDistribution(board)
+printTopN(board, 5)
+
+// do[Option] lookups
+printHeader("Task Lookup (do[Option])")
+lookupTask(board, 6)
+lookupTask(board, 15)
+lookupTask(board, 99)
+IO::println("")
+printHeader("Priority via do[Option] chaining")
+foreach id: Int in ([1, 6, 15, 99] as List[Int]) {
+  val pOpt = taskPriorityLabel(board, id)
+  if pOpt.isEmpty() {
+    IO::println("  Task ##{id}: not found")
+  } else {
+    IO::println("  Task ##{id}: priority = #{pOpt.get()}")
+  }
+}
+IO::println("")
+
+// Partition: done vs pending
+printHeader("Done vs Pending")
+val allTasksList = board.allTasks()
+val parts        = allTasksList.partition { t => t.status().isComplete() }
+val doneTasks    = parts[0] as List[Object]
+val pendingTasks = parts[1] as List[Object]
+IO::println("  Done    : #{doneTasks.size.plural("task")}, #{board.completedHours().fmtHrs()} completed")
+IO::println("  Pending : #{pendingTasks.size.plural("task")}")
+
+// Distinct tags in use
+val tagLabels = allTasksList.map { t => t.tag().label() }.distinct()
+IO::println("  Tags in sprint: #{tagLabels.size} distinct")
+var tagStr = ""
+foreach lbl: Object in tagLabels {
+  if tagStr.length() > 0 { tagStr = tagStr + ", " }
+  tagStr = tagStr + (lbl as String)
+}
+IO::println("    " + tagStr)
+IO::println("")
+
+IO::println(line("═", 66))
+IO::println("  Report complete.")
+IO::println(line("═", 66))

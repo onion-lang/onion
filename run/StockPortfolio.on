@@ -1,0 +1,545 @@
+// StockPortfolio.on — A simulated stock portfolio management system.
+// Exercises: records with methods, plain/data-carrying/ADT enums, interface +
+// conforms, extension methods on Int/Double/String, collection pipelines
+// (filter/map/fold/reduce/sortedBy/groupBy/distinct/partition/find),
+// select/pattern matching, nullable types, string interpolation, try/catch,
+// recursion, foreach on map (k,v), range foreach.
+
+import { java.util.ArrayList }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+extension Double {
+  def dabs(): Double { if self < 0.0 { return 0.0 - self } return self }
+  def usd(): String {
+    val sign: String  = if self < 0.0 { "-" } else { "" }
+    val a: Double     = self.dabs()
+    val whole: Int    = a.intValue()
+    val frac: Int     = ((a - (whole as Double)) * 100.0 + 0.5).intValue()
+    val fs: String    = if frac < 10 { "0" + frac } else { "" + frac }
+    return sign + "$" + whole + "." + fs
+  }
+  def pct(): String {
+    val sign: String  = if self < 0.0 { "-" } else { "+" }
+    val a: Double     = self.dabs()
+    val whole: Int    = a.intValue()
+    val frac: Int     = ((a - (whole as Double)) * 100.0 + 0.5).intValue()
+    val fs: String    = if frac < 10 { "0" + frac } else { "" + frac }
+    return sign + whole + "." + fs + "%"
+  }
+}
+
+extension Int {
+  def shareWord(): String = if self == 1 { "share" } else { "shares" }
+  def ipad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Sector {
+  Tech, Finance, Healthcare, Energy, Consumer
+public:
+  def label(): String = select this {
+    case Sector::Tech:       "Technology"
+    case Sector::Finance:    "Finance"
+    case Sector::Healthcare: "Healthcare"
+    case Sector::Energy:     "Energy"
+    case Sector::Consumer:   "Consumer"
+    else:                    "Other"
+  }
+  def icon(): String = select this {
+    case Sector::Tech:       "[T]"
+    case Sector::Finance:    "[F]"
+    case Sector::Healthcare: "[H]"
+    case Sector::Energy:     "[E]"
+    case Sector::Consumer:   "[C]"
+    else:                    "[?]"
+  }
+}
+
+enum TradeKind {
+  BUY, SELL
+public:
+  def label(): String = select this {
+    case TradeKind::BUY:  "BUY "
+    case TradeKind::SELL: "SELL"
+    else: "???"
+  }
+}
+
+// ADT enum: special corporate events affecting a holding
+enum CorpEvent {
+  case Dividend(ticker: String, amountPerShare: Double)
+  case StockSplit(ticker: String, ratio: Int)
+  case Delisted(ticker: String, reason: String)
+public:
+  def describe(): String = select this {
+    case e is Dividend:
+      "Dividend: " + e.ticker() + " pays " + e.amountPerShare().usd() + "/share"
+    case e is StockSplit:
+      "Split: " + e.ticker() + " " + e.ratio() + "-for-1"
+    case e is Delisted:
+      "Delisted: " + e.ticker() + " (" + e.reason() + ")"
+  }
+  def affectedTicker(): String = select this {
+    case e is Dividend:   e.ticker()
+    case e is StockSplit: e.ticker()
+    case e is Delisted:   e.ticker()
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Stock(
+  ticker: String,
+  name: String,
+  sector: Sector,
+  price: Double,
+  prevClose: Double
+) {
+public:
+  def change(): Double    = self.price() - self.prevClose()
+  def changePct(): Double = (self.change() / self.prevClose()) * 100.0
+  def isUp(): Boolean     = self.change() >= 0.0
+  def summary(): String =
+    self.ticker().padRight(6) + "  " +
+    self.name().padRight(24) +
+    self.sector().icon() + "  " +
+    self.price().usd().padLeft(9) + "  " +
+    self.change().usd().padLeft(8) + "  " +
+    self.changePct().pct().padLeft(8)
+}
+
+record Trade(
+  ticker: String,
+  shares: Int,
+  pricePerShare: Double,
+  kind: TradeKind
+) {
+public:
+  def total(): Double = (self.shares() as Double) * self.pricePerShare()
+  def describe(): String =
+    self.kind().label() + " " + self.shares() + " " + self.ticker() +
+    " @ " + self.pricePerShare().usd() +
+    "  (total: " + self.total().usd() + ")"
+}
+
+record Position(
+  ticker: String,
+  shares: Int,
+  avgCost: Double,
+  currentPrice: Double
+) {
+public:
+  def costBasis(): Double     = (self.shares() as Double) * self.avgCost()
+  def marketValue(): Double   = (self.shares() as Double) * self.currentPrice()
+  def unrealizedPnL(): Double = self.marketValue() - self.costBasis()
+  def unrealizedPct(): Double = (self.unrealizedPnL() / self.costBasis()) * 100.0
+  def isProfit(): Boolean     = self.unrealizedPnL() >= 0.0
+  def row(): String =
+    self.ticker().padRight(6) + "  " +
+    ("" + self.shares() + " " + self.shares().shareWord()).padRight(14) +
+    self.avgCost().usd().padLeft(8) + "  " +
+    self.currentPrice().usd().padLeft(9) + "  " +
+    self.marketValue().usd().padLeft(11) + "  " +
+    self.unrealizedPnL().usd().padLeft(10) + "  " +
+    self.unrealizedPct().pct().padLeft(8)
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def header(): String
+  def body(): void
+}
+
+// ─── Portfolio class ──────────────────────────────────────────────────────────
+
+class Portfolio conforms Reportable {
+  val name: String
+  val positions: List[Object]
+  val cash: Double
+
+public:
+  def this(name: String, initialCash: Double) {
+    self.name = name
+    self.positions = []
+    self.cash = initialCash
+  }
+
+  def addPosition(pos: Position): void {
+    self.positions << pos
+  }
+
+  def investedValue(): Double =
+    self.positions.fold(0.0) { acc, p =>
+      (acc as Double) + (p as Position).marketValue()
+    } as Double
+
+  def totalValue(): Double = self.cash + self.investedValue()
+
+  def totalCost(): Double =
+    self.positions.fold(0.0) { acc, p =>
+      (acc as Double) + (p as Position).costBasis()
+    } as Double
+
+  def totalPnL(): Double  = self.investedValue() - self.totalCost()
+
+  def pnlPct(): Double {
+    val cost: Double = self.totalCost()
+    if cost <= 0.0 { return 0.0 }
+    return (self.totalPnL() / cost) * 100.0
+  }
+
+  def header(): String = "=== Portfolio: " + self.name + " ==="
+
+  def body(): void {
+    IO::println("  Cash reserve:    " + self.cash.usd())
+    IO::println("  Invested value:  " + self.investedValue().usd())
+    IO::println("  Total value:     " + self.totalValue().usd())
+    IO::println("  Cost basis:      " + self.totalCost().usd())
+    IO::println("  Net P&L:         " + self.totalPnL().usd() +
+                " (" + self.pnlPct().pct() + ")")
+    IO::println("  Positions held:  " + self.positions.size)
+  }
+}
+
+// ─── Recursive helpers ────────────────────────────────────────────────────────
+
+def maxPnL(positions: List[Object], idx: Int, best: Double): Double {
+  if idx >= positions.size { return best }
+  val pnl: Double = (positions[idx] as Position).unrealizedPnL()
+  return maxPnL(positions, idx + 1, if pnl > best { pnl } else { best })
+}
+
+def minPnL(positions: List[Object], idx: Int, worst: Double): Double {
+  if idx >= positions.size { return worst }
+  val pnl: Double = (positions[idx] as Position).unrealizedPnL()
+  return minPnL(positions, idx + 1, if pnl < worst { pnl } else { worst })
+}
+
+// ─── Main Program ─────────────────────────────────────────────────────────────
+
+val HR60: String  = "─".rep(60)
+val HR75: String  = "─".rep(75)
+val EQ60: String  = "=".rep(60)
+
+// Stock universe (ticker, name, sector, current price, prev close)
+val stocks: List[Object] = [
+  new Stock("AAPL",  "Apple Inc.",           Sector::Tech,       187.32, 182.15),
+  new Stock("MSFT",  "Microsoft Corp.",      Sector::Tech,       415.70, 408.90),
+  new Stock("GOOGL", "Alphabet Inc.",        Sector::Tech,       175.25, 179.10),
+  new Stock("AMZN",  "Amazon.com Inc.",      Sector::Tech,       198.44, 195.30),
+  new Stock("JPM",   "JPMorgan Chase",       Sector::Finance,    202.88, 198.50),
+  new Stock("GS",    "Goldman Sachs",        Sector::Finance,    485.15, 490.20),
+  new Stock("UNH",   "UnitedHealth Group",   Sector::Healthcare, 528.60, 532.00),
+  new Stock("JNJ",   "Johnson & Johnson",    Sector::Healthcare, 152.44, 150.90),
+  new Stock("XOM",   "Exxon Mobil Corp.",    Sector::Energy,     108.92, 106.75),
+  new Stock("WMT",   "Walmart Inc.",         Sector::Consumer,    82.37,  80.10)
+]
+
+// Trade history
+val trades: List[Object] = [
+  new Trade("AAPL",  50,  168.50, TradeKind::BUY),
+  new Trade("AAPL",  25,  175.00, TradeKind::BUY),
+  new Trade("MSFT",  30,  390.00, TradeKind::BUY),
+  new Trade("GOOGL", 40,  172.50, TradeKind::BUY),
+  new Trade("GOOGL", 10,  180.00, TradeKind::SELL),
+  new Trade("JPM",   60,  185.00, TradeKind::BUY),
+  new Trade("UNH",   15,  515.00, TradeKind::BUY),
+  new Trade("XOM",   80,  102.00, TradeKind::BUY),
+  new Trade("XOM",   20,  105.00, TradeKind::BUY),
+  new Trade("WMT",  100,   77.50, TradeKind::BUY)
+]
+
+// ── Trade history ─────────────────────────────────────────────────────────────
+IO::println(EQ60)
+IO::println("  TRADE HISTORY")
+IO::println(EQ60)
+foreach t: Trade in trades {
+  IO::println("  " + t.describe())
+}
+
+// Build ticker → current price map
+val priceMap: Map[Object, Object] = [:]
+foreach s: Stock in stocks {
+  priceMap[s.ticker()] = s.price()
+}
+
+// Build ticker → sector map
+val sectorMap: Map[Object, Object] = [:]
+foreach s: Stock in stocks {
+  sectorMap[s.ticker()] = s.sector()
+}
+
+// Group trades by ticker, then compute net position per ticker
+val byTicker = trades.groupBy { t => (t as Trade).ticker() }
+
+val allPositions: List[Object] = []
+foreach (ticker, tradeList) in byTicker {
+  val ts: List[Object] = tradeList as List[Object]
+  val netShares: Int = ts.fold(0) { acc, t =>
+    val tr: Trade = t as Trade
+    val delta: Int = if tr.kind() == TradeKind::BUY { tr.shares() } else { 0 - tr.shares() }
+    (acc as Int) + delta
+  } as Int
+  val buyShares: Int = ts.fold(0) { acc, t =>
+    val tr: Trade = t as Trade
+    (acc as Int) + (if tr.kind() == TradeKind::BUY { tr.shares() } else { 0 })
+  } as Int
+  val buyCost: Double = ts.fold(0.0) { acc, t =>
+    val tr: Trade = t as Trade
+    (acc as Double) + (if tr.kind() == TradeKind::BUY { tr.total() } else { 0.0 })
+  } as Double
+  if netShares > 0 && buyShares > 0 {
+    val avgCost: Double    = buyCost / (buyShares as Double)
+    val curPrice: Double   = if priceMap[ticker] != null { priceMap[ticker] as Double } else { 0.0 }
+    allPositions << new Position(ticker as String, netShares, avgCost, curPrice)
+  }
+}
+
+// Compute cash remaining after all BUY trades minus SELL proceeds
+val netCashSpent: Double = trades.fold(0.0) { acc, t =>
+  val tr: Trade = t as Trade
+  val flow: Double = if tr.kind() == TradeKind::BUY { tr.total() } else { 0.0 - tr.total() }
+  (acc as Double) + flow
+} as Double
+val startingCash: Double = 75000.0
+val remainingCash: Double = startingCash - netCashSpent
+
+// Build the Portfolio object
+val portfolio: Portfolio = new Portfolio("Growth Fund", remainingCash)
+foreach p: Position in allPositions {
+  portfolio.addPosition(p)
+}
+
+// ── Portfolio Summary ─────────────────────────────────────────────────────────
+IO::println("")
+IO::println(EQ60)
+IO::println("  PORTFOLIO SUMMARY")
+IO::println(EQ60)
+IO::println(portfolio.header())
+portfolio.body()
+
+// ── Positions table sorted by market value ────────────────────────────────────
+IO::println("")
+IO::println("POSITIONS (by market value, descending):")
+IO::println(HR75)
+IO::println(
+  "Ticker".padRight(8) +
+  "Holding         ".padRight(16) +
+  "AvgCost ".padLeft(8) +
+  " CurrPrice".padLeft(10) +
+  " MktValue  ".padLeft(11) +
+  " Unreal P&L".padLeft(11) +
+  " Return ".padLeft(8)
+)
+IO::println(HR75)
+val sortedByValue: List[Object] = allPositions.sortedBy { p => 0.0 - (p as Position).marketValue() }
+foreach p: Position in sortedByValue {
+  IO::println(p.row())
+}
+IO::println(HR75)
+
+// ── Winners & Losers (partition) ──────────────────────────────────────────────
+val parts                  = allPositions.partition { p => (p as Position).isProfit() }
+val winners: List[Object]  = parts[0] as List[Object]
+val losers: List[Object]   = parts[1] as List[Object]
+IO::println("")
+IO::println("Winners (" + winners.size + "):")
+foreach p: Position in winners.sortedBy { p => 0.0 - (p as Position).unrealizedPct() } {
+  IO::println(
+    "  ▲ " + p.ticker().padRight(6) +
+    p.unrealizedPnL().usd().padLeft(10) +
+    "  " + p.unrealizedPct().pct()
+  )
+}
+IO::println("Losers  (" + losers.size + "):")
+foreach p: Position in losers.sortedBy { p => (p as Position).unrealizedPct() } {
+  IO::println(
+    "  ▼ " + p.ticker().padRight(6) +
+    p.unrealizedPnL().usd().padLeft(10) +
+    "  " + p.unrealizedPct().pct()
+  )
+}
+
+// ── Sector Breakdown (groupBy + foreach map) ──────────────────────────────────
+IO::println("")
+IO::println("SECTOR BREAKDOWN:")
+IO::println(HR60)
+val bySector = allPositions.groupBy { p =>
+  val sec: Sector = if sectorMap[(p as Position).ticker()] != null {
+    sectorMap[(p as Position).ticker()] as Sector
+  } else { Sector::Consumer }
+  sec.label()
+}
+foreach (secLabel, posList) in bySector {
+  val ps: List[Object]   = posList as List[Object]
+  val secVal: Double     = ps.fold(0.0) { a, p => (a as Double) + (p as Position).marketValue() } as Double
+  val secPnL: Double     = ps.fold(0.0) { a, p => (a as Double) + (p as Position).unrealizedPnL() } as Double
+  val secTickers: List[Object] = ps.map { p => (p as Position).ticker() }
+  IO::println(
+    "  " + (secLabel as String).padRight(14) +
+    secVal.usd().padLeft(11) +
+    "   P&L " + secPnL.usd().padLeft(10) +
+    "   tickers: " + secTickers.fold("") { a, t => if (a as String) == "" { t as String } else { (a as String) + "," + (t as String) } }
+  )
+}
+
+// ── Market Movers (Top 3 Up / Top 3 Down) ────────────────────────────────────
+IO::println("")
+IO::println("MARKET MOVERS (Top 3 Gainers / Top 3 Losers):")
+IO::println(HR75)
+IO::println(
+  "Ticker  " +
+  "Name                      " +
+  "Sect " +
+  " Price     " +
+  " Change    " +
+  "  Chg%"
+)
+IO::println(HR75)
+val sortedStocks: List[Object] = stocks.sortedBy { s => 0.0 - (s as Stock).changePct() }
+val nStocks: Int = sortedStocks.size
+IO::println("▲ TOP GAINERS")
+foreach i: Int in 0..<3 {
+  IO::println("  " + (sortedStocks[i] as Stock).summary())
+}
+IO::println("▼ TOP LOSERS")
+foreach i: Int in (nStocks - 3)..<nStocks {
+  IO::println("  " + (sortedStocks[i] as Stock).summary())
+}
+
+// ── Distinct sectors held (distinct) ─────────────────────────────────────────
+val distinctSectors: List[String] = allPositions
+  .map { p =>
+    val sec = sectorMap[(p as Position).ticker()]
+    if sec != null { (sec as Sector).label() } else { "Unknown" }
+  }
+  .distinct()
+IO::println("")
+IO::println("Distinct sectors in portfolio (" + distinctSectors.size + "):")
+foreach sl: Object in distinctSectors {
+  IO::println("  • " + sl)
+}
+
+// ── Corporate Events (ADT enum pattern match) ─────────────────────────────────
+IO::println("")
+IO::println("CORPORATE EVENTS:")
+IO::println(HR60)
+val events: List[Object] = [
+  new Dividend("AAPL", 0.25),
+  new StockSplit("GOOGL", 20),
+  new Dividend("JPM", 1.05),
+  new Delisted("ENPH", "Bankruptcy filing")
+]
+foreach e: CorpEvent in events {
+  IO::println("  • " + e.describe())
+  val evTicker: String   = e.affectedTicker()
+  val held: Position?    = allPositions.find { p => (p as Position).ticker() == evTicker } as Position?
+  if held != null {
+    IO::println("    → You hold " + held.shares() + " " + held.shares().shareWord() +
+                " — event applies to this position.")
+  }
+}
+
+// ── Portfolio Statistics ──────────────────────────────────────────────────────
+IO::println("")
+IO::println("PORTFOLIO STATISTICS:")
+IO::println(HR60)
+val totalCostAll: Double = allPositions.fold(0.0) { a, p => (a as Double) + (p as Position).costBasis() } as Double
+val totalValAll: Double  = allPositions.fold(0.0) { a, p => (a as Double) + (p as Position).marketValue() } as Double
+val totalPnLAll: Double  = totalValAll - totalCostAll
+val nPos: Int = allPositions.size
+IO::println("  Total invested:      " + totalCostAll.usd())
+IO::println("  Total market value:  " + totalValAll.usd())
+IO::println("  Net unrealized P&L:  " + totalPnLAll.usd())
+IO::println("  Cash reserve:        " + remainingCash.usd())
+IO::println("  Grand total value:   " + (totalValAll + remainingCash).usd())
+IO::println("  # of positions:      " + nPos)
+IO::println("  Profitable:          " + winners.size + " / " + nPos)
+if nPos > 0 {
+  val bestPnL:  Double = maxPnL(allPositions, 0, -999999.0)
+  val worstPnL: Double = minPnL(allPositions, 0,  999999.0)
+  IO::println("  Best P&L:            " + bestPnL.usd())
+  IO::println("  Worst P&L:           " + worstPnL.usd())
+  val avgPnL: Double = totalPnLAll / (nPos as Double)
+  IO::println("  Avg P&L/position:    " + avgPnL.usd())
+}
+
+// ── try/catch: safe lookup of a ticker not in portfolio ──────────────────────
+IO::println("")
+IO::println("TICKER LOOKUP (try/catch demo):")
+IO::println(HR60)
+def requirePosition(positions: List[Object], ticker: String): Position {
+  val p: Position? = positions.find { p => (p as Position).ticker() == ticker } as Position?
+  if p == null { throw new Exception("No position found for: " + ticker) }
+  return p as Position
+}
+val lookupTickers: List[Object] = ["AAPL", "TSLA", "MSFT"]
+foreach lt: String in lookupTickers {
+  try {
+    val pos: Position = requirePosition(allPositions, lt)
+    IO::println("  " + lt + " → held: " + pos.shares() + " shares @ " + pos.currentPrice().usd())
+  } catch e: Exception {
+    IO::println("  " + lt + " → not held: " + e.getMessage())
+  }
+}
+
+// ── while loop: simulate 5 daily price-change steps for AAPL ─────────────────
+IO::println("")
+IO::println("SIMULATED DAILY P&L WALK (AAPL, 5 days):")
+IO::println(HR60)
+var aaplPrice: Double = 187.32
+var aaplShares: Int = 75
+var day: Int = 0
+val dailyChanges: List[Object] = [2.14, -1.87, 3.55, -0.92, 4.21]
+while day < dailyChanges.size {
+  aaplPrice = aaplPrice + (dailyChanges[day] as Double)
+  val aaplVal: Double = (aaplShares as Double) * aaplPrice
+  IO::println("  Day #{day + 1}:  AAPL = " + aaplPrice.usd() +
+              "  portfolio value = " + aaplVal.usd())
+  day = day + 1
+}
+
+// ── zip: pair each position with its rank by return ──────────────────────────
+IO::println("")
+IO::println("POSITIONS BY RETURN RANK:")
+val ranked: List[Object] = sortedByValue.sortedBy { p => 0.0 - (p as Position).unrealizedPct() }
+val ranks: List[Object]  = []
+foreach i: Int in 1..ranked.size { ranks << i }
+val zipped = ranks.zip(ranked)
+foreach pair: Object in zipped {
+  val pairList = pair as List
+  val rank: Int     = pairList[0] as Int
+  val pos: Position = pairList[1] as Position
+  IO::println("  #" + rank + "  " + pos.ticker().padRight(6) +
+              pos.unrealizedPct().pct().padLeft(8) +
+              "  (" + pos.unrealizedPnL().usd() + ")")
+}
+
+IO::println("")
+IO::println("Done.")

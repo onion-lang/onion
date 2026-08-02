@@ -1,0 +1,502 @@
+// PlaylistManager.on — A music playlist manager demonstrating records,
+// plain and ADT enums, classes with public fields, interfaces, generics,
+// collection pipelines (map/filter/fold/sortedBy/groupBy/partition/find/zip),
+// select/pattern matching with exhaustiveness, nullable, closures,
+// string interpolation, try/catch, foreach (range and map k,v), extension
+// methods on Int and String, and while loops.
+
+import { java.util.ArrayList }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def toMinSec(): String {
+    val m: Int = self / 60
+    val s: Int = self % 60
+    val pad: String = if s < 10 { "0" + s } else { "" + s }
+    return "" + m + ":" + pad
+  }
+  def plural(word: String): String {
+    if self == 1 { return "1 " + word }
+    return "" + self + " " + word + "s"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = this
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = this
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String {
+    if this.length() <= n { return this }
+    return this.substring(0, n - 1) + "~"
+  }
+}
+
+// ─── Genre ADT enum ───────────────────────────────────────────────────────────
+
+enum Genre {
+  case Pop
+  case Rock
+  case Jazz
+  case Classical
+  case Electronic
+  case HipHop
+  case Country
+  case Unknown
+public:
+  def label(): String = select this {
+    case g is Pop:        "Pop"
+    case g is Rock:       "Rock"
+    case g is Jazz:       "Jazz"
+    case g is Classical:  "Classical"
+    case g is Electronic: "Electronic"
+    case g is HipHop:     "Hip-Hop"
+    case g is Country:    "Country"
+    case g is Unknown:    "Unknown"
+  }
+  def isPrimarilyInstrumental(): Boolean = select this {
+    case g is Jazz:       true
+    case g is Classical:  true
+    else:                 false
+  }
+}
+
+// ─── PlaybackMode plain enum ──────────────────────────────────────────────────
+
+enum PlaybackMode {
+  Sequential, Shuffle, RepeatOne, RepeatAll
+public:
+  def label(): String = select this {
+    case PlaybackMode::Sequential: "Sequential"
+    case PlaybackMode::Shuffle:    "Shuffle"
+    case PlaybackMode::RepeatOne:  "Repeat One"
+    case PlaybackMode::RepeatAll:  "Repeat All"
+    else: "Unknown"
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Song(id: Int, title: String, artist: String, album: String, durationSec: Int, genre: Genre, year: Int, rating: Int)
+  example { new Song(1, "T", "A", "Alb", 200, new Pop(), 2000, 4).rating() == 4 }
+  example { new Song(1, "T", "A", "Alb", 200, new Pop(), 2000, 4).durationSec() > 0 }
+
+record PlaylistStats(totalSongs: Int, totalDurationSec: Int, averageRating: Double, topArtist: String?)
+  example { new PlaylistStats(5, 1000, 4.2, "Queen").totalSongs() == 5 }
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Displayable {
+  def display(): String
+}
+
+// ─── Playlist class ───────────────────────────────────────────────────────────
+
+class Playlist conforms Displayable {
+public:
+  val name: String
+  val songs: ArrayList[Song]
+  var mode: PlaybackMode
+  var nextId: Int
+
+  def this(name: String) {
+    this.name = name
+    this.songs = new ArrayList[Song]()
+    this.mode = PlaybackMode::Sequential
+    this.nextId = 1
+  }
+
+  def addSong(title: String, artist: String, album: String, durationSec: Int, genre: Genre, year: Int, rating: Int): Song {
+    val s = new Song(this.nextId, title, artist, album, durationSec, genre, year, rating)
+    this.songs.add(s)
+    this.nextId = this.nextId + 1
+    return s
+  }
+
+  def removeSong(id: Int): Boolean {
+    var found: Song? = null
+    foreach s: Song in this.songs {
+      if s.id() == id { found = s }
+    }
+    if found != null {
+      this.songs.remove(found)
+      return true
+    }
+    return false
+  }
+
+  def findById(id: Int): Song? {
+    foreach s: Song in this.songs {
+      if s.id() == id { return s }
+    }
+    return null
+  }
+
+  def findByArtist(artist: String): ArrayList[Song] {
+    val result = new ArrayList[Song]()
+    foreach s: Song in this.songs {
+      if s.artist().toLowerCase() == artist.toLowerCase() { result.add(s) }
+    }
+    return result
+  }
+
+  def asList(): List[Song] {
+    val lst: List[Song] = []
+    foreach s: Song in this.songs { lst << s }
+    return lst
+  }
+
+  def topRated(minRating: Int): List[Song] {
+    return this.asList().filter { s => s.rating() >= minRating }
+                        .sortedBy { s => 0 - s.rating() }
+  }
+
+  def sortedByArtist(): List[Song] { return this.asList().sortedBy { s => s.artist() } }
+  def sortedByDuration(): List[Song] { return this.asList().sortedBy { s => s.durationSec() } }
+  def sortedByYear(): List[Song] { return this.asList().sortedBy { s => s.year() } }
+  def recentDecade(): List[Song] { return this.asList().filter { s => s.year() >= 2010 } }
+
+  def totalDurationSec(): Int {
+    return this.asList().fold(0) { acc, s => acc + s.durationSec() }
+  }
+
+  def averageRating(): Double {
+    val cnt = this.songs.size()
+    if cnt == 0 { return 0.0 }
+    val total: Int = this.asList().fold(0) { acc, s => acc + s.rating() }
+    return (total as Double) / (cnt as Double)
+  }
+
+  def topArtist(): String? {
+    val byArtist = this.asList().groupBy { s => s.artist() }
+    var best: String? = null
+    var bestCount: Int = 0
+    foreach (artist, grp) in byArtist {
+      val cnt = (grp as List[Song]).size
+      if cnt > bestCount {
+        bestCount = cnt
+        best = artist as String
+      }
+    }
+    return best
+  }
+
+  def stats(): PlaylistStats {
+    return new PlaylistStats(
+      this.songs.size(),
+      this.totalDurationSec(),
+      this.averageRating(),
+      this.topArtist()
+    )
+  }
+
+  def display(): String {
+    return "Playlist[" + this.name + ", " + this.songs.size() + " songs, " + this.mode.label() + "]"
+  }
+
+  def setMode(m: PlaybackMode): void {
+    this.mode = m
+  }
+}
+
+// ─── MusicLibrary class ───────────────────────────────────────────────────────
+
+class MusicLibrary {
+public:
+  val playlists: ArrayList[Playlist]
+
+  def this {
+    this.playlists = new ArrayList[Playlist]()
+  }
+
+  def createPlaylist(name: String): Playlist {
+    val p = new Playlist(name)
+    this.playlists.add(p)
+    return p
+  }
+
+  def findPlaylist(name: String): Playlist? {
+    foreach p: Playlist in this.playlists {
+      if p.name == name { return p }
+    }
+    return null
+  }
+
+  def allSongs(): List[Song] {
+    val result: List[Song] = []
+    foreach p: Playlist in this.playlists {
+      foreach s: Song in p.songs {
+        result << s
+      }
+    }
+    return result
+  }
+
+  def uniqueArtists(): List[String] {
+    return this.allSongs().map { s => s.artist() }.distinct().sortedBy { a => a as String }
+  }
+}
+
+// ─── Pretty-printing helpers ──────────────────────────────────────────────────
+
+def printSong(s: Song): void {
+  val title  = s.title().truncate(26).padRight(28)
+  val artist = s.artist().truncate(18).padRight(20)
+  val dur    = s.durationSec().toMinSec().padLeft(5)
+  val stars  = "★★★★★".substring(0, s.rating())
+  IO::println("  " + title + " " + artist + " " + dur + "  " + stars + "  (" + s.year() + ") [" + s.genre().label() + "]")
+}
+
+def printSeparator(): void {
+  IO::println("  " + "-".padRight(82))
+}
+
+def printStats(pl: Playlist): void {
+  val st = pl.stats()
+  if st.totalSongs() == 0 {
+    IO::println("  (empty playlist)")
+    return
+  }
+  IO::println("  Songs : " + st.totalSongs().plural("song"))
+  IO::println("  Time  : " + st.totalDurationSec().toMinSec() + " total")
+  IO::println("  Rating: " + st.averageRating() + " avg")
+  val top = st.topArtist()
+  if top != null {
+    IO::println("  Top   : " + top)
+  }
+  IO::println("  Genres:")
+  foreach (genre, grp) in pl.asList().groupBy { s => s.genre().label() } {
+    IO::println("    " + (genre as String).padRight(12) + " " + (grp as List[Song]).size + " songs")
+  }
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println("═".padRight(60))
+  IO::println("  " + title)
+  IO::println("═".padRight(60))
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val lib = new MusicLibrary()
+
+// Build two playlists
+val mainPl = lib.createPlaylist("My Favourites")
+val chill  = lib.createPlaylist("Chill Vibes")
+
+// Populate main playlist
+mainPl.addSong("Bohemian Rhapsody",       "Queen",           "A Night at the Opera", 354, new Rock(),       1975, 5)
+mainPl.addSong("Hotel California",         "Eagles",          "Hotel California",     391, new Rock(),       1977, 5)
+mainPl.addSong("Billie Jean",              "Michael Jackson", "Thriller",             294, new Pop(),        1982, 5)
+mainPl.addSong("Smells Like Teen Spirit",  "Nirvana",         "Nevermind",            301, new Rock(),       1991, 4)
+mainPl.addSong("Rolling in the Deep",      "Adele",           "21",                   228, new Pop(),        2010, 5)
+mainPl.addSong("Lose Yourself",            "Eminem",          "8 Mile",               326, new HipHop(),     2002, 5)
+mainPl.addSong("Shake It Off",             "Taylor Swift",    "1989",                 219, new Pop(),        2014, 4)
+mainPl.addSong("Superstition",             "Stevie Wonder",   "Talking Book",         245, new Rock(),       1972, 5)
+mainPl.addSong("Blue in Green",            "Miles Davis",     "Kind of Blue",         337, new Jazz(),       1959, 5)
+mainPl.addSong("Take Five",                "Dave Brubeck",    "Time Out",             324, new Jazz(),       1959, 5)
+mainPl.addSong("Gold Digger",              "Kanye West",      "Late Registration",    207, new HipHop(),     2005, 4)
+mainPl.addSong("Blinding Lights",          "The Weeknd",      "After Hours",          200, new Pop(),        2019, 4)
+mainPl.addSong("Watermelon Sugar",         "Harry Styles",    "Fine Line",            174, new Pop(),        2019, 3)
+mainPl.addSong("As It Was",                "Harry Styles",    "Harry's House",        167, new Pop(),        2022, 4)
+mainPl.addSong("Stay With Me",             "Sam Smith",       "In the Lonely Hour",   172, new Pop(),        2014, 3)
+
+// Populate chill playlist
+chill.addSong("Clair de Lune",             "Claude Debussy",  "Suite bergamasque",    330, new Classical(),  1905, 5)
+chill.addSong("Gymnopedie No.1",           "Erik Satie",      "Gymnopedies",          195, new Classical(),  1888, 5)
+chill.addSong("Teardrop",                  "Massive Attack",  "Mezzanine",            330, new Electronic(), 1998, 5)
+chill.addSong("Porcelain",                 "Moby",            "Play",                 238, new Electronic(), 1999, 4)
+chill.addSong("Breathe 2 AM",              "Anna Nalick",     "Wreck of the Day",     244, new Pop(),        2004, 4)
+chill.setMode(PlaybackMode::Shuffle)
+
+// ─── Display overview ─────────────────────────────────────────────────────────
+
+printSection("PLAYLIST OVERVIEW")
+foreach p: Playlist in lib.playlists {
+  IO::println("  " + p.display())
+}
+
+// ─── Main playlist full listing ───────────────────────────────────────────────
+
+printSection("MY FAVOURITES — all songs (sorted by artist)")
+printSeparator()
+foreach s: Song in mainPl.sortedByArtist() {
+  printSong(s)
+}
+printSeparator()
+printStats(mainPl)
+
+// ─── Genre breakdown ──────────────────────────────────────────────────────────
+
+printSection("MY FAVOURITES — by genre")
+val byGenre = mainPl.asList().groupBy { s => s.genre().label() }
+foreach (genre, songs) in byGenre {
+  val songList = songs as List[Song]
+  IO::println("  ── " + (genre as String) + " (" + songList.size + ") ──")
+  foreach s: Song in songList.sortedBy { s => s.title() } {
+    IO::println("     " + s.title() + " — " + s.artist())
+  }
+}
+
+// ─── Top-rated songs ──────────────────────────────────────────────────────────
+
+printSection("TOP RATED (5 stars) in My Favourites")
+foreach s: Song in mainPl.topRated(5) {
+  printSong(s)
+}
+
+// ─── Songs from 2010+ ─────────────────────────────────────────────────────────
+
+printSection("RECENT (2010 onwards)")
+val recent = mainPl.recentDecade().sortedBy { s => s.year() }
+foreach s: Song in recent {
+  IO::println("  " + s.year() + "  " + s.title() + " — " + s.artist())
+}
+
+// ─── Partition: instrumental vs vocal ─────────────────────────────────────────
+
+printSection("INSTRUMENTAL vs VOCAL (all songs in library)")
+val allSongs = lib.allSongs()
+val parts = allSongs.partition { s => (s as Song).genre().isPrimarilyInstrumental() }
+val instrumental = (parts as List)[0] as List[Song]
+val vocal        = (parts as List)[1] as List[Song]
+IO::println("  Instrumental: " + instrumental.size.plural("song"))
+foreach s: Song in instrumental.sortedBy { s => s.title() } {
+  IO::println("    " + s.title() + " — " + s.artist() + " [" + s.genre().label() + "]")
+}
+IO::println("  Vocal: " + vocal.size.plural("song"))
+
+// ─── Harry Styles songs ───────────────────────────────────────────────────────
+
+printSection("HARRY STYLES in My Favourites")
+val harryAll = mainPl.findByArtist("Harry Styles")
+if harryAll.size() == 0 {
+  IO::println("  (none found)")
+} else {
+  foreach s: Song in harryAll {
+    printSong(s)
+  }
+}
+
+// ─── findById demo ────────────────────────────────────────────────────────────
+
+printSection("FIND BY ID demo")
+foreach id: Int in [3, 7, 99] {
+  val found: Song? = mainPl.findById(id)
+  if found != null {
+    IO::println("  ID " + id + ": \"" + found.title() + "\" — " + found.artist())
+  } else {
+    IO::println("  ID " + id + ": not found")
+  }
+}
+
+// ─── Duration extremes ───────────────────────────────────────────────────────
+
+printSection("DURATION EXTREMES in My Favourites")
+val byDur    = mainPl.sortedByDuration()
+val shortest = byDur[0]
+val longest  = byDur[byDur.size - 1]
+IO::println("  Shortest: " + shortest.title() + " (" + shortest.durationSec().toMinSec() + ")")
+IO::println("  Longest : " + longest.title() + " (" + longest.durationSec().toMinSec() + ")")
+
+// ─── Unique artists across library ───────────────────────────────────────────
+
+printSection("ALL UNIQUE ARTISTS IN LIBRARY")
+val artists = lib.uniqueArtists()
+var idx: Int = 1
+foreach a: String in artists {
+  IO::println("  " + ("" + idx).padLeft(2) + ". " + a)
+  idx = idx + 1
+}
+
+// ─── Songs per year (map iteration, k,v) ─────────────────────────────────────
+
+printSection("SONGS PER YEAR (main playlist, chronological)")
+val byYear = mainPl.sortedByYear().groupBy { s => s.year() }
+foreach (yr, grp) in byYear {
+  val yrSongs = grp as List[Song]
+  val titles  = yrSongs.map { s => s.title() }
+  IO::println("  " + yr + ": " + titles)
+}
+
+// ─── Zip: rank + longest songs ────────────────────────────────────────────────
+
+printSection("TOP 5 LONGEST SONGS (zip rank + title)")
+val top5long = mainPl.sortedByDuration().sortedBy { s => 0 - s.durationSec() }
+val ranks: List[Int] = [1, 2, 3, 4, 5]
+val zipped = ranks.zip(top5long)
+foreach pair: Object in zipped {
+  val pl2 = pair as List
+  val rank = pl2[0] as Int
+  val song = pl2[1] as Song
+  IO::println("  " + rank + ". " + song.title() + " (" + song.durationSec().toMinSec() + ")")
+}
+
+// ─── removeSong demo ──────────────────────────────────────────────────────────
+
+printSection("REMOVE DEMO")
+val removed = mainPl.removeSong(1)
+IO::println("  removeSong(id=1): " + removed)
+IO::println("  Songs remaining:  " + mainPl.songs.size())
+
+// ─── try/catch: negative index ────────────────────────────────────────────────
+
+printSection("TRY/CATCH DEMO")
+try {
+  val negIdx: Int = 0 - 1
+  val _ = mainPl.asList()[negIdx]
+  IO::println("  (no exception — unexpected)")
+} catch e: Exception {
+  IO::println("  Caught: " + e.getClass().getSimpleName())
+}
+
+// ─── findPlaylist via MusicLibrary ────────────────────────────────────────────
+
+printSection("FIND PLAYLIST demo")
+val found1: Playlist? = lib.findPlaylist("My Favourites")
+val found2: Playlist? = lib.findPlaylist("Nonexistent")
+if found1 != null {
+  IO::println("  'My Favourites': found (" + found1.songs.size() + " songs)")
+} else {
+  IO::println("  'My Favourites': not found")
+}
+if found2 != null {
+  IO::println("  'Nonexistent': found")
+} else {
+  IO::println("  'Nonexistent': not found")
+}
+
+// ─── Chill playlist stats ─────────────────────────────────────────────────────
+
+printSection("CHILL VIBES STATS")
+IO::println("  Mode: " + chill.mode.label())
+foreach s: Song in chill.asList().sortedBy { s => s.title() } {
+  printSong(s)
+}
+printSeparator()
+printStats(chill)
+
+// ─── Recursive: count songs by rating level ───────────────────────────────────
+
+printSection("RATING DISTRIBUTION (recursion demo)")
+def countRating(lst: List[Song], r: Int): Int {
+  if r > 5 { return 0 }
+  return lst.filter { s => s.rating() == r }.size
+}
+foreach r: Int in 1..5 {
+  val cnt = countRating(mainPl.asList(), r)
+  var bar: String = ""
+  foreach _: Int in 1..cnt { bar = bar + "■" }
+  IO::println("  " + r + " star" + (if r == 1 { " " } else { "s" }) + ": " + bar + " (" + cnt + ")")
+}
+
+IO::println("")
+IO::println("Done.")

@@ -15,7 +15,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 |---|-----------|----------------|----------------------|----------------|
 | 1 | Test suite | `sbt -batch -Duser.language=en test` | 2848 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 79 / 79 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 22 (BankLedger, Blackjack, BrokenLogDemo, BudgetTracker, GradeBook, GraphSearch, HotelReservation, Inventory, LibraryCatalog, LibrarySystem, MiniRpg, OrderReport, PayrollReport, PlaylistManager, RecipeManager, ShapeProcessor, StatsApp, StockPortfolio, TextAnalyzer, TodoManager, ToolDemo, TournamentTracker) | ≥ 5 |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 23 (BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, GradeBook, GraphSearch, HotelReservation, Inventory, LibraryCatalog, LibrarySystem, MiniRpg, OrderReport, PayrollReport, PlaylistManager, RecipeManager, ShapeProcessor, StatsApp, StockPortfolio, TextAnalyzer, TodoManager, ToolDemo, TournamentTracker) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |

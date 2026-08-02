@@ -1,0 +1,279 @@
+// Inventory.on — A shop inventory manager (~230 lines)
+// Features: data-carrying ADT enums, records with example/law,
+//   extension String/Double, collection pipelines (map/filter/fold/groupBy/
+//   sortedBy/find/partition), select+type-pattern exhaustiveness, nullable
+//   types, foreach (k,v) on Map, closures, string interpolation, try/catch.
+
+import {
+  java.util.*
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension String {
+  def padLeft(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 1) + "…"
+  }
+}
+
+extension Double {
+  def fmt(): String {
+    val whole: Int  = self.intValue()
+    val frac: Int   = ((self - whole) * 100 + 0.5).intValue()
+    val fracS: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return "" + whole + "." + fracS
+  }
+}
+
+// ── Data-carrying enum for item category ─────────────────────────────────────
+
+enum Category {
+  case Food(shelfDays: Int)
+  case Electronics(warrantyMonths: Int)
+  case Clothing(material: String)
+  case Books(genre: String)
+}
+
+def categoryLabel(c: Category): String = select c {
+  case f  is Food:        "Food"
+  case e  is Electronics: "Electronics"
+  case cl is Clothing:    "Clothing"
+  case b  is Books:       "Books"
+}
+
+def categoryDetail(c: Category): String = select c {
+  case f  is Food:        "shelf #{f.shelfDays()}d"
+  case e  is Electronics: "warranty #{e.warrantyMonths()}m"
+  case cl is Clothing:    "#{cl.material()}"
+  case b  is Books:       "#{b.genre()}"
+}
+
+// ── ADT enum for transaction kind ────────────────────────────────────────────
+
+enum TxKind {
+  case Restock(units: Int, cost: Double)
+  case Sale(units: Int, price: Double)
+  case Adjustment(delta: Int, reason: String)
+}
+
+def txLabel(k: TxKind): String = select k {
+  case r is Restock:    "+#{r.units()} (restock @$#{r.cost().fmt()} each)"
+  case s is Sale:       "-#{s.units()} (sold @$#{s.price().fmt()} each)"
+  case a is Adjustment: "#{a.delta()} (adj: #{a.reason()})"
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Item(sku: String, name: String, category: Category, price: Double, stock: Int)
+  example { new Item("X1", "T", new Food(7), 1.99, 10).stock() == 10 }
+  example { new Item("X1", "T", new Food(7), 1.99, 10).price() == 1.99 }
+
+record Transaction(sku: String, kind: TxKind)
+
+record StockAlert(sku: String, name: String, stock: Int, threshold: Int)
+  example { new StockAlert("S1", "Bread", 2, 5).stock() < new StockAlert("S1", "Bread", 2, 5).threshold() }
+
+// ── Inventory class ───────────────────────────────────────────────────────────
+
+class Inventory {
+  var items:        List[Item]
+  var transactions: List[Transaction]
+
+public:
+  def this() {
+    this.items        = []
+    this.transactions = []
+  }
+
+  def add(item: Item): void { items.add(item) }
+
+  def findBySku(sku: String): Item? {
+    var found: Item? = null
+    foreach i: Item in items {
+      if i.sku() == sku { found = i }
+    }
+    return found
+  }
+
+  def apply(tx: Transaction): Boolean {
+    var found: Item? = null
+    foreach i: Item in items {
+      if i.sku() == tx.sku() { found = i }
+    }
+    if found == null { return false }
+    val item: Item   = found as Item
+    val delta: Int   = select tx.kind() {
+      case r is Restock:    r.units()
+      case s is Sale:       -s.units()
+      case a is Adjustment: a.delta()
+    }
+    val newStock: Int = item.stock() + delta
+    if newStock < 0 { return false }
+    val updated: Item = new Item(
+      item.sku(), item.name(), item.category(), item.price(), newStock)
+    items        = items.map { i => if i.sku() == tx.sku() { updated } else { i } }
+    transactions.add(tx)
+    return true
+  }
+
+  def getItems(): List[Item] = items
+
+  def lowStock(threshold: Int): List[StockAlert] {
+    return items
+      .filter  { i => i.stock() <= threshold }
+      .map     { i => new StockAlert(i.sku(), i.name(), i.stock(), threshold) }
+      .sortedBy { a => a.stock() }
+  }
+
+  def byCategory(): Map[String, List[Item]] {
+    return items.groupBy { i => categoryLabel(i.category()) }
+  }
+
+  def totalValue(): Double {
+    var acc: Double = 0.0
+    foreach i: Item in items { acc = acc + i.price() * i.stock() }
+    return acc
+  }
+
+  def getTransactions(): List[Transaction] = transactions
+  def itemCount(): Int = items.size
+  def txCount():   Int = transactions.size
+}
+
+// ── Report helpers ────────────────────────────────────────────────────────────
+
+def hline(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "─"; i++ }
+  return s
+}
+
+def printItemRow(i: Item): void {
+  val cat:    String = categoryLabel(i.category())
+  val detail: String = categoryDetail(i.category())
+  val nameFmt: String = i.name().padRight(20)
+  val skuFmt:  String = i.sku().padLeft(5)
+  val catFmt:  String = cat.padRight(12)
+  IO::println("  #{skuFmt}  #{nameFmt}  #{catFmt}  (#{detail})  $#{i.price().fmt()}  qty=#{i.stock()}")
+}
+
+def printCategoryReport(inv: Inventory): void {
+  IO::println("\n#{hline(65)}")
+  IO::println("  Items by Category")
+  IO::println(hline(65))
+  val groups: Map[String, List[Item]] = inv.byCategory()
+  foreach (cat, lst) in groups {
+    val catS: String     = cat as String
+    val lstI: List[Item] = lst as List[Item]
+    val count: Int       = lstI.size
+    var value: Double    = 0.0
+    foreach item: Item in lstI { value = value + item.price() * item.stock() }
+    IO::println("  #{catS.padRight(12)} : #{count} item(s)  total value $#{value.fmt()}")
+    foreach item: Item in lstI {
+      IO::println("    · #{item.name()} [#{item.sku()}] qty=#{item.stock()} @$#{item.price().fmt()}")
+    }
+  }
+}
+
+def printAlerts(inv: Inventory, threshold: Int): void {
+  val alerts: List[StockAlert] = inv.lowStock(threshold)
+  IO::println("\n#{hline(65)}")
+  IO::println("  Low-Stock Alerts  (threshold ≤ #{threshold})")
+  IO::println(hline(65))
+  if alerts.size == 0 {
+    IO::println("  No low-stock items.")
+  } else {
+    foreach a: StockAlert in alerts {
+      IO::println("  ! #{a.name().padRight(22)} [#{a.sku()}]  stock=#{a.stock()}  (below #{a.threshold()})")
+    }
+  }
+}
+
+def printTransactionLog(txs: List[Transaction]): void {
+  IO::println("\n#{hline(65)}")
+  IO::println("  Transaction Log")
+  IO::println(hline(65))
+  var idx: Int = 1
+  foreach tx: Transaction in txs {
+    IO::println("  #{idx}. [#{tx.sku()}] #{txLabel(tx.kind())}")
+    idx++
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val inv: Inventory = new Inventory()
+
+// Stock up with diverse items
+inv.add(new Item("F001", "Whole Milk",      new Food(7),           1.29, 48))
+inv.add(new Item("F002", "Sourdough Bread", new Food(5),           3.49, 24))
+inv.add(new Item("F003", "Cheddar Cheese",  new Food(30),          4.99, 16))
+inv.add(new Item("E001", "USB-C Hub",       new Electronics(12),  29.99,  8))
+inv.add(new Item("E002", "Wireless Mouse",  new Electronics(24),  24.99, 12))
+inv.add(new Item("C001", "Cotton T-Shirt",  new Clothing("cotton"),14.99, 20))
+inv.add(new Item("C002", "Denim Jacket",    new Clothing("denim"), 49.99,  6))
+inv.add(new Item("B001", "Onion Cookbook",  new Books("Culinary"),  8.99, 15))
+inv.add(new Item("B002", "Scala in Action", new Books("Tech"),     34.99,  4))
+
+// Apply transactions
+inv.apply(new Transaction("F001", new Sale(10, 1.29)))
+inv.apply(new Transaction("F002", new Sale(18, 3.49)))
+inv.apply(new Transaction("E001", new Sale(5,  29.99)))
+inv.apply(new Transaction("B002", new Sale(3,  34.99)))
+inv.apply(new Transaction("C002", new Restock(10, 40.00)))
+inv.apply(new Transaction("F003", new Adjustment(-2, "damaged")))
+
+// Attempt to over-sell (should fail gracefully)
+val oversell: Boolean = inv.apply(new Transaction("B002", new Sale(100, 34.99)))
+// Attempt on unknown SKU (should fail gracefully)
+val unknown:  Boolean = inv.apply(new Transaction("Z999", new Sale(1, 9.99)))
+
+// ── Print report ──────────────────────────────────────────────────────────────
+IO::println("#{hline(65)}")
+IO::println("  SHOP INVENTORY REPORT")
+IO::println(hline(65))
+IO::println("  Items tracked : #{inv.itemCount()}")
+IO::println("  Transactions  : #{inv.txCount()}")
+IO::println("  Over-sell rejected : #{!oversell}")
+IO::println("  Unknown SKU  rejected : #{!unknown}")
+IO::println("  Total stock value : $#{inv.totalValue().fmt()}")
+IO::println(hline(65))
+
+IO::println("\n  All Items:")
+foreach item: Item in inv.getItems() { printItemRow(item) }
+
+printCategoryReport(inv)
+printAlerts(inv, 5)
+printTransactionLog(inv.getTransactions())
+
+// Collection pipeline showcase
+val expensive: List[Item] = inv.getItems()
+  .filter  { i => i.price() >= 20.0 }
+  .sortedBy { i => -i.price().intValue() }
+
+IO::println("\n#{hline(65)}")
+IO::println("  Premium Items (price ≥ $20.00)")
+IO::println(hline(65))
+foreach item: Item in expensive {
+  IO::println("  #{item.name().padRight(22)} $#{item.price().fmt()}  qty=#{item.stock()}")
+}
+
+val inStockCount:  Int = inv.getItems().filter { i => i.stock() > 0  }.size
+val outStockCount: Int = inv.getItems().filter { i => i.stock() == 0 }.size
+IO::println("\n  In stock: #{inStockCount}  /  Out of stock: #{outStockCount}")
+
+IO::println("\n#{hline(65)}")
+IO::println("  Done.")
+IO::println(hline(65))

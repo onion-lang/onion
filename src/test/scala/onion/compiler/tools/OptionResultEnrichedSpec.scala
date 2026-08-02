@@ -31,8 +31,12 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "val a = some.orElseGet(() -> -1)\n" +
         "val b = non.orElseGet(() -> -1)\n" +
         "val c = non.orElse(some).getOrElse(0)\n" +
-        "return a + b + c",
-        Shell.Success(83))
+        "val d = some.orNull()\n" +
+        "val e = non.orNull()\n" +
+        "val dv = d ?: -1\n" +
+        "val ev = e ?: -1\n" +
+        "return a + b + c + dv + ev",
+        Shell.Success(124))
     }
 
     it("contains, exists and fold inspect the value") {
@@ -51,6 +55,16 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "val non: Option[Int] = Option::none()\n" +
         "return some.toList().size() + non.toList().size()",
         Shell.Success(1))
+    }
+
+    it("of wraps a non-null value and collapses null to none") {
+      runInt(
+        "val present: Option[Int] = Option::of(42)\n" +
+        "val absent: Option[Int] = Option::of(null)\n" +
+        "val a = present.isDefined()\n" +
+        "val b = absent.isDefined()\n" +
+        "return present.getOrElse(-1) + absent.getOrElse(-1) + (if a { 100 } else { 0 }) + (if b { 100 } else { 0 })",
+        Shell.Success(141))
     }
   }
 
@@ -74,6 +88,16 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         Shell.Success(11))
     }
 
+    it("mapError transforms an Err and passes through an Ok") {
+      run(
+        "val ok: Result[Int, String] = Result::ok(10)\n" +
+        "val er: Result[Int, String] = Result::err(\"boom\")\n" +
+        "val a = ok.mapError((e: String) -> e.toUpperCase())\n" +
+        "val b = er.mapError((e: String) -> e.toUpperCase())\n" +
+        "return a.getOrElse(-1) + \"|\" + a.isOk() + \"|\" + b.getError() + \"|\" + b.isErr()",
+        Shell.Success("10|true|BOOM|true"))
+    }
+
     it("orElseGet, exists and toList work on Ok/Err") {
       runInt(
         "val ok: Result[Int, String] = Result::ok(10)\n" +
@@ -81,8 +105,23 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "val a = er.orElseGet(() -> -99)\n" +
         "val b = if ok.exists((v: Int) -> v > 5) { 100 } else { 0 }\n" +
         "val c = ok.toList().size() + er.toList().size()\n" +
-        "return a + b + c",
-        Shell.Success(2))
+        "val f = ok.orNull()\n" +
+        "val g = er.orNull()\n" +
+        "val fv = f ?: -1\n" +
+        "val gv = g ?: -1\n" +
+        "return a + b + c + fv + gv",
+        Shell.Success(11))
+    }
+
+    it("ofNullable and trying wrap nullable values and throwing operations") {
+      run(
+        "val a: Result[String, String] = Result::ofNullable(\"v\", \"boom\")\n" +
+        "val b: Result[String, String] = Result::ofNullable(null, \"boom\")\n" +
+        "val c: Result[String, Throwable] = Result::trying(() -> \"ok\")\n" +
+        "val d: Result[String, Throwable] = Result::trying(() -> { throw new RuntimeException(\"bad\") })\n" +
+        "return a.getOrElse(\"X\") + \"|\" + a.isOk() + \"|\" + b.getError() + \"|\" + b.isErr() + \"|\" + " +
+        "c.getOrElse(\"X\") + \"|\" + c.isOk() + \"|\" + d.getError().getMessage() + \"|\" + d.isErr()",
+        Shell.Success("v|true|boom|true|ok|true|bad|true"))
     }
   }
 }

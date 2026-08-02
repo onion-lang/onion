@@ -158,5 +158,53 @@ class AdtEnumSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success("ABF") == r)
     }
+
+    it("allows explicit return in every branch of an ADT enum method (no operand-stack underflow)") {
+      val r = shell.run(
+        """
+          |enum R {
+          |  case Found(n: Int)
+          |  case None
+          |public:
+          |  def describe(): String = select this {
+          |    case f is Found: return "found " + f.n()
+          |    case r is None: return "none"
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r1: R = new Found(4)
+          |    val r2: R = new None()
+          |    return r1.describe() + "|" + r2.describe()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("found 4|none") == r)
+    }
+
+    it("allows explicit return of a Boolean in every branch (primitive return via StatementTerm)") {
+      val r = shell.run(
+        """
+          |enum R {
+          |  case Found(n: Int)
+          |  case None
+          |public:
+          |  def isFound(): Boolean = select this {
+          |    case f is Found: return true
+          |    case u is None: return false
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r1: R = new Found(4)
+          |    val r2: R = new None()
+          |    return "" + r1.isFound() + "|" + r2.isFound()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("true|false") == r)
+    }
   }
 }

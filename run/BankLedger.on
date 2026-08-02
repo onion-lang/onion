@@ -1,0 +1,299 @@
+// BankLedger.on — a bank account ledger (~200 lines)
+// Exercises: ADT enums with data, records with example/law, extension Int for
+// currency formatting, class inheritance, Map-backed registry, collection
+// pipelines (sortedBy/filter/map/fold/partition), foreach (k,v) on Map,
+// select type patterns with exhaustiveness, nullable types, string interpolation,
+// try/catch, closures, and while loop.
+
+import {
+  java.util.*
+}
+
+// ── Transaction kinds ─────────────────────────────────────────────────────────
+
+enum TxKind {
+  case Deposit(amount: Int)
+  case Withdrawal(amount: Int)
+  case Transfer(amount: Int, counterparty: String, outbound: Boolean)
+}
+
+// ── Transaction record ────────────────────────────────────────────────────────
+
+record Tx(seq: Int, kind: TxKind, note: String)
+  example { new Tx(1, new Deposit(500), "init").seq() == 1 }
+  example { new Tx(2, new Withdrawal(100), "atm").note() == "atm" }
+
+// ── Int extension for currency display ───────────────────────────────────────
+
+extension Int {
+  def currency(): String {
+    if self < 0 { return "-$" + (0 - self) }
+    return "$" + self
+  }
+  def abs(): Int {
+    if self < 0 { return 0 - self }
+    return self
+  }
+}
+
+// ── Account class ─────────────────────────────────────────────────────────────
+
+class Account {
+  val id: String
+  var balance: Int
+  val history: List[Tx]
+  var nextSeq: Int
+
+public:
+  def this(id: String, openingBalance: Int) {
+    this.id         = id
+    this.balance    = openingBalance
+    this.history    = []
+    this.nextSeq    = 1
+    if openingBalance > 0 {
+      history.add(new Tx(nextSeq, new Deposit(openingBalance), "opening balance"))
+      nextSeq = nextSeq + 1
+    }
+  }
+
+  def getId(): String    = id
+  def getBalance(): Int  = balance
+  def getHistory(): List[Tx] = history
+
+  def deposit(amount: Int, note: String): void {
+    if amount <= 0 { throw new IllegalArgumentException("deposit must be positive") }
+    balance  = balance + amount
+    history.add(new Tx(nextSeq, new Deposit(amount), note))
+    nextSeq = nextSeq + 1
+  }
+
+  def withdraw(amount: Int, note: String): Boolean {
+    if amount <= 0 { return false }
+    if amount > balance { return false }
+    balance  = balance - amount
+    history.add(new Tx(nextSeq, new Withdrawal(amount), note))
+    nextSeq = nextSeq + 1
+    return true
+  }
+
+  def recordTransfer(amount: Int, counterparty: String, outbound: Boolean, note: String): void {
+    if outbound {
+      balance = balance - amount
+    } else {
+      balance = balance + amount
+    }
+    history.add(new Tx(nextSeq, new Transfer(amount, counterparty, outbound), note))
+    nextSeq = nextSeq + 1
+  }
+
+  def printStatement(): void {
+    IO::println("┌─ Account: #{id}  Balance: #{balance.currency()} ─┐")
+    foreach tx: Tx in history {
+      val desc: String = select tx.kind() {
+        case d is Deposit:    "  CREDIT  +" + d.amount().currency() + "  " + tx.note()
+        case w is Withdrawal: "  DEBIT   -" + w.amount().currency() + "  " + tx.note()
+        case t is Transfer:
+          if t.outbound() {
+            "  XFER →  " + t.counterparty() + "  " + t.amount().currency() + "  " + tx.note()
+          } else {
+            "  XFER ←  " + t.counterparty() + "  " + t.amount().currency() + "  " + tx.note()
+          }
+      }
+      IO::println("[#{tx.seq()}]" + desc)
+    }
+    IO::println("└──────────────────────────────────────────────────┘")
+  }
+}
+
+// ── Bank class — account registry backed by a Map ────────────────────────────
+
+class Bank {
+  val accounts: Map[String, Account]
+  var totalTransactions: Int
+
+public:
+  def this() {
+    this.accounts          = [:]
+    this.totalTransactions = 0
+  }
+
+  def open(id: String, initial: Int): Account {
+    val acc: Account = new Account(id, initial)
+    accounts.put(id, acc)
+    if initial > 0 { totalTransactions = totalTransactions + 1 }
+    return acc
+  }
+
+  def find(id: String): Account? {
+    val acc: Account = accounts.get(id)
+    return acc
+  }
+
+  def transfer(fromId: String, toId: String, amount: Int, note: String): Boolean {
+    val fromRaw: Account = accounts.get(fromId)
+    val toRaw: Account   = accounts.get(toId)
+    if fromRaw == null || toRaw == null { return false }
+    val from: Account = fromRaw as Account
+    val to: Account   = toRaw as Account
+    if amount <= 0 || amount > from.getBalance() { return false }
+    from.recordTransfer(amount, toId, true, note)
+    to.recordTransfer(amount, fromId, false, note)
+    totalTransactions = totalTransactions + 1
+    return true
+  }
+
+  def totalAssets(): Int {
+    var total: Int = 0
+    foreach (_, v) in accounts {
+      val acc: Account = v as Account
+      total = total + acc.getBalance()
+    }
+    return total
+  }
+
+  def richest(): Account? {
+    var best: Account? = null
+    foreach (_, v) in accounts {
+      val acc: Account = v as Account
+      if best == null || acc.getBalance() > (best as Account).getBalance() {
+        best = acc
+      }
+    }
+    return best
+  }
+
+  def allAccounts(): List[Account] {
+    var result: List[Account] = []
+    foreach (_, v) in accounts {
+      result.add(v as Account)
+    }
+    return result
+  }
+
+  def printSummary(): void {
+    IO::println("\n═══ Bank Summary ═══════════════════════════════════")
+    val sorted: List[Account] = allAccounts().sortedBy { a => 0 - (a as Account).getBalance() }
+    foreach acc: Account in sorted {
+      val a: Account = acc as Account
+      IO::println("  #{a.getId()}  #{a.getBalance().currency()}")
+    }
+    IO::println("────────────────────────────────────────────────────")
+    IO::println("  Total assets:        #{totalAssets().currency()}")
+    IO::println("  Total transactions:  #{totalTransactions}")
+    val r: Account? = richest()
+    if r != null {
+      val rich: Account = r as Account
+      IO::println("  Richest account:     #{rich.getId()} (#{rich.getBalance().currency()})")
+    }
+    IO::println("════════════════════════════════════════════════════")
+  }
+}
+
+// ── Analytics helper functions ────────────────────────────────────────────────
+
+def depositTotal(acc: Account): Int {
+  val txs: List[Tx] = acc.getHistory()
+  var total: Int = 0
+  foreach tx: Tx in txs {
+    select tx.kind() {
+      case d is Deposit: total = total + d.amount()
+      case w is Withdrawal: total = total
+      case t is Transfer: total = total
+    }
+  }
+  return total
+}
+
+def withdrawalTotal(acc: Account): Int {
+  val txs: List[Tx] = acc.getHistory()
+  var total: Int = 0
+  foreach tx: Tx in txs {
+    select tx.kind() {
+      case d is Deposit: total = total
+      case w is Withdrawal: total = total + w.amount()
+      case t is Transfer: if t.outbound() { total = total + t.amount() }
+    }
+  }
+  return total
+}
+
+def txCount(acc: Account): Int = acc.getHistory().size
+
+// ── Main script ───────────────────────────────────────────────────────────────
+
+val bank: Bank = new Bank()
+
+// Open accounts
+val alice: Account = bank.open("alice",  5000)
+val bob: Account   = bank.open("bob",    2000)
+val carol: Account = bank.open("carol",  8000)
+val dave: Account  = bank.open("dave",      0)
+
+// Normal deposits and withdrawals
+alice.deposit(1500, "salary")
+alice.deposit(200, "freelance")
+val w1: Boolean = alice.withdraw(800, "rent")
+IO::println("alice withdraw $800: #{w1}")
+
+bob.deposit(500, "bonus")
+val w2: Boolean = bob.withdraw(3000, "big purchase")
+IO::println("bob overdraft attempt: #{w2}")
+bob.withdraw(100, "groceries")
+
+carol.deposit(250, "gift")
+carol.withdraw(1200, "laptop")
+
+// Transfers between accounts
+val t1: Boolean = bank.transfer("carol", "dave", 500, "gift")
+IO::println("carol→dave $500: #{t1}")
+val t2: Boolean = bank.transfer("alice", "bob", 200, "dinner split")
+IO::println("alice→bob $200: #{t2}")
+val t3: Boolean = bank.transfer("dave", "alice", 9999, "impossible")
+IO::println("dave→alice $9999 (should fail): #{t3}")
+
+// Try/catch for invalid deposit
+try {
+  dave.deposit(0 - 10, "bad deposit")
+} catch e: Exception {
+  IO::println("caught: #{e.getMessage()}")
+}
+
+// Print individual statements
+IO::println("")
+alice.printStatement()
+IO::println("")
+bob.printStatement()
+IO::println("")
+carol.printStatement()
+IO::println("")
+dave.printStatement()
+
+// Analytics with collection pipelines
+IO::println("")
+val allAccs: List[Account] = bank.allAccounts()
+  .sortedBy { a => 0 - (a as Account).getBalance() }
+
+IO::println("── Per-account analytics ────────────────────────────")
+foreach acc: Account in allAccs {
+  val a: Account = acc as Account
+  IO::println("  #{a.getId()}: deposits=#{depositTotal(a).currency()} " +
+              "withdrawals=#{withdrawalTotal(a).currency()} " +
+              "txCount=#{txCount(a)}")
+}
+
+// Partition: solvent vs zero-balance
+val parts             = allAccs.partition { a => (a as Account).getBalance() > 0 }
+val solvent: List[Object] = parts[0] as List[Object]
+val empty: List[Object]   = parts[1] as List[Object]
+IO::println("solvent accounts: #{solvent.size}  zero-balance: #{empty.size}")
+
+// Find richest with fold
+val foldRichest: Account = allAccs.fold(alice) { best, a =>
+  val bestA: Account = best as Account
+  val candA: Account = a as Account
+  if candA.getBalance() > bestA.getBalance() { a } else { best }
+} as Account
+IO::println("fold-richest: #{foldRichest.getId()} #{foldRichest.getBalance().currency()}")
+
+// Overall summary
+bank.printSummary()

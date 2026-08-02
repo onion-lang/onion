@@ -8,15 +8,15 @@
 いましたが実際は 2644、ガイドは 14/14 に対し 15/15（`docs/guide/tools.md` が #357 で追加）、
 診断コードは 77 に対し 80（capability boundary が追加した `E0077`–`E0079`）でした。
 
-| # | 次元 | 測定方法 | 現在値（2026-07-27） | 合格閾値 |
+| # | 次元 | 測定方法 | 現在値（2026-08-02） | 合格閾値 |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 2848 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 74 / 74 compile | すべてコンパイル、rot なし |
-| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 17（Blackjack、BrokenLogDemo、BudgetTracker、GradeBook、GraphSearch、Inventory、LibraryCatalog、LibrarySystem、MiniRpg、OrderReport、PayrollReport、ShapeProcessor、StatsApp、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker） | ≥ 5 |
+| 1 | テストスイート | `sbt -batch -Duser.language=en test` | 3108 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | サンプルの健全性 | `SampleCompilesSpec` / `SampleProgramsSpec`（どちらも `run/*.on` 全件をコンパイル） | 88 / 88 compile | すべてコンパイル、rot なし |
+| 3 | 大規模プログラム | 100行以上の `run/*.on` をそのまま end-to-end で実行できる数 | 31（AuctionHouse、BankLedger、BankSystem、Blackjack、BrokenLogDemo、BudgetTracker、EventTicketing、FitnessTracker、GameStore、GradeBook、GraphSearch、HotelReservation、Inventory、LibraryCatalog、LibrarySystem、MiniRpg、MusicLibrary、OrderReport、ParkingGarage、PayrollReport、PlaylistManager、RecipeManager、ShapeProcessor、ShoppingCart、StatsApp、StockPortfolio、TaskPlanner、TextAnalyzer、TodoManager、ToolDemo、TournamentTracker） | ≥ 5 |
 | 4 | 機能網羅性 | 下記のチェックリストが大規模サンプル内で実証されている | 完了 | すべての項目 ✓ |
 | 5 | 既知の使い勝手バグ | 実装済みだが到達不能/壊れた機能として未解決のもの | 0 | 0 |
 | 6 | ドキュメントの対等性 | `docs/guide` と `docs/ja/guide` の数 + すべてのコードブロックがコンパイル可能 | 15 / 15 | 対等性 + すべてのブロックを検証 |
-| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 81 | よくあるエラーごとに専用コード |
+| 7 | 診断メッセージ | 英語と日本語の `E00xx` コード | 82 | よくあるエラーごとに専用コード |
 
 **`SBT_OPTS` は設定しないでください。** 以前のこのファイルは `SBT_OPTS="-Xmx2g"` を薦めて
 いましたが、これは現在プロジェクト既定の 4g を*下げて*しまい、スイートの途中で

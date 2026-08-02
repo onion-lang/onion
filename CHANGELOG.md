@@ -7,6 +7,148 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.19] - 2026-08-02
+
+### Fixed
+
+- **A `static def` in an ADT case-enum's `public:` section could not be
+  called** — `Grade::fromScore(x)` raised `E0005: method ... is not found`
+  even when the signature matched exactly, because
+  `TypingOutlinePass.processInterfaceMethodDeclaration` hard-coded
+  `M_PUBLIC` for every interface method declaration, silently dropping
+  `M_STATIC`. ADT case-enums desugar to a sealed interface + one record per
+  case, so a static factory method declared in the enum's `public:` section
+  was registered without the static modifier, and
+  `collectMethodsMatching(isStaticMethod)` could no longer find it.
+
+### Added
+
+- **`run/MusicLibrary.on`, a 274-line music library catalog sample.**
+  Exercises a simple enum (`Genre`), records with a nullable field
+  (`Entry(song, rating: Rating?)`), a generic class (`Catalog[T extends
+  Object]`), extension methods on `Int`/`String`, collection pipelines
+  (`fold`/`filter`/`map`/`groupBy`/`sortedBy`/`sortedByDescending`/
+  `distinct`), `select`/enum pattern matching, string interpolation, and
+  `foreach` over typed lists and maps (28th large sample, 85 total corpus
+  programs).
+
+- **`run/GameStore.on`, a 292-line game store inventory and sales
+  reporting sample.** Exercises homogeneous enums (`Genre`, `Platform`),
+  records with methods (`Game`, `Sale`), typed generics (`List[Game]`,
+  `Map[String, Double]`), collection pipelines (`groupBy`/`sortedBy`/
+  `fold`/`filter`/`find`/`indexOf`), nullable types with null-guards,
+  string interpolation, extension methods on `Int`/`Double`/`String`,
+  `foreach (k, v)` map iteration, closures, and a class with access
+  sections and mutable state (29th large sample, 86 total corpus
+  programs).
+
+- **`run/EventTicketing.on`, a 279-line event ticketing system sample.**
+  Exercises homogeneous enums with methods (`TicketTier`, `EventStatus`),
+  an ADT enum (`BookingResult { case Ok(...); case Refused(...) }`) matched
+  with `case r is Ok:` / `case r is Refused:`, records (`Venue`, `Event`,
+  `Order`, `CustomerSpend`), typed collections (`List[Event]`,
+  `List[Order]`, `Map[String, Double]`), collection pipelines
+  (`filter`/`sortedBy`), `foreach (k, v)` map iteration, `foreach` over a
+  range, nullable handling with null-guards, and string interpolation
+  (30th large sample, 87 total corpus programs).
+
+- **`run/ParkingGarage.on`, a 254-line multi-level parking garage
+  management sample.** Exercises a homogeneous enum with methods
+  (`VehicleType`), a plain enum (`SpotStatus`), two ADT enums (`ParkResult
+  { case Parked(...); case Denied(...) }`, `ExitResult { case
+  Charged(...); case Rejected(...) }`), records with methods (`Spot`,
+  `Ticket`, `LevelUsage`), extension methods on `Int`/`Double`, a class
+  with mutable `Map`/`List` state (`Garage`), collection pipelines
+  (`filter`/`sortedBy`), `foreach (k, v)` map iteration, `foreach` over a
+  range and a list literal, nullable handling (`Spot?`, `String?`),
+  `try`/`catch`, and string interpolation (31st large sample, 88 total
+  corpus programs).
+
+## [0.10.18] - 2026-08-02
+
+### Fixed
+
+- **Two methods with the same name and parameter types in one `extension`
+  block compiled clean and crashed later with an internal compiler error
+  (`I0000`)** — a JVM `ClassFormatError` ("Duplicate method name ...") when
+  the synthesized extension container class was loaded, since
+  `TypingDuplicationPass` checked classes, interfaces, records, top-level
+  functions, and global variables for duplicates but never visited
+  `AST.ExtensionDeclaration`. Found by the mutation fuzzer duplicating a
+  method in `run/TaskPlanner.on`'s `extension Double` block. Added a new
+  `E0084` diagnostic (`DUPLICATE_EXTENSION_METHOD`) so this is now a normal
+  compile error instead of a crash.
+
+- **Tail-call optimization miscompiled recursive functions that declared
+  body-local variables** (e.g. `val x = items[idx] as Item`), either
+  crashing with `I0000 BytecodeGeneration` or silently producing wrong
+  results (an accumulator parameter would read the same element every
+  iteration). Three related bugs in `TailCallOptimization`: the loop-variable
+  offset fallback for top-level/synthetic methods collided with body-local
+  slots, the temp-variable offset assumed loop variables always started at
+  `paramCount`, and the parameter-reference rewrite pass didn't recurse into
+  several compound AST node types (`AsInstanceOf`, `RefArray`, `RefField`,
+  `NewObject`, `ListLiteral`, and others), so `RefLocal` nodes nested inside
+  them kept reading stale JVM slots. Added `run/RecipeManager.on` (365
+  lines, 19th large sample) as additional end-to-end coverage.
+
+- **`onion --help` silently omitted three working script-runner flags** —
+  `--effects`, `--stacktrace`, and `--watch` were all parsed and honored by
+  `ScriptRunner.runMain`/`run`, but `printUsage()` never listed them, so
+  they were undiscoverable outside reading the source. Added them to the
+  help text, documented them in `docs/tools/script-runner.md` and its ja
+  counterpart, and extended `OnionCliSpec`'s help-text assertion so the gap
+  can't silently reopen.
+
+- **Writing `{ (k, v) => ... }` for a trailing lambda produced a bare
+  "Encountered `{`, but expecting..." token dump**, with no indication that
+  the actual mistake was the parentheses. Trailing lambdas (`m.filter { k, v
+  => ... }`) never take parenthesized parameters — that syntax is reserved
+  for the non-trailing `(k, v) -> ...` form — and it's an easy slip since
+  both forms are documented side by side. The parser now recognizes this
+  specific shape and names the fix directly: "Hint: a trailing lambda's
+  parameters aren't parenthesized — write `{ k, v => ... }`, not `{ (k, v)
+  => ... }`."
+
+### Added
+
+- **`run/TaskPlanner.on`, a 425-line sprint task planner sample.** Combines
+  two ADT case-enums (`Priority`, `TaskStatus`) with a plain enum (`Tag`),
+  records with `example` clauses, typed `ArrayList[Task]`/`List[Task]`
+  collections, collection pipelines (`filter`/`sortedBy`/`groupBy`/
+  `partition`/`any`/`count`/`distinct`/`take`/`fold`/`map`/`zip`/`find`),
+  `foreach (k, v)` map iteration, extension methods on `Int`/`Double`/
+  `String`, `do[Option]` chaining, nullable fields, and exhaustive `select`
+  type-pattern matching (24th large sample, 81 total corpus programs).
+
+- **`run/PlaylistManager.on`, a 502-line music playlist manager sample.** Adds a
+  large end-to-end program to the corpus (18th at ≥100 lines), combining an
+  ADT case-enum (`Genre`, 8 cases) and a plain enum with methods
+  (`PlaybackMode`), records with `example` clauses, a class implementing an
+  interface via `conforms`, `ArrayList[T]` generics, collection pipelines
+  (`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`find`/`zip`/`map`/
+  `distinct`), `foreach (k, v)` map iteration, range `foreach`, exhaustive
+  `select` type-pattern matching, nullable types, extension methods on `Int`
+  and `String`, closures, string interpolation, and `try`/`catch` in one
+  coherent scenario.
+
+- **`run/BankLedger.on`, a 299-line bank account ledger sample.** Combines an
+  ADT case-enum (`TxKind`: `Deposit`/`Withdrawal`/`Transfer`), a record with
+  `example` laws, `extension Int` for currency formatting, nullable-safe
+  account lookups, `Map`-backed accounts with `foreach (k, v)` iteration,
+  collection pipelines (`sortedBy`/`filter`/`map`/`fold`/`partition`), and
+  `try`/`catch` in one end-to-end scenario (21st large sample, 78 total
+  corpus programs).
+
+### Fixed
+
+- **CI's `Build and Test` job could hit a real JVM `OutOfMemoryError`** on the
+  GitHub Actions runner as the `run/` corpus and test count grew, then wedge
+  for several minutes with dying background threads before being reported as
+  stuck rather than failing cleanly. Raised the job's heap headroom
+  (`SBT_OPTS=-Xmx6G`, up from the `.jvmopts` default of 4g) to give the
+  growing suite room to run without GC thrashing.
+
 ## [0.10.17] - 2026-08-01
 
 ### Fixed

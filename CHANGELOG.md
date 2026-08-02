@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.18] - 2026-08-02
+
 ### Fixed
 
 - **Two methods with the same name and parameter types in one `extension`

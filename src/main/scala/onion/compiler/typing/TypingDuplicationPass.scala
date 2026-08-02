@@ -35,6 +35,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       case node: AST.RecordDeclaration => processRecordDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
+      case node: AST.ExtensionDeclaration => processExtensionDeclaration(node)
       case _ =>
     }
   }
@@ -206,6 +207,29 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     if (mangledName.startsWith(LawMethodPrefix)) s"law '${mangledName.stripPrefix(LawMethodPrefix)}'"
     else if (mangledName.startsWith(ExampleMethodPrefix)) s"example '${mangledName.stripPrefix(ExampleMethodPrefix)}'"
     else mangledName
+
+  // Two `extension Double { }` blocks for the same receiver already collide as
+  // DUPLICATE_CLASS (their synthesized container class shares a generated name),
+  // but two methods declared within the *same* block went unchecked entirely: a
+  // duplicate compiled clean and only blew up later as a JVM ClassFormatError
+  // ("Duplicate method name ... in class file Extension$...") once the container
+  // class was loaded, surfaced as an internal compiler error (I0000) instead of a
+  // normal diagnostic — the same failure mode fixed for record law/example clauses
+  // above.
+  private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =
+    withKernel[ClassDefinition](node) { clazz =>
+      seenMethods.clear()
+      unitContext.currentDefinition = clazz
+      typing.find(clazz.name).foreach(unitContext.currentMapper = _)
+      node.methods.foreach(processExtensionMethodDeclaration)
+    }
+
+  private def processExtensionMethodDeclaration(node: AST.MethodDeclaration): Unit =
+    withKernel[ExtensionMethodDefinition](node) { method =>
+      if (seenMethods.contains(method))
+        typing.report(SemanticError.DUPLICATE_EXTENSION_METHOD, node, method.receiverType, method.name, method.arguments)
+      else seenMethods.add(method)
+    }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>

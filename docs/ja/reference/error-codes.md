@@ -412,6 +412,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
+| `E0084` | duplicated extension method …(…) on … |
 
 ## 関連項目
 

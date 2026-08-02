@@ -50,6 +50,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   range, nullable handling with null-guards, and string interpolation
   (30th large sample, 87 total corpus programs).
 
+- **`run/ParkingGarage.on`, a 254-line multi-level parking garage
+  management sample.** Exercises a homogeneous enum with methods
+  (`VehicleType`), a plain enum (`SpotStatus`), two ADT enums (`ParkResult
+  { case Parked(...); case Denied(...) }`, `ExitResult { case
+  Charged(...); case Rejected(...) }`), records with methods (`Spot`,
+  `Ticket`, `LevelUsage`), extension methods on `Int`/`Double`, a class
+  with mutable `Map`/`List` state (`Garage`), collection pipelines
+  (`filter`/`sortedBy`), `foreach (k, v)` map iteration, `foreach` over a
+  range and a list literal, nullable handling (`Spot?`, `String?`),
+  `try`/`catch`, and string interpolation (31st large sample, 88 total
+  corpus programs).
+
 ## [0.10.18] - 2026-08-02
 
 ### Fixed

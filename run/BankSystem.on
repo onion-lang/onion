@@ -1,0 +1,309 @@
+// BankSystem.on
+// A banking management system exercising: homogeneous enums with methods,
+// records, classes with mutable fields, collection loops, string interpolation,
+// nullable types, closures, pattern matching via select, and arithmetic.
+
+// ─────────────────────────── enums ────────────────────────────────────────────
+
+enum TxType {
+  DEPOSIT, WITHDRAWAL, TRANSFER_OUT, TRANSFER_IN, INTEREST, FEE
+public:
+  def label(): String = select this {
+    case TxType::DEPOSIT:      "Deposit      "
+    case TxType::WITHDRAWAL:   "Withdrawal   "
+    case TxType::TRANSFER_OUT: "Transfer Out "
+    case TxType::TRANSFER_IN:  "Transfer In  "
+    case TxType::INTEREST:     "Interest     "
+    case TxType::FEE:          "Fee          "
+  }
+  def isCredit(): Boolean = select this {
+    case TxType::DEPOSIT:     true
+    case TxType::TRANSFER_IN: true
+    case TxType::INTEREST:    true
+    else:                     false
+  }
+}
+
+enum AccType {
+  CHECKING, SAVINGS, INVESTMENT
+public:
+  def label(): String = select this {
+    case AccType::CHECKING:   "Checking"
+    case AccType::SAVINGS:    "Savings"
+    case AccType::INVESTMENT: "Investment"
+  }
+  def annualRate(): Double = select this {
+    case AccType::CHECKING:   0.01d
+    case AccType::SAVINGS:    0.03d
+    case AccType::INVESTMENT: 0.07d
+  }
+  def monthlyFee(): Double = select this {
+    case AccType::CHECKING:   5.0d
+    case AccType::SAVINGS:    2.0d
+    case AccType::INVESTMENT: 0.0d
+  }
+}
+
+// ─────────────────────────── records ──────────────────────────────────────────
+
+record Transaction(id: Int, txType: TxType, amount: Double, memo: String)
+
+record MonthlyStatement(accountId: Int, owner: String, openBal: Double,
+                        closeBal: Double, credits: Double, debits: Double,
+                        txCount: Int)
+
+// ─────────────────────────── Account class ────────────────────────────────────
+
+class Account {
+public:
+  val id: Int
+  val owner: String
+  val accType: AccType
+  var balance: Double
+  val history: List[Transaction]
+  var nextTxId: Int
+
+  def this(id: Int, owner: String, accType: AccType, opening: Double) {
+    this.id = id
+    this.owner = owner
+    this.accType = accType
+    this.balance = opening
+    this.history = []
+    this.nextTxId = 1
+    this.history << new Transaction(nextTxId, TxType::DEPOSIT, opening, "Opening deposit")
+    this.nextTxId = this.nextTxId + 1
+  }
+
+  def recordTx(txType: TxType, amount: Double, memo: String): void {
+    history << new Transaction(nextTxId, txType, amount, memo)
+    nextTxId = nextTxId + 1
+  }
+
+  def deposit(amount: Double, memo: String): Boolean {
+    if amount <= 0.0d { return false }
+    balance = balance + amount
+    recordTx(TxType::DEPOSIT, amount, memo)
+    return true
+  }
+
+  def withdraw(amount: Double, memo: String): Boolean {
+    if amount <= 0.0d || amount > balance { return false }
+    balance = balance - amount
+    recordTx(TxType::WITHDRAWAL, amount, memo)
+    return true
+  }
+
+  def credit(amount: Double, txType: TxType, memo: String): void {
+    balance = balance + amount
+    recordTx(txType, amount, memo)
+  }
+
+  def debit(amount: Double, txType: TxType, memo: String): void {
+    balance = balance - amount
+    recordTx(txType, amount, memo)
+  }
+
+  def applyMonthlyInterest(): Double {
+    val rate   = accType.annualRate() / 12.0d
+    val earned = balance * rate
+    credit(earned, TxType::INTEREST, "Monthly interest")
+    return earned
+  }
+
+  def applyMonthlyFee(): Double {
+    val fee = accType.monthlyFee()
+    if fee > 0.0d {
+      debit(fee, TxType::FEE, "Monthly maintenance fee")
+    }
+    return fee
+  }
+
+  def totalCredits(): Double {
+    var sum: Double = 0.0d
+    foreach t: Object in history {
+      val tx = t as Transaction
+      if tx.txType().isCredit() { sum = sum + tx.amount() }
+    }
+    return sum
+  }
+
+  def totalDebits(): Double {
+    var sum: Double = 0.0d
+    foreach t: Object in history {
+      val tx = t as Transaction
+      if !tx.txType().isCredit() { sum = sum + tx.amount() }
+    }
+    return sum
+  }
+
+  def printStatement(): void {
+    IO::println("\n  Statement — #{accType.label()} ##{id} [#{owner}]")
+    IO::println("  " + "─".repeat(58))
+    IO::println("  #{"ID"} #{"Type"         } #{"Amount"  } #{"Memo"}")
+    IO::println("  " + "─".repeat(58))
+    foreach t: Object in history {
+      val tx = t as Transaction
+      val sign  = if tx.txType().isCredit() { "+" } else { "-" }
+      IO::println("  #{tx.id()}  #{tx.txType().label()}  #{sign}$#{tx.amount()}  #{tx.memo()}")
+    }
+    IO::println("  " + "─".repeat(58))
+    IO::println("  Balance: $#{balance}  |  Credits: $#{totalCredits()}  |  Debits: $#{totalDebits()}")
+  }
+
+  def buildStatement(openBal: Double): MonthlyStatement {
+    return new MonthlyStatement(id, owner, openBal, balance,
+                                totalCredits(), totalDebits(), history.size)
+  }
+
+  def oneLiner(): String = "#{accType.label()} ##{id} [#{owner}] $#{balance}"
+}
+
+// ─────────────────────────── Bank class ───────────────────────────────────────
+
+class Bank {
+public:
+  val name: String
+  val accounts: List[Account]
+  var nextId: Int
+
+  def this(name: String) {
+    this.name = name
+    this.accounts = []
+    this.nextId = 1
+  }
+
+  def open(owner: String, accType: AccType, opening: Double): Account {
+    val acc = new Account(nextId, owner, accType, opening)
+    accounts << acc
+    nextId = nextId + 1
+    return acc
+  }
+
+  def findById(id: Int): Account? {
+    foreach a: Object in accounts {
+      val acc = a as Account
+      if acc.id == id { return acc }
+    }
+    return null
+  }
+
+  def transfer(fromId: Int, toId: Int, amount: Double, memo: String): Boolean {
+    val src: Account? = findById(fromId)
+    val dst: Account? = findById(toId)
+    if src == null || dst == null { return false }
+    val s = src as Account
+    val d = dst as Account
+    if amount <= 0.0d || amount > s.balance { return false }
+    s.debit(amount,  TxType::TRANSFER_OUT, "Transfer to   ##{toId}: #{memo}")
+    d.credit(amount, TxType::TRANSFER_IN,  "Transfer from ##{fromId}: #{memo}")
+    return true
+  }
+
+  def runMonthEnd(): void {
+    IO::println("\n[#{name}] ── Month-end processing ──")
+    foreach a: Object in accounts {
+      val acc = a as Account
+      val fee      = acc.applyMonthlyFee()
+      val interest = acc.applyMonthlyInterest()
+      val feeMsg  = if fee > 0.0d { "  fee=$#{fee}" } else { "" }
+      IO::println("  ##{acc.id} #{acc.owner}: interest=+$#{interest}#{feeMsg}  new balance=$#{acc.balance}")
+    }
+  }
+
+  def totalAssets(): Double {
+    var sum: Double = 0.0d
+    foreach a: Object in accounts { sum = sum + (a as Account).balance }
+    return sum
+  }
+
+  def countByType(accType: AccType): Int {
+    var n: Int = 0
+    foreach a: Object in accounts {
+      if (a as Account).accType == accType { n = n + 1 }
+    }
+    return n
+  }
+
+  def sumBalanceByType(accType: AccType): Double {
+    var sum: Double = 0.0d
+    foreach a: Object in accounts {
+      val acc = a as Account
+      if acc.accType == accType { sum = sum + acc.balance }
+    }
+    return sum
+  }
+
+  def printPortfolioReport(): void {
+    IO::println("\n═══ #{name} — Portfolio Report ═══")
+    IO::println("Total accounts : #{accounts.size}")
+    IO::println("Total assets   : $#{totalAssets()}")
+    IO::println("")
+    foreach t: Object in [AccType::CHECKING, AccType::SAVINGS, AccType::INVESTMENT] {
+      val at  = t as AccType
+      val cnt = countByType(at)
+      val bal = sumBalanceByType(at)
+      IO::println("  #{at.label()} : #{cnt} account(s)  $#{bal}")
+    }
+    IO::println("\nAll accounts:")
+    foreach a: Object in accounts {
+      IO::println("  #{(a as Account).oneLiner()}")
+    }
+  }
+}
+
+// ─────────────────────────── demo ─────────────────────────────────────────────
+
+val bank = new Bank("Onion National Bank")
+
+val alice = bank.open("Alice",   AccType::CHECKING,   2000.0d)
+val bob   = bank.open("Bob",     AccType::SAVINGS,    1500.0d)
+val carol = bank.open("Carol",   AccType::INVESTMENT, 8000.0d)
+val dave  = bank.open("Dave",    AccType::SAVINGS,     800.0d)
+
+IO::println("Accounts opened.")
+
+alice.deposit(500.0d,  "Paycheck")
+alice.deposit(200.0d,  "Freelance payment")
+alice.withdraw(120.0d, "Rent")
+alice.withdraw(45.0d,  "Groceries")
+
+bob.deposit(300.0d, "Birthday gift")
+bob.withdraw(100.0d, "Concert tickets")
+
+carol.deposit(2000.0d, "Bonus")
+
+val ok1 = bank.transfer(alice.id, dave.id, 200.0d, "Shared expenses")
+val ok2 = bank.transfer(bob.id,   alice.id, 50.0d, "Dinner split")
+val okBad = bank.transfer(dave.id, carol.id, 9999.0d, "Should fail")
+
+IO::println("Transfers: t1=#{ok1} t2=#{ok2} t3(over-limit)=#{okBad}")
+
+bank.runMonthEnd()
+bank.printPortfolioReport()
+
+alice.printStatement()
+bob.printStatement()
+
+// ─── inline analytics ─────────────────────────────────────────────────────────
+IO::println("\n── Accounts with balance > $2000 ──")
+foreach a: Object in bank.accounts {
+  val acc = a as Account
+  if acc.balance > 2000.0d {
+    IO::println("  #{acc.oneLiner()}")
+  }
+}
+
+IO::println("\n── Top earner by interest rate ──")
+var best: Account? = null
+foreach a: Object in bank.accounts {
+  val acc = a as Account
+  if best == null || acc.accType.annualRate() > (best as Account).accType.annualRate() {
+    best = acc
+  }
+}
+if best != null {
+  val b = best as Account
+  IO::println("  #{b.owner} (#{b.accType.label()} @ #{(b.accType.annualRate() * 100.0d)}% p.a.)")
+}
+
+IO::println("\nDone.")

@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `String?`, `try/catch`, and the `|>` pipeline operator (33rd large
   sample, 90 total corpus programs).
 
+- **`run/InventoryManager.on`, a 329-line stock-tracking sample.** Exercises
+  a data-carrying enum (`Category`, 4 variants), records (`Product`,
+  `StockMovement`), an interface (`Reportable`) implemented by a class with
+  public `List[Object]` fields, extension methods on `Double`/`Int`,
+  collection pipelines (`filter`/`fold`/`sortedBy`/`groupBy`/`find`),
+  `select` pattern matching on enum values and strings, nullable `Object?`
+  with `null` guards, a recursive function, `while`/`foreach` loops
+  (including an exclusive range `0..<5`), `try/catch` around
+  `Integer::parseInt`, and string interpolation throughout (34th large
+  sample, 91 total corpus programs).
+
 ## [0.10.19] - 2026-08-02
 
 ### Fixed

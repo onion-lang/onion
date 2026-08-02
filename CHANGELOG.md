@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two methods with the same name and parameter types in one `extension`
+  block compiled clean and only crashed later.** `TypingDuplicationPass`
+  checked classes, interfaces, records, top-level functions and global
+  variables for duplicate declarations, but never visited extension blocks,
+  so a duplicate method there reached bytecode generation as two
+  same-signature static methods on the synthesized container class (e.g.
+  `Extension$Double`) — a JVM `ClassFormatError` the moment anything loaded
+  that class, surfaced as an internal compiler error (`I0000`) instead of a
+  normal diagnostic. Caught by the mutation fuzzer duplicating a method line
+  in `run/TaskPlanner.on`'s `extension Double` block; the ambiguous-call
+  check (`E0006`) that catches a *used* duplicate never ran because the
+  duplicated method was never called. Added a dedicated `E0084` diagnostic
+  (`DUPLICATE_EXTENSION_METHOD`) and a regression test.
+
 - **Tail-call optimization miscompiled recursive functions that declared
   body-local variables** (e.g. `val x = items[idx] as Item`), either
   crashing with `I0000 BytecodeGeneration` or silently producing wrong

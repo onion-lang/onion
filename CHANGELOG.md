@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.18] - 2026-08-02
+
 ### Fixed
+
+- **Two methods with the same name and parameter types in one `extension`
+  block compiled clean and crashed later with an internal compiler error
+  (`I0000`)** — a JVM `ClassFormatError` ("Duplicate method name ...") when
+  the synthesized extension container class was loaded, since
+  `TypingDuplicationPass` checked classes, interfaces, records, top-level
+  functions, and global variables for duplicates but never visited
+  `AST.ExtensionDeclaration`. Found by the mutation fuzzer duplicating a
+  method in `run/TaskPlanner.on`'s `extension Double` block. Added a new
+  `E0084` diagnostic (`DUPLICATE_EXTENSION_METHOD`) so this is now a normal
+  compile error instead of a crash.
 
 - **Tail-call optimization miscompiled recursive functions that declared
   body-local variables** (e.g. `val x = items[idx] as Item`), either
@@ -41,6 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   => ... }`."
 
 ### Added
+
+- **`run/TaskPlanner.on`, a 425-line sprint task planner sample.** Combines
+  two ADT case-enums (`Priority`, `TaskStatus`) with a plain enum (`Tag`),
+  records with `example` clauses, typed `ArrayList[Task]`/`List[Task]`
+  collections, collection pipelines (`filter`/`sortedBy`/`groupBy`/
+  `partition`/`any`/`count`/`distinct`/`take`/`fold`/`map`/`zip`/`find`),
+  `foreach (k, v)` map iteration, extension methods on `Int`/`Double`/
+  `String`, `do[Option]` chaining, nullable fields, and exhaustive `select`
+  type-pattern matching (24th large sample, 81 total corpus programs).
 
 - **`run/PlaylistManager.on`, a 502-line music playlist manager sample.** Adds a
   large end-to-end program to the corpus (18th at ≥100 lines), combining an

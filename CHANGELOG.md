@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matching with exhaustiveness, nullable null checks, string interpolation,
   `try/catch`, recursion, `while`, and `foreach` over ranges and `(k, v)` maps
   (37th large sample, 94 total corpus programs).
+- **`run/CinemaBooking.on`, a 228-line cinema seat-booking system sample.**
+  Exercises an ADT enum (`SeatType`: `Standard`/`Premium`/`VIP`) dispatched via
+  `select`, records with `example` clauses (`Movie`, `Booking`, `MovieStat`),
+  extension methods on `Int` and `Double`, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`distinct`), `foreach`
+  over integer ranges and `(k, v)` map entries, string interpolation, a closure
+  stored in a `val`, `try/catch`, and the `|>` pipeline operator (44th large
+  sample, 101 total corpus programs).
 
 ## [0.10.20] - 2026-08-02
 

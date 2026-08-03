@@ -1,0 +1,249 @@
+// TournamentStandings.on — A football-league standings system.
+// Exercises records, data-carrying enums, classes, collection pipelines,
+// groupBy, sortedBy, select, string interpolation, foreach on map entries,
+// nullable, closures, recursion, while/foreach ranges, try/catch.
+
+record Team(name: String, city: String)
+record Match(home: Team, away: Team, homeGoals: Int, awayGoals: Int)
+
+// Data-carrying enum for match outcome
+enum Outcome(homePoints: Int, awayPoints: Int) {
+  HOME_WIN(3, 0),
+  AWAY_WIN(0, 3),
+  DRAW(1, 1)
+}
+
+def outcome(m: Match): Outcome {
+  if m.homeGoals() > m.awayGoals() { return Outcome::HOME_WIN }
+  if m.awayGoals() > m.homeGoals() { return Outcome::AWAY_WIN }
+  return Outcome::DRAW
+}
+
+record TeamStats(
+  name: String, played: Int, won: Int, drawn: Int, lost: Int,
+  goalsFor: Int, goalsAgainst: Int
+)
+
+def goalDiff(s: TeamStats): Int = s.goalsFor() - s.goalsAgainst()
+def points(s: TeamStats): Int = s.won() * 3 + s.drawn()
+
+def computeStats(team: Team, matches: List[Match]): TeamStats {
+  var played: Int = 0
+  var won: Int = 0
+  var drawn: Int = 0
+  var lost: Int = 0
+  var gf: Int = 0
+  var ga: Int = 0
+
+  foreach m: Match in matches {
+    val isHome: Boolean = m.home().name() == team.name()
+    val isAway: Boolean = m.away().name() == team.name()
+    if !isHome && !isAway { continue }
+    played = played + 1
+    if isHome {
+      gf = gf + m.homeGoals()
+      ga = ga + m.awayGoals()
+      val o = outcome(m)
+      if o == Outcome::HOME_WIN { won = won + 1 }
+      else if o == Outcome::DRAW { drawn = drawn + 1 }
+      else { lost = lost + 1 }
+    } else {
+      gf = gf + m.awayGoals()
+      ga = ga + m.homeGoals()
+      val o = outcome(m)
+      if o == Outcome::AWAY_WIN { won = won + 1 }
+      else if o == Outcome::DRAW { drawn = drawn + 1 }
+      else { lost = lost + 1 }
+    }
+  }
+  return new TeamStats(team.name(), played, won, drawn, lost, gf, ga)
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+def fmt(n: Int, width: Int): String = ("" + n).padLeft(width)
+def fmtGd(n: Int): String {
+  if n >= 0 { return ("+" + n).padLeft(4) }
+  return ("" + n).padLeft(4)
+}
+
+// --- Teams and match data ---
+val teamA = new Team("Lions",  "London")
+val teamB = new Team("Bears",  "Berlin")
+val teamC = new Team("Eagles", "Edinburgh")
+val teamD = new Team("Wolves", "Warsaw")
+val teams: List[Team] = [teamA, teamB, teamC, teamD]
+
+val matches: List[Match] = [
+  new Match(teamA, teamB, 2, 1),
+  new Match(teamC, teamD, 0, 0),
+  new Match(teamA, teamC, 3, 1),
+  new Match(teamB, teamD, 1, 1),
+  new Match(teamD, teamA, 2, 2),
+  new Match(teamB, teamC, 0, 2)
+]
+
+// --- Compute and sort standings ---
+val standings = teams
+  .map { t => computeStats(t, matches) }
+  .sortedBy { s => 0 - (points(s) * 1000 + goalDiff(s) * 100 + s.goalsFor()) }
+
+IO::println("--- League Standings ---")
+IO::println("#  Team            P   W   D   L  GF  GA  GD  Pts")
+IO::println("-- --------------- --- --- --- --- --- --- ---- ---")
+var rank = 1
+foreach s: TeamStats in standings {
+  IO::println("#{rank}  #{s.name().padRight(15)} #{fmt(s.played(),3)} #{fmt(s.won(),3)} #{fmt(s.drawn(),3)} #{fmt(s.lost(),3)} #{fmt(s.goalsFor(),3)} #{fmt(s.goalsAgainst(),3)} #{fmtGd(goalDiff(s))} #{fmt(points(s),3)}")
+  rank = rank + 1
+}
+
+// --- Match results ---
+IO::println("")
+IO::println("--- Match Results ---")
+foreach m: Match in matches {
+  val o = outcome(m)
+  val resultStr = select o {
+    case Outcome::HOME_WIN: m.home().name() + " win"
+    case Outcome::AWAY_WIN: m.away().name() + " win"
+    case Outcome::DRAW:     "Draw"
+    else: "Unknown"
+  }
+  IO::println("#{m.home().name()} #{m.homeGoals()} - #{m.awayGoals()} #{m.away().name()} (#{resultStr})")
+}
+
+// --- Goals scored grouped by home city ---
+IO::println("")
+IO::println("--- Goals by City (home matches) ---")
+val homeGoalsByCity = matches.groupBy { m => m.home().city() }
+foreach (city, cityMatches) in homeGoalsByCity {
+  val totalGoals = (cityMatches as List).fold(0) { acc, m => (acc as Int) + (m as Match).homeGoals() }
+  IO::println("  #{city}: #{totalGoals} goals at home")
+}
+
+// --- Highest-scoring match (nullable find) ---
+val highestScoring = matches.sortedBy { m => 0 - (m.homeGoals() + m.awayGoals()) }.find { m => true }
+if highestScoring != null {
+  val hm = highestScoring as Match
+  IO::println("")
+  IO::println("--- Highest-Scoring Match ---")
+  IO::println("#{hm.home().name()} #{hm.homeGoals()} - #{hm.awayGoals()} #{hm.away().name()} (#{hm.homeGoals() + hm.awayGoals()} goals total)")
+}
+
+// --- Win rates via closure ---
+IO::println("")
+IO::println("--- Win Rates ---")
+val winRate = (s: TeamStats) -> if s.played() == 0 { 0 } else { s.won() * 100 / s.played() }
+foreach s: TeamStats in standings {
+  IO::println("  #{s.name()}: #{winRate(s)}% win rate")
+}
+
+// --- Fibonacci for fun (recursion) ---
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+IO::println("")
+IO::println("--- Fun: Fibonacci (first #{teams.size} terms) ---")
+val fibNums: List[String] = []
+foreach i: Int in 0..<teams.size {
+  fibNums << "" + fib(i)
+}
+IO::println(fibNums.join(", "))
+
+// --- Try/catch: safe scoring rate ---
+def safeRate(goals: Int, played: Int): String {
+  try {
+    return "" + (goals * 10 / played) + "% (scaled)"
+  } catch e: Exception {
+    return "n/a"
+  }
+}
+IO::println("")
+IO::println("--- Scoring Rate ---")
+foreach s: TeamStats in standings {
+  IO::println("  #{s.name()}: #{safeRate(s.goalsFor(), s.played())}")
+}
+
+// --- Partition: teams above and below average ---
+val totalPts = standings.fold(0) { acc, s => (acc as Int) + points(s as TeamStats) }
+val avgPts = totalPts / standings.size
+val parts = standings.partition { s => points(s as TeamStats) >= avgPts }
+val topTeams  = parts[0] as List
+val lowTeams  = parts[1] as List
+IO::println("")
+IO::println("--- Teams at/above #{avgPts}-pt average: #{topTeams.map { s => (s as TeamStats).name() }.join(", ")} ---")
+IO::println("--- Teams below average: #{lowTeams.map { s => (s as TeamStats).name() }.join(", ")} ---")
+
+// --- While loop: separator ---
+var sep: String = ""
+var si: Int = 0
+while si < 50 { sep = sep + "-"; si = si + 1 }
+IO::println("")
+IO::println(sep)
+IO::println("Season complete: #{teams.size} teams, #{matches.size} matches")
+
+// --- Class encapsulating league logic ---
+class League {
+  val leagueName: String
+  val leagueTeams: List[Team]
+  val leagueMatches: List[Match]
+public:
+  def this(n: String, ts: List[Team], ms: List[Match]) {
+    this.leagueName = n
+    this.leagueTeams = ts
+    this.leagueMatches = ms
+  }
+  def getName(): String = leagueName
+  def standings(): List[TeamStats] {
+    return leagueTeams
+      .map { t => computeStats(t, leagueMatches) }
+      .sortedBy { s => 0 - (points(s) * 1000 + goalDiff(s) * 100 + s.goalsFor()) }
+  }
+  def leader(): TeamStats? {
+    val sorted = this.standings()
+    if sorted.size == 0 { return null }
+    return sorted[0] as TeamStats
+  }
+  def totalGoals(): Int {
+    return leagueMatches.fold(0) { acc, m => (acc as Int) + (m as Match).homeGoals() + (m as Match).awayGoals() }
+  }
+  def avgGoalsPerMatch(): Int {
+    if leagueMatches.size == 0 { return 0 }
+    return this.totalGoals() / leagueMatches.size
+  }
+  def matchCount(): Int = leagueMatches.size
+}
+
+val league = new League("Euro Cup Group A", teams, matches)
+val leader = league.leader()
+IO::println("")
+IO::println("--- League: #{league.getName()} ---")
+if leader != null {
+  IO::println("Leader: #{leader.name()} with #{points(leader)} points")
+}
+IO::println("Total goals scored: #{league.totalGoals()}")
+IO::println("Average goals per match: #{league.avgGoalsPerMatch()}")
+
+// --- foreach over matches with select on outcome ---
+IO::println("")
+IO::println("--- Season Timeline ---")
+var matchNum: Int = 1
+foreach m: Match in matches {
+  val o = outcome(m)
+  val pts = select o {
+    case Outcome::HOME_WIN: "3-0"
+    case Outcome::AWAY_WIN: "0-3"
+    case Outcome::DRAW:     "1-1"
+    else: "?"
+  }
+  IO::println("Match #{matchNum}: #{m.home().name()} vs #{m.away().name()} → #{pts} pts")
+  matchNum = matchNum + 1
+}

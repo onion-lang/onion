@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/JobScheduler.on`, a 261-line priority-based CI/build job scheduler.**
+  Exercises an ADT enum with per-case data (`JobState`: `Pending`, running
+  `Running(startedAtMs)`, `Succeeded(durationMs)`, `Failed(reason)`), records
+  with `example`s, extension methods on `Int`/`String`, a class-based priority
+  queue, `try`/`catch` around job validation (rejecting an out-of-range
+  priority and a non-positive estimate), exhaustive `select` / type-pattern
+  matching, and the full collection-pipeline set
+  (`map`/`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`find`/`distinct`/
+  `any`/`take`) alongside `foreach`, string interpolation, and the `|>`
+  pipeline. 47th large sample, 104 total corpus programs.
 - **`run/CarRentalFleet.on`, a 225-line car rental fleet & billing report.**
   Exercises an ADT enum (`VehicleCategory`), records with `example`s, extension
   methods on `Int` and `Double`, and the full collection-pipeline set

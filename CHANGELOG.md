@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The English `error.count` trailer no longer says "1 errors are found."
+  for a single-error compile.** `error.count` in `errorMessage.properties`
+  used a plain `"{0} errors are found."` template regardless of count; it now
+  uses a `MessageFormat` choice format (`1#1 error is found.|1<{0} errors are
+  found.`) so a single error reads "1 error is found." while multiple errors
+  keep the plural wording. The Japanese bundle was unaffected (Japanese does
+  not pluralize).
+
 ## [0.10.21] - 2026-08-03
 
 ### Fixed

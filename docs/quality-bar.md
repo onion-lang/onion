@@ -13,7 +13,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 
 | # | Dimension | How to measure | Current (2026-08-03) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3149 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3150 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 100 / 100 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 43 (AirlineReservation, AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, BugTracker, EventTicketing, FitnessTracker, FleetManager, GameStore, GradeBook, GraphAlgorithms, GraphSearch, HotelReservation, Inventory, InventoryManager, InventoryReport, LibraryCatalog, LibrarySystem, LogAnalytics, MathParser, MiniRpg, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, PokerHands, RecipeManager, ShapeProcessor, ShipmentTracker, ShoppingCart, StatsApp, StockPortfolio, TaskPlanner, TextAnalyzer, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, VirtualMachine) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |

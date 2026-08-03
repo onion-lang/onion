@@ -1,0 +1,261 @@
+// JobScheduler.on — a priority-based CI/build job scheduler demonstrating an
+// ADT enum with per-case data (JobState), records with example clauses,
+// extension methods on Int/String, a class-based priority queue, exhaustive
+// select matching, try/catch around job validation, and the full
+// collection-pipeline set (map/filter/fold/sortedBy/groupBy/partition/find/
+// any/distinct/take/zip) alongside foreach, string interpolation, and the
+// |> pipeline.
+
+import { java.util.ArrayList }
+
+// ─── JobState ADT enum ────────────────────────────────────────────────────────
+enum JobState {
+  case Pending
+  case Running(startedAtMs: Int)
+  case Succeeded(durationMs: Int)
+  case Failed(reason: String)
+public:
+  def label(): String = select this {
+    case s is Pending:           "PENDING  "
+    case r is Running:           "RUNNING  "
+    case c is Succeeded:         "SUCCEEDED"
+    case f is Failed:            "FAILED   "
+  }
+  def isTerminal(): Boolean = select this {
+    case c is Succeeded: true
+    case f is Failed:    true
+    else:                false
+  }
+  def isFailure(): Boolean = select this {
+    case f is Failed: true
+    else:             false
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+record Job(id: Int, name: String, priority: Int, estimatedMs: Int)
+  example { new Job(1, "compile", 9, 4000).priority() == 9 }
+  example { new Job(2, "lint", 3, 1200).estimatedMs() == 1200 }
+
+record Worker(id: Int, name: String, capacity: Int)
+  example { new Worker(1, "runner-a", 2).capacity() == 2 }
+
+record RunResult(job: Job, state: JobState)
+
+record QueueSummary(
+  total: Int,
+  succeeded: Int,
+  failed: Int,
+  pending: Int,
+  totalMs: Int
+)
+  example { new QueueSummary(10, 7, 1, 2, 5000).succeeded() == 7 }
+  example { new QueueSummary(10, 7, 1, 2, 5000).failed() + 9 == 10 }
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+extension Int {
+  def isCritical(): Boolean = self >= 9
+  def plural(word: String): String {
+    if self == 1 { return "1 " + word }
+    return "" + self + " " + word + "s"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = this
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def isFlaky(): Boolean = this.length() % 2 == 0 && this.length() > 4
+}
+
+// ─── Validation (raises for the try/catch demo) ───────────────────────────────
+def validateJob(id: Int, name: String, priority: Int, estimatedMs: Int): Job {
+  if priority < 0 || priority > 10 {
+    throw new Exception("job #{id} (#{name}): priority #{priority} out of range 0..10")
+  }
+  if estimatedMs <= 0 {
+    throw new Exception("job #{id} (#{name}): non-positive estimate #{estimatedMs}ms")
+  }
+  return new Job(id, name, priority, estimatedMs)
+}
+
+// ─── JobQueue class ────────────────────────────────────────────────────────────
+class JobQueue {
+  var jobs: ArrayList[Job] = new ArrayList[Job]()
+
+public:
+  def this { jobs = new ArrayList[Job]() }
+
+  def enqueue(j: Job): void { jobs.add(j) }
+
+  def all(): List[Job] {
+    val list: List[Job] = []
+    foreach j: Job in jobs { list << j }
+    return list
+  }
+
+  // Highest priority first; ties broken by lower id (earlier submission wins).
+  def byPriority(): List[Job] {
+    return all().sortedBy { j => 0 - j.priority() }
+  }
+
+  def findById(id: Int): Job? {
+    val found = all().find { j => j.id() == id }
+    if found == null { return null }
+    return found as Job
+  }
+
+  def criticalJobs(): List[Job] {
+    return all().filter { j => j.priority().isCritical() }
+  }
+
+  def totalEstimatedMs(): Int {
+    return all().fold(0) { acc, j => (acc as Int) + j.estimatedMs() } as Int
+  }
+}
+
+// ─── Simulated execution ──────────────────────────────────────────────────────
+// A job "fails" when its name has flaky letter-count parity AND its priority
+// is below the critical threshold — deterministic, no randomness, so the
+// sample's output (and the mutation fuzzer's crash search over it) is stable.
+def run(j: Job): RunResult {
+  if j.name().isFlaky() && !j.priority().isCritical() {
+    return new RunResult(j, new Failed("simulated flake in " + j.name()))
+  }
+  return new RunResult(j, new Succeeded(j.estimatedMs()))
+}
+
+def runAll(queue: JobQueue): List[RunResult] {
+  return queue.byPriority().map { j => run(j) }
+}
+
+def summarize(results: List[RunResult]): QueueSummary {
+  val total  = results.size
+  val ok     = results.filter { r => !(r as RunResult).state().isFailure() }.size
+  val bad    = results.filter { r => (r as RunResult).state().isFailure() }.size
+  val ms     = results.fold(0) { acc, r => (acc as Int) + (r as RunResult).job().estimatedMs() } as Int
+  return new QueueSummary(total, ok, bad, 0, ms)
+}
+
+// ─── Reporting ─────────────────────────────────────────────────────────────────
+def line(c: String, n: Int): String {
+  var s = ""
+  var i = 0
+  while i < n { s = s + c; i++ }
+  return s
+}
+
+def printHeader(title: String): void {
+  IO::println(line("-", 60))
+  IO::println("  " + title)
+  IO::println(line("-", 60))
+}
+
+def printResult(r: RunResult, rank: Int): void {
+  val j = r.job()
+  val st = r.state().label()
+  IO::println("  #{rank}. ##{j.id()} #{j.name().padRight(14)} pri=#{j.priority()}  #{st}  #{j.estimatedMs()}ms")
+}
+
+// ─── Build the demo queue (with a couple of validation failures caught) ───────
+val queue = new JobQueue()
+
+val specs: List[List[Object]] = [
+  [1,  "compile",      9,  4000],
+  [2,  "lint",          3,  1200],
+  [3,  "unit-test",     7,  3500],
+  [4,  "integration",   6,  6000],
+  [5,  "package",       8,  2000],
+  [6,  "docs",          2,  900],
+  [7,  "e2e",           5,  7000],
+  [8,  "deploy-check",  9,  1500],
+  [9,  "verify",        4,  5000],
+  [10, "cleanup",      -1,  500],   // invalid: negative priority
+  [11, "notify",        1,  0]      // invalid: non-positive estimate
+]
+
+foreach spec: Object in specs {
+  val row = spec as List[Object]
+  val id  = row[0] as Int
+  val nm  = row[1] as String
+  val pri = row[2] as Int
+  val est = row[3] as Int
+  try {
+    val j = validateJob(id, nm, pri, est)
+    queue.enqueue(j)
+  } catch e: Exception {
+    IO::println("  [rejected] #{e.message()}")
+  }
+}
+IO::println("")
+
+IO::println(line("=", 60))
+IO::println("  JOB SCHEDULER — build pipeline")
+IO::println(line("=", 60))
+IO::println("")
+
+printHeader("Queued Jobs (by priority)")
+var rank = 1
+foreach j: Job in queue.byPriority() {
+  IO::println("  #{rank}. ##{j.id()} #{j.name().padRight(14)} pri=#{j.priority()}  est=#{j.estimatedMs()}ms")
+  rank++
+}
+IO::println("")
+
+printHeader("Critical Jobs")
+foreach j: Job in queue.criticalJobs() {
+  IO::println("  ##{j.id()} #{j.name()} (priority #{j.priority()})")
+}
+IO::println("")
+
+val results = runAll(queue)
+printHeader("Execution Results")
+var i = 1
+foreach r: RunResult in results {
+  printResult(r, i)
+  i++
+}
+IO::println("")
+
+val summary = summarize(results)
+printHeader("Summary")
+IO::println("  Total     : #{summary.total().plural("job")}")
+IO::println("  Succeeded : #{summary.succeeded()}")
+IO::println("  Failed    : #{summary.failed()}")
+IO::println("  Total time: #{summary.totalMs()}ms")
+IO::println("")
+
+printHeader("Failures — root cause")
+val failures = results.filter { r => (r as RunResult).state().isFailure() }
+foreach r: RunResult in failures {
+  select r.state() {
+    case f is Failed: IO::println("  ##{r.job().id()} #{r.job().name()}: #{f.reason()}")
+    else: {}
+  }
+}
+IO::println("")
+
+// Grouping and pipeline demo
+printHeader("Jobs grouped by outcome")
+val grouped = results.groupBy { r => (r as RunResult).state().label().trim() }
+foreach (label, rlist) in grouped {
+  val grp = rlist as List[Object]
+  IO::println("  #{label}: #{grp.size.plural("job")}")
+}
+IO::println("")
+
+val distinctPriorities = queue.all().map { j => j.priority() }.distinct()
+IO::println("  Distinct priority levels in use: #{distinctPriorities.size}")
+
+val topTwo = queue.byPriority().take(2)
+IO::println("  Top #{topTwo.size.plural("job")} by priority:")
+foreach j: Job in topTwo { IO::println("    ##{j.id()} #{j.name()}") }
+IO::println("")
+
+queue.all().map { j => j.name() } |> IO::println
+
+IO::println(line("=", 60))
+IO::println("  Report complete.")
+IO::println(line("=", 60))

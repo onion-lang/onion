@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A homogeneous enum with two identically-named methods no longer crashes
+  the compiler with an I0000 internal error ("Duplicate method name").**
+  `TypingDuplicationPass.run()` dispatched over `ClassDeclaration`,
+  `InterfaceDeclaration`, and `RecordDeclaration` but silently dropped
+  `EnumDeclaration`, so the duplicate slipped through to codegen and produced
+  invalid bytecode instead of the normal `E0010`/`E0035` diagnostic.
 - **Records with a user-defined `override def toString`/`equals`/`hashCode`/`copy` in
   their body no longer crash the compiler with an I0000 internal error
   ("Duplicate method name").** `TypingOutlinePass` now skips emitting the
@@ -18,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Six new large end-to-end samples added to the `run/` corpus**:
+  `InventoryReport.on` (249 lines), `AirlineReservation.on` (598 lines),
+  `PokerHands.on` (443 lines), `VirtualMachine.on` (337 lines, a stack-based
+  bytecode interpreter), `TournamentStandings.on` (249 lines), and
+  `LogAnalytics.on` (298 lines, log analysis pipeline with `record ... from
+  re"..."` parsing). Corpus now stands at 100 samples, 43 of them ≥ 100 lines.
 - **`run/BugTracker.on`, a 398-line software issue tracker sample.** Exercises
   ADT enums (`Priority`, `Status`, `Resolution` — including data-carrying cases
   `Fixed(inVersion)`, `WontFix(reason)`, `Duplicate(ofId)`), data-carrying

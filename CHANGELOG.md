@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same name, so the user's override compiles through the normal path instead
   of colliding with the auto-generated one.
 
+### Added
+
+- **`run/BugTracker.on`, a 398-line software issue tracker sample.** Exercises
+  ADT enums (`Priority`, `Status`, `Resolution` — including data-carrying cases
+  `Fixed(inVersion)`, `WontFix(reason)`, `Duplicate(ofId)`), data-carrying
+  homogeneous enum (`IssueType`), a record with `example` (`Issue` with nullable
+  `assignee`), extension methods on `Int` (story-size label, bar chart) and
+  `Double` (percentage string), an interface (`Reportable`), a class
+  (`IssueTracker`), collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`partition`/`distinct`/`find`/
+  `zip`/`any`/`count`/`take`), `|>` pipeline operator, select / type-pattern
+  matching with exhaustiveness, nullable null checks, string interpolation,
+  `try/catch`, recursion, `while`, and `foreach` over ranges and `(k, v)` maps
+  (37th large sample, 94 total corpus programs).
+
 ## [0.10.20] - 2026-08-02
 
 ### Added

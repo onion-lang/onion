@@ -2,386 +2,386 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://onion-lang.org/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/GENERICS_DESIGN/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/RELEASING/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/parser-refactoring/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/quality-bar/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/compiler/tail-call-optimization/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/contributing/building/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/contributing/development/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/design/onion-v0.5-audit/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/design/readme-rewrite-proposal/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/design/roadmap/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/design/type-classes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/design/typed-boundaries/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/async/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/basic/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/error-handling/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/functional/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/json-http/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/oop/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/overview/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/scripting/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/examples/tools/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/getting-started/hello-world/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/getting-started/installation/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/getting-started/quick-start/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/basic-syntax/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/classes-and-objects/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/collections/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/control-flow/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/functions/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/inheritance/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/java-interop/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/lambda-expressions/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/null-safety/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/overview/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/scripting/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/shapes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/tools/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/type-classes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/guide/variables-and-types/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/CLAUDE_ja/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/GENERICS_DESIGN/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/RELEASING/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/parser-refactoring/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/quality-bar/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/compiler/tail-call-optimization/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/contributing/building/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/contributing/development/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/async/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/basic/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/error-handling/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/functional/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/json-http/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/oop/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/scripting/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/examples/tools/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/getting-started/hello-world/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/getting-started/installation/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/getting-started/quick-start/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/basic-syntax/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/classes-and-objects/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/collections/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/control-flow/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/functions/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/inheritance/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/java-interop/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/lambda-expressions/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/null-safety/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/overview/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/scripting/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/shapes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/tools/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/type-classes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/guide/variables-and-types/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/reference/compiler-architecture/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/reference/effects/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/reference/error-codes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/reference/specification/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/reference/stdlib/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/tools/compiler/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/tools/language-server/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/tools/project-cli/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/tools/repl/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/ja/tools/script-runner/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/reference/compiler-architecture/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/reference/effects/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/reference/error-codes/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/reference/specification/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/reference/stdlib/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/tools/compiler/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/tools/language-server/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/tools/project-cli/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/tools/repl/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
     <url>
          <loc>https://onion-lang.org/tools/script-runner/</loc>
-         <lastmod>2026-08-02</lastmod>
+         <lastmod>2026-08-03</lastmod>
     </url>
 </urlset>

@@ -216,38 +216,53 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       ctor.setArgumentsWithDefaults(methodArgs)
       definition_.add(ctor)
 
+      // Collect method names declared in user-provided body sections so we can
+      // skip generating a synthetic where the user has supplied an override.
+      val userDefinedMethodNames: Set[String] =
+        node.sections.flatMap(_.members).collect {
+          case m: AST.MethodDeclaration => m.name
+        }.toSet
+
       // Generate equals(Object): Boolean method
-      val equalsModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
-      val equalsMethod = new MethodDefinition(
-        node.location, equalsModifier, definition_, "equals",
-        Array(rootClass), BasicType.BOOLEAN, null
-      )
-      definition_.add(equalsMethod)
+      if (!userDefinedMethodNames.contains("equals")) {
+        val equalsModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val equalsMethod = new MethodDefinition(
+          node.location, equalsModifier, definition_, "equals",
+          Array(rootClass), BasicType.BOOLEAN, null
+        )
+        definition_.add(equalsMethod)
+      }
 
       // Generate hashCode(): Int method
-      val hashCodeModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
-      val hashCodeMethod = new MethodDefinition(
-        node.location, hashCodeModifier, definition_, "hashCode",
-        Array.empty, BasicType.INT, null
-      )
-      definition_.add(hashCodeMethod)
+      if (!userDefinedMethodNames.contains("hashCode")) {
+        val hashCodeModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val hashCodeMethod = new MethodDefinition(
+          node.location, hashCodeModifier, definition_, "hashCode",
+          Array.empty, BasicType.INT, null
+        )
+        definition_.add(hashCodeMethod)
+      }
 
       // Generate toString(): String method
-      val toStringModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
       val stringType = loadRequired("java.lang.String")
-      val toStringMethod = new MethodDefinition(
-        node.location, toStringModifier, definition_, "toString",
-        Array.empty, stringType, null
-      )
-      definition_.add(toStringMethod)
+      if (!userDefinedMethodNames.contains("toString")) {
+        val toStringModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val toStringMethod = new MethodDefinition(
+          node.location, toStringModifier, definition_, "toString",
+          Array.empty, stringType, null
+        )
+        definition_.add(toStringMethod)
+      }
 
       // Generate copy(components...): ThisType method
-      val copyModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
-      val copyMethod = new MethodDefinition(
-        node.location, copyModifier, definition_, "copy",
-        argTypes, definition_, null
-      )
-      definition_.add(copyMethod)
+      if (!userDefinedMethodNames.contains("copy")) {
+        val copyModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val copyMethod = new MethodDefinition(
+          node.location, copyModifier, definition_, "copy",
+          argTypes, definition_, null
+        )
+        definition_.add(copyMethod)
+      }
 
       // Pattern-attached records (`record ... from re"..."`): validate that every
       // component type can be derived from a captured String, then register the

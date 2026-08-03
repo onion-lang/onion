@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Records with a user-defined `override def toString`/`equals`/`hashCode`/`copy` in
+  their body no longer crash the compiler with an I0000 internal error
+  ("Duplicate method name").** `TypingOutlinePass` now skips emitting the
+  synthetic record method whenever the user has already defined one with the
+  same name, so the user's override compiles through the normal path instead
+  of colliding with the auto-generated one.
+
 ### Added
 
 - **`run/BugTracker.on`, a 398-line software issue tracker sample.** Exercises
@@ -20,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `zip`/`any`/`count`/`take`), `|>` pipeline operator, select / type-pattern
   matching with exhaustiveness, nullable null checks, string interpolation,
   `try/catch`, recursion, `while`, and `foreach` over ranges and `(k, v)` maps
-  (35th large sample, 92 total corpus programs).
+  (37th large sample, 94 total corpus programs).
 
 ## [0.10.20] - 2026-08-02
 

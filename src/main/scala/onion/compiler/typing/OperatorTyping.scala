@@ -298,26 +298,26 @@ final class OperatorTyping(
   private val operatorMethodNames: Map[String, String] =
     Map("+" -> "plus", "-" -> "minus", "*" -> "times", "/" -> "div", "%" -> "rem")
 
-  def tryOperatorMethod(node: AST.Node, symbol: String, left: Term, right: Term): Option[Term] = {
-    val methodName = operatorMethodNames.getOrElse(symbol, return None)
-    left.`type` match {
-      case targetType: ObjectType if right.`type`.isObjectType || right.`type`.isBasicType =>
-        val params = Array(right)
-        tryFindMethod(node, targetType, methodName, params) match {
-          case Right(method) =>
-            val classSubst = TypeSubstitution.classSubstitution(targetType)
-            val resultType = TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
-            Some(TypeSubst.withCast(new Call(left, method, params), resultType))
-          case Left(_) =>
-            // No member `plus`/`minus`/... — consult extension methods so an
-            // operator defined via an `extension` block resolves (records have no
-            // body block, so extensions are the only way to overload their
-            // operators). None here lets the caller fall back to string concat.
-            body.tryExtensionOperatorMethod(node, methodName, left, targetType, right, null)
-        }
-      case _ => None
+  def tryOperatorMethod(node: AST.Node, symbol: String, left: Term, right: Term): Option[Term] =
+    operatorMethodNames.get(symbol).flatMap { methodName =>
+      left.`type` match {
+        case targetType: ObjectType if right.`type`.isObjectType || right.`type`.isBasicType =>
+          val params = Array(right)
+          tryFindMethod(node, targetType, methodName, params) match {
+            case Right(method) =>
+              val classSubst = TypeSubstitution.classSubstitution(targetType)
+              val resultType = TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+              Some(TypeSubst.withCast(new Call(left, method, params), resultType))
+            case Left(_) =>
+              // No member `plus`/`minus`/... — consult extension methods so an
+              // operator defined via an `extension` block resolves (records have no
+              // body block, so extensions are the only way to overload their
+              // operators). None here lets the caller fall back to string concat.
+              body.tryExtensionOperatorMethod(node, methodName, left, targetType, right, null)
+          }
+        case _ => None
+      }
     }
-  }
 
   def typeLogicalBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
     val ops = processLogicalExpression(node, context)

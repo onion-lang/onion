@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A constructor argument needing ordinary numeric widening (an `Int` literal
+  passed where a `Double`/`Float`/`Long` parameter is declared, e.g. `new
+  Game(99)` against `record Game(price: Double)`) no longer crashes the
+  compiler with an I0000 internal error in `BytecodeGeneration`.**
+  `ConstructionTyping.findConstructorWithBoxing` only inserted an explicit
+  conversion for the Byte/Short/Char constant-narrowing case (issue #374); a
+  genuine widening match — already accepted as legal by
+  `TypeRelations.isAssignableWithBoxing` — left the argument term unconverted,
+  so codegen pushed a 1-slot `int` where the constructor's descriptor declared
+  a 2-slot `double`/`long`, corrupting the JVM stack map frames
+  (`NegativeArraySizeException` in ASM's `Frame.merge`, or a `VerifyError` at
+  class-load time). Argument adaptation (boxing and numeric conversion alike)
+  now happens once, in a shared `adaptToFormals` step, applied uniformly
+  whether the constructor was matched by the primary finder or the boxing
+  fallback. Found by `MutationFuzzSpec` mutating a decimal literal (`59.99` ->
+  `99`) in `run/GameStore.on`.
 - **A homogeneous enum with two identically-named methods no longer crashes
   the compiler with an I0000 internal error ("Duplicate method name").**
   `TypingDuplicationPass.run()` dispatched over `ClassDeclaration`,
@@ -24,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/ExpenseAuditor.on`, a 135-line expense-report auditing tool.** Exercises
+  the `tool` capability boundary (`requires { read(src), write(out), console }`,
+  with `--help`/`--plan`/`--contract` all deriving from the single declaration),
+  an ADT enum (`Category`) with per-case behavior, a record derived from a regex
+  pattern (`from re"..."`) documented with `example`s rather than a `law` (a
+  free-text field can contain the format's own delimiter, so a full round-trip
+  law isn't satisfiable — a design point worth having on record), an extension
+  method on `Double`, and collection pipelines (`filter`/`map`/`groupBy`/`fold`/
+  `sortedBy`/`partition`). 45th large sample, 102 total corpus programs.
 - **Six new large end-to-end samples added to the `run/` corpus**:
   `InventoryReport.on` (249 lines), `AirlineReservation.on` (598 lines),
   `PokerHands.on` (443 lines), `VirtualMachine.on` (337 lines, a stack-based

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.21] - 2026-08-03
+
 ### Fixed
 
 - **A constructor argument needing ordinary numeric widening (an `Int` literal

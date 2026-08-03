@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/CarRentalFleet.on`, a 225-line car rental fleet & billing report.**
+  Exercises an ADT enum (`VehicleCategory`), records with `example`s, extension
+  methods on `Int` and `Double`, and the full collection-pipeline set
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`distinct`)
+  alongside `foreach` over ranges and `Map` entries, `select` with type
+  patterns, string interpolation, closures, `try`/`catch`, and the `|>`
+  pipeline. 46th large sample, 103 total corpus programs.
 - **`run/ExpenseAuditor.on`, a 135-line expense-report auditing tool.** Exercises
   the `tool` capability boundary (`requires { read(src), write(out), console }`,
   with `--help`/`--plan`/`--contract` all deriving from the single declaration),

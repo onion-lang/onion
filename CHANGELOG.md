@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Records with a user-defined `override def toString`/`equals`/`hashCode`/`copy` in
+  their body no longer crash the compiler with an I0000 internal error
+  ("Duplicate method name").** `TypingOutlinePass` now skips emitting the
+  synthetic record method whenever the user has already defined one with the
+  same name, so the user's override compiles through the normal path instead
+  of colliding with the auto-generated one.
+
 ## [0.10.20] - 2026-08-02
 
 ### Added

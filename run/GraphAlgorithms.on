@@ -1,0 +1,360 @@
+// GraphAlgorithms.on — graph data structures and classic traversal algorithms
+// Exercises: records, data-carrying enums, classes, collection pipelines,
+// select/pattern matching, closures, foreach/while loops, recursion.
+
+// ── Edge record ────────────────────────────────────────────────────────────────
+
+record Edge(from: Int, to: Int, weight: Int) {
+public:
+  def display(): String = "#{from()}->#{to()}(#{weight()})"
+}
+
+// ── Traversal result tag ───────────────────────────────────────────────────────
+
+enum TraversalKind { BFS, DFS }
+
+// ── Adjacency-list graph ───────────────────────────────────────────────────────
+
+class Graph {
+  var nodeCount: Int
+  var edgeList: List[Edge]
+
+public:
+  def this(n: Int) {
+    this.nodeCount = n
+    this.edgeList = []
+  }
+
+  def addEdge(from: Int, to: Int, weight: Int): void {
+    edgeList.add(new Edge(from, to, weight))
+  }
+
+  def addEdge(from: Int, to: Int): void {
+    addEdge(from, to, 1)
+  }
+
+  def edges(): List[Edge] = edgeList
+  def size(): Int = nodeCount
+
+  def neighbors(node: Int): List[Int] {
+    val result: List[Int] = []
+    foreach e: Object in edgeList {
+      val edge = e as Edge
+      if edge.from() == node { result.add(edge.to()) }
+    }
+    return result
+  }
+
+  def edgesFrom(node: Int): List[Edge] {
+    val result: List[Edge] = []
+    foreach e: Object in edgeList {
+      val edge = e as Edge
+      if edge.from() == node { result.add(edge) }
+    }
+    return result
+  }
+
+  def traverse(start: Int, kind: TraversalKind): List[Int] = select kind {
+    case TraversalKind::BFS: bfs(start)
+    case TraversalKind::DFS: dfs(start)
+  }
+
+  def bfs(start: Int): List[Int] {
+    val visited: Boolean[] = new Boolean[nodeCount]
+    val order: List[Int] = []
+    val queue: List[Int] = []
+    visited[start] = true
+    queue.add(start)
+    while queue.size > 0 {
+      val node = queue.remove(0) as Int
+      order.add(node)
+      foreach nb: Object in neighbors(node) {
+        val n = nb as Int
+        if !visited[n] { visited[n] = true; queue.add(n) }
+      }
+    }
+    return order
+  }
+
+  def dfs(start: Int): List[Int] {
+    val visited: Boolean[] = new Boolean[nodeCount]
+    val order: List[Int] = []
+    dfsHelper(start, visited, order)
+    return order
+  }
+
+  def hasCycle(): Boolean {
+    val WHITE: Int = 0
+    val GRAY: Int = 1
+    val BLACK: Int = 2
+    val color: Int[] = new Int[nodeCount]
+    var found: Boolean = false
+    var i: Int = 0
+    while i < nodeCount && !found {
+      if color[i] == WHITE { found = cycleCheck(i, color, WHITE, GRAY, BLACK) }
+      i = i + 1
+    }
+    return found
+  }
+
+  def topologicalSort(): List[Int] {
+    val inDeg: Int[] = new Int[nodeCount]
+    foreach e: Object in edgeList {
+      val edge = e as Edge
+      inDeg[edge.to()] = inDeg[edge.to()] + 1
+    }
+    val queue: List[Int] = []
+    var i: Int = 0
+    while i < nodeCount {
+      if inDeg[i] == 0 { queue.add(i) }
+      i = i + 1
+    }
+    val order: List[Int] = []
+    while queue.size > 0 {
+      val node = queue.remove(0) as Int
+      order.add(node)
+      foreach e: Object in edgesFrom(node) {
+        val nb = (e as Edge).to()
+        inDeg[nb] = inDeg[nb] - 1
+        if inDeg[nb] == 0 { queue.add(nb) }
+      }
+    }
+    return order
+  }
+
+  def shortestPaths(start: Int): Int[] {
+    val INF: Int = 2147483647
+    val dist: Int[] = new Int[nodeCount]
+    val visited: Boolean[] = new Boolean[nodeCount]
+    var i: Int = 0
+    while i < nodeCount { dist[i] = INF; i = i + 1 }
+    dist[start] = 0
+    var steps: Int = 0
+    while steps < nodeCount {
+      val u = minNode(dist, visited, INF)
+      if u == -1 { steps = nodeCount }
+      else {
+        visited[u] = true
+        foreach e: Object in edgesFrom(u) {
+          val edge = e as Edge
+          val v = edge.to()
+          val nd = dist[u] + edge.weight()
+          if dist[u] != INF && nd < dist[v] { dist[v] = nd }
+        }
+        steps = steps + 1
+      }
+    }
+    return dist
+  }
+
+  def connectedComponents(): Int {
+    val visited: Boolean[] = new Boolean[nodeCount]
+    var count: Int = 0
+    var i: Int = 0
+    while i < nodeCount {
+      if !visited[i] {
+        count = count + 1
+        markReachable(i, visited)
+      }
+      i = i + 1
+    }
+    return count
+  }
+
+  def inDegrees(): Int[] {
+    val deg: Int[] = new Int[nodeCount]
+    foreach e: Object in edgeList {
+      val edge = e as Edge
+      deg[edge.to()] = deg[edge.to()] + 1
+    }
+    return deg
+  }
+
+  def outDegrees(): Int[] {
+    val deg: Int[] = new Int[nodeCount]
+    foreach e: Object in edgeList {
+      val edge = e as Edge
+      deg[edge.from()] = deg[edge.from()] + 1
+    }
+    return deg
+  }
+
+private:
+  def dfsHelper(node: Int, visited: Boolean[], order: List[Int]): void {
+    visited[node] = true
+    order.add(node)
+    foreach nb: Object in neighbors(node) {
+      val n = nb as Int
+      if !visited[n] { dfsHelper(n, visited, order) }
+    }
+  }
+
+  def cycleCheck(node: Int, color: Int[], WHITE: Int, GRAY: Int, BLACK: Int): Boolean {
+    color[node] = GRAY
+    foreach nb: Object in neighbors(node) {
+      val n = nb as Int
+      if color[n] == GRAY { return true }
+      if color[n] == WHITE { if cycleCheck(n, color, WHITE, GRAY, BLACK) { return true } }
+    }
+    color[node] = BLACK
+    return false
+  }
+
+  def minNode(dist: Int[], visited: Boolean[], INF: Int): Int {
+    var best: Int = INF
+    var node: Int = -1
+    var i: Int = 0
+    while i < nodeCount {
+      if !visited[i] && dist[i] < best { best = dist[i]; node = i }
+      i = i + 1
+    }
+    return node
+  }
+
+  def markReachable(start: Int, visited: Boolean[]): void {
+    val queue: List[Int] = []
+    visited[start] = true
+    queue.add(start)
+    while queue.size > 0 {
+      val node = queue.remove(0) as Int
+      foreach nb: Object in neighbors(node) {
+        val n = nb as Int
+        if !visited[n] { visited[n] = true; queue.add(n) }
+      }
+    }
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+def printList(label: String, items: List[Int]): void {
+  var s: String = label + ": ["
+  var first: Boolean = true
+  foreach x: Object in items {
+    if !first { s = s + ", " }
+    s = s + (x as Int)
+    first = false
+  }
+  IO::println(s + "]")
+}
+
+def printArr(label: String, arr: Int[], n: Int): void {
+  val INF: Int = 2147483647
+  var s: String = label + ": ["
+  var i: Int = 0
+  while i < n {
+    if i > 0 { s = s + ", " }
+    if arr[i] == INF { s = s + "INF" } else { s = s + arr[i] }
+    i = i + 1
+  }
+  IO::println(s + "]")
+}
+
+def sumArr(arr: Int[], n: Int): Int {
+  var total: Int = 0
+  var i: Int = 0
+  while i < n { total = total + arr[i]; i = i + 1 }
+  return total
+}
+
+// ── Demo ───────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // Undirected grid 0-1-2 / 3-4-5 with vertical edges 0-3 and 2-5
+  val g1 = new Graph(6)
+  g1.addEdge(0, 1); g1.addEdge(1, 0)
+  g1.addEdge(1, 2); g1.addEdge(2, 1)
+  g1.addEdge(0, 3); g1.addEdge(3, 0)
+  g1.addEdge(2, 5); g1.addEdge(5, 2)
+  g1.addEdge(3, 4); g1.addEdge(4, 3)
+  g1.addEdge(4, 5); g1.addEdge(5, 4)
+
+  IO::println("=== Undirected 6-node grid ===")
+  printList("BFS from 0", g1.bfs(0))
+  printList("DFS from 0", g1.dfs(0))
+  IO::println("Has cycle: " + g1.hasCycle())
+  IO::println("Components: " + g1.connectedComponents())
+  printList("BFS from 3 (via traverse)", g1.traverse(3, TraversalKind::BFS))
+  printList("DFS from 3 (via traverse)", g1.traverse(3, TraversalKind::DFS))
+
+  // Disconnected graph: nodes 0-1-2 and isolated 3
+  val g3 = new Graph(4)
+  g3.addEdge(0, 1); g3.addEdge(1, 0)
+  g3.addEdge(1, 2); g3.addEdge(2, 1)
+
+  IO::println("\n=== Disconnected graph ===")
+  IO::println("Components: " + g3.connectedComponents())
+  printList("BFS from 0", g3.bfs(0))
+
+  // Weighted directed graph for Dijkstra
+  val g2 = new Graph(5)
+  g2.addEdge(0, 1, 2)
+  g2.addEdge(0, 2, 6)
+  g2.addEdge(1, 3, 1)
+  g2.addEdge(1, 4, 5)
+  g2.addEdge(2, 3, 4)
+  g2.addEdge(3, 4, 3)
+
+  IO::println("\n=== Dijkstra shortest paths from 0 ===")
+  val dist = g2.shortestPaths(0)
+  printArr("dist", dist, 5)
+  printArr("in-degrees", g2.inDegrees(), 5)
+  printArr("out-degrees", g2.outDegrees(), 5)
+
+  // DAG — topological sort
+  val dag = new Graph(6)
+  dag.addEdge(5, 2)
+  dag.addEdge(5, 0)
+  dag.addEdge(4, 0)
+  dag.addEdge(4, 1)
+  dag.addEdge(2, 3)
+  dag.addEdge(3, 1)
+
+  IO::println("\n=== DAG (6 nodes, Kahn topological sort) ===")
+  IO::println("Has cycle: " + dag.hasCycle())
+  printList("Topo order", dag.topologicalSort())
+  printArr("in-degrees", dag.inDegrees(), 6)
+
+  // Cycle detection
+  val cyclic = new Graph(3)
+  cyclic.addEdge(0, 1)
+  cyclic.addEdge(1, 2)
+  cyclic.addEdge(2, 0)
+
+  IO::println("\n=== Cyclic graph ===")
+  IO::println("Has cycle: " + cyclic.hasCycle())
+
+  // Collection pipelines on edges
+  IO::println("\n=== Edge pipelines (g2) ===")
+  val heavy = g2.edges().filter { e => (e as Edge).weight() > 2 }
+  IO::println("Heavy edges (weight > 2):")
+  foreach e: Object in heavy { IO::println("  " + (e as Edge).display()) }
+
+  val byWeight = g2.edges().sortedBy { e => (e as Edge).weight() as Object }
+  IO::println("Sorted by weight:")
+  foreach e: Object in byWeight { IO::println("  " + (e as Edge).display()) }
+
+  val doubled = g2.edges().map { e =>
+    val edge = e as Edge
+    new Edge(edge.from(), edge.to(), edge.weight() * 2) as Object
+  }
+  IO::println("Doubled:")
+  foreach e: Object in doubled { IO::println("  " + (e as Edge).display()) }
+
+  var totalW: Int = 0
+  foreach e: Object in g2.edges() { totalW = totalW + (e as Edge).weight() }
+  IO::println("Total weight: " + totalW)
+
+  // Find minimum spanning edge
+  val minEdge = g2.edges().sortedBy { e => (e as Edge).weight() as Object }.get(0) as Edge
+  IO::println("Lightest edge: " + minEdge.display())
+
+  // String interpolation summary
+  val n1 = g1.size()
+  val e1 = g1.edges().size
+  val n2 = g2.size()
+  val e2 = g2.edges().size
+  IO::println("\nSummary:")
+  IO::println("  g1: #{n1} nodes, #{e1} edges (undirected grid)")
+  IO::println("  g2: #{n2} nodes, #{e2} edges (weighted directed)")
+}

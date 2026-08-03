@@ -315,9 +315,8 @@ final class ConstructionTyping(
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
-    val (constructors, parameters) =
-      if (constructors0.nonEmpty) (constructors0, parameters0)
-      else findConstructorWithBoxing(typeRef, parameters0)
+    val constructors = if (constructors0.nonEmpty) constructors0 else findConstructorWithBoxing(typeRef, parameters0)
+    val parameters = parameters0
     // Guard the substitution-blind exact match: for an applied generic type the
     // matched constructor must accept the arguments under the type-argument
     // substitution (T -> String), not merely under the erased bound (Object).
@@ -373,12 +372,39 @@ final class ConstructionTyping(
             def name: String = constructors(0).name
             def getArgs: Array[TypedAST.Type] = constructors(0).getArgs
           }
-          Some(new NewObject(appliedCtor, parameters))
+          val classSubst = TypeSubstitution.classSubstitution(applied)
+          val formals = constructors(0).getArgs.map(t =>
+            TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+          Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
         case _ =>
-          Some(new NewObject(constructors(0), parameters))
+          Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
       }
     }
   }
+
+  /**
+   * Adapts already-matched arguments to their constructor's formal types:
+   * boxes a primitive argument for a non-primitive formal, and inserts an
+   * explicit numeric conversion (widening or constant-narrowing alike)
+   * whenever both sides are primitive but differ. A resolved match can need
+   * either even outside the boxing-fallback path -- `record Game(price:
+   * Double)` called as `new Game(99)` matches directly via `findConstructor`'s
+   * own widening-aware comparison, and leaving that `Int` argument
+   * unconverted left codegen pushing a 1-slot value where the constructor's
+   * descriptor declares a 2-slot `double`, corrupting the JVM stack map
+   * frames (`NegativeArraySizeException` in ASM's `Frame.merge`, or a
+   * `VerifyError` at class-load time). Found via `MutationFuzzSpec` mutating
+   * a decimal literal down to an `Int` in `run/GameStore.on`.
+   */
+  private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
+    if (parameters.length != formals.length) parameters
+    else parameters.zip(formals).map { (p, f) =>
+      if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+      else f match {
+        case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
+        case _ => p
+      }
+    }
 
   /** Whether `actual` can fill a parameter declared `formal`, either through
     * ordinary boxing-aware assignability or -- for a literal like `-3` against
@@ -392,34 +418,21 @@ final class ConstructionTyping(
 
   /**
    * Boxing-aware constructor fallback: substitutes class type arguments into
-   * the constructor signatures, matches with primitive boxing or constant
-   * narrowing, and adapts the argument terms (boxing primitives, narrowing
-   * literals) for the unique match.
+   * the constructor signatures and matches with primitive boxing or constant
+   * narrowing. Argument adaptation (boxing, numeric conversion) happens once
+   * the caller has settled on the unique match, in `adaptToFormals`.
    */
   private def findConstructorWithBoxing(
     typeRef: ClassType,
     parameters: Array[Term]
-  ): (Array[ConstructorRef], Array[Term]) = {
+  ): Array[ConstructorRef] = {
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     def substitutedArgs(c: ConstructorRef): Array[Type] =
       c.getArgs.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-    val candidates = typeRef.constructors.filter { c =>
+    typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == parameters.length &&
         formals.indices.forall(i => formalAccepts(formals(i), parameters(i)))
-    }
-    if (candidates.length != 1) (candidates, parameters)
-    else {
-      val formals = substitutedArgs(candidates(0))
-      val adapted = parameters.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-        else f match {
-          case bt: BasicType if bt != p.`type` && ConstantNarrowing.constantIntOf(p).exists(v => ConstantNarrowing.fits(bt, v)) =>
-            new AsInstanceOf(p.location, p, bt)
-          case _ => p
-        }
-      }
-      (candidates, adapted)
     }
   }
 

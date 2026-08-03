@@ -33,6 +33,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
       case node: AST.RecordDeclaration => processRecordDeclaration(node)
+      case node: AST.EnumDeclaration => processEnumDeclaration(node)
       case node: AST.GlobalVariableDeclaration => processGlobalVariableDeclaration(node)
       case node: AST.FunctionDeclaration => processFunctionDeclaration(node)
       case node: AST.ExtensionDeclaration => processExtensionDeclaration(node)
@@ -235,6 +236,15 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
       for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
+      DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
+    }
+
+  // ADT enums are desugared by Rewriting into interface + records before this
+  // pass runs, so only homogeneous (java.lang.Enum) declarations reach here.
+  private def processEnumDeclaration(node: AST.EnumDeclaration): Unit =
+    withKernel[ClassDefinition](node) { clazz =>
+      resetForTypeDeclaration(clazz)
+      for (section <- node.sections) processAccessSection(section)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 }

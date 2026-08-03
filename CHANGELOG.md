@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.21] - 2026-08-03
+
+### Fixed
+
+- **A constructor argument needing ordinary numeric widening (an `Int` literal
+  passed where a `Double`/`Float`/`Long` parameter is declared, e.g. `new
+  Game(99)` against `record Game(price: Double)`) no longer crashes the
+  compiler with an I0000 internal error in `BytecodeGeneration`.**
+  `ConstructionTyping.findConstructorWithBoxing` only inserted an explicit
+  conversion for the Byte/Short/Char constant-narrowing case (issue #374); a
+  genuine widening match — already accepted as legal by
+  `TypeRelations.isAssignableWithBoxing` — left the argument term unconverted,
+  so codegen pushed a 1-slot `int` where the constructor's descriptor declared
+  a 2-slot `double`/`long`, corrupting the JVM stack map frames
+  (`NegativeArraySizeException` in ASM's `Frame.merge`, or a `VerifyError` at
+  class-load time). Argument adaptation (boxing and numeric conversion alike)
+  now happens once, in a shared `adaptToFormals` step, applied uniformly
+  whether the constructor was matched by the primary finder or the boxing
+  fallback. Found by `MutationFuzzSpec` mutating a decimal literal (`59.99` ->
+  `99`) in `run/GameStore.on`.
+- **A homogeneous enum with two identically-named methods no longer crashes
+  the compiler with an I0000 internal error ("Duplicate method name").**
+  `TypingDuplicationPass.run()` dispatched over `ClassDeclaration`,
+  `InterfaceDeclaration`, and `RecordDeclaration` but silently dropped
+  `EnumDeclaration`, so the duplicate slipped through to codegen and produced
+  invalid bytecode instead of the normal `E0010`/`E0035` diagnostic.
+- **Records with a user-defined `override def toString`/`equals`/`hashCode`/`copy` in
+  their body no longer crash the compiler with an I0000 internal error
+  ("Duplicate method name").** `TypingOutlinePass` now skips emitting the
+  synthetic record method whenever the user has already defined one with the
+  same name, so the user's override compiles through the normal path instead
+  of colliding with the auto-generated one.
+
+### Added
+
+- **`run/JobScheduler.on`, a 261-line priority-based CI/build job scheduler.**
+  Exercises an ADT enum with per-case data (`JobState`: `Pending`, running
+  `Running(startedAtMs)`, `Succeeded(durationMs)`, `Failed(reason)`), records
+  with `example`s, extension methods on `Int`/`String`, a class-based priority
+  queue, `try`/`catch` around job validation (rejecting an out-of-range
+  priority and a non-positive estimate), exhaustive `select` / type-pattern
+  matching, and the full collection-pipeline set
+  (`map`/`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`find`/`distinct`/
+  `any`/`take`) alongside `foreach`, string interpolation, and the `|>`
+  pipeline. 47th large sample, 104 total corpus programs.
+- **`run/CarRentalFleet.on`, a 225-line car rental fleet & billing report.**
+  Exercises an ADT enum (`VehicleCategory`), records with `example`s, extension
+  methods on `Int` and `Double`, and the full collection-pipeline set
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`distinct`)
+  alongside `foreach` over ranges and `Map` entries, `select` with type
+  patterns, string interpolation, closures, `try`/`catch`, and the `|>`
+  pipeline. 46th large sample, 103 total corpus programs.
+- **`run/ExpenseAuditor.on`, a 135-line expense-report auditing tool.** Exercises
+  the `tool` capability boundary (`requires { read(src), write(out), console }`,
+  with `--help`/`--plan`/`--contract` all deriving from the single declaration),
+  an ADT enum (`Category`) with per-case behavior, a record derived from a regex
+  pattern (`from re"..."`) documented with `example`s rather than a `law` (a
+  free-text field can contain the format's own delimiter, so a full round-trip
+  law isn't satisfiable — a design point worth having on record), an extension
+  method on `Double`, and collection pipelines (`filter`/`map`/`groupBy`/`fold`/
+  `sortedBy`/`partition`). 45th large sample, 102 total corpus programs.
+- **Six new large end-to-end samples added to the `run/` corpus**:
+  `InventoryReport.on` (249 lines), `AirlineReservation.on` (598 lines),
+  `PokerHands.on` (443 lines), `VirtualMachine.on` (337 lines, a stack-based
+  bytecode interpreter), `TournamentStandings.on` (249 lines), and
+  `LogAnalytics.on` (298 lines, log analysis pipeline with `record ... from
+  re"..."` parsing). Corpus now stands at 100 samples, 43 of them ≥ 100 lines.
+- **`run/BugTracker.on`, a 398-line software issue tracker sample.** Exercises
+  ADT enums (`Priority`, `Status`, `Resolution` — including data-carrying cases
+  `Fixed(inVersion)`, `WontFix(reason)`, `Duplicate(ofId)`), data-carrying
+  homogeneous enum (`IssueType`), a record with `example` (`Issue` with nullable
+  `assignee`), extension methods on `Int` (story-size label, bar chart) and
+  `Double` (percentage string), an interface (`Reportable`), a class
+  (`IssueTracker`), collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`partition`/`distinct`/`find`/
+  `zip`/`any`/`count`/`take`), `|>` pipeline operator, select / type-pattern
+  matching with exhaustiveness, nullable null checks, string interpolation,
+  `try/catch`, recursion, `while`, and `foreach` over ranges and `(k, v)` maps
+  (37th large sample, 94 total corpus programs).
+- **`run/CinemaBooking.on`, a 228-line cinema seat-booking system sample.**
+  Exercises an ADT enum (`SeatType`: `Standard`/`Premium`/`VIP`) dispatched via
+  `select`, records with `example` clauses (`Movie`, `Booking`, `MovieStat`),
+  extension methods on `Int` and `Double`, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`distinct`), `foreach`
+  over integer ranges and `(k, v)` map entries, string interpolation, a closure
+  stored in a `val`, `try/catch`, and the `|>` pipeline operator (44th large
+  sample, 101 total corpus programs).
+
 ## [0.10.20] - 2026-08-02
 
 ### Added

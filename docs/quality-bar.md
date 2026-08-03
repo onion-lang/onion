@@ -11,11 +11,11 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
 (`E0077`–`E0079` added by the capability boundary).
 
-| # | Dimension | How to measure | Current (2026-08-02) | Pass threshold |
+| # | Dimension | How to measure | Current (2026-08-03) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3108 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 91 / 91 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 34 (AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, EventTicketing, FitnessTracker, FleetManager, GameStore, GradeBook, GraphSearch, HotelReservation, Inventory, InventoryManager, LibraryCatalog, LibrarySystem, MathParser, MiniRpg, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, RecipeManager, ShapeProcessor, ShoppingCart, StatsApp, StockPortfolio, TaskPlanner, TextAnalyzer, TodoManager, ToolDemo, TournamentTracker) | ≥ 5 |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3164 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 104 / 104 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 47 (AirlineReservation, AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CinemaBooking, EventTicketing, ExpenseAuditor, FitnessTracker, FleetManager, GameStore, GradeBook, GraphAlgorithms, GraphSearch, HotelReservation, Inventory, InventoryManager, InventoryReport, JobScheduler, LibraryCatalog, LibrarySystem, LogAnalytics, MathParser, MiniRpg, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, PokerHands, RecipeManager, ShapeProcessor, ShipmentTracker, ShoppingCart, StatsApp, StockPortfolio, TaskPlanner, TextAnalyzer, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, VirtualMachine) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |

@@ -1,0 +1,135 @@
+// ExpenseAuditor.on — a policy-checking expense report tool. Demonstrates an
+// ADT enum (Category) with per-case behavior, a record derived from a regex
+// pattern (`from re"..."`) carrying a `law` + `example` (parse ∘ format == id,
+// machine-checked at build time), extension methods on Double, collection
+// pipelines (map/filter/groupBy/fold/sortedBy/partition), string
+// interpolation, and a `tool` declaration whose `requires` clause is the
+// entire capability boundary — read the input, write the report, talk to the
+// console, nothing else.
+
+// ── Category (ADT enum) ───────────────────────────────────────────────────────
+
+enum Category {
+  case Travel
+  case Meals
+  case Supplies
+  case Other
+public:
+  def label(): String = select this {
+    case c is Travel:   "Travel  "
+    case c is Meals:    "Meals   "
+    case c is Supplies: "Supplies"
+    case c is Other:    "Other   "
+  }
+  def dailyLimit(): Double = select this {
+    case c is Travel:   250.0
+    case c is Meals:    75.0
+    case c is Supplies: 150.0
+    case c is Other:    50.0
+  }
+  static def of(name: String): Category = select name {
+    case "Travel":   new Travel()
+    case "Meals":    new Meals()
+    case "Supplies": new Supplies()
+    else:            new Other()
+  }
+}
+
+// ── Expense (record derived from a regex pattern) ────────────────────────────
+//
+// `from re"..."` synthesizes `Expense::parse(line): Expense?` (anchored, null
+// on no-match) and `Expense::parseAll(text): List`. Unlike `Point` in
+// RecordLaws.on (two `Int`s over `-?\d+`, so every value round-trips), a
+// free-text `memo` field can contain the `|` delimiter itself, which makes a
+// full `law roundtrip` unsatisfiable over arbitrary generated values — so
+// this record pins the contract down with `example`s instead, each a fixed,
+// build-time-checked input/output pair (E0065 on a false one).
+
+record Expense(date: String, category: String, amount: Double, memo: String)
+  from re"(\d{4}-\d{2}-\d{2})\|(\w+)\|([0-9.]+)\|(.*)"
+  example { Expense::parse("2026-01-05|Travel|120.50|taxi to airport")?.amount() == 120.50 }
+  example { Expense::parse("not a valid line") == null }
+
+// ── formatting extension ──────────────────────────────────────────────────────
+
+extension Double {
+  def asCurrency(): String {
+    val cents = ((self * 100.0) + 0.5) as Int
+    val dollars = cents / 100
+    val rem = cents % 100
+    val remStr = if rem < 10 { "0" + rem } else { "" + rem }
+    return "$" + dollars + "." + remStr
+  }
+}
+
+// ── a flagged violation, paired with the expense that caused it ─────────────
+
+record Violation(expense: Expense, reason: String)
+
+// ── report line (a plain record used only to shape output rows) ─────────────
+
+record CategoryTotal(category: String, count: Int, total: Double)
+
+class ExpenseAuditorSupport {
+public:
+  static def flagged(rows: List[Expense]): List[Violation] {
+    return rows
+      .filter { e => e.amount() > Category::of(e.category()).dailyLimit() }
+      .map { e => new Violation(e, e.category() + " over daily limit of " + Category::of(e.category()).dailyLimit().asCurrency()) }
+  }
+
+  static def totalsByCategory(rows: List[Expense]): List[CategoryTotal] {
+    val groups = rows.groupBy { e => e.category() }
+    val out = new java.util.ArrayList[CategoryTotal]()
+    foreach (k, v) in groups {
+      val group = v as List
+      val sum = group.fold(0.0) { acc, x => acc + (x as Expense).amount() }
+      out.add(new CategoryTotal(k as String, group.size, sum))
+    }
+    return out.sortedBy { t => -(t as CategoryTotal).total() }
+  }
+
+  static def buildReport(rows: List[Expense], bad: List[Violation], limit: Double): String {
+    val sb = new StringBuilder()
+    sb.append("expense audit\n")
+    sb.append("=============\n")
+    sb.append("entries read: #{rows.size}\n")
+    val grand = rows.fold(0.0) { acc, e => acc + e.amount() }
+    sb.append("grand total:  #{grand.asCurrency()}\n\n")
+
+    sb.append("by category:\n")
+    foreach t: CategoryTotal in totalsByCategory(rows) {
+      sb.append("  #{t.category()} x#{t.count()} = #{t.total().asCurrency()}\n")
+    }
+
+    sb.append("\nviolations (#{bad.size}):\n")
+    foreach v: Violation in bad {
+      sb.append("  #{v.expense().date()} #{v.expense().memo()}: #{v.reason()}\n")
+    }
+    val big = bad.partition { v => v.expense().amount() > limit }
+    val overCap = big[0] as List[Object]
+    sb.append("\nover the hard cap of #{limit.asCurrency()}: #{overCap.size}\n")
+    return sb.toString()
+  }
+}
+
+// The boundary. `audit` can read the file named `src`, write the file named
+// `out`, and talk to the console — the compiler proved it, so `--plan` shows
+// exactly these three effects bound to your real arguments, and deleting the
+// `write(out)` clause below breaks the build at the `Files::writeText` call
+// with E0077 rather than silently doing the wrong thing at runtime.
+tool audit(src: String, out: String, cap: Double = 1000.0, loud: Boolean = false): Int
+  requires { read(src), write(out), console }
+{
+  val text = Files::readText(src)
+  val rows = Expense::parseAll(text) as List[Expense]
+  val bad = ExpenseAuditorSupport::flagged(rows)
+  val report = ExpenseAuditorSupport::buildReport(rows, bad, cap)
+
+  Files::writeText(out, report)
+  if loud {
+    IO::println(report)
+  }
+  IO::println("audit: #{rows.size} entries, #{bad.size} violations, report written to #{out}")
+  return 0
+}

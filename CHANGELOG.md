@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   end-of-file summary table, unlike every other code, which also gets a prose section
   with an example and a fix.** Added the missing `### E0084` and `### E0085` sections to
   both language references.
+- **`E0006` (ambiguous method) and `E0007`–`E0010` (duplicate local variable/class/
+  field/method) had the same gap** — mentioned only in the summary table, with no
+  prose section, example, or fix. Added the missing sections to both language
+  references, using the existing `SemanticErrorCodeCoverageSpec` cases as the basis
+  for each example.
 
 ## [0.10.22] - 2026-08-04
 

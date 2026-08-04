@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **E0085**. Found by the mutation fuzzer stripping the opening brace from `main`'s body in
   `run/LineFilter.on`.
 
+### Documentation
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0084`
+  (duplicate extension method) and `E0085` (static method with no body) only in the
+  end-of-file summary table, unlike every other code, which also gets a prose section
+  with an example and a fix.** Added the missing `### E0084` and `### E0085` sections to
+  both language references.
+
 ## [0.10.22] - 2026-08-04
 
 ### Fixed

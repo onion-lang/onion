@@ -413,6 +413,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 | `E0084` | duplicated extension method …(…) on … |
+| `E0085` | static method … must have a body |
 
 ## 関連項目
 

@@ -1,5 +1,8 @@
 package onion.compiler.typing
 
+import scala.util.boundary
+import scala.util.boundary.break
+
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
@@ -11,9 +14,9 @@ final class StringInterpolationTyping(
   private val body: TypingBodyPass
 ) {
 
-  def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] = {
+  def typeStringInterpolation(node: AST.StringInterpolation, context: LocalContext): Option[Term] = boundary {
     val typedExprs = node.expressions.map(e => typed(e, context).getOrElse(null))
-    if (typedExprs.contains(null)) return None
+    if (typedExprs.contains(null)) break(None)
 
     val stringType = bodyContext.load("java.lang.String")
     val sbType = bodyContext.load("java.lang.StringBuilder")
@@ -21,7 +24,7 @@ final class StringInterpolationTyping(
     val constructors = sbType.findConstructor(Array[Term]())
     if (constructors.isEmpty) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, sbType, Array[Type](), sbType.constructors)
-      return None
+      break(None)
     }
     val noArgConstructor = constructors(0)
 
@@ -60,7 +63,7 @@ final class StringInterpolationTyping(
               }
             case other =>
               bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
-              return None
+              break(None)
           }
         }
       }
@@ -69,7 +72,7 @@ final class StringInterpolationTyping(
     val toStringMethods = sbType.findMethod("toString", Array[Term]())
     if (toStringMethods.isEmpty) {
       bodyContext.report(METHOD_NOT_FOUND, node, sbType, "toString", Array[Type]())
-      return None
+      break(None)
     }
     Some(new Call(result, toStringMethods(0), Array[Term]()))
   }

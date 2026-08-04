@@ -298,6 +298,46 @@ try {
 より具体的な型を先に書くよう並べ替えるか、到達不能な節を削除してください。1つの
 multi-catch 節（`catch e: A | B`）の候補同士は互いにチェックされません。
 
+## extension メソッドエラー
+
+### `E0084` — extension メソッドの重複
+
+同じ `extension` ブロック内に、同じ名前・同じパラメータ型を持つメソッドが2つ宣言され
+ています。チェックせずに放置すると、生成されるコンテナクラスが同一の JVM シグネチャを
+持つメソッドを2つ持つことになり、コンパイル時ではなくクラスをロードした瞬間に初めて
+（`ClassFormatError` が内部エラー I0000 として現れる形で）失敗します。
+
+```onion
+extension Double {
+  def pct(): String = "" + self
+  def pct(): String = "" + self   // E0084: duplicated extension method pct() on Double
+}
+```
+
+対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
+extension メソッド同士は影響を受けません — 通常のオーバーロードです。
+
+## 宣言エラー
+
+### `E0085` — 本体のない static メソッド
+
+`static` と宣言されたメソッドに本体（`{ ... }` も `= expr` も）がありません。文法上
+本体のないメソッドは abstract/interface 的な宣言として受理されますが、`static` と
+abstract は矛盾します — static メソッドはオーバーライドできないため、abstract にも
+なり得ません。もしクラスファイルを生成すれば `ACC_STATIC` と `ACC_ABSTRACT` の両方が
+必要になり、これは JVM が拒否します。
+
+```onion
+class LineFilter {
+public:
+  static def main(args: String[]): void
+  // E0085: static method main must have a body
+}
+```
+
+対処: 本体を追加するか、`static` を外して通常の abstract インスタンスメソッドとして
+宣言してください。
+
 ## パターンマッチングエラー
 
 ### `E0042` — 網羅性のないパターンマッチング

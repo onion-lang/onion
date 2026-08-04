@@ -300,6 +300,46 @@ Reorder so the more specific type comes first, or remove the unreachable clause.
 alternatives of a single multi-catch clause (`catch e: A | B`) are not checked against
 each other.
 
+## Extension method errors
+
+### `E0084` — Duplicate extension method
+
+Two methods with the same name and parameter types are declared in the same
+`extension` block. Left unchecked, the generated container class would carry two
+methods with an identical JVM signature, which only fails once something loads the
+class (a `ClassFormatError`, surfaced as an internal I0000 error) rather than at
+compile time.
+
+```onion
+extension Double {
+  def pct(): String = "" + self
+  def pct(): String = "" + self   // E0084: duplicated extension method pct() on Double
+}
+```
+
+Fix: remove or rename the duplicate. Two extension methods with the same name but
+different parameter types are unaffected — that's ordinary overloading.
+
+## Declaration errors
+
+### `E0085` — Static method with no body
+
+A method declared `static` has no body (no `{ ... }` and no `= expr`). The grammar
+also accepts a bodyless method as an abstract/interface-style declaration, but `static`
+and abstract are contradictory — a static method cannot be overridden, so it cannot be
+abstract either. Generating a class file for one would need both `ACC_STATIC` and
+`ACC_ABSTRACT`, which the JVM rejects.
+
+```onion
+class LineFilter {
+public:
+  static def main(args: String[]): void
+  // E0085: static method main must have a body
+}
+```
+
+Fix: add a body, or drop `static` to declare an ordinary abstract instance method.
+
 ## Pattern-matching errors
 
 ### `E0042` — Non-exhaustive pattern match

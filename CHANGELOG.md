@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.22] - 2026-08-04
+
+### Fixed
+
+- **The English `error.count` trailer no longer says "1 errors are found."
+  for a single-error compile.** `error.count` in `errorMessage.properties`
+  used a plain `"{0} errors are found."` template regardless of count; it now
+  uses a `MessageFormat` choice format (`1#1 error is found.|1<{0} errors are
+  found.`) so a single error reads "1 error is found." while multiple errors
+  keep the plural wording. The Japanese bundle was unaffected (Japanese does
+  not pluralize).
+- **An ADT case-enum's shared-body `override def toString`/`equals`/`hashCode`
+  is no longer silently ignored on every case.** `enum Shape { case Circle(...)
+  public: override def toString(): String = ... }` desugars the shared body to
+  a sealed-interface default method and each `case` to a bodyless
+  `record X(...) conforms Shape`; `TypingOutlinePass` generated each case's
+  synthetic toString/equals/hashCode whenever the record's OWN body had no
+  override, with no way to see the interface's default, so the shared
+  override compiled cleanly but was never actually called (a class's own
+  method — even a mechanical, auto-generated one — always wins over an
+  inherited interface default for these three names). A record whose
+  conforms-to interface already supplies a concrete default now gets a real
+  forwarding method (`INVOKESPECIAL` back to the interface) instead of the
+  field-based synthetic.
+
 ## [0.10.21] - 2026-08-03
 
 ### Fixed

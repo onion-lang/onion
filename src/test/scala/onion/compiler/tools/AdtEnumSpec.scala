@@ -183,6 +183,63 @@ class AdtEnumSpec extends AbstractShellSpec {
       assert(Shell.Success("found 4|none") == r)
     }
 
+    it("dispatches a shared-body `override def toString` from every case (not the per-case synthetic)") {
+      // Regression: desugarAdtEnum turns the shared body into a sealed-interface
+      // default method and each `case` into a bare `record X(...) conforms Shape`
+      // with no body. TypingOutlinePass.processRecordDeclaration only skips
+      // generating a record's synthetic toString/equals/hashCode/copy when the
+      // RECORD's OWN sections declare an override — it had no way to see the
+      // interface's default method, so every case record still got its own
+      // synthetic toString, which (a class's own method always wins over an
+      // inherited interface default) silently shadowed the user's override.
+      val r = shell.run(
+        """
+          |enum Shape {
+          |  case Circle(radius: Double)
+          |  case Square(side: Double)
+          |public:
+          |  override def toString(): String = select this {
+          |    case c is Circle: "Circle(" + c.radius() + ")"
+          |    case s is Square: "Square(" + s.side() + ")"
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val c: Shape = new Circle(2.0)
+          |    val s: Shape = new Square(3.0)
+          |    return c.toString() + "|" + s.toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("Circle(2.0)|Square(3.0)") == r)
+    }
+
+    it("dispatches a shared-body `override def equals` from every case") {
+      val r = shell.run(
+        """
+          |enum Box {
+          |  case Full(value: Int)
+          |  case Empty
+          |public:
+          |  override def equals(o: Object): Boolean {
+          |    if o == null { return false }
+          |    if !(o is Box) { return false }
+          |    return true
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a: Box = new Full(1)
+          |    val b: Box = new Empty()
+          |    return "" + a.equals(b)
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("true") == r)
+    }
+
     it("allows explicit return of a Boolean in every branch (primitive return via StatementTerm)") {
       val r = shell.run(
         """

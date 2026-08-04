@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.22] - 2026-08-04
+
 ### Fixed
 
 - **The English `error.count` trailer no longer says "1 errors are found."

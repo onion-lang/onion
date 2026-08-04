@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.23] - 2026-08-04
+
 ### Fixed
 
 - **A `static` method declared with no body (e.g. `static def main(args: String[]): void`

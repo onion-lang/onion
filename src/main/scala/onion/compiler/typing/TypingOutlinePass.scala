@@ -624,7 +624,18 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         } else mapFrom(node.returnType)
       for (args <- argsOption; returnType <- returnTypeOption) {
         var modifier = node.modifiers | access_
-        if (node.block == null) modifier |= AST.M_ABSTRACT
+        if (node.block == null) {
+          // A static method can never be abstract (the JVM rejects a method
+          // carrying both ACC_STATIC and ACC_ABSTRACT); OR-ing in M_ABSTRACT
+          // here regardless of staticness used to produce exactly that illegal
+          // combination, which only surfaced later as a raw ClassFormatError
+          // when something loaded the class (e.g. LawCheckPhase).
+          if ((node.modifiers & AST.M_STATIC) != 0) {
+            report(SemanticError.STATIC_METHOD_WITHOUT_BODY, node, node.name)
+          } else {
+            modifier |= AST.M_ABSTRACT
+          }
+        }
         val throwsTypes = node.throwsTypes.flatMap(t => mapFrom(t).collect { case ct: ClassType => ct }).toArray
         val hasVararg = node.args.lastOption.exists(_.isVararg)
         val annotations = node.annotations.map(_.name).toSet

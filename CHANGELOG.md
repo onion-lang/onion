@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `static` method declared with no body (e.g. `static def main(args: String[]): void`
+  followed by a stray blank instead of `{ ... }`) no longer crashes the compiler with an
+  I0000 internal error.** The grammar accepts a bodyless method as an abstract/interface-style
+  declaration, and `TypingOutlinePass.processMethodDeclaration` unconditionally OR'd in
+  `M_ABSTRACT` whenever the body was absent — even for a method already carrying `M_STATIC`.
+  The resulting class file declared a method with both `ACC_STATIC` and `ACC_ABSTRACT`, which
+  the JVM rejects; loading it (e.g. via `OnionClassLoader`, exercised by `LawCheckPhase`) threw
+  a raw `ClassFormatError` that surfaced as an uncaught internal compiler error instead of a
+  normal diagnostic. A static method with no body is now rejected up front with a new error,
+  **E0085**. Found by the mutation fuzzer stripping the opening brace from `main`'s body in
+  `run/LineFilter.on`.
+
 ## [0.10.22] - 2026-08-04
 
 ### Fixed

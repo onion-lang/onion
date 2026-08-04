@@ -223,9 +223,30 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           case m: AST.MethodDeclaration => m.name
         }.toSet
 
+      // A record whose declared super interface already supplies a concrete
+      // (default) method of the same name/arity needs a REAL forwarding method
+      // here, not a plain skip: java.lang.Object already provides concrete
+      // equals/hashCode/toString, and per the JVM's method-resolution rules a
+      // class's inherited-from-Object implementation always wins over an
+      // interface default of the same signature unless the class declares its
+      // own override. So without a class-level method the interface default is
+      // unreachable no matter what. Emitting `Modifier.SYNTHETIC_INTERFACE_FORWARD`
+      // (block == null, handled in AsmCodeGeneration by an INVOKESPECIAL back to
+      // the interface's default) gives the class its own override while keeping
+      // the interface's body as the single source of behavior. This is what makes
+      // an ADT case-enum's shared-body `override def toString`/`equals`/`hashCode`
+      // (desugared to a sealed-interface default method, with each `case`
+      // becoming a bodyless `record ... conforms Enum`) actually take effect for
+      // every case, instead of every case silently keeping the field-based
+      // synthetic (which shadowed it) or Object's identity-based one (which a
+      // bare skip fell back to).
+      def hasDefaultInterfaceMethod(name: String, arity: Int): Boolean =
+        interfaces.exists(_.methods(name).exists(m => !Modifier.isAbstract(m.modifier) && m.arguments.length == arity))
+
       // Generate equals(Object): Boolean method
       if (!userDefinedMethodNames.contains("equals")) {
-        val equalsModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val equalsModifier = Modifier.PUBLIC |
+          (if (hasDefaultInterfaceMethod("equals", 1)) Modifier.SYNTHETIC_INTERFACE_FORWARD else Modifier.SYNTHETIC_RECORD)
         val equalsMethod = new MethodDefinition(
           node.location, equalsModifier, definition_, "equals",
           Array(rootClass), BasicType.BOOLEAN, null
@@ -235,7 +256,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
       // Generate hashCode(): Int method
       if (!userDefinedMethodNames.contains("hashCode")) {
-        val hashCodeModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val hashCodeModifier = Modifier.PUBLIC |
+          (if (hasDefaultInterfaceMethod("hashCode", 0)) Modifier.SYNTHETIC_INTERFACE_FORWARD else Modifier.SYNTHETIC_RECORD)
         val hashCodeMethod = new MethodDefinition(
           node.location, hashCodeModifier, definition_, "hashCode",
           Array.empty, BasicType.INT, null
@@ -246,7 +268,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // Generate toString(): String method
       val stringType = loadRequired("java.lang.String")
       if (!userDefinedMethodNames.contains("toString")) {
-        val toStringModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        val toStringModifier = Modifier.PUBLIC |
+          (if (hasDefaultInterfaceMethod("toString", 0)) Modifier.SYNTHETIC_INTERFACE_FORWARD else Modifier.SYNTHETIC_RECORD)
         val toStringMethod = new MethodDefinition(
           node.location, toStringModifier, definition_, "toString",
           Array.empty, stringType, null

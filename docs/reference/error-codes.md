@@ -85,6 +85,29 @@ val xs = new ArrayLst[String]()   // E0003, suggests ArrayList
 
 No method matches the call.  If a method with the same name exists but the argument types differ, the compiler lists the available signatures.
 
+### `E0006` — Ambiguous method
+
+Two overloads are equally applicable to the call and neither is more specific than
+the other — often because an argument's static type (e.g. `null`, or a common
+supertype) fits multiple unrelated parameter types at once.
+
+```onion
+class A {}
+class B {}
+class Test {
+public:
+  static def foo(x: A): Int = 1
+  static def foo(x: B): Int = 2
+  static def main(args: String[]): Int {
+    foo(null)   // E0006: applicable to both foo(A) and foo(B)
+    return 0
+  }
+}
+```
+
+Fix: cast the argument to pin the overload (`foo(null as A)`), or rename/merge one
+of the overloads so only one candidate matches.
+
 ### `E0021` — Constructor not found
 
 No constructor matches the arguments.  The compiler lists available constructors.
@@ -321,6 +344,66 @@ Fix: remove or rename the duplicate. Two extension methods with the same name bu
 different parameter types are unaffected — that's ordinary overloading.
 
 ## Declaration errors
+
+### `E0007` — Duplicate local variable
+
+The same name is declared twice as a local variable in the same scope.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x = 1
+    val x = 2   // E0007: x is already declared in this scope
+    return 0
+  }
+}
+```
+
+Fix: rename one of the variables, or drop the redundant declaration.
+
+### `E0008` — Duplicate class
+
+Two top-level classes (or interfaces/records/enums) share the same name.
+
+```onion
+class A { public: def this {} }
+class A { public: def this {} }   // E0008: A is already declared
+```
+
+Fix: rename or remove one of the declarations.
+
+### `E0009` — Duplicate field
+
+The same field name is declared twice on a class.
+
+```onion
+class A {
+  var x: Int
+  var x: Int   // E0009: x is already declared on A
+public:
+  def this {}
+}
+```
+
+Fix: remove the duplicate field, or give it a different name.
+
+### `E0010` — Duplicate method
+
+Two methods on the same class share an identical name and parameter list, so
+neither is a valid overload of the other.
+
+```onion
+class Test {
+public:
+  def m(): Int = 1
+  def m(): Int = 2   // E0010: m() is already declared on Test
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+Fix: rename one method, or give it different parameter types to make it a genuine
+overload.
 
 ### `E0085` — Static method with no body
 

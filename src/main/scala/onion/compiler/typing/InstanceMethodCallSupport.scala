@@ -8,6 +8,8 @@ import onion.compiler.typing.session.TypingBodyContext
 import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
+import scala.util.boundary
+import scala.util.boundary.break
 
 import ArgumentHelpers.hasNamedArguments
 
@@ -151,55 +153,57 @@ private[compiler] final class InstanceMethodCallSupport(
         }
       case _ => return None
     }
-    val components = definition.recordComponents.getOrElse(return None)
+    boundary[Option[Term]] {
+      val components = definition.recordComponents.getOrElse(break(None))
 
-    val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
-    node.args.foreach {
-      case AST.NamedArgument(_, name, value) => named(name) = value
-      case _ => return None // positional args mixed in: use the regular path
-    }
-    for (name <- named.keys if !components.exists(_._1 == name)) {
-      calls.reportMethodNotFound(node, targetType, s"copy(${name} = ...)", Array[Type]())
-      return Some(null).filter(_ != null) // reported; abort typing
-    }
-
-    val classSubst = TypeSubstitution.classSubstitution(targetType)
-    val fullParams = new Array[Term](components.length)
-    var i = 0
-    while (i < components.length) {
-      val (cname, ctype) = components(i)
-      val expectedType = TypeSubstitution.substituteType(ctype, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
-      named.get(cname) match {
-        case Some(expr) =>
-          calls.typed(expr, context, expectedType) match {
-            case Some(term) =>
-              // Box primitives against reference-typed components so the
-              // raw signature (copy(A, B)) still matches: copy(second = 42)
-              fullParams(i) =
-                if (!expectedType.isBasicType && term.isBasicType) onion.compiler.toolbox.Boxing.boxing(bodyContext.table, term)
-                else term
-            case None => return Some(null).filter(_ != null)
-          }
-        case None =>
-          targetType.findMethod(cname, Array[Term]()) match {
-            case Array(getter, _*) =>
-              // Specialize the component type for applied records so the
-              // kept value of first() on Pair[String, Integer] is a String
-              val call = new Call(target, getter, Array[Term]())
-              fullParams(i) = TypeSubst.withCast(call, TypeSubst.withClassOnly(getter.returnType, targetType))
-            case _ => return None
-          }
+      val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
+      node.args.foreach {
+        case AST.NamedArgument(_, name, value) => named(name) = value
+        case _ => break(None) // positional args mixed in: use the regular path
       }
-      i += 1
-    }
+      for (name <- named.keys if !components.exists(_._1 == name)) {
+        calls.reportMethodNotFound(node, targetType, s"copy(${name} = ...)", Array[Type]())
+        break(None) // reported; abort typing
+      }
 
-    targetType.findMethod("copy", fullParams) match {
-      case Array(method, _*) =>
-        calls.buildResolvedCall(node, method, fullParams, node.typeArgs, classSubst, null)(
-          expectedArgs => calls.processParamsWithExpected(node, fullParams, expectedArgs),
-          finalParams => new Call(target, method, finalParams)
-        )
-      case _ => None
+      val classSubst = TypeSubstitution.classSubstitution(targetType)
+      val fullParams = new Array[Term](components.length)
+      var i = 0
+      while (i < components.length) {
+        val (cname, ctype) = components(i)
+        val expectedType = TypeSubstitution.substituteType(ctype, classSubst, scala.collection.immutable.Map.empty, defaultToBound = true)
+        named.get(cname) match {
+          case Some(expr) =>
+            calls.typed(expr, context, expectedType) match {
+              case Some(term) =>
+                // Box primitives against reference-typed components so the
+                // raw signature (copy(A, B)) still matches: copy(second = 42)
+                fullParams(i) =
+                  if (!expectedType.isBasicType && term.isBasicType) onion.compiler.toolbox.Boxing.boxing(bodyContext.table, term)
+                  else term
+              case None => break(None)
+            }
+          case None =>
+            targetType.findMethod(cname, Array[Term]()) match {
+              case Array(getter, _*) =>
+                // Specialize the component type for applied records so the
+                // kept value of first() on Pair[String, Integer] is a String
+                val call = new Call(target, getter, Array[Term]())
+                fullParams(i) = TypeSubst.withCast(call, TypeSubst.withClassOnly(getter.returnType, targetType))
+              case _ => break(None)
+            }
+        }
+        i += 1
+      }
+
+      targetType.findMethod("copy", fullParams) match {
+        case Array(method, _*) =>
+          calls.buildResolvedCall(node, method, fullParams, node.typeArgs, classSubst, null)(
+            expectedArgs => calls.processParamsWithExpected(node, fullParams, expectedArgs),
+            finalParams => new Call(target, method, finalParams)
+          )
+        case _ => None
+      }
     }
   }
 

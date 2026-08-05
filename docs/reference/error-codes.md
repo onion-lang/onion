@@ -122,6 +122,86 @@ public:
 Fix: cast the argument to pin the overload (`foo(null as A)`), or rename/merge one
 of the overloads so only one candidate matches.
 
+### `E0011` — Duplicated global variable definition
+
+A top-level `var`/`val` is declared twice with the same name — whether both are
+modifier-qualified (`static var x = ...` twice) or bare (no modifier; a bare
+top-level `var`/`val` is promoted to a `public static` field of the script's
+synthetic class, so it is just as global as the modifier-qualified form).
+
+```onion
+static var x: Int = 1
+static var x: Int = 2   // E0011: x already defined
+```
+
+### `E0012` — Duplicated function definition
+
+Two top-level `def` functions share the same name and the same parameter types.
+Overloading by different parameter types is still allowed.
+
+```onion
+def foo(x: Int): Int { return x }
+def foo(x: Int): Int { return x + 1 }   // E0012: foo(Int) already defined
+
+def bar(x: Int): Int { return x }
+def bar(x: String): String { return x }   // fine: different parameter types
+```
+
+### `E0013` — Method not accessible
+
+A `private` (or otherwise insufficiently visible) method, constructor, or static
+method is called from outside the class that can see it.
+
+```onion
+class C {
+private:
+  static def s(): Int = 1
+}
+def main(args: String[]): void { IO::println(C::s()) }   // E0013
+```
+
+### `E0014` — Field not accessible
+
+A non-public field is read or written from outside its declaring class.
+
+```onion
+class Plain {
+  var value: String
+public:
+  def this(v: String) { value = v }
+}
+val p = new Plain("orig")
+p.value = "changed"   // E0014: value is not public
+```
+
+### `E0015` — Class not accessible
+
+A member is selected on a value whose static type is an `internal` class declared
+in a different module. Accessibility is module-scoped: an `internal` class is
+visible only within the module (the dotted prefix before the class name) that
+declares it.
+
+```onion
+module pkg.a
+internal class Hidden {
+public:
+  var n: Int
+  def this { n = 1 }
+}
+```
+
+```onion
+module pkg.b
+import { pkg.a.Hidden }
+class UseIt {
+public:
+  static def main(args: String[]): Int {
+    val h: Hidden = null
+    return h.n   // E0015: Hidden is internal to pkg.a
+  }
+}
+```
+
 ### `E0021` — Constructor not found
 
 No constructor matches the arguments.  The compiler lists available constructors.

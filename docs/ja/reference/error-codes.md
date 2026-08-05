@@ -122,6 +122,85 @@ public:
 対処: 引数をキャストしてオーバーロードを確定させるか（`foo(null as A)`）、
 どちらか一方しか一致しないようにオーバーロードをリネーム・統合してください。
 
+### `E0011` — トップレベルのグローバル変数定義の重複
+
+同じ名前のトップレベル `var`/`val` が2回宣言されています。修飾子付き（`static var x = ...`
+を2回）でも、修飾子なし（ベアなトップレベル `var`/`val` はスクリプトの合成クラスの
+`public static` フィールドに昇格されるため、修飾子付きの形と同様にグローバルです）でも
+該当します。
+
+```onion
+static var x: Int = 1
+static var x: Int = 2   // E0011: x は既に定義されている
+```
+
+### `E0012` — トップレベル関数定義の重複
+
+2つのトップレベル `def` 関数が同じ名前・同じ引数型を持っています。引数型が異なる
+オーバーロードは引き続き許可されます。
+
+```onion
+def foo(x: Int): Int { return x }
+def foo(x: Int): Int { return x + 1 }   // E0012: foo(Int) は既に定義されている
+
+def bar(x: Int): Int { return x }
+def bar(x: String): String { return x }   // OK: 引数型が異なる
+```
+
+### `E0013` — メソッドにアクセスできない
+
+`private`（またはアクセスが不十分な）メソッド・コンストラクタ・静的メソッドが、
+それを参照できないクラスの外部から呼び出されています。
+
+```onion
+class C {
+private:
+  static def s(): Int = 1
+}
+def main(args: String[]): void { IO::println(C::s()) }   // E0013
+```
+
+### `E0014` — フィールドにアクセスできない
+
+非公開フィールドがその宣言クラスの外部から読み書きされています。
+
+```onion
+class Plain {
+  var value: String
+public:
+  def this(v: String) { value = v }
+}
+val p = new Plain("orig")
+p.value = "changed"   // E0014: value は public ではない
+```
+
+### `E0015` — クラスにアクセスできない
+
+静的型が別モジュールで宣言された `internal` クラスである値に対して、メンバーが
+選択されています。可視性はモジュール単位（クラス名の最後のドットより前の接頭辞）
+で決まり、`internal` クラスはそれを宣言したモジュール内からのみアクセスできます。
+
+```onion
+module pkg.a
+internal class Hidden {
+public:
+  var n: Int
+  def this { n = 1 }
+}
+```
+
+```onion
+module pkg.b
+import { pkg.a.Hidden }
+class UseIt {
+public:
+  static def main(args: String[]): Int {
+    val h: Hidden = null
+    return h.n   // E0015: Hidden は pkg.a に internal
+  }
+}
+```
+
 ### `E0021` — コンストラクタが見つからない
 
 引数に一致するコンストラクタがありません。コンパイラは利用可能なコンストラクタを一覧表示します。

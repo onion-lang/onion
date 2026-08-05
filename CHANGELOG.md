@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0043`
+  (unknown named argument), `E0044` (duplicate argument), `E0045` (positional argument
+  after named argument), `E0046` (wrong destructuring binding count), `E0047` (not a
+  record type), `E0048` (break outside loop), `E0049` (continue outside loop), `E0050`
+  (current instance not available in static context), `E0051` (return type is
+  required), `E0052` (lambda parameter needs a type), `E0053` (cyclic type alias),
+  `E0054` (duplicate type alias), and `E0055` (function requires a body) only in the
+  end-of-file summary table.** Added the missing `### E0043`–`### E0055` sections to
+  both language references (a new "Control-flow errors" category covers `E0048`–`E0050`),
+  and added regression coverage asserting the error *code* (not just compile failure)
+  for `E0046`, `E0047`, and `E0052`, which previously had no such assertion.
+
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0036`
   (cannot assign to val), `E0037` (unimplemented abstract method), `E0038` (cannot
   instantiate abstract class), `E0039` (cannot override a final method), `E0040` (cannot

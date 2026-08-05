@@ -876,6 +876,70 @@ class Box[T, T] { public: def this {} }   // E0029: T is already declared
 
 Fix: give the type parameters distinct names.
 
+### `E0051` — Return type is required
+
+A top-level function or extension method has no declared return type, and the
+compiler cannot infer one — typically because the function is self-recursive,
+so there is no already-typed body to infer the type from.
+
+```onion
+def f(n: Int) = f(n)   // E0051: f needs an explicit return type
+def main(): void { }
+```
+
+Fix: give the function an explicit return type, e.g. `def f(n: Int): Int = f(n)`.
+
+### `E0052` — Lambda parameter must specify a type
+
+A lambda parameter has no type annotation, and the context the lambda appears
+in gives the compiler no functional-interface type to infer the parameter's
+type from.
+
+```onion
+val f = (x) -> x + 1   // E0052: x's type can't be inferred here
+def main(): void { }
+```
+
+Fix: annotate the parameter explicitly (`(x: Int) -> x + 1`), or use the
+lambda where its target type is known — e.g. passed directly as an argument
+to a method with a declared function-typed parameter.
+
+### `E0053` — Cyclic type alias
+
+Two or more `type` aliases refer to each other, so resolving any of them
+would recurse forever.
+
+```onion
+type A = B
+type B = A   // E0053: A -> B -> A
+```
+
+Fix: break the cycle by pointing at least one alias at a concrete type.
+
+### `E0054` — Duplicate type alias
+
+The same `type` alias name is declared twice at the same scope.
+
+```onion
+type A = java.lang.String
+type A = java.lang.Integer   // E0054: A is already declared
+```
+
+Fix: rename or remove one of the declarations.
+
+### `E0055` — Function requires a body
+
+A top-level function was declared without a body (no `{ ... }` and no
+`= expr`). Unlike a class method, a top-level function can never be
+abstract, so it must always carry an implementation.
+
+```onion
+def f(): Int;   // E0055: f requires a body
+def main(): void { }
+```
+
+Fix: give the function a body.
+
 ### `E0085` — Static method with no body
 
 A method declared `static` has no body (no `{ ... }` and no `= expr`). The grammar
@@ -894,6 +958,55 @@ public:
 
 Fix: add a body, or drop `static` to declare an ordinary abstract instance method.
 
+## Control-flow errors
+
+### `E0048` — Break outside loop
+
+A `break` (labeled or not) appears outside any enclosing loop.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    break   // E0048: no enclosing loop
+    return 0
+  }
+}
+```
+
+Fix: only use `break` inside a `while`, `for`, or `foreach` loop.
+
+### `E0049` — Continue outside loop
+
+A `continue` (labeled or not) appears outside any enclosing loop.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    continue   // E0049: no enclosing loop
+    return 0
+  }
+}
+```
+
+Fix: only use `continue` inside a `while`, `for`, or `foreach` loop.
+
+### `E0050` — Current instance not available in static context
+
+`this`/`self` was used inside a `static` method, where there is no receiver
+instance.
+
+```onion
+class Test {
+public:
+  static def s(): Int { return this.hashCode() }   // E0050: s is static
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+Fix: drop `static`, or pass the instance in explicitly as a parameter.
+
 ## Pattern-matching errors
 
 ### `E0042` — Non-exhaustive pattern match
@@ -910,6 +1023,89 @@ select shape {
   // missing Rect case → E0042
 }
 ```
+
+### `E0043` — Unknown named argument
+
+A call used `name = value` syntax for an argument name that does not match
+any parameter of the resolved method, constructor, or function.
+
+```onion
+class T {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: f has no parameter named nope
+}
+```
+
+Fix: check the argument name's spelling against the target's declaration.
+
+### `E0044` — Duplicate argument
+
+The same parameter was bound twice in one call — for example by a named
+argument that repeats a name already used earlier in the same call.
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x is already bound
+}
+```
+
+Fix: remove the duplicate binding.
+
+### `E0045` — Positional argument after named argument
+
+A call places a positional argument after a named one. Once a call starts
+naming arguments, every argument after that point must also be named —
+otherwise it is ambiguous which parameter the positional value fills.
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 comes after a named argument
+}
+```
+
+Fix: name every remaining argument, or move the positional ones first.
+
+### `E0046` — Wrong number of bindings in destructuring pattern
+
+A destructuring `val`/`var (a, b, ...)` declaration (or a nested destructuring
+pattern) named a different number of variables than the record has
+components.
+
+```onion
+record Point(x: Int, y: Int)
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b, c) = new Point(1, 2)   // E0046: Point has 2 fields, 3 bindings given
+    return 0
+  }
+}
+```
+
+Fix: match the binding count to the record's component count.
+
+### `E0047` — Not a record type
+
+A destructuring `val`/`var (a, b, ...) = expr` was used against a value whose
+type is not a record, so there are no positional components to bind.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b) = "not a record"   // E0047: String is not a record type
+    return 0
+  }
+}
+```
+
+Fix: destructure a record value, or bind the whole value with a plain
+`val`/`var` instead.
 
 ## Parser errors
 

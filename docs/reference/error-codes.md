@@ -81,6 +81,20 @@ A type name could not be resolved.  Check spelling and imports.
 val xs = new ArrayLst[String]()   // E0003, suggests ArrayList
 ```
 
+### `E0004` — Field not found
+
+No field with that name exists on the target type.  Check spelling and field visibility.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s = "a".noSuchField   // E0004
+    return 0
+  }
+}
+```
+
 ### `E0005` — Method not found
 
 No method matches the call.  If a method with the same name exists but the argument types differ, the compiler lists the available signatures.

@@ -362,6 +362,17 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
   }
 
   describe("generics") {
+    it("E0030 type is not generic") {
+      failsWith("E0030",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x: String[Int] = null
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
     it("E0031 type argument arity mismatch") {
       failsWith("E0031",
         """class Box[T] { public: def this {} }

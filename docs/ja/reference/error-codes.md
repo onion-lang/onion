@@ -98,6 +98,87 @@ public:
 
 修正方法: 変数・フィールド・配列要素に代入してください。
 
+### `E0030` — 型はジェネリックではない
+
+型引数を取らない型に対して型引数が渡されました。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String[Int] = null   // E0030: String は型引数を取らない
+    return 0
+  }
+}
+```
+
+修正方法: 型引数を外してください（`String[Int]` ではなく `String`）。
+
+### `E0031` — 型引数の個数が一致しない
+
+ジェネリック型に渡された型引数の個数が誤っています。
+
+```onion
+class Box[T] { public: def this {} }
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val b = new Box[String, String]()   // E0031: Box は1個であり2個ではない
+    return 0
+  }
+}
+```
+
+このエラーは、`val b: Box[String, String]? = null` のように nullable な型注釈の
+中に個数不一致が書かれた場合にも発生します。
+
+### `E0033` — メソッドはジェネリックではない
+
+型引数を取らないメソッドの呼び出しに型引数が渡されました。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int { return "abc".length[String]() }   // E0033
+}
+```
+
+修正方法: 呼び出しから型引数を外してください（`"abc".length()`）。
+
+### `E0034` — メソッド型引数の個数が一致しない
+
+ジェネリックメソッド呼び出しに渡された明示的な型引数の個数が誤っています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val l = java.util.Collections::emptyList[String, String]()   // E0034: 1個であり2個ではない
+    return 0
+  }
+}
+```
+
+### `E0035` — erasure 後の JVM シグネチャが衝突している
+
+Onion の型システムでは異なる2つのオーバーロードが、同じ JVM メソッド記述子に
+erasure されてしまう場合があります（ジェネリクスは erasure ベースであり、
+`List[String]` と `List[Integer]` はバイトコードレベルでは区別できません）。
+その結果、クラスファイルは両方を保持できません。
+
+```onion
+class C {
+public:
+  def this {}
+  def f(x: java.util.List[String]): Int = 1
+  def f(x: java.util.List[Integer]): Int = 2   // E0035: どちらも f(List)I に erasure される
+}
+```
+
+修正方法: オーバーロードの erasure 後シグネチャを変える（引数の個数を変える、
+同じクラスに erasure されない引数型にするなど）か、内部で分岐する1つの
+メソッドに統合してください。
+
 ## 名前解決エラー
 
 ### `E0002` — 変数が見つからない

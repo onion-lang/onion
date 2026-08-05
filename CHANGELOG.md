@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0030`
+  (type is not generic), `E0031` (type argument arity mismatch), `E0033` (method is not
+  generic), `E0034` (method type argument arity mismatch), and `E0035` (erased JVM
+  signature collision) only in the end-of-file summary table.** Added the missing
+  `### E0030`–`### E0035` sections (skipping `E0032`, which has a live report site but
+  no in-process trigger under the current grammar — see the note in
+  `SemanticErrorCodeCoverageSpec`) to both language references, using the existing
+  `SemanticErrorCodeCoverageSpec` cases as the basis for the examples, and added a new
+  `E0030` coverage case (previously untested).
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0025`
   (duplicate constructor), `E0026` (duplicate generated method), `E0027` (type not
   boxable), `E0028` (lvalue required), and `E0029` (duplicate type parameter) only in

@@ -202,9 +202,109 @@ public:
 }
 ```
 
+### `E0016` — Cyclic inheritance
+
+A class's or interface's supertype chain (`extends`/`conforms`) loops back on
+itself, directly or through an intermediate type.
+
+```onion
+class A extends B {
+}
+class B extends A {   // E0016: A -> B -> A cyclicity
+}
+```
+
+Fix: break the cycle — one of the two must not extend the other.
+
+### `E0018` — Illegal inheritance
+
+A class or interface `extends`/`conforms` a supertype it isn't allowed to use —
+either the supertype is `final`, or an interface position holds a class (or vice
+versa).
+
+```onion
+class A extends java.lang.String { public: def this {} }   // E0018: String is final
+```
+
+Fix: extend a non-`final` class, or use `conforms` only with interfaces and
+`extends` only with a class.
+
+### `E0019` — Illegal method call
+
+A `static` method was called through an instance receiver (`obj.m(...)` or
+`obj?.m(...)`) instead of the class itself.
+
+```onion
+class A {
+public:
+  def this {}
+  static def s(): Int = 1
+}
+class Test {
+public:
+  static def main(args: String[]): Int { return new A().s() }   // E0019
+}
+```
+
+Fix: call it through the class, `A::s()`.
+
+### `E0020` — Cannot return value
+
+A bare `return;` appears in a method whose declared return type isn't `void`,
+or a `return` yields a `void`-typed expression where a value was expected.
+
+```onion
+class Test {
+public:
+  static def f(): Int { return }   // E0020: f must return an Int
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+Fix: return a value of the declared type (`return 0`), or change the method's
+return type to `void`.
+
 ### `E0021` — Constructor not found
 
 No constructor matches the arguments.  The compiler lists available constructors.
+
+### `E0022` — Ambiguous constructor
+
+Two constructor overloads are equally applicable to a `new` call — often because
+an argument's static type (e.g. `null`) fits multiple unrelated parameter types
+at once.
+
+```onion
+class C {
+public:
+  def this(a: String) {}
+  def this(b: StringBuilder) {}
+}
+class Test {
+public:
+  static def main(args: String[]): Int { val c = new C(null); return 0 }   // E0022
+}
+```
+
+Fix: cast the argument to pin the overload (`new C(null as String)`), or
+rename/merge one of the constructors so only one candidate matches.
+
+### `E0023` — Interface required
+
+A position that requires an interface type — a `forward`-delegated field's
+declared type, or a `{ ... }` closure literal's target type — was given a
+non-interface (e.g. class) type instead.
+
+```onion
+class A {
+  forward val x: String   // E0023: String is a class, not an interface
+public:
+  def this { x = "a" }
+}
+```
+
+Fix: declare the field/target with an interface type, or drop `forward` if
+delegation isn't actually needed.
 
 ### `E0073` — Map cannot be iterated directly
 

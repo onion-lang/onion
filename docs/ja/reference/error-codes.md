@@ -201,9 +201,109 @@ public:
 }
 ```
 
+### `E0016` — 継承関係が循環している
+
+クラスまたはインタフェースのスーパータイプ連鎖（`extends`/`conforms`）が、直接
+または中間の型を経由して自分自身に戻ってしまっています。
+
+```onion
+class A extends B {
+}
+class B extends A {   // E0016: A -> B -> A の循環
+}
+```
+
+対処: 循環を断ち切ります。どちらか一方が他方を継承しないようにしてください。
+
+### `E0018` — 不正な継承
+
+クラスまたはインタフェースが、使用できないスーパータイプを `extends`/`conforms`
+しています。スーパータイプが `final` であるか、インタフェースの位置にクラスが
+（またはその逆が）指定されています。
+
+```onion
+class A extends java.lang.String { public: def this {} }   // E0018: String は final
+```
+
+対処: `final` でないクラスを継承するか、`conforms` はインタフェースにのみ、
+`extends` はクラスにのみ使用してください。
+
+### `E0019` — 不正なメソッド呼び出し
+
+`static` メソッドが、クラス自体ではなくインスタンスレシーバー（`obj.m(...)` や
+`obj?.m(...)`）経由で呼び出されました。
+
+```onion
+class A {
+public:
+  def this {}
+  static def s(): Int = 1
+}
+class Test {
+public:
+  static def main(args: String[]): Int { return new A().s() }   // E0019
+}
+```
+
+対処: クラス経由で呼び出してください（`A::s()`）。
+
+### `E0020` — 値を返すことができない
+
+宣言された戻り値の型が `void` ではないメソッド内でベアな `return;` が使われて
+いるか、値が必要な位置で `return` が `void` 型の式を返しています。
+
+```onion
+class Test {
+public:
+  static def f(): Int { return }   // E0020: f は Int を返す必要がある
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+対処: 宣言された型の値を返す（`return 0`）か、メソッドの戻り値の型を `void`
+に変更してください。
+
 ### `E0021` — コンストラクタが見つからない
 
 引数に一致するコンストラクタがありません。コンパイラは利用可能なコンストラクタを一覧表示します。
+
+### `E0022` — コンストラクタ呼び出しが曖昧
+
+`new` 呼び出しに対して2つのコンストラクタオーバーロードが同等に適合します。
+多くの場合、引数の静的型（`null` など）が複数の無関係な仮引数型に同時に
+適合することが原因です。
+
+```onion
+class C {
+public:
+  def this(a: String) {}
+  def this(b: StringBuilder) {}
+}
+class Test {
+public:
+  static def main(args: String[]): Int { val c = new C(null); return 0 }   // E0022
+}
+```
+
+対処: 引数をキャストしてオーバーロードを確定させる（`new C(null as String)`）か、
+候補が1つだけになるようコンストラクタの一方を改名・統合してください。
+
+### `E0023` — インタフェースが要求されている
+
+インタフェース型を要求する位置（`forward` で委譲するフィールドの宣言型、または
+`{ ... }` クロージャリテラルの対象型）に、インタフェースではない型（クラスなど）
+が指定されました。
+
+```onion
+class A {
+  forward val x: String   // E0023: String はクラスであり、インタフェースではない
+public:
+  def this { x = "a" }
+}
+```
+
+対処: フィールド／対象をインタフェース型で宣言するか、委譲が本当に不要であれば
+`forward` を取り除いてください。
 
 ### `E0073` — Map は直接反復できない
 

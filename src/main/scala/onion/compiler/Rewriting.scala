@@ -480,68 +480,70 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         "be a scalar parsed from the command line.")))
     }
 
-    toplevels.collectFirst {
+    val restMatch = toplevels.collectFirst {
       case f: AST.FunctionDeclaration if f.name == "main" && !allScalar(f) && restPattern(f) => f
-    }.foreach { f =>
-      val loc = f.location
-      val k = f.args.length - 1
-      val usage = f.args.init.map(a => "<" + a.name + ">").mkString(" ") + " <" + f.args.last.name + ">..."
-      toplevels += AST.StaticMethodCall(
-        loc,
-        AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
-        "requireArgs",
-        List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k), AST.StringLiteral(loc, usage))
-      )
-      val argExprs = f.args.zipWithIndex.map { case (a, i) =>
-        if (i < k) convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, AST.Indexing(loc, AST.Id(loc, "args"), AST.IntegerLiteral(loc, i)))
-        else AST.StaticMethodCall(
+    }
+    restMatch match {
+      case Some(f) =>
+        val loc = f.location
+        val k = f.args.length - 1
+        val usage = f.args.init.map(a => "<" + a.name + ">").mkString(" ") + " <" + f.args.last.name + ">..."
+        toplevels += AST.StaticMethodCall(
           loc,
           AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
-          "rest",
-          List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k))
+          "requireArgs",
+          List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k), AST.StringLiteral(loc, usage))
         )
-      }
-      toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
-      return
-    }
+        val argExprs = f.args.zipWithIndex.map { case (a, i) =>
+          if (i < k) convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, AST.Indexing(loc, AST.Id(loc, "args"), AST.IntegerLiteral(loc, i)))
+          else AST.StaticMethodCall(
+            loc,
+            AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
+            "rest",
+            List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k))
+          )
+        }
+        toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
 
-    val mainFn = toplevels.collectFirst {
-      case f: AST.FunctionDeclaration if f.name == "main" && allScalar(f) => f
-    }
-    mainFn.foreach { f =>
-      val loc = f.location
-      // Zero-arg main: emit a direct call with no CLI preamble
-      if (f.args.isEmpty) {
-        toplevels += AST.UnqualifiedMethodCall(loc, "main", Nil)
-        return
-      }
-      val cliVar = "__cliArgs"
-      val spec = f.args.map { a =>
-        val kind = cliKindOf(a.typeRef).get
-        if (a.defaultValue == null) a.name
-        else if (kind == "Boolean") a.name + "?"
-        else a.name + "="
-      }.mkString(",")
-      val parseCall = AST.StaticMethodCall(
-        loc,
-        AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
-        "parse",
-        List(AST.Id(loc, "args"), AST.StringLiteral(loc, spec))
-      )
-      val decl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, cliVar, null, parseCall)
-      val argExprs = f.args.zipWithIndex.map { case (a, i) =>
-        val raw = AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i))
-        val converted = convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, raw)
-        if (a.defaultValue == null) converted
-        else AST.IfExpression(
-          loc,
-          AST.Equal(loc, AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i)), AST.NullLiteral(loc)),
-          AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
-          AST.BlockExpression(loc, List(converted))
-        )
-      }
-      toplevels += decl
-      toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
+      case None =>
+        val mainFn = toplevels.collectFirst {
+          case f: AST.FunctionDeclaration if f.name == "main" && allScalar(f) => f
+        }
+        mainFn.foreach { f =>
+          val loc = f.location
+          // Zero-arg main: emit a direct call with no CLI preamble
+          if (f.args.isEmpty) {
+            toplevels += AST.UnqualifiedMethodCall(loc, "main", Nil)
+          } else {
+            val cliVar = "__cliArgs"
+            val spec = f.args.map { a =>
+              val kind = cliKindOf(a.typeRef).get
+              if (a.defaultValue == null) a.name
+              else if (kind == "Boolean") a.name + "?"
+              else a.name + "="
+            }.mkString(",")
+            val parseCall = AST.StaticMethodCall(
+              loc,
+              AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
+              "parse",
+              List(AST.Id(loc, "args"), AST.StringLiteral(loc, spec))
+            )
+            val decl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, cliVar, null, parseCall)
+            val argExprs = f.args.zipWithIndex.map { case (a, i) =>
+              val raw = AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i))
+              val converted = convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, raw)
+              if (a.defaultValue == null) converted
+              else AST.IfExpression(
+                loc,
+                AST.Equal(loc, AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i)), AST.NullLiteral(loc)),
+                AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+                AST.BlockExpression(loc, List(converted))
+              )
+            }
+            toplevels += decl
+            toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
+          }
+        }
     }
   }
 

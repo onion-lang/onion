@@ -98,6 +98,26 @@ public:
 
 Fix: assign to a variable, field, or array element instead.
 
+### `E0036` — Cannot assign to val
+
+A `val`-declared binding — a local variable, or an instance field written from
+outside its constructor — was reassigned (or incremented/decremented) after
+its initial assignment.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: Int = 1
+    x = 2   // E0036: x is a val, not a var
+    return x
+  }
+}
+```
+
+Fix: declare the binding `var` if it needs to change, or assign an instance
+`val` field only once, from within the constructor.
+
 ### `E0030` — Type is not generic
 
 Type arguments were supplied for a type that takes none.
@@ -422,6 +442,104 @@ public:
 
 Fix: declare the field/target with an interface type, or drop `forward` if
 delegation isn't actually needed.
+
+### `E0037` — Unimplemented abstract method
+
+A class doesn't provide an implementation for an abstract method declared by
+an interface it `conforms` to (or an abstract class it `extends`), and the
+class itself isn't declared `abstract`.
+
+```onion
+interface I { def m(): Int }
+class A conforms I {   // E0037: A must implement m() or be declared abstract
+public:
+  def this {}
+}
+```
+
+Fix: implement the missing method(s), or declare the class `abstract`.
+
+### `E0038` — Cannot instantiate abstract class
+
+A `new` expression targets a class declared `abstract`, whether or not it
+declares any abstract methods of its own.
+
+```onion
+abstract class Shape {
+public:
+  abstract def area(): Int
+}
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s: Shape = new Shape();   // E0038: Shape is abstract
+    return 0
+  }
+}
+```
+
+Fix: instantiate a concrete subclass instead.
+
+### `E0039` — Cannot override a final method
+
+A method marked `override` targets a method its superclass declared `final`.
+
+```onion
+class A {
+public:
+  def this {}
+  final def m(): Int = 1
+}
+class B extends A {
+public:
+  def this {}
+  override def m(): Int = 2   // E0039: A.m is final
+}
+```
+
+Fix: drop the `override`, or remove `final` from the superclass method if
+overriding was actually intended.
+
+### `E0040` — Cannot call method on primitive type
+
+A method call's target expression has `void` type — typically chaining a call
+directly onto the result of another call that returns nothing.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    IO::println("a").toString()   // E0040: println returns void
+    return 0
+  }
+}
+```
+
+Fix: split the two calls into separate statements.
+
+### `E0041` — Invalid method call target
+
+A method call (or `[...]` indexing) targets an expression whose type isn't a
+usable receiver — for example a nullable class-typed value (`T?`) that hasn't
+been unwrapped, or a wildcard type with no concrete upper bound.
+
+```onion
+class Box {
+public:
+  def this {}
+}
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val b: Box? = null;
+    val v = b[0];   // E0041: Box? is not a valid method call target
+    return 0
+  }
+}
+```
+
+Fix: exclude `null` first (`if b != null { ... }`, `b ?: default`, or
+`b?.method()`/`b?[...]`) so the receiver has a definite, non-null type.
 
 ### `E0073` — Map cannot be iterated directly
 

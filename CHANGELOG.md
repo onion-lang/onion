@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0036`
+  (cannot assign to val), `E0037` (unimplemented abstract method), `E0038` (cannot
+  instantiate abstract class), `E0039` (cannot override a final method), `E0040` (cannot
+  call method on primitive type), and `E0041` (invalid method call target) only in the
+  end-of-file summary table.** Added the missing `### E0036`–`### E0041` sections to both
+  language references. `E0041` (`INVALID_METHOD_CALL_TARGET`) had no regression test at
+  all; added `InvalidMethodCallTargetSpec` covering the "indexing a nullable class-typed
+  value" trigger site.
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0030`
   (type is not generic), `E0031` (type argument arity mismatch), `E0033` (method is not
   generic), `E0034` (method type argument arity mismatch), and `E0035` (erased JVM

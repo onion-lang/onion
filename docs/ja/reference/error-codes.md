@@ -98,6 +98,26 @@ public:
 
 修正方法: 変数・フィールド・配列要素に代入してください。
 
+### `E0036` — val に代入できない
+
+`val` で宣言された束縛 ― ローカル変数、またはコンストラクタの外から書き込まれた
+インスタンスフィールド ― に、初回の代入のあとで再代入（あるいはインクリメント・
+デクリメント）が行われました。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: Int = 1
+    x = 2   // E0036: x は val であり var ではない
+    return x
+  }
+}
+```
+
+修正方法: 値を変更する必要があるなら `var` として宣言してください。インスタンスの
+`val` フィールドはコンストラクタ内で一度だけ代入するようにしてください。
+
 ### `E0030` — 型はジェネリックではない
 
 型引数を取らない型に対して型引数が渡されました。
@@ -421,6 +441,105 @@ public:
 
 対処: フィールド／対象をインタフェース型で宣言するか、委譲が本当に不要であれば
 `forward` を取り除いてください。
+
+### `E0037` — 抽象メソッドが実装されていない
+
+クラスが `conforms` したインタフェース（または `extends` した抽象クラス）が宣言する
+抽象メソッドの実装を提供しておらず、かつそのクラス自身も `abstract` として宣言され
+ていません。
+
+```onion
+interface I { def m(): Int }
+class A conforms I {   // E0037: A は m() を実装するか abstract 宣言が必要
+public:
+  def this {}
+}
+```
+
+対処: 不足しているメソッドを実装するか、クラスを `abstract` として宣言してください。
+
+### `E0038` — 抽象クラスをインスタンス化できない
+
+`new` 式が `abstract` として宣言されたクラスを対象にしています。そのクラス自身が
+抽象メソッドを宣言しているかどうかは問いません。
+
+```onion
+abstract class Shape {
+public:
+  abstract def area(): Int
+}
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s: Shape = new Shape();   // E0038: Shape は abstract
+    return 0
+  }
+}
+```
+
+対処: 代わりに具象サブクラスをインスタンス化してください。
+
+### `E0039` — final メソッドをオーバーライドできない
+
+`override` を付けたメソッドが、スーパークラスで `final` として宣言されたメソッドを
+対象にしています。
+
+```onion
+class A {
+public:
+  def this {}
+  final def m(): Int = 1
+}
+class B extends A {
+public:
+  def this {}
+  override def m(): Int = 2   // E0039: A.m は final
+}
+```
+
+対処: `override` を取り除くか、オーバーライドが本当に必要であればスーパークラス側の
+`final` を外してください。
+
+### `E0040` — プリミティブ型に対するメソッド呼び出し
+
+メソッド呼び出しの対象式が `void` 型を持っています。典型的には、何も返さない
+呼び出しの結果に対して直接メソッドを連鎖させた場合に発生します。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    IO::println("a").toString()   // E0040: println は void を返す
+    return 0
+  }
+}
+```
+
+対処: 2つの呼び出しを別々の文に分けてください。
+
+### `E0041` — 不正なメソッド呼び出しターゲット
+
+メソッド呼び出し（または `[...]` によるインデックスアクセス）の対象式の型が、
+呼び出し可能なレシーバーとして使えません。たとえば `null` 除去前の nullable な
+クラス型の値（`T?`）や、具体的な上限を持たないワイルドカード型などです。
+
+```onion
+class Box {
+public:
+  def this {}
+}
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val b: Box? = null;
+    val v = b[0];   // E0041: Box? はメソッド呼び出しのターゲットとして不正
+    return 0
+  }
+}
+```
+
+対処: まず `null` を除外してください（`if b != null { ... }`、`b ?: default`、
+`b?.method()` / `b?[...]` など）。レシーバーが確定した非 null 型を持つようにします。
 
 ### `E0073` — Map は直接反復できない
 

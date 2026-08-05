@@ -98,6 +98,87 @@ public:
 
 Fix: assign to a variable, field, or array element instead.
 
+### `E0030` — Type is not generic
+
+Type arguments were supplied for a type that takes none.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String[Int] = null   // E0030: String takes no type arguments
+    return 0
+  }
+}
+```
+
+Fix: drop the type arguments (`String`, not `String[Int]`).
+
+### `E0031` — Type argument arity mismatch
+
+A generic type was applied with the wrong number of type arguments.
+
+```onion
+class Box[T] { public: def this {} }
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val b = new Box[String, String]()   // E0031: Box takes 1, not 2
+    return 0
+  }
+}
+```
+
+This also fires when the mismatch is written inside a nullable type
+annotation, e.g. `val b: Box[String, String]? = null`.
+
+### `E0033` — Method is not generic
+
+Type arguments were supplied at a call site for a method that takes none.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int { return "abc".length[String]() }   // E0033
+}
+```
+
+Fix: drop the type arguments from the call (`"abc".length()`).
+
+### `E0034` — Method type argument arity mismatch
+
+A generic method call supplied the wrong number of explicit type arguments.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val l = java.util.Collections::emptyList[String, String]()   // E0034: expects 1, not 2
+    return 0
+  }
+}
+```
+
+### `E0035` — Erased JVM signature collision
+
+Two overloads have parameter types that differ in Onion's type system but erase
+to the same JVM method descriptor (generics are erasure-based, so `List[String]`
+and `List[Integer]` are indistinguishable at the bytecode level), so the class
+file cannot carry both.
+
+```onion
+class C {
+public:
+  def this {}
+  def f(x: java.util.List[String]): Int = 1
+  def f(x: java.util.List[Integer]): Int = 2   // E0035: both erase to f(List)I
+}
+```
+
+Fix: give the overloads different erased signatures (e.g. different arity, or
+a parameter type that doesn't erase to the same class), or merge them into one
+method that dispatches internally.
+
 ## Resolution errors
 
 ### `E0002` — Variable not found

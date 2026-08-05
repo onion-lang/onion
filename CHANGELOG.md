@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/ja/reference/stdlib.md`'s Strings Module section was missing 13 of the 29
+  documented `Strings::*` members** (`split`, `join`, `upper`, `lower`, `trim`, `replace`,
+  `replaceRegex`, `startsWith`, `endsWith`, `contains`, `padLeft`, `padRight`, `repeat`) —
+  the first code block was dropped during translation, leaving only the case/inspection
+  and null-safe-parsing examples. Restored it in the same grouping as the English
+  reference, and added `StdlibDocStringsModuleParitySpec` to guard against this drifting
+  again (the existing subheading-based parity specs don't cover this section, since it
+  has no `###` subheadings to count).
+
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0058`
   (label not found), `E0059` (invalid regex literal), `E0060` (regex capture group /
   binding count mismatch), `E0061` (record component type unsupported by `from

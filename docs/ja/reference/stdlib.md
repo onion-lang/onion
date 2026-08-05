@@ -935,7 +935,18 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 ## Strings モジュール
 
-文字列ユーティリティ（`onion.Strings`、自動 import）。分割・結合・大文字小文字変換・パディングに加え：
+文字列ユーティリティ（`onion.Strings`、自動 import）：
+
+```onion
+Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
+Strings::join(parts, "-")             // 配列・List どちらも可
+Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
+Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
+Strings::startsWith(s, p) / Strings::endsWith(s, p) / Strings::contains(s, sub)
+Strings::padLeft(s, 8, '0') / Strings::padRight(s, 8, ' ') / Strings::repeat(s, 3)
+```
+
+大文字小文字と検査のヘルパー：
 
 ```onion
 Strings::capitalize("hello")             // "Hello"

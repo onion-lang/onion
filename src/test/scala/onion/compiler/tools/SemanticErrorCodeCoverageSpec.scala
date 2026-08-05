@@ -530,6 +530,38 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
   }
 
+  describe("closures and destructuring") {
+    it("E0052 lambda parameter needs a type annotation when none can be inferred") {
+      failsWith("E0052",
+        """val f = (x) -> x + 1
+          |def main(): void { }
+          |""".stripMargin)
+    }
+    it("E0046 destructuring binding count must match the record's field count") {
+      failsWith("E0046",
+        """record Point(x: Int, y: Int)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val (a, b, c) = new Point(1, 2)
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0047 destructuring a non-record value") {
+      failsWith("E0047",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val (a, b) = "not a record"
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+  }
+
   describe("drift guard: the dead-code registry") {
     it("codes listed as dead have no report site; every other code has one") {
       val srcDir = java.nio.file.Path.of("src/main/scala")

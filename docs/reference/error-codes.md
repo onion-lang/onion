@@ -62,6 +62,42 @@ Fixes:
 - Add an explicit `return`: `{ return 5 + 10 }`.
 - Use an expression body: `def f(): Int = 5 + 10`.
 
+### `E0027` — Type is not boxable
+
+A `void`-typed expression (the result of calling a `void` method) was used
+where a value is required, e.g. as an operand of string concatenation. `void`
+has no boxed form, so there is nothing to box.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s = "a" + IO::println("b")   // E0027: IO::println returns void
+    return 0
+  }
+}
+```
+
+Fix: don't use the result of a `void` call as a value — call it as its own
+statement instead.
+
+### `E0028` — Lvalue required
+
+The left-hand side of an assignment is not an assignable location (a local
+variable, field, or array element) — e.g. a method call result or a literal.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    "a".length() = 3   // E0028: the left side isn't an assignable location
+    return 0
+  }
+}
+```
+
+Fix: assign to a variable, field, or array element instead.
+
 ## Resolution errors
 
 ### `E0002` — Variable not found
@@ -598,6 +634,48 @@ public:
 
 Fix: rename one method, or give it different parameter types to make it a genuine
 overload.
+
+### `E0025` — Duplicate constructor
+
+Two constructors on the same class have identical parameter types, so
+neither is a valid overload of the other.
+
+```onion
+class A {
+public:
+  def this(x: Int) {}
+  def this(y: Int) {}   // E0025: this(Int) is already declared on A
+}
+```
+
+Fix: give one constructor different parameter types, or remove the duplicate.
+
+### `E0026` — Duplicate generated method
+
+A record's `law`/`example` clauses synthesize a check method per clause,
+named after the clause. Two `law` (or two `example`) clauses with the same
+name and the same parameter types mangle to the same method, colliding at
+codegen. Without this check the collision surfaced later as a raw JVM
+`ClassFormatError` instead of a normal diagnostic.
+
+```onion
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
+  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
+```
+
+Fix: rename one of the clauses, or remove the duplicate.
+
+### `E0029` — Duplicate type parameter
+
+The same type parameter name appears twice in one class, interface, or
+method's type parameter list.
+
+```onion
+class Box[T, T] { public: def this {} }   // E0029: T is already declared
+```
+
+Fix: give the type parameters distinct names.
 
 ### `E0085` — Static method with no body
 

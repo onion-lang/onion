@@ -81,6 +81,20 @@ println(usrName)   // E0002、userName を提案
 val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
 ```
 
+### `E0004` — フィールドが見つからない
+
+対象の型にその名前のフィールドが存在しません。スペルとフィールドの可視性を確認してください。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s = "a".noSuchField   // E0004
+    return 0
+  }
+}
+```
+
 ### `E0005` — メソッドが見つからない
 
 呼び出しに一致するメソッドがありません。同じ名前のメソッドが存在するが引数の型が異なる場合、コンパイラは利用可能なシグネチャを一覧表示します。

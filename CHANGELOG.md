@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0004`
+  (field not found) only in the end-of-file summary table, unlike its neighbors `E0003`
+  and `E0005`, which both have a full prose section.** Added the missing `### E0004`
+  section to both language references, using the existing `SemanticErrorCodeCoverageSpec`
+  case as the basis for the example.
+
 ## [0.10.23] - 2026-08-05
 
 ### Fixed

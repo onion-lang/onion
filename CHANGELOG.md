@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/ja/reference/stdlib.md`'s Maps Module and Sets Module sections were missing
+  several members that `docs/reference/stdlib.md` documents** — Maps: `newMap`,
+  `getOrDefault`, `filterKeys`, `filterValues`, `toList`, `forEach`, `merge`; Sets:
+  `newSet`, `containsAll`, `forEach`. Restored the missing entries and added
+  `StdlibDocMapsSetsModuleParitySpec` (same approach as `StdlibDocStringsModuleParitySpec`)
+  so this can't silently drift again.
+
 - **`docs/ja/reference/stdlib.md`'s Strings Module section was missing 13 of the 29
   documented `Strings::*` members** (`split`, `join`, `upper`, `lower`, `trim`, `replace`,
   `replaceRegex`, `startsWith`, `endsWith`, `contains`, `padLeft`, `padRight`, `repeat`) —

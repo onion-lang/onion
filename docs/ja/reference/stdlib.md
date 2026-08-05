@@ -970,14 +970,20 @@ Strings::toIntOr("nope", 0)              // 0
 Map ユーティリティ（`onion.Maps`）。結果 Map は挿入順を保持（`LinkedHashMap`）。
 
 ```onion
+val m: Map[String, Int] = Maps::newMap()
+Maps::getOrDefault(m, "a", 0)                 // あればその値、無ければデフォルト
 Maps::getOrElse(m, "x", () -> compute())      // 遅延デフォルト
 Maps::keys(m) / Maps::values(m)               // 順序を保ったリスト
 Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUpperCase())
+Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語
 Maps::invert(m)                               // キーと値を入れ替え
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List
+Maps::forEach(m, (k: String, v: Int) -> println(k))
 Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
 Maps::groupBy(items, keyOf)                   // Map[K, List]
 Maps::countBy(items, keyOf)                   // 頻度 Map[K, Integer]
+val merged = Maps::merge(a, b)                // 衝突時は b が優先
 Maps::mergeWith(a, b, (x: Int, y: Int) -> x + y)  // 衝突を結合
 Maps::update(m, "a", (v: Int) -> v + 1)       // 関数的更新
 ```
@@ -987,11 +993,13 @@ Maps::update(m, "a", (v: Int) -> v + 1)       // 関数的更新
 Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持し、集合演算は null 安全。
 
 ```onion
-Sets::of(1, 2, 3) / Sets::fromList([1, 1, 2]) / Sets::toList(a)
+Sets::of(1, 2, 3) / Sets::newSet[Int]() / Sets::fromList([1, 1, 2]) / Sets::toList(a)
 Sets::union(a, b) / Sets::intersection(a, b) / Sets::difference(a, b)
 Sets::symmetricDifference(a, b)               // どちらか一方だけに含まれる
+Sets::containsAll(a, b)                       // a が b の要素をすべて含む
 Sets::isSubsetOf(a, b) / Sets::isSupersetOf(a, b) / Sets::isDisjoint(a, b)
 Sets::map(a, f) / Sets::filter(a, p) / Sets::find(a, p)
+Sets::forEach(a, (x: Int) -> println(x))
 Sets::count(a, p) / Sets::any(a, p) / Sets::all(a, p)
 ```
 

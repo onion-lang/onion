@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0025`
+  (duplicate constructor), `E0026` (duplicate generated method), `E0027` (type not
+  boxable), `E0028` (lvalue required), and `E0029` (duplicate type parameter) only in
+  the end-of-file summary table.** Added the missing `### E0025`–`### E0029` sections
+  to both language references, using the existing `SemanticErrorCodeCoverageSpec` and
+  `RecordDuplicateLawExampleSpec` cases as the basis for the examples.
+
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0004`
   (field not found) only in the end-of-file summary table, unlike its neighbors `E0003`
   and `E0005`, which both have a full prose section.** Added the missing `### E0004`

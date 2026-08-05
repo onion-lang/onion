@@ -85,6 +85,29 @@ val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
 
 呼び出しに一致するメソッドがありません。同じ名前のメソッドが存在するが引数の型が異なる場合、コンパイラは利用可能なシグネチャを一覧表示します。
 
+### `E0006` — メソッド呼び出しが曖昧
+
+2つのオーバーロードが呼び出しに対して同等に適用可能で、どちらがより特定的かを
+決められません。しばしば、引数の静的型（`null` や共通のスーパータイプなど）が
+複数の無関係なパラメータ型に同時に一致することが原因です。
+
+```onion
+class A {}
+class B {}
+class Test {
+public:
+  static def foo(x: A): Int = 1
+  static def foo(x: B): Int = 2
+  static def main(args: String[]): Int {
+    foo(null)   // E0006: foo(A) と foo(B) の両方に適用可能
+    return 0
+  }
+}
+```
+
+対処: 引数をキャストしてオーバーロードを確定させるか（`foo(null as A)`）、
+どちらか一方しか一致しないようにオーバーロードをリネーム・統合してください。
+
 ### `E0021` — コンストラクタが見つからない
 
 引数に一致するコンストラクタがありません。コンパイラは利用可能なコンストラクタを一覧表示します。
@@ -298,6 +321,107 @@ try {
 より具体的な型を先に書くよう並べ替えるか、到達不能な節を削除してください。1つの
 multi-catch 節（`catch e: A | B`）の候補同士は互いにチェックされません。
 
+## extension メソッドエラー
+
+### `E0084` — extension メソッドの重複
+
+同じ `extension` ブロック内に、同じ名前・同じパラメータ型を持つメソッドが2つ宣言され
+ています。チェックせずに放置すると、生成されるコンテナクラスが同一の JVM シグネチャを
+持つメソッドを2つ持つことになり、コンパイル時ではなくクラスをロードした瞬間に初めて
+（`ClassFormatError` が内部エラー I0000 として現れる形で）失敗します。
+
+```onion
+extension Double {
+  def pct(): String = "" + self
+  def pct(): String = "" + self   // E0084: duplicated extension method pct() on Double
+}
+```
+
+対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
+extension メソッド同士は影響を受けません — 通常のオーバーロードです。
+
+## 宣言エラー
+
+### `E0007` — ローカル変数の重複
+
+同じスコープ内で、同じ名前のローカル変数が2回宣言されています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x = 1
+    val x = 2   // E0007: x はこのスコープで既に宣言済み
+    return 0
+  }
+}
+```
+
+対処: どちらか一方の変数をリネームするか、冗長な宣言を削除してください。
+
+### `E0008` — クラスの重複
+
+トップレベルのクラス（インターフェース・レコード・enum を含む）が同じ名前で
+2つ宣言されています。
+
+```onion
+class A { public: def this {} }
+class A { public: def this {} }   // E0008: A は既に宣言済み
+```
+
+対処: どちらか一方の宣言をリネームまたは削除してください。
+
+### `E0009` — フィールドの重複
+
+同じフィールド名がクラス上で2回宣言されています。
+
+```onion
+class A {
+  var x: Int
+  var x: Int   // E0009: x は A 上に既に宣言済み
+public:
+  def this {}
+}
+```
+
+対処: 重複したフィールドを削除するか、別の名前を付けてください。
+
+### `E0010` — メソッドの重複
+
+同じクラス上で、同じ名前・同じパラメータリストを持つメソッドが2つ宣言されて
+おり、どちらも他方の正当なオーバーロードになっていません。
+
+```onion
+class Test {
+public:
+  def m(): Int = 1
+  def m(): Int = 2   // E0010: m() は Test 上に既に宣言済み
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+対処: どちらか一方のメソッドをリネームするか、パラメータ型を変えて正当な
+オーバーロードにしてください。
+
+### `E0085` — 本体のない static メソッド
+
+`static` と宣言されたメソッドに本体（`{ ... }` も `= expr` も）がありません。文法上
+本体のないメソッドは abstract/interface 的な宣言として受理されますが、`static` と
+abstract は矛盾します — static メソッドはオーバーライドできないため、abstract にも
+なり得ません。もしクラスファイルを生成すれば `ACC_STATIC` と `ACC_ABSTRACT` の両方が
+必要になり、これは JVM が拒否します。
+
+```onion
+class LineFilter {
+public:
+  static def main(args: String[]): void
+  // E0085: static method main must have a body
+}
+```
+
+対処: 本体を追加するか、`static` を外して通常の abstract インスタンスメソッドとして
+宣言してください。
+
 ## パターンマッチングエラー
 
 ### `E0042` — 網羅性のないパターンマッチング
@@ -413,6 +537,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
 | `E0084` | duplicated extension method …(…) on … |
+| `E0085` | static method … must have a body |
 
 ## 関連項目
 

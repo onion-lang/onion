@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.23] - 2026-08-05
+
+### Fixed
+
+- **A `static` method declared with no body (e.g. `static def main(args: String[]): void`
+  followed by a stray blank instead of `{ ... }`) no longer crashes the compiler with an
+  I0000 internal error.** The grammar accepts a bodyless method as an abstract/interface-style
+  declaration, and `TypingOutlinePass.processMethodDeclaration` unconditionally OR'd in
+  `M_ABSTRACT` whenever the body was absent — even for a method already carrying `M_STATIC`.
+  The resulting class file declared a method with both `ACC_STATIC` and `ACC_ABSTRACT`, which
+  the JVM rejects; loading it (e.g. via `OnionClassLoader`, exercised by `LawCheckPhase`) threw
+  a raw `ClassFormatError` that surfaced as an uncaught internal compiler error instead of a
+  normal diagnostic. A static method with no body is now rejected up front with a new error,
+  **E0085**. Found by the mutation fuzzer stripping the opening brace from `main`'s body in
+  `run/LineFilter.on`.
+
+### Documentation
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0084`
+  (duplicate extension method) and `E0085` (static method with no body) only in the
+  end-of-file summary table, unlike every other code, which also gets a prose section
+  with an example and a fix.** Added the missing `### E0084` and `### E0085` sections to
+  both language references.
+- **`E0006` (ambiguous method) and `E0007`–`E0010` (duplicate local variable/class/
+  field/method) had the same gap** — mentioned only in the summary table, with no
+  prose section, example, or fix. Added the missing sections to both language
+  references, using the existing `SemanticErrorCodeCoverageSpec` cases as the basis
+  for each example.
+
 ## [0.10.22] - 2026-08-04
 
 ### Fixed

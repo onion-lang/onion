@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0043`
+  (unknown parameter name), `E0044` (duplicate argument), `E0045` (positional argument
+  after named argument), `E0046` (wrong number of bindings in a destructuring pattern),
+  and `E0047` (not a record type) only in the end-of-file summary table.** Added the
+  missing `### E0043`–`### E0047` sections to both language references, using the
+  existing `SemanticErrorCodeCoverageSpec` cases as the basis for the `E0043`–`E0045`
+  examples, and adding new `E0046`/`E0047` coverage cases (previously untested by
+  error code, though `DestructuringDeclarationSpec` exercised the underlying behavior
+  via `Shell.Failure(-1)`).
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0036`
   (cannot assign to val), `E0037` (unimplemented abstract method), `E0038` (cannot
   instantiate abstract class), `E0039` (cannot override a final method), `E0040` (cannot

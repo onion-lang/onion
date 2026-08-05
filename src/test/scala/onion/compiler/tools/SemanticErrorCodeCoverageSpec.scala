@@ -528,6 +528,29 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
     }
+    it("E0046 destructuring declaration binding-count mismatch") {
+      failsWith("E0046",
+        """record Point(x: Int, y: Int)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val (a, b, c) = new Point(1, 2)
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0047 destructuring declaration on a non-record initializer") {
+      failsWith("E0047",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val (a, b) = "not a record"
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
   }
 
   describe("drift guard: the dead-code registry") {

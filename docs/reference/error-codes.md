@@ -911,6 +911,82 @@ select shape {
 }
 ```
 
+### `E0043` — Unknown parameter name
+
+A named-argument call site used a parameter name that the target method,
+constructor, or function doesn't have.
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: no such parameter
+}
+```
+
+Fix: match the name to the declared parameter, or check for a typo.
+
+### `E0044` — Duplicate argument
+
+A named argument bound the same parameter twice (typically once positionally
+and once by name, or by name twice).
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x is bound twice
+}
+```
+
+### `E0045` — Positional argument after named argument
+
+A call mixed named and positional arguments with a positional one following
+a named one.
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 is positional after x = 1
+}
+```
+
+Fix: put all positional arguments first, then the named ones.
+
+### `E0046` — Wrong number of bindings in destructuring pattern
+
+A `val`/`var (a, b, ...) = expr` destructuring declaration bound a different
+number of names than the record type has components.
+
+```onion
+record Point(x: Int, y: Int)
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b, c) = new Point(1, 2)   // E0046: Point has 2 fields, 3 bindings given
+    return 0
+  }
+}
+```
+
+### `E0047` — Not a record type
+
+A destructuring declaration's initializer has a type that isn't a record, so
+there are no positional components to bind.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b) = "not a record"   // E0047: String is not a record type
+    return 0
+  }
+}
+```
+
+Fix: destructure a record value, or use a plain declaration instead.
+
 ## Parser errors
 
 Parser errors do not carry `E` codes; they report the encountered token and the expected tokens.

@@ -910,6 +910,77 @@ select shape {
 }
 ```
 
+### `E0043` — 不明なパラメータ名
+
+名前付き引数の呼び出しで、対象のメソッド・コンストラクタ・関数に存在しないパラメータ名を指定しました。
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: そのようなパラメータは無い
+}
+```
+
+修正方法: 宣言されたパラメータ名に合わせるか、タイプミスがないか確認してください。
+
+### `E0044` — 引数の重複
+
+同じパラメータに対して名前付き引数が二重に束縛されました（位置引数と名前付き引数の両方で束縛した場合や、同じ名前を2回指定した場合など）。
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x が二重に束縛されている
+}
+```
+
+### `E0045` — 名前付き引数の後の位置引数
+
+名前付き引数と位置引数を混在させた呼び出しで、名前付き引数の後に位置引数が続きました。
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: x = 1 の後に位置引数 2 が続く
+}
+```
+
+修正方法: 位置引数をすべて先に書き、名前付き引数を後に置いてください。
+
+### `E0046` — デストラクチャリングパターンのバインディング数不一致
+
+`val`/`var (a, b, ...) = expr` によるデストラクチャリング宣言で、レコード型のコンポーネント数と異なる数の名前を束縛しました。
+
+```onion
+record Point(x: Int, y: Int)
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b, c) = new Point(1, 2)   // E0046: Point は2フィールドだが3個のバインディングが指定された
+    return 0
+  }
+}
+```
+
+### `E0047` — レコード型ではない
+
+デストラクチャリング宣言の初期化式の型がレコードではないため、束縛できる位置コンポーネントがありません。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b) = "not a record"   // E0047: String はレコード型ではない
+    return 0
+  }
+}
+```
+
+修正方法: レコード値をデストラクチャリングするか、通常の宣言を使ってください。
+
 ## パーサーエラー
 
 パーサーエラーには `E` コードは付きません。出現したトークンと期待されるトークンが報告されます。

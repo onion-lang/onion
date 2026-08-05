@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to both language references, using the existing `DuplicateGlobalVariableSpec`,
   `DuplicateFunctionSpec`, `StaticMethodAccessSpec`, `FieldWriteAccessSpec`, and
   `ClassAccessibilitySpec` cases as the basis for the examples.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed
+  `E0016` (cyclic inheritance), `E0018` (illegal inheritance), `E0019` (illegal
+  method call), `E0020` (cannot return value), `E0022` (ambiguous constructor), and
+  `E0023` (interface required) only in the end-of-file summary table.** Added the
+  missing `### E0016`, `### E0018`–`### E0020`, and `### E0022`–`### E0023` sections
+  to both language references, using the existing `CyclicInheritanceSpec` and
+  `SemanticErrorCodeCoverageSpec` cases as the basis for the examples.
 
 ## [0.10.23] - 2026-08-05
 

@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0058`
+  (label not found), `E0059` (invalid regex literal), `E0060` (regex capture group /
+  binding count mismatch), `E0061` (record component type unsupported by `from
+  re"..."`), `E0062` (record component type unsupported by `derive!(Json)`), `E0063`
+  (unknown `derive!` marker), `E0064` (law violation), `E0065` (example failed),
+  `E0068` (override target not found), `E0069` (local val requires an initializer),
+  `E0070` (nullable member access), `E0071` (static call on instance), and `E0072`
+  (abstract method with a body) only in the end-of-file summary table.** Added the
+  missing `### E0058`–`### E0072` sections (13 codes total) to both language
+  references, filed under their most fitting existing category (control-flow,
+  pattern-matching, resolution, null-safety, and declaration errors), using the
+  existing dedicated regression specs (`LabelNotFoundSpec`, `RegexLiteralValidationSpec`,
+  `RegexPatternSpec`, `RecordFromRegexSpec`, `RecordJsonSpec`, `LawExampleSpec`,
+  `OverrideTargetNotFoundSpec`, `UninitializedValSpec`, `NullableMemberAccessSpec`,
+  `StaticCallOnInstanceSpec`, `AbstractMethodBodySpec`) as the basis for the examples.
+  This closes the remaining gap in the error-code reference — every code in the
+  summary table now has a full prose section, except `E0032` (intentionally
+  skipped — no in-process trigger under the current grammar, see the note in
+  `SemanticErrorCodeCoverageSpec`).
+
 - **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0043`
   (unknown named argument), `E0044` (duplicate argument), `E0045` (positional argument
   after named argument), `E0046` (wrong destructuring binding count), `E0047` (not a

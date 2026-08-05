@@ -385,6 +385,26 @@ public:
 
 Fix: call it through the class, `A::s()`.
 
+### `E0071` — Static call on instance
+
+`s::m()` was used where `s` resolves to a local variable, not a type — the
+Java/Kotlin habit of reaching for `::` on an instance. Instead of the
+generic "type not found", the compiler points at the fix.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): void {
+    val s: String = "hi"
+    IO::println(s::length())   // E0071: s is a variable, not a type
+  }
+}
+```
+
+Fix: use `.` for an instance call (`s.length()`); `::` is only for a type's
+static members. A real type with the same name as a local still resolves
+correctly — this only fires when `::` is applied to a variable.
+
 ### `E0020` — Cannot return value
 
 A bare `return;` appears in a method whose declared return type isn't `void`,
@@ -500,6 +520,44 @@ public:
 Fix: drop the `override`, or remove `final` from the superclass method if
 overriding was actually intended.
 
+### `E0068` — Override target not found
+
+A method marked `override` does not actually override anything — no base
+class or interface in its supertype chain declares a method of that name
+(and signature).
+
+```onion
+class Base {
+public:
+  def helper(): Int { return 1; }
+}
+class Sub extends Base {
+public:
+  override def notInBase(): Int { return 2; }   // E0068: no such method on Base
+}
+```
+
+Fix: correct the method name/signature to match the one being overridden,
+or drop `override` if it's a new method.
+
+### `E0072` — Abstract method with a body
+
+A method explicitly declared `abstract` also has a body. The body would be
+silently dropped at codegen — `abstract` and a body are contradictory, so
+this is rejected rather than compiled into a method that quietly ignores
+what it says.
+
+```onion
+abstract class B {
+public:
+  abstract def foo(): Int { return 99 }   // E0072: abstract method cannot have a body
+}
+```
+
+Fix: remove `abstract` to keep the body (a concrete method), or remove the
+body to leave it abstract. An interface's default method (a body with no
+`abstract` keyword) is unaffected.
+
 ### `E0040` — Cannot call method on primitive type
 
 A method call's target expression has `void` type — typically chaining a call
@@ -540,6 +598,74 @@ public:
 
 Fix: exclude `null` first (`if b != null { ... }`, `b ?: default`, or
 `b?.method()`/`b?[...]`) so the receiver has a definite, non-null type.
+
+### `E0061` — Record component type unsupported by `from re"..."`
+
+A `record ... from re"..."` clause derives `parse`/`parseAll` by converting each
+regex capture group to its component's type. Only `String`, `Int`, `Long`,
+`Double`, `Float`, `Boolean`, `Short`, and `Byte` components can be produced
+this way.
+
+```onion
+record Inner(x: Int)
+record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner is not a supported component type
+```
+
+Fix: keep every component in the supported scalar set, or parse the field
+manually after a plain `from re"..."` match on the rest.
+
+### `E0062` — Record component type unsupported by `derive!(Json)`
+
+`derive!(Json)` generates `fromJson`/`toJson` by mapping each component to a
+JSON scalar. Only `String`, `Int`, `Long`, `Double`, `Float`, `Boolean`,
+`Short`, and `Byte` components are supported — the same set as `from re"..."`.
+
+```onion
+record Inner(z: Int)
+record Bad(a: String, b: Inner) derive!(Json)   // E0062: Inner cannot be serialized
+```
+
+Fix: keep every component in the supported scalar set.
+
+### `E0063` — Unknown `derive!` marker
+
+`derive!(...)` names a format the compiler does not implement. The only
+supported marker today is `Json`.
+
+```onion
+record U(a: String) derive!(Bogus)   // E0063: unknown derive! marker Bogus
+```
+
+Fix: use `derive!(Json)`, or remove the clause.
+
+### `E0064` — Law violation
+
+A `law name(p: T) { boolExpr }` clause is checked at build time against
+generated sample values of `p`; a sample that makes the expression false is a
+counterexample, reported with the settings (seed, sample count) that produced
+it so the failure can be reproduced.
+
+```onion
+record Pt(x: Int, y: Int)
+  law wrong(p: Pt) { p.x() == p.y() }   // E0064: falsified, e.g. by Pt(0, 1)
+```
+
+Fix: correct the law (or the code it's checking) so it holds for every
+generated sample, or remove the law if it doesn't actually hold in general.
+
+### `E0065` — Example failed
+
+A top-level or record-attached `example { boolExpr }` clause evaluated to
+`false` (or threw) at build time. Unlike `law`, an `example` checks one fixed
+case, not a generated family of them.
+
+```onion
+record R(x: Int)
+  example { new R(1).x() == 2 }   // E0065: evaluated to false
+```
+
+Fix: correct the example's expected value, or fix the code it's asserting
+against.
 
 ### `E0073` — Map cannot be iterated directly
 
@@ -702,6 +828,24 @@ public:
 Fixes:
 - Use `?.` / `?:` / `if x != null`.
 - Declare a non-null bound: `class Box[T extends Object]`.
+
+### `E0070` — Nullable member access
+
+A field (not method) was accessed directly on a value of nullable type
+(`T?`), which may be null at that point.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String? = "abc"
+    return x.length   // E0070: x may be null
+  }
+}
+```
+
+Fix: use `?.` to access it safely, `?:` to supply a default, `!!` to assert
+non-null, or check for null first (`if x != null { ... }`).
 
 ### `E0081` — Tool parameter cannot be read from the command line
 
@@ -958,6 +1102,27 @@ public:
 
 Fix: add a body, or drop `static` to declare an ordinary abstract instance method.
 
+### `E0069` — Local val requires an initializer
+
+A local `val` was declared without an initializer (no `= expr`). Unlike a
+`var`, a `val` can never be assigned later, so a `val` with no initializer
+could only ever read the JVM's zero-value default — a bug, not a value.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String   // E0069: x is never initialized
+    IO::println(x)
+    return 0
+  }
+}
+```
+
+Fix: give it an initializer at the declaration (`val x: String = ...`), or
+use `var` if the value genuinely needs to be assigned later. A field `val`
+initialized in the constructor is unaffected.
+
 ## Control-flow errors
 
 ### `E0048` — Break outside loop
@@ -1006,6 +1171,25 @@ public:
 ```
 
 Fix: drop `static`, or pass the instance in explicitly as a parameter.
+
+### `E0058` — Label not found
+
+A labeled `break`/`continue` names a label that is not bound to any
+enclosing loop.
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): void {
+    foreach i: Int in 0..3 {
+      break nosuch   // E0058: no enclosing loop labeled nosuch
+    }
+  }
+}
+```
+
+Fix: label the target loop (`outer: foreach ... { break outer }`), or
+correct the spelling of the label.
 
 ## Pattern-matching errors
 
@@ -1106,6 +1290,35 @@ public:
 
 Fix: destructure a record value, or bind the whole value with a plain
 `val`/`var` instead.
+
+### `E0059` — Invalid regex literal
+
+A `re"..."` literal (bare, in a `select case`, or in a `from re"..."`
+clause) is not a well-formed regular expression. It is validated at compile
+time so a bad pattern is caught there instead of throwing
+`PatternSyntaxException` at run time.
+
+```onion
+val p = re"(unclosed"   // E0059: invalid regular expression literal
+```
+
+Fix: correct the pattern.
+
+### `E0060` — Regex capture group / binding count mismatch
+
+A `case re"..." (b1, b2, ...)` pattern (or a `record ... from re"..."`
+clause) named a different number of bindings/components than the pattern
+has capture groups.
+
+```onion
+select "x" {
+  case re"(\d+)-(\d+)" (a): a   // E0060: pattern has 2 groups, 1 binding given
+  else: "no"
+}
+```
+
+Fix: match the binding (or record component) count to the pattern's capture
+group count.
 
 ## Parser errors
 

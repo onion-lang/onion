@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `E0005`, which both have a full prose section.** Added the missing `### E0004`
   section to both language references, using the existing `SemanticErrorCodeCoverageSpec`
   case as the basis for the example.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0011`
+  (duplicate global variable), `E0012` (duplicate function), `E0013` (method not
+  accessible), `E0014` (field not accessible), and `E0015` (class not accessible) only
+  in the end-of-file summary table.** Added the missing `### E0011`–`### E0015` sections
+  to both language references, using the existing `DuplicateGlobalVariableSpec`,
+  `DuplicateFunctionSpec`, `StaticMethodAccessSpec`, `FieldWriteAccessSpec`, and
+  `ClassAccessibilitySpec` cases as the basis for the examples.
 
 ## [0.10.23] - 2026-08-05
 

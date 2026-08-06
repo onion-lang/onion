@@ -218,6 +218,35 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
   }
 
+  describe("member accessibility") {
+    it("E0013 private static method called from another class") {
+      failsWith("E0013",
+        """class C {
+          |private:
+          |  static def s(): Int = 1
+          |}
+          |def main(args: String[]): void { IO::println(C::s()) }
+          |""".stripMargin)
+    }
+    it("E0014 writing a non-public field from outside its class") {
+      failsWith("E0014",
+        """class Plain {
+          |  var value: String
+          |public:
+          |  def this(v: String) { value = v }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val p = new Plain("orig")
+          |    p.value = "changed"
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+  }
+
   describe("inheritance and interfaces") {
     it("E0018 illegal inheritance (extending a final class)") {
       failsWith("E0018",

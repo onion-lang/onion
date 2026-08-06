@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/WeatherReport.on`, a 261-line weather data analysis sample.** A new
+  domain not previously covered by the corpus. Exercises a data-carrying enum
+  (`AlertLevel`: `NONE`/`ADVISORY`/`WARNING`/`EMERGENCY`), records with inline
+  methods (`DailyReading`, `WeekSummary`), an interface implemented by a class
+  (`Reportable`/`MonthData`), extension methods on `Double` and `String`,
+  `select` dispatch over enum cases, a recursive moving-average function, and
+  collection-pipeline operations underused elsewhere in the corpus
+  (`reduce`/`partition`/`take`/`drop`/`zip`/`flatten`/`distinct`/`sortedBy`).
+  107 total corpus programs.
+
 ### Documentation
 
 - **`docs/ja/reference/stdlib.md`'s Json Module section never mentioned `Json::value`,

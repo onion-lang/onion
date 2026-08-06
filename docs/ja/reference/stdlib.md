@@ -886,16 +886,79 @@ Json::getStringOr(obj, "name", "anon")  // "anon"
 
 ## Yaml モジュール
 
-YAML（flat block mapping のサブセット）のパースとシリアライズ。中間表現は Json と共通です。
+flat block mapping ドキュメント限定の YAML パースとシリアライズ（`onion.Yaml`）。
+Json と同じ中間表現を共有しており（scalar は同じ Java 型にマップされる）、
+`derive!(Yaml)` は `derive!(Json)` とまったく同じ `toMap` / `fromMap` の土台の上に
+構築されています。
 
-### Yaml::parse / Yaml::stringify
+対象範囲: flat block mapping のみ（ネストした map、シーケンス、アンカーは非対応）。
+
+### Yaml::parse
+
+YAML の flat block-mapping 文字列を `LinkedHashMap` にパースします:
 
 ```onion
-val obj = Yaml::parse("name: ko\nage: 3")    // Object（実体は Map）
-val text = Yaml::stringify(obj)               // "name: ko\nage: 3\n"
+val data = Yaml::parse("name: Alice\nage: 30\n")
+// data は LinkedHashMap；scalar の型推論は Json::parse と同じ
 ```
 
-scalar の型推論は Json と一致します（`3`→Long、`3.5`→Double、`true`→Boolean、`null`→null）。自分が出力した範囲を読み戻せる round-trip サブセットで、`record ... derive!(Yaml)` の土台になっています。`:` や前後の空白を含むキーは `key: value` の区切りと衝突しないよう自動的にダブルクォートされます(値側の quoting ルールと同じ)。
+scalar の型推論規則（Json と同一）:
+- `""` または `null` → `null`
+- `true` / `false` → `Boolean`
+- 整数リテラル（`-?\d+` にマッチ）→ `Long`
+- 浮動小数点パターンや `.`/`e`/`E` を含む数値 → `Double`
+- クォートされた `"..."` → `String`（エスケープ解除のみ、それ以上の変換なし）
+- それ以外 → `String`
+
+不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
+`fromYaml` はこれを捕捉して代わりに `null` を返します。
+
+### Yaml::stringify
+
+`Map`（または scalar）を YAML の flat block-mapping 文字列にシリアライズします:
+
+```onion
+val m = ["name": "Alice", "age": 30L]
+val yaml = Yaml::stringify(m)
+// "name: Alice\nage: 30\n"
+```
+
+パースし直したときに誤読される可能性のある文字列値（`:`、`#`、改行を含む、または
+数値・真偽値に見えるもの）は自動的にダブルクォートされます。数値と真偽値はそのまま
+出力されます。Map の**キー**も同じ規則でクォートされます — `:` や前後の空白を含む
+キーは `key: value` の区切りと衝突しないようダブルクォートされます。
+
+### round-trip の保証
+
+`Yaml::parse` が生成した任意の `Map` について、`Yaml::parse(Yaml::stringify(m))` は
+等しい map を返します。同様に、`derive!(Yaml)` を付けたレコードでは、scalar 成分の
+みを持つすべての値について `fromYaml(toYaml(v)) == v` が成り立ちます。
+
+### `derive!(Yaml)` の利用
+
+`derive!(Yaml)` は scalar 成分のみを持つ任意のレコードに対して `fromYaml` と
+`toYaml` を合成します。
+
+```onion
+record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)
+
+val cfg = new ServerConfig("localhost", 8080, false)
+val yaml = ServerConfig::toYaml(cfg)
+// "host: localhost\nport: 8080\ndebug: false\n"
+
+val cfg2 = ServerConfig::fromYaml(yaml)   // ServerConfig? — パース/変換失敗時は null
+```
+
+`derive!(Json, Yaml)` も有効です。両フォーマットは内部の `toMap` / `fromMap` を
+共有するため、重複はありません:
+
+```onion
+record User(name: String, age: Int) derive!(Json, Yaml)
+
+val u = new User("ko", 3)
+val viaJson = User::fromJson(User::toJson(u))   // == u
+val viaYaml = User::fromYaml(User::toYaml(u))  // == u
+```
 
 ## Config モジュール
 

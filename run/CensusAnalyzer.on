@@ -1,0 +1,468 @@
+// CensusAnalyzer.on — population data parsing, aggregation, and reporting.
+// Exercises: from re"..." record parsing, do[List] comprehensions,
+// |> pipeline, extension methods on Int/Double, ADT enums, records with methods,
+// collection pipelines (sortedBy/filter/map/fold/partition/find/any),
+// nullable types, select/type-pattern matching, string interpolation,
+// foreach (k,v) on Map, closures.
+
+// ─── primitive helpers ───────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { -self } else { self }
+  def maxWith(other: Int): Int = if self > other { self } else { other }
+  def minWith(other: Int): Int = if self < other { self } else { other }
+}
+
+extension Double {
+  def round2(): Double {
+    val factor: Long = 100L
+    return (self * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
+  }
+  def toPercent(total: Int): String {
+    if total == 0 { return "0.00%" }
+    val pct = (self / total.doubleValue() * 100.0).round2()
+    return "" + pct + "%"
+  }
+}
+
+// ─── income bracket enum ─────────────────────────────────────────────────────
+
+enum IncomeBracket {
+  Low, Middle, High, VeryHigh
+public:
+  def label(): String = select this {
+    case IncomeBracket::Low:      "Low (<30k)"
+    case IncomeBracket::Middle:   "Middle (30k-80k)"
+    case IncomeBracket::High:     "High (80k-150k)"
+    case IncomeBracket::VeryHigh: "Very High (>150k)"
+    else: "Unknown"
+  }
+}
+
+// ─── age group ADT ───────────────────────────────────────────────────────────
+
+enum AgeGroup {
+  case Child(age: Int)
+  case YoungAdult(age: Int)
+  case MiddleAged(age: Int)
+  case Senior(age: Int)
+public:
+  def label(): String = select this {
+    case c is Child:      "Child (#{c.age()})"
+    case y is YoungAdult: "Young Adult (#{y.age()})"
+    case m is MiddleAged: "Middle-Aged (#{m.age()})"
+    case s is Senior:     "Senior (#{s.age()})"
+  }
+  static def of(age: Int): AgeGroup = select 0 {
+    case 0 when age < 18:  new Child(age)
+    case 0 when age < 35:  new YoungAdult(age)
+    case 0 when age < 60:  new MiddleAged(age)
+    else:                  new Senior(age)
+  }
+}
+
+// ─── person record parsed from CSV-like line ─────────────────────────────────
+
+record Person(name: String, age: Int, city: String, occupation: String, income: Int)
+  from re"(\w+),(\d+),(\w+),(\w+),(\d+)"
+
+example { Person::parse("Alice,34,Portland,Engineer,95000") != null }
+example { Person::parse("Bob,19,Seattle,Student,8000") != null }
+example { Person::parse("badline") == null }
+
+// ─── PersonExt — computed properties via a wrapper ───────────────────────────
+
+record PersonExt(p: Person) {
+public:
+  def ageGroup(): AgeGroup = AgeGroup::of(p.age())
+  def bracket(): IncomeBracket = select 0 {
+    case 0 when p.income() < 30000:  IncomeBracket::Low
+    case 0 when p.income() < 80000:  IncomeBracket::Middle
+    case 0 when p.income() < 150000: IncomeBracket::High
+    else:                            IncomeBracket::VeryHigh
+  }
+  def summary(): String =
+    "#{p.name()} age=#{p.age()} city=#{p.city()} occ=#{p.occupation()} income=#{p.income()}"
+}
+
+// ─── stats record ────────────────────────────────────────────────────────────
+
+record Stats(count: Int, total: Int, lo: Int, hi: Int) {
+public:
+  def mean(): Double = if count == 0 { 0.0 } else { total.doubleValue() / count.doubleValue() }
+  def meanRounded(): Double = mean().round2()
+  def display(): String = "count=#{count()} mean=#{meanRounded()} lo=#{lo()} hi=#{hi()}"
+  static def of(values: List[Object]): Stats {
+    if values.size == 0 { return new Stats(0, 0, 0, 0) }
+    var total: Int = 0
+    var lo: Int = 999999
+    var hi: Int = -999999
+    foreach v: Object in values {
+      val n = v as Int
+      total = total + n
+      lo = lo.minWith(n)
+      hi = hi.maxWith(n)
+    }
+    return new Stats(values.size, total, lo, hi)
+  }
+}
+
+// ─── occupation rank record ───────────────────────────────────────────────────
+
+record OccRank(occupation: String, meanIncome: Double, count: Int) {
+public:
+  def display(): String = "#{occupation()}: mean=$#{meanIncome()} (#{count()} people)"
+}
+
+// ─── census data ─────────────────────────────────────────────────────────────
+
+class CensusData {
+  var records: List[Object]
+
+public:
+  def this {
+    records = []
+  }
+
+  def load(lines: List[Object]): void {
+    foreach line: Object in lines {
+      val s = line as String
+      if s.trim().length() == 0 { continue }
+      if s.startsWith("#") { continue }
+      val p: Person? = Person::parse(s.trim())
+      if p != null { records.add(p) }
+    }
+  }
+
+  def size(): Int = records.size
+
+  def cities(): List[Object] {
+    val result: List[Object] = []
+    foreach r: Object in records {
+      val city = (r as Person).city()
+      if !result.contains(city) { result.add(city) }
+    }
+    return result.sortedBy { c => c as String }
+  }
+
+  def occupations(): List[Object] {
+    val result: List[Object] = []
+    foreach r: Object in records {
+      val occ = (r as Person).occupation()
+      if !result.contains(occ) { result.add(occ) }
+    }
+    return result.sortedBy { o => o as String }
+  }
+
+  def byCity(city: String): List[Object] {
+    return records.filter { r => (r as Person).city() == city }
+  }
+
+  def byOccupation(occ: String): List[Object] {
+    return records.filter { r => (r as Person).occupation() == occ }
+  }
+
+  def ageStats(): Stats {
+    val ages: List[Object] = records.map { r => (r as Person).age() }
+    return Stats::of(ages)
+  }
+
+  def incomeStats(): Stats {
+    val incomes: List[Object] = records.map { r => (r as Person).income() }
+    return Stats::of(incomes)
+  }
+
+  def topEarners(n: Int): List[Object] {
+    return records.sortedBy { r => -(r as Person).income() }.take(n)
+  }
+
+  def youngestIn(city: String): Person? {
+    val inCity = byCity(city)
+    if inCity.size == 0 { return null }
+    return inCity.sortedBy { r => (r as Person).age() }.get(0) as Person
+  }
+
+  def oldestIn(city: String): Person? {
+    val inCity = byCity(city)
+    if inCity.size == 0 { return null }
+    return inCity.sortedBy { r => -(r as Person).age() }.get(0) as Person
+  }
+
+  def meanIncomeByCity(): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    foreach city: Object in cities() {
+      val c = city as String
+      val people = byCity(c)
+      if people.size > 0 {
+        val total = people.fold(0) { acc, r => (acc as Int) + (r as Person).income() }
+        val mean = (total as Int).doubleValue() / people.size.doubleValue()
+        result.put(c, mean.round2())
+      }
+    }
+    return result
+  }
+
+  def bracketDistribution(): Map[String, Int] {
+    val counts: Map[String, Int] = [:]
+    counts.put("Low", 0)
+    counts.put("Middle", 0)
+    counts.put("High", 0)
+    counts.put("VeryHigh", 0)
+    foreach r: Object in records {
+      val ext = new PersonExt(r as Person)
+      val label = select ext.bracket() {
+        case IncomeBracket::Low:      "Low"
+        case IncomeBracket::Middle:   "Middle"
+        case IncomeBracket::High:     "High"
+        case IncomeBracket::VeryHigh: "VeryHigh"
+        else: "Low"
+      }
+      counts.put(label, (counts.get(label) as Int) + 1)
+    }
+    return counts
+  }
+
+  def ageGroupSummary(): Map[String, Int] {
+    val counts: Map[String, Int] = [:]
+    foreach r: Object in records {
+      val p = r as Person
+      val key = select AgeGroup::of(p.age()) {
+        case g is Child:      "Child"
+        case g is YoungAdult: "YoungAdult"
+        case g is MiddleAged: "MiddleAged"
+        case g is Senior:     "Senior"
+      }
+      val prev: Int? = counts.get(key) as Int?
+      counts.put(key, if prev != null { prev + 1 } else { 1 })
+    }
+    return counts
+  }
+
+  def occupationIncomeRank(): List[Object] {
+    val result: List[Object] = []
+    foreach occ: Object in occupations() {
+      val o = occ as String
+      val people = byOccupation(o)
+      if people.size > 0 {
+        val total = people.fold(0) { acc, r => (acc as Int) + (r as Person).income() }
+        val mean = (total as Int).doubleValue() / people.size.doubleValue()
+        result.add(new OccRank(o, mean.round2(), people.size))
+      }
+    }
+    return result.sortedBy { row => -(row as OccRank).meanIncome() }
+  }
+
+  def partitionByAge(threshold: Int): List[List[Object]] {
+    return records.partition { r => (r as Person).age() < threshold }
+  }
+}
+
+// ─── printing helpers ─────────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  println("")
+  println("═══════════════════════════════════════")
+  println("  " + title)
+  println("═══════════════════════════════════════")
+}
+
+def printKV(key: String, value: String): void {
+  println("  " + key + ": " + value)
+}
+
+// ─── sample data ─────────────────────────────────────────────────────────────
+
+val rawLines: List[Object] = [
+  "Alice,34,Portland,Engineer,95000",
+  "Bob,19,Seattle,Student,8000",
+  "Carol,52,Portland,Manager,135000",
+  "Dave,28,Seattle,Engineer,78000",
+  "Eve,41,Portland,Doctor,185000",
+  "Frank,67,Boston,Retired,24000",
+  "Grace,23,Seattle,Designer,52000",
+  "Henry,38,Boston,Lawyer,142000",
+  "Iris,55,Portland,Teacher,48000",
+  "Jack,31,Boston,Engineer,88000",
+  "Kate,44,Seattle,Manager,118000",
+  "Liam,26,Portland,Developer,72000",
+  "Mia,60,Boston,Doctor,195000",
+  "Noah,35,Seattle,Analyst,65000",
+  "Olivia,48,Portland,Nurse,61000",
+  "Pete,22,Boston,Student,5000",
+  "Quinn,57,Seattle,Retired,28000",
+  "Rose,33,Portland,Designer,58000",
+  "Sam,45,Boston,Manager,125000",
+  "Tara,29,Seattle,Developer,81000",
+  "Uma,63,Portland,Teacher,44000",
+  "Victor,36,Boston,Lawyer,155000",
+  "Wendy,27,Seattle,Engineer,77000",
+  "Xander,50,Portland,Doctor,172000",
+  "Yara,24,Boston,Designer,47000",
+  "Zoe,39,Seattle,Analyst,69000",
+  "# this is a comment line",
+  "",
+  "Aaron,71,Portland,Retired,31000",
+  "Beth,42,Boston,Nurse,67000"
+]
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+val census = new CensusData()
+census.load(rawLines)
+
+printSection("Census Overview")
+printKV("Total records loaded", "" + census.size())
+
+val ageSt = census.ageStats()
+printKV("Age stats", ageSt.display())
+
+val incSt = census.incomeStats()
+printKV("Income stats", incSt.display())
+
+// ─── cities ───────────────────────────────────────────────────────────────────
+
+printSection("Population by City")
+foreach city: Object in census.cities() {
+  val c = city as String
+  val people = census.byCity(c)
+  val incomes: List[Object] = people.map { r => (r as Person).income() }
+  val st = Stats::of(incomes)
+  println("  #{c}: #{people.size} residents, mean income #{st.meanRounded()}")
+}
+
+// ─── mean income by city via foreach (k,v) ────────────────────────────────────
+
+printSection("Mean Income by City")
+val meanByCity = census.meanIncomeByCity()
+foreach city: Object in census.cities() {
+  val c = city as String
+  val mean: Double? = meanByCity.get(c) as Double?
+  if mean != null { println("  #{c}: $#{mean}") }
+}
+
+// ─── income bracket distribution ─────────────────────────────────────────────
+
+printSection("Income Bracket Distribution")
+val brackets = census.bracketDistribution()
+val bracketOrder: List[Object] = ["Low", "Middle", "High", "VeryHigh"]
+foreach key: Object in bracketOrder {
+  val k = key as String
+  val cnt: Int? = brackets.get(k) as Int?
+  val label = select k {
+    case "Low":      IncomeBracket::Low.label()
+    case "Middle":   IncomeBracket::Middle.label()
+    case "High":     IncomeBracket::High.label()
+    case "VeryHigh": IncomeBracket::VeryHigh.label()
+    else: k
+  }
+  println("  #{label}: #{if cnt != null { cnt } else { 0 }}")
+}
+
+// ─── age groups ───────────────────────────────────────────────────────────────
+
+printSection("Age Group Distribution")
+val ageGroups = census.ageGroupSummary()
+val groupOrder: List[Object] = ["Child", "YoungAdult", "MiddleAged", "Senior"]
+foreach key: Object in groupOrder {
+  val k = key as String
+  val cnt: Int? = ageGroups.get(k) as Int?
+  println("  #{k}: #{if cnt != null { cnt } else { 0 }}")
+}
+
+// ─── top earners ──────────────────────────────────────────────────────────────
+
+printSection("Top 5 Earners")
+var rank: Int = 1
+foreach r: Object in census.topEarners(5) {
+  val p = r as Person
+  println("  #{rank}. #{p.name()} (#{p.city()}, #{p.occupation()}): $#{p.income()}")
+  rank = rank + 1
+}
+
+// ─── youngest and oldest per city ─────────────────────────────────────────────
+
+printSection("Age Extremes by City")
+foreach city: Object in census.cities() {
+  val c = city as String
+  val youngest: Person? = census.youngestIn(c)
+  val oldest: Person? = census.oldestIn(c)
+  val yStr = if youngest != null { "#{youngest.name()} (#{youngest.age()})" } else { "N/A" }
+  val oStr = if oldest != null { "#{oldest.name()} (#{oldest.age()})" } else { "N/A" }
+  println("  #{c}: youngest=#{yStr}, oldest=#{oStr}")
+}
+
+// ─── occupation income ranking via OccRank records ───────────────────────────
+
+printSection("Occupations by Mean Income")
+foreach row: Object in census.occupationIncomeRank() {
+  println("  " + (row as OccRank).display())
+}
+
+// ─── do[List] comprehension: city × age-threshold cross-tabulation ───────────
+
+printSection("do[List]: City × Age-threshold cross-counts")
+val thresholds: List[Object] = [25, 40, 60]
+val cityList   = census.cities()
+val crossRows  = do[List] {
+  thresh <- thresholds
+  city   <- cityList
+  ret "  under #{thresh as Int} in #{city as String}: " +
+        census.byCity(city as String)
+             .filter { r => (r as Person).age() < thresh as Int }
+             .size
+}
+foreach line: Object in crossRows {
+  println(line as String)
+}
+
+// ─── |> pipeline: top earners formatted ──────────────────────────────────────
+
+printSection("|> Pipeline: Top 8 Earners Formatted")
+census.topEarners(8)
+  .map { r => "$" + (r as Person).income() + " (" + (r as Person).name() + ")" }
+  |> println
+
+// ─── partition by age ─────────────────────────────────────────────────────────
+
+printSection("Partition: Under 35 vs 35+")
+val ageParts = census.partitionByAge(35)
+val youngList = ageParts[0] as List[Object]
+val matureList = ageParts[1] as List[Object]
+println("  Under 35: #{youngList.size}")
+println("  35 and over: #{matureList.size}")
+
+val youngIncomes: List[Object] = youngList.map { r => (r as Person).income() }
+val matureIncomes: List[Object] = matureList.map { r => (r as Person).income() }
+val ySt = Stats::of(youngIncomes)
+val mSt = Stats::of(matureIncomes)
+println("  Under 35 income: #{ySt.display()}")
+println("  35+ income: #{mSt.display()}")
+
+// ─── PersonExt: age group labels for seniors ─────────────────────────────────
+
+printSection("Senior Summary (age >= 60)")
+val seniors = census.topEarners(census.size())
+              .filter { r => (r as Person).age() >= 60 }
+foreach r: Object in seniors {
+  val p = r as Person
+  val ext = new PersonExt(p)
+  println("  #{ext.summary()} | group=#{ext.ageGroup().label()}")
+}
+
+// ─── any / find demos ────────────────────────────────────────────────────────
+
+printSection("Any / Find")
+val allPeople = census.topEarners(census.size())
+val hasHighEarner = allPeople.any { r => (r as Person).income() >= 190000 }
+println("  Any income >= 190k: #{hasHighEarner}")
+
+val firstYoungDoc: Person? = census.byOccupation("Doctor")
+  .find { r => (r as Person).age() < 50 } as Person?
+if firstYoungDoc != null {
+  println("  First doctor under 50: #{firstYoungDoc.name()} (#{firstYoungDoc.age()})")
+} else {
+  println("  First doctor under 50: none")
+}
+
+println("")
+println("Done.")

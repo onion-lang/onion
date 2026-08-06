@@ -1,0 +1,325 @@
+// TicTacToe.on — Tic-Tac-Toe with minimax AI.
+// Exercises: ADT enums, records, classes, extension methods on Int and String,
+// collection pipelines (filter/map/find), pattern matching (select/is),
+// recursion (minimax), while/foreach, closures, string interpolation, try/catch.
+
+// ─── Cell and player types ────────────────────────────────────────────────────
+
+enum Player {
+  X, O
+}
+
+enum Cell {
+  case Empty
+  case Filled(player: Player)
+}
+
+// ─── GameResult: outcome of a finished game ───────────────────────────────────
+
+enum GameResult {
+  case Winner(player: Player)
+  case Draw
+  case InProgress
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Board ────────────────────────────────────────────────────────────────────
+
+class Board {
+  val cells: List[Cell]  // 9 cells, row-major: index = row*3 + col
+
+public:
+  def this {
+    val c: List[Cell] = []
+    var i: Int = 0
+    while i < 9 {
+      c << new Empty()
+      i = i + 1
+    }
+    self.cells = c
+  }
+
+  def cellAt(row: Int, col: Int): Cell =
+    self.cells[row * 3 + col] as Cell
+
+  def isOpen(row: Int, col: Int): Boolean =
+    (self.cellAt(row, col)) is Empty
+
+  def place(row: Int, col: Int, p: Player): Board {
+    val newCells: List[Cell] = []
+    var i: Int = 0
+    while i < 9 {
+      if i == row * 3 + col {
+        newCells << new Filled(p)
+      } else {
+        newCells << (self.cells[i] as Cell)
+      }
+      i = i + 1
+    }
+    val newBoard = new Board()
+    // Copy newCells into newBoard.cells
+    i = 0
+    while i < 9 {
+      newBoard.cells[i] = newCells[i] as Cell
+      i = i + 1
+    }
+    return newBoard
+  }
+
+  // Returns all open positions as (row*3+col) indices.
+  def openIndices(): List[Int] {
+    val result: List[Int] = []
+    var i: Int = 0
+    while i < 9 {
+      if (self.cells[i] as Cell) is Empty {
+        result << i
+      }
+      i = i + 1
+    }
+    return result
+  }
+
+  def isFull(): Boolean = self.openIndices().size == 0
+
+  // Check if a player occupies all three positions of a line.
+  def lineWin(p: Player, a: Int, b: Int, c: Int): Boolean {
+    val ca = self.cells[a] as Cell
+    val cb = self.cells[b] as Cell
+    val cc = self.cells[c] as Cell
+    val ma = ca is Filled && (ca as Filled).player() == p
+    val mb = cb is Filled && (cb as Filled).player() == p
+    val mc = cc is Filled && (cc as Filled).player() == p
+    return ma && mb && mc
+  }
+
+  def hasWon(p: Player): Boolean {
+    // rows
+    if self.lineWin(p, 0, 1, 2) { return true }
+    if self.lineWin(p, 3, 4, 5) { return true }
+    if self.lineWin(p, 6, 7, 8) { return true }
+    // cols
+    if self.lineWin(p, 0, 3, 6) { return true }
+    if self.lineWin(p, 1, 4, 7) { return true }
+    if self.lineWin(p, 2, 5, 8) { return true }
+    // diagonals
+    if self.lineWin(p, 0, 4, 8) { return true }
+    if self.lineWin(p, 2, 4, 6) { return true }
+    return false
+  }
+
+  def result(): GameResult {
+    if self.hasWon(Player::X) { return new Winner(Player::X) }
+    if self.hasWon(Player::O) { return new Winner(Player::O) }
+    if self.isFull()          { return new Draw() }
+    return new InProgress()
+  }
+
+  def render(): String {
+    var s: String = ""
+    var row: Int = 0
+    while row < 3 {
+      var col: Int = 0
+      while col < 3 {
+        val c = self.cellAt(row, col)
+        val ch: String = select c {
+          case e is Empty:  "."
+          case f is Filled: if f.player() == Player::X { "X" } else { "O" }
+        }
+        s = s + ch
+        if col < 2 { s = s + "|" }
+        col = col + 1
+      }
+      if row < 2 { s = s + "\n-+-+-\n" }
+      row = row + 1
+    }
+    return s
+  }
+}
+
+// ─── Minimax AI ───────────────────────────────────────────────────────────────
+
+// Returns +1 if X wins, -1 if O wins, 0 for draw from this board/turn.
+def minimax(board: Board, isMaximizing: Boolean, depth: Int): Int {
+  select board.result() {
+    case w is Winner:
+      val score = if w.player() == Player::X { 1 } else { -1 }
+      return score
+    case d is Draw: return 0
+    case ip is InProgress:
+      val moves = board.openIndices()
+      if isMaximizing {
+        var best: Int = -100
+        foreach idx: Object in moves {
+          val i = idx as Int
+          val row = i / 3
+          val col = i % 3
+          val child = board.place(row, col, Player::X)
+                val score = minimax(child, false, depth + 1)
+          if score > best { best = score }
+        }
+        return best
+      } else {
+        var best: Int = 100
+        foreach idx: Object in moves {
+          val i = idx as Int
+          val row = i / 3
+          val col = i % 3
+          val child = board.place(row, col, Player::O)
+          val score = minimax(child, true, depth + 1)
+          if score < best { best = score }
+        }
+        return best
+      }
+  }
+}
+
+// Best move for the AI (playing O — minimizer).
+def bestMove(board: Board): Int {
+  val moves = board.openIndices()
+  var bestIdx: Int = -1
+  var bestScore: Int = 100
+  foreach idx: Object in moves {
+    val i = idx as Int
+    val row = i / 3
+    val col = i % 3
+    val child = board.place(row, col, Player::O)
+    val score = minimax(child, true, 0)
+    if score < bestScore {
+      bestScore = score
+      bestIdx = i
+    }
+  }
+  return bestIdx
+}
+
+def resultLabel(r: GameResult): String {
+  select r {
+    case w is Winner: return if w.player() == Player::X { "X wins!" } else { "O wins!" }
+    case d is Draw: return "Draw."
+    case ip is InProgress: return "(in progress)"
+  }
+}
+
+// ─── Game simulation ──────────────────────────────────────────────────────────
+
+IO::println("=== Tic-Tac-Toe: X (human) vs O (minimax AI) ===\n")
+
+// Scenario 1: X uses the opposite-corners fork; AI (O) responds with minimax.
+// X wins because the corner-fork forces two simultaneous threats.
+IO::println("--- Scenario 1: X corner fork vs AI ---")
+var board1 = new Board()
+// X deliberately plays corners; AI picks best O response each time
+board1 = board1.place(0, 0, Player::X)  // X: top-left
+var aiIdx = bestMove(board1)
+board1 = board1.place(aiIdx / 3, aiIdx % 3, Player::O)
+board1 = board1.place(2, 2, Player::X)  // X: bottom-right
+aiIdx = bestMove(board1)
+board1 = board1.place(aiIdx / 3, aiIdx % 3, Player::O)
+board1 = board1.place(0, 2, Player::X)  // X: top-right
+aiIdx = bestMove(board1)
+board1 = board1.place(aiIdx / 3, aiIdx % 3, Player::O)
+board1 = board1.place(2, 0, Player::X)  // X: bottom-left
+aiIdx = bestMove(board1)
+board1 = board1.place(aiIdx / 3, aiIdx % 3, Player::O)
+board1 = board1.place(1, 0, Player::X)  // last move for X
+IO::println(board1.render())
+IO::println("Result: " + resultLabel(board1.result()))
+
+// Scenario 2: X tries to win in a row — AI should block
+IO::println("\n--- Scenario 2: AI blocks top-row threat ---")
+var board2 = new Board()
+board2 = board2.place(0, 0, Player::X)
+board2 = board2.place(0, 1, Player::X)  // X threatens top-row win
+aiIdx = bestMove(board2)
+IO::println("AI blocks at index " + aiIdx + " (row=" + (aiIdx / 3) + ", col=" + (aiIdx % 3) + ")")
+board2 = board2.place(aiIdx / 3, aiIdx % 3, Player::O)
+IO::println(board2.render())
+
+// Scenario 3: O has two in the top row and can win immediately.
+// AI must take the winning move at (0,2) to complete the top row.
+IO::println("\n--- Scenario 3: AI takes winning move ---")
+var board3 = new Board()
+board3 = board3.place(1, 1, Player::X)  // X: center
+board3 = board3.place(0, 0, Player::O)  // O: top-left
+board3 = board3.place(2, 2, Player::X)  // X: bottom-right
+board3 = board3.place(0, 1, Player::O)  // O: top-mid → O has two in top row
+// O can win at (0,2) to complete the top row
+aiIdx = bestMove(board3)
+IO::println("AI wins at index " + aiIdx + " (row=" + (aiIdx / 3) + ", col=" + (aiIdx % 3) + ")")
+board3 = board3.place(aiIdx / 3, aiIdx % 3, Player::O)
+IO::println(board3.render())
+IO::println("Result: " + resultLabel(board3.result()))
+
+// Scenario 4: Full AI vs AI game
+IO::println("\n--- Scenario 4: full AI vs AI (X maximises, O minimises) ---")
+var board4 = new Board()
+var turn: Int = 0   // 0 = X's turn, 1 = O's turn
+var moveCount: Int = 0
+while (board4.result()) is InProgress {
+  val isX = turn == 0
+  val player = if isX { Player::X } else { Player::O }
+  // For X, we run minimax as maximizer; bestMove finds best O move,
+  // so for X we invert: find index with highest score.
+  val moves = board4.openIndices()
+  var chosen: Int = -1
+  if isX {
+    var best: Int = -100
+    foreach idx: Object in moves {
+      val i = idx as Int
+      val child = board4.place(i / 3, i % 3, Player::X)
+      val score = minimax(child, false, 0)
+      if score > best {
+        best = score
+        chosen = i
+      }
+    }
+  } else {
+    chosen = bestMove(board4)
+  }
+  board4 = board4.place(chosen / 3, chosen % 3, player)
+  turn = if isX { 1 } else { 0 }
+  moveCount = moveCount + 1
+}
+IO::println(board4.render())
+IO::println("Result after #{moveCount} moves: " + resultLabel(board4.result()))
+
+// ─── Board analysis helpers ───────────────────────────────────────────────────
+
+IO::println("\n--- Board utilities ---")
+
+// Count open cells
+val board5 = new Board().place(0, 0, Player::X).place(1, 1, Player::O)
+IO::println("Open cells on [X..; .O.; ...]: " + board5.openIndices().size)
+
+// Verify known win detection
+val winBoard = new Board()
+  .place(0, 0, Player::X).place(0, 1, Player::X).place(0, 2, Player::X)
+IO::println("Top row all X — hasWon(X): " + winBoard.hasWon(Player::X))
+IO::println("Top row all X — hasWon(O): " + winBoard.hasWon(Player::O))
+IO::println("Result: " + resultLabel(winBoard.result()))
+
+// Extension method clamp
+val raw = 150
+IO::println("150.clamp(0,100) = " + raw.clamp(0, 100))
+
+// String interpolation summary
+val totalMoves = moveCount
+IO::println("\nAI vs AI finished in #{totalMoves} moves — always a draw with optimal play.")
+IO::println("Done.")

@@ -17,7 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `select` dispatch over enum cases, a recursive moving-average function, and
   collection-pipeline operations underused elsewhere in the corpus
   (`reduce`/`partition`/`take`/`drop`/`zip`/`flatten`/`distinct`/`sortedBy`).
-  107 total corpus programs.
+- **`run/CourseRegistration.on`, a 365-line university course registration sample.**
+  Exercises plain enums (`Department`, `Grade`) with `select` dispatch, records with
+  inline methods (`Course`, `Student`, `Enrollment`, `RankedStudent`), a class with
+  private `Map[String, T]` fields, `foreach (k, v) in map` iteration, nullable
+  (`Grade?`) fields with null-checks, an extension method on a record
+  (`Student::shortLabel`), and an in-place insertion sort over `List[RankedStudent]`.
+  108 total corpus programs.
 
 ### Documentation
 

@@ -46,6 +46,24 @@ onionc -d build/classes MyProgram.on
 onionc -maxErrorReport 10 MyProgram.on
 ```
 
+### `-super <super class>`
+
+トップレベルのスクリプトが生成するクラスの親クラスを指定します。明示的なクラス宣言が
+ない場合にのみ意味を持ちます。
+
+```bash
+onionc -super java.lang.Object MyScript.on
+```
+
+### `--verbose`
+
+各コンパイルフェーズ（構文解析、書き換え、型検査、コード生成）の所要時間を実行時に
+表示します。
+
+```bash
+onionc --verbose MyProgram.on
+```
+
 ### `--dump-ast`
 
 構文解析後のASTを標準エラー出力に出力します。構文やパースのデバッグに便利です。
@@ -124,6 +142,14 @@ onionc --no-check-laws MyProgram.on
 ```bash
 onionc --law-samples 500 MyProgram.on
 onionc --law-seed 7 MyProgram.on
+```
+
+### `--effects`
+
+コンパイルされた各メソッドの推論済みエフェクト集合（`read write net exec env clock rand console unknown`。空はpureを意味する）を標準エラー出力に表示します。
+
+```bash
+onionc --effects MyProgram.on
 ```
 
 ## 例

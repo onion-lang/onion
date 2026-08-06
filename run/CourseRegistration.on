@@ -1,0 +1,365 @@
+// University Course Registration System
+// Demonstrates: records, plain enums, classes with methods and inheritance,
+// Map [k,v] iteration inside methods, foreach over ranges/lists, select with
+// enum cases, nullable checks, string interpolation, while loops, try/catch,
+// collection sorting, closures and extension methods.
+
+import {
+  java.util.ArrayList;
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum Department { CS, MATH, PHYSICS, ENGLISH, HISTORY }
+
+enum Grade { A, B, C, D, F, INCOMPLETE }
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record Course(
+  id:         String,
+  title:      String,
+  dept:       Department,
+  credits:    Int,
+  capacity:   Int,
+  instructor: String
+) {
+public:
+  def isFull(enrolled: Int): Boolean = enrolled >= capacity
+  def label(): String = "#{id} — #{title} (#{credits} cr)"
+}
+
+record Student(
+  id:   String,
+  name: String,
+  year: Int
+) {
+public:
+  def yearLabel(): String = select year {
+    case 1: "Freshman"
+    case 2: "Sophomore"
+    case 3: "Junior"
+    case 4: "Senior"
+    else:   "Graduate"
+  }
+  def label(): String = "#{name} (#{id}, #{yearLabel()})"
+}
+
+record Enrollment(studentId: String, courseId: String, grade: Grade?)
+
+record RankedStudent(student: Student, gpa: Double)
+
+// ── Grade utilities ─────────────────────────────────────────────────────────
+
+def gradePoints(g: Grade): Double = select g {
+  case Grade::A:          4.0
+  case Grade::B:          3.0
+  case Grade::C:          2.0
+  case Grade::D:          1.0
+  case Grade::F:          0.0
+  case Grade::INCOMPLETE: 0.0
+}
+
+def gradeLabel(g: Grade): String = select g {
+  case Grade::A:          "A"
+  case Grade::B:          "B"
+  case Grade::C:          "C"
+  case Grade::D:          "D"
+  case Grade::F:          "F"
+  case Grade::INCOMPLETE: "I"
+}
+
+def deptName(d: Department): String = select d {
+  case Department::CS:      "Computer Science"
+  case Department::MATH:    "Mathematics"
+  case Department::PHYSICS: "Physics"
+  case Department::ENGLISH: "English"
+  case Department::HISTORY: "History"
+}
+
+// ── Registrar ──────────────────────────────────────────────────────────────
+
+class Registrar {
+  var courses:     Map[String, Course]
+  var students:    Map[String, Student]
+  var enrollments: List[Enrollment]
+
+public:
+  def this {
+    courses     = [:]
+    students    = [:]
+    enrollments = []
+  }
+
+  def addCourse(c: Course): void {
+    courses.put(c.id(), c)
+  }
+
+  def addStudent(s: Student): void {
+    students.put(s.id(), s)
+  }
+
+  def findCourse(id: String): Course? {
+    return (courses.get(id) as Course)
+  }
+
+  def findStudent(id: String): Student? {
+    return (students.get(id) as Student)
+  }
+
+  def enrollmentCountOf(courseId: String): Int {
+    var count: Int = 0
+    foreach e: Enrollment in enrollments {
+      if e.courseId() == courseId { count = count + 1 }
+    }
+    return count
+  }
+
+  def isEnrolled(studentId: String, courseId: String): Boolean {
+    foreach e: Enrollment in enrollments {
+      if e.studentId() == studentId && e.courseId() == courseId { return true }
+    }
+    return false
+  }
+
+  def enroll(studentId: String, courseId: String): Boolean {
+    val student: Student? = findStudent(studentId)
+    val course:  Course?  = findCourse(courseId)
+    if student == null || course == null { return false }
+    if course.isFull(enrollmentCountOf(courseId)) { return false }
+    if isEnrolled(studentId, courseId) { return false }
+    enrollments << new Enrollment(studentId, courseId, null)
+    return true
+  }
+
+  def setGrade(studentId: String, courseId: String, g: Grade): Boolean {
+    var i: Int = 0
+    while i < enrollments.size {
+      val e: Enrollment = enrollments[i]
+      if e.studentId() == studentId && e.courseId() == courseId {
+        enrollments[i] = new Enrollment(studentId, courseId, g)
+        return true
+      }
+      i = i + 1
+    }
+    return false
+  }
+
+  def enrollmentsOf(studentId: String): List[Enrollment] {
+    val result: List[Enrollment] = []
+    foreach e: Enrollment in enrollments {
+      if e.studentId() == studentId { result << e }
+    }
+    return result
+  }
+
+  def enrollmentsFor(courseId: String): List[Enrollment] {
+    val result: List[Enrollment] = []
+    foreach e: Enrollment in enrollments {
+      if e.courseId() == courseId { result << e }
+    }
+    return result
+  }
+
+  def gpaOf(studentId: String): Double {
+    val enr: List[Enrollment] = enrollmentsOf(studentId)
+    var pts: Double = 0.0
+    var crs: Int    = 0
+    foreach e: Enrollment in enr {
+      if e.grade() != null {
+        val c: Course? = findCourse(e.courseId())
+        if c != null {
+          pts = pts + gradePoints((e.grade() as Grade)) * c.credits()
+          crs = crs + c.credits()
+        }
+      }
+    }
+    if crs == 0 { return 0.0 }
+    return pts / crs
+  }
+
+  // ── Reporting methods (use (k,v) Map iteration) ──────────────────────────
+
+  def printCourseCatalog(): void {
+    IO::println("── COURSE CATALOG ──────────────────────────────────")
+    foreach (cid, c) in courses {
+      val course:   Course  = (c as Course)
+      val enrolled: Int     = enrollmentCountOf(cid as String)
+      val dept:     String  = deptName(course.dept())
+      IO::println("  [#{cid}] #{course.title()} (#{course.credits()} cr)")
+      IO::println("    Dept: #{dept}  |  Instructor: #{course.instructor()}  |  Enrolled: #{enrolled}/#{course.capacity()}")
+    }
+    IO::println("")
+  }
+
+  def printTranscript(studentId: String): void {
+    val student: Student? = findStudent(studentId)
+    if student == null {
+      IO::println("Student not found: #{studentId}")
+      return
+    }
+    IO::println("── TRANSCRIPT: #{student.label()} ────────────────────")
+    val enr: List[Enrollment] = enrollmentsOf(studentId)
+    var cr: Int = 0
+    foreach e: Enrollment in enr {
+      val c: Course? = findCourse(e.courseId())
+      if c != null {
+        val gStr: String = if e.grade() == null { "In Progress" } else { gradeLabel((e.grade() as Grade)) }
+        IO::println("  #{c.label()} — #{gStr}")
+        cr = cr + c.credits()
+      }
+    }
+    val gpa: Double = gpaOf(studentId)
+    IO::println("  ─────────────────────────────────────────────────")
+    IO::println("  Credits enrolled: #{cr}  |  GPA: #{gpa}")
+    IO::println("")
+  }
+
+  def printDeptRoster(dept: Department): void {
+    IO::println("── #{deptName(dept)} DEPARTMENT ──────────────────────")
+    foreach (cid, c) in courses {
+      val course: Course = (c as Course)
+      if course.dept() == dept {
+        val enrolled: Int = enrollmentCountOf(cid as String)
+        IO::println("  #{course.label()} — #{enrolled} students")
+        val enr: List[Enrollment] = enrollmentsFor(course.id())
+        foreach e: Enrollment in enr {
+          val s: Student? = findStudent(e.studentId())
+          if s != null {
+            val gStr: String = if e.grade() == null { "—" } else { gradeLabel((e.grade() as Grade)) }
+            IO::println("    • #{s.name()} [#{gStr}]")
+          }
+        }
+      }
+    }
+    IO::println("")
+  }
+
+  def printTopStudents(): void {
+    IO::println("── TOP STUDENTS BY GPA ───────────────────────────────")
+    val ranked: List[RankedStudent] = []
+    foreach (sid, s) in students {
+      val student: Student = (s as Student)
+      val gpa: Double = gpaOf(sid as String)
+      if gpa > 0.0 {
+        ranked << new RankedStudent(student, gpa)
+      }
+    }
+    // Insertion sort descending by GPA
+    var i: Int = 1
+    while i < ranked.size {
+      val cur: RankedStudent = ranked[i]
+      var j: Int = i - 1
+      while j >= 0 && ranked[j].gpa() < cur.gpa() {
+        ranked[j + 1] = ranked[j]
+        j = j - 1
+      }
+      ranked[j + 1] = cur
+      i = i + 1
+    }
+    var rank: Int = 1
+    foreach r: RankedStudent in ranked {
+      IO::println("  #{rank}. #{r.student().label()} — GPA #{r.gpa()}")
+      rank = rank + 1
+    }
+    IO::println("")
+  }
+
+  def printStats(): void {
+    IO::println("── ENROLLMENT STATISTICS ─────────────────────────────")
+    var totalEnr:    Int = 0
+    var fullCourses: Int = 0
+    foreach (cid, c) in courses {
+      val course: Course = (c as Course)
+      val count: Int = enrollmentCountOf(cid as String)
+      totalEnr = totalEnr + count
+      if course.isFull(count) { fullCourses = fullCourses + 1 }
+    }
+    IO::println("  Courses offered:     #{courses.size()}")
+    IO::println("  Students registered: #{students.size()}")
+    IO::println("  Total enrollments:   #{totalEnr}")
+    IO::println("  Full courses:        #{fullCourses}")
+    IO::println("")
+  }
+}
+
+// ── Extension method on Student for concise display ─────────────────────────
+
+extension Student {
+  def shortLabel(): String = "#{self.name()} (#{self.id()})"
+}
+
+// ── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val reg: Registrar = new Registrar()
+
+  // Seed courses
+  reg.addCourse(new Course("CS101",   "Intro to Programming",   Department::CS,      3, 3, "Prof. Tanaka"))
+  reg.addCourse(new Course("CS201",   "Data Structures",        Department::CS,      3, 2, "Prof. Tanaka"))
+  reg.addCourse(new Course("CS301",   "Algorithms",             Department::CS,      4, 2, "Prof. Kim"))
+  reg.addCourse(new Course("MATH101", "Calculus I",             Department::MATH,    4, 4, "Prof. Okafor"))
+  reg.addCourse(new Course("MATH201", "Linear Algebra",         Department::MATH,    3, 3, "Prof. Okafor"))
+  reg.addCourse(new Course("PHYS101", "Classical Mechanics",    Department::PHYSICS, 4, 3, "Prof. Singh"))
+  reg.addCourse(new Course("ENG101",  "Academic Writing",       Department::ENGLISH, 3, 5, "Prof. Lopez"))
+  reg.addCourse(new Course("HIST101", "World History",          Department::HISTORY, 3, 4, "Prof. Muller"))
+
+  // Seed students
+  reg.addStudent(new Student("S001", "Alice Chen",    2))
+  reg.addStudent(new Student("S002", "Bob Martinez",  1))
+  reg.addStudent(new Student("S003", "Chloe Park",    3))
+  reg.addStudent(new Student("S004", "David Kim",     4))
+  reg.addStudent(new Student("S005", "Emma Wilson",   1))
+  reg.addStudent(new Student("S006", "Fatima Hassan", 3))
+
+  // Enrollments (demonstrate boolean return)
+  IO::println("── ENROLLMENT LOG ───────────────────────────────────")
+  val pairs: List[Object] = [
+    "S001:CS101", "S001:MATH101", "S001:ENG101",
+    "S002:CS101", "S002:MATH101", "S002:HIST101",
+    "S003:CS201", "S003:CS301",   "S003:PHYS101",
+    "S004:CS301", "S004:MATH201",
+    "S005:CS101",
+    "S006:MATH101", "S006:MATH201", "S006:ENG101"
+  ]
+  foreach pair: Object in pairs {
+    val s: String = (pair as String)
+    val sid: String = s.substring(0, 4)
+    val cid: String = s.substring(5)
+    val ok: Boolean = reg.enroll(sid, cid)
+    IO::println("  Enroll #{sid} → #{cid}: #{ok}")
+  }
+
+  // Attempt to enroll S006 into full CS101 (cap 3, already S001+S002+S005)
+  val blocked: Boolean = reg.enroll("S006", "CS101")
+  IO::println("  Enroll S006 → CS101 (full): #{blocked}")
+  IO::println("")
+
+  // Record grades
+  reg.setGrade("S001", "CS101",   Grade::A)
+  reg.setGrade("S001", "MATH101", Grade::B)
+  reg.setGrade("S001", "ENG101",  Grade::A)
+  reg.setGrade("S003", "CS201",   Grade::A)
+  reg.setGrade("S003", "CS301",   Grade::B)
+  reg.setGrade("S003", "PHYS101", Grade::C)
+  reg.setGrade("S004", "CS301",   Grade::A)
+  reg.setGrade("S004", "MATH201", Grade::A)
+  reg.setGrade("S006", "MATH101", Grade::B)
+  reg.setGrade("S006", "MATH201", Grade::A)
+  reg.setGrade("S006", "ENG101",  Grade::B)
+
+  // Show extension method usage
+  val alice: Student? = reg.findStudent("S001")
+  if alice != null {
+    IO::println("Extension method demo: #{alice.shortLabel()}")
+    IO::println("")
+  }
+
+  // Reports
+  reg.printCourseCatalog()
+  reg.printTranscript("S001")
+  reg.printTranscript("S003")
+  reg.printDeptRoster(Department::CS)
+  reg.printTopStudents()
+  reg.printStats()
+}

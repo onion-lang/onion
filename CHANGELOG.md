@@ -30,7 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `break` and non-local `return` inside `foreach`, collection pipelines
   (`filter`/`sortedBy`/`find`), `String::format` for column-aligned output, and
   an `extension String` method.
-  109 total corpus programs.
+- **`run/StudentGradeBook.on`, a 248-line student grade management sample.**
+  Exercises records (`Course`, `Student`, `Enrollment`), a data-carrying enum
+  (`Semester(label)`), collection pipelines (`filter`/`map`/`sortedBy`/
+  `sortedByDescending`/`groupBy`/`fold`/`find`), `select` dispatch on `String`,
+  closures capturing outer `val`s, recursion (`halveDepth`), `foreach` over
+  list/map-entry/range, `while`, `try`/`catch`, and the two-step
+  `(val as Int) as Double` numeric cast pattern.
+  110 total corpus programs.
 
 ### Documentation
 

@@ -271,6 +271,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/StatsApp.on"))
     }
 
+    it("runs GradeBook.on") {
+      assert(Shell.Success(null) == runSample("run/GradeBook.on"))
+    }
+
     it("runs TodoManager.on") {
       assert(Shell.Success(null) == runSample("run/TodoManager.on"))
     }

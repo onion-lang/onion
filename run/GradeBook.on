@@ -1,0 +1,337 @@
+// GradeBook.on — student grade book exercising records (with methods), data-
+// carrying enums, interfaces, generic classes, collection pipelines, closures,
+// string interpolation, pattern matching, extension methods, and recursion.
+
+// ── Records ──────────────────────────────────────────────────────────────────
+record Student(id: Int, name: String, dept: String)
+
+record Assignment(id: Int, title: String, maxPts: Int)
+
+record Submission(student: Student, assignment: Assignment, pts: Int) {
+public:
+  def pct(): Double = (pts() as Double) / (assignment().maxPts() as Double) * 100.0
+  def letterGrade(): String {
+    val p = pct()
+    if p >= 90.0 { return "A" }
+    else if p >= 80.0 { return "B" }
+    else if p >= 70.0 { return "C" }
+    else if p >= 60.0 { return "D" }
+    else { return "F" }
+  }
+}
+
+// ── Data-carrying enum ────────────────────────────────────────────────────────
+enum LetterGrade(symbol: String, minPct: Int) {
+  A("A", 90),
+  B("B", 80),
+  C("C", 70),
+  D("D", 60),
+  F("F", 0)
+}
+
+// ── Plain enum ────────────────────────────────────────────────────────────────
+enum Semester {
+  FALL, SPRING, SUMMER
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+interface Reportable {
+  def report(): String
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+extension Int {
+  def pad2(): String {
+    if self < 10 { return "0" + self } else { return "" + self }
+  }
+  def stars(): String {
+    var s = ""
+    var i = 0
+    while i < self {
+      s = s + "*"
+      i = i + 1
+    }
+    return s
+  }
+}
+
+extension Double {
+  def pctFmt(): String {
+    val whole = self as Int
+    val frac = ((self - (whole as Double)) * 10.0) as Int
+    return "" + whole + "." + frac + "%"
+  }
+}
+
+// ── Generic Scoreboard ────────────────────────────────────────────────────────
+class Scoreboard[T extends Object] {
+  val entries: List[T]
+public:
+  def this(es: List[T]) {
+    this.entries = es
+  }
+  def size(): Int = entries.size
+  def get(i: Int): T = entries[i] as T
+}
+
+// ── GradeBook class ───────────────────────────────────────────────────────────
+class GradeBook conforms Reportable {
+  val students: List[Student]
+  val assignments: List[Assignment]
+  val submissions: List[Submission]
+public:
+  def this(ss: List[Student], as_: List[Assignment], subs: List[Submission]) {
+    this.students = ss
+    this.assignments = as_
+    this.submissions = subs
+  }
+
+  def subsFor(s: Student): List[Submission] {
+    return submissions.filter { sub => (sub as Submission).student().id() == s.id() }
+  }
+
+  def avgPct(s: Student): Double {
+    val subs = subsFor(s)
+    if subs.size == 0 { return 0.0 }
+    var total = 0.0
+    foreach sub: Object in subs {
+      total = total + (sub as Submission).pct()
+    }
+    return total / (subs.size as Double)
+  }
+
+  def letterFor(s: Student): String {
+    val p = avgPct(s)
+    if p >= 90.0 { return "A" }
+    else if p >= 80.0 { return "B" }
+    else if p >= 70.0 { return "C" }
+    else if p >= 60.0 { return "D" }
+    else { return "F" }
+  }
+
+  def report(): String {
+    val sc = students.size
+    val ac = assignments.size
+    val uc = submissions.size
+    return "GradeBook[#{sc} students, #{ac} assignments, #{uc} submissions]"
+  }
+
+  def topStudent(): Student? {
+    if students.size == 0 { return null }
+    var best = students[0] as Student
+    var i = 1
+    while i < students.size {
+      val st = students[i] as Student
+      if avgPct(st) > avgPct(best) { best = st }
+      i = i + 1
+    }
+    return best
+  }
+
+  def avgForAssignment(aId: Int): Double {
+    val subs = submissions.filter { sub => (sub as Submission).assignment().id() == aId }
+    if subs.size == 0 { return 0.0 }
+    var total = 0.0
+    foreach sub: Object in subs {
+      total = total + (sub as Submission).pct()
+    }
+    return total / (subs.size as Double)
+  }
+}
+
+// ── Data setup ────────────────────────────────────────────────────────────────
+val students = [
+  new Student(1, "Alice",   "CS"),
+  new Student(2, "Bob",     "Math"),
+  new Student(3, "Carol",   "CS"),
+  new Student(4, "Dave",    "Physics"),
+  new Student(5, "Eve",     "Math")
+]
+
+val assignments = [
+  new Assignment(1, "Homework 1",  100),
+  new Assignment(2, "Midterm",     200),
+  new Assignment(3, "Project",     150),
+  new Assignment(4, "Final Exam",  250)
+]
+
+// Submissions: every student × every assignment
+val submissions = [
+  new Submission(students[0] as Student, assignments[0] as Assignment,  88),
+  new Submission(students[0] as Student, assignments[1] as Assignment, 176),
+  new Submission(students[0] as Student, assignments[2] as Assignment, 138),
+  new Submission(students[0] as Student, assignments[3] as Assignment, 225),
+  new Submission(students[1] as Student, assignments[0] as Assignment,  72),
+  new Submission(students[1] as Student, assignments[1] as Assignment, 148),
+  new Submission(students[1] as Student, assignments[2] as Assignment, 105),
+  new Submission(students[1] as Student, assignments[3] as Assignment, 183),
+  new Submission(students[2] as Student, assignments[0] as Assignment,  95),
+  new Submission(students[2] as Student, assignments[1] as Assignment, 192),
+  new Submission(students[2] as Student, assignments[2] as Assignment, 145),
+  new Submission(students[2] as Student, assignments[3] as Assignment, 240),
+  new Submission(students[3] as Student, assignments[0] as Assignment,  61),
+  new Submission(students[3] as Student, assignments[1] as Assignment, 130),
+  new Submission(students[3] as Student, assignments[2] as Assignment,  90),
+  new Submission(students[3] as Student, assignments[3] as Assignment, 162),
+  new Submission(students[4] as Student, assignments[0] as Assignment,  80),
+  new Submission(students[4] as Student, assignments[1] as Assignment, 164),
+  new Submission(students[4] as Student, assignments[2] as Assignment, 120),
+  new Submission(students[4] as Student, assignments[3] as Assignment, 210)
+]
+
+val gb = new GradeBook(students, assignments, submissions)
+
+// ── Basic report ──────────────────────────────────────────────────────────────
+IO::println(gb.report())
+
+// ── Per-student average + letter ─────────────────────────────────────────────
+IO::println("--- Student Averages ---")
+val ranked = students.sortedBy { s => 0.0 - gb.avgPct(s as Student) }
+foreach s: Object in ranked {
+  val st = s as Student
+  val avg = gb.avgPct(st)
+  val letter = gb.letterFor(st)
+  IO::println("  " + st.name() + " (" + st.dept() + "): " + avg + "% -> " + letter)
+}
+
+// ── Top student ───────────────────────────────────────────────────────────────
+val top = gb.topStudent()
+if top != null {
+  IO::println("Top student: " + (top as Student).name())
+}
+
+// ── Group students by department ──────────────────────────────────────────────
+IO::println("--- By Department ---")
+val byDept = students.groupBy { s => (s as Student).dept() }
+foreach (dept, deptStudents) in byDept {
+  val cnt = (deptStudents as List).size
+  IO::println("  " + dept + ": " + cnt + " student(s)")
+}
+
+// ── Assignment difficulty (ascending avg score) ───────────────────────────────
+IO::println("--- Assignment Difficulty (easiest first) ---")
+val byDiff = assignments.sortedBy { a => gb.avgForAssignment((a as Assignment).id()) }
+foreach a: Object in byDiff {
+  val asn = a as Assignment
+  val avg2 = gb.avgForAssignment(asn.id())
+  IO::println("  " + asn.title() + ": avg " + avg2 + "%")
+}
+
+// ── High scorers (A grade) ────────────────────────────────────────────────────
+val aGrades = submissions.filter { sub => (sub as Submission).letterGrade() == "A" }
+IO::println("A-grade submissions: " + aGrades.size)
+
+// ── Scoreboard generic wrapper ────────────────────────────────────────────────
+val board = new Scoreboard[Student](students)
+IO::println("Scoreboard size: " + board.size())
+IO::println("First on board: " + board.get(0).name())
+
+// ── Closures ──────────────────────────────────────────────────────────────────
+val isPassing = (avg: Double) -> avg >= 60.0
+val passingNames = students
+  .filter { s => isPassing(gb.avgPct(s as Student)) }
+  .map { s => (s as Student).name() }
+IO::println("Passing: " + passingNames.toString())
+
+// ── Data-carrying enum usage ──────────────────────────────────────────────────
+val gradeA = LetterGrade::A
+IO::println("A: symbol=" + gradeA.symbol() + " minPct=" + gradeA.minPct())
+val gradeC = LetterGrade::C
+IO::println("C: symbol=" + gradeC.symbol() + " minPct=" + gradeC.minPct())
+
+// ── Plain enum usage ──────────────────────────────────────────────────────────
+val sem = Semester::FALL
+IO::println("Semester: " + sem)
+
+// ── Extension method usage ────────────────────────────────────────────────────
+IO::println("7.pad2()  = " + 7.pad2())
+IO::println("42.pad2() = " + 42.pad2())
+IO::println("5.stars()  = " + 5.stars())
+
+// ── try/catch ────────────────────────────────────────────────────────────────
+def safeDivide(a: Int, b: Int): Int {
+  try {
+    return a / b
+  } catch e: Exception {
+    return 0 - 1
+  }
+}
+IO::println("10/3  = " + safeDivide(10, 3))
+IO::println("10/0  = " + safeDivide(10, 0))
+
+// ── Recursion: Fibonacci ──────────────────────────────────────────────────────
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+IO::println("fib(8) = " + fib(8))
+IO::println("fib(10) = " + fib(10))
+
+// ── while loop: accumulate total points ──────────────────────────────────────
+var totalPts: Int = 0
+var idx = 0
+while idx < submissions.size {
+  totalPts = totalPts + (submissions[idx] as Submission).pts()
+  idx = idx + 1
+}
+IO::println("Total raw points: " + totalPts)
+
+// ── foreach range ─────────────────────────────────────────────────────────────
+var rangeSum = 0
+foreach k: Int in 1..10 {
+  rangeSum = rangeSum + k
+}
+IO::println("rangeSum(1..10) = " + rangeSum)
+
+// ── count/all/any collection methods ─────────────────────────────────────────
+val highScoreCount = submissions.count { sub => (sub as Submission).pct() >= 80.0 }
+IO::println("High-score submissions (>=80%): " + highScoreCount)
+
+val allPass = students.all { s => gb.avgPct(s as Student) >= 60.0 }
+IO::println("All students passing: " + allPass)
+
+val anyExcellent = students.any { s => gb.avgPct(s as Student) >= 90.0 }
+IO::println("Any excellent (>=90%): " + anyExcellent)
+
+// ── find ──────────────────────────────────────────────────────────────────────
+val topCS = students.find { s => (s as Student).dept() == "CS" && gb.avgPct(s as Student) >= 90.0 }
+if topCS != null {
+  IO::println("Top CS student: " + (topCS as Student).name())
+}
+
+// ── distinct (duplicate department strings) ───────────────────────────────────
+val allDepts = students.map { s => (s as Student).dept() }
+val uniqueDepts = allDepts.distinct()
+IO::println("Unique depts: " + uniqueDepts.size)
+
+// ── mkString ──────────────────────────────────────────────────────────────────
+val nameList = students.map { s => (s as Student).name() }
+IO::println("Students: " + nameList.mkString(", "))
+
+// ── sortedBy descending for final ranking ────────────────────────────────────
+IO::println("--- Final Ranking ---")
+val finalRank = students.sortedBy { s => 0.0 - gb.avgPct(s as Student) }
+var rank = 1
+foreach s: Object in finalRank {
+  val st = s as Student
+  val avg = gb.avgPct(st)
+  val ltr = gb.letterFor(st)
+  IO::println("  " + rank.pad2() + ". " + st.name() + " - " + ltr + " (" + avg + "%)")
+  rank = rank + 1
+}
+
+// ── select pattern matching ───────────────────────────────────────────────────
+def describeGrade(letter: String): String {
+  select letter {
+    case "A": return "Excellent"
+    case "B": return "Good"
+    case "C": return "Satisfactory"
+    case "D": return "Below Average"
+    else: return "Failing"
+  }
+}
+IO::println("A -> " + describeGrade("A"))
+IO::println("B -> " + describeGrade("B"))
+IO::println("F -> " + describeGrade("F"))
+
+// ── String interpolation summary ─────────────────────────────────────────────
+val numStudents = students.size
+val numA = aGrades.size
+IO::println("Done: #{numStudents} students, #{numA} A-grades, rangeSum=#{rangeSum}")

@@ -1,0 +1,298 @@
+// LogAnalytics — a log analysis pipeline exercising record-from-regex,
+// ADT enums with select, pipe operator, collection pipelines (filter/map/
+// groupBy/sortedBy/distinct/fold/reduce/take), nullable types, closures,
+// extension methods, and string interpolation.
+
+// ── Level enum ────────────────────────────────────────────────────────────────
+
+enum LogLevel {
+  DEBUG, INFO, WARN, ERROR, FATAL
+
+public:
+  static def fromString(s: String): LogLevel = select s {
+    case "DEBUG": return LogLevel::DEBUG
+    case "INFO":  return LogLevel::INFO
+    case "WARN":  return LogLevel::WARN
+    case "ERROR": return LogLevel::ERROR
+    case "FATAL": return LogLevel::FATAL
+    else:         return LogLevel::INFO
+  }
+
+  def severity(): Int = select this {
+    case LogLevel::DEBUG: 0
+    case LogLevel::INFO:  1
+    case LogLevel::WARN:  2
+    case LogLevel::ERROR: 3
+    case LogLevel::FATAL: 4
+  }
+
+  def isAtLeast(other: LogLevel): Boolean = this.severity() >= other.severity()
+}
+
+// ── Alert ADT ─────────────────────────────────────────────────────────────────
+
+enum Alert {
+  case ErrorSpike(source: String, count: Int)
+  case SlowQuery(durationMs: Int)
+  case CapacityWarning(resource: String, pct: Int)
+  case AuthFailure(user: String)
+
+public:
+  def description(): String = select this {
+    case a is ErrorSpike:      "ERROR SPIKE in #{a.source()}: #{a.count()} errors"
+    case a is SlowQuery:       "SLOW QUERY: #{a.durationMs()}ms"
+    case a is CapacityWarning: "CAPACITY: #{a.resource()} at #{a.pct()}%"
+    case a is AuthFailure:     "AUTH FAILURE for user #{a.user()}"
+  }
+
+  def severity(): Int = select this {
+    case a is ErrorSpike:      if a.count() >= 3 { 10 } else { 5 }
+    case a is SlowQuery:       if a.durationMs() > 2000 { 7 } else { 3 }
+    case a is CapacityWarning: if a.pct() > 90 { 8 } else { 4 }
+    case a is AuthFailure:     9
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record LogEntry(timestamp: String, level: String, source: String, message: String)
+  from re"(\S+) +(\w+) +\[([^\]]+)\] +(.*)"
+
+record SourceReport(source: String, total: Int, warnCount: Int, errorCount: Int) {
+public:
+  def health(): String {
+    if errorCount >= 3 { return "CRITICAL" }
+    if errorCount > 0  { return "DEGRADED" }
+    if warnCount > 2   { return "STRESSED" }
+    return "OK"
+  }
+  def describe(): String =
+    "  #{source}: total=#{total} warn=#{warnCount} error=#{errorCount} [#{health()}]"
+}
+
+record LevelSummary(level: String, count: Int, pct: Double) {
+public:
+  def bar(): String {
+    val filled = (pct / 5.0) as Int
+    var b = ""
+    var i = 0
+    while i < filled { b = b + "#"; i++ }
+    while i < 20    { b = b + "."; i++ }
+    return b
+  }
+  def describe(): String = "  #{level} #{count} |#{bar()}| #{pct}%"
+}
+
+record MinuteBucket(minute: String, count: Int, errorCount: Int) {
+public:
+  def describe(): String = "  #{minute}: #{count} entries (#{errorCount} errors)"
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+}
+
+extension String {
+  def minuteOf(): String {
+    val i = self.lastIndexOf(":")
+    if i < 0 { return self }
+    return self.substring(0, i)
+  }
+}
+
+// ── Analysis functions ────────────────────────────────────────────────────────
+
+def buildSourceReports(entries: List[LogEntry]): List[SourceReport] {
+  val totals: Map[String, Int] = [:]
+  val warns:  Map[String, Int] = [:]
+  val errors: Map[String, Int] = [:]
+
+  foreach e: LogEntry in entries {
+    val src = e.source()
+    val t = totals[src]
+    totals[src] = if t == null { 1 } else { (t as Int) + 1 }
+    if e.level() == "WARN" {
+      val w = warns[src]
+      warns[src] = if w == null { 1 } else { (w as Int) + 1 }
+    }
+    if e.level() == "ERROR" || e.level() == "FATAL" {
+      val er = errors[src]
+      errors[src] = if er == null { 1 } else { (er as Int) + 1 }
+    }
+  }
+
+  val result: List[SourceReport] = []
+  foreach (src, cnt) in totals {
+    val w  = warns[src]
+    val er = errors[src]
+    result.add(new SourceReport(src as String, cnt as Int,
+      if w  == null { 0 } else { w  as Int },
+      if er == null { 0 } else { er as Int }))
+  }
+  return result.sortedBy { r: SourceReport => 0 - r.errorCount() }
+}
+
+def buildLevelSummaries(entries: List[LogEntry]): List[LevelSummary] {
+  val counts: Map[String, Int] = [:]
+  foreach e: LogEntry in entries {
+    val lv = e.level()
+    val c  = counts[lv]
+    counts[lv] = if c == null { 1 } else { (c as Int) + 1 }
+  }
+  val total = entries.size as Double
+  val result: List[LevelSummary] = []
+  foreach lv: String in ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"] {
+    val cnt = counts[lv]
+    if cnt != null {
+      val c   = cnt as Int
+      val pct = ((c as Double) / total * 100.0).round2()
+      result.add(new LevelSummary(lv, c, pct))
+    }
+  }
+  return result
+}
+
+def buildMinuteBuckets(entries: List[LogEntry]): List[MinuteBucket] {
+  val counts: Map[String, Int] = [:]
+  val errCts: Map[String, Int] = [:]
+  foreach e: LogEntry in entries {
+    val min = e.timestamp().minuteOf()
+    val c   = counts[min]
+    counts[min] = if c == null { 1 } else { (c as Int) + 1 }
+    if e.level() == "ERROR" || e.level() == "FATAL" {
+      val er = errCts[min]
+      errCts[min] = if er == null { 1 } else { (er as Int) + 1 }
+    }
+  }
+  val result: List[MinuteBucket] = []
+  foreach (min, cnt) in counts {
+    val er = errCts[min]
+    result.add(new MinuteBucket(min as String, cnt as Int,
+      if er == null { 0 } else { er as Int }))
+  }
+  return result.sortedBy { b: MinuteBucket => b.minute() }
+}
+
+def detectAlerts(entries: List[LogEntry]): List[Alert] {
+  val alerts: List[Alert] = []
+
+  val errCts: Map[String, Int] = [:]
+  foreach e: LogEntry in entries {
+    if e.level() == "ERROR" || e.level() == "FATAL" {
+      val src = e.source()
+      val c   = errCts[src]
+      errCts[src] = if c == null { 1 } else { (c as Int) + 1 }
+    }
+  }
+  foreach (src, cnt) in errCts {
+    if (cnt as Int) >= 2 {
+      alerts.add(new ErrorSpike(src as String, cnt as Int))
+    }
+  }
+
+  foreach e: LogEntry in entries {
+    val msg = e.message()
+    val slow = re"took (\d+)ms".matcher(msg)
+    if slow.find() {
+      val ms = Integer::parseInt(slow.group(1))
+      if ms > 1500 { alerts.add(new SlowQuery(ms)) }
+    }
+    val cap = re"at (\d+)% capacity".matcher(msg)
+    if cap.find() {
+      alerts.add(new CapacityWarning(e.source(), Integer::parseInt(cap.group(1))))
+    }
+    val auth = re"Login attempt blocked user (\w+)".matcher(msg)
+    if auth.find() {
+      alerts.add(new AuthFailure(auth.group(1)))
+    }
+  }
+
+  return alerts.sortedBy { a: Alert => 0 - a.severity() }
+}
+
+def printSection(title: String, lines: List[String]): void {
+  IO::println("--- #{title} ---")
+  foreach line: String in lines { IO::println(line) }
+  IO::println("")
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val logLines = [
+    "2024-01-15T10:00:01 INFO  [auth] User alice logged in",
+    "2024-01-15T10:00:45 DEBUG [cache] Cache hit ratio: 0.92",
+    "2024-01-15T10:01:03 WARN  [db] Query took 1850ms (threshold: 1000ms)",
+    "2024-01-15T10:01:12 ERROR [api] POST /orders failed: timeout",
+    "2024-01-15T10:01:30 INFO  [auth] Token refreshed for user bob",
+    "2024-01-15T10:02:00 WARN  [db] Query took 2100ms",
+    "2024-01-15T10:02:11 ERROR [db] Deadlock detected, rolled back tx #4421",
+    "2024-01-15T10:02:33 INFO  [api] GET /products 200 OK (45ms)",
+    "2024-01-15T10:03:05 DEBUG [cache] Evicted 120 stale entries",
+    "2024-01-15T10:03:15 ERROR [api] GET /users/42 404 Not Found",
+    "2024-01-15T10:03:47 WARN  [cache] Cache size at 89% capacity",
+    "2024-01-15T10:04:00 FATAL [db] Connection pool exhausted (max=50)",
+    "2024-01-15T10:04:22 ERROR [auth] Login attempt blocked user admin",
+    "2024-01-15T10:04:45 INFO  [api] Scheduled maintenance window started",
+    "2024-01-15T10:05:03 WARN  [auth] Session about to expire for user charlie",
+    "2024-01-15T10:05:30 INFO  [db] Connection pool recovered",
+    "2024-01-15T10:05:52 DEBUG [api] Request traced: id=req-9923",
+    "2024-01-15T10:06:15 ERROR [cache] Write-back failed: disk full",
+    "2024-01-15T10:06:40 INFO  [auth] Password changed for user alice"
+  ]
+
+  val text = logLines.fold("") { acc: String, line: String =>
+    if acc.length() == 0 { line } else { acc + "\n" + line }
+  }
+
+  val entries = LogEntry::parseAll(text)
+  IO::println("=== Log Analysis Report ===")
+  IO::println("Total entries parsed: #{entries.size}")
+  IO::println("")
+
+  // Level distribution
+  printSection("Level Distribution",
+    buildLevelSummaries(entries).map { s: LevelSummary => s.describe() })
+
+  // Source health
+  printSection("Source Health",
+    buildSourceReports(entries).map { r: SourceReport => r.describe() })
+
+  // Timeline
+  printSection("Timeline (per minute)",
+    buildMinuteBuckets(entries).map { b: MinuteBucket => b.describe() })
+
+  // High-severity entries
+  val highSev = entries
+    .filter { e: LogEntry => LogLevel::fromString(e.level().trim()).isAtLeast(LogLevel::WARN) }
+    .sortedBy { e: LogEntry => e.timestamp() }
+    .map { e: LogEntry => "  #{e.timestamp()} [#{e.level()}] #{e.source()}: #{e.message()}" }
+  printSection("High-Severity Entries", highSev)
+
+  // Alerts
+  val alerts = detectAlerts(entries)
+  val alertLines = if alerts.size == 0 {
+    ["  (none)"]
+  } else {
+    alerts.map { a: Alert => "  [sev=#{a.severity()}] #{a.description()}" }
+  }
+  printSection("Active Alerts (by severity)", alertLines)
+
+  // Summary via fold/reduce and |>
+  val errorCount = entries.fold(0) { acc: Int, e: LogEntry =>
+    if e.level() == "ERROR" || e.level() == "FATAL" { acc + 1 } else { acc }
+  }
+  val criticalSources = entries
+    .filter { e: LogEntry => LogLevel::fromString(e.level().trim()).isAtLeast(LogLevel::WARN) }
+    .map { e: LogEntry => e.source() }
+    .distinct()
+    .sortedBy { s: String => s }
+
+  IO::println("--- Summary ---")
+  IO::println("  Errors+Fatals : #{errorCount}")
+  IO::println("  Alerts raised : #{alerts.size}")
+  IO::print("  At-risk srcs  : ")
+  criticalSources |> println
+}

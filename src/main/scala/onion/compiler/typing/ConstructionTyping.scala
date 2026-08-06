@@ -6,6 +6,9 @@ import onion.compiler.TypedAST.*
 import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
+import scala.util.boundary
+import scala.util.boundary.break
+
 final class ConstructionTyping(
   private val typing: Typing,
   private val bodyContext: TypingBodyContext,
@@ -223,56 +226,58 @@ final class ConstructionTyping(
     if (hasNamedArguments(node.args)) return None
 
     bareGenericTarget(node).flatMap { raw =>
-      // Probe-type the arguments: a genuine error here is reported once by the
-      // real resolution path below, not twice by this speculative pass.
-      val args = typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
-      if (args == null || args.exists(_ == null)) return None
+      boundary[Option[ClassType]] {
+        // Probe-type the arguments: a genuine error here is reported once by the
+        // real resolution path below, not twice by this speculative pass.
+        val args = typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
+        if (args == null || args.exists(_ == null)) break(None)
 
-      val typeParams = raw.typeParameters
-      val candidates = raw.constructors.collect {
-        case cd: ConstructorDefinition
-          if cd.getArgs.length == args.length ||
-            (cd.argumentsWithDefaults != null && args.length < cd.argumentsWithDefaults.length && args.length >= cd.minArguments) => cd
-      }
-      if (candidates.isEmpty) return None
-
-      val solutions: List[List[Type]] = candidates.toList.flatMap { candidate =>
-        val synthetic = new MethodDefinition(
-          node.location,
-          candidate.modifier,
-          raw,
-          "<init>",
-          candidate.getArgs.take(args.length),
-          raw,
-          null,
-          typeParams
-        )
-        val bindings = typing.withSuppressedReporting {
-          GenericMethodTypeArguments.inferWithoutDefaults(
-            typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+        val typeParams = raw.typeParameters
+        val candidates = raw.constructors.collect {
+          case cd: ConstructorDefinition
+            if cd.getArgs.length == args.length ||
+              (cd.argumentsWithDefaults != null && args.length < cd.argumentsWithDefaults.length && args.length >= cd.minArguments) => cd
         }
-        // Every class type parameter must be pinned by an argument; a partially
-        // inferred type would otherwise silently default the rest to their bound.
-        if (typeParams.forall(tp => bindings.contains(tp.name)))
-          Some(typeParams.map(tp => bindings(tp.name)).toList)
-        else None
-      }.distinct
+        if (candidates.isEmpty) break(None)
 
-      solutions match {
-        case only :: Nil => Some(AppliedClassType(raw, only))
-        case _ => None
+        val solutions: List[List[Type]] = candidates.toList.flatMap { candidate =>
+          val synthetic = new MethodDefinition(
+            node.location,
+            candidate.modifier,
+            raw,
+            "<init>",
+            candidate.getArgs.take(args.length),
+            raw,
+            null,
+            typeParams
+          )
+          val bindings = typing.withSuppressedReporting {
+            GenericMethodTypeArguments.inferWithoutDefaults(
+              typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+          }
+          // Every class type parameter must be pinned by an argument; a partially
+          // inferred type would otherwise silently default the rest to their bound.
+          if (typeParams.forall(tp => bindings.contains(tp.name)))
+            Some(typeParams.map(tp => bindings(tp.name)).toList)
+          else None
+        }.distinct
+
+        solutions match {
+          case only :: Nil => Some(AppliedClassType(raw, only))
+          case _ => None
+        }
       }
     }
   }
 
-  def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] = {
+  def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] = boundary {
     val typeRef = diamondType(node, expected).orElse(diamondTypeFromArguments(node, context)).getOrElse {
       typing.mapFromDeclared(node.typeRef) match {
         case Some(ct: ClassType) => ct
         case Some(other) =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, bodyContext.rootClass, other)
-          return None
-        case None => return None
+          break(None)
+        case None => break(None)
       }
     }
 
@@ -283,12 +288,12 @@ final class ConstructionTyping(
     }
     if (Modifier.isAbstract(classToCheck.modifier)) {
       bodyContext.report(ABSTRACT_CLASS_INSTANTIATION, node, typeRef)
-      return None
+      break(None)
     }
 
     // Check for named arguments
     if (hasNamedArguments(node.args)) {
-      return typeNewObjectWithNamedArgs(node, typeRef, context)
+      break(typeNewObjectWithNamedArgs(node, typeRef, context))
     }
 
     // A lambda argument can't take its final type until its target type (the
@@ -302,22 +307,21 @@ final class ConstructionTyping(
     }.toSet
     if (untypedClosureIndices.nonEmpty) {
       resolveConstructorForClosures(node, typeRef, context, untypedClosureIndices) match {
-        case Some(term) => return Some(term)
+        case Some(term) => break(Some(term))
         case None => // ambiguous/unresolved: fall through to the eager path, which reports E0052 / constructor-not-found
       }
     }
 
     // Existing positional argument handling
     val parameters0 = typedTerms(node.args.toArray, context)
-    if (parameters0 == null) return None
+    if (parameters0 == null) break(None)
 
     val constructors0 = typeRef.findConstructor(parameters0)
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
-    val (constructors, parameters) =
-      if (constructors0.nonEmpty) (constructors0, parameters0)
-      else findConstructorWithBoxing(typeRef, parameters0)
+    val constructors = if (constructors0.nonEmpty) constructors0 else findConstructorWithBoxing(typeRef, parameters0)
+    val parameters = parameters0
     // Guard the substitution-blind exact match: for an applied generic type the
     // matched constructor must accept the arguments under the type-argument
     // substitution (T -> String), not merely under the erased bound (Object).
@@ -336,7 +340,7 @@ final class ConstructionTyping(
     }
     if (!substitutionValid) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
-      return None
+      break(None)
     }
     if (constructors.length == 0) {
       // Default-parameter fallback: a constructor with defaults accepts
@@ -348,7 +352,7 @@ final class ConstructionTyping(
             parameters0.length >= cd.minArguments
         case _ => false
       }
-      if (defaultsCandidate) return typeNewObjectWithNamedArgs(node, typeRef, context)
+      if (defaultsCandidate) break(typeNewObjectWithNamedArgs(node, typeRef, context))
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {
@@ -373,12 +377,39 @@ final class ConstructionTyping(
             def name: String = constructors(0).name
             def getArgs: Array[TypedAST.Type] = constructors(0).getArgs
           }
-          Some(new NewObject(appliedCtor, parameters))
+          val classSubst = TypeSubstitution.classSubstitution(applied)
+          val formals = constructors(0).getArgs.map(t =>
+            TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+          Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
         case _ =>
-          Some(new NewObject(constructors(0), parameters))
+          Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
       }
     }
   }
+
+  /**
+   * Adapts already-matched arguments to their constructor's formal types:
+   * boxes a primitive argument for a non-primitive formal, and inserts an
+   * explicit numeric conversion (widening or constant-narrowing alike)
+   * whenever both sides are primitive but differ. A resolved match can need
+   * either even outside the boxing-fallback path -- `record Game(price:
+   * Double)` called as `new Game(99)` matches directly via `findConstructor`'s
+   * own widening-aware comparison, and leaving that `Int` argument
+   * unconverted left codegen pushing a 1-slot value where the constructor's
+   * descriptor declares a 2-slot `double`, corrupting the JVM stack map
+   * frames (`NegativeArraySizeException` in ASM's `Frame.merge`, or a
+   * `VerifyError` at class-load time). Found via `MutationFuzzSpec` mutating
+   * a decimal literal down to an `Int` in `run/GameStore.on`.
+   */
+  private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
+    if (parameters.length != formals.length) parameters
+    else parameters.zip(formals).map { (p, f) =>
+      if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+      else f match {
+        case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
+        case _ => p
+      }
+    }
 
   /** Whether `actual` can fill a parameter declared `formal`, either through
     * ordinary boxing-aware assignability or -- for a literal like `-3` against
@@ -392,34 +423,21 @@ final class ConstructionTyping(
 
   /**
    * Boxing-aware constructor fallback: substitutes class type arguments into
-   * the constructor signatures, matches with primitive boxing or constant
-   * narrowing, and adapts the argument terms (boxing primitives, narrowing
-   * literals) for the unique match.
+   * the constructor signatures and matches with primitive boxing or constant
+   * narrowing. Argument adaptation (boxing, numeric conversion) happens once
+   * the caller has settled on the unique match, in `adaptToFormals`.
    */
   private def findConstructorWithBoxing(
     typeRef: ClassType,
     parameters: Array[Term]
-  ): (Array[ConstructorRef], Array[Term]) = {
+  ): Array[ConstructorRef] = {
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     def substitutedArgs(c: ConstructorRef): Array[Type] =
       c.getArgs.map(t => TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-    val candidates = typeRef.constructors.filter { c =>
+    typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == parameters.length &&
         formals.indices.forall(i => formalAccepts(formals(i), parameters(i)))
-    }
-    if (candidates.length != 1) (candidates, parameters)
-    else {
-      val formals = substitutedArgs(candidates(0))
-      val adapted = parameters.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-        else f match {
-          case bt: BasicType if bt != p.`type` && ConstantNarrowing.constantIntOf(p).exists(v => ConstantNarrowing.fits(bt, v)) =>
-            new AsInstanceOf(p.location, p, bt)
-          case _ => p
-        }
-      }
-      (candidates, adapted)
     }
   }
 
@@ -457,7 +475,7 @@ final class ConstructionTyping(
     typeRef: ClassType,
     context: LocalContext,
     closureIndices: Set[Int]
-  ): Option[Term] = {
+  ): Option[Term] = boundary {
     val args = node.args.toArray
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     def substitutedArgs(c: ConstructorRef): Array[Type] =
@@ -467,7 +485,7 @@ final class ConstructionTyping(
     for (i <- args.indices if !closureIndices.contains(i)) {
       typed(args(i), context) match {
         case Some(t) => prelim(i) = t
-        case None => return None
+        case None => break(None)
       }
     }
 
@@ -481,7 +499,7 @@ final class ConstructionTyping(
             TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
-    if (candidates.length != 1) return None
+    if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)
     val formals = substitutedArgs(ctor)
@@ -490,7 +508,7 @@ final class ConstructionTyping(
       if (closureIndices.contains(i)) {
         typed(args(i), context, formals(i)) match {
           case Some(t) => finalParams(i) = t
-          case None => return None
+          case None => break(None)
         }
       } else {
         val p = prelim(i)

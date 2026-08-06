@@ -1,0 +1,443 @@
+// PokerHands.on — poker hand classifier and comparator.
+// Exercises: data-carrying enums (Rank), plain enums (Suit) with methods,
+// ADT/case-enums (HandKind), records with methods (Card, EvalResult),
+// interfaces (Displayable), classes, collection pipelines (groupBy/sortedBy/
+// filter/map/fold), pattern matching (select/case-is), extension methods on
+// Int and Double, string interpolation, foreach over List and Map (k,v),
+// nullable types, try/catch, while loop, recursion.
+
+import { java.util.ArrayList }
+
+// ── Rank: data-carrying enum ────────────────────────────────────────────────
+
+enum Rank(value: Int) {
+  TWO(2), THREE(3), FOUR(4), FIVE(5), SIX(6), SEVEN(7),
+  EIGHT(8), NINE(9), TEN(10), JACK(11), QUEEN(12), KING(13), ACE(14)
+}
+
+// ── Suit: plain enum with display methods ───────────────────────────────────
+
+enum Suit {
+  HEARTS, DIAMONDS, CLUBS, SPADES
+public:
+  def symbol(): String = select this {
+    case Suit::HEARTS:   "♥"
+    case Suit::DIAMONDS: "♦"
+    case Suit::CLUBS:    "♣"
+    case Suit::SPADES:   "♠"
+    else: "?"
+  }
+  def isRed(): Boolean {
+    select this {
+      case Suit::HEARTS, Suit::DIAMONDS: return true
+      else: return false
+    }
+  }
+}
+
+// ── Card record ─────────────────────────────────────────────────────────────
+
+record Card(rank: Rank, suit: Suit) {
+public:
+  def rankShort(): String {
+    select rank().value() {
+      case 11: return "J"
+      case 12: return "Q"
+      case 13: return "K"
+      case 14: return "A"
+      else:    return "" + rank().value()
+    }
+  }
+  def display(): String = rankShort() + suit().symbol()
+  def colorLabel(): String {
+    if suit().isRed() { return "(red)" }
+    return "(blk)"
+  }
+}
+
+// ── HandKind: ADT case-enum for the 10 hand categories ─────────────────────
+
+enum HandKind {
+  case HighCard
+  case OnePair
+  case TwoPair
+  case ThreeOfAKind
+  case Straight
+  case Flush
+  case FullHouse
+  case FourOfAKind
+  case StraightFlush
+  case RoyalFlush
+}
+
+def kindName(hk: HandKind): String {
+  select hk {
+    case h is HighCard:      return "High Card"
+    case h is OnePair:       return "One Pair"
+    case h is TwoPair:       return "Two Pair"
+    case h is ThreeOfAKind:  return "Three of a Kind"
+    case h is Straight:      return "Straight"
+    case h is Flush:         return "Flush"
+    case h is FullHouse:     return "Full House"
+    case h is FourOfAKind:   return "Four of a Kind"
+    case h is StraightFlush: return "Straight Flush"
+    case h is RoyalFlush:    return "Royal Flush"
+  }
+}
+
+def kindRank(hk: HandKind): Int {
+  select hk {
+    case h is HighCard:      return 0
+    case h is OnePair:       return 1
+    case h is TwoPair:       return 2
+    case h is ThreeOfAKind:  return 3
+    case h is Straight:      return 4
+    case h is Flush:         return 5
+    case h is FullHouse:     return 6
+    case h is FourOfAKind:   return 7
+    case h is StraightFlush: return 8
+    case h is RoyalFlush:    return 9
+  }
+}
+
+// ── Displayable interface ───────────────────────────────────────────────────
+
+interface Displayable {
+  def show(): String
+}
+
+// ── EvalResult record ───────────────────────────────────────────────────────
+
+record EvalResult(cards: List[Card], kind: HandKind) conforms Displayable {
+public:
+  def show(): String {
+    var disp: String = ""
+    foreach c: Object in cards() {
+      if disp.length() > 0 { disp = disp + " " }
+      disp = disp + (c as Card).display()
+    }
+    return "[#{disp}]  →  #{kindName(kind())}"
+  }
+  def rank(): Int = kindRank(kind())
+}
+
+// ── Classification helpers ───────────────────────────────────────────────────
+
+def isFlush(cards: List[Card]): Boolean {
+  val firstSuit = (cards[0] as Card).suit()
+  return cards.filter { c => c.suit() == firstSuit }.size == 5
+}
+
+def countDistinctRanks(cards: List[Card]): Int {
+  val groups = cards.groupBy { c => c.rank().value() }
+  var n: Int = 0
+  foreach (k, v) in groups { n = n + 1 }
+  return n
+}
+
+def isStraight(cards: List[Card]): Boolean {
+  if countDistinctRanks(cards) != 5 { return false }
+  val sorted: List[Card] = cards.sortedBy { c => c.rank().value() }
+  val lo = (sorted[0] as Card).rank().value()
+  val hi = (sorted[4] as Card).rank().value()
+  return (hi - lo) == 4
+}
+
+def maxGroupSize(cards: List[Card]): Int {
+  val groups = cards.groupBy { c => c.rank().value() }
+  var mx: Int = 0
+  foreach (k, v) in groups {
+    val sz = (v as List[Object]).size
+    if sz > mx { mx = sz }
+  }
+  return mx
+}
+
+def secondGroupSize(cards: List[Card]): Int {
+  val groups = cards.groupBy { c => c.rank().value() }
+  var first: Int = 0
+  var second: Int = 0
+  foreach (k, v) in groups {
+    val sz = (v as List[Object]).size
+    if sz > first { second = first; first = sz }
+    else if sz > second { second = sz }
+  }
+  return second
+}
+
+def classify(cards: List[Card]): HandKind {
+  val flush    = isFlush(cards)
+  val straight = isStraight(cards)
+  val mx       = maxGroupSize(cards)
+  val sec      = secondGroupSize(cards)
+  if flush && straight {
+    val sorted: List[Card] = cards.sortedBy { c => c.rank().value() }
+    if (sorted[4] as Card).rank().value() == 14 { return new RoyalFlush() }
+    return new StraightFlush()
+  }
+  if mx == 4 { return new FourOfAKind() }
+  if mx == 3 && sec == 2 { return new FullHouse() }
+  if flush { return new Flush() }
+  if straight { return new Straight() }
+  if mx == 3 { return new ThreeOfAKind() }
+  if mx == 2 && sec == 2 { return new TwoPair() }
+  if mx == 2 { return new OnePair() }
+  return new HighCard()
+}
+
+def eval(cards: List[Card]): EvalResult =
+  new EvalResult(cards, classify(cards))
+
+// ── Hand comparison ──────────────────────────────────────────────────────────
+
+def compareHands(a: EvalResult, b: EvalResult): String {
+  val ra = a.rank()
+  val rb = b.rank()
+  if ra > rb { return "Hand A wins (#{kindName(a.kind())} beats #{kindName(b.kind())})" }
+  if ra < rb { return "Hand B wins (#{kindName(b.kind())} beats #{kindName(a.kind())})" }
+  return "Tie (both #{kindName(a.kind())})"
+}
+
+// ── Deck utilities ───────────────────────────────────────────────────────────
+
+def buildDeck(): ArrayList[Card] {
+  val deck = new ArrayList[Card]()
+  foreach s: Suit in Suit::values() {
+    foreach r: Rank in Rank::values() {
+      deck.add(new Card(r, s))
+    }
+  }
+  return deck
+}
+
+def dealHand(deck: ArrayList[Card], start: Int, count: Int): List[Card] {
+  val hand = new ArrayList[Card]()
+  var i: Int = start
+  while i < start + count && i < deck.size {
+    hand.add(deck[i] as Card)
+    i = i + 1
+  }
+  return hand
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def pct(): String {
+    val whole: Int = (self * 100.0) as Int
+    val frac: Int  = ((self * 1000.0) as Int) % 10
+    return "" + whole + "." + frac + "%"
+  }
+}
+
+// ── Safe division helper (shows try/catch) ───────────────────────────────────
+
+def safeDiv(a: Int, b: Int): Int {
+  try {
+    return a / b
+  } catch e: Exception {
+    return 0
+  }
+}
+
+// ── Recursion: Fibonacci as warmup ───────────────────────────────────────────
+
+def fib(n: Int): Int =
+  if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Main demo
+// ═══════════════════════════════════════════════════════════════════════════════
+
+IO::println("═══ Poker Hand Evaluator ═══")
+IO::println("")
+
+// ── 1. Classify one example of every hand type ─────────────────────────────
+
+val hands: List[List[Card]] = [
+  // Royal Flush
+  [new Card(Rank::ACE, Suit::SPADES), new Card(Rank::KING, Suit::SPADES),
+   new Card(Rank::QUEEN, Suit::SPADES), new Card(Rank::JACK, Suit::SPADES),
+   new Card(Rank::TEN, Suit::SPADES)],
+  // Straight Flush
+  [new Card(Rank::NINE, Suit::DIAMONDS), new Card(Rank::EIGHT, Suit::DIAMONDS),
+   new Card(Rank::SEVEN, Suit::DIAMONDS), new Card(Rank::SIX, Suit::DIAMONDS),
+   new Card(Rank::FIVE, Suit::DIAMONDS)],
+  // Four of a Kind
+  [new Card(Rank::KING, Suit::HEARTS), new Card(Rank::KING, Suit::DIAMONDS),
+   new Card(Rank::KING, Suit::CLUBS), new Card(Rank::KING, Suit::SPADES),
+   new Card(Rank::ACE, Suit::HEARTS)],
+  // Full House
+  [new Card(Rank::TEN, Suit::HEARTS), new Card(Rank::TEN, Suit::CLUBS),
+   new Card(Rank::TEN, Suit::SPADES), new Card(Rank::SIX, Suit::HEARTS),
+   new Card(Rank::SIX, Suit::DIAMONDS)],
+  // Flush
+  [new Card(Rank::ACE, Suit::CLUBS), new Card(Rank::JACK, Suit::CLUBS),
+   new Card(Rank::NINE, Suit::CLUBS), new Card(Rank::FIVE, Suit::CLUBS),
+   new Card(Rank::TWO, Suit::CLUBS)],
+  // Straight
+  [new Card(Rank::EIGHT, Suit::HEARTS), new Card(Rank::SEVEN, Suit::DIAMONDS),
+   new Card(Rank::SIX, Suit::CLUBS), new Card(Rank::FIVE, Suit::SPADES),
+   new Card(Rank::FOUR, Suit::HEARTS)],
+  // Three of a Kind
+  [new Card(Rank::QUEEN, Suit::HEARTS), new Card(Rank::QUEEN, Suit::CLUBS),
+   new Card(Rank::QUEEN, Suit::SPADES), new Card(Rank::NINE, Suit::DIAMONDS),
+   new Card(Rank::THREE, Suit::HEARTS)],
+  // Two Pair
+  [new Card(Rank::JACK, Suit::HEARTS), new Card(Rank::JACK, Suit::CLUBS),
+   new Card(Rank::FOUR, Suit::DIAMONDS), new Card(Rank::FOUR, Suit::SPADES),
+   new Card(Rank::ACE, Suit::HEARTS)],
+  // One Pair
+  [new Card(Rank::SEVEN, Suit::HEARTS), new Card(Rank::SEVEN, Suit::CLUBS),
+   new Card(Rank::ACE, Suit::SPADES), new Card(Rank::KING, Suit::DIAMONDS),
+   new Card(Rank::TWO, Suit::HEARTS)],
+  // High Card
+  [new Card(Rank::ACE, Suit::HEARTS), new Card(Rank::JACK, Suit::SPADES),
+   new Card(Rank::NINE, Suit::DIAMONDS), new Card(Rank::SIX, Suit::CLUBS),
+   new Card(Rank::TWO, Suit::HEARTS)]
+]
+
+IO::println("Hand Examples:")
+foreach h: Object in hands {
+  val cards = h as List[Card]
+  val result = eval(cards)
+  IO::println("  " + result.show())
+}
+IO::println("")
+
+// ── 2. Compare two hands ────────────────────────────────────────────────────
+
+IO::println("── Hand Comparisons ──")
+val handA = eval(hands[2] as List[Card])   // Four of a Kind
+val handB = eval(hands[3] as List[Card])   // Full House
+IO::println("  A: " + handA.show())
+IO::println("  B: " + handB.show())
+IO::println("  " + compareHands(handA, handB))
+IO::println("")
+
+val handC = eval(hands[8] as List[Card])   // One Pair
+val handD = eval(hands[9] as List[Card])   // High Card
+IO::println("  C: " + handC.show())
+IO::println("  D: " + handD.show())
+IO::println("  " + compareHands(handC, handD))
+IO::println("")
+
+// ── 3. Build full deck and analyze composition ──────────────────────────────
+
+IO::println("── Full Deck Analysis ──")
+val deck = buildDeck()
+IO::println("  Deck size: #{deck.size}")
+
+// Count red vs black
+var redCount: Int = 0
+var blackCount: Int = 0
+foreach c: Object in deck {
+  val card = c as Card
+  if card.suit().isRed() { redCount = redCount + 1 }
+  else { blackCount = blackCount + 1 }
+}
+IO::println("  Red cards: #{redCount}, Black cards: #{blackCount}")
+
+// Group deck by rank name
+val byRank = (deck as List[Object]).groupBy { c => (c as Card).rank().name() }
+var rankLine: String = ""
+foreach (rankName, group) in byRank {
+  val sz = (group as List[Object]).size
+  if rankLine.length() > 0 { rankLine = rankLine + ", " }
+  rankLine = rankLine + rankName + "×" + sz
+}
+IO::println("  By rank: " + rankLine)
+IO::println("")
+
+// ── 4. Deal sample hands from deck and rank them ────────────────────────────
+
+IO::println("── Dealt Hands from Deck (top 20 cards, 4 hands) ──")
+val dealt: List[EvalResult] = [
+  eval(dealHand(deck, 0,  5)),
+  eval(dealHand(deck, 5,  5)),
+  eval(dealHand(deck, 10, 5)),
+  eval(dealHand(deck, 15, 5))
+]
+var pos: Int = 1
+foreach h: Object in dealt {
+  val er = h as EvalResult
+  IO::println("  Hand #{pos}: " + er.show())
+  pos = pos + 1
+}
+val bestHand: EvalResult = (dealt as List[Object]).fold(dealt[0] as EvalResult) { best, h =>
+  val er = h as EvalResult
+  val b  = best as EvalResult
+  if er.rank() > b.rank() { er } else { b }
+}
+IO::println("  Best: #{kindName(bestHand.kind())}")
+IO::println("")
+
+// ── 5. String interpolation and extension methods ───────────────────────────
+
+IO::println("── Statistics ──")
+val totalRanks: Int = 13
+val totalSuits: Int = 4
+val deckSize: Int   = totalRanks * totalSuits
+val flushCombos: Int = 4 * 1287   // C(13,5) per suit × 4 suits
+val handCombos: Int  = 2598960    // C(52,5) total 5-card hands
+IO::println("  Deck: #{deckSize} cards (#{totalRanks} ranks × #{totalSuits} suits)")
+IO::println("  5-card combinations: #{handCombos}")
+IO::println("  Flush combos: #{flushCombos}")
+val flushPct: Double = (flushCombos as Double) / (handCombos as Double)
+IO::println("  Flush probability: #{flushPct.pct()}")
+IO::println("  Safe-div test: 10/3=#{safeDiv(10,3)}, 10/0=#{safeDiv(10,0)}")
+IO::println("")
+
+// ── 6. Recursion: Fibonacci ──────────────────────────────────────────────────
+
+IO::println("── Fibonacci ──")
+var fibLine: String = ""
+foreach n: Int in 0..9 {
+  if fibLine.length() > 0 { fibLine = fibLine + ", " }
+  fibLine = fibLine + fib(n)
+}
+IO::println("  fib(0..9): " + fibLine)
+IO::println("")
+
+// ── 7. Foreach over range with kindRank mapping ─────────────────────────────
+
+IO::println("── Hand Kind Rank Table ──")
+val kindExamples: List[HandKind] = [
+  new HighCard(), new OnePair(), new TwoPair(), new ThreeOfAKind(),
+  new Straight(), new Flush(), new FullHouse(), new FourOfAKind(),
+  new StraightFlush(), new RoyalFlush()
+]
+foreach k: Object in kindExamples {
+  val hk = k as HandKind
+  val r   = kindRank(hk)
+  IO::println("  " + r.padLeft(2) + "  " + kindName(hk))
+}
+IO::println("")
+
+// ── 8. Nullable lookup (find a Straight Flush in dealt hands) ────────────────
+
+IO::println("── Nullable Find ──")
+val sfHand = (dealt as List[Object]).find { h =>
+  val er = h as EvalResult
+  select er.kind() {
+    case x is StraightFlush: true
+    case x is RoyalFlush:    true
+    else: false
+  }
+}
+if sfHand != null {
+  IO::println("  Found straight flush: " + (sfHand as EvalResult).show())
+} else {
+  IO::println("  No straight flush in dealt hands (expected with top-of-deck)")
+}
+
+IO::println("")
+IO::println("Done.")

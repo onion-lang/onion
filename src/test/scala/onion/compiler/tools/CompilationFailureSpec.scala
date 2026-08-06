@@ -290,5 +290,21 @@ class CompilationFailureSpec extends AbstractShellSpec {
       )
       assert(Shell.Failure(-1) == result)
     }
+
+    it("returns failure (E0010) when an enum body has a duplicate method") {
+      val result = shell.run(
+        """
+          |enum Color { RED, GREEN, BLUE
+          |public:
+          |  def label(): String = "a"
+          |  def label(): String = "b"
+          |}
+          |def main(): void { IO::println(Color::RED.label()) }
+        """.stripMargin,
+        "DupEnumMethod.on",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
   }
 }

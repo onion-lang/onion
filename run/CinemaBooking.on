@@ -1,0 +1,228 @@
+// CinemaBooking.on — Cinema seat-booking system with daily revenue report.
+// Exercises: ADT enum (SeatType), records with example, extension methods on Int
+// and Double, collection pipelines (map/filter/fold/groupBy/sortedBy/find/
+// partition/distinct), foreach on range and Map(k,v), select with type patterns,
+// string interpolation, closures, while, try/catch, and |> pipeline.
+
+// ── Seat category (ADT enum) ──────────────────────────────────────────────────
+enum SeatType {
+  case Standard
+  case Premium
+  case VIP
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Movie(title: String, genre: String, durationMin: Int)
+  example { new Movie("T", "Drama", 120).durationMin() == 120 }
+  example { new Movie("T", "Drama", 120).genre() == "Drama" }
+
+record Booking(movie: Movie, seat: SeatType, customer: String, basePrice: Int)
+  example {
+    new Booking(new Movie("X", "Action", 90), new Standard(), "Alice", 1200).basePrice() == 1200
+  }
+
+record MovieStat(title: String, genre: String, count: Int, revenue: Int)
+
+// ── String formatting helpers ─────────────────────────────────────────────────
+def padLeft(s: String, w: Int): String {
+  var r = s
+  while r.length() < w { r = " " + r }
+  return r
+}
+
+def padRight(s: String, w: Int): String {
+  var r = s
+  while r.length() < w { r = r + " " }
+  return r
+}
+
+def fmtYen(n: Int): String = n + " yen"
+
+// ── Seat type helpers (select on ADT enum) ────────────────────────────────────
+def seatName(st: SeatType): String = select st {
+  case s is Standard: "Standard"
+  case s is Premium:  "Premium"
+  case s is VIP:      "VIP"
+}
+
+def seatMultiplier(st: SeatType): Double = select st {
+  case s is Standard: 1.0
+  case s is Premium:  1.5
+  case s is VIP:      2.5
+}
+
+def bookingRevenue(b: Booking): Int =
+  ((b.basePrice() as Double) * seatMultiplier(b.seat())) as Int
+
+// ── Extension methods on Int ──────────────────────────────────────────────────
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "N/A" }
+    return "" + (self * 100 / total) + "%"
+  }
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+extension Double {
+  def round1(): Double = (self * 10.0 + 0.5) as Long / 10.0
+}
+
+// ── Movie catalogue ───────────────────────────────────────────────────────────
+val actionMovie = new Movie("Cosmic Blast",     "Action",  128)
+val comedyMovie = new Movie("Laugh Together",   "Comedy",   95)
+val dramaMovie  = new Movie("Silent Echoes",    "Drama",   112)
+val scifiMovie  = new Movie("Stellar Drift",    "Sci-Fi",  145)
+val horrorMovie = new Movie("Midnight Shadows", "Horror",  104)
+
+// ── Booking data ──────────────────────────────────────────────────────────────
+val bookings = [
+  new Booking(actionMovie,  new Standard(), "Alice",   1200),
+  new Booking(actionMovie,  new Premium(),  "Bob",     1200),
+  new Booking(actionMovie,  new VIP(),      "Carol",   1200),
+  new Booking(comedyMovie,  new Standard(), "Dave",    1000),
+  new Booking(comedyMovie,  new Standard(), "Eve",     1000),
+  new Booking(comedyMovie,  new Premium(),  "Frank",   1000),
+  new Booking(dramaMovie,   new VIP(),      "Grace",   1400),
+  new Booking(dramaMovie,   new Standard(), "Hank",    1400),
+  new Booking(dramaMovie,   new Premium(),  "Ivy",     1400),
+  new Booking(scifiMovie,   new VIP(),      "Jack",    1500),
+  new Booking(scifiMovie,   new VIP(),      "Kate",    1500),
+  new Booking(scifiMovie,   new Standard(), "Leo",     1500),
+  new Booking(horrorMovie,  new Standard(), "Mia",     1100),
+  new Booking(horrorMovie,  new Premium(),  "Ned",     1100),
+  new Booking(horrorMovie,  new VIP(),      "Olivia",  1100),
+  new Booking(actionMovie,  new Standard(), "Pete",    1200),
+  new Booking(scifiMovie,   new Premium(),  "Quinn",   1500),
+  new Booking(comedyMovie,  new VIP(),      "Rosa",    1000),
+  new Booking(dramaMovie,   new Standard(), "Sam",     1400),
+  new Booking(horrorMovie,  new Standard(), "Tina",    1100)
+]
+
+IO::println("=== Cinema Booking Report ===")
+IO::println("Total bookings: " + bookings.size)
+IO::println("")
+
+// ── Total revenue (fold) ──────────────────────────────────────────────────────
+val totalRevenue = bookings.fold(0) { acc, b =>
+  (acc as Int) + bookingRevenue(b as Booking)
+} as Int
+IO::println("Total revenue: " + fmtYen(totalRevenue))
+IO::println("")
+
+// ── Revenue by seat type (filter + fold for each seat name) ───────────────────
+IO::println("── Revenue by Seat Type ────────────────────────────")
+IO::println(padRight("Seat", 12) + padLeft("Count", 7) + padLeft("Revenue", 14))
+IO::println("-".repeat(34))
+val seatNames = ["Standard", "Premium", "VIP"]
+foreach stName: String in seatNames {
+  val stB = bookings.filter { b => seatName((b as Booking).seat()) == stName }
+  val cnt = stB.size
+  val rev = stB.fold(0) { acc, b => (acc as Int) + bookingRevenue(b as Booking) } as Int
+  IO::println(padRight(stName, 12) + padLeft("" + cnt, 7) + padLeft(fmtYen(rev), 14))
+}
+IO::println("")
+
+// ── Revenue by movie (map into MovieStat, sortedBy revenue) ───────────────────
+IO::println("── Revenue by Movie ─────────────────────────────────")
+IO::println(padRight("Movie", 22) + padRight("Genre", 10) + padLeft("Count", 7) + padLeft("Revenue", 14))
+IO::println("-".repeat(55))
+val allMovies = [actionMovie, comedyMovie, dramaMovie, scifiMovie, horrorMovie]
+val movieStats = allMovies.map { m =>
+  val mv = m as Movie
+  val mb = bookings.filter { b => (b as Booking).movie().title() == mv.title() }
+  val rev = mb.fold(0) { acc, b => (acc as Int) + bookingRevenue(b as Booking) } as Int
+  new MovieStat(mv.title(), mv.genre(), mb.size, rev)
+}
+val sortedByRev = movieStats.sortedBy { ms => 0 - (ms as MovieStat).revenue() }
+foreach i: Int in 1..5 {
+  val ms = sortedByRev[i - 1] as MovieStat
+  IO::println(
+    padRight(ms.title(), 22) +
+    padRight(ms.genre(), 10) +
+    padLeft("" + ms.count(), 7) +
+    padLeft(fmtYen(ms.revenue()), 14)
+  )
+}
+IO::println("")
+
+// ── Genre breakdown (groupBy + foreach on map entries) ───────────────────────
+IO::println("── Bookings by Genre ───────────────────────────────")
+val byGenre = bookings.groupBy { b => (b as Booking).movie().genre() }
+foreach (genre, grp) in byGenre {
+  val cnt = (grp as List).size
+  var bar = ""
+  foreach _: Int in 1..cnt { bar = bar + "#" }
+  IO::println(padRight(genre as String, 10) + " " + bar + " (" + cnt + ")")
+}
+IO::println("")
+
+// ── VIP customers (filter by ADT pattern + foreach) ───────────────────────────
+IO::println("── VIP Customers ───────────────────────────────────")
+val vipBookings = bookings.filter { b =>
+  select (b as Booking).seat() {
+    case s is VIP: true
+    else:          false
+  }
+}
+foreach vb: Booking in vipBookings {
+  val rev = bookingRevenue(vb)
+  IO::println("  " + vb.customer() + " — " + vb.movie().title() + " (" + fmtYen(rev) + ")")
+}
+IO::println("")
+
+// ── Partition: high-value vs budget bookings ──────────────────────────────────
+val parts     = bookings.partition { b => bookingRevenue(b as Booking) >= 2000 }
+val highValue = parts[0] as List[Object]
+val budget    = parts[1] as List[Object]
+IO::println("Bookings >= 2000 yen: " + highValue.size)
+IO::println("Bookings <  2000 yen: " + budget.size)
+IO::println("")
+
+// ── Distinct movie titles seen (distinct) ─────────────────────────────────────
+val seenTitles = bookings.map { b => (b as Booking).movie().title() }.distinct()
+IO::println("Distinct movies with bookings: " + seenTitles.size)
+IO::println("")
+
+// ── Movies ranked by duration (sortedBy + indexed foreach) ───────────────────
+IO::println("── Movies by Duration ──────────────────────────────")
+val sortedByDur = allMovies.sortedBy { m => 0 - (m as Movie).durationMin() }
+foreach i: Int in 1..5 {
+  val mv = sortedByDur[i - 1] as Movie
+  IO::println("  #{i}. #{mv.title()} — #{mv.durationMin()} min")
+}
+IO::println("")
+
+// ── find: most expensive movie revenue ───────────────────────────────────────
+val topMovie = sortedByRev[0] as MovieStat
+IO::println("Highest-revenue movie: #{topMovie.title()} (#{fmtYen(topMovie.revenue())})")
+IO::println("")
+
+// ── Average revenue per booking (extension method round1) ─────────────────────
+val avgRevenue: Double = (totalRevenue as Double) / (bookings.size as Double)
+IO::println("Average revenue per booking: #{avgRevenue.round1()} yen")
+IO::println("")
+
+// ── try/catch: safe percentage helper ────────────────────────────────────────
+def safePct(n: Int, total: Int): String {
+  try {
+    return "" + (n * 100 / total) + "%"
+  } catch e: Exception {
+    return "N/A"
+  }
+}
+
+val vipCount = vipBookings.size
+IO::println("VIP booking rate: " + safePct(vipCount, bookings.size))
+IO::println("")
+
+// ── Closure stored in a val ───────────────────────────────────────────────────
+val makeBanner = (title: String) -> "=== " + title + " ==="
+IO::println(makeBanner("Summary"))
+
+// ── String interpolation ──────────────────────────────────────────────────────
+IO::println("Total: #{bookings.size} bookings, #{fmtYen(totalRevenue)} revenue")
+IO::println("VIP seats: #{vipCount} (#{vipCount.pct(bookings.size)} of all bookings)")
+
+// ── |> pipeline ──────────────────────────────────────────────────────────────
+"Report covers #{allMovies.size} movies and #{seatNames.size} seat categories" |> IO::println
+IO::println("=== End of Cinema Report ===")

@@ -11,15 +11,15 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
 (`E0077`–`E0079` added by the capability boundary).
 
-| # | Dimension | How to measure | Current (2026-07-27) | Pass threshold |
+| # | Dimension | How to measure | Current (2026-08-03) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | 2848 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 65 / 65 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 8 (BrokenLogDemo, OrderReport, ShapeProcessor, StatsApp, StudentGradeBook, TextAnalyzer, TodoManager, ToolDemo) | ≥ 5 |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3164 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 110 / 110 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 53 (AirlineReservation, AuctionHouse, BankLedger, BankSystem, Blackjack, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CinemaBooking, CourseRegistration, EventTicketing, ExpenseAuditor, FitnessTracker, FleetManager, GameStore, GradeBook, GraphAlgorithms, GraphSearch, HotelReservation, Inventory, InventoryManager, InventoryReport, JobScheduler, LibraryCatalog, LibrarySystem, LogAnalytics, MathParser, MiniRpg, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PlaylistManager, PokerHands, RankedChoice, RecipeManager, ShapeProcessor, ShipmentTracker, ShoppingCart, StatsApp, StockPortfolio, StudentGradeBook, TaskPlanner, TextAnalyzer, TicTacToe, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, VirtualMachine, VirtualShell, WeatherReport) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 81 | every common error has a dedicated code |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 83 | every common error has a dedicated code |
 
 **Do not set `SBT_OPTS`.** The previous version of this file recommended
 `SBT_OPTS="-Xmx2g"`, which now *lowers* the heap below the project's own default of 4g and

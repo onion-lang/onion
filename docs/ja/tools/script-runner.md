@@ -34,6 +34,24 @@ onion -encoding UTF-8 MyScript.on
 onion -maxErrorReport 10 MyScript.on
 ```
 
+### `-super <super class>`
+
+トップレベルのスクリプトが生成するクラスの親クラスを指定します。明示的なクラス宣言が
+ない場合にのみ意味を持ちます。
+
+```bash
+onion -super java.lang.Object MyScript.on
+```
+
+### `--verbose`
+
+スクリプト実行前に、各コンパイルフェーズ（構文解析、書き換え、型検査、コード生成）の
+所要時間を表示します。
+
+```bash
+onion --verbose MyScript.on
+```
+
 ### `--dump-ast`
 
 スクリプト実行前に、構文解析後のASTを標準エラー出力に出力します。
@@ -106,6 +124,30 @@ onion --no-check-laws MyScript.on
 
 ```bash
 onion --law-samples 500 MyScript.on
+```
+
+### `--effects`
+
+コンパイルされた各メソッドの推論済みエフェクト集合（`read write net exec env clock rand console unknown`。空はpureを意味する）を標準エラー出力に表示します。
+
+```bash
+onion --effects MyScript.on
+```
+
+### `--stacktrace`
+
+未捕捉のランタイムエラーについて、整形された診断レポートの代わりに生のJVMスタックトレースを表示します。
+
+```bash
+onion --stacktrace MyScript.on
+```
+
+### `--watch`
+
+スクリプトを実行した後、ファイルが変更されるたびに自動的に再実行します。コンパイルエラーやランタイム例外が発生してもウォッチループは止まりません。Ctrl-Cで停止します。
+
+```bash
+onion --watch MyScript.on
 ```
 
 ## プログラム引数

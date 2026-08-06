@@ -159,41 +159,40 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
       unitContext.currentDefinition = definition
       typing.find(definition.name).foreach(unitContext.currentMapper = _)
       val stringType = typing.loadRequired("java.lang.String")
-      val ctorOpt = definition.constructors.headOption
-      if (ctorOpt.isEmpty) return
-      val ctor = ctorOpt.get
-      val paramTypes = ctor.getArgs.drop(2)
-      val enumContext = new LocalContext
-      enumContext.setStatic(true)
-      val statements = scala.collection.mutable.Buffer[ActionStatement]()
-      node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
-        if (constant.args.length != paramTypes.length) {
-          typing.report(
-            SemanticError.CONSTRUCTOR_NOT_FOUND, constant, definition,
-            constant.args.map(_ => bodyContext.rootClass: Type).toArray, definition.constructors
-          )
-        } else {
-          val typedArgs = constant.args.zip(paramTypes).map { case (argExpr, expected) =>
-            typed(argExpr, enumContext, expected).map { term =>
-              assignabilitySupport.processAssignable(argExpr, expected, term)
-            }.orNull
-          }
-          if (typedArgs.forall(_ != null)) {
-            val field = definition.field(constant.name)
-            val callArgs: Array[Term] =
-              Array[Term](new StringValue(constant.name, stringType), new IntValue(constant.location, ordinal)) ++ typedArgs
-            val init = new NewObject(ctor, callArgs)
-            statements += new ExpressionActionStatement(new SetStaticField(constant.location, definition, field, init))
+      definition.constructors.headOption.foreach { ctor =>
+        val paramTypes = ctor.getArgs.drop(2)
+        val enumContext = new LocalContext
+        enumContext.setStatic(true)
+        val statements = scala.collection.mutable.Buffer[ActionStatement]()
+        node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
+          if (constant.args.length != paramTypes.length) {
+            typing.report(
+              SemanticError.CONSTRUCTOR_NOT_FOUND, constant, definition,
+              constant.args.map(_ => bodyContext.rootClass: Type).toArray, definition.constructors
+            )
+          } else {
+            val typedArgs = constant.args.zip(paramTypes).map { case (argExpr, expected) =>
+              typed(argExpr, enumContext, expected).map { term =>
+                assignabilitySupport.processAssignable(argExpr, expected, term)
+              }.orNull
+            }
+            if (typedArgs.forall(_ != null)) {
+              val field = definition.field(constant.name)
+              val callArgs: Array[Term] =
+                Array[Term](new StringValue(constant.name, stringType), new IntValue(constant.location, ordinal)) ++ typedArgs
+              val init = new NewObject(ctor, callArgs)
+              statements += new ExpressionActionStatement(new SetStaticField(constant.location, definition, field, init))
+            }
           }
         }
-      }
-      definition.setStaticInitializers(statements.toArray)
+        definition.setStaticInitializers(statements.toArray)
 
-      // Type the bodies of user-defined members
-      for (section <- node.sections; member <- section.members) {
-        member match {
-          case m: AST.MethodDeclaration => processMethodDeclaration(m)
-          case _ => // enum bodies currently support methods only
+        // Type the bodies of user-defined members
+        for (section <- node.sections; member <- section.members) {
+          member match {
+            case m: AST.MethodDeclaration => processMethodDeclaration(m)
+            case _ => // enum bodies currently support methods only
+          }
         }
       }
     }

@@ -1,0 +1,398 @@
+// BugTracker.on — A software issue tracker demonstrating ADT enums (Priority,
+// Status, Resolution), data-carrying enum (IssueType), records with example,
+// extension methods, classes + interface, collection pipelines (filter/map/fold/
+// sortedBy/groupBy/partition/distinct/find/zip/any/count/take), select / type-
+// pattern matching with exhaustiveness, nullable assignee, string interpolation,
+// try/catch, recursion, while/foreach (ranges and map k,v), closures, |> pipeline.
+
+// ── Priority (ADT enum) ───────────────────────────────────────────────────────
+
+enum Priority {
+  case Critical
+  case High
+  case Medium
+  case Low
+public:
+  def order(): Int = select this {
+    case p is Critical: 0
+    case p is High:     1
+    case p is Medium:   2
+    case p is Low:      3
+  }
+  def label(): String = select this {
+    case p is Critical: "CRITICAL"
+    case p is High:     "HIGH    "
+    case p is Medium:   "MEDIUM  "
+    case p is Low:      "LOW     "
+  }
+  def isUrgent(): Boolean = select this {
+    case p is Critical: true
+    case p is High:     true
+    else:               false
+  }
+}
+
+// ── Status (ADT enum) ─────────────────────────────────────────────────────────
+
+enum Status {
+  case Open
+  case Working
+  case Reviewing
+  case Done
+  case Cancelled
+public:
+  def label(): String = select this {
+    case s is Open:      "Open      "
+    case s is Working:   "Working   "
+    case s is Reviewing: "Reviewing "
+    case s is Done:      "Done      "
+    case s is Cancelled: "Cancelled "
+  }
+  def isActive(): Boolean = select this {
+    case s is Open:      true
+    case s is Working:   true
+    case s is Reviewing: true
+    else:                false
+  }
+  def isDone(): Boolean = select this {
+    case s is Done: true
+    else:           false
+  }
+  def isFinal(): Boolean = select this {
+    case s is Done:      true
+    case s is Cancelled: true
+    else:                false
+  }
+}
+
+// ── IssueType (data-carrying enum) ───────────────────────────────────────────
+
+enum IssueType(symbol: String) {
+  BUG("BUG"), FEATURE("FEAT"), TASK("TASK"), CHORE("CHORE")
+}
+
+// ── Resolution (ADT enum with data) ──────────────────────────────────────────
+
+enum Resolution {
+  case Unresolved
+  case Fixed(inVersion: String)
+  case WontFix(reason: String)
+  case Duplicate(ofId: Int)
+public:
+  def label(): String = select this {
+    case r is Unresolved: "Unresolved"
+    case r is Fixed:      "Fixed in #{r.inVersion()}"
+    case r is WontFix:    "Won't fix: #{r.reason()}"
+    case r is Duplicate:  "Duplicate of ##{r.ofId()}"
+  }
+  def isResolved(): Boolean = select this {
+    case r is Fixed:     true
+    case r is WontFix:   true
+    case r is Duplicate: true
+    else:                false
+  }
+}
+
+// ── Extension methods on Int ──────────────────────────────────────────────────
+
+extension Int {
+  def storyLabel(): String = select self {
+    case n when n <= 1: "XS"
+    case n when n <= 3: "S "
+    case n when n <= 5: "M "
+    case n when n <= 8: "L "
+    else:               "XL"
+  }
+  def priorityBar(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "#"; i++ }
+    while i < 10  { s = s + "-"; i++ }
+    return s
+  }
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+
+extension Double {
+  def pctStr(): String {
+    val tenths = (self * 10.0) as Int
+    return (tenths / 10) + "." + (tenths % 10) + "%"
+  }
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Issue(
+  id: Int,
+  title: String,
+  issueType: IssueType,
+  priority: Priority,
+  status: Status,
+  resolution: Resolution,
+  assignee: String?,
+  storyPoints: Int
+)
+  example { new Issue(1, "crash", IssueType::BUG, new Critical(), new Open(), new Unresolved(), null, 3).id() == 1 }
+  example { new Issue(2, "feat",  IssueType::FEATURE, new Low(), new Done(), new Fixed("v2.0"), "alice", 5).assignee() == "alice" }
+
+// ── IssueTracker class ────────────────────────────────────────────────────────
+
+class IssueTracker conforms Reportable {
+public:
+  val issues: List[Object]
+
+  def this {
+    val empty: List[Object] = []
+    this.issues = empty
+  }
+
+  def add(issue: Issue): void {
+    issues << issue
+  }
+
+  def openIssues(): List[Object] = issues.filter { i => (i as Issue).status().isActive() }
+  def closedIssues(): List[Object] = issues.filter { i => (i as Issue).status().isFinal() }
+  def doneIssues(): List[Object] = issues.filter { i => (i as Issue).status().isDone() }
+
+  def byPriority(p: Priority): List[Object] = issues.filter { i => (i as Issue).priority().order() == p.order() }
+
+  def byAssignee(name: String): List[Object] =
+    issues.filter { i =>
+      val iss = i as Issue
+      iss.assignee() != null && iss.assignee() == name
+    }
+
+  def unassigned(): List[Object] = issues.filter { i => (i as Issue).assignee() == null }
+
+  def urgent(): List[Object] = issues.filter { i => (i as Issue).priority().isUrgent() }
+
+  def totalPoints(): Int = issues.fold(0) { acc, i => (acc as Int) + (i as Issue).storyPoints() }
+
+  def completedPoints(): Int = doneIssues().fold(0) { acc, i => (acc as Int) + (i as Issue).storyPoints() }
+
+  def findById(targetId: Int): Issue? {
+    val found = issues.find { i => (i as Issue).id() == targetId }
+    if found == null { return null }
+    return found as Issue
+  }
+
+  def report(): String {
+    val total  = issues.size
+    val active = openIssues().size
+    val pts    = totalPoints()
+    val done   = completedPoints()
+    return "IssueTracker[#{total} issues | #{active} active | #{pts} total pts | #{done} pts done]"
+  }
+}
+
+// ── Build tracker ─────────────────────────────────────────────────────────────
+
+val tracker = new IssueTracker()
+
+tracker.add(new Issue(1,  "Login crashes on empty password",   IssueType::BUG,     new Critical(), new Working(),   new Unresolved(),        "alice",  3))
+tracker.add(new Issue(2,  "Add OAuth2 login",                  IssueType::FEATURE, new High(),     new Open(),      new Unresolved(),        "bob",    8))
+tracker.add(new Issue(3,  "Improve search performance",        IssueType::TASK,    new High(),     new Reviewing(), new Unresolved(),        "alice",  5))
+tracker.add(new Issue(4,  "Fix payment rounding error",        IssueType::BUG,     new Critical(), new Done(),      new Fixed("v2.3"),       "carol",  2))
+tracker.add(new Issue(5,  "Update README.md",                  IssueType::CHORE,   new Low(),      new Done(),      new Fixed("v2.2"),       "dave",   1))
+tracker.add(new Issue(6,  "Dashboard shows wrong user count",  IssueType::BUG,     new Medium(),   new Open(),      new Unresolved(),        null,     3))
+tracker.add(new Issue(7,  "Add dark mode",                     IssueType::FEATURE, new Low(),      new Open(),      new Unresolved(),        "bob",    8))
+tracker.add(new Issue(8,  "Session timeout too short",         IssueType::BUG,     new Medium(),   new Done(),      new WontFix("by design"), "alice", 2))
+tracker.add(new Issue(9,  "Audit log truncates long messages", IssueType::BUG,     new High(),     new Open(),      new Unresolved(),        "carol",  3))
+tracker.add(new Issue(10, "CSV export broken for empty tables",IssueType::BUG,     new Critical(), new Open(),      new Unresolved(),        null,     5))
+tracker.add(new Issue(11, "Refactor authentication module",    IssueType::CHORE,   new Medium(),   new Open(),      new Unresolved(),        "dave",   5))
+tracker.add(new Issue(12, "Old crash report — already fixed",  IssueType::BUG,     new Low(),      new Cancelled(), new Duplicate(4),        null,     1))
+
+// ── Summary ──────────────────────────────────────────────────────────────────
+
+tracker.report() |> IO::println
+
+// ── Full issue listing ────────────────────────────────────────────────────────
+
+IO::println("\n── All Issues ───────────────────────────────────────────────────────────────")
+foreach item: Object in tracker.issues {
+  val iss = item as Issue
+  val who = if iss.assignee() != null { iss.assignee() } else { "unassigned" }
+  IO::println("  ##{iss.id()} [#{iss.issueType().symbol()}] #{iss.priority().label()} | #{iss.status().label()} | #{who} | #{iss.storyPoints().storyLabel()} | #{iss.title()}")
+}
+
+// ── Open issues sorted by priority ───────────────────────────────────────────
+
+IO::println("\n── Open Issues (by priority) ────────────────────────────────────────────────")
+val openSorted = tracker.openIssues().sortedBy { i => (i as Issue).priority().order() }
+foreach item: Object in openSorted {
+  val iss = item as Issue
+  val who = if iss.assignee() != null { iss.assignee() } else { "unassigned" }
+  IO::println("  ##{iss.id()} #{iss.priority().label()} #{iss.title()} [#{who}]")
+}
+
+// ── Done issues with resolution ───────────────────────────────────────────────
+
+IO::println("\n── Resolved Issues ──────────────────────────────────────────────────────────")
+foreach item: Object in tracker.doneIssues() {
+  val iss = item as Issue
+  IO::println("  ##{iss.id()} #{iss.title()} → #{iss.resolution().label()}")
+}
+
+// ── Group by priority ─────────────────────────────────────────────────────────
+
+IO::println("\n── By Priority ──────────────────────────────────────────────────────────────")
+val byPri = tracker.issues.groupBy { i => (i as Issue).priority().label().trim() }
+foreach (priLabel, group) in byPri {
+  IO::println("  #{priLabel}: #{(group as List).size} issue(s)")
+}
+
+// ── Group by assignee ─────────────────────────────────────────────────────────
+
+IO::println("\n── By Assignee ──────────────────────────────────────────────────────────────")
+val assigned = tracker.issues.filter { i => (i as Issue).assignee() != null }
+val byDev = assigned.groupBy { i => (i as Issue).assignee() }
+foreach (dev, devIssues) in byDev {
+  val pts = (devIssues as List).fold(0) { acc, i => (acc as Int) + (i as Issue).storyPoints() }
+  IO::println("  #{dev}: #{(devIssues as List).size} issue(s), #{pts} pts")
+}
+
+// ── Unassigned ────────────────────────────────────────────────────────────────
+
+IO::println("\n── Unassigned Issues ────────────────────────────────────────────────────────")
+foreach item: Object in tracker.unassigned() {
+  val iss = item as Issue
+  IO::println("  ##{iss.id()} #{iss.priority().label()} #{iss.title()}")
+}
+
+// ── Partition: active vs final ────────────────────────────────────────────────
+
+IO::println("\n── Partition: Active vs Final ───────────────────────────────────────────────")
+val parts   = tracker.issues.partition { i => (i as Issue).status().isActive() }
+val active  = parts[0] as List[Object]
+val final_  = parts[1] as List[Object]
+IO::println("  Active: #{active.size}   Final: #{final_.size}")
+
+// ── Distinct assignees ────────────────────────────────────────────────────────
+
+IO::println("\n── Contributors (distinct assignees) ────────────────────────────────────────")
+val assignees = tracker.issues
+  .filter { i => (i as Issue).assignee() != null }
+  .map    { i => (i as Issue).assignee() }
+  .distinct()
+  .sortedBy { a => a as String }
+IO::println("  " + assignees.size + " contributor(s): " + assignees)
+
+// ── Find by ID ────────────────────────────────────────────────────────────────
+
+IO::println("\n── Find by ID ───────────────────────────────────────────────────────────────")
+val found  = tracker.findById(3)
+val missed = tracker.findById(99)
+if found != null {
+  IO::println("  Found #3: #{(found as Issue).title()}")
+}
+if missed == null {
+  IO::println("  #99 not found (expected)")
+}
+
+// ── Zip: rank open issues by priority ────────────────────────────────────────
+
+IO::println("\n── Open Issues Ranked by Priority (zip) ─────────────────────────────────────")
+val ranked = tracker.openIssues().sortedBy { i => (i as Issue).priority().order() }
+val ranks: List[Object] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+val zipped = ranks.zip(ranked)
+foreach pair: Object in zipped {
+  val row = pair as List
+  val rank = row[0] as Int
+  val iss  = row[1] as Issue
+  IO::println("  #{rank}. ##{iss.id()} #{iss.title()}")
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+IO::println("\n── Statistics ───────────────────────────────────────────────────────────────")
+val total     = tracker.issues.size
+val totalPts  = tracker.totalPoints()
+val donePts   = tracker.completedPoints()
+val pctDone   = if total == 0 { 0.0 } else { (donePts as Double) / (totalPts as Double) * 100.0 }
+IO::println("  Total issues:     #{total}")
+IO::println("  Total story pts:  #{totalPts}")
+IO::println("  Completed pts:    #{donePts}")
+IO::println("  Completion:       #{pctDone.pctStr()}")
+
+// ── Count and any ─────────────────────────────────────────────────────────────
+
+val critCount  = tracker.issues.count { i => (i as Issue).priority().order() == 0 }
+val hasCritOpen = tracker.urgent().any { i => (i as Issue).status().isActive() }
+IO::println("  Critical issues:  #{critCount}")
+IO::println("  Has urgent open:  #{hasCritOpen}")
+
+// ── Point histogram (bar chart) ───────────────────────────────────────────────
+
+IO::println("\n── Story Point Histogram ────────────────────────────────────────────────────")
+val pointGroups = tracker.issues.groupBy { i => (i as Issue).storyPoints().storyLabel().trim() }
+val labels: List[Object] = ["XS", "S", "M", "L", "XL"]
+foreach lbl: Object in labels {
+  val key = lbl as String
+  val bucket = pointGroups[key]
+  val cnt = if bucket == null { 0 } else { (bucket as List).size }
+  IO::println("  #{key}: #{cnt.priorityBar()} #{cnt}")
+}
+
+// ── Recursion: sum points of open issues ─────────────────────────────────────
+
+def sumPoints(lst: List[Object], idx: Int): Int {
+  if idx >= lst.size { return 0 }
+  val iss = lst[idx] as Issue
+  return iss.storyPoints() + sumPoints(lst, idx + 1)
+}
+
+val openPts = sumPoints(tracker.openIssues(), 0)
+IO::println("\n── Remaining Story Points ───────────────────────────────────────────────────")
+IO::println("  Open pts (recursive): #{openPts}")
+
+// ── Foreach over range: show top-5 open by priority ──────────────────────────
+
+IO::println("\n── Top-5 Open Issues ────────────────────────────────────────────────────────")
+val top5 = tracker.openIssues().sortedBy { i => (i as Issue).priority().order() }.take(5)
+foreach k: Int in 0..<top5.size {
+  val iss = top5[k] as Issue
+  IO::println("  #{k + 1}. [#{iss.issueType().symbol()}] #{iss.title()} (#{iss.priority().label().trim()})")
+}
+
+// ── Try/catch: safe priority parse ───────────────────────────────────────────
+
+def parsePriority(s: String): Priority? {
+  try {
+    select s {
+      case "CRITICAL": return new Critical()
+      case "HIGH":     return new High()
+      case "MEDIUM":   return new Medium()
+      case "LOW":      return new Low()
+      else:            throw new Exception("Unknown priority: " + s)
+    }
+  } catch e: Exception {
+    return null
+  }
+}
+
+IO::println("\n── Priority Parsing ─────────────────────────────────────────────────────────")
+val p1 = parsePriority("HIGH")
+val p2 = parsePriority("BOGUS")
+IO::println("  parse('HIGH'):  #{if p1 != null { (p1 as Priority).label().trim() } else { "null" }}")
+IO::println("  parse('BOGUS'): #{if p2 != null { (p2 as Priority).label().trim() } else { "null (expected)" }}")
+
+// ── Resolution display across all issues ─────────────────────────────────────
+
+IO::println("\n── Resolution Status ────────────────────────────────────────────────────────")
+val resolvedCount   = tracker.issues.count { i => (i as Issue).resolution().isResolved() }
+val unresolvedCount = tracker.issues.size - resolvedCount
+IO::println("  Resolved:   #{resolvedCount}")
+IO::println("  Unresolved: #{unresolvedCount}")
+foreach item: Object in tracker.closedIssues() {
+  val iss = item as Issue
+  IO::println("  ##{iss.id()} #{iss.title()} → #{iss.resolution().label()}")
+}
+
+IO::println("\nDone.")

@@ -83,6 +83,35 @@ class OriginSpec extends AbstractShellSpec {
       assert(Shell.Success(true) == result)
     }
 
+    it("covers a span of characters via spanning()") {
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Origin::spanning("a.on", 3, 8, 4)
+          |    return o.source() + "|" + o.line() + "|" + o.column() + "|" + o.span()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("a.on|3|8|4") == result)
+    }
+
+    it("clamps a non-positive span to at least one character via spanning()") {
+      // Origin.spanning(..., span) takes Math.max(1, span); a parser that computed a
+      // zero-or-negative span (e.g. an empty match) must still get a valid Origin.
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return Origin::spanning("a.on", 3, 8, 0).span()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == result)
+    }
+
     it("shifts to a line within an enclosing text, for per-line parsing") {
       // `S.lines` parses each line separately; each sub-parse reports positions relative
       // to its own line and has to be lifted back into the whole document.
@@ -96,6 +125,35 @@ class OriginSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "None", Array())
       assert(Shell.Success("log.txt:40:3") == result)
+    }
+
+    it("knows whether a column is present, as opposed to only a line") {
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return Origin::at("x.on", 1, 3).hasColumn() + "|" + Origin::atLine("x.on", 1).hasColumn()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("true|false") == result)
+    }
+
+    it("retargets to a different source via inSource(), keeping line, column and span") {
+      // A sub-parse may only learn which document it came from after the fact (e.g. an
+      // included file); inSource() moves an already-built Origin without re-deriving it.
+      val result = shell.run(
+        """import { onion.Origin; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Origin::at("a.on", 3, 8).inSource("b.on")
+          |    return o.source() + "|" + o.line() + "|" + o.column()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("b.on|3|8") == result)
     }
   }
 }

@@ -34,6 +34,24 @@ Limit the number of compilation errors reported.
 onion -maxErrorReport 10 MyScript.on
 ```
 
+### `-super <super class>`
+
+Specify the class a top-level script's synthesized class extends. Only meaningful when
+the source has no explicit class declaration.
+
+```bash
+onion -super java.lang.Object MyScript.on
+```
+
+### `--verbose`
+
+Show timing for each compilation phase (parsing, rewriting, type checking, code
+generation) before the script runs.
+
+```bash
+onion --verbose MyScript.on
+```
+
 ### `--dump-ast`
 
 Print the parsed AST to stderr before running the script.

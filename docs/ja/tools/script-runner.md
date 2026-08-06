@@ -34,6 +34,24 @@ onion -encoding UTF-8 MyScript.on
 onion -maxErrorReport 10 MyScript.on
 ```
 
+### `-super <super class>`
+
+トップレベルのスクリプトが生成するクラスの親クラスを指定します。明示的なクラス宣言が
+ない場合にのみ意味を持ちます。
+
+```bash
+onion -super java.lang.Object MyScript.on
+```
+
+### `--verbose`
+
+スクリプト実行前に、各コンパイルフェーズ（構文解析、書き換え、型検査、コード生成）の
+所要時間を表示します。
+
+```bash
+onion --verbose MyScript.on
+```
+
 ### `--dump-ast`
 
 スクリプト実行前に、構文解析後のASTを標準エラー出力に出力します。

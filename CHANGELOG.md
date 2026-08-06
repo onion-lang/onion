@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`docs/tools/compiler.md` and `docs/tools/script-runner.md` (and their `docs/ja`
+  translations) had no section for the real `-super <super class>` and `--verbose`
+  flags, and the `compiler.md` pair was additionally missing `--effects`** — all three
+  work today but were absent from every option reference. Added the missing sections
+  to all four pages and added `CliOptionDocCoverageSpec`, which ties each page to the
+  actual `--help` option list in `CompilerFrontend`/`ScriptRunner` so a future flag
+  added to one and not the other fails the build instead of drifting silently.
+
 ## [0.10.24] - 2026-08-06
 
 ### Documentation

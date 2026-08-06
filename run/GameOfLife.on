@@ -1,0 +1,242 @@
+// Conway's Game of Life
+// Demonstrates: classes, 2D array grids, nested loops, enums,
+// records, collection pipelines (map/filter/fold/reduce), select,
+// string interpolation, try/catch, and recursive helpers.
+
+// ─── Cell state ──────────────────────────────────────────────────────────────
+enum Cell { ALIVE, DEAD }
+
+// ─── A named starting pattern (rows of '.' = dead, '#' = alive) ──────────────
+record Pattern(name: String, rows: List[String]) {
+public:
+  def width(): Int  = (rows[0] as String).length()
+  def height(): Int = rows.size
+}
+
+// ─── 2D grid stored as a flat Int array (1 = alive, 0 = dead) ────────────────
+class Grid {
+  val width:  Int
+  val height: Int
+  var cells:  Int[]
+
+public:
+  def this(w: Int, h: Int) {
+    self.width  = w
+    self.height = h
+    self.cells  = new Int[w * h]
+  }
+
+  def alive(r: Int, c: Int): Boolean {
+    if r < 0 || r >= height || c < 0 || c >= width { return false }
+    return cells[r * width + c] == 1
+  }
+
+  def setAlive(r: Int, c: Int, live: Boolean): void {
+    if r < 0 || r >= height || c < 0 || c >= width { return }
+    cells[r * width + c] = if live { 1 } else { 0 }
+  }
+
+  // Expose cell as enum (shows enum usage on top of the grid)
+  def cellAt(r: Int, c: Int): Cell =
+    if alive(r, c) { Cell::ALIVE } else { Cell::DEAD }
+
+  def countNeighbors(r: Int, c: Int): Int {
+    var n: Int = 0
+    for var dr: Int = -1; dr <= 1; dr++ {
+      for var dc: Int = -1; dc <= 1; dc++ {
+        if dr == 0 && dc == 0 { continue }
+        if alive(r + dr, c + dc) { n++ }
+      }
+    }
+    return n
+  }
+
+  // Stamp a Pattern at grid offset (startRow, startCol); silently clips to bounds.
+  def stamp(p: Pattern, startRow: Int, startCol: Int): void {
+    foreach r: Int in 0..<p.height() {
+      val row: String = p.rows[r] as String
+      foreach c: Int in 0..<p.width() {
+        setAlive(startRow + r, startCol + c, row.substring(c, c + 1) == "#")
+      }
+    }
+  }
+
+  // Apply one generation of Conway's rules and return the new grid.
+  def next(): Grid {
+    val ng: Grid = new Grid(width, height)
+    for var r: Int = 0; r < height; r++ {
+      for var c: Int = 0; c < width; c++ {
+        val n: Int = countNeighbors(r, c)
+        val cur: Boolean = alive(r, c)
+        ng.setAlive(r, c,
+          select n {
+            case 2: cur
+            case 3: true
+            else:   false
+          }
+        )
+      }
+    }
+    return ng
+  }
+
+  def countAlive(): Int {
+    var total: Int = 0
+    for var i: Int = 0; i < cells.length; i++ {
+      if cells[i] == 1 { total++ }
+    }
+    return total
+  }
+
+  // Build a text snapshot (# = alive, . = dead)
+  def render(): String {
+    var sb: String = ""
+    for var r: Int = 0; r < height; r++ {
+      for var c: Int = 0; c < width; c++ {
+        val ch: String = if alive(r, c) { "#" } else { "." }
+        sb = sb + ch
+      }
+      sb = sb + "\n"
+    }
+    return sb
+  }
+}
+
+// ─── Per-generation statistics ────────────────────────────────────────────────
+record GenStat(generation: Int, alive: Int) {
+public:
+  def describe(): String = "gen #{generation}: #{alive} alive"
+}
+
+// ─── Simulation driver ────────────────────────────────────────────────────────
+class Simulation {
+  var grid:       Grid
+  var generation: Int
+  var history:    List[GenStat]
+
+public:
+  def this(g: Grid) {
+    self.grid       = g
+    self.generation = 0
+    self.history    = []
+    self.recordStat()
+  }
+
+  def recordStat(): void {
+    history << new GenStat(generation, grid.countAlive())
+  }
+
+  def step(): void {
+    grid       = grid.next()
+    generation = generation + 1
+    self.recordStat()
+  }
+
+  def run(steps: Int): void {
+    foreach _: Int in 0..<steps { self.step() }
+  }
+
+  def printGrid(): void {
+    println("=== Generation #{generation} (#{grid.countAlive()} alive) ===")
+    print(grid.render())
+  }
+
+  def printHistory(): void {
+    println("Population history:")
+    foreach stat: GenStat in history {
+      println("  " + stat.describe())
+    }
+  }
+
+  // Generation with the highest live-cell count.
+  def peakGeneration(): GenStat {
+    var best: GenStat = history[0] as GenStat
+    foreach s: GenStat in history {
+      if s.alive() > best.alive() { best = s }
+    }
+    return best
+  }
+
+  // Integer average of alive cells over all recorded generations.
+  def avgAlive(): Int {
+    val total: Int = (history.fold(0) { acc, s => (acc as Int) + (s as GenStat).alive() }) as Int
+    return total / history.size
+  }
+
+  def getHistory(): List[GenStat] = history
+}
+
+// ─── Classic named patterns ───────────────────────────────────────────────────
+def blinker(): Pattern  = new Pattern("Blinker",     ["###"])
+def block(): Pattern    = new Pattern("Block",       ["##", "##"])
+def glider(): Pattern   = new Pattern("Glider",      [".#.", "..#", "###"])
+def rPentomino(): Pattern = new Pattern("R-pentomino",[".##", "##.", ".#."])
+def toad(): Pattern     = new Pattern("Toad",        [".###", "###."])
+
+// ─── Demo runner ─────────────────────────────────────────────────────────────
+def runDemo(p: Pattern, generations: Int): void {
+  val W: Int = 18
+  val H: Int = 14
+  val g: Grid = new Grid(W, H)
+  g.stamp(p, (H - p.height()) / 2, (W - p.width()) / 2)
+
+  val sim: Simulation = new Simulation(g)
+
+  println("\n### Pattern: #{p.name()} ###")
+  sim.printGrid()
+  sim.run(generations)
+  sim.printGrid()
+  sim.printHistory()
+
+  val peak: GenStat = sim.peakGeneration()
+  println("Peak: gen #{peak.generation()} with #{peak.alive()} alive")
+  println("Avg alive: #{sim.avgAlive()}")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+def main(): void {
+  println("Conway's Game of Life\n")
+
+  // Blinker: period-2 oscillator — should return to initial state at gen 2
+  runDemo(blinker(), 4)
+
+  // Block: still life — count must stay constant every generation
+  runDemo(block(), 3)
+
+  // Glider: translates diagonally; population stays at 5 always
+  runDemo(glider(), 8)
+
+  // R-pentomino: methuselah — active for many generations
+  runDemo(rPentomino(), 10)
+
+  // Toad: period-2 oscillator
+  runDemo(toad(), 5)
+
+  // ─── Pipeline stats on an extra toad grid ──────────────────────────────────
+  println("\n--- Pipeline demo ---")
+  val toadGrid: Grid = new Grid(12, 12)
+  toadGrid.stamp(toad(), 4, 3)
+  val sim2: Simulation = new Simulation(toadGrid)
+  sim2.run(6)
+
+  val counts: List[Int] = sim2.getHistory().map { s => (s as GenStat).alive() }
+  println("Alive counts: #{counts}")
+
+  val maxAlive: Int = (counts.reduce { a, b => if (a as Int) > (b as Int) { a } else { b } }) as Int
+  val minAlive: Int = (counts.reduce { a, b => if (a as Int) < (b as Int) { a } else { b } }) as Int
+  println("Max alive: #{maxAlive}  Min alive: #{minAlive}")
+
+  val evens: List[Int] = counts.filter { c => (c as Int) % 2 == 0 }
+  println("Even-alive generations count: #{evens.size}")
+
+  // try/catch around a deliberate divide-by-zero
+  try {
+    val zero: Int = counts.size - counts.size
+    println("" + (1 / zero))
+    println("No exception (unexpected)")
+  } catch e: Exception {
+    println("Caught expected exception: #{e.getClass().getSimpleName()}")
+  }
+
+  println("\nDone.")
+}

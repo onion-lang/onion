@@ -633,10 +633,7 @@ final class BlockElementLowering(
 
   /** True when the value is a java.util.Map (which has no iterator()). */
   private def isMapType(tp: Type): Boolean =
-    bodyContext.load("java.util.Map") match {
-      case mapType: ObjectType => TypeRules.isSuperType(mapType, tp)
-      case _ => false
-    }
+    TypeRules.isSuperType(bodyContext.load("java.util.Map"), tp)
 
   private def indexref(bind: ClosureLocalBinding, value: Term): Term =
     new RefArray(new RefLocal(bind), value)

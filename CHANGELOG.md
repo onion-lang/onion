@@ -37,7 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closures capturing outer `val`s, recursion (`halveDepth`), `foreach` over
   list/map-entry/range, `while`, `try`/`catch`, and the two-step
   `(val as Int) as Double` numeric cast pattern.
-  110 total corpus programs.
+- **`run/CensusAnalyzer.on`, a 468-line population data parsing and reporting
+  sample.** Combines features under-represented elsewhere in the corpus:
+  `from re"..."` pattern-attached record parsing (`Person`), `do[List]`
+  list-comprehension cross-tabulation, the `|>` pipeline operator, an ADT
+  `case`-enum (`AgeGroup`) alongside a homogeneous enum with methods
+  (`IncomeBracket`), a wrapper record with computed properties (`PersonExt`),
+  extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
+  `record example {}` build-time parse round-trip assertions.
+  111 total corpus programs.
 
 ### Documentation
 

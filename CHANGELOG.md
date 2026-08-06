@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/ja/reference/stdlib.md`'s Json Module section never mentioned `Json::value`,
+  the navigable JSON wrapper (`Value`, indexable with `[]` and read with
+  `asString`/`asInt`/`asLong`/`asDouble`/`asBoolean`/`isNull`/`size`) that
+  `docs/reference/stdlib.md` documents.** Added the missing subsection and example to
+  the Japanese page, and added `StdlibDocJsonModuleParitySpec` (same approach as
+  `StdlibDocYamlModuleParitySpec`) so this can't silently drift again.
+
 - **`docs/tools/compiler.md` and `docs/tools/script-runner.md` (and their `docs/ja`
   translations) had no section for the real `-super <super class>` and `--verbose`
   flags, and the `compiler.md` pair was additionally missing `--effects`** — all three

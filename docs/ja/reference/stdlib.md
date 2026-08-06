@@ -884,6 +884,21 @@ Json::getIntOr(obj, "missing", 42)      // 42（NPE にならない）
 Json::getStringOr(obj, "name", "anon")  // "anon"
 ```
 
+### Json::value（ナビゲート可能なラッパー）
+
+`Json::value(text)` は `[]` でインデックスアクセスできるラッパー値を返します。オブジェクトのキーには文字列、
+配列の要素には整数でアクセスでき、値の取り出しには `asString()` / `asInt()` / `asLong()` / `asDouble()` /
+`asBoolean()` を使います:
+
+```onion
+val v = Json::value(jsonText)
+v["users"][0]["name"].asString()
+```
+
+キーが存在しない・添字が範囲外のときは null を保持する `Value` を返すので、途中の欠損があっても例外にはなりません
+（末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
+要素数を調べられます。
+
 ## Yaml モジュール
 
 flat block mapping ドキュメント限定の YAML パースとシリアライズ（`onion.Yaml`）。

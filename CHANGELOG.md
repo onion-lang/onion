@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`docs/ja/reference/stdlib.md`'s Yaml Module section collapsed the English section's
+  four subsections (`Yaml::parse`, `Yaml::stringify`, the round-trip guarantee, and
+  `derive!(Yaml)` usage) into a single short paragraph, dropping the round-trip
+  guarantee statement and the `derive!(Yaml)` code examples (`ServerConfig`,
+  `derive!(Json, Yaml)`) entirely.** Restored the missing subsections and examples, and
+  added `StdlibDocYamlModuleParitySpec` (same subheading-count approach as
+  `StdlibDocFutureModuleParitySpec`, plus a direct check for the `derive!(Yaml)` example)
+  so this can't silently drift again.
+
 - **`docs/ja/reference/stdlib.md`'s Maps Module and Sets Module sections were missing
   several members that `docs/reference/stdlib.md` documents** — Maps: `newMap`,
   `getOrDefault`, `filterKeys`, `filterValues`, `toList`, `forEach`, `merge`; Sets:

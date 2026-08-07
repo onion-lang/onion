@@ -1,0 +1,381 @@
+// MiniRpg.on — RPG equipment, party, and battle-simulation.
+// Exercises: homogeneous enum, ADT case-enum, records with methods,
+// classes with ArrayList inventory, extension methods on Int,
+// collection pipelines (map/filter/fold/sortedBy/groupBy/find),
+// select with type patterns, string interpolation, while/foreach,
+// nullable types, try/catch, recursion, map entry iteration.
+
+import { java.util.ArrayList }
+
+// ──────────────────────── primitive helpers ───────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int =
+    if self < lo { lo } else if self > hi { hi } else { self }
+  def orZero(): Int = if self < 0 { 0 } else { self }
+  def pct(total: Int): String =
+    if total == 0 { "0%" } else { "" + (self * 100 / total) + "%" }
+}
+
+// ──────────────────────── character class enum ───────────────────────────
+
+enum CharClass {
+  Warrior, Mage, Rogue
+public:
+  def label(): String = select this {
+    case CharClass::Warrior: "Warrior"
+    case CharClass::Mage:    "Mage"
+    case CharClass::Rogue:   "Rogue"
+    else: "Unknown"
+  }
+  def baseHp(): Int = select this {
+    case CharClass::Warrior: 120
+    case CharClass::Mage:    70
+    case CharClass::Rogue:   90
+    else: 80
+  }
+  def baseAtk(): Int = select this {
+    case CharClass::Warrior: 18
+    case CharClass::Mage:    12
+    case CharClass::Rogue:   15
+    else: 10
+  }
+  def baseDef(): Int = select this {
+    case CharClass::Warrior: 10
+    case CharClass::Mage:    4
+    case CharClass::Rogue:   7
+    else: 5
+  }
+  def baseSpd(): Int = select this {
+    case CharClass::Warrior: 8
+    case CharClass::Mage:    10
+    case CharClass::Rogue:   14
+    else: 8
+  }
+}
+
+// ──────────────────────── gear: ADT case-enum ────────────────────────────
+
+enum GearKind {
+  case Sword(gname: String, power: Int)
+  case Bow(gname: String, power: Int, range: Int)
+  case Shield(gname: String, guard: Int)
+  case Helm(gname: String, guard: Int)
+  case Ring(gname: String, attr: String, bonus: Int)
+public:
+  def label(): String = select this {
+    case s is Sword:  "#{s.gname()} [Sword ATK+#{s.power()}]"
+    case b is Bow:    "#{b.gname()} [Bow ATK+#{b.power()} RNG#{b.range()}]"
+    case sh is Shield: "#{sh.gname()} [Shield DEF+#{sh.guard()}]"
+    case h is Helm:   "#{h.gname()} [Helm DEF+#{h.guard()}]"
+    case r is Ring:   "#{r.gname()} [Ring #{r.attr()}+#{r.bonus()}]"
+  }
+  def atkBonus(): Int = select this {
+    case s is Sword: s.power()
+    case b is Bow:   b.power()
+    else: 0
+  }
+  def defBonus(): Int = select this {
+    case sh is Shield: sh.guard()
+    case h is Helm:    h.guard()
+    else: 0
+  }
+  def spdBonus(): Int = select this {
+    case r is Ring: if r.attr() == "SPD" { r.bonus() } else { 0 }
+    case b is Bow:  b.range() / 4
+    else: 0
+  }
+  def slot(): String = select this {
+    case s is Sword:   "weapon"
+    case b is Bow:     "weapon"
+    case sh is Shield: "offhand"
+    case h is Helm:    "head"
+    case r is Ring:    "ring"
+  }
+}
+
+// ──────────────────────── hero class ─────────────────────────────────────
+
+class Hero {
+public:
+  val name: String
+  val charClass: CharClass
+  var hp: Int
+  val maxHp: Int
+  var baseAtk: Int
+  var baseDef: Int
+  var baseSpd: Int
+  val backpack: ArrayList[GearKind]
+  val equipped: ArrayList[GearKind]
+
+  def this(n: String, cc: CharClass) {
+    this.name = n
+    this.charClass = cc
+    this.hp = cc.baseHp()
+    this.maxHp = cc.baseHp()
+    this.baseAtk = cc.baseAtk()
+    this.baseDef = cc.baseDef()
+    this.baseSpd = cc.baseSpd()
+    this.backpack = new ArrayList[GearKind]()
+    this.equipped = new ArrayList[GearKind]()
+  }
+
+  def isAlive(): Boolean = hp > 0
+
+  def acquire(g: GearKind): void { backpack.add(g) }
+
+  def equip(g: GearKind): void {
+    if backpack.contains(g) {
+      backpack.remove(g)
+      equipped.add(g)
+    }
+  }
+
+  def effectiveAtk(): Int {
+    var bonus: Int = 0
+    foreach g: GearKind in equipped { bonus = bonus + g.atkBonus() }
+    return baseAtk + bonus
+  }
+
+  def effectiveDef(): Int {
+    var bonus: Int = 0
+    foreach g: GearKind in equipped { bonus = bonus + g.defBonus() }
+    return baseDef + bonus
+  }
+
+  def effectiveSpd(): Int {
+    var bonus: Int = 0
+    foreach g: GearKind in equipped { bonus = bonus + g.spdBonus() }
+    return baseSpd + bonus
+  }
+
+  def heal(amount: Int): void { hp = (hp + amount).clamp(0, maxHp) }
+
+  def takeDamage(dmg: Int): void { hp = (hp - dmg).orZero() }
+
+  def hpBar(): String {
+    val filled = (hp * 20 / maxHp).clamp(0, 20)
+    var bar: String = "["
+    var i: Int = 0
+    while i < 20 {
+      bar = bar + (if i < filled { "#" } else { "-" })
+      i = i + 1
+    }
+    bar = bar + "]"
+    return "#{bar} #{hp}/#{maxHp}"
+  }
+
+  def statusLine(): String =
+    "#{charClass.label()} #{name} | HP:#{hpBar()} | ATK:#{effectiveAtk()} DEF:#{effectiveDef()} SPD:#{effectiveSpd()}"
+
+  def gearReport(): String {
+    if equipped.size == 0 { return "  (no gear equipped)" }
+    var s: String = ""
+    foreach g: GearKind in equipped {
+      s = s + "  • " + g.label() + "\n"
+    }
+    return s
+  }
+}
+
+// ──────────────────────── monster record ─────────────────────────────────
+
+record Monster(mname: String, mhp: Int, matk: Int, mdef: Int, reward: Int) {
+public:
+  def describe(): String = "#{mname()} | HP:#{mhp()} ATK:#{matk()} DEF:#{mdef()}"
+}
+
+// ──────────────────────── battle record ──────────────────────────────────
+
+record BattleResult(winner: String, loser: String, rounds: Int, hpLeft: Int) {
+public:
+  def summary(): String =
+    "#{winner()} defeated #{loser()} in #{rounds()} round(s) (#{hpLeft()} HP left)"
+}
+
+// ──────────────────────── battle simulation ───────────────────────────────
+
+def battle(hero: Hero, mon: Monster): BattleResult {
+  var mhp: Int = mon.mhp()
+  hero.hp = hero.maxHp   // restore HP before each fight
+  var rounds: Int = 0
+  var heroGoesFirst: Boolean = hero.effectiveSpd() >= mon.mdef()
+
+  while hero.isAlive() && mhp > 0 {
+    rounds = rounds + 1
+
+    if heroGoesFirst {
+      val dmg = (hero.effectiveAtk() - mon.mdef()).orZero()
+      mhp = (mhp - dmg).orZero()
+      if mhp <= 0 {
+        return new BattleResult(hero.name, mon.mname(), rounds, hero.hp)
+      }
+    }
+
+    val monDmg = (mon.matk() - hero.effectiveDef()).orZero()
+    hero.takeDamage(monDmg)
+
+    if !heroGoesFirst && hero.isAlive() {
+      val dmg = (hero.effectiveAtk() - mon.mdef()).orZero()
+      mhp = (mhp - dmg).orZero()
+    }
+  }
+
+  if hero.isAlive() {
+    return new BattleResult(hero.name, mon.mname(), rounds, hero.hp)
+  } else {
+    return new BattleResult(mon.mname(), hero.name, rounds, mhp)
+  }
+}
+
+// ──────────────────────── main program ────────────────────────────────────
+
+// Create three heroes
+val warrior = new Hero("Aldric", CharClass::Warrior)
+val mage    = new Hero("Lyra",   CharClass::Mage)
+val rogue   = new Hero("Silas",  CharClass::Rogue)
+
+// Define gear items
+val ironSword  = new Sword("Iron Sword",  12)
+val silverBow  = new Bow("Silver Bow",    10, 8)
+val kiteShield = new Shield("Kite Shield", 8)
+val leatherHelm = new Helm("Leather Helm", 5)
+val speedRing  = new Ring("Ring of Swiftness", "SPD", 6)
+val powerRing  = new Ring("Ring of Power",     "ATK", 4)
+val flameSword = new Sword("Flame Sword", 20)
+val towerShield = new Shield("Tower Shield", 14)
+
+// Equip heroes
+warrior.acquire(ironSword)
+warrior.acquire(kiteShield)
+warrior.acquire(leatherHelm)
+warrior.equip(ironSword)
+warrior.equip(kiteShield)
+warrior.equip(leatherHelm)
+
+mage.acquire(silverBow)
+mage.acquire(speedRing)
+mage.equip(silverBow)
+mage.equip(speedRing)
+
+rogue.acquire(flameSword)
+rogue.acquire(powerRing)
+rogue.equip(flameSword)
+rogue.equip(powerRing)
+
+// Print party status
+IO::println("═══════════════ PARTY STATUS ════════════════")
+val heroes: ArrayList[Hero] = new ArrayList[Hero]()
+heroes.add(warrior)
+heroes.add(mage)
+heroes.add(rogue)
+foreach h: Hero in heroes {
+  IO::println(h.statusLine())
+  IO::print(h.gearReport())
+}
+
+// Define monsters
+val goblin  = new Monster("Goblin",   40, 14, 3, 10)
+val orc     = new Monster("Orc",      80, 20, 8, 25)
+val dragon  = new Monster("Dragon", 200, 35, 15, 100)
+val monsters: ArrayList[Monster] = new ArrayList[Monster]()
+monsters.add(goblin)
+monsters.add(orc)
+monsters.add(dragon)
+
+// Run all heroes vs all monsters
+IO::println("\n══════════════ BATTLE RESULTS ══════════════")
+val allResults: ArrayList[BattleResult] = new ArrayList[BattleResult]()
+foreach h: Hero in heroes {
+  foreach m: Monster in monsters {
+    val result = battle(h, m)
+    IO::println(result.summary())
+    allResults.add(result)
+  }
+}
+
+// Summarise wins per fighter
+IO::println("\n══════════════ WIN COUNTS ═══════════════════")
+val winCounts = allResults
+  .groupBy { r => (r as BattleResult).winner() }
+val names: ArrayList[String] = new ArrayList[String]()
+names.add(warrior.name)
+names.add(mage.name)
+names.add(rogue.name)
+foreach n: String in names {
+  val wins = if winCounts.containsKey(n) { (winCounts.get(n) as List).size } else { 0 }
+  IO::println("  #{n}: #{wins} win(s)")
+}
+
+// Gear summary: sort gear by combined bonus (atk+def+spd)
+IO::println("\n══════════════ GEAR LEADERBOARD ═════════════")
+val allGear: ArrayList[GearKind] = new ArrayList[GearKind]()
+allGear.add(ironSword); allGear.add(silverBow); allGear.add(kiteShield)
+allGear.add(leatherHelm); allGear.add(speedRing); allGear.add(powerRing)
+allGear.add(flameSword); allGear.add(towerShield)
+val ranked = allGear
+  .sortedBy { g => 0 - ((g as GearKind).atkBonus() + (g as GearKind).defBonus() + (g as GearKind).spdBonus()) }
+var rank: Int = 1
+foreach g: GearKind in ranked {
+  val gk = g as GearKind
+  IO::println("  #{rank}. #{gk.label()}")
+  rank = rank + 1
+}
+
+// Best surviving HP across hero victories only
+IO::println("\n══════════════ BEST SURVIVAL ════════════════")
+val heroNames = [warrior.name, mage.name, rogue.name]
+val heroWins  = allResults.filter { r => heroNames.contains((r as BattleResult).winner()) }
+if heroWins.size > 0 {
+  val best = heroWins.reduce { a, b =>
+    if (a as BattleResult).hpLeft() > (b as BattleResult).hpLeft() { a } else { b }
+  }
+  IO::println("  Hero with most HP left: " + (best as BattleResult).summary())
+} else {
+  IO::println("  No hero survived any battle!")
+}
+
+// Recursive XP-to-level calculation (XP needed for level n = 50 * n * (n+1) / 2)
+def xpForLevel(n: Int): Int = if n <= 0 { 0 } else { 50 * n + xpForLevel(n - 1) }
+def levelFromXp(xp: Int, lvl: Int): Int =
+  if xp < xpForLevel(lvl + 1) { lvl } else { levelFromXp(xp, lvl + 1) }
+
+IO::println("\n══════════════ LEVEL SIMULATION ════════════════")
+val xpTable = [0, 150, 375, 700, 1250]
+foreach xp: Int in xpTable {
+  val level = levelFromXp(xp, 1)
+  IO::println("  #{xp} XP -> Level #{level} (next level needs #{xpForLevel(level + 1)} XP)")
+}
+
+// Safe division helper via try/catch
+def safeDiv(a: Int, b: Int): String {
+  try {
+    return "" + (a / b)
+  } catch e: Exception {
+    return "div/0"
+  }
+}
+
+IO::println("\n══════════════ EFFICIENCY RATINGS ══════════════")
+foreach h: Hero in heroes {
+  val totalWins = winCounts.containsKey(h.name)
+  val wins2 = if winCounts.containsKey(h.name) { (winCounts.get(h.name) as List).size } else { 0 }
+  val dmgPerAtk = safeDiv(h.effectiveAtk(), h.effectiveDef())
+  IO::println("  #{h.name}: #{wins2} win(s), ATK/DEF ratio #{dmgPerAtk}")
+}
+
+// Nullable: find first unequipped tower shield in any hero's backpack
+var foundShield: GearKind? = null
+foreach h: Hero in heroes {
+  if foundShield == null {
+    val found = h.backpack.find { g => (g as GearKind).slot() == "offhand" }
+    if found != null { foundShield = found as GearKind }
+  }
+}
+if foundShield != null {
+  IO::println("\n  Unequipped offhand gear found: " + (foundShield as GearKind).label())
+} else {
+  IO::println("\n  All offhand gear is equipped (or none in backpacks).")
+}
+
+IO::println("\nDone.")

@@ -1,0 +1,365 @@
+// RecipeManager.on — a recipe management system (~200 lines)
+// Exercises: regular enums, data-carrying enums, records with method bodies,
+// extension methods on enums, collection pipelines, groupBy, foreach with map
+// entries, closures, string interpolation, pattern matching, nullable types,
+// try/catch, and tail-recursive iteration.
+
+// --- Enums ---
+
+enum Cuisine {
+  ITALIAN, MEXICAN, ASIAN, AMERICAN, MEDITERRANEAN
+}
+
+enum DietaryTag {
+  VEGAN, VEGETARIAN, GLUTEN_FREE, DAIRY_FREE, KETO
+}
+
+// Data-carrying enum for star ratings.
+enum Stars(value: Int) {
+  ONE(1), TWO(2), THREE(3), FOUR(4), FIVE(5)
+}
+
+// --- Extension methods on enums ---
+
+extension Cuisine {
+  def displayName(): String {
+    select self {
+      case Cuisine::ITALIAN:       return "Italian"
+      case Cuisine::MEXICAN:       return "Mexican"
+      case Cuisine::ASIAN:         return "Asian"
+      case Cuisine::AMERICAN:      return "American"
+      case Cuisine::MEDITERRANEAN: return "Mediterranean"
+    }
+    return "Unknown"
+  }
+}
+
+extension DietaryTag {
+  def label(): String {
+    select self {
+      case DietaryTag::VEGAN:       return "Vegan"
+      case DietaryTag::VEGETARIAN:  return "Vegetarian"
+      case DietaryTag::GLUTEN_FREE: return "Gluten-Free"
+      case DietaryTag::DAIRY_FREE:  return "Dairy-Free"
+      case DietaryTag::KETO:        return "Keto"
+    }
+    return "Other"
+  }
+}
+
+// --- Records ---
+
+record Ingredient(name: String, amount: String) {
+public:
+  def describe(): String = amount() + " " + name()
+}
+
+record Recipe(
+  name: String,
+  cuisine: Cuisine,
+  prepMins: Int,
+  stars: Stars,
+  ingredients: List[Ingredient],
+  tags: List[DietaryTag],
+  notes: String
+) {
+public:
+  def tagList(): String {
+    var result: String = ""
+    var first: Boolean = true
+    foreach t: Object in tags() {
+      val tag = t as DietaryTag
+      if !first { result = result + ", " }
+      result = result + tag.label()
+      first = false
+    }
+    return result
+  }
+
+  def hasTag(tag: DietaryTag): Boolean {
+    foreach t: Object in tags() {
+      if (t as DietaryTag) == tag { return true }
+    }
+    return false
+  }
+
+  def ingredientCount(): Int = ingredients().size
+
+  def summary(): String {
+    return name() + " (" + cuisine().displayName() + ", " +
+           prepMins() + " min, " + stars().value() + " stars)"
+  }
+}
+
+// --- RecipeBook class ---
+
+class RecipeBook {
+  val recipes: List[Recipe]
+
+public:
+  def this() {
+    val empty: List[Recipe] = []
+    this.recipes = empty
+  }
+
+  def add(r: Recipe): void {
+    this.recipes << r
+  }
+
+  def size(): Int = this.recipes.size
+
+  def all(): List[Recipe] {
+    return this.recipes
+  }
+
+  def byCuisine(c: Cuisine): List[Recipe] {
+    val result: List[Recipe] = []
+    foreach r: Object in this.recipes {
+      val recipe = r as Recipe
+      if recipe.cuisine() == c {
+        result << recipe
+      }
+    }
+    return result
+  }
+
+  def withTag(tag: DietaryTag): List[Recipe] {
+    val result: List[Recipe] = []
+    foreach r: Object in this.recipes {
+      val recipe = r as Recipe
+      if recipe.hasTag(tag) {
+        result << recipe
+      }
+    }
+    return result
+  }
+
+  def quickRecipes(maxMins: Int): List[Recipe] {
+    val result: List[Recipe] = []
+    foreach r: Object in this.recipes {
+      val recipe = r as Recipe
+      if recipe.prepMins() <= maxMins {
+        result << recipe
+      }
+    }
+    return result
+  }
+
+  def topByStars(): List[Recipe] {
+    return this.recipes.sortedBy { r => 0 - (r as Recipe).stars().value() }
+  }
+
+  def findByName(target: String): Recipe? {
+    foreach r: Object in this.recipes {
+      val recipe = r as Recipe
+      if recipe.name().toLowerCase() == target.toLowerCase() {
+        return recipe
+      }
+    }
+    return null
+  }
+
+  def avgPrepMins(): Int {
+    val total = this.recipes.size
+    if total == 0 { return 0 }
+    val sum = this.recipes.fold(0) { acc, r => (acc as Int) + (r as Recipe).prepMins() }
+    return (sum as Int) / total
+  }
+}
+
+// --- Helper functions ---
+
+def ratingBar(s: Stars): String {
+  val n = s.value()
+  var bar: String = ""
+  foreach i: Int in 1..5 {
+    if i <= n { bar = bar + "*" } else { bar = bar + "." }
+  }
+  return bar
+}
+
+// Count recipes with at least `threshold` stars (iterative).
+def countAbove(recipes: List[Recipe], threshold: Int): Int {
+  var count: Int = 0
+  foreach r: Object in recipes {
+    if (r as Recipe).stars().value() >= threshold {
+      count = count + 1
+    }
+  }
+  return count
+}
+
+// Safe int parse; returns -1 on failure.
+def parseMins(s: String): Int {
+  try {
+    return JInteger::parseInt(s)
+  } catch e: Exception {
+    return 0 - 1
+  }
+}
+
+// --- Sample data ---
+
+val book = new RecipeBook
+
+book.add(new Recipe(
+  "Spaghetti Carbonara", Cuisine::ITALIAN, 25, Stars::FOUR,
+  [new Ingredient("spaghetti", "400g"),
+   new Ingredient("eggs", "4"),
+   new Ingredient("pecorino", "100g"),
+   new Ingredient("guanciale", "200g")],
+  [],
+  "Classic Roman pasta"
+))
+
+book.add(new Recipe(
+  "Street Tacos", Cuisine::MEXICAN, 20, Stars::FIVE,
+  [new Ingredient("tortillas", "8"),
+   new Ingredient("chicken", "500g"),
+   new Ingredient("lime", "2"),
+   new Ingredient("cilantro", "1 bunch")],
+  [DietaryTag::GLUTEN_FREE],
+  "Quick and flavourful"
+))
+
+book.add(new Recipe(
+  "Veggie Stir Fry", Cuisine::ASIAN, 15, Stars::FOUR,
+  [new Ingredient("tofu", "300g"),
+   new Ingredient("broccoli", "1 head"),
+   new Ingredient("soy sauce", "3 tbsp"),
+   new Ingredient("ginger", "1 tsp")],
+  [DietaryTag::VEGAN, DietaryTag::GLUTEN_FREE],
+  "Fast weeknight dinner"
+))
+
+book.add(new Recipe(
+  "Margherita Pizza", Cuisine::ITALIAN, 40, Stars::FIVE,
+  [new Ingredient("pizza dough", "500g"),
+   new Ingredient("tomato sauce", "200g"),
+   new Ingredient("mozzarella", "250g"),
+   new Ingredient("basil", "10 leaves")],
+  [DietaryTag::VEGETARIAN],
+  "Neapolitan classic"
+))
+
+book.add(new Recipe(
+  "Greek Salad", Cuisine::MEDITERRANEAN, 10, Stars::THREE,
+  [new Ingredient("cucumber", "1"),
+   new Ingredient("tomatoes", "4"),
+   new Ingredient("feta", "150g"),
+   new Ingredient("olives", "100g")],
+  [DietaryTag::VEGETARIAN, DietaryTag::GLUTEN_FREE],
+  "Light and refreshing"
+))
+
+book.add(new Recipe(
+  "Beef Burger", Cuisine::AMERICAN, 30, Stars::FOUR,
+  [new Ingredient("beef patty", "200g"),
+   new Ingredient("bun", "1"),
+   new Ingredient("lettuce", "2 leaves"),
+   new Ingredient("cheddar", "1 slice")],
+  [],
+  "All-American classic"
+))
+
+book.add(new Recipe(
+  "Shoyu Ramen", Cuisine::ASIAN, 60, Stars::FIVE,
+  [new Ingredient("ramen noodles", "200g"),
+   new Ingredient("chicken broth", "1L"),
+   new Ingredient("soy sauce", "4 tbsp"),
+   new Ingredient("soft-boiled egg", "2"),
+   new Ingredient("nori", "4 sheets")],
+  [],
+  "Umami-rich noodle soup"
+))
+
+book.add(new Recipe(
+  "Hummus Bowl", Cuisine::MEDITERRANEAN, 12, Stars::FOUR,
+  [new Ingredient("chickpeas", "400g"),
+   new Ingredient("tahini", "3 tbsp"),
+   new Ingredient("lemon juice", "2 tbsp"),
+   new Ingredient("garlic", "2 cloves"),
+   new Ingredient("olive oil", "2 tbsp")],
+  [DietaryTag::VEGAN, DietaryTag::GLUTEN_FREE, DietaryTag::DAIRY_FREE],
+  "Creamy and nutritious"
+))
+
+// --- Output ---
+
+println("=== Recipe Manager ===")
+println("Total: " + book.size() + " recipes, avg prep: " + book.avgPrepMins() + " min")
+
+println("\n--- All recipes (by stars, descending) ---")
+foreach r: Object in book.topByStars() {
+  val recipe = r as Recipe
+  println(ratingBar(recipe.stars()) + "  " + recipe.summary())
+}
+
+println("\n--- Italian cuisine ---")
+foreach r: Object in book.byCuisine(Cuisine::ITALIAN) {
+  val recipe = r as Recipe
+  println("  " + recipe.name() +
+          " (#{recipe.prepMins()} min, #{recipe.ingredientCount()} ingredients)")
+}
+
+println("\n--- Quick recipes (<=20 min) ---")
+foreach r: Object in book.quickRecipes(20) {
+  val recipe = r as Recipe
+  println("  " + recipe.summary())
+}
+
+println("\n--- Vegan recipes ---")
+val vegan = book.withTag(DietaryTag::VEGAN)
+if vegan.size == 0 {
+  println("  (none)")
+} else {
+  foreach r: Object in vegan {
+    val recipe = r as Recipe
+    println("  " + recipe.name() + " [" + recipe.tagList() + "]")
+  }
+}
+
+println("\n--- Gluten-free recipes ---")
+foreach r: Object in book.withTag(DietaryTag::GLUTEN_FREE) {
+  val recipe = r as Recipe
+  println("  " + recipe.name() + " [" + recipe.tagList() + "]")
+}
+
+println("\n--- Recipes grouped by cuisine ---")
+val byCuisine = book.all().groupBy { r => (r as Recipe).cuisine().displayName() }
+foreach (cuisine, items) in byCuisine {
+  println("  " + cuisine + ": " + (items as List[Recipe]).size + " recipe(s)")
+}
+
+println("\n--- Lookup by name ---")
+val found = book.findByName("greek salad")
+if found != null {
+  val r = found as Recipe
+  println("  Found: " + r.summary())
+  println("  Notes: " + r.notes())
+}
+val missing = book.findByName("mystery dish")
+val missingResult = if missing == null { "not found" } else { "found" }
+println("  'mystery dish': " + missingResult)
+
+println("\n--- Top recipe ingredients ---")
+val top = book.topByStars()
+if top.size > 0 {
+  val best = top[0] as Recipe
+  println("  Top: " + best.name())
+  foreach ing: Object in best.ingredients() {
+    val i = ing as Ingredient
+    println("    - " + i.describe())
+  }
+}
+
+println("\n--- Recipes with 4+ stars: " +
+        countAbove(book.topByStars(), 4) + " ---")
+
+println("\n--- Parse demo ---")
+println("  parseMins('30'): " + parseMins("30"))
+println("  parseMins('bad'): " + parseMins("bad"))
+
+val n = book.size()
+val cuisineCount = byCuisine.size
+println("\nReport complete: #{n} recipes across #{cuisineCount} cuisine(s).")

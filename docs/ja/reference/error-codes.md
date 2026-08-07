@@ -62,6 +62,143 @@ public:
 - 明示的な `return` を追加: `{ return 5 + 10 }`。
 - 式本体を使う: `def f(): Int = 5 + 10`。
 
+### `E0027` — boxing できない型
+
+`void` 型の式（`void` メソッドの呼び出し結果）が、値が必要な場所（文字列連結の
+被演算子など）で使われました。`void` には box 化した形が存在しないため、box する
+対象がありません。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s = "a" + IO::println("b")   // E0027: IO::println は void を返す
+    return 0
+  }
+}
+```
+
+修正方法: `void` を返す呼び出しの結果を値として使わず、単独の文として呼び出して
+ください。
+
+### `E0028` — lvalue が必要
+
+代入式の左辺が代入可能な場所（ローカル変数・フィールド・配列要素）ではありません
+（メソッド呼び出しの結果やリテラルなど）。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    "a".length() = 3   // E0028: 左辺が代入可能な場所ではない
+    return 0
+  }
+}
+```
+
+修正方法: 変数・フィールド・配列要素に代入してください。
+
+### `E0036` — val に代入できない
+
+`val` で宣言された束縛 ― ローカル変数、またはコンストラクタの外から書き込まれた
+インスタンスフィールド ― に、初回の代入のあとで再代入（あるいはインクリメント・
+デクリメント）が行われました。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: Int = 1
+    x = 2   // E0036: x は val であり var ではない
+    return x
+  }
+}
+```
+
+修正方法: 値を変更する必要があるなら `var` として宣言してください。インスタンスの
+`val` フィールドはコンストラクタ内で一度だけ代入するようにしてください。
+
+### `E0030` — 型はジェネリックではない
+
+型引数を取らない型に対して型引数が渡されました。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String[Int] = null   // E0030: String は型引数を取らない
+    return 0
+  }
+}
+```
+
+修正方法: 型引数を外してください（`String[Int]` ではなく `String`）。
+
+### `E0031` — 型引数の個数が一致しない
+
+ジェネリック型に渡された型引数の個数が誤っています。
+
+```onion
+class Box[T] { public: def this {} }
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val b = new Box[String, String]()   // E0031: Box は1個であり2個ではない
+    return 0
+  }
+}
+```
+
+このエラーは、`val b: Box[String, String]? = null` のように nullable な型注釈の
+中に個数不一致が書かれた場合にも発生します。
+
+### `E0033` — メソッドはジェネリックではない
+
+型引数を取らないメソッドの呼び出しに型引数が渡されました。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int { return "abc".length[String]() }   // E0033
+}
+```
+
+修正方法: 呼び出しから型引数を外してください（`"abc".length()`）。
+
+### `E0034` — メソッド型引数の個数が一致しない
+
+ジェネリックメソッド呼び出しに渡された明示的な型引数の個数が誤っています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val l = java.util.Collections::emptyList[String, String]()   // E0034: 1個であり2個ではない
+    return 0
+  }
+}
+```
+
+### `E0035` — erasure 後の JVM シグネチャが衝突している
+
+Onion の型システムでは異なる2つのオーバーロードが、同じ JVM メソッド記述子に
+erasure されてしまう場合があります（ジェネリクスは erasure ベースであり、
+`List[String]` と `List[Integer]` はバイトコードレベルでは区別できません）。
+その結果、クラスファイルは両方を保持できません。
+
+```onion
+class C {
+public:
+  def this {}
+  def f(x: java.util.List[String]): Int = 1
+  def f(x: java.util.List[Integer]): Int = 2   // E0035: どちらも f(List)I に erasure される
+}
+```
+
+修正方法: オーバーロードの erasure 後シグネチャを変える（引数の個数を変える、
+同じクラスに erasure されない引数型にするなど）か、内部で分岐する1つの
+メソッドに統合してください。
+
 ## 名前解決エラー
 
 ### `E0002` — 変数が見つからない
@@ -81,13 +218,451 @@ println(usrName)   // E0002、userName を提案
 val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
 ```
 
+### `E0004` — フィールドが見つからない
+
+対象の型にその名前のフィールドが存在しません。スペルとフィールドの可視性を確認してください。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s = "a".noSuchField   // E0004
+    return 0
+  }
+}
+```
+
 ### `E0005` — メソッドが見つからない
 
 呼び出しに一致するメソッドがありません。同じ名前のメソッドが存在するが引数の型が異なる場合、コンパイラは利用可能なシグネチャを一覧表示します。
 
+### `E0006` — メソッド呼び出しが曖昧
+
+2つのオーバーロードが呼び出しに対して同等に適用可能で、どちらがより特定的かを
+決められません。しばしば、引数の静的型（`null` や共通のスーパータイプなど）が
+複数の無関係なパラメータ型に同時に一致することが原因です。
+
+```onion
+class A {}
+class B {}
+class Test {
+public:
+  static def foo(x: A): Int = 1
+  static def foo(x: B): Int = 2
+  static def main(args: String[]): Int {
+    foo(null)   // E0006: foo(A) と foo(B) の両方に適用可能
+    return 0
+  }
+}
+```
+
+対処: 引数をキャストしてオーバーロードを確定させるか（`foo(null as A)`）、
+どちらか一方しか一致しないようにオーバーロードをリネーム・統合してください。
+
+### `E0011` — トップレベルのグローバル変数定義の重複
+
+同じ名前のトップレベル `var`/`val` が2回宣言されています。修飾子付き（`static var x = ...`
+を2回）でも、修飾子なし（ベアなトップレベル `var`/`val` はスクリプトの合成クラスの
+`public static` フィールドに昇格されるため、修飾子付きの形と同様にグローバルです）でも
+該当します。
+
+```onion
+static var x: Int = 1
+static var x: Int = 2   // E0011: x は既に定義されている
+```
+
+### `E0012` — トップレベル関数定義の重複
+
+2つのトップレベル `def` 関数が同じ名前・同じ引数型を持っています。引数型が異なる
+オーバーロードは引き続き許可されます。
+
+```onion
+def foo(x: Int): Int { return x }
+def foo(x: Int): Int { return x + 1 }   // E0012: foo(Int) は既に定義されている
+
+def bar(x: Int): Int { return x }
+def bar(x: String): String { return x }   // OK: 引数型が異なる
+```
+
+### `E0013` — メソッドにアクセスできない
+
+`private`（またはアクセスが不十分な）メソッド・コンストラクタ・静的メソッドが、
+それを参照できないクラスの外部から呼び出されています。
+
+```onion
+class C {
+private:
+  static def s(): Int = 1
+}
+def main(args: String[]): void { IO::println(C::s()) }   // E0013
+```
+
+### `E0014` — フィールドにアクセスできない
+
+非公開フィールドがその宣言クラスの外部から読み書きされています。
+
+```onion
+class Plain {
+  var value: String
+public:
+  def this(v: String) { value = v }
+}
+val p = new Plain("orig")
+p.value = "changed"   // E0014: value は public ではない
+```
+
+### `E0015` — クラスにアクセスできない
+
+静的型が別モジュールで宣言された `internal` クラスである値に対して、メンバーが
+選択されています。可視性はモジュール単位（クラス名の最後のドットより前の接頭辞）
+で決まり、`internal` クラスはそれを宣言したモジュール内からのみアクセスできます。
+
+```onion
+module pkg.a
+internal class Hidden {
+public:
+  var n: Int
+  def this { n = 1 }
+}
+```
+
+```onion
+module pkg.b
+import { pkg.a.Hidden }
+class UseIt {
+public:
+  static def main(args: String[]): Int {
+    val h: Hidden = null
+    return h.n   // E0015: Hidden は pkg.a に internal
+  }
+}
+```
+
+### `E0016` — 継承関係が循環している
+
+クラスまたはインタフェースのスーパータイプ連鎖（`extends`/`conforms`）が、直接
+または中間の型を経由して自分自身に戻ってしまっています。
+
+```onion
+class A extends B {
+}
+class B extends A {   // E0016: A -> B -> A の循環
+}
+```
+
+対処: 循環を断ち切ります。どちらか一方が他方を継承しないようにしてください。
+
+### `E0018` — 不正な継承
+
+クラスまたはインタフェースが、使用できないスーパータイプを `extends`/`conforms`
+しています。スーパータイプが `final` であるか、インタフェースの位置にクラスが
+（またはその逆が）指定されています。
+
+```onion
+class A extends java.lang.String { public: def this {} }   // E0018: String は final
+```
+
+対処: `final` でないクラスを継承するか、`conforms` はインタフェースにのみ、
+`extends` はクラスにのみ使用してください。
+
+### `E0019` — 不正なメソッド呼び出し
+
+`static` メソッドが、クラス自体ではなくインスタンスレシーバー（`obj.m(...)` や
+`obj?.m(...)`）経由で呼び出されました。
+
+```onion
+class A {
+public:
+  def this {}
+  static def s(): Int = 1
+}
+class Test {
+public:
+  static def main(args: String[]): Int { return new A().s() }   // E0019
+}
+```
+
+対処: クラス経由で呼び出してください（`A::s()`）。
+
+### `E0071` — インスタンスに対する静的呼び出し
+
+`s::m()` が使われましたが、`s` は型ではなくローカル変数に解決されました —
+Java/Kotlin の癖でインスタンスに `::` を使ってしまうケースです。汎用的な
+「型が見つからない」エラーではなく、修正方法を直接示します。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): void {
+    val s: String = "hi"
+    IO::println(s::length())   // E0071: s は変数であり、型ではない
+  }
+}
+```
+
+対処: インスタンスメソッドの呼び出しには `.` を使ってください（`s.length()`）。
+`::` は型の静的メンバー専用です。ローカル変数と同名の実在する型に対しては
+正しく解決されます — このエラーは `::` が変数に対して使われた場合にのみ発生します。
+
+### `E0020` — 値を返すことができない
+
+宣言された戻り値の型が `void` ではないメソッド内でベアな `return;` が使われて
+いるか、値が必要な位置で `return` が `void` 型の式を返しています。
+
+```onion
+class Test {
+public:
+  static def f(): Int { return }   // E0020: f は Int を返す必要がある
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+対処: 宣言された型の値を返す（`return 0`）か、メソッドの戻り値の型を `void`
+に変更してください。
+
 ### `E0021` — コンストラクタが見つからない
 
 引数に一致するコンストラクタがありません。コンパイラは利用可能なコンストラクタを一覧表示します。
+
+### `E0022` — コンストラクタ呼び出しが曖昧
+
+`new` 呼び出しに対して2つのコンストラクタオーバーロードが同等に適合します。
+多くの場合、引数の静的型（`null` など）が複数の無関係な仮引数型に同時に
+適合することが原因です。
+
+```onion
+class C {
+public:
+  def this(a: String) {}
+  def this(b: StringBuilder) {}
+}
+class Test {
+public:
+  static def main(args: String[]): Int { val c = new C(null); return 0 }   // E0022
+}
+```
+
+対処: 引数をキャストしてオーバーロードを確定させる（`new C(null as String)`）か、
+候補が1つだけになるようコンストラクタの一方を改名・統合してください。
+
+### `E0023` — インタフェースが要求されている
+
+インタフェース型を要求する位置（`forward` で委譲するフィールドの宣言型、または
+`{ ... }` クロージャリテラルの対象型）に、インタフェースではない型（クラスなど）
+が指定されました。
+
+```onion
+class A {
+  forward val x: String   // E0023: String はクラスであり、インタフェースではない
+public:
+  def this { x = "a" }
+}
+```
+
+対処: フィールド／対象をインタフェース型で宣言するか、委譲が本当に不要であれば
+`forward` を取り除いてください。
+
+### `E0037` — 抽象メソッドが実装されていない
+
+クラスが `conforms` したインタフェース（または `extends` した抽象クラス）が宣言する
+抽象メソッドの実装を提供しておらず、かつそのクラス自身も `abstract` として宣言され
+ていません。
+
+```onion
+interface I { def m(): Int }
+class A conforms I {   // E0037: A は m() を実装するか abstract 宣言が必要
+public:
+  def this {}
+}
+```
+
+対処: 不足しているメソッドを実装するか、クラスを `abstract` として宣言してください。
+
+### `E0038` — 抽象クラスをインスタンス化できない
+
+`new` 式が `abstract` として宣言されたクラスを対象にしています。そのクラス自身が
+抽象メソッドを宣言しているかどうかは問いません。
+
+```onion
+abstract class Shape {
+public:
+  abstract def area(): Int
+}
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val s: Shape = new Shape();   // E0038: Shape は abstract
+    return 0
+  }
+}
+```
+
+対処: 代わりに具象サブクラスをインスタンス化してください。
+
+### `E0039` — final メソッドをオーバーライドできない
+
+`override` を付けたメソッドが、スーパークラスで `final` として宣言されたメソッドを
+対象にしています。
+
+```onion
+class A {
+public:
+  def this {}
+  final def m(): Int = 1
+}
+class B extends A {
+public:
+  def this {}
+  override def m(): Int = 2   // E0039: A.m は final
+}
+```
+
+対処: `override` を取り除くか、オーバーライドが本当に必要であればスーパークラス側の
+`final` を外してください。
+
+### `E0068` — オーバーライド対象が見つからない
+
+`override` を付けたメソッドが、実際には何もオーバーライドしていません —
+そのスーパータイプ連鎖（基底クラスまたはインタフェース）に同名（同シグネチャ）の
+メソッドが存在しません。
+
+```onion
+class Base {
+public:
+  def helper(): Int { return 1; }
+}
+class Sub extends Base {
+public:
+  override def notInBase(): Int { return 2; }   // E0068: Base にそのようなメソッドはない
+}
+```
+
+対処: オーバーライド対象のメソッド名・シグネチャを一致させるか、新規メソッドであれば
+`override` を外してください。
+
+### `E0072` — 本体を持つ abstract メソッド
+
+`abstract` として明示的に宣言されたメソッドが本体を持っています。本体はコード生成時に
+黙って破棄されてしまうため — `abstract` と本体は矛盾する組み合わせなので、何も言わずに
+無視するメソッドとしてコンパイルするのではなく、エラーとして拒否します。
+
+```onion
+abstract class B {
+public:
+  abstract def foo(): Int { return 99 }   // E0072: abstract メソッドは本体を持てない
+}
+```
+
+対処: 本体を残すなら `abstract` を外して具象メソッドにするか、abstract のままにするなら
+本体を削除してください。インタフェースのデフォルトメソッド（`abstract` キーワードのない
+本体）はこのエラーの対象外です。
+
+### `E0040` — プリミティブ型に対するメソッド呼び出し
+
+メソッド呼び出しの対象式が `void` 型を持っています。典型的には、何も返さない
+呼び出しの結果に対して直接メソッドを連鎖させた場合に発生します。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    IO::println("a").toString()   // E0040: println は void を返す
+    return 0
+  }
+}
+```
+
+対処: 2つの呼び出しを別々の文に分けてください。
+
+### `E0041` — 不正なメソッド呼び出しターゲット
+
+メソッド呼び出し（または `[...]` によるインデックスアクセス）の対象式の型が、
+呼び出し可能なレシーバーとして使えません。たとえば `null` 除去前の nullable な
+クラス型の値（`T?`）や、具体的な上限を持たないワイルドカード型などです。
+
+```onion
+class Box {
+public:
+  def this {}
+}
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val b: Box? = null;
+    val v = b[0];   // E0041: Box? はメソッド呼び出しのターゲットとして不正
+    return 0
+  }
+}
+```
+
+対処: まず `null` を除外してください（`if b != null { ... }`、`b ?: default`、
+`b?.method()` / `b?[...]` など）。レシーバーが確定した非 null 型を持つようにします。
+
+### `E0061` — `from re"..."` がサポートしないレコード成分型
+
+`record ... from re"..."` 句は、各正規表現キャプチャグループをレコード成分の型に
+変換することで `parse`/`parseAll` を導出します。この方法で生成できるのは
+`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte` の成分だけです。
+
+```onion
+record Inner(x: Int)
+record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポートされていない成分型
+```
+
+対処: すべての成分をサポートされているスカラー型にとどめるか、通常の `from re"..."`
+マッチのあとで該当フィールドを手動でパースしてください。
+
+### `E0062` — `derive!(Json)` がサポートしないレコード成分型
+
+`derive!(Json)` は各成分を JSON のスカラー値にマッピングすることで `fromJson`/`toJson`
+を生成します。サポートされる成分型は `from re"..."` と同じ、`String`、`Int`、`Long`、
+`Double`、`Float`、`Boolean`、`Short`、`Byte` です。
+
+```onion
+record Inner(z: Int)
+record Bad(a: String, b: Inner) derive!(Json)   // E0062: Inner はシリアライズできない
+```
+
+対処: すべての成分をサポートされているスカラー型にとどめてください。
+
+### `E0063` — 未知の `derive!` マーカー
+
+`derive!(...)` が、コンパイラが実装していないフォーマット名を指定しています。
+現在サポートされているマーカーは `Json` のみです。
+
+```onion
+record U(a: String) derive!(Bogus)   // E0063: 未知の derive! マーカー Bogus
+```
+
+対処: `derive!(Json)` を使うか、この句を削除してください。
+
+### `E0064` — law の反証
+
+`law name(p: T) { boolExpr }` 句は、ビルド時に `p` の生成されたサンプル値に対して
+チェックされます。式を false にするサンプルは反例であり、再現できるように
+（シードやサンプル数などの）生成設定とともに報告されます。
+
+```onion
+record Pt(x: Int, y: Int)
+  law wrong(p: Pt) { p.x() == p.y() }   // E0064: 反証された（例: Pt(0, 1)）
+```
+
+対処: あらゆる生成サンプルに対して成り立つように law（またはチェック対象のコード）を
+修正するか、一般には成り立たない law であれば削除してください。
+
+### `E0065` — example の失敗
+
+トップレベルまたはレコードに付随する `example { boolExpr }` 句が、ビルド時に
+`false` と評価された（または例外をスローした）ケースです。`law` と異なり、
+`example` は生成されたサンプル群ではなく、1つの固定ケースをチェックします。
+
+```onion
+record R(x: Int)
+  example { new R(1).x() == 2 }   // E0065: false と評価された
+```
+
+対処: example が期待する値を修正するか、その example が検証しているコード側を
+修正してください。
 
 ### `E0073` — Map は直接反復できない
 
@@ -249,6 +824,25 @@ public:
 - `?.` / `?:` / `if x != null` を使う。
 - 非 null 制限を宣言: `class Box[T extends Object]`。
 
+### `E0070` — nullable なメンバへのアクセス
+
+nullable な型（`T?`）の値に対して、フィールド（メソッドではない）が直接アクセス
+されました。この時点で値は null である可能性があります。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String? = "abc"
+    return x.length   // E0070: x は null の可能性がある
+  }
+}
+```
+
+対処: 安全にアクセスするには `?.`、デフォルト値を与えるには `?:`、非 null を
+断言するには `!!`、または先に null チェック（`if x != null { ... }`）を行って
+ください。
+
 ### `E0081` — tool のパラメータがコマンドラインから読めない
 
 CLI は `tool` のパラメータから導出されるので、パラメータはすべてコマンドライン引数から
@@ -298,6 +892,302 @@ try {
 より具体的な型を先に書くよう並べ替えるか、到達不能な節を削除してください。1つの
 multi-catch 節（`catch e: A | B`）の候補同士は互いにチェックされません。
 
+## extension メソッドエラー
+
+### `E0084` — extension メソッドの重複
+
+同じ `extension` ブロック内に、同じ名前・同じパラメータ型を持つメソッドが2つ宣言され
+ています。チェックせずに放置すると、生成されるコンテナクラスが同一の JVM シグネチャを
+持つメソッドを2つ持つことになり、コンパイル時ではなくクラスをロードした瞬間に初めて
+（`ClassFormatError` が内部エラー I0000 として現れる形で）失敗します。
+
+```onion
+extension Double {
+  def pct(): String = "" + self
+  def pct(): String = "" + self   // E0084: duplicated extension method pct() on Double
+}
+```
+
+対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
+extension メソッド同士は影響を受けません — 通常のオーバーロードです。
+
+## 宣言エラー
+
+### `E0007` — ローカル変数の重複
+
+同じスコープ内で、同じ名前のローカル変数が2回宣言されています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x = 1
+    val x = 2   // E0007: x はこのスコープで既に宣言済み
+    return 0
+  }
+}
+```
+
+対処: どちらか一方の変数をリネームするか、冗長な宣言を削除してください。
+
+### `E0008` — クラスの重複
+
+トップレベルのクラス（インターフェース・レコード・enum を含む）が同じ名前で
+2つ宣言されています。
+
+```onion
+class A { public: def this {} }
+class A { public: def this {} }   // E0008: A は既に宣言済み
+```
+
+対処: どちらか一方の宣言をリネームまたは削除してください。
+
+### `E0009` — フィールドの重複
+
+同じフィールド名がクラス上で2回宣言されています。
+
+```onion
+class A {
+  var x: Int
+  var x: Int   // E0009: x は A 上に既に宣言済み
+public:
+  def this {}
+}
+```
+
+対処: 重複したフィールドを削除するか、別の名前を付けてください。
+
+### `E0010` — メソッドの重複
+
+同じクラス上で、同じ名前・同じパラメータリストを持つメソッドが2つ宣言されて
+おり、どちらも他方の正当なオーバーロードになっていません。
+
+```onion
+class Test {
+public:
+  def m(): Int = 1
+  def m(): Int = 2   // E0010: m() は Test 上に既に宣言済み
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+対処: どちらか一方のメソッドをリネームするか、パラメータ型を変えて正当な
+オーバーロードにしてください。
+
+### `E0025` — コンストラクタの重複
+
+同じクラスの2つのコンストラクタがまったく同じパラメータ型を持っており、
+どちらも他方の正当なオーバーロードになっていません。
+
+```onion
+class A {
+public:
+  def this(x: Int) {}
+  def this(y: Int) {}   // E0025: this(Int) は A に既に定義されている
+}
+```
+
+対処: 一方のコンストラクタのパラメータ型を変えるか、重複を削除してください。
+
+### `E0026` — 生成されたメソッドの重複
+
+record の `law`/`example` 節は、節ごとに検査用メソッドを1つ合成し、その節の名前を
+付けます。同じ名前・同じパラメータ型を持つ2つの `law`（または2つの `example`）は
+同じメソッドへとマングルされ、コード生成時に衝突します。このチェックがなければ、
+この衝突は通常の診断ではなく、生の JVM `ClassFormatError` として後になって表面化
+していました。
+
+```onion
+record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)"
+  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
+  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }   // E0026
+```
+
+対処: 一方の節の名前を変更するか、重複を削除してください。
+
+### `E0029` — 型パラメータの重複
+
+同じ型パラメータ名が、1つのクラス・インタフェース・メソッドの型パラメータリスト内で
+2回出現しています。
+
+```onion
+class Box[T, T] { public: def this {} }   // E0029: T は既に宣言されている
+```
+
+対処: 型パラメータに異なる名前を付けてください。
+
+### `E0051` — 戻り値の型が必要
+
+トップレベル関数または extension メソッドに戻り値の型が宣言されておらず、
+コンパイラがそれを推論できません。典型的には、その関数が自己再帰的で、
+型付け済みの本体から型を推論する手がかりがない場合に発生します。
+
+```onion
+def f(n: Int) = f(n)   // E0051: f には明示的な戻り値の型が必要
+def main(): void { }
+```
+
+対処: 関数に明示的な戻り値の型を与えてください（例: `def f(n: Int): Int = f(n)`）。
+
+### `E0052` — ラムダのパラメータに型指定が必要
+
+ラムダのパラメータに型注釈がなく、そのラムダが現れている文脈からは
+コンパイラがパラメータの型を推論するための関数型インタフェースが得られません。
+
+```onion
+val f = (x) -> x + 1   // E0052: x の型をここでは推論できない
+def main(): void { }
+```
+
+対処: パラメータに明示的に型を注釈する（`(x: Int) -> x + 1`）か、目的の型が
+わかる文脈でラムダを使ってください — 例えば、関数型のパラメータが宣言された
+メソッドへ直接引数として渡す、など。
+
+### `E0053` — 循環した型エイリアス
+
+2つ以上の `type` エイリアスが互いを参照しており、どれを解決しようとしても
+無限に再帰してしまいます。
+
+```onion
+type A = B
+type B = A   // E0053: A -> B -> A
+```
+
+対処: 少なくとも一方のエイリアスを具体的な型に向けることで循環を断ち切って
+ください。
+
+### `E0054` — 型エイリアスの重複
+
+同じ `type` エイリアス名が同じスコープで2回宣言されています。
+
+```onion
+type A = java.lang.String
+type A = java.lang.Integer   // E0054: A は既に宣言されている
+```
+
+対処: 一方の宣言をリネームするか削除してください。
+
+### `E0055` — 関数には本体が必要
+
+トップレベル関数が本体なし（`{ ... }` も `= expr` もなし）で宣言されています。
+クラスのメソッドと異なり、トップレベル関数は決して abstract にはなれないため、
+常に実装を持つ必要があります。
+
+```onion
+def f(): Int;   // E0055: f には本体が必要
+def main(): void { }
+```
+
+対処: 関数に本体を与えてください。
+
+### `E0085` — 本体のない static メソッド
+
+`static` と宣言されたメソッドに本体（`{ ... }` も `= expr` も）がありません。文法上
+本体のないメソッドは abstract/interface 的な宣言として受理されますが、`static` と
+abstract は矛盾します — static メソッドはオーバーライドできないため、abstract にも
+なり得ません。もしクラスファイルを生成すれば `ACC_STATIC` と `ACC_ABSTRACT` の両方が
+必要になり、これは JVM が拒否します。
+
+```onion
+class LineFilter {
+public:
+  static def main(args: String[]): void
+  // E0085: static method main must have a body
+}
+```
+
+対処: 本体を追加するか、`static` を外して通常の abstract インスタンスメソッドとして
+宣言してください。
+
+### `E0069` — ローカル val に初期化子が必要
+
+ローカル `val` が初期化子（`= expr`）なしで宣言されました。`var` と異なり `val` は
+後から代入できないため、初期化子のない `val` は JVM のゼロ値デフォルトしか読み取れず
+— それはバグであって、値ではありません。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val x: String   // E0069: x は初期化されていない
+    IO::println(x)
+    return 0
+  }
+}
+```
+
+対処: 宣言時に初期化子を与える（`val x: String = ...`）か、後から代入する必要が
+本当にあるなら `var` を使ってください。コンストラクタ内で初期化されるフィールドの
+`val` はこのエラーの対象外です。
+
+## 制御フローエラー
+
+### `E0048` — ループの外での break
+
+`break`（ラベル付き・なし問わず）が、囲むループのない場所に出現しています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    break   // E0048: 囲むループがない
+    return 0
+  }
+}
+```
+
+対処: `break` は `while`・`for`・`foreach` ループの内側でのみ使用してください。
+
+### `E0049` — ループの外での continue
+
+`continue`（ラベル付き・なし問わず）が、囲むループのない場所に出現しています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    continue   // E0049: 囲むループがない
+    return 0
+  }
+}
+```
+
+対処: `continue` は `while`・`for`・`foreach` ループの内側でのみ使用してください。
+
+### `E0050` — static コンテキストで現在のインスタンスが利用できない
+
+`static` メソッドの内部で `this`/`self` が使われています。static メソッドには
+レシーバインスタンスが存在しません。
+
+```onion
+class Test {
+public:
+  static def s(): Int { return this.hashCode() }   // E0050: s は static
+  static def main(args: String[]): Int { return 0 }
+}
+```
+
+対処: `static` を外すか、インスタンスを明示的にパラメータとして渡してください。
+
+### `E0058` — ラベルが見つからない
+
+ラベル付きの `break`/`continue` が、囲んでいるどのループにも束縛されていない
+ラベルを指定しています。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): void {
+    foreach i: Int in 0..3 {
+      break nosuch   // E0058: nosuch というラベルの付いた囲みループがない
+    }
+  }
+}
+```
+
+対処: 対象のループにラベルを付ける（`outer: foreach ... { break outer }`）か、
+ラベルの綴りを修正してください。
+
 ## パターンマッチングエラー
 
 ### `E0042` — 網羅性のないパターンマッチング
@@ -314,6 +1204,114 @@ select shape {
   // Rect ケースが欠けている → E0042
 }
 ```
+
+### `E0043` — 未知の名前付き引数
+
+呼び出しが `name = value` 構文を使ったが、その名前が解決されたメソッド・
+コンストラクタ・関数のどのパラメータとも一致しません。
+
+```onion
+class T {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, nope = 2) }   // E0043: f に nope という名前のパラメータはない
+}
+```
+
+対処: 引数名のスペルを対象の宣言と照らし合わせてください。
+
+### `E0044` — 引数の重複
+
+同じパラメータが1回の呼び出しの中で2回束縛されています — 例えば、同じ呼び出し内で
+既に使われた名前を繰り返す名前付き引数などです。
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, x = 2) }   // E0044: x は既に束縛されている
+}
+```
+
+対処: 重複した束縛を削除してください。
+
+### `E0045` — 名前付き引数の後の位置引数
+
+呼び出しで、名前付き引数の後に位置引数が置かれています。呼び出しが一度名前付き
+引数を使い始めたら、それ以降の引数もすべて名前で指定する必要があります —
+そうでなければ、位置引数がどのパラメータを埋めるのか曖昧になるためです。
+
+```onion
+class Test {
+public:
+  static def f(x: Int, y: Int): Int = x + y
+  static def main(args: String[]): Int { return f(x = 1, 2) }   // E0045: 2 が名前付き引数の後に来ている
+}
+```
+
+対処: 残りの引数もすべて名前付きにするか、位置引数を先頭にまとめてください。
+
+### `E0046` — 分割宣言パターンの束縛数が一致しない
+
+分割宣言の `val`/`var (a, b, ...)`（またはネストした分割パターン）で指定した
+変数の数が、record のコンポーネント数と一致していません。
+
+```onion
+record Point(x: Int, y: Int)
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b, c) = new Point(1, 2)   // E0046: Point は2フィールドだが3つの束縛が指定された
+    return 0
+  }
+}
+```
+
+対処: 束縛の数を record のコンポーネント数に合わせてください。
+
+### `E0047` — record 型ではない
+
+分割宣言の `val`/`var (a, b, ...) = expr` が、record ではない型の値に対して
+使われたため、位置で束縛できるコンポーネントがありません。
+
+```onion
+class Test {
+public:
+  static def main(args: String[]): Int {
+    val (a, b) = "not a record"   // E0047: String は record 型ではない
+    return 0
+  }
+}
+```
+
+対処: record の値を分割するか、通常の `val`/`var` で値全体を束縛してください。
+
+### `E0059` — 不正な正規表現リテラル
+
+`re"..."` リテラル（裸の式、`select case`、`from re"..."` 句のいずれでも）が
+正しい正規表現になっていません。コンパイル時に検証されるため、不正なパターンは
+実行時に `PatternSyntaxException` をスローする代わりにここで捕捉されます。
+
+```onion
+val p = re"(unclosed"   // E0059: 不正な正規表現リテラル
+```
+
+対処: パターンを修正してください。
+
+### `E0060` — 正規表現のキャプチャグループ数とバインディング数の不一致
+
+`case re"..." (b1, b2, ...)` パターン（または `record ... from re"..."` 句）が、
+パターンのキャプチャグループ数とは異なる数のバインディング／成分を指定しています。
+
+```onion
+select "x" {
+  case re"(\d+)-(\d+)" (a): a   // E0060: パターンは2グループだが、バインディングは1個
+  else: "no"
+}
+```
+
+対処: バインディング（またはレコード成分）の数をパターンのキャプチャグループ数に
+合わせてください。
 
 ## パーサーエラー
 
@@ -412,6 +1410,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
+| `E0084` | duplicated extension method …(…) on … |
+| `E0085` | static method … must have a body |
 
 ## 関連項目
 

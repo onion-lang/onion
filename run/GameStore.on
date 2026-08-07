@@ -1,0 +1,292 @@
+// GameStore.on — Game store inventory and sales reporting system
+// Exercises: homogeneous enum, records with methods, typed generics,
+//   collection pipelines (sortedBy/groupBy/fold/find/filter), pattern
+//   matching with select, nullable, string interpolation, extension
+//   methods on Int/Double/String, foreach (k,v) on Map, closures,
+//   mutable class state, access-section visibility.
+
+import {
+  java.util.*
+}
+
+// ─── Enumerations ────────────────────────────────────────────────────────────
+
+enum Genre {
+  Action, RPG, Strategy, Puzzle, Sports, Horror, Simulation
+}
+
+enum Platform {
+  PC, PlayStation, Xbox, Switch, Mobile
+}
+
+// ─── Records ─────────────────────────────────────────────────────────────────
+
+record Game(
+  id:       String,
+  title:    String,
+  genre:    Genre,
+  platform: Platform,
+  price:    Double,
+  stock:    Int
+) {
+public:
+  def isLowStock(): Boolean   = stock > 0 && stock < 5
+  def isOutOfStock(): Boolean  = stock == 0
+  def stockLabel(): String    = if stock == 0 { "OUT" } else if stock < 5 { "LOW" } else { "OK " }
+  def discountedPrice(pct: Double): Double = price * (1.0 - pct / 100.0)
+}
+
+record Sale(gameId: String, title: String, quantity: Int, revenue: Double)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String   = String::format("%.2f", self)
+  def fmtUsd(): String = "$" + String::format("%.2f", self)
+}
+
+extension Int {
+  def plural(word: String): String =
+    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+  def padLeft(w: Int): String {
+    val s = "" + self
+    if s.length() >= w { return s }
+    return " ".repeat(w - s.length()) + s
+  }
+}
+
+extension String {
+  def ljust(w: Int): String =
+    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+  def rjust(w: Int): String =
+    if self.length() >= w { self } else { " ".repeat(w - self.length()) + self }
+  def center(w: Int): String {
+    val pad = w - self.length()
+    if pad <= 0 { return self }
+    val l = pad / 2
+    return " ".repeat(l) + self + " ".repeat(pad - l)
+  }
+  def truncate(w: Int): String =
+    if self.length() <= w { self } else { self.substring(0, w - 1) + "~" }
+}
+
+// ─── GameStore class ──────────────────────────────────────────────────────────
+
+class GameStore {
+  val storeName: String
+  val inventory: List[Game]
+  val sales:     List[Sale]
+
+public:
+  def this(name: String) {
+    this.storeName = name
+    this.inventory = []
+    this.sales     = []
+  }
+
+  def getName(): String       = storeName
+  def getInventory(): List[Game] = inventory
+  def getSales(): List[Sale]  = sales
+
+  def addGame(g: Game): void { inventory.add(g) }
+
+  def gameCount(): Int = inventory.size
+
+  def findById(id: String): Game? {
+    var found: Game? = null
+    foreach g: Game in inventory { if g.id() == id { found = g } }
+    return found
+  }
+
+  def sell(id: String, qty: Int): Boolean {
+    val g = findById(id)
+    if g == null { return false }
+    if g.stock() < qty { return false }
+    val idx = inventory.indexOf(g)
+    inventory.set(idx, g.copy(stock = g.stock() - qty))
+    sales.add(new Sale(id, g.title(), qty, g.price() * qty))
+    return true
+  }
+
+  def totalRevenue(): Double =
+    sales.fold(0.0) { acc, s => (acc as Double) + (s as Sale).revenue() }
+
+  def totalUnitsSold(): Int =
+    sales.fold(0) { acc, s => (acc as Int) + (s as Sale).quantity() }
+
+  def sortedByPriceDesc(): List[Game] =
+    inventory.sortedBy { g => 0 - (g as Game).price().intValue() }
+
+  def topSale(): Sale? {
+    if sales.size == 0 { return null }
+    var best: Sale = (sales.get(0) as Sale)
+    foreach s: Object in sales {
+      val sale = (s as Sale)
+      if sale.revenue() > best.revenue() { best = sale }
+    }
+    return best
+  }
+
+  def revenueByGame(): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    foreach s: Object in sales {
+      val sale  = (s as Sale)
+      val title = sale.title()
+      var cur: Double = 0.0
+      val prev = result.get(title)
+      if prev != null { cur = (prev as Double) }
+      result.put(title, cur + sale.revenue())
+    }
+    return result
+  }
+
+  def stockAlerts(): List[String] {
+    val alerts: List[String] = []
+    foreach g: Game in inventory {
+      if g.isOutOfStock() { alerts.add("[OUT] #{g.title()}: out of stock") }
+      else if g.isLowStock() { alerts.add("[LOW] #{g.title()}: only #{g.stock().plural("unit")} left") }
+    }
+    return alerts
+  }
+
+  def averagePrice(): Double {
+    if inventory.size == 0 { return 0.0 }
+    val total = inventory.fold(0.0) { acc, g => (acc as Double) + (g as Game).price() }
+    return (total as Double) / inventory.size
+  }
+}
+
+// ─── Print helpers ────────────────────────────────────────────────────────────
+
+def rule(ch: String): void      { IO::println(ch.repeat(62)) }
+def header(title: String): void { rule("="); IO::println(title.center(62)); rule("=") }
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val store = new GameStore("Pixel Palace")
+
+  // ── Stock the shelves ──
+  store.addGame(new Game("G01", "Dragon Odyssey",     Genre::RPG,        Platform::PC,          59.99, 12))
+  store.addGame(new Game("G02", "Street Brawler 5",   Genre::Action,     Platform::PlayStation,  49.99,  3))
+  store.addGame(new Game("G03", "Chess Master Pro",   Genre::Strategy,   Platform::Switch,       29.99,  0))
+  store.addGame(new Game("G04", "Puzzle Frenzy",      Genre::Puzzle,     Platform::Mobile,        4.99, 50))
+  store.addGame(new Game("G05", "Soccer Stars",       Genre::Sports,     Platform::Xbox,         39.99,  8))
+  store.addGame(new Game("G06", "Silent Depths",      Genre::Horror,     Platform::PC,           44.99,  4))
+  store.addGame(new Game("G07", "Farm Life Sim",      Genre::Simulation, Platform::PC,           24.99, 20))
+  store.addGame(new Game("G08", "Cyber Rogue",        Genre::Action,     Platform::PlayStation,  54.99,  2))
+  store.addGame(new Game("G09", "Tower Defense X",    Genre::Strategy,   Platform::Switch,       19.99, 15))
+  store.addGame(new Game("G10", "Haunted Mansion",    Genre::Horror,     Platform::Xbox,         34.99,  0))
+  store.addGame(new Game("G11", "Mech Warriors",      Genre::Action,     Platform::PC,           44.99, 10))
+  store.addGame(new Game("G12", "Puzzle Box Deluxe",  Genre::Puzzle,     Platform::Switch,        9.99, 30))
+
+  // ── Process sales ──
+  store.sell("G01", 4)
+  store.sell("G02", 2)
+  store.sell("G04", 15)
+  store.sell("G05", 3)
+  store.sell("G07", 6)
+  store.sell("G08", 2)
+  store.sell("G09", 5)
+  store.sell("G11", 3)
+  store.sell("G12", 8)
+
+  // ─────────────────────────────────────────────
+  // 1. FULL INVENTORY
+  // ─────────────────────────────────────────────
+  header("#{store.getName()} — INVENTORY (#{store.gameCount().plural("title")})")
+  IO::println("  #{"ID".ljust(5)} #{"Title".ljust(22)} #{"Genre".ljust(12)} #{"Platform".ljust(14)} #{"Price".rjust(7)} #{"Stk".rjust(4)} St")
+  rule("-")
+  foreach g: Game in store.getInventory() {
+    IO::println("  #{g.id().ljust(5)} #{g.title().truncate(22).ljust(22)} #{g.genre().name().ljust(12)} #{g.platform().name().ljust(14)} #{g.price().fmtUsd().rjust(7)} #{("" + g.stock()).rjust(4)} #{g.stockLabel()}")
+  }
+  IO::println("  Average price: #{store.averagePrice().fmtUsd()}")
+
+  // ─────────────────────────────────────────────
+  // 2. SALES LEDGER
+  // ─────────────────────────────────────────────
+  IO::println("")
+  header("SALES LEDGER")
+  IO::println("  #{"Title".ljust(24)} #{"Qty".rjust(5)} #{"Revenue".rjust(10)}")
+  rule("-")
+  foreach s: Sale in store.getSales() {
+    IO::println("  #{s.title().ljust(24)} #{("" + s.quantity()).rjust(5)} #{s.revenue().fmtUsd().rjust(10)}")
+  }
+  rule("-")
+  IO::println("  #{"TOTALS".ljust(24)} #{("" + store.totalUnitsSold()).rjust(5)} #{store.totalRevenue().fmtUsd().rjust(10)}")
+
+  // ─────────────────────────────────────────────
+  // 3. REVENUE BY GAME (sorted desc)
+  // ─────────────────────────────────────────────
+  IO::println("")
+  header("REVENUE PER TITLE")
+  val revByGame: Map[String, Double] = store.revenueByGame()
+  val revTitles: List[String] = []
+  foreach t: Object in revByGame.keySet() { revTitles.add((t as String)) }
+  val sortedRevTitles = revTitles.sortedBy { t => 0 - (revByGame.get(t) as Double).intValue() }
+  foreach t: Object in sortedRevTitles {
+    val rev = (revByGame.get(t) as Double)
+    IO::println("  #{(t as String).ljust(24)} #{rev.fmtUsd().rjust(10)}")
+  }
+
+  // ─────────────────────────────────────────────
+  // 4. INVENTORY BY GENRE
+  // ─────────────────────────────────────────────
+  IO::println("")
+  header("INVENTORY BY GENRE")
+  val byGenre = store.getInventory().groupBy { g => (g as Game).genre().name() }
+  foreach (genre, games) in byGenre {
+    val gList = (games as List[Game])
+    IO::println("  #{genre} (#{gList.size.plural("title")}):")
+    foreach g: Object in gList {
+      val game = (g as Game)
+      IO::println("    * #{game.title().ljust(22)} #{game.price().fmtUsd()}  [#{game.stockLabel()}]")
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // 5. INVENTORY BY PLATFORM
+  // ─────────────────────────────────────────────
+  IO::println("")
+  header("INVENTORY BY PLATFORM")
+  val byPlat = store.getInventory().groupBy { g => (g as Game).platform().name() }
+  foreach (plat, games) in byPlat {
+    val gList = (games as List[Game])
+    val catVal = gList.fold(0.0) { acc, g => (acc as Double) + (g as Game).price() }
+    IO::println("  #{(plat as String).ljust(14)} #{gList.size.plural("title")}  catalogue value: #{(catVal as Double).fmtUsd()}")
+  }
+
+  // ─────────────────────────────────────────────
+  // 6. PRICE RANKING
+  // ─────────────────────────────────────────────
+  IO::println("")
+  header("PRICE RANKING (high to low)")
+  var rank = 1
+  foreach g: Object in store.sortedByPriceDesc() {
+    val game = (g as Game)
+    IO::println("  #{rank.padLeft(2)}. #{game.title().ljust(24)} #{game.price().fmtUsd()}")
+    rank = rank + 1
+  }
+
+  // ─────────────────────────────────────────────
+  // 7. HIGHLIGHTS & ALERTS
+  // ─────────────────────────────────────────────
+  IO::println("")
+  header("HIGHLIGHTS")
+  val top = store.topSale()
+  if top != null {
+    IO::println("  Best single sale: #{top.title()} -- #{top.quantity().plural("unit")} / #{top.revenue().fmtUsd()}")
+  }
+  IO::println("")
+  val alerts: List[String] = store.stockAlerts()
+  if alerts.size == 0 {
+    IO::println("  All titles are well-stocked.")
+  } else {
+    IO::println("  Stock alerts (#{alerts.size.plural("item")}):")
+    foreach alert: String in alerts { IO::println("  #{alert}") }
+  }
+  IO::println("")
+  IO::println("  Total revenue   : #{store.totalRevenue().fmtUsd()}")
+  IO::println("  Total units sold: #{store.totalUnitsSold().plural("unit")}")
+  rule("=")
+}

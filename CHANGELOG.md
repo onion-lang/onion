@@ -7,6 +7,768 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/PerfReview.on`, a 284-line employee performance review dashboard.**
+  Exercises ADT case-enum (`PerformanceBand` with `Exceptional`/`Strong`/`Meets`/
+  `BelowTarget`/`Critical` and `select this` dispatch), a homogeneous enum
+  (`ReviewStatus` with `::` constant access), records with compile-time `example`
+  clauses (`ReviewMetrics`), extension methods on records, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`zip`/`distinct`),
+  nullable map lookups, `foreach (k, v) in map` destructuring, and `foreach :
+  Type in list` typed iteration.
+
+- **`run/GradeReport.on`, a 255-line student gradebook sample.** Exercises an
+  ADT enum (`Standing`) dispatched via `select this { case x is T: }`, a
+  data-carrying enum (`LetterGrade`), records with `List` fields (`Student`,
+  `Enrollment`, `Course`), an interface implemented by a class
+  (`Reportable`/`StudentReport`), extension methods on `Double`/`Int`,
+  collection pipelines (`map`/`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`),
+  recursive and `while`-based iteration, `foreach` over an inclusive range and
+  over `Map` entries, and `try`/`catch`.
+- **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
+  enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
+  dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,
+  `Comment`, `Reaction`), a `Network` class backed by `HashMap` stores,
+  collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
+  BFS-style friend-of-friend recommendation engine, and nullable lookups
+  (`User?`/`Post?`).
+- **`run/PetShelter.on`, a 269-line pet shelter management sample.** Exercises a
+  data-carrying enum (`PetType`), an ADT case-enum (`AdoptionStatus` with
+  `Available`/`Foster`/`Adopted`/`Quarantine` cases and shared methods via
+  `select this`), records (`Pet`, `Adopter`, `FosterRecord`), a class with
+  public/private sections and a replace-on-update mutation pattern, extension
+  methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
+  `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
+  for intake validation.
+
+## [0.10.25] - 2026-08-07
+
+### Added
+
+- **`run/WeatherReport.on`, a 261-line weather data analysis sample.** A new
+  domain not previously covered by the corpus. Exercises a data-carrying enum
+  (`AlertLevel`: `NONE`/`ADVISORY`/`WARNING`/`EMERGENCY`), records with inline
+  methods (`DailyReading`, `WeekSummary`), an interface implemented by a class
+  (`Reportable`/`MonthData`), extension methods on `Double` and `String`,
+  `select` dispatch over enum cases, a recursive moving-average function, and
+  collection-pipeline operations underused elsewhere in the corpus
+  (`reduce`/`partition`/`take`/`drop`/`zip`/`flatten`/`distinct`/`sortedBy`).
+- **`run/CourseRegistration.on`, a 365-line university course registration sample.**
+  Exercises plain enums (`Department`, `Grade`) with `select` dispatch, records with
+  inline methods (`Course`, `Student`, `Enrollment`, `RankedStudent`), a class with
+  private `Map[String, T]` fields, `foreach (k, v) in map` iteration, nullable
+  (`Grade?`) fields with null-checks, an extension method on a record
+  (`Student::shortLabel`), and an in-place insertion sort over `List[RankedStudent]`.
+- **`run/RankedChoice.on`, a 312-line instant-runoff voting simulation.** Runs a
+  5-candidate/30-ballot election (4 elimination rounds) and a 3-candidate
+  "plurality != RCV" demo. Exercises records with inline methods (`Candidate`,
+  `ElectionSummary`), `foreach (k, v) in map` and `foreach v in map.values()`,
+  `break` and non-local `return` inside `foreach`, collection pipelines
+  (`filter`/`sortedBy`/`find`), `String::format` for column-aligned output, and
+  an `extension String` method.
+- **`run/StudentGradeBook.on`, a 248-line student grade management sample.**
+  Exercises records (`Course`, `Student`, `Enrollment`), a data-carrying enum
+  (`Semester(label)`), collection pipelines (`filter`/`map`/`sortedBy`/
+  `sortedByDescending`/`groupBy`/`fold`/`find`), `select` dispatch on `String`,
+  closures capturing outer `val`s, recursion (`halveDepth`), `foreach` over
+  list/map-entry/range, `while`, `try`/`catch`, and the two-step
+  `(val as Int) as Double` numeric cast pattern.
+- **`run/CensusAnalyzer.on`, a 468-line population data parsing and reporting
+  sample.** Combines features under-represented elsewhere in the corpus:
+  `from re"..."` pattern-attached record parsing (`Person`), `do[List]`
+  list-comprehension cross-tabulation, the `|>` pipeline operator, an ADT
+  `case`-enum (`AgeGroup`) alongside a homogeneous enum with methods
+  (`IncomeBracket`), a wrapper record with computed properties (`PersonExt`),
+  extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
+  `record example {}` build-time parse round-trip assertions.
+  111 total corpus programs.
+- **`run/ClinicRecords.on`, a 523-line medical clinic patient and appointment
+  management sample.** Exercises homogeneous enums with `select` dispatch
+  (`BloodType`, `Severity`, `ApptStatus`), an ADT `case`-enum (`DiagnosisResult`:
+  `Clear`/`Condition`/`Referral`) matched with type patterns, records with method
+  bodies including a nullable field (`Appointment.notes: String?`), a class with
+  typed `List[T]` fields, `sortedBy`/`groupBy`/`fold` pipelines, and extension
+  methods on `String`/`Int`/`Double`.
+  112 total corpus programs.
+
+### Documentation
+
+- **`docs/ja/reference/stdlib.md`'s Json Module section never mentioned `Json::value`,
+  the navigable JSON wrapper (`Value`, indexable with `[]` and read with
+  `asString`/`asInt`/`asLong`/`asDouble`/`asBoolean`/`isNull`/`size`) that
+  `docs/reference/stdlib.md` documents.** Added the missing subsection and example to
+  the Japanese page, and added `StdlibDocJsonModuleParitySpec` (same approach as
+  `StdlibDocYamlModuleParitySpec`) so this can't silently drift again.
+
+- **`docs/tools/compiler.md` and `docs/tools/script-runner.md` (and their `docs/ja`
+  translations) had no section for the real `-super <super class>` and `--verbose`
+  flags, and the `compiler.md` pair was additionally missing `--effects`** — all three
+  work today but were absent from every option reference. Added the missing sections
+  to all four pages and added `CliOptionDocCoverageSpec`, which ties each page to the
+  actual `--help` option list in `CompilerFrontend`/`ScriptRunner` so a future flag
+  added to one and not the other fails the build instead of drifting silently.
+
+## [0.10.24] - 2026-08-06
+
+### Documentation
+
+- **`docs/ja/reference/stdlib.md`'s Yaml Module section collapsed the English section's
+  four subsections (`Yaml::parse`, `Yaml::stringify`, the round-trip guarantee, and
+  `derive!(Yaml)` usage) into a single short paragraph, dropping the round-trip
+  guarantee statement and the `derive!(Yaml)` code examples (`ServerConfig`,
+  `derive!(Json, Yaml)`) entirely.** Restored the missing subsections and examples, and
+  added `StdlibDocYamlModuleParitySpec` (same subheading-count approach as
+  `StdlibDocFutureModuleParitySpec`, plus a direct check for the `derive!(Yaml)` example)
+  so this can't silently drift again.
+
+- **`docs/ja/reference/stdlib.md`'s Maps Module and Sets Module sections were missing
+  several members that `docs/reference/stdlib.md` documents** — Maps: `newMap`,
+  `getOrDefault`, `filterKeys`, `filterValues`, `toList`, `forEach`, `merge`; Sets:
+  `newSet`, `containsAll`, `forEach`. Restored the missing entries and added
+  `StdlibDocMapsSetsModuleParitySpec` (same approach as `StdlibDocStringsModuleParitySpec`)
+  so this can't silently drift again.
+
+- **`docs/ja/reference/stdlib.md`'s Strings Module section was missing 13 of the 29
+  documented `Strings::*` members** (`split`, `join`, `upper`, `lower`, `trim`, `replace`,
+  `replaceRegex`, `startsWith`, `endsWith`, `contains`, `padLeft`, `padRight`, `repeat`) —
+  the first code block was dropped during translation, leaving only the case/inspection
+  and null-safe-parsing examples. Restored it in the same grouping as the English
+  reference, and added `StdlibDocStringsModuleParitySpec` to guard against this drifting
+  again (the existing subheading-based parity specs don't cover this section, since it
+  has no `###` subheadings to count).
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0058`
+  (label not found), `E0059` (invalid regex literal), `E0060` (regex capture group /
+  binding count mismatch), `E0061` (record component type unsupported by `from
+  re"..."`), `E0062` (record component type unsupported by `derive!(Json)`), `E0063`
+  (unknown `derive!` marker), `E0064` (law violation), `E0065` (example failed),
+  `E0068` (override target not found), `E0069` (local val requires an initializer),
+  `E0070` (nullable member access), `E0071` (static call on instance), and `E0072`
+  (abstract method with a body) only in the end-of-file summary table.** Added the
+  missing `### E0058`–`### E0072` sections (13 codes total) to both language
+  references, filed under their most fitting existing category (control-flow,
+  pattern-matching, resolution, null-safety, and declaration errors), using the
+  existing dedicated regression specs (`LabelNotFoundSpec`, `RegexLiteralValidationSpec`,
+  `RegexPatternSpec`, `RecordFromRegexSpec`, `RecordJsonSpec`, `LawExampleSpec`,
+  `OverrideTargetNotFoundSpec`, `UninitializedValSpec`, `NullableMemberAccessSpec`,
+  `StaticCallOnInstanceSpec`, `AbstractMethodBodySpec`) as the basis for the examples.
+  This closes the remaining gap in the error-code reference — every code in the
+  summary table now has a full prose section, except `E0032` (intentionally
+  skipped — no in-process trigger under the current grammar, see the note in
+  `SemanticErrorCodeCoverageSpec`).
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0043`
+  (unknown named argument), `E0044` (duplicate argument), `E0045` (positional argument
+  after named argument), `E0046` (wrong destructuring binding count), `E0047` (not a
+  record type), `E0048` (break outside loop), `E0049` (continue outside loop), `E0050`
+  (current instance not available in static context), `E0051` (return type is
+  required), `E0052` (lambda parameter needs a type), `E0053` (cyclic type alias),
+  `E0054` (duplicate type alias), and `E0055` (function requires a body) only in the
+  end-of-file summary table.** Added the missing `### E0043`–`### E0055` sections to
+  both language references (a new "Control-flow errors" category covers `E0048`–`E0050`),
+  and added regression coverage asserting the error *code* (not just compile failure)
+  for `E0046`, `E0047`, and `E0052`, which previously had no such assertion.
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0036`
+  (cannot assign to val), `E0037` (unimplemented abstract method), `E0038` (cannot
+  instantiate abstract class), `E0039` (cannot override a final method), `E0040` (cannot
+  call method on primitive type), and `E0041` (invalid method call target) only in the
+  end-of-file summary table.** Added the missing `### E0036`–`### E0041` sections to both
+  language references. `E0041` (`INVALID_METHOD_CALL_TARGET`) had no regression test at
+  all; added `InvalidMethodCallTargetSpec` covering the "indexing a nullable class-typed
+  value" trigger site.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0030`
+  (type is not generic), `E0031` (type argument arity mismatch), `E0033` (method is not
+  generic), `E0034` (method type argument arity mismatch), and `E0035` (erased JVM
+  signature collision) only in the end-of-file summary table.** Added the missing
+  `### E0030`–`### E0035` sections (skipping `E0032`, which has a live report site but
+  no in-process trigger under the current grammar — see the note in
+  `SemanticErrorCodeCoverageSpec`) to both language references, using the existing
+  `SemanticErrorCodeCoverageSpec` cases as the basis for the examples, and added a new
+  `E0030` coverage case (previously untested).
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0025`
+  (duplicate constructor), `E0026` (duplicate generated method), `E0027` (type not
+  boxable), `E0028` (lvalue required), and `E0029` (duplicate type parameter) only in
+  the end-of-file summary table.** Added the missing `### E0025`–`### E0029` sections
+  to both language references, using the existing `SemanticErrorCodeCoverageSpec` and
+  `RecordDuplicateLawExampleSpec` cases as the basis for the examples.
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0004`
+  (field not found) only in the end-of-file summary table, unlike its neighbors `E0003`
+  and `E0005`, which both have a full prose section.** Added the missing `### E0004`
+  section to both language references, using the existing `SemanticErrorCodeCoverageSpec`
+  case as the basis for the example.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0011`
+  (duplicate global variable), `E0012` (duplicate function), `E0013` (method not
+  accessible), `E0014` (field not accessible), and `E0015` (class not accessible) only
+  in the end-of-file summary table.** Added the missing `### E0011`–`### E0015` sections
+  to both language references, using the existing `DuplicateGlobalVariableSpec`,
+  `DuplicateFunctionSpec`, `StaticMethodAccessSpec`, `FieldWriteAccessSpec`, and
+  `ClassAccessibilitySpec` cases as the basis for the examples.
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0016`
+  (cyclic inheritance), `E0018` (illegal inheritance), `E0019` (illegal method call),
+  `E0020` (cannot return value), `E0022` (ambiguous constructor), and `E0023` (interface
+  required) only in the end-of-file summary table.** Added the missing `### E0016`,
+  `### E0018`–`### E0020`, and `### E0022`–`### E0023` sections to both language
+  references, using the existing `CyclicInheritanceSpec` and
+  `SemanticErrorCodeCoverageSpec` cases as the basis for the examples.
+
+## [0.10.23] - 2026-08-05
+
+### Fixed
+
+- **A `static` method declared with no body (e.g. `static def main(args: String[]): void`
+  followed by a stray blank instead of `{ ... }`) no longer crashes the compiler with an
+  I0000 internal error.** The grammar accepts a bodyless method as an abstract/interface-style
+  declaration, and `TypingOutlinePass.processMethodDeclaration` unconditionally OR'd in
+  `M_ABSTRACT` whenever the body was absent — even for a method already carrying `M_STATIC`.
+  The resulting class file declared a method with both `ACC_STATIC` and `ACC_ABSTRACT`, which
+  the JVM rejects; loading it (e.g. via `OnionClassLoader`, exercised by `LawCheckPhase`) threw
+  a raw `ClassFormatError` that surfaced as an uncaught internal compiler error instead of a
+  normal diagnostic. A static method with no body is now rejected up front with a new error,
+  **E0085**. Found by the mutation fuzzer stripping the opening brace from `main`'s body in
+  `run/LineFilter.on`.
+
+### Documentation
+
+- **`docs/reference/error-codes.md` and `docs/ja/reference/error-codes.md` listed `E0084`
+  (duplicate extension method) and `E0085` (static method with no body) only in the
+  end-of-file summary table, unlike every other code, which also gets a prose section
+  with an example and a fix.** Added the missing `### E0084` and `### E0085` sections to
+  both language references.
+- **`E0006` (ambiguous method) and `E0007`–`E0010` (duplicate local variable/class/
+  field/method) had the same gap** — mentioned only in the summary table, with no
+  prose section, example, or fix. Added the missing sections to both language
+  references, using the existing `SemanticErrorCodeCoverageSpec` cases as the basis
+  for each example.
+
+## [0.10.22] - 2026-08-04
+
+### Fixed
+
+- **The English `error.count` trailer no longer says "1 errors are found."
+  for a single-error compile.** `error.count` in `errorMessage.properties`
+  used a plain `"{0} errors are found."` template regardless of count; it now
+  uses a `MessageFormat` choice format (`1#1 error is found.|1<{0} errors are
+  found.`) so a single error reads "1 error is found." while multiple errors
+  keep the plural wording. The Japanese bundle was unaffected (Japanese does
+  not pluralize).
+- **An ADT case-enum's shared-body `override def toString`/`equals`/`hashCode`
+  is no longer silently ignored on every case.** `enum Shape { case Circle(...)
+  public: override def toString(): String = ... }` desugars the shared body to
+  a sealed-interface default method and each `case` to a bodyless
+  `record X(...) conforms Shape`; `TypingOutlinePass` generated each case's
+  synthetic toString/equals/hashCode whenever the record's OWN body had no
+  override, with no way to see the interface's default, so the shared
+  override compiled cleanly but was never actually called (a class's own
+  method — even a mechanical, auto-generated one — always wins over an
+  inherited interface default for these three names). A record whose
+  conforms-to interface already supplies a concrete default now gets a real
+  forwarding method (`INVOKESPECIAL` back to the interface) instead of the
+  field-based synthetic.
+
+## [0.10.21] - 2026-08-03
+
+### Fixed
+
+- **A constructor argument needing ordinary numeric widening (an `Int` literal
+  passed where a `Double`/`Float`/`Long` parameter is declared, e.g. `new
+  Game(99)` against `record Game(price: Double)`) no longer crashes the
+  compiler with an I0000 internal error in `BytecodeGeneration`.**
+  `ConstructionTyping.findConstructorWithBoxing` only inserted an explicit
+  conversion for the Byte/Short/Char constant-narrowing case (issue #374); a
+  genuine widening match — already accepted as legal by
+  `TypeRelations.isAssignableWithBoxing` — left the argument term unconverted,
+  so codegen pushed a 1-slot `int` where the constructor's descriptor declared
+  a 2-slot `double`/`long`, corrupting the JVM stack map frames
+  (`NegativeArraySizeException` in ASM's `Frame.merge`, or a `VerifyError` at
+  class-load time). Argument adaptation (boxing and numeric conversion alike)
+  now happens once, in a shared `adaptToFormals` step, applied uniformly
+  whether the constructor was matched by the primary finder or the boxing
+  fallback. Found by `MutationFuzzSpec` mutating a decimal literal (`59.99` ->
+  `99`) in `run/GameStore.on`.
+- **A homogeneous enum with two identically-named methods no longer crashes
+  the compiler with an I0000 internal error ("Duplicate method name").**
+  `TypingDuplicationPass.run()` dispatched over `ClassDeclaration`,
+  `InterfaceDeclaration`, and `RecordDeclaration` but silently dropped
+  `EnumDeclaration`, so the duplicate slipped through to codegen and produced
+  invalid bytecode instead of the normal `E0010`/`E0035` diagnostic.
+- **Records with a user-defined `override def toString`/`equals`/`hashCode`/`copy` in
+  their body no longer crash the compiler with an I0000 internal error
+  ("Duplicate method name").** `TypingOutlinePass` now skips emitting the
+  synthetic record method whenever the user has already defined one with the
+  same name, so the user's override compiles through the normal path instead
+  of colliding with the auto-generated one.
+
+### Added
+
+- **`run/JobScheduler.on`, a 261-line priority-based CI/build job scheduler.**
+  Exercises an ADT enum with per-case data (`JobState`: `Pending`, running
+  `Running(startedAtMs)`, `Succeeded(durationMs)`, `Failed(reason)`), records
+  with `example`s, extension methods on `Int`/`String`, a class-based priority
+  queue, `try`/`catch` around job validation (rejecting an out-of-range
+  priority and a non-positive estimate), exhaustive `select` / type-pattern
+  matching, and the full collection-pipeline set
+  (`map`/`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`find`/`distinct`/
+  `any`/`take`) alongside `foreach`, string interpolation, and the `|>`
+  pipeline. 47th large sample, 104 total corpus programs.
+- **`run/CarRentalFleet.on`, a 225-line car rental fleet & billing report.**
+  Exercises an ADT enum (`VehicleCategory`), records with `example`s, extension
+  methods on `Int` and `Double`, and the full collection-pipeline set
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`distinct`)
+  alongside `foreach` over ranges and `Map` entries, `select` with type
+  patterns, string interpolation, closures, `try`/`catch`, and the `|>`
+  pipeline. 46th large sample, 103 total corpus programs.
+- **`run/ExpenseAuditor.on`, a 135-line expense-report auditing tool.** Exercises
+  the `tool` capability boundary (`requires { read(src), write(out), console }`,
+  with `--help`/`--plan`/`--contract` all deriving from the single declaration),
+  an ADT enum (`Category`) with per-case behavior, a record derived from a regex
+  pattern (`from re"..."`) documented with `example`s rather than a `law` (a
+  free-text field can contain the format's own delimiter, so a full round-trip
+  law isn't satisfiable — a design point worth having on record), an extension
+  method on `Double`, and collection pipelines (`filter`/`map`/`groupBy`/`fold`/
+  `sortedBy`/`partition`). 45th large sample, 102 total corpus programs.
+- **Six new large end-to-end samples added to the `run/` corpus**:
+  `InventoryReport.on` (249 lines), `AirlineReservation.on` (598 lines),
+  `PokerHands.on` (443 lines), `VirtualMachine.on` (337 lines, a stack-based
+  bytecode interpreter), `TournamentStandings.on` (249 lines), and
+  `LogAnalytics.on` (298 lines, log analysis pipeline with `record ... from
+  re"..."` parsing). Corpus now stands at 100 samples, 43 of them ≥ 100 lines.
+- **`run/BugTracker.on`, a 398-line software issue tracker sample.** Exercises
+  ADT enums (`Priority`, `Status`, `Resolution` — including data-carrying cases
+  `Fixed(inVersion)`, `WontFix(reason)`, `Duplicate(ofId)`), data-carrying
+  homogeneous enum (`IssueType`), a record with `example` (`Issue` with nullable
+  `assignee`), extension methods on `Int` (story-size label, bar chart) and
+  `Double` (percentage string), an interface (`Reportable`), a class
+  (`IssueTracker`), collection pipelines
+  (`filter`/`map`/`fold`/`sortedBy`/`groupBy`/`partition`/`distinct`/`find`/
+  `zip`/`any`/`count`/`take`), `|>` pipeline operator, select / type-pattern
+  matching with exhaustiveness, nullable null checks, string interpolation,
+  `try/catch`, recursion, `while`, and `foreach` over ranges and `(k, v)` maps
+  (37th large sample, 94 total corpus programs).
+- **`run/CinemaBooking.on`, a 228-line cinema seat-booking system sample.**
+  Exercises an ADT enum (`SeatType`: `Standard`/`Premium`/`VIP`) dispatched via
+  `select`, records with `example` clauses (`Movie`, `Booking`, `MovieStat`),
+  extension methods on `Int` and `Double`, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`distinct`), `foreach`
+  over integer ranges and `(k, v)` map entries, string interpolation, a closure
+  stored in a `val`, `try/catch`, and the `|>` pipeline operator (44th large
+  sample, 101 total corpus programs).
+
+## [0.10.20] - 2026-08-02
+
+### Added
+
+- **`run/MathParser.on`, a 413-line recursive-descent arithmetic expression
+  parser and evaluator sample.** Exercises an ADT enum (`Expr` with 7
+  cases: `Lit`/`Var`/`BinOp`/`Neg`/`Cmp`/`IfExpr`/`Let`) dispatched via
+  `select this { case x is T: ... }` with E0042 exhaustiveness, a
+  homogeneous enum (`TokKind`, 20 variants), records with body methods
+  (`Tok`, `EvalResult` with nullable fields), a hand-written `Lexer` and
+  recursive-descent `Parser` class, `HashMap[String, Object]` scope
+  chaining for `let` binding, `if/then/else` as an expression, collection
+  pipelines (`filter`/`map`/`fold`/`sortedBy`/`groupBy`), and `try/catch`
+  for parse/runtime errors (32nd large sample, 89 total corpus programs).
+
+- **`run/FleetManager.on`, a 364-line vehicle fleet management sample.**
+  Exercises classes implementing an interface (`Vehicle`, `Car`, `Truck`),
+  a data-carrying ADT enum (`VehicleStatus`), a plain enum with a method
+  (`FuelType`), records with `example` (`TripEntry`, `MaintenanceEntry`,
+  `FleetStats`), extension methods on `String`/`Double`/`Int`, collection
+  pipelines (`filter`/`fold`/`groupBy`/`sortedBy`/`partition`/`distinct`),
+  `foreach (k, v)` map iteration, `select` type-pattern dispatch, nullable
+  `String?`, `try/catch`, and the `|>` pipeline operator (33rd large
+  sample, 90 total corpus programs).
+
+- **`run/InventoryManager.on`, a 329-line stock-tracking sample.** Exercises
+  a data-carrying enum (`Category`, 4 variants), records (`Product`,
+  `StockMovement`), an interface (`Reportable`) implemented by a class with
+  public `List[Object]` fields, extension methods on `Double`/`Int`,
+  collection pipelines (`filter`/`fold`/`sortedBy`/`groupBy`/`find`),
+  `select` pattern matching on enum values and strings, nullable `Object?`
+  with `null` guards, a recursive function, `while`/`foreach` loops
+  (including an exclusive range `0..<5`), `try/catch` around
+  `Integer::parseInt`, and string interpolation throughout (34th large
+  sample, 91 total corpus programs).
+
+## [0.10.19] - 2026-08-02
+
+### Fixed
+
+- **A `static def` in an ADT case-enum's `public:` section could not be
+  called** — `Grade::fromScore(x)` raised `E0005: method ... is not found`
+  even when the signature matched exactly, because
+  `TypingOutlinePass.processInterfaceMethodDeclaration` hard-coded
+  `M_PUBLIC` for every interface method declaration, silently dropping
+  `M_STATIC`. ADT case-enums desugar to a sealed interface + one record per
+  case, so a static factory method declared in the enum's `public:` section
+  was registered without the static modifier, and
+  `collectMethodsMatching(isStaticMethod)` could no longer find it.
+
+### Added
+
+- **`run/MusicLibrary.on`, a 274-line music library catalog sample.**
+  Exercises a simple enum (`Genre`), records with a nullable field
+  (`Entry(song, rating: Rating?)`), a generic class (`Catalog[T extends
+  Object]`), extension methods on `Int`/`String`, collection pipelines
+  (`fold`/`filter`/`map`/`groupBy`/`sortedBy`/`sortedByDescending`/
+  `distinct`), `select`/enum pattern matching, string interpolation, and
+  `foreach` over typed lists and maps (28th large sample, 85 total corpus
+  programs).
+
+- **`run/GameStore.on`, a 292-line game store inventory and sales
+  reporting sample.** Exercises homogeneous enums (`Genre`, `Platform`),
+  records with methods (`Game`, `Sale`), typed generics (`List[Game]`,
+  `Map[String, Double]`), collection pipelines (`groupBy`/`sortedBy`/
+  `fold`/`filter`/`find`/`indexOf`), nullable types with null-guards,
+  string interpolation, extension methods on `Int`/`Double`/`String`,
+  `foreach (k, v)` map iteration, closures, and a class with access
+  sections and mutable state (29th large sample, 86 total corpus
+  programs).
+
+- **`run/EventTicketing.on`, a 279-line event ticketing system sample.**
+  Exercises homogeneous enums with methods (`TicketTier`, `EventStatus`),
+  an ADT enum (`BookingResult { case Ok(...); case Refused(...) }`) matched
+  with `case r is Ok:` / `case r is Refused:`, records (`Venue`, `Event`,
+  `Order`, `CustomerSpend`), typed collections (`List[Event]`,
+  `List[Order]`, `Map[String, Double]`), collection pipelines
+  (`filter`/`sortedBy`), `foreach (k, v)` map iteration, `foreach` over a
+  range, nullable handling with null-guards, and string interpolation
+  (30th large sample, 87 total corpus programs).
+
+- **`run/ParkingGarage.on`, a 254-line multi-level parking garage
+  management sample.** Exercises a homogeneous enum with methods
+  (`VehicleType`), a plain enum (`SpotStatus`), two ADT enums (`ParkResult
+  { case Parked(...); case Denied(...) }`, `ExitResult { case
+  Charged(...); case Rejected(...) }`), records with methods (`Spot`,
+  `Ticket`, `LevelUsage`), extension methods on `Int`/`Double`, a class
+  with mutable `Map`/`List` state (`Garage`), collection pipelines
+  (`filter`/`sortedBy`), `foreach (k, v)` map iteration, `foreach` over a
+  range and a list literal, nullable handling (`Spot?`, `String?`),
+  `try`/`catch`, and string interpolation (31st large sample, 88 total
+  corpus programs).
+
+## [0.10.18] - 2026-08-02
+
+### Fixed
+
+- **Two methods with the same name and parameter types in one `extension`
+  block compiled clean and crashed later with an internal compiler error
+  (`I0000`)** — a JVM `ClassFormatError` ("Duplicate method name ...") when
+  the synthesized extension container class was loaded, since
+  `TypingDuplicationPass` checked classes, interfaces, records, top-level
+  functions, and global variables for duplicates but never visited
+  `AST.ExtensionDeclaration`. Found by the mutation fuzzer duplicating a
+  method in `run/TaskPlanner.on`'s `extension Double` block. Added a new
+  `E0084` diagnostic (`DUPLICATE_EXTENSION_METHOD`) so this is now a normal
+  compile error instead of a crash.
+
+- **Tail-call optimization miscompiled recursive functions that declared
+  body-local variables** (e.g. `val x = items[idx] as Item`), either
+  crashing with `I0000 BytecodeGeneration` or silently producing wrong
+  results (an accumulator parameter would read the same element every
+  iteration). Three related bugs in `TailCallOptimization`: the loop-variable
+  offset fallback for top-level/synthetic methods collided with body-local
+  slots, the temp-variable offset assumed loop variables always started at
+  `paramCount`, and the parameter-reference rewrite pass didn't recurse into
+  several compound AST node types (`AsInstanceOf`, `RefArray`, `RefField`,
+  `NewObject`, `ListLiteral`, and others), so `RefLocal` nodes nested inside
+  them kept reading stale JVM slots. Added `run/RecipeManager.on` (365
+  lines, 19th large sample) as additional end-to-end coverage.
+
+- **`onion --help` silently omitted three working script-runner flags** —
+  `--effects`, `--stacktrace`, and `--watch` were all parsed and honored by
+  `ScriptRunner.runMain`/`run`, but `printUsage()` never listed them, so
+  they were undiscoverable outside reading the source. Added them to the
+  help text, documented them in `docs/tools/script-runner.md` and its ja
+  counterpart, and extended `OnionCliSpec`'s help-text assertion so the gap
+  can't silently reopen.
+
+- **Writing `{ (k, v) => ... }` for a trailing lambda produced a bare
+  "Encountered `{`, but expecting..." token dump**, with no indication that
+  the actual mistake was the parentheses. Trailing lambdas (`m.filter { k, v
+  => ... }`) never take parenthesized parameters — that syntax is reserved
+  for the non-trailing `(k, v) -> ...` form — and it's an easy slip since
+  both forms are documented side by side. The parser now recognizes this
+  specific shape and names the fix directly: "Hint: a trailing lambda's
+  parameters aren't parenthesized — write `{ k, v => ... }`, not `{ (k, v)
+  => ... }`."
+
+### Added
+
+- **`run/TaskPlanner.on`, a 425-line sprint task planner sample.** Combines
+  two ADT case-enums (`Priority`, `TaskStatus`) with a plain enum (`Tag`),
+  records with `example` clauses, typed `ArrayList[Task]`/`List[Task]`
+  collections, collection pipelines (`filter`/`sortedBy`/`groupBy`/
+  `partition`/`any`/`count`/`distinct`/`take`/`fold`/`map`/`zip`/`find`),
+  `foreach (k, v)` map iteration, extension methods on `Int`/`Double`/
+  `String`, `do[Option]` chaining, nullable fields, and exhaustive `select`
+  type-pattern matching (24th large sample, 81 total corpus programs).
+
+- **`run/PlaylistManager.on`, a 502-line music playlist manager sample.** Adds a
+  large end-to-end program to the corpus (18th at ≥100 lines), combining an
+  ADT case-enum (`Genre`, 8 cases) and a plain enum with methods
+  (`PlaybackMode`), records with `example` clauses, a class implementing an
+  interface via `conforms`, `ArrayList[T]` generics, collection pipelines
+  (`filter`/`fold`/`sortedBy`/`groupBy`/`partition`/`find`/`zip`/`map`/
+  `distinct`), `foreach (k, v)` map iteration, range `foreach`, exhaustive
+  `select` type-pattern matching, nullable types, extension methods on `Int`
+  and `String`, closures, string interpolation, and `try`/`catch` in one
+  coherent scenario.
+
+- **`run/BankLedger.on`, a 299-line bank account ledger sample.** Combines an
+  ADT case-enum (`TxKind`: `Deposit`/`Withdrawal`/`Transfer`), a record with
+  `example` laws, `extension Int` for currency formatting, nullable-safe
+  account lookups, `Map`-backed accounts with `foreach (k, v)` iteration,
+  collection pipelines (`sortedBy`/`filter`/`map`/`fold`/`partition`), and
+  `try`/`catch` in one end-to-end scenario (21st large sample, 78 total
+  corpus programs).
+
+### Fixed
+
+- **CI's `Build and Test` job could hit a real JVM `OutOfMemoryError`** on the
+  GitHub Actions runner as the `run/` corpus and test count grew, then wedge
+  for several minutes with dying background threads before being reported as
+  stuck rather than failing cleanly. Raised the job's heap headroom
+  (`SBT_OPTS=-Xmx6G`, up from the `.jvmopts` default of 4g) to give the
+  growing suite room to run without GC thrashing.
+
+## [0.10.17] - 2026-08-01
+
+### Fixed
+
+- **Internal compiler error (operand-stack underflow) when an ADT-enum method
+  body used an explicit `return` in every branch of a `select this`
+  expression**, e.g. `def describe(): String = select this { case f is Found:
+  return "found"; case n is None: return "none" }`. The typed AST collapses
+  such a select into a `StatementTerm(BottomType)` once every branch already
+  transfers control via an inner `Return`; codegen then emitted dead
+  unboxing/return bytecode on an empty operand stack, which the JVM verifier
+  rejected as `[I0000]`. Fixed in `AssignabilitySupport.processAssignable`
+  and `ControlFlowEmitter.emitReturn` to recognize a bottom-typed
+  `StatementTerm` and skip the redundant instructions.
+
+### Added
+
+- **`run/Inventory.on`, a 279-line shop inventory manager sample.** Adds a
+  large end-to-end program to the corpus (16th at ≥100 lines), combining
+  data-carrying ADT enums (`Category` and `TxKind`, four cases each),
+  records with compiler-verified `example` clauses (`Item`, `Transaction`,
+  `StockAlert`), extension methods on `String` and `Double`, `select` with
+  type-pattern exhaustiveness, a nullable `Item?` lookup, collection
+  pipelines (`filter`/`map`/`groupBy`/`sortedBy`/`find`), `foreach (k, v)`
+  map iteration, closures, string interpolation, and graceful
+  exception-free failure returns.
+
+## [0.10.16] - 2026-08-01
+
+### Added
+
+- **`run/TournamentTracker.on`, a 473-line football world-cup simulator
+  sample.** Adds a large end-to-end program to the corpus (15th at ≥100
+  lines), combining an ADT case-enum (`Phase` with a data-carrying
+  `GroupStage(round: Int)` case and singleton `Quarterfinal`/`Semifinal`/
+  `Final` cases) matched via `select`/type patterns, plain enums with
+  methods (`Division`, `SportType`), an interface (`Printable`) implemented
+  through `conforms`, records with methods (`Player`, `MatchResult`,
+  `Standing`), extension methods on `String` and `Int`, collection
+  pipelines (`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`/`partition`/
+  `distinct`/`zip`), `foreach (k, v)` map iteration, range `foreach`, and
+  `try`/`catch` in one coherent scenario.
+
+- **`run/PayrollReport.on`, a 274-line employee payroll report sample.** Adds
+  a large end-to-end program to the corpus (14th at ≥100 lines), combining an
+  ADT case-enum (`ContractType` with `Permanent`/`Hourly`/`Freelance` cases)
+  matched via `select`/type patterns, an interface (`PayrollItem`) implemented
+  by a class, collection pipelines (`partition`/`zip`/`any`/`all`/`count`/
+  `distinct`/`flatMap`/`sortedByDescending`/`groupBy`), `foreach (k, v)` map
+  iteration, extension methods on `Int` and `String`, a recursive salary
+  projection, and `try`/`catch` in one coherent scenario.
+
+## [0.10.15] - 2026-08-01
+
+### Added
+
+- **`run/BudgetTracker.on`, a 308-line personal finance tracker sample.** Adds
+  a large end-to-end program to the corpus (13th at ≥100 lines), combining an
+  ADT case-enum (`TransactionKind` with `Income`/`Expense` cases) matched via
+  `select`/type patterns, a homogeneous enum (`Month`) with methods, three
+  records with methods (`Transaction`, `Category`, `MonthSummary`), a class
+  with a `List[Transaction]` field, collection pipelines (`groupBy`/
+  `sortedBy`/`filter`/`map`/`fold`/`partition`/`reverse`/`take`/`distinct`),
+  `foreach (k, v)` map iteration, nullable-map-lookup null guards, and a
+  tail-recursive compound-interest helper in one coherent scenario.
+
+- **`run/LibraryCatalog.on`, a 329-line library management sample.** Adds a
+  large end-to-end program to the corpus (12th at ≥100 lines), combining
+  interfaces (`Lendable`, `Describable`) with `conforms`, class inheritance
+  via primary-constructor super-args (`RareBook extends Book`), an ADT enum
+  (`LoanStatus`) matched with `select`/type patterns, a homogeneous enum
+  with an extension method, records, mutable class state, collection
+  pipelines (`map`/`filter`/`sortedBy`/`groupBy`/`partition`/`distinct`/
+  `zip`/`reduce`), `try`/`catch`, and recursion in one coherent scenario.
+
+- **Execution coverage for `onion.Config::loadJson`.** It was implemented and
+  documented in `docs/reference/stdlib.md` as the canonical entry point for
+  loading a config file, but unlike `parseJson` and the accessors, never
+  invoked by a `shell.run` test case in `ConfigSpec.scala` (only reached by
+  an effect-table metadata assertion, never actually executed). Added a case
+  covering the read-file-then-parse round trip and a case covering the
+  missing-file error path.
+
+- **Execution coverage for `onion.Http::put`/`Http::delete`.** Both were
+  implemented and documented in `docs/reference/stdlib.md`'s Http "Other
+  Methods" section, but unlike `get`/`post`, never invoked by a `shell.run`
+  test case in `HttpSpec.scala`. Added cases against a local echo server
+  covering `put`'s body passthrough, `put`'s null-body-becomes-empty
+  behavior, and `delete`'s method/empty-body request.
+
+- **Execution coverage for `onion.Future::all`/`Future::first`.** Both were
+  implemented and documented in `docs/reference/stdlib.md`'s "Combining
+  Futures" section right next to `zip`/`race`, but unlike those, never
+  invoked by a `shell.run` test case in `FutureSpec.scala`. Added cases
+  covering `all`'s in-order result list and `first`'s first-completed value.
+
+- **Execution coverage for `onion.Option::of`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Option::some`/
+  `Option::none`, but unlike those, never invoked by a `shell.run` test case
+  in `OptionResultEnrichedSpec.scala`. Added a case covering both the
+  non-null wrap and the null-collapses-to-`none` behavior that distinguishes
+  it from `Option::some`.
+
+- **Execution coverage for `onion.Result::mapError`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `map`/`flatMap`/
+  `fold`/`recover`, but unlike those, never invoked by a `shell.run` test
+  case in `OptionResultEnrichedSpec.scala`. Added a case covering the `Err`
+  transform and the `Ok` passthrough.
+
+- **Execution coverage for `JInteger`/`JLong`/`JDouble`/`JBoolean` static
+  methods.** `JInteger::parseInt`, `JInteger::MAX_VALUE`/`MIN_VALUE`,
+  `JLong::parseLong`, `JLong::toString`, `JDouble::parseDouble`,
+  `JDouble::toString`, `JBoolean::parseBoolean`, and `JBoolean::toString`
+  were all implemented and documented in `docs/reference/stdlib.md`'s
+  Wrapper Classes section, but — unlike `JInteger::toString`, which is
+  exercised incidentally by unrelated specs — none were ever invoked
+  directly by a `shell.run` test case anywhere in the suite. Added
+  `WrapperClassesSpec` with one case per method.
+
+- **Execution coverage for `onion.Config::get`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to the typed accessors
+  (`getString`/`getInt`/`getLong`/`getDouble`/`getBoolean`) that all delegate
+  to it, but unlike those, never invoked directly by a `shell.run` test case
+  in `ConfigSpec.scala`. Added three cases: an existing dot-notation path, a
+  missing path returning `null`, and a numeric path segment indexing into an
+  array.
+
+- **Execution coverage for `onion.Iterables::exists`, `forAll`, and `listOf`.**
+  All three were implemented and documented in `docs/reference/stdlib.md`
+  right next to `map`/`filter`/`foldl`/`sort`, but unlike those, never
+  invoked by a `shell.run` test case in `IterablesSpec.scala`. Added cases
+  covering `exists`/`forAll` in both the matching and non-matching case, and
+  `listOf`'s varargs construction.
+
+- **Execution coverage for `onion.Proc::captureIn` and `Proc::execIn`.** Both
+  were implemented and documented in `docs/reference/stdlib.md` right next to
+  `runIn`, but unlike `runIn`, never invoked by a `shell.run` test case in
+  `ProcSpec.scala`. Added one case each, exercising the working-directory
+  behavior via the process's own exit status/stderr.
+
+- **Execution coverage for `onion.Json::stringifyPretty`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `Json::stringify`,
+  but unlike `stringify`, never invoked by a `shell.run` test case in
+  `JsonSpec.scala`. Added two cases covering object indentation and a nested
+  array inside an object.
+
+- **Execution coverage for `onion.Strings::replaceRegex`.** It was implemented
+  and documented in `docs/reference/stdlib.md` right next to `Strings::replace`,
+  but unlike `replace`, never invoked by a `shell.run` test case in
+  `StringsSpec.scala`. Added one case.
+
+- **Execution coverage for `onion.Files::list`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Files::glob`, but
+  unlike `glob`, never invoked by a `shell.run` test case anywhere in the
+  suite. Added `FilesListSpec` with one case.
+
+- **Execution coverage for `onion.Files::readBytes` / `Files::writeBytes`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `readText`/`writeText`, but unlike those, never invoked by a
+  `shell.run` test case anywhere in the suite. Added `FilesBytesSpec` with a
+  round-trip case.
+
+- **Execution coverage for `onion.Rand::nextInt()` / `Rand::nextLong()`
+  (no-arg overloads).** Both were implemented and documented in
+  `docs/reference/stdlib.md` right next to their bounded counterparts, but
+  unlike those, never invoked by a `shell.run` test case in `RandomSpec.scala`.
+  Added one case each.
+
+- **Execution coverage for `onion.Origin::spanning`.** It was implemented and
+  documented in `docs/reference/stdlib.md` right next to `Origin::at` and
+  `Origin::atLine`, but unlike those, never invoked by a `shell.run` test
+  case in `OriginSpec.scala`. Added a case covering the normal span and one
+  covering the `Math.max(1, span)` clamp for a non-positive span.
+
+- **Execution coverage for the generic static `onion.Stats::sum`.** It was
+  implemented and documented in `docs/reference/stdlib.md` as the first
+  example in the Stats module section, but unlike `sumInt`/`sumLong` and the
+  other aggregates, never invoked directly by a `shell.run` test case in
+  `HashCodecStatsSpec.scala` (only reached transitively through
+  `xs.sum()`). Added a case to `HashCodecStatsSpec`.
+
+- **Execution coverage for `onion.Origin::hasColumn` and `Origin::inSource`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `onLine` (`inSource` in the same subsection, `hasColumn` in the
+  module's intro example), but unlike `onLine`, never invoked by a
+  `shell.run` test case in `OriginSpec.scala`. Added a case for
+  `hasColumn()` distinguishing `at()` from `atLine()`, and a case for
+  `inSource()` retargeting an Origin's source while keeping line/column.
+
+- **Execution coverage for `onion.Config::getLong` and
+  `Config::getWithEnvOverride`.** Both were implemented and documented in
+  `docs/reference/stdlib.md` right next to `getInt`/`getDouble`/`getBoolean`
+  and `getEnv`, but unlike those, never invoked by a `shell.run` test case in
+  `ConfigSpec.scala`. Added two cases per method (value found / falls back to
+  default).
+
+- **Execution coverage for `onion.Option::orNull` and `onion.Result::orNull`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `getOrElse`/`orElseGet`, and even name-checked in
+  `OptionResultEnrichedSpec`'s own doc comment as covered, but unlike their
+  siblings, never actually invoked by a `shell.run` test case. Extended the
+  existing "orElseGet, orNull and orElse" (Option) and "orElseGet, exists and
+  toList" (Result) cases to also assert `.orNull()` on both the
+  present/`Ok` and absent/`Err` sides.
+
+- **Execution coverage for `onion.Future::race`.** It was implemented and
+  documented in `docs/reference/stdlib.md` under "Combining Futures", but
+  unlike `zip`, never invoked by a `shell.run` test case in `FutureSpec.scala`
+  — the file had no "combining futures" block at all. Added one, racing two
+  already-completed futures holding the same value so the winner is
+  deterministic regardless of which completes first.
+
+- **Execution coverage for `onion.Result::ofNullable` and `Result::trying`.**
+  Both were implemented and documented in `docs/reference/stdlib.md` right
+  next to `Result::ok`/`Result::err`, but unlike those, never invoked by a
+  `shell.run` test case in `OptionResultEnrichedSpec.scala`. Added a case
+  covering `ofNullable`'s non-null/null branches and `trying`'s
+  success/throw branches.
+
+- **Execution coverage for `onion.Http::post` and `Http::postJson`.** Both
+  were implemented and documented in `docs/reference/stdlib.md`'s Http "POST
+  Requests" subsection, but unlike `put`/`delete`, never invoked by a
+  `shell.run` test case in `HttpSpec.scala`. Added cases against the local
+  echo server covering `post`'s body passthrough, `post`'s null-body-becomes-
+  empty behavior, `postJson`'s body passthrough, and `postJson`'s
+  null-body-becomes-`"{}"` behavior.
+
+- **`run/LibrarySystem.on`, a 374-line library management sample.** Adds a
+  large end-to-end program to the corpus (10th at ≥100 lines), combining a
+  plain enum matched via `select`, four records, a class with mutable `List`
+  fields, `String`/`Int` extension methods, method chaining, string
+  interpolation, bubble sort, and recursion in one coherent scenario.
+
+## [0.10.14] - 2026-07-31
+
 ### Fixed
 
 - **`errorMessage_ja.properties` had two diagnostics that were untranslated or
@@ -21,6 +783,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently.
 
 ### Added
+
+- **Execution coverage for `onion.Maps::filterKeys` and `Maps::forEach`.**
+  Both were implemented and documented in `docs/reference/stdlib.md`, but
+  unlike every other `Maps` method, never invoked by a `shell.run` test
+  case — `MapsEnrichedSpec`'s own docstring claimed to cover `forEach`
+  without actually calling it, and `filterKeys` wasn't mentioned at all.
+  Added one case per method to `MapsEnrichedSpec`.
 
 - **Execution coverage for `onion.Sets::newSet`, `Sets::containsAll`, and
   `Sets::forEach`.** All three were implemented and documented in

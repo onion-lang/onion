@@ -1,0 +1,254 @@
+// ParkingGarage.on — Multi-level parking garage management (~300 lines)
+// Exercises: homogeneous enums with methods, two ADT enums for park/exit
+// results, records with methods, a class with mutable state, extension
+// methods on Int/Double, collection pipelines (filter/sortedBy), foreach on
+// ranges and maps, nullable handling, try/catch, string interpolation.
+
+// ── Homogeneous enums ────────────────────────────────────────────────────────
+
+enum VehicleType {
+  CAR, MOTORCYCLE, TRUCK
+public:
+  def hourlyRate(): Double = select this {
+    case VehicleType::CAR:        3.0d
+    case VehicleType::MOTORCYCLE: 1.5d
+    case VehicleType::TRUCK:      6.0d
+  }
+  def label(): String = select this {
+    case VehicleType::CAR:        "Car"
+    case VehicleType::MOTORCYCLE: "Motorcycle"
+    case VehicleType::TRUCK:      "Truck"
+  }
+}
+
+enum SpotStatus {
+  FREE, OCCUPIED, OUT_OF_SERVICE
+}
+
+// ── ADT enums for outcomes ────────────────────────────────────────────────────
+
+enum ParkResult {
+  case Parked(ticketId: String, spotId: String)
+  case Denied(reason: String)
+public:
+  def isOk(): Boolean {
+    select this {
+      case r is Parked: return true
+      case r is Denied: return false
+    }
+  }
+  def describe(): String {
+    select this {
+      case r is Parked:
+        return "Parked — ticket #{r.ticketId()} at spot #{r.spotId()}"
+      case r is Denied:
+        return "Denied: #{r.reason()}"
+    }
+  }
+}
+
+enum ExitResult {
+  case Charged(ticketId: String, hours: Int, fee: Double)
+  case Rejected(reason: String)
+public:
+  def describe(): String {
+    select this {
+      case r is Charged:
+        return "Ticket #{r.ticketId()}: #{r.hours()}h, fee $#{r.fee()}"
+      case r is Rejected:
+        return "Rejected: #{r.reason()}"
+    }
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Spot(id: String, level: Int, kind: VehicleType) {
+public:
+  def label(): String = "#{id} (L#{level}, #{kind.label()})"
+}
+
+record Ticket(id: String, spotId: String, plate: String, kind: VehicleType, entryHour: Int) {
+public:
+  def fee(exitHour: Int): Double {
+    val hours: Int = if exitHour > entryHour { exitHour - entryHour } else { 1 }
+    return hours * kind.hourlyRate()
+  }
+}
+
+record LevelUsage(level: Int, occupied: Int, total: Int)
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def asMoney(): String = "$#{self}"
+}
+
+extension Int {
+  def asHours(): String = if self == 1 { "1 hour" } else { "#{self} hours" }
+}
+
+// ── Garage class ──────────────────────────────────────────────────────────────
+
+class Garage {
+  var spots: List[Spot] = []
+  var occupied: Map[String, String] = [:]     // spotId -> ticketId
+  var tickets: Map[String, Ticket] = [:]       // ticketId -> Ticket
+  var closedFees: List[Double] = []
+  var nextTicket: Int = 1
+
+public:
+  def addSpot(spot: Spot): void {
+    spots.add(spot)
+  }
+
+  def findFreeSpot(kind: VehicleType): Spot? {
+    foreach s: Spot in spots {
+      if s.kind() == kind && !occupied.containsKey(s.id()) { return s }
+    }
+    return null
+  }
+
+  def park(plate: String, kind: VehicleType, hour: Int): ParkResult {
+    if plate == "" { return new Denied("empty plate") }
+    val spot: Spot? = findFreeSpot(kind)
+    if spot == null { return new Denied("no free spot for #{kind.label()}") }
+    val s: Spot = spot as Spot
+    val tid: String = "T-#{nextTicket}"
+    nextTicket = nextTicket + 1
+    tickets.put(tid, new Ticket(tid, s.id(), plate, kind, hour))
+    occupied.put(s.id(), tid)
+    return new Parked(tid, s.id())
+  }
+
+  def exit(ticketId: String, hour: Int): ExitResult {
+    val ticket: Ticket? = tickets.get(ticketId)
+    if ticket == null { return new Rejected("unknown ticket: #{ticketId}") }
+    val t: Ticket = ticket as Ticket
+    val amount: Double = t.fee(hour)
+    occupied.remove(t.spotId())
+    tickets.remove(ticketId)
+    closedFees.add(amount)
+    return new Charged(ticketId, if hour > t.entryHour() { hour - t.entryHour() } else { 1 }, amount)
+  }
+
+  def occupiedCount(): Int = occupied.size
+
+  def totalSpots(): Int = spots.size
+
+  def usageByLevel(): List[LevelUsage] {
+    val totalByLevel: Map[Int, Int] = [:]
+    val occByLevel: Map[Int, Int] = [:]
+    foreach s: Spot in spots {
+      val lvl: Int = s.level()
+      totalByLevel.put(lvl, totalByLevel.getOrDefault(lvl, 0) + 1)
+      if occupied.containsKey(s.id()) {
+        occByLevel.put(lvl, occByLevel.getOrDefault(lvl, 0) + 1)
+      }
+    }
+    val usages: List[LevelUsage] = []
+    foreach (lvl, total) in totalByLevel {
+      usages.add(new LevelUsage(lvl, occByLevel.getOrDefault(lvl, 0), total))
+    }
+    return usages.sortedBy { u => (u as LevelUsage).level() }
+  }
+
+  def revenue(): Double {
+    var sum: Double = 0.0d
+    foreach fee: Double in closedFees { sum = sum + fee }
+    return sum
+  }
+
+  def closedTicketCount(): Int = closedFees.size
+
+  def freeSpotsOfKind(kind: VehicleType): Int {
+    return spots.filter { s => (s as Spot).kind() == kind && !occupied.containsKey((s as Spot).id()) }.size
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def printParkResult(result: ParkResult): void {
+  IO::println("  " + result.describe())
+}
+
+def printExitResult(result: ExitResult): void {
+  IO::println("  " + result.describe())
+}
+
+def safeParkAttempt(garage: Garage, plate: String?, kind: VehicleType, hour: Int): void {
+  try {
+    if plate == null { throw new IllegalArgumentException("null plate") }
+    printParkResult(garage.park(plate as String, kind, hour))
+  } catch e: Exception {
+    IO::println("  error: #{e.message()}")
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val garage: Garage = new Garage()
+
+// Build a small 2-level garage: level 1 has cars + motorcycles, level 2 has trucks.
+foreach i: Int in 1..4 {
+  garage.addSpot(new Spot("A#{i}", 1, VehicleType::CAR))
+}
+foreach i: Int in 1..2 {
+  garage.addSpot(new Spot("M#{i}", 1, VehicleType::MOTORCYCLE))
+}
+foreach i: Int in 1..3 {
+  garage.addSpot(new Spot("B#{i}", 2, VehicleType::TRUCK))
+}
+
+IO::println("=== Garage layout ===")
+IO::println("Total spots: #{garage.totalSpots()}")
+
+IO::println("")
+IO::println("=== Parking vehicles ===")
+printParkResult(garage.park("ABC-100", VehicleType::CAR, 8))
+printParkResult(garage.park("ABC-101", VehicleType::CAR, 9))
+printParkResult(garage.park("ABC-102", VehicleType::CAR, 9))
+printParkResult(garage.park("ABC-103", VehicleType::CAR, 10))
+printParkResult(garage.park("ABC-104", VehicleType::CAR, 11))     // no free car spot
+printParkResult(garage.park("BIKE-1",  VehicleType::MOTORCYCLE, 8))
+printParkResult(garage.park("RIG-1",   VehicleType::TRUCK, 7))
+
+IO::println("")
+IO::println("--- Edge cases ---")
+printParkResult(garage.park("", VehicleType::CAR, 8))             // empty plate
+safeParkAttempt(garage, null, VehicleType::CAR, 8)                // null plate via helper
+
+IO::println("")
+IO::println("=== Occupancy by level ===")
+val usages: List[LevelUsage] = garage.usageByLevel()
+foreach u: LevelUsage in usages {
+  IO::println("  Level #{u.level()}: #{u.occupied()}/#{u.total()} occupied")
+}
+
+IO::println("")
+IO::println("=== Free car spots ===")
+IO::println("  #{garage.freeSpotsOfKind(VehicleType::CAR)} free car spot(s)")
+
+IO::println("")
+IO::println("=== Exits ===")
+printExitResult(garage.exit("T-1", 12))
+printExitResult(garage.exit("T-2", 9))                            // 1 hour minimum
+printExitResult(garage.exit("T-999", 12))                         // unknown ticket
+
+IO::println("")
+IO::println("=== After exits ===")
+IO::println("Currently occupied: #{garage.occupiedCount()}")
+IO::println("Closed tickets: #{garage.closedTicketCount()}")
+IO::println("Revenue so far: #{garage.revenue().asMoney()}")
+
+IO::println("")
+IO::println("=== Rate card ===")
+foreach v: VehicleType in VehicleType::values() {
+  IO::println("  #{v.label()}: #{v.hourlyRate().asMoney()}/hour")
+}
+
+IO::println("")
+IO::println("=== Duration formatting ===")
+foreach h: Int in [1, 2, 5] {
+  IO::println("  #{h.asHours()}")
+}

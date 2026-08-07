@@ -34,6 +34,24 @@ Limit the number of compilation errors reported.
 onion -maxErrorReport 10 MyScript.on
 ```
 
+### `-super <super class>`
+
+Specify the class a top-level script's synthesized class extends. Only meaningful when
+the source has no explicit class declaration.
+
+```bash
+onion -super java.lang.Object MyScript.on
+```
+
+### `--verbose`
+
+Show timing for each compilation phase (parsing, rewriting, type checking, code
+generation) before the script runs.
+
+```bash
+onion --verbose MyScript.on
+```
+
 ### `--dump-ast`
 
 Print the parsed AST to stderr before running the script.
@@ -107,6 +125,30 @@ produced its counterexample.
 
 ```bash
 onion --law-samples 500 MyScript.on
+```
+
+### `--effects`
+
+Print each compiled method's inferred effect set (`read write net exec env clock rand console unknown`; empty means pure) to stderr.
+
+```bash
+onion --effects MyScript.on
+```
+
+### `--stacktrace`
+
+Print the raw JVM trace for an uncaught runtime error instead of the rendered diagnostic report.
+
+```bash
+onion --stacktrace MyScript.on
+```
+
+### `--watch`
+
+Run the script, then re-run it automatically whenever its file changes. Compile errors and runtime exceptions are printed without stopping the watch loop; press Ctrl-C to stop.
+
+```bash
+onion --watch MyScript.on
 ```
 
 ## Program Arguments

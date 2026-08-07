@@ -1,0 +1,286 @@
+// ShipmentTracker.on — global supply-chain dashboard.
+//
+// Exercises:
+//   data-carrying ADT enum (ShipmentStatus with InTransit/Delivered/Returned),
+//   record with `from re"..."` (CsvRow CSV batch import),
+//   do[Option] for safe warehouse lookups,
+//   extension methods on Double and String (kgLabel / padRight / truncate),
+//   collection pipelines: groupBy, sortedBy, filter, fold, map,
+//   foreach (k,v) in Map, select with exhaustive type patterns,
+//   try/catch for error recovery, and string interpolation.
+
+import {
+  java.lang.Double as JDouble;
+  onion.Option;
+}
+
+// ── Status ADT ────────────────────────────────────────────────────────────────
+enum ShipmentStatus {
+  case Pending
+  case InTransit(eta: String)
+  case Delivered(date: String)
+  case Returned(reason: String)
+  case Lost
+}
+
+// ── Core domain record ────────────────────────────────────────────────────────
+record Shipment(id: String, carrier: String, origin: String, dest: String, weightKg: Double)
+
+// ── CSV import record (pipe-delimited: id|carrier|origin|dest|weight) ─────────
+record CsvRow(id: String, carrier: String, origin: String, dest: String, weightStr: String)
+  from re"([A-Z0-9]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([0-9.]+)"
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+extension Double {
+  def kgLabel(): String = "#{Math::round(self * 10.0) / 10.0}kg"
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = this
+    while s.length() < n { s = s + " " }
+    return s
+  }
+
+  def truncate(n: Int): String {
+    if this.length() <= n { return this }
+    return this.substring(0, n) + ".."
+  }
+}
+
+// ── Warehouse ─────────────────────────────────────────────────────────────────
+class Warehouse {
+  val shipments: List[Shipment] = []
+  val statuses: Map[String, ShipmentStatus] = [:]
+
+public:
+  def addShipment(s: Shipment, status: ShipmentStatus): void {
+    shipments << s
+    statuses[s.id()] = status
+  }
+
+  def findById(id: String): Option[Shipment] {
+    foreach s: Shipment in shipments {
+      if s.id() == id { return Option::some(s) }
+    }
+    return Option::none()
+  }
+
+  def statusOf(id: String): ShipmentStatus? = statuses[id]
+
+  def all(): List[Shipment] = shipments
+  def allStatuses(): Map[String, ShipmentStatus] = statuses
+
+  def addFromCsv(csvData: String): Int {
+    val rows: List[CsvRow] = CsvRow::parseAll(csvData) as List[CsvRow]
+    var added: Int = 0
+    foreach r: CsvRow in rows {
+      try {
+        val weight: Double = JDouble::parseDouble(r.weightStr())
+        addShipment(new Shipment(r.id(), r.carrier(), r.origin(), r.dest(), weight), new Pending())
+        added = added + 1
+      } catch e: Exception {
+        IO::println("  [WARN] skipping malformed row for #{r.id()}: #{e.message()}")
+      }
+    }
+    return added
+  }
+}
+
+// ── Status display ────────────────────────────────────────────────────────────
+def statusLabel(s: ShipmentStatus): String {
+  return select s {
+    case x is Pending:    "PENDING"
+    case x is InTransit:  "IN-TRANSIT (eta #{x.eta()})"
+    case x is Delivered:  "DELIVERED  (#{x.date()})"
+    case x is Returned:   "RETURNED   (#{x.reason()})"
+    case x is Lost:       "LOST"
+  }
+}
+
+def statusCode(s: ShipmentStatus): String {
+  return select s {
+    case x is Pending:   "P"
+    case x is InTransit: "T"
+    case x is Delivered: "D"
+    case x is Returned:  "R"
+    case x is Lost:      "L"
+  }
+}
+
+// ── Build initial dataset ─────────────────────────────────────────────────────
+val wh = new Warehouse()
+wh.addShipment(new Shipment("SH001", "FedEx",  "Tokyo",    "London",   12.5), new InTransit("2024-02-10"))
+wh.addShipment(new Shipment("SH002", "DHL",    "Berlin",   "New York", 4.2),  new Delivered("2024-01-30"))
+wh.addShipment(new Shipment("SH003", "UPS",    "Sydney",   "Paris",    31.0), new Pending())
+wh.addShipment(new Shipment("SH004", "FedEx",  "London",   "Tokyo",    7.8),  new Delivered("2024-01-28"))
+wh.addShipment(new Shipment("SH005", "DHL",    "New York", "Berlin",   2.1),  new InTransit("2024-02-12"))
+wh.addShipment(new Shipment("SH006", "Aramex", "Dubai",    "Sydney",   15.6), new Lost())
+wh.addShipment(new Shipment("SH007", "UPS",    "Paris",    "Tokyo",    9.3),  new Returned("customs"))
+
+// ── do[Option] safe lookup demo ───────────────────────────────────────────────
+IO::println("=== Shipment Lookup (do[Option]) ===")
+
+val found: Option[Shipment] = do[Option] {
+  s1 <- wh.findById("SH003")
+  ret s1
+}
+IO::println("SH003: #{found.map { s => (s as Shipment).id() + " " + (s as Shipment).carrier() + " -> " + (s as Shipment).dest() }.getOrElse("(not found)")}")
+
+val chained: Option[String] = do[Option] {
+  s1 <- wh.findById("SH001")
+  s2 <- wh.findById("SH004")
+  ret "route loop: #{(s1 as Shipment).origin()} -> #{(s1 as Shipment).dest()} -> #{(s2 as Shipment).dest()}"
+}
+IO::println(chained.getOrElse("(none)"))
+
+val missing: Option[Shipment] = do[Option] {
+  s <- wh.findById("SH999")
+  ret s
+}
+IO::println("SH999: #{missing.getOrElse(new Shipment("?","?","?","?",0.0)).id()}")
+
+// ── CSV batch import ──────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== CSV Batch Import ===")
+val csvData =
+  "SH008|TNT|Cairo|Mumbai|8.9\n" +
+  "SH009|FedEx|Singapore|Frankfurt|22.1\n" +
+  "INVALID_LINE_WITHOUT_PIPE_SEPARATORS\n" +
+  "SH010|DHL|Toronto|Seoul|6.7"
+
+val imported = wh.addFromCsv(csvData)
+IO::println("Imported #{imported} shipments from CSV (bad lines auto-skipped)")
+
+// ── Full shipment table ───────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== All Shipments ===")
+IO::println("ID      Carrier     Origin        Destination   Weight   St")
+IO::println("------  ----------  ------------  ------------  -------  --")
+val sorted: List[Shipment] = wh.all().sortedBy { s => (s as Shipment).id() } as List[Shipment]
+foreach s: Shipment in sorted {
+  val st: ShipmentStatus? = wh.statusOf(s.id())
+  val code: String = if st != null { statusCode(st) } else { "?" }
+  IO::println("#{s.id().padRight(6)}  #{s.carrier().padRight(10)}  #{s.origin().padRight(12)}  #{s.dest().padRight(12)}  #{s.weightKg().kgLabel().padRight(7)}  #{code}")
+}
+
+// ── Carrier breakdown ─────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== By Carrier ===")
+val byCarrier: Map[String, List[Shipment]] = wh.all().groupBy { s => (s as Shipment).carrier() } as Map[String, List[Shipment]]
+foreach (carrier, items) in byCarrier {
+  val sl: List[Shipment] = items as List[Shipment]
+  val tw: Double = sl.fold(0.0) { acc, s => (acc as Double) + (s as Shipment).weightKg() } as Double
+  IO::println("  #{carrier.padRight(12)} #{sl.size()} shipments  #{tw.kgLabel()} total")
+}
+
+// ── Status summary ────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Status Summary ===")
+var pendingN: Int   = 0
+var transitN: Int   = 0
+var deliverN: Int   = 0
+var returnedN: Int  = 0
+var lostN: Int      = 0
+
+foreach s: Shipment in wh.all() {
+  val st: ShipmentStatus? = wh.statusOf(s.id())
+  if st != null {
+    select st {
+      case x is Pending:   pendingN  = pendingN  + 1
+      case x is InTransit: transitN  = transitN  + 1
+      case x is Delivered: deliverN  = deliverN  + 1
+      case x is Returned:  returnedN = returnedN + 1
+      case x is Lost:      lostN     = lostN     + 1
+    }
+  }
+}
+val totalN: Int = wh.all().size()
+IO::println("  Pending:    #{pendingN}")
+IO::println("  In-Transit: #{transitN}")
+IO::println("  Delivered:  #{deliverN}")
+IO::println("  Returned:   #{returnedN}")
+IO::println("  Lost:       #{lostN}")
+IO::println("  Total:      #{totalN}")
+
+// ── Weight statistics ─────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Weight Statistics ===")
+val allWeights: List[Double] = wh.all().map { s => (s as Shipment).weightKg() } as List[Double]
+val totalW: Double = allWeights.fold(0.0) { acc, w => (acc as Double) + (w as Double) } as Double
+val avgW: Double   = totalW / (wh.all().size() as Double)
+
+val heaviestS: Shipment = wh.all().sortedBy { s => 0.0 - (s as Shipment).weightKg() }[0] as Shipment
+val lightestS: Shipment = wh.all().sortedBy { s => (s as Shipment).weightKg() }[0] as Shipment
+
+IO::println("  Total:    #{totalW.kgLabel()}")
+IO::println("  Average:  #{avgW.kgLabel()}")
+IO::println("  Heaviest: #{heaviestS.id()} #{heaviestS.weightKg().kgLabel()} (#{heaviestS.origin()}->#{heaviestS.dest()})")
+IO::println("  Lightest: #{lightestS.id()} #{lightestS.weightKg().kgLabel()} (#{lightestS.origin()}->#{lightestS.dest()})")
+
+// ── Destination hot-spots ─────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Top Destinations ===")
+val byDest: Map[String, List[Shipment]] = wh.all().groupBy { s => (s as Shipment).dest() } as Map[String, List[Shipment]]
+// Build (dest, count) pairs for sorting by inbound volume
+val destPairs: List[String] = wh.all()
+  .map { s => (s as Shipment).dest() } as List[String]
+val uniqueDests: List[String] = destPairs.distinct() as List[String]
+val sortedDests: List[String] = uniqueDests.sortedBy { d =>
+  val sl2: List[Shipment] = byDest[d as String] as List[Shipment]
+  0 - sl2.size()
+} as List[String]
+foreach dest: String in sortedDests {
+  val sl3: List[Shipment] = byDest[dest] as List[Shipment]
+  IO::println("  #{dest.padRight(14)} #{sl3.size()} inbound")
+}
+
+// ── In-flight shipment detail ─────────────────────────────────────────────────
+IO::println("")
+IO::println("=== In-Flight Shipments (Pending + InTransit) ===")
+val inFlight: List[Shipment] = wh.all().filter { s =>
+  val sid: String = (s as Shipment).id()
+  val st: ShipmentStatus? = wh.statusOf(sid)
+  if st == null { return true }
+  select st {
+    case x is InTransit: return true
+    case x is Pending:   return true
+    else: return false
+  }
+} as List[Shipment]
+val heavyFirst: List[Shipment] = inFlight.sortedBy { s => 0.0 - (s as Shipment).weightKg() } as List[Shipment]
+foreach s: Shipment in heavyFirst {
+  val st: ShipmentStatus? = wh.statusOf(s.id())
+  val stl: String = if st != null { statusLabel(st) } else { "UNKNOWN" }
+  IO::println("  #{s.id()} #{s.carrier().padRight(8)} #{s.origin().padRight(12)} -> #{s.dest().padRight(12)} #{s.weightKg().kgLabel().padRight(8)} #{stl}")
+}
+
+// ── Delivery performance ──────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Delivery Performance ===")
+val deliveredList: List[Shipment] = wh.all().filter { s =>
+  val st: ShipmentStatus? = wh.statusOf((s as Shipment).id())
+  if st == null { return false }
+  select st { case x is Delivered: return true; else: return false }
+} as List[Shipment]
+
+val failedList: List[Shipment] = wh.all().filter { s =>
+  val st: ShipmentStatus? = wh.statusOf((s as Shipment).id())
+  if st == null { return false }
+  select st {
+    case x is Lost:     return true
+    case x is Returned: return true
+    else: return false
+  }
+} as List[Shipment]
+
+val delivRate: Int = (deliveredList.size() as Double / totalN as Double * 100.0) as Int
+val failRate: Int  = (failedList.size() as Double  / totalN as Double * 100.0) as Int
+val inFlightRate: Int = (inFlight.size() as Double / totalN as Double * 100.0) as Int
+
+IO::println("  Delivered:   #{deliveredList.size()}/#{totalN} (#{delivRate}%)")
+IO::println("  Failed/Lost: #{failedList.size()}/#{totalN} (#{failRate}%)")
+IO::println("  In-flight:   #{inFlight.size()}/#{totalN} (#{inFlightRate}%)")
+
+IO::println("")
+IO::println("=== Done — #{totalN} shipments tracked across #{byCarrier.size()} carriers ===")

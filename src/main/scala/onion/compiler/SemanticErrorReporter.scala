@@ -236,6 +236,10 @@ class SemanticErrorReporter(threshold: Int) {
       "error.semantic.duplicateGeneratedMethod",
       Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
     ),
+    SemanticError.DUPLICATE_EXTENSION_METHOD -> ErrorDef(
+      "error.semantic.duplicateExtensionMethod",
+      Seq(items => typeName(items(0)), items => asString(items(1)), items => typeNames(asTypeArray(items(2))))
+    ),
 
     // Access errors
     SemanticError.METHOD_NOT_ACCESSIBLE -> ErrorDef(
@@ -436,6 +440,10 @@ class SemanticErrorReporter(threshold: Int) {
     ),
     SemanticError.SHAPE_INSTANCE_WITHOUT_LAW -> ErrorDef(
       "error.semantic.shapeInstanceWithoutLaw",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
+      "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
     ),
     // Reported through the normal reporter path (NameResolution / TypingHeaderPass)

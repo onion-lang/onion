@@ -1,0 +1,248 @@
+// StudentGradeBook — manages students, courses, and grades.
+// Exercises: records, data-carrying enum, collection pipelines (filter/
+// map/fold/groupBy/sortedBy/sortedByDescending/find), select/pattern
+// matching, closures, string interpolation, nullable, recursion,
+// foreach (list + map entry + range), while loop, try/catch.
+
+// ── Data types ──────────────────────────────────────────────────────────
+
+enum Semester(label: String) {
+  FALL("Fall"),
+  SPRING("Spring"),
+  SUMMER("Summer")
+}
+
+record Course(code: String, name: String, credits: Int, semester: Semester)
+record Student(id: Int, name: String, major: String)
+record Enrollment(studentId: Int, course: Course, score: Int)
+
+// ── Grading helpers ──────────────────────────────────────────────────────
+
+def letterGrade(score: Int): String {
+  if score >= 90 { return "A" }
+  if score >= 80 { return "B" }
+  if score >= 70 { return "C" }
+  if score >= 60 { return "D" }
+  return "F"
+}
+
+def gradePoints(score: Int): Double {
+  select letterGrade(score) {
+    case "A": return 4.0
+    case "B": return 3.0
+    case "C": return 2.0
+    case "D": return 1.0
+    else:     return 0.0
+  }
+}
+
+// Compute GPA for a student (weighted by course credits).
+def computeGpa(studentId: Int, enrollments: List[Enrollment]): Double {
+  val mine = enrollments.filter { e => (e as Enrollment).studentId() == studentId }
+  if mine.size == 0 { return 0.0 }
+  var totalPoints: Double = 0.0
+  var totalCredits: Int = 0
+  foreach e: Object in mine {
+    val enr = e as Enrollment
+    totalPoints = totalPoints + gradePoints(enr.score()) * (enr.course().credits() as Double)
+    totalCredits = totalCredits + enr.course().credits()
+  }
+  if totalCredits == 0 { return 0.0 }
+  return totalPoints / (totalCredits as Double)
+}
+
+// Academic standing label derived from GPA.
+def standing(gpa: Double): String {
+  if gpa >= 3.9 { return "Summa Cum Laude" }
+  if gpa >= 3.7 { return "Magna Cum Laude" }
+  if gpa >= 3.5 { return "Cum Laude" }
+  return "Good Standing"
+}
+
+// Print a course summary: enrolment count, average score, highest score.
+def courseReport(course: Course, enrollments: List[Enrollment]): void {
+  val mine = enrollments.filter { e =>
+    (e as Enrollment).course().code() == course.code()
+  }
+  val n = mine.size
+  if n == 0 {
+    IO::println("  #{course.code()} #{course.name()}: no students enrolled")
+    return
+  }
+  var total: Int = 0
+  foreach e: Object in mine {
+    total = total + (e as Enrollment).score()
+  }
+  val avg = (total as Double) / (n as Double)
+  val sorted = mine.sortedByDescending { e => (e as Enrollment).score() }
+  val hiScore = (sorted[0] as Enrollment).score()
+  IO::println("  #{course.code()} #{course.name()}: #{n} student(s), avg #{avg}, top #{hiScore}")
+}
+
+// Try-wrapped safe average (returns -1.0 on empty list).
+def safeAvg(scores: List[Int]): Double {
+  try {
+    val n = scores.size
+    if n == 0 { return 0 - 1.0 }
+    var total: Int = 0
+    foreach s: Object in scores {
+      total = total + (s as Int)
+    }
+    return (total as Double) / (n as Double)
+  } catch e: Exception {
+    return 0 - 1.0
+  }
+}
+
+// Recursive: compute a depth based on repeatedly halving the score.
+def halveDepth(score: Int, depth: Int): Int {
+  if depth >= 5 || score <= 1 { return depth }
+  return halveDepth(score / 2, depth + 1)
+}
+
+// ── Data ─────────────────────────────────────────────────────────────────
+
+val cs101   = new Course("CS101",   "Intro to CS",    3, Semester::FALL)
+val math201 = new Course("MATH201", "Calculus",       4, Semester::SPRING)
+val cs301   = new Course("CS301",   "Algorithms",     3, Semester::FALL)
+val phys101 = new Course("PHYS101", "Physics I",      4, Semester::SPRING)
+val cs401   = new Course("CS401",   "Compilers",      3, Semester::FALL)
+
+val courses: List[Course] = [cs101, math201, cs301, phys101, cs401]
+
+val students: List[Student] = [
+  new Student(1, "Alice",  "CS"),
+  new Student(2, "Bob",    "Math"),
+  new Student(3, "Carol",  "CS"),
+  new Student(4, "Dave",   "Physics"),
+  new Student(5, "Eve",    "Math"),
+  new Student(6, "Frank",  "CS")
+]
+
+val enrollments: List[Enrollment] = [
+  new Enrollment(1, cs101,   95),
+  new Enrollment(1, math201, 87),
+  new Enrollment(1, cs301,   92),
+  new Enrollment(2, math201, 78),
+  new Enrollment(2, cs101,   82),
+  new Enrollment(2, cs401,   74),
+  new Enrollment(3, cs101,   71),
+  new Enrollment(3, cs301,   68),
+  new Enrollment(3, phys101, 85),
+  new Enrollment(4, phys101, 91),
+  new Enrollment(4, math201, 73),
+  new Enrollment(4, cs101,   60),
+  new Enrollment(5, math201, 96),
+  new Enrollment(5, cs101,   88),
+  new Enrollment(6, cs101,   45),
+  new Enrollment(6, cs301,   58),
+  new Enrollment(6, cs401,   62)
+]
+
+// ── Reports ───────────────────────────────────────────────────────────────
+
+IO::println("=== Course Reports ===")
+foreach c: Object in courses {
+  courseReport(c as Course, enrollments)
+}
+
+// GPA per student, sorted descending.
+IO::println("\n=== Student GPA Rankings ===")
+val ranked = students.sortedByDescending { s =>
+  computeGpa((s as Student).id(), enrollments)
+}
+foreach s: Object in ranked {
+  val st = s as Student
+  val gpa = computeGpa(st.id(), enrollments)
+  val lvl = standing(gpa)
+  IO::println("  #{st.name()} (#{st.major()}): GPA #{gpa} — #{lvl}")
+}
+
+// Honor roll: GPA >= 3.5.
+IO::println("\n=== Honor Roll (GPA >= 3.5) ===")
+val honorRoll = students
+  .filter { s => computeGpa((s as Student).id(), enrollments) >= 3.5 }
+  .map    { s => (s as Student).name() }
+if honorRoll.size == 0 {
+  IO::println("  (none)")
+} else {
+  foreach name: Object in honorRoll {
+    IO::println("  " + name)
+  }
+}
+
+// Grade distribution across all enrollments.
+IO::println("\n=== Grade Distribution ===")
+val gradeDist = enrollments.groupBy { e => letterGrade((e as Enrollment).score()) }
+foreach (grade, group) in gradeDist {
+  IO::println("  " + grade + ": " + (group as List).size + " enrollment(s)")
+}
+
+// Semester breakdown via data-carrying enum accessor.
+IO::println("\n=== Semester Schedule ===")
+foreach c: Object in courses {
+  val course = c as Course
+  IO::println("  #{course.code()} — #{course.semester().label()} (#{course.credits()} credits)")
+}
+
+// Students grouped by major.
+IO::println("\n=== Students by Major ===")
+val byMajor = students.groupBy { s => (s as Student).major() }
+foreach (major, group) in byMajor {
+  val names = (group as List).map { s => (s as Student).name() }
+  IO::println("  " + major + ": " + names.toString())
+}
+
+// Summary counts via string interpolation.
+val totalStudents    = students.size
+val totalCourses     = courses.size
+val totalEnrollments = enrollments.size
+IO::println("\n#{totalStudents} students, #{totalCourses} courses, #{totalEnrollments} total enrollments")
+
+// Overall average score via while loop.
+var i: Int = 0
+var runningTotal: Int = 0
+while i < enrollments.size {
+  runningTotal = runningTotal + (enrollments[i] as Enrollment).score()
+  i = i + 1
+}
+val overallAvg = (runningTotal as Double) / (enrollments.size as Double)
+IO::println("Overall score average: #{overallAvg}")
+
+// Score thresholds demonstrated with range foreach.
+IO::println("\n=== Score -> Letter Grade (every 5 pts) ===")
+foreach threshold: Int in 55..100 {
+  if threshold % 5 == 0 {
+    IO::println("  #{threshold} -> #{letterGrade(threshold)}")
+  }
+}
+
+// Safe average on a literal list.
+val sampleScores: List[Int] = [85, 72, 91, 68, 78]
+val avg = safeAvg(sampleScores)
+IO::println("\nsafeAvg([85,72,91,68,78]) = #{avg}")
+val emptyAvg = safeAvg([])
+IO::println("safeAvg([]) = #{emptyAvg}")
+
+// Nullable: find top-scoring enrollment and identify the student.
+val topEnroll = enrollments.find { e => (e as Enrollment).score() == 96 }
+if topEnroll != null {
+  val te    = topEnroll as Enrollment
+  val owner = students.find { s => (s as Student).id() == te.studentId() }
+  if owner != null {
+    IO::println("\nTop score (96) belongs to #{(owner as Student).name()}")
+  }
+}
+
+// Recursion demo: count halvings until score drops below 1.
+IO::println("\n=== Halve-depth of scores ===")
+val testScores: List[Int] = [10, 50, 90, 95, 100]
+foreach sc: Object in testScores {
+  val s = sc as Int
+  IO::println("  score #{s} -> depth #{halveDepth(s, 0)}")
+}
+
+// Fold demo: compute total enrolled credits.
+IO::println("\n=== Total enrolled credits ===")
+val totalCredits = enrollments.fold(0) { acc, e => (acc as Int) + (e as Enrollment).course().credits() }
+IO::println("Total credit-hours: #{totalCredits}")

@@ -226,12 +226,6 @@ private[typing] object GenericMethodTypeArguments {
                 case Some(view) => unifyWithApplied(view)
                 case None =>
             case _ =>
-        case aft: ArrayType =>
-          actual match {
-            case aat: ArrayType if aft.dimension == aat.dimension =>
-              unify(aft.component, aat.component, position)
-            case _ =>
-          }
         case _ =>
     }
 
@@ -447,12 +441,6 @@ private[typing] object GenericMethodTypeArguments {
                 case Some(view) => unifyWithApplied(view)
                 case None =>
             case _ =>
-        case aft: ArrayType =>
-          actual match {
-            case aat: ArrayType if aft.dimension == aat.dimension =>
-              unify(aft.component, aat.component, position)
-            case _ =>
-          }
         case _ =>
     }
 

@@ -1,0 +1,225 @@
+// CarRentalFleet.on — Car rental agency fleet & billing report.
+// Exercises: ADT enum (VehicleCategory), records with example, extension methods
+// on Int and Double, collection pipelines (map/filter/fold/groupBy/sortedBy/find/
+// partition/distinct), foreach on range and Map(k,v), select with type patterns,
+// string interpolation, closures, while, try/catch, and |> pipeline.
+
+// ── Vehicle category (ADT enum) ────────────────────────────────────────────────
+enum VehicleCategory {
+  case Economy
+  case SUV
+  case Luxury
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Vehicle(plate: String, make: String, model: String, dailyRate: Int)
+  example { new Vehicle("P1", "Toyota", "Corolla", 4500).dailyRate() == 4500 }
+  example { new Vehicle("P1", "Toyota", "Corolla", 4500).make() == "Toyota" }
+
+record Rental(vehicle: Vehicle, category: VehicleCategory, customer: String, days: Int)
+  example {
+    new Rental(new Vehicle("X", "Honda", "Civic", 4000), new Economy(), "Alice", 3).days() == 3
+  }
+
+record VehicleStat(model: String, category: String, count: Int, revenue: Int)
+
+// ── String formatting helpers ─────────────────────────────────────────────────
+def padLeft(s: String, w: Int): String {
+  var r = s
+  while r.length() < w { r = " " + r }
+  return r
+}
+
+def padRight(s: String, w: Int): String {
+  var r = s
+  while r.length() < w { r = r + " " }
+  return r
+}
+
+def fmtYen(n: Int): String = n + " yen"
+
+// ── Category helpers (select on ADT enum) ─────────────────────────────────────
+def categoryName(c: VehicleCategory): String = select c {
+  case e is Economy: "Economy"
+  case s is SUV:     "SUV"
+  case l is Luxury:  "Luxury"
+}
+
+def categoryMultiplier(c: VehicleCategory): Double = select c {
+  case e is Economy: 1.0
+  case s is SUV:     1.4
+  case l is Luxury:  2.2
+}
+
+def rentalRevenue(r: Rental): Int =
+  ((r.vehicle().dailyRate() as Double) * (r.days() as Double) * categoryMultiplier(r.category())) as Int
+
+// ── Extension methods on Int ──────────────────────────────────────────────────
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "N/A" }
+    return "" + (self * 100 / total) + "%"
+  }
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+extension Double {
+  def round1(): Double = (self * 10.0 + 0.5) as Long / 10.0
+}
+
+// ── Fleet catalogue ───────────────────────────────────────────────────────────
+val corolla = new Vehicle("KX-101", "Toyota",     "Corolla",   4500)
+val civic   = new Vehicle("KX-202", "Honda",      "Civic",     4300)
+val rav4    = new Vehicle("KX-303", "Toyota",     "RAV4",      7200)
+val cx5     = new Vehicle("KX-404", "Mazda",      "CX-5",      6900)
+val es      = new Vehicle("KX-505", "Lexus",      "ES",       12000)
+
+// ── Rental data ───────────────────────────────────────────────────────────────
+val rentals = [
+  new Rental(corolla, new Economy(), "Alice",    3),
+  new Rental(civic,   new Economy(), "Bob",      2),
+  new Rental(rav4,    new SUV(),     "Carol",    5),
+  new Rental(corolla, new Economy(), "Dave",     1),
+  new Rental(civic,   new Economy(), "Eve",      7),
+  new Rental(cx5,     new SUV(),     "Frank",    4),
+  new Rental(es,      new Luxury(), "Grace",     2),
+  new Rental(rav4,    new SUV(),     "Hank",     3),
+  new Rental(es,      new Luxury(), "Ivy",       6),
+  new Rental(corolla, new Economy(), "Jack",     4),
+  new Rental(cx5,     new SUV(),     "Kate",     8),
+  new Rental(civic,   new Economy(), "Leo",      2),
+  new Rental(es,      new Luxury(), "Mia",       3),
+  new Rental(rav4,    new SUV(),     "Ned",      1),
+  new Rental(corolla, new Economy(), "Olivia",   9),
+  new Rental(cx5,     new SUV(),     "Pete",     2),
+  new Rental(civic,   new Economy(), "Quinn",    5),
+  new Rental(es,      new Luxury(), "Rosa",      1),
+  new Rental(rav4,    new SUV(),     "Sam",      7),
+  new Rental(corolla, new Economy(), "Tina",     2)
+]
+
+IO::println("=== Car Rental Fleet Report ===")
+IO::println("Total rentals: " + rentals.size)
+IO::println("")
+
+// ── Total revenue (fold) ──────────────────────────────────────────────────────
+val totalRevenue = rentals.fold(0) { acc, r =>
+  (acc as Int) + rentalRevenue(r as Rental)
+} as Int
+IO::println("Total revenue: " + fmtYen(totalRevenue))
+IO::println("")
+
+// ── Revenue by category (filter + fold for each category name) ────────────────
+IO::println("── Revenue by Category ─────────────────────────────")
+IO::println(padRight("Category", 12) + padLeft("Count", 7) + padLeft("Revenue", 14))
+IO::println("-".repeat(34))
+val categoryNames = ["Economy", "SUV", "Luxury"]
+foreach catName: String in categoryNames {
+  val catR = rentals.filter { r => categoryName((r as Rental).category()) == catName }
+  val cnt = catR.size
+  val rev = catR.fold(0) { acc, r => (acc as Int) + rentalRevenue(r as Rental) } as Int
+  IO::println(padRight(catName, 12) + padLeft("" + cnt, 7) + padLeft(fmtYen(rev), 14))
+}
+IO::println("")
+
+// ── Revenue by vehicle (map into VehicleStat, sortedBy revenue) ───────────────
+IO::println("── Revenue by Vehicle ───────────────────────────────")
+IO::println(padRight("Vehicle", 14) + padRight("Category", 10) + padLeft("Count", 7) + padLeft("Revenue", 14))
+IO::println("-".repeat(46))
+val fleet = [corolla, civic, rav4, cx5, es]
+val fleetCats = ["Economy", "Economy", "SUV", "SUV", "Luxury"]
+val vehicleStats = fleet.map { v =>
+  val vh = v as Vehicle
+  val vr = rentals.filter { r => (r as Rental).vehicle().plate() == vh.plate() }
+  val rev = vr.fold(0) { acc, r => (acc as Int) + rentalRevenue(r as Rental) } as Int
+  val cat = categoryName((vr[0] as Rental).category())
+  new VehicleStat(vh.model(), cat, vr.size, rev)
+}
+val sortedByRev = vehicleStats.sortedBy { vs => 0 - (vs as VehicleStat).revenue() }
+foreach i: Int in 1..5 {
+  val vs = sortedByRev[i - 1] as VehicleStat
+  IO::println(
+    padRight(vs.model(), 14) +
+    padRight(vs.category(), 10) +
+    padLeft("" + vs.count(), 7) +
+    padLeft(fmtYen(vs.revenue()), 14)
+  )
+}
+IO::println("")
+
+// ── Rentals by make (groupBy + foreach on map entries) ────────────────────────
+IO::println("── Rentals by Make ─────────────────────────────────")
+val byMake = rentals.groupBy { r => (r as Rental).vehicle().make() }
+foreach (make, grp) in byMake {
+  val cnt = (grp as List).size
+  var bar = ""
+  foreach _: Int in 1..cnt { bar = bar + "#" }
+  IO::println(padRight(make as String, 10) + " " + bar + " (" + cnt + ")")
+}
+IO::println("")
+
+// ── Long-term rentals (filter by ADT pattern + foreach) ────────────────────────
+IO::println("── Long-Term Rentals (5+ days) ─────────────────────")
+val longTermRentals = rentals.filter { r => (r as Rental).days() >= 5 }
+foreach lr: Rental in longTermRentals {
+  val rev = rentalRevenue(lr)
+  IO::println("  " + lr.customer() + " — " + lr.vehicle().model() + " (" + lr.days() + " days, " + fmtYen(rev) + ")")
+}
+IO::println("")
+
+// ── Partition: high-value vs budget rentals ────────────────────────────────────
+val parts     = rentals.partition { r => rentalRevenue(r as Rental) >= 15000 }
+val highValue = parts[0] as List[Object]
+val budget    = parts[1] as List[Object]
+IO::println("Rentals >= 15000 yen: " + highValue.size)
+IO::println("Rentals <  15000 yen: " + budget.size)
+IO::println("")
+
+// ── Distinct customers seen (distinct) ─────────────────────────────────────────
+val seenCustomers = rentals.map { r => (r as Rental).customer() }.distinct()
+IO::println("Distinct customers: " + seenCustomers.size)
+IO::println("")
+
+// ── Vehicles ranked by daily rate (sortedBy + indexed foreach) ────────────────
+IO::println("── Vehicles by Daily Rate ──────────────────────────")
+val sortedByRate = fleet.sortedBy { v => 0 - (v as Vehicle).dailyRate() }
+foreach i: Int in 1..5 {
+  val v = sortedByRate[i - 1] as Vehicle
+  IO::println("  #{i}. #{v.model()} — #{fmtYen(v.dailyRate())}/day")
+}
+IO::println("")
+
+// ── find: most expensive vehicle revenue ───────────────────────────────────────
+val topVehicle = sortedByRev[0] as VehicleStat
+IO::println("Highest-revenue vehicle: #{topVehicle.model()} (#{fmtYen(topVehicle.revenue())})")
+IO::println("")
+
+// ── Average revenue per rental (extension method round1) ───────────────────────
+val avgRevenue: Double = (totalRevenue as Double) / (rentals.size as Double)
+IO::println("Average revenue per rental: #{avgRevenue.round1()} yen")
+IO::println("")
+
+// ── try/catch: safe percentage helper ───────────────────────────────────────────
+def safePct(n: Int, total: Int): String {
+  try {
+    return "" + (n * 100 / total) + "%"
+  } catch e: Exception {
+    return "N/A"
+  }
+}
+
+val longTermCount = longTermRentals.size
+IO::println("Long-term rental rate: " + safePct(longTermCount, rentals.size))
+IO::println("")
+
+// ── Closure stored in a val ────────────────────────────────────────────────────
+val makeBanner = (title: String) -> "=== " + title + " ==="
+IO::println(makeBanner("Summary"))
+
+// ── String interpolation ───────────────────────────────────────────────────────
+IO::println("Total: #{rentals.size} rentals, #{fmtYen(totalRevenue)} revenue")
+IO::println("Long-term rentals: #{longTermCount} (#{longTermCount.pct(rentals.size)} of all rentals)")
+
+// ── |> pipeline ─────────────────────────────────────────────────────────────────
+"Report covers #{fleet.size} vehicles and #{categoryNames.size} categories" |> IO::println
+IO::println("=== End of Fleet Report ===")

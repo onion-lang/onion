@@ -1,0 +1,598 @@
+// AirlineReservation.on — a realistic airline reservation system.
+// Exercises: records, plain and data-carrying enums, classes with interfaces,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/distinct/find/
+// partition/zip/any/count), select/type-pattern matching with exhaustiveness,
+// nullable types, closures, string interpolation, try/catch, recursion,
+// while/foreach (ranges and map (k,v)), |> pipeline, extension methods.
+
+import { java.util.ArrayList }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+// ADT enum: each case is an instantiable class
+enum CabinClass {
+  case Economy
+  case Business
+  case FirstClass
+public:
+  def label(): String = select this {
+    case c is Economy:    "Economy"
+    case c is Business:   "Business"
+    case c is FirstClass: "First Class"
+  }
+  def multiplier(): Double = select this {
+    case c is Economy:    1.0
+    case c is Business:   2.5
+    case c is FirstClass: 4.0
+  }
+  def bagAllowance(): Int = select this {
+    case c is Economy:    1
+    case c is Business:   2
+    case c is FirstClass: 3
+  }
+}
+
+enum BookingStatus {
+  case Confirmed
+  case Pending
+  case Voided
+  case CheckedIn
+public:
+  def label(): String = select this {
+    case s is Confirmed:  "CONFIRMED"
+    case s is Pending:    "PENDING"
+    case s is Voided:     "VOIDED"
+    case s is CheckedIn:  "CHECKED-IN"
+  }
+  def isActive(): Boolean = select this {
+    case s is Confirmed: true
+    case s is CheckedIn: true
+    else: false
+  }
+  def canCancel(): Boolean = select this {
+    case s is Confirmed: true
+    case s is Pending:   true
+    else: false
+  }
+}
+
+enum FlightStatus {
+  case OnTime
+  case Delayed(minutes: Int)
+  case Grounded
+  case Boarding
+  case Departed
+public:
+  def label(): String = select this {
+    case s is OnTime:    "ON TIME"
+    case s is Delayed:   "DELAYED #{s.minutes()} min"
+    case s is Grounded:  "GROUNDED"
+    case s is Boarding:  "BOARDING"
+    case s is Departed:  "DEPARTED"
+  }
+  def delayMinutes(): Int = select this {
+    case s is Delayed: s.minutes()
+    else: 0
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Airport(code: String, city: String, country: String)
+  example { new Airport("JFK", "New York", "USA").code() == "JFK" }
+  example { new Airport("LHR", "London", "UK").city() == "London" }
+
+record Passenger(id: String, firstName: String, lastName: String, email: String) {
+public:
+  def fullName(): String = "#{firstName()} #{lastName()}"
+  def displayId(): String = "[#{id()}] #{fullName()}"
+}
+
+record Seat(row: Int, col: String, cabin: CabinClass) {
+public:
+  def label(): String = "#{row()}#{col()}"
+  def description(): String = "#{label()} (#{cabin().label()})"
+}
+
+record Flight(flightNo: String, origin: Airport, dest: Airport, departs: String, arrives: String, capacity: Int, basePrice: Double) {
+public:
+  def route(): String = "#{flightNo()}: #{origin().code()} -> #{dest().code()}"
+  def priceFor(cabin: CabinClass): Double = basePrice() * cabin.multiplier()
+  def summary(): String = "#{route()} | #{departs()} -> #{arrives()} | Base: $#{basePrice()}"
+}
+
+record Booking(ref: String, passenger: Passenger, flight: Flight, seat: Seat, status: BookingStatus) {
+public:
+  def price(): Double = flight().priceFor(seat().cabin())
+  def receipt(): String = "#{ref()} | #{passenger().fullName()} | #{flight().route()} | #{seat().description()} | #{status().label()} | $#{price()}"
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val rounded: Long = (self * 100.0).longValue()
+    val neg: Boolean = rounded < 0L
+    val abs: Long = if neg { -rounded } else { rounded }
+    val intPart: Long = abs / 100L
+    val fracPart: Long = abs % 100L
+    val fracStr: String = if fracPart < 10L { "0" + fracPart } else { "" + fracPart }
+    val sign: String = if neg { "-" } else { "" }
+    return "#{sign}#{intPart}.#{fracStr}"
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── Interface for pricing strategies ─────────────────────────────────────────
+
+interface PricingStrategy {
+  def apply(base: Double, cabin: CabinClass): Double
+}
+
+class StandardPricing conforms PricingStrategy {
+public:
+  def apply(base: Double, cabin: CabinClass): Double = base * cabin.multiplier()
+}
+
+class DiscountPricing conforms PricingStrategy {
+  val discount: Double
+public:
+  def this(d: Double) { this.discount = d }
+  def apply(base: Double, cabin: CabinClass): Double = base * cabin.multiplier() * (1.0 - discount)
+}
+
+class SurgePricing conforms PricingStrategy {
+  val surge: Double
+public:
+  def this(s: Double) { this.surge = s }
+  def apply(base: Double, cabin: CabinClass): Double = base * cabin.multiplier() * surge
+}
+
+// ─── Airline class ────────────────────────────────────────────────────────────
+
+class Airline {
+  val name:     String
+  val iata:     String
+  var flights:  List[Flight]
+  var bookings: List[Booking]
+  var nextRef:  Int
+
+public:
+  def this(n: String, code: String) {
+    this.name     = n
+    this.iata     = code
+    this.flights  = []
+    this.bookings = []
+    this.nextRef  = 1000
+  }
+
+  def addFlight(f: Flight): void { flights.add(f) }
+
+  def allFlights(): List[Flight] {
+    val list: List[Flight] = []
+    foreach f: Flight in flights { list.add(f) }
+    return list
+  }
+
+  def findFlight(flightNo: String): Flight? {
+    foreach f: Flight in flights { if f.flightNo() == flightNo { return f } }
+    return null
+  }
+
+  def findBooking(ref: String): Booking? {
+    foreach b: Booking in bookings { if b.ref() == ref { return b } }
+    return null
+  }
+
+  def book(passenger: Passenger, flightNo: String, row: Int, col: String, cabin: CabinClass): Booking? {
+    val f: Flight? = findFlight(flightNo)
+    if f == null { return null }
+    nextRef = nextRef + 1
+    val ref: String = iata + nextRef
+    val seat: Seat = new Seat(row, col, cabin)
+    val bk: Booking = new Booking(ref, passenger, f, seat, new Confirmed())
+    bookings.add(bk)
+    return bk
+  }
+
+  def cancel(ref: String): Boolean {
+    val bk: Booking? = findBooking(ref)
+    if bk == null { return false }
+    if !bk.status().canCancel() { return false }
+    val idx: Int = bookings.indexOf(bk)
+    bookings.set(idx, new Booking(bk.ref(), bk.passenger(), bk.flight(), bk.seat(), new Voided()))
+    return true
+  }
+
+  def checkIn(ref: String): Boolean {
+    val bk: Booking? = findBooking(ref)
+    if bk == null { return false }
+    if !(bk.status() is Confirmed) { return false }
+    val idx: Int = bookings.indexOf(bk)
+    bookings.set(idx, new Booking(bk.ref(), bk.passenger(), bk.flight(), bk.seat(), new CheckedIn()))
+    return true
+  }
+
+  def activeBookings(): List[Booking] = bookings.filter { b => b.status().isActive() }
+
+  def bookingsForFlight(flightNo: String): List[Booking] =
+    bookings.filter { b => b.flight().flightNo() == flightNo }
+
+  def revenue(): Double = activeBookings().fold(0.0) { acc, b => acc + b.price() }
+
+  def revenueByFlight(): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    val byFlight: Map[String, List[Booking]] = activeBookings().groupBy { b => b.flight().flightNo() }
+    foreach (fn, bks) in byFlight {
+      result.put(fn, bks.fold(0.0) { acc, b => acc + b.price() })
+    }
+    return result
+  }
+
+  def allBookings(): List[Booking] {
+    val list: List[Booking] = []
+    foreach b: Booking in bookings { list.add(b) }
+    return list
+  }
+
+  def passengerCount(): Int = activeBookings().size
+
+  def cabinBreakdown(): Map[String, Int] {
+    val result: Map[String, Int] = [:]
+    val byCabin: Map[String, List[Booking]] = activeBookings().groupBy { b => b.seat().cabin().label() }
+    foreach (cabin, bks) in byCabin {
+      result.put(cabin, bks.size)
+    }
+    return result
+  }
+
+  def topDestinations(n: Int): List[String] {
+    val counts: Map[String, List[Booking]] = activeBookings().groupBy { b => b.flight().dest().city() }
+    val keys: List[String] = []
+    foreach k: Object in counts.keySet() { keys.add(k as String) }
+    val sorted: List[String] = keys.sortedBy { k => -(counts.get(k).size) }
+    var result: List[String] = []
+    var i: Int = 0
+    foreach dest: String in sorted {
+      if i >= n { break }
+      result.add(dest)
+      i = i + 1
+    }
+    return result
+  }
+
+  def flightLoad(flightNo: String): Double {
+    val f: Flight? = findFlight(flightNo)
+    if f == null { return 0.0 }
+    val booked: Int = bookingsForFlight(flightNo).count { b => b.status().isActive() }
+    return (booked as Double) / (f.capacity() as Double) * 100.0
+  }
+
+  def printManifest(flightNo: String): void {
+    val bks: List[Booking] = bookingsForFlight(flightNo)
+      .filter { b => b.status().isActive() }
+      .sortedBy { b => b.seat().row() }
+    println("-- Manifest: #{flightNo} (#{bks.size} passengers) --")
+    foreach bk: Booking in bks {
+      println("  #{bk.seat().description().padRight(18)} #{bk.passenger().fullName()}")
+    }
+  }
+}
+
+// ─── Recursive fleet helpers ──────────────────────────────────────────────────
+
+def totalCapacityRec(flights: List[Flight], idx: Int, acc: Int): Int {
+  if idx >= flights.size { return acc }
+  return totalCapacityRec(flights, idx + 1, acc + flights.get(idx).capacity())
+}
+
+def longestRouteRec(flights: List[Flight], idx: Int, best: Flight?): Flight? {
+  if idx >= flights.size { return best }
+  val f: Flight = flights.get(idx)
+  val winner: Flight? = if best == null { f } else {
+    if f.route().length() > best.route().length() { f } else { best }
+  }
+  return longestRouteRec(flights, idx + 1, winner)
+}
+
+// ─── Pricing strategy demo ────────────────────────────────────────────────────
+
+def compareStrategies(base: Double, cabin: CabinClass): void {
+  val strategies: List[PricingStrategy] = [new StandardPricing(), new DiscountPricing(0.15), new SurgePricing(1.3)]
+  val names: List[String] = ["Standard", "15% Off", "Surge x1.3"]
+  val zipped = strategies.zip(names)
+  println("  Pricing for #{cabin.label()} (base $#{base.fmt2()}):")
+  foreach pair: Object in zipped {
+    val p = pair as List
+    val strat = p[0] as PricingStrategy
+    val label = p[1] as String
+    println("    #{label.padRight(12)}: $#{strat.apply(base, cabin).fmt2()}")
+  }
+}
+
+// ─── do[Option] helper ────────────────────────────────────────────────────────
+
+def toOptBooking(bk: Booking?): Option[Booking] {
+  if bk == null { return Option::none() }
+  return Option::some(bk as Booking)
+}
+
+def upgradeInfoOpt(airline: Airline, ref: String): Option[String] {
+  val econBk = airline.activeBookings().find { b => b.ref() == ref && (b.seat().cabin() is Economy) }
+  return do[Option] {
+    bk <- toOptBooking(econBk)
+    ret "Upgrade #{bk.passenger().fullName()} from #{bk.seat().description()} to Business for $#{(bk.flight().priceFor(new Business()) - bk.price()).fmt2()}"
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val jfk: Airport = new Airport("JFK", "New York",    "USA")
+val lhr: Airport = new Airport("LHR", "London",       "UK")
+val nrt: Airport = new Airport("NRT", "Tokyo",       "Japan")
+val cdg: Airport = new Airport("CDG", "Paris",      "France")
+val syd: Airport = new Airport("SYD", "Sydney",  "Australia")
+
+val airline: Airline = new Airline("Onion Air", "OA")
+
+airline.addFlight(new Flight("OA101", jfk, lhr, "08:00", "20:00", 180, 450.0))
+airline.addFlight(new Flight("OA202", jfk, nrt, "11:30", "15:30", 250, 800.0))
+airline.addFlight(new Flight("OA303", lhr, cdg, "09:15", "11:30", 120, 150.0))
+airline.addFlight(new Flight("OA404", nrt, syd, "14:00", "06:00", 300, 600.0))
+airline.addFlight(new Flight("OA505", cdg, jfk, "13:45", "16:30", 200, 520.0))
+
+val p1: Passenger = new Passenger("P001", "Alice",   "Chen",    "alice@mail.com")
+val p2: Passenger = new Passenger("P002", "Bob",     "Tanaka",  "bob@mail.com")
+val p3: Passenger = new Passenger("P003", "Clara",   "Dupont",  "clara@mail.com")
+val p4: Passenger = new Passenger("P004", "Dmitri",  "Volkov",  "d@mail.com")
+val p5: Passenger = new Passenger("P005", "Emilia",  "Santos",  "e@mail.com")
+val p6: Passenger = new Passenger("P006", "Fatima",  "Al-Said", "f@mail.com")
+val p7: Passenger = new Passenger("P007", "George",  "Walsh",   "g@mail.com")
+val p8: Passenger = new Passenger("P008", "Hana",    "Kim",     "h@mail.com")
+
+val bk1: Booking? = airline.book(p1, "OA101", 12, "A", new Economy())
+val bk2: Booking? = airline.book(p2, "OA101",  3, "C", new Business())
+val bk3: Booking? = airline.book(p3, "OA202",  7, "B", new FirstClass())
+val bk4: Booking? = airline.book(p4, "OA202", 22, "D", new Economy())
+val bk5: Booking? = airline.book(p5, "OA303",  5, "A", new Economy())
+val bk6: Booking? = airline.book(p6, "OA404", 11, "F", new Business())
+val bk7: Booking? = airline.book(p7, "OA505",  1, "A", new FirstClass())
+val bk8: Booking? = airline.book(p8, "OA101", 18, "B", new Economy())
+
+println("===================================================")
+println("        ONION AIR RESERVATION SYSTEM              ")
+println("===================================================")
+println("")
+
+// ─── Print all receipts ───────────────────────────────────────────────────────
+println("-- All Bookings ------------------------------------")
+foreach bk: Booking in airline.allBookings() {
+  println(bk.receipt())
+}
+println("")
+
+// ─── Check-in ────────────────────────────────────────────────────────────────
+if bk1 != null { airline.checkIn(bk1.ref()); println("Checked in: #{bk1.ref()}") }
+if bk3 != null { airline.checkIn(bk3.ref()); println("Checked in: #{bk3.ref()}") }
+if bk7 != null { airline.checkIn(bk7.ref()); println("Checked in: #{bk7.ref()}") }
+println("")
+
+// ─── Cancel one booking ───────────────────────────────────────────────────────
+if bk5 != null {
+  val cancelled: Boolean = airline.cancel(bk5.ref())
+  println("Cancel #{bk5.ref()}: #{cancelled}")
+}
+println("")
+
+// ─── Flight manifests ─────────────────────────────────────────────────────────
+airline.printManifest("OA101")
+println("")
+airline.printManifest("OA202")
+println("")
+
+// ─── Revenue report ───────────────────────────────────────────────────────────
+println("-- Revenue by Flight --------------------------------")
+val rev: Map[String, Double] = airline.revenueByFlight()
+val revKeys: List[String] = []
+foreach k: Object in rev.keySet() { revKeys.add(k as String) }
+val sortedFlights: List[String] = revKeys.sortedBy { k => k }
+foreach fn: String in sortedFlights {
+  val amount: Double = rev.get(fn)
+  println("  #{fn}: $#{amount.fmt2()}")
+}
+println("  TOTAL: $#{airline.revenue().fmt2()}")
+println("")
+
+// ─── Cabin breakdown ─────────────────────────────────────────────────────────
+println("-- Cabin Class Breakdown ----------------------------")
+val breakdown: Map[String, Int] = airline.cabinBreakdown()
+foreach (cabin, count) in breakdown {
+  println("  #{cabin.padRight(12)}: #{count} passenger(s)")
+}
+println("")
+
+// ─── Load factor per flight ───────────────────────────────────────────────────
+println("-- Load Factor --------------------------------------")
+foreach f: Flight in airline.allFlights() {
+  val load: Double = airline.flightLoad(f.flightNo())
+  println("  #{f.route()}: #{load.intValue()}%")
+}
+println("")
+
+// ─── Top destinations ────────────────────────────────────────────────────────
+println("-- Top 3 Destinations -------------------------------")
+val top: List[String] = airline.topDestinations(3)
+var rank: Int = 1
+foreach dest: String in top {
+  println("  #{rank}. #{dest}")
+  rank = rank + 1
+}
+println("")
+
+// ─── Pricing strategy comparison ─────────────────────────────────────────────
+println("-- Pricing Strategy Comparison (OA101 base $450) ---")
+compareStrategies(450.0, new Economy())
+compareStrategies(450.0, new Business())
+println("")
+
+// ─── do[Option] upgrade info ─────────────────────────────────────────────────
+println("-- Upgrade Suggestions (Economy passengers) ---------")
+foreach bk: Booking in airline.activeBookings() {
+  val opt: Option[String] = upgradeInfoOpt(airline, bk.ref())
+  if !opt.isEmpty() { println("  " + opt.get()) }
+}
+println("")
+
+// ─── FlightStatus ADT demo ────────────────────────────────────────────────────
+println("-- Flight Status Board ------------------------------")
+val statuses: List[FlightStatus] = [new OnTime(), new Delayed(25), new Boarding(), new Departed(), new Delayed(90)]
+val flightNos: List[String] = ["OA101", "OA202", "OA303", "OA404", "OA505"]
+val board = flightNos.zip(statuses)
+foreach bpair: Object in board {
+  val bp = bpair as List
+  val fn = bp[0] as String
+  val st = bp[1] as FlightStatus
+  val delay: Int = st.delayMinutes()
+  val marker: String = if delay > 60 { " [!]" } else if delay > 0 { " [i]" } else { "" }
+  println("  #{fn.padRight(6)}: #{st.label()}#{marker}")
+}
+println("")
+
+// ─── Recursive fleet summary ─────────────────────────────────────────────────
+println("-- Fleet Summary ------------------------------------")
+val totalCap: Int = totalCapacityRec(airline.allFlights(), 0, 0)
+val totalF: Int = airline.allFlights().size
+val avgCap: Int = if totalF == 0 { 0 } else { totalCap / totalF }
+println("  Flights: #{totalF} | Total seats: #{totalCap} | Avg: #{avgCap}")
+val best: Flight? = longestRouteRec(airline.allFlights(), 0, null)
+if best != null { println("  Longest route label: #{best.route()}") }
+println("")
+
+// ─── Partition: international vs domestic ────────────────────────────────────
+println("-- International vs Domestic ------------------------")
+val parts = airline.allFlights().partition { f => f.origin().country() != f.dest().country() }
+val intl = parts[0] as List[Object]
+val dom  = parts[1] as List[Object]
+println("  International routes: #{intl.size}")
+println("  Domestic routes: #{dom.size}")
+foreach fp: Object in intl {
+  val f: Flight = fp as Flight
+  println("    #{f.route()}: #{f.origin().country()} -> #{f.dest().country()}")
+}
+println("")
+
+// ─── Distinct countries served ────────────────────────────────────────────────
+println("-- Countries Served ---------------------------------")
+val countryList: List[String] = []
+foreach f: Flight in airline.allFlights() {
+  val oc: String = f.origin().country()
+  val dc: String = f.dest().country()
+  if !countryList.contains(oc) { countryList.add(oc) }
+  if !countryList.contains(dc) { countryList.add(dc) }
+}
+val countries: List[String] = countryList.sortedBy { c => c }
+foreach c: String in countries { println("  " + c) }
+println("")
+
+// ─── Active passenger summary ────────────────────────────────────────────────
+println("-- Active Passenger Summary -------------------------")
+println("  Total active: #{airline.passengerCount()}")
+val highValue: List[Booking] =
+  airline.activeBookings()
+    .filter { b => b.price() > 1000.0 }
+    .sortedBy { b => -(b.price().intValue()) }
+println("  High-value bookings (>$1000): #{highValue.size}")
+foreach bk: Booking in highValue {
+  println("    #{bk.passenger().fullName().padRight(16)}: $#{bk.price().fmt2()}")
+}
+println("")
+
+// ─── Average ticket price by cabin ───────────────────────────────────────────
+println("-- Average Ticket Price by Cabin --------------------")
+val byCabin: Map[String, List[Booking]] = airline.activeBookings().groupBy { b => b.seat().cabin().label() }
+foreach (cabin, bks) in byCabin {
+  val total: Double = bks.fold(0.0) { acc, b => acc + b.price() }
+  val avg: Double = total / (bks.size as Double)
+  println("  #{cabin.padRight(12)}: avg $#{avg.fmt2()} (#{bks.size} booking(s))")
+}
+println("")
+
+// ─── Zip demo: flights with base prices ──────────────────────────────────────
+println("-- Flight Base Prices (zip demo) --------------------")
+val fNos: List[String] = airline.allFlights().map { f => f.flightNo() }
+val fPrices: List[Double] = airline.allFlights().map { f => f.basePrice() }
+val fzipped = fNos.zip(fPrices)
+foreach fpair: Object in fzipped {
+  val fp = fpair as List
+  val fn2 = fp[0] as String
+  val price = fp[1] as Double
+  println("  #{fn2.padRight(6)}: base $#{price.fmt2()}")
+}
+println("")
+
+// ─── try/catch validation demo ───────────────────────────────────────────────
+println("-- Booking Validation Demo --------------------------")
+try {
+  val bad: Booking? = airline.book(p1, "ZZZZ99", 1, "A", new Economy())
+  if bad == null {
+    println("  Unknown flight correctly rejected (null returned)")
+  }
+} catch e: Exception {
+  println("  Unexpected error: #{e.message()}")
+}
+val alreadyBooked: Boolean =
+  airline.bookingsForFlight("OA101")
+    .any { b => b.passenger().id() == p1.id() && b.status().isActive() }
+println("  Alice already on OA101: #{alreadyBooked}")
+println("")
+
+// ─── Any / count pipeline queries ────────────────────────────────────────────
+println("-- Fleet Queries ------------------------------------")
+val hasFirstClass: Boolean = airline.activeBookings().any { b => b.seat().cabin() is FirstClass }
+val checkedInCount: Int = airline.allBookings().count { b => b.status() is CheckedIn }
+val confirmedCount: Int = airline.allBookings().count { b => b.status() is Confirmed }
+val voidedCount: Int    = airline.allBookings().count { b => b.status() is Voided }
+println("  Any first-class: #{hasFirstClass}")
+println("  Checked-in: #{checkedInCount} | Confirmed: #{confirmedCount} | Voided: #{voidedCount}")
+println("")
+
+// ─── Range-based foreach ─────────────────────────────────────────────────────
+println("-- Sample Row Numbers (range foreach) ---------------")
+var rowNums: String = ""
+foreach i: Int in 1..5 {
+  rowNums = if rowNums == "" { "" + i } else { rowNums + ", " + i }
+}
+println("  Rows 1..5: #{rowNums}")
+println("")
+
+// ─── Closures and |> pipeline ────────────────────────────────────────────────
+println("-- Top Earners via Pipeline -------------------------")
+val topEarners: List[Booking] =
+  airline.activeBookings()
+    .sortedBy { b => -(b.price().intValue()) }
+    .filter { b => b.price() > 500.0 }
+var idx: Int = 0
+foreach bk: Booking in topEarners {
+  idx = idx + 1
+  println("  #{idx}. #{bk.passenger().fullName().padRight(16)} $#{bk.price().fmt2()} (#{bk.seat().cabin().label()})")
+}
+// |> pipeline: pipe summary to print
+val summaryLine: String = "Total bookings: #{airline.allBookings().size} | Active: #{airline.passengerCount()}"
+summaryLine |> println
+println("")
+
+println("===================================================")
+println("               END OF REPORT                      ")
+println("===================================================")

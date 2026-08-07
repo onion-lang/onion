@@ -328,10 +328,16 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // Synthetic getter for records: non-abstract, no block, no args, has return type, and NOT static
     val isSyntheticGetter = node.block == null && !Modifier.isAbstract(node.modifier) &&
                             node.arguments.isEmpty && node.returnType != BasicType.VOID && !isStatic &&
-                            !Modifier.isSyntheticRecord(node.modifier)
+                            !Modifier.isSyntheticRecord(node.modifier) &&
+                            !Modifier.isSyntheticInterfaceForward(node.modifier)
 
     // Check for synthetic record methods (equals, hashCode, toString, copy)
     val isSyntheticRecord = Modifier.isSyntheticRecord(node.modifier)
+
+    // A record's equals/hashCode/toString that a conforms-to interface already
+    // supplies as a default method (see TypingOutlinePass.processRecordDeclaration):
+    // forwards to that default via INVOKESPECIAL instead of the field-based logic.
+    val isSyntheticInterfaceForward = Modifier.isSyntheticInterfaceForward(node.modifier)
 
     // Synthetic enum helpers: values() and valueOf(String) have no block
     val enumClassDef = node.classType match
@@ -357,12 +363,17 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
             case "copy"     => emitRecordCopy(gen, className, components)
             case _ => // Unknown synthetic record method, no-op
         case _ => // Not a record, no-op
+    else if isSyntheticInterfaceForward then
+      findInterfaceDefaultOwner(node.classType, node.name, node.arguments.length) match
+        case Some(owner) => emitInterfaceForward(gen, node, owner, argTypes, returnType)
+        case None => // Resolved earlier in TypingOutlinePass; absence here would be a compiler bug
+      end match
     else if isSyntheticGetter then
       // Synthetic getter for records: return this.fieldName
       gen.loadThis()
       gen.getField(AsmUtil.objectType(className), node.name, returnType)
 
-    if !isSyntheticGetter && !isSyntheticRecord && !isEnumHelper then
+    if !isSyntheticGetter && !isSyntheticRecord && !isEnumHelper && !isSyntheticInterfaceForward then
       val needsDefault = node.block == null || !hasReturn(node.block.statements)
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else
@@ -388,6 +399,36 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         })
       case _ => false
     }
+
+  /**
+   * Finds the superinterface that declares a concrete (non-abstract) method
+   * of the given name/arity — the target of a `SYNTHETIC_INTERFACE_FORWARD`
+   * method (see TypingOutlinePass.processRecordDeclaration). Mirrors the
+   * lookup made there when the modifier was assigned, so this should always
+   * find a match; `None` only on a compiler bug.
+   */
+  private def findInterfaceDefaultOwner(classType: TypedAST.ClassType, name: String, arity: Int): Option[TypedAST.ClassType] =
+    classType.interfaces.find(_.methods(name).exists(m => !Modifier.isAbstract(m.modifier) && m.arguments.length == arity))
+
+  /**
+   * Emits `this.<name>(args...)` as a super call to `owner`'s default method
+   * (`INVOKESPECIAL owner.name(desc)` with the interface flag) — the bytecode
+   * `Owner.super.name(...)` would produce. A class's own method always wins
+   * over an inherited interface default for the same signature, so this
+   * class-level method exists solely to redirect back to the interface body
+   * instead of reimplementing it.
+   */
+  private def emitInterfaceForward(
+    gen: GeneratorAdapter,
+    node: MethodDefinition,
+    owner: TypedAST.ClassType,
+    argTypes: Array[AsmType],
+    returnType: AsmType
+  ): Unit =
+    val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
+    gen.loadThis()
+    argTypes.indices.foreach(gen.loadArg)
+    gen.visitMethodInsn(Opcodes.INVOKESPECIAL, AsmUtil.internalName(owner.name), node.name, desc, true)
 
   // =====================================================
   // Synthetic Record Methods: equals, hashCode, toString, copy

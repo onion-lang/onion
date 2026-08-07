@@ -155,6 +155,15 @@ final class ControlFlowEmitter(
   def emitReturn(node: Return): Unit =
     if node.term != null then
       visitTerm(node.term)
+      // A StatementTerm with BottomType has already transferred control on every
+      // path (via inner `return`/`throw` nodes). The operand stack is empty after
+      // it and emitting `gen.returnValue()` would place a dead `areturn` on an
+      // empty stack, which the JVM verifier rejects as "Operand stack underflow".
+      // Each inner Return node already runs finallyStack entries on its own path,
+      // so there is nothing left to do here.
+      node.term match
+        case _: StatementTerm if node.term.`type`.isBottomType => return
+        case _ =>
     if finallyStack.nonEmpty then
       // Run enclosing finally blocks before returning; stash the result across them.
       val slot = if node.term != null then storeResultIfNeeded(node.term.`type`) else None

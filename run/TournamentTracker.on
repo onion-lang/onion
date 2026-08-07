@@ -1,0 +1,473 @@
+// TournamentTracker.on — A round-robin tournament management system.
+// Exercises: records (with methods), plain enums, ADT case-enum with
+// singleton and data-carrying cases, class with ArrayList, interface +
+// conforms, generics, collection pipelines (filter/map/fold/reduce/
+// sortedBy/groupBy/partition/distinct/zip), select/type-pattern matching,
+// nullable types, closures, string interpolation, try/catch,
+// foreach on map (k,v), extension methods on String and Int, range foreach.
+
+import { java.util.ArrayList }
+
+// ─── Extension methods ────────────────────────────────────────────────────
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = this
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def rep(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + this; i = i + 1 }
+    return s
+  }
+}
+
+extension Int {
+  def absVal(): Int { if self < 0 { return 0 - self } return self }
+  def clampRange(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+}
+
+// ─── Plain enums ──────────────────────────────────────────────────────────
+
+enum Division {
+  GroupA, GroupB
+public:
+  def label(): String = select this {
+    case Division::GroupA: "Group A"
+    case Division::GroupB: "Group B"
+    else: "Unknown"
+  }
+}
+
+enum SportType {
+  Football, Basketball
+public:
+  def label(): String = select this {
+    case SportType::Football:   "Football"
+    case SportType::Basketball: "Basketball"
+    else: "Sport"
+  }
+  def maxScore(): Int = select this {
+    case SportType::Football:   20
+    case SportType::Basketball: 120
+    else: 99
+  }
+}
+
+// ─── ADT case-enum: tournament phase ─────────────────────────────────────
+
+enum TournamentPhase {
+  case GroupStage(round: Int)
+  case Quarterfinal
+  case Semifinal
+  case Final
+public:
+  def label(): String = select this {
+    case p is GroupStage:  "Group Stage R#{p.round()}"
+    case p is Quarterfinal: "Quarterfinal"
+    case p is Semifinal:    "Semifinal"
+    case p is Final:        "Final"
+  }
+  def isKnockout(): Boolean = select this {
+    case p is GroupStage: false
+    else: true
+  }
+  def groupRound(): Int = select this {
+    case p is GroupStage: p.round()
+    else: 0
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────
+
+record Player(id: Int, name: String, country: String, division: Division) {
+public:
+  def display(): String = "#{name} (#{country})"
+}
+
+record MatchResult(
+  matchId: Int,
+  p1Id: Int, p2Id: Int,
+  score1: Int, score2: Int,
+  phase: TournamentPhase
+) {
+public:
+  def winner(): Int? {
+    if score1 > score2 { return p1Id }
+    if score2 > score1 { return p2Id }
+    return null
+  }
+  def isDraw(): Boolean { return score1 == score2 }
+  def goalsFor(pid: Int): Int {
+    if pid == p1Id { return score1 }
+    return score2
+  }
+  def goalsAgainst(pid: Int): Int {
+    if pid == p1Id { return score2 }
+    return score1
+  }
+  def pointsFor(pid: Int): Int {
+    val w = winner()
+    if w == null { return 1 }
+    if (w as Int) == pid { return 3 }
+    return 0
+  }
+  def involves(pid: Int): Boolean { return p1Id == pid || p2Id == pid }
+  def label(): String { return "M#{matchId}[#{phase.label()}] #{score1}-#{score2}" }
+}
+
+record Standing(
+  pid: Int, name: String, country: String,
+  wins: Int, draws: Int, losses: Int,
+  goalsFor: Int, goalsAgainst: Int
+) {
+public:
+  def pts(): Int { return wins * 3 + draws }
+  def diff(): Int { return goalsFor - goalsAgainst }
+  def played(): Int { return wins + draws + losses }
+  def display(): String {
+    val dstr: String = if diff() >= 0 { "+#{diff()}" } else { "#{diff()}" }
+    return "#{name.padRight(18)} #{played()}P  #{wins}W-#{draws}D-#{losses}L  GD:#{dstr}  Pts:#{pts()}"
+  }
+}
+
+// ─── Interface ────────────────────────────────────────────────────────────
+
+interface Printable {
+  def printReport(): void
+}
+
+// ─── Tournament class ──────────────────────────────────────────────────────
+
+class Tournament {
+  var playerList: ArrayList[Player]
+  var results: ArrayList[MatchResult]
+  var sport: SportType
+  var nextId: Int
+
+public:
+  def this(s: SportType) {
+    sport      = s
+    playerList = new ArrayList[Player]()
+    results    = new ArrayList[MatchResult]()
+    nextId     = 1
+  }
+
+  def addPlayer(p: Player): void { playerList.add(p) }
+
+  def addMatch(p1Id: Int, p2Id: Int, s1: Int, s2: Int, phase: TournamentPhase): void {
+    val mx: Int = sport.maxScore()
+    val c1: Int = s1.clampRange(0, mx)
+    val c2: Int = s2.clampRange(0, mx)
+    results.add(new MatchResult(nextId, p1Id, p2Id, c1, c2, phase))
+    nextId = nextId + 1
+  }
+
+  def allPlayers(): List[Object] {
+    val out: List[Object] = []
+    foreach p: Player in playerList { out << p }
+    return out
+  }
+
+  def findPlayer(pid: Int): Player? {
+    foreach p: Player in playerList {
+      if p.id() == pid { return p }
+    }
+    return null
+  }
+
+  def requirePlayer(pid: Int): Player {
+    val p = findPlayer(pid)
+    if p == null { throw new Exception("Unknown player id: #{pid}") }
+    return p as Player
+  }
+
+  def allResults(): List[Object] {
+    val out: List[Object] = []
+    foreach r: MatchResult in results { out << r }
+    return out
+  }
+
+  def matchesFor(pid: Int): List[Object] {
+    return allResults().filter { r => (r as MatchResult).involves(pid) }
+  }
+
+  def groupStageMatches(): List[Object] {
+    return allResults().filter { r => !(r as MatchResult).phase().isKnockout() }
+  }
+
+  def knockoutMatches(): List[Object] {
+    return allResults().filter { r => (r as MatchResult).phase().isKnockout() }
+  }
+
+  def totalGoals(pid: Int): Int {
+    return matchesFor(pid)
+      .fold(0) { acc, r => (acc as Int) + (r as MatchResult).goalsFor(pid) } as Int
+  }
+
+  def computeStandings(div: Division): List[Object] {
+    val divPs = allPlayers().filter { p => (p as Player).division() == div }
+    val standings: List[Object] = []
+    foreach p: Object in divPs {
+      val pl = p as Player
+      val pid = pl.id()
+      val ms = matchesFor(pid).filter { r => !(r as MatchResult).phase().isKnockout() }
+      val w = ms.fold(0) { acc, r =>
+        val won = (r as MatchResult).winner()
+        (acc as Int) + (if won != null && (won as Int) == pid { 1 } else { 0 })
+      } as Int
+      val d = ms.fold(0) { acc, r =>
+        (acc as Int) + (if (r as MatchResult).isDraw() { 1 } else { 0 })
+      } as Int
+      val l = (ms.size as Int) - w - d
+      val gf = ms.fold(0) { acc, r => (acc as Int) + (r as MatchResult).goalsFor(pid) } as Int
+      val ga = ms.fold(0) { acc, r => (acc as Int) + (r as MatchResult).goalsAgainst(pid) } as Int
+      standings << new Standing(pid, pl.name(), pl.country(), w, d, l, gf, ga)
+    }
+    return standings.sortedBy { s => 0 - (s as Standing).pts() }
+  }
+
+  def topScorer(): Player? {
+    if playerList.size == 0 { return null }
+    val ids = allPlayers().map { p => (p as Player).id() }
+    val bestId = ids.reduce { a, b =>
+      val ga = totalGoals(a as Int)
+      val gb = totalGoals(b as Int)
+      if ga >= gb { a } else { b }
+    }
+    if bestId == null { return null }
+    return findPlayer(bestId as Int)
+  }
+
+  def unbeatenPlayers(): List[Object] {
+    return allPlayers().filter { p =>
+      val pid = (p as Player).id()
+      val lossCount = matchesFor(pid).filter { r =>
+        val m = r as MatchResult
+        val w = m.winner()
+        w != null && (w as Int) != pid
+      }.size
+      lossCount == 0
+    }.map { p => (p as Player).display() }
+  }
+
+  def printStandings(div: Division): void {
+    IO::println("")
+    IO::println("  ── #{sport.label()} · #{div.label()} Standings ──")
+    IO::println("  #{"Player".padRight(18)} Pld  W-D-L  GD   Pts")
+    IO::println("  " + "─".rep(48))
+    val st = computeStandings(div)
+    var rank: Int = 1
+    foreach s: Object in st {
+      IO::println("  #{rank}. #{(s as Standing).display()}")
+      rank = rank + 1
+    }
+  }
+
+  def printKnockoutResults(): void {
+    val km = knockoutMatches()
+    if km.size == 0 { IO::println("  (no knockout matches played)"); return }
+    IO::println("")
+    IO::println("  ── Knockout Results ──")
+    foreach r: Object in km {
+      val m = r as MatchResult
+      val np1 = findPlayer(m.p1Id())
+      val np2 = findPlayer(m.p2Id())
+      val n1 = if np1 != null { (np1 as Player).name() } else { "P#{m.p1Id()}" }
+      val n2 = if np2 != null { (np2 as Player).name() } else { "P#{m.p2Id()}" }
+      val wid = m.winner()
+      val outcome: String = if wid == null { "DRAW" } else {
+        val wp = findPlayer(wid as Int)
+        if wp != null { (wp as Player).name() + " wins" } else { "P#{wid} wins" }
+      }
+      IO::println("  [#{m.phase().label()}] #{n1} #{m.score1()}-#{m.score2()} #{n2} → #{outcome}")
+    }
+  }
+}
+
+// ─── Standings reporter (conforms Printable) ─────────────────────────────
+
+class StandingsReporter conforms Printable {
+  var tournament: Tournament
+  var division: Division
+
+public:
+  def this(t: Tournament, d: Division) {
+    tournament = t
+    division   = d
+  }
+
+  def printReport(): void {
+    tournament.printStandings(division)
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────
+
+val t: Tournament = new Tournament(SportType::Football)
+
+// Register players — Group A (ids 1–4) and Group B (ids 5–8)
+t.addPlayer(new Player(1, "Aurelio Santos",  "Brazil",  Division::GroupA))
+t.addPlayer(new Player(2, "Marco Furst",     "Germany", Division::GroupA))
+t.addPlayer(new Player(3, "Kaito Yamashita", "Japan",   Division::GroupA))
+t.addPlayer(new Player(4, "Luca Bianchi",    "Italy",   Division::GroupA))
+t.addPlayer(new Player(5, "Diego Herrera",   "Spain",   Division::GroupB))
+t.addPlayer(new Player(6, "James Okonkwo",   "Nigeria", Division::GroupB))
+t.addPlayer(new Player(7, "Pierre Lefebvre", "France",  Division::GroupB))
+t.addPlayer(new Player(8, "Ali Al-Rashid",   "Saudi",   Division::GroupB))
+
+// Group stage rounds
+val gs1: TournamentPhase = new GroupStage(1)
+val gs2: TournamentPhase = new GroupStage(2)
+val gs3: TournamentPhase = new GroupStage(3)
+
+// Group A
+t.addMatch(1, 2, 3, 1, gs1); t.addMatch(3, 4, 2, 2, gs1)
+t.addMatch(1, 3, 1, 1, gs2); t.addMatch(2, 4, 2, 0, gs2)
+t.addMatch(1, 4, 4, 0, gs3); t.addMatch(2, 3, 1, 3, gs3)
+
+// Group B
+t.addMatch(5, 6, 0, 2, gs1); t.addMatch(7, 8, 3, 0, gs1)
+t.addMatch(5, 7, 1, 1, gs2); t.addMatch(6, 8, 2, 1, gs2)
+t.addMatch(5, 8, 2, 0, gs3); t.addMatch(6, 7, 1, 2, gs3)
+
+// Knockout rounds — singleton ADT cases constructed with new CaseName()
+val qf: TournamentPhase = new Quarterfinal()
+val sf: TournamentPhase = new Semifinal()
+val fi: TournamentPhase = new Final()
+
+t.addMatch(1, 6, 2, 0, qf)
+t.addMatch(3, 5, 1, 2, qf)
+t.addMatch(2, 7, 3, 2, qf)
+t.addMatch(4, 8, 0, 1, qf)
+t.addMatch(1, 2, 1, 2, sf)
+t.addMatch(5, 8, 2, 1, sf)
+t.addMatch(2, 5, 3, 2, fi)
+
+// ── Print banner ──────────────────────────────────────────────────────────
+
+IO::println("══════════════════════════════════════════════════")
+IO::println("         FOOTBALL WORLD CUP SIMULATOR            ")
+IO::println("══════════════════════════════════════════════════")
+
+// Standings via Printable interface
+val repA: Printable = new StandingsReporter(t, Division::GroupA)
+val repB: Printable = new StandingsReporter(t, Division::GroupB)
+repA.printReport()
+repB.printReport()
+
+// Knockout results
+t.printKnockoutResults()
+
+// Top scorer
+IO::println("")
+IO::println("  ── Top Scorer ──")
+val ts = t.topScorer()
+if ts != null {
+  val scorer = ts as Player
+  IO::println("  #{scorer.display()} — #{t.totalGoals(scorer.id())} goal(s)")
+} else {
+  IO::println("  (no matches played)")
+}
+
+// Unbeaten players (across all phases)
+IO::println("")
+IO::println("  ── Unbeaten Players (all phases) ──")
+val unbeaten = t.unbeatenPlayers()
+if unbeaten.size == 0 {
+  IO::println("  None — everyone lost at least once")
+} else {
+  foreach name: Object in unbeaten { IO::println("  · #{name}") }
+}
+
+// Group-stage summary with fold and partition
+IO::println("")
+IO::println("  ── Group-Stage Summary ──")
+val gsMatches = t.groupStageMatches()
+val totalGoalsScored = gsMatches.fold(0) { acc, r =>
+  val m = r as MatchResult
+  (acc as Int) + m.score1() + m.score2()
+} as Int
+val matchCount: Int = gsMatches.size as Int
+val avgGoals: Double = (totalGoalsScored as Double) / (matchCount as Double)
+IO::println("  Matches played  : #{matchCount}")
+IO::println("  Total goals     : #{totalGoalsScored}")
+IO::println("  Avg goals/match : #{String::format("%.2f", avgGoals)}")
+
+val parts = gsMatches.partition { r =>
+  val m = r as MatchResult
+  (m.score1() + m.score2()) >= 4
+}
+val highScoring = (parts as List)[0] as List
+val lowScoring  = (parts as List)[1] as List
+IO::println("  High-scoring (≥4 goals): #{highScoring.size}")
+IO::println("  Low-scoring  (<4 goals): #{lowScoring.size}")
+
+// Countries: distinct + groupBy → foreach (k,v)
+IO::println("")
+IO::println("  ── Players by Country ──")
+val byCountry = t.allPlayers().groupBy { p => (p as Player).country() }
+foreach (country, ps) in byCountry {
+  val c = country as String
+  val names = (ps as List[Object]).map { p => (p as Player).name() }
+  IO::println("  #{c}: #{names}")
+}
+
+// distinct rounds used in group stage
+IO::println("")
+IO::println("  ── Group-Stage Rounds ──")
+val rounds = gsMatches
+  .map { r => (r as MatchResult).phase().groupRound() }
+  .distinct()
+  .sortedBy { r => r as Int }
+foreach robj: Object in rounds {
+  val rn = robj as Int
+  val rMatches = gsMatches.filter { r => (r as MatchResult).phase().groupRound() == rn }
+  IO::println("  Round #{rn}: #{rMatches.size} match(es)")
+}
+
+// zip: rank numbers alongside Group-A goal tallies
+IO::println("")
+IO::println("  ── Group-A Goal Tallies ──")
+val gAIds: List[Int] = [1, 2, 3, 4]
+val goalLines = gAIds.map { id =>
+  val pid = id as Int
+  val pl = t.findPlayer(pid)
+  val gls = t.totalGoals(pid)
+  val nm: String = if pl != null { (pl as Player).name() } else { "P#{pid}" }
+  "#{nm}: #{gls} goal(s)"
+}
+val rankNums: List[Int] = [1, 2, 3, 4]
+val zipped = rankNums.zip(goalLines)
+foreach pair: Object in zipped {
+  val pairList = pair as List
+  IO::println("  #{pairList[0]}. #{pairList[1]}")
+}
+
+// try/catch error demo
+IO::println("")
+IO::println("  ── Error-handling Demo ──")
+try {
+  val ghost = t.requirePlayer(99)
+  IO::println("  Found: #{(ghost as Player).name()}")
+} catch e: Exception {
+  IO::println("  Caught: #{e.getMessage()}")
+}
+
+// range-based foreach
+IO::println("")
+IO::println("  ── Player IDs (range 1..8) ──")
+var idLine: String = "  IDs:"
+foreach i: Int in 1..8 { idLine = idLine + " P#{i}" }
+IO::println(idLine)
+
+IO::println("")
+IO::println("══════════════════════════════════════════════════")
+IO::println("          CHAMPION: Marco Furst (Germany)        ")
+IO::println("══════════════════════════════════════════════════")

@@ -96,8 +96,12 @@ jobs:
             exit 1
           fi
       - name: Test
+        env:
+          SBT_OPTS: "-Xmx6G -XX:+UseG1GC -Xss16m"
         run: sbt test
       - name: Build artifacts
+        env:
+          SBT_OPTS: "-Xmx6G -XX:+UseG1GC -Xss16m"
         run: sbt assembly dist
       - name: Collect artifacts
         run: |

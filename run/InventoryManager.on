@@ -1,0 +1,329 @@
+// InventoryManager — stock-tracking sample exercising records, data-carrying enums,
+// interfaces, classes, collection pipelines, pattern matching, closures, extension
+// methods, string interpolation, try/catch, loops, nullable types, and recursion.
+
+// === Data model ===
+
+enum Category(displayName: String) {
+  ELECTRONICS("Electronics"),
+  APPAREL("Apparel"),
+  GROCERY("Grocery"),
+  TOOLS("Tools")
+}
+
+record Product(id: Int, name: String, price: Double, qty: Int, category: Category)
+
+record StockMovement(productId: Int, delta: Int, reason: String)
+
+// === Extension methods ===
+
+extension Double {
+  def cents(): Int = (self * 100.0) as Int
+  def formatted(): String {
+    val c = (self * 100.0) as Int
+    val whole = c / 100
+    val frac = c % 100
+    if frac < 10 {
+      return whole + ".0" + frac
+    }
+    return whole + "." + frac
+  }
+}
+
+extension Int {
+  def absVal(): Int = if self < 0 { 0 - self } else { self }
+}
+
+// === Stock-status helpers ===
+
+def stockStatus(qty: Int): String {
+  if qty == 0 { return "OUT" }
+  if qty < 10 { return "LOW" }
+  return "OK"
+}
+
+def priceLabel(p: Product): String = "$" + p.price().formatted()
+
+// === Interface ===
+
+interface Reportable {
+  def summary(): String
+}
+
+// === Inventory class ===
+
+class Inventory conforms Reportable {
+public:
+  val items: List[Object]
+  val movements: List[Object]
+
+  def this {
+    val empty: List[Object] = []
+    val emptyM: List[Object] = []
+    this.items = empty
+    this.movements = emptyM
+  }
+
+  def addProduct(p: Product): void {
+    this.items << p
+  }
+
+  def recordMovement(m: StockMovement): void {
+    this.movements << m
+  }
+
+  def findById(id: Int): Object? {
+    foreach item: Object in this.items {
+      if (item as Product).id() == id {
+        return item
+      }
+    }
+    return null
+  }
+
+  def byCategory(cat: Category): List[Object] {
+    return this.items.filter { p => (p as Product).category() == cat }
+  }
+
+  def lowStock(): List[Object] {
+    return this.items.filter { p => (p as Product).qty() < 10 && (p as Product).qty() > 0 }
+  }
+
+  def outOfStock(): List[Object] {
+    return this.items.filter { p => (p as Product).qty() == 0 }
+  }
+
+  def totalValue(): Double {
+    return this.items.fold(0.0) { acc, p =>
+      (acc as Double) + (p as Product).price() * (p as Product).qty()
+    }
+  }
+
+  def mostExpensive(): Object? {
+    var best: Object? = null
+    foreach item: Object in this.items {
+      val p = item as Product
+      if best == null {
+        best = item
+      } else {
+        if p.price() > (best as Product).price() {
+          best = item
+        }
+      }
+    }
+    return best
+  }
+
+  def summary(): String {
+    val count = this.items.size
+    val value = this.totalValue()
+    return "Inventory[#{count} products, value=$#{value.formatted()}]"
+  }
+}
+
+// === Build inventory ===
+
+val products: List[Product] = [
+  new Product(1,  "Laptop Pro 15",       1299.99, 15,  Category::ELECTRONICS),
+  new Product(2,  "USB-C Hub",              39.99, 42,  Category::ELECTRONICS),
+  new Product(3,  "Wireless Mouse",         29.99,  8,  Category::ELECTRONICS),
+  new Product(4,  "Cotton T-Shirt M",       14.99, 120, Category::APPAREL),
+  new Product(5,  "Denim Jeans 32",         49.99,  35, Category::APPAREL),
+  new Product(6,  "Organic Apples 1kg",      4.99, 200, Category::GROCERY),
+  new Product(7,  "Sourdough Bread",         6.49,   5, Category::GROCERY),
+  new Product(8,  "Cheddar Cheese 250g",     3.99,   0, Category::GROCERY),
+  new Product(9,  "Cordless Drill",         89.99,  18, Category::TOOLS),
+  new Product(10, "Measuring Tape 5m",       9.99,   3, Category::TOOLS)
+]
+
+val inv = new Inventory()
+foreach p: Product in products {
+  inv.addProduct(p)
+}
+
+inv.recordMovement(new StockMovement(3, -5, "Sold"))
+inv.recordMovement(new StockMovement(7, 50, "Restock"))
+inv.recordMovement(new StockMovement(8, 30, "Restock"))
+
+// === Reports ===
+
+IO::println(inv.summary())
+
+// --- Full listing ---
+IO::println("\n--- All Products ---")
+foreach item: Object in inv.items {
+  val p = item as Product
+  IO::println("  [#{p.id()}] #{p.name()} | #{priceLabel(p)} | qty:#{p.qty()} | #{stockStatus(p.qty())}")
+}
+
+// --- Group by category ---
+IO::println("\n--- By Category ---")
+val byCat = inv.items.groupBy { p => (p as Product).category().displayName() }
+foreach (cat, ps) in byCat {
+  IO::println("  #{cat}: #{(ps as List).size} product(s)")
+}
+
+// --- Prices sorted descending ---
+IO::println("\n--- By Price (desc) ---")
+val byPriceDesc = inv.items.sortedBy { p => 0 - (p as Product).price().cents() }
+foreach item: Object in byPriceDesc {
+  val p = item as Product
+  IO::println("  #{p.name()}: #{priceLabel(p)}")
+}
+
+// --- Stock alerts ---
+IO::println("\n--- Alerts ---")
+foreach item: Object in inv.lowStock() {
+  val p = item as Product
+  IO::println("  WARN: #{p.name()} — only #{p.qty()} left")
+}
+foreach item: Object in inv.outOfStock() {
+  IO::println("  CRITICAL: #{(item as Product).name()} — out of stock")
+}
+
+// --- Lookup by id ---
+val found = inv.findById(5)
+if found != null {
+  IO::println("\nLookup id=5: #{(found as Product).name()}")
+} else {
+  IO::println("\nLookup id=5: not found")
+}
+val notFound = inv.findById(99)
+if notFound == null {
+  IO::println("Lookup id=99: not found (expected)")
+}
+
+// --- Most expensive ---
+val top = inv.mostExpensive()
+if top != null {
+  IO::println("Most expensive: #{(top as Product).name()} @ #{priceLabel(top as Product)}")
+}
+
+// --- Total value ---
+IO::println("\nTotal inventory value: $#{inv.totalValue().formatted()}")
+
+// --- Movements log ---
+IO::println("\n--- Stock Movements ---")
+foreach item: Object in inv.movements {
+  val m = item as StockMovement
+  val dir = if m.delta() > 0 { "+" } else { "" }
+  IO::println("  product #{m.productId()}: #{dir}#{m.delta()} (#{m.reason()})")
+}
+
+// === Stage 3: pattern matching, closures, recursion, try/catch, ranges ===
+
+// --- Category discount via select ---
+def categoryDiscount(cat: Category): Int {
+  select cat {
+    case Category::ELECTRONICS: return 5
+    case Category::APPAREL:     return 15
+    case Category::GROCERY:     return 10
+    case Category::TOOLS:       return 8
+  }
+  return 0
+}
+
+// --- Discounted price ---
+def discountedPrice(p: Product): Double {
+  val pct = categoryDiscount(p.category())
+  return p.price() * (100 - pct) / 100
+}
+
+IO::println("\n--- Discounted Prices ---")
+foreach item: Object in inv.items {
+  val p = item as Product
+  val disc = discountedPrice(p)
+  val pct = categoryDiscount(p.category())
+  IO::println("  #{p.name()}: #{priceLabel(p)} -> $#{disc.formatted()} (#{pct}% off)")
+}
+
+// --- Reorder report via select on stock status ---
+IO::println("\n--- Reorder Report ---")
+foreach item: Object in inv.items {
+  val p = item as Product
+  val status = stockStatus(p.qty())
+  select status {
+    case "OUT": IO::println("  REORDER NOW: #{p.name()} (#{p.category().displayName()})")
+    case "LOW": IO::println("  REORDER SOON: #{p.name()} — #{p.qty()} remaining")
+    else: {}  // OK items: no action
+  }
+}
+
+// --- Statistics: min, max, average using closures and fold ---
+val minPrice = inv.items.fold(999999.0) { acc, p =>
+  val price = (p as Product).price()
+  if price < (acc as Double) { price } else { (acc as Double) }
+}
+val maxPrice = inv.items.fold(0.0) { acc, p =>
+  val price = (p as Product).price()
+  if price > (acc as Double) { price } else { (acc as Double) }
+}
+val sumPrices = inv.items.fold(0.0) { acc, p =>
+  (acc as Double) + (p as Product).price()
+}
+val avgPrice = sumPrices / inv.items.size
+
+IO::println("\n--- Price Statistics ---")
+IO::println("  Min: $#{minPrice.formatted()}")
+IO::println("  Max: $#{maxPrice.formatted()}")
+IO::println("  Avg: $#{avgPrice.formatted()}")
+
+// --- Recursive: total discounted value of a category ---
+def discountedCatValue(ps: List[Object], idx: Int): Double {
+  if idx >= ps.size { return 0.0 }
+  val p = ps[idx] as Product
+  return discountedPrice(p) * p.qty() + discountedCatValue(ps, idx + 1)
+}
+
+IO::println("\n--- Discounted Total Value by Category ---")
+val electronics = inv.byCategory(Category::ELECTRONICS)
+val apparel     = inv.byCategory(Category::APPAREL)
+val grocery     = inv.byCategory(Category::GROCERY)
+val tools       = inv.byCategory(Category::TOOLS)
+IO::println("  Electronics: $#{discountedCatValue(electronics, 0).formatted()}")
+IO::println("  Apparel:     $#{discountedCatValue(apparel, 0).formatted()}")
+IO::println("  Grocery:     $#{discountedCatValue(grocery, 0).formatted()}")
+IO::println("  Tools:       $#{discountedCatValue(tools, 0).formatted()}")
+
+// --- Try/catch: safe integer parse ---
+def safeParseQty(s: String): Int {
+  try {
+    return Integer::parseInt(s)
+  } catch e: Exception {
+    return 0 - 1
+  }
+}
+IO::println("\nParse '42': #{safeParseQty("42")}")
+IO::println("Parse 'bad': #{safeParseQty("bad")}")
+
+// --- While loop: count in-stock categories ---
+var catIdx = 0
+var catsInStock = 0
+val catNames: List[Object] = ["Electronics", "Apparel", "Grocery", "Tools"]
+val catEnums: List[Object] = [Category::ELECTRONICS, Category::APPAREL, Category::GROCERY, Category::TOOLS]
+while catIdx < catEnums.size {
+  val cat = catEnums[catIdx] as Category
+  val catProds = inv.byCategory(cat)
+  val hasStock = catProds.filter { p => (p as Product).qty() > 0 }.size
+  if hasStock > 0 {
+    catsInStock = catsInStock + 1
+  }
+  catIdx = catIdx + 1
+}
+IO::println("\nCategories with stock: #{catsInStock}/#{catEnums.size}")
+
+// --- Foreach over exclusive range: top-5 products by stock ---
+IO::println("\n--- Top Products by Stock (first 5) ---")
+val byQtyDesc = inv.items.sortedBy { p => 0 - (p as Product).qty() }
+foreach k: Int in 0..<5 {
+  val p = byQtyDesc[k] as Product
+  IO::println("  #{k + 1}. #{p.name()} — #{p.qty()} units")
+}
+
+// --- String operations: names containing a substring ---
+val keyword = "a"
+val matching = inv.items.filter { p => (p as Product).name().toLowerCase().contains(keyword) }
+IO::println("\nProducts with '#{keyword}' in name: #{matching.size}")
+foreach item: Object in matching {
+  IO::println("  #{(item as Product).name()}")
+}

@@ -1,0 +1,337 @@
+// VirtualMachine.on — a simple stack-based bytecode interpreter
+// Exercises: ADT case-enum with methods, Int[] array registers, class with
+// mutable state, foreach typed-element iteration, extension Int (rjust),
+// records, select exhaustiveness, collection pipelines (sortedBy/fold/map),
+// string interpolation, nullable types, while loop.
+
+import { java.lang.Integer as JInteger; }
+
+// ── Opcode ADT ────────────────────────────────────────────────────────────────
+enum Opcode {
+  case Push(value: Int)       // push literal onto stack
+  case Pop                    // discard top
+  case Add                    // pop two, push sum
+  case Sub                    // pop two, push difference (a-b, a pushed first)
+  case Mul                    // pop two, push product
+  case Div                    // pop two, push quotient
+  case Dup                    // duplicate top
+  case Swap                   // exchange top two elements
+  case Store(slot: Int)       // pop into register r0..r7
+  case Load(slot: Int)        // push from register r0..r7
+  case JumpIfZero(target: Int) // pop; if 0, set pc = target
+  case Jump(target: Int)      // set pc = target unconditionally
+  case Print                  // pop and println
+  case PrintStr(msg: String)  // println literal string
+  case Halt                   // stop execution
+public:
+  def mnemonic(): String = select this {
+    case o is Push:        "PUSH   " + o.value()
+    case o is Pop:         "POP"
+    case o is Add:         "ADD"
+    case o is Sub:         "SUB"
+    case o is Mul:         "MUL"
+    case o is Div:         "DIV"
+    case o is Dup:         "DUP"
+    case o is Swap:        "SWAP"
+    case o is Store:       "STORE  r" + o.slot()
+    case o is Load:        "LOAD   r" + o.slot()
+    case o is JumpIfZero:  "JZ     " + o.target()
+    case o is Jump:        "JUMP   " + o.target()
+    case o is Print:       "PRINT"
+    case o is PrintStr:    "PRINTS " + o.msg()
+    case o is Halt:        "HALT"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Program(name: String, instructions: List[Object])
+record ExecStats(name: String, steps: Int, peakStack: Int)
+
+// ── Extension on Int ──────────────────────────────────────────────────────────
+extension Int {
+  def rjust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def ljust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+extension String {
+  def rjustS(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def ljustS(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ── Virtual Machine ───────────────────────────────────────────────────────────
+class VirtualMachine {
+  var dataStack: List[Object]    // stack of boxed Int (JInteger)
+  var registers: Int[]   // 8 direct Int registers
+  var pc: Int
+  var steps: Int
+  var peakStack: Int
+  var halted: Boolean
+
+public:
+  def this {
+    this.dataStack = []
+    this.registers = new Int[8]
+    this.pc = 0
+    this.steps = 0
+    this.peakStack = 0
+    this.halted = false
+  }
+
+  def push(v: Int): void {
+    this.dataStack << v
+    val d: Int = this.dataStack.size
+    if d > this.peakStack { this.peakStack = d }
+  }
+
+  def pop(): Int {
+    val last: Int = this.dataStack.size - 1
+    val v: Int = (this.dataStack[last] as JInteger).intValue()
+    this.dataStack.remove(last)
+    return v
+  }
+
+  def peek(): Int? {
+    if this.dataStack.size == 0 { return null }
+    return (this.dataStack[this.dataStack.size - 1] as JInteger).intValue()
+  }
+
+  def reset(): void {
+    this.dataStack = []
+    this.registers = new Int[8]
+    this.pc = 0
+    this.steps = 0
+    this.peakStack = 0
+    this.halted = false
+  }
+
+  def run(prog: Program): ExecStats {
+    reset()
+    val code: List[Object] = prog.instructions()
+    while !this.halted && this.pc < code.size {
+      val op: Opcode = (code[this.pc] as Opcode)
+      this.pc = this.pc + 1
+      this.steps = this.steps + 1
+      execute(op)
+    }
+    return new ExecStats(prog.name(), this.steps, this.peakStack)
+  }
+
+  def execute(op: Opcode): void {
+    select op {
+      case o is Push:
+        push(o.value())
+      case o is Pop:
+        pop()
+      case o is Add:
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a + b)
+      case o is Sub:
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a - b)
+      case o is Mul:
+        val b: Int = pop()
+        val a: Int = pop()
+        push(a * b)
+      case o is Div:
+        val b: Int = pop()
+        val a: Int = pop()
+        if b != 0 { push(a / b) }
+      case o is Dup:
+        val t: Int? = peek()
+        if t != null { push(t) }
+      case o is Swap:
+        val b: Int = pop()
+        val a: Int = pop()
+        push(b)
+        push(a)
+      case o is Store:
+        this.registers[o.slot()] = pop()
+      case o is Load:
+        push(this.registers[o.slot()])
+      case o is JumpIfZero:
+        val v: Int = pop()
+        if v == 0 { this.pc = o.target() }
+      case o is Jump:
+        this.pc = o.target()
+      case o is Print:
+        IO::println("" + pop())
+      case o is PrintStr:
+        IO::println(o.msg())
+      case o is Halt:
+        this.halted = true
+    }
+  }
+}
+
+// ── Disassembler ──────────────────────────────────────────────────────────────
+def disassemble(prog: Program): void {
+  IO::println("  Listing: " + prog.name())
+  val code: List[Object] = prog.instructions()
+  var i: Int = 0
+  foreach op: Object in code {
+    IO::println("    " + i.rjust(3) + "  " + (op as Opcode).mnemonic())
+    i = i + 1
+  }
+}
+
+// ── Sample Programs ───────────────────────────────────────────────────────────
+
+// Sum 1..10 = 55  (r0 = n, r1 = acc)
+val sumProg: Program = new Program("Sum 1..10", [
+  new Push(10),           // 0  [10]
+  new Store(0),           // 1  r0=10; []
+  new Push(0),            // 2  [0]
+  new Store(1),           // 3  r1=0; []
+  new Load(0),            // 4  <- loop: [n]
+  new JumpIfZero(15),     // 5  pop; if n==0 goto 15
+  new Load(1),            // 6  [acc]
+  new Load(0),            // 7  [acc, n]
+  new Add(),              // 8  [acc+n]
+  new Store(1),           // 9  r1=acc+n; []
+  new Load(0),            // 10 [n]
+  new Push(1),            // 11 [n, 1]
+  new Sub(),              // 12 [n-1]
+  new Store(0),           // 13 r0=n-1; []
+  new Jump(4),            // 14 goto 4
+  new PrintStr("Sum 1..10 ="),  // 15
+  new Load(1),            // 16 [55]
+  new Print(),            // 17
+  new Halt()              // 18
+])
+
+// Factorial 5! = 120  (r0 = n, r1 = acc)
+val factProg: Program = new Program("Factorial(5)", [
+  new Push(5),            // 0
+  new Store(0),           // 1  r0=5
+  new Push(1),            // 2
+  new Store(1),           // 3  r1=1
+  new Load(0),            // 4  <- loop
+  new JumpIfZero(15),     // 5
+  new Load(1),            // 6  [acc]
+  new Load(0),            // 7  [acc, n]
+  new Mul(),              // 8  [acc*n]
+  new Store(1),           // 9  r1=acc*n
+  new Load(0),            // 10 [n]
+  new Push(1),            // 11 [n, 1]
+  new Sub(),              // 12 [n-1]
+  new Store(0),           // 13 r0=n-1
+  new Jump(4),            // 14 goto 4
+  new PrintStr("5! ="),   // 15
+  new Load(1),            // 16 [120]
+  new Print(),            // 17
+  new Halt()              // 18
+])
+
+// Fibonacci(7) = 13  (0-indexed, r0=counter, r1=a, r2=b)
+val fibProg: Program = new Program("Fibonacci(7)", [
+  new Push(7),            // 0
+  new Store(0),           // 1  r0=7
+  new Push(0),            // 2
+  new Store(1),           // 3  r1=0
+  new Push(1),            // 4
+  new Store(2),           // 5  r2=1
+  new Load(0),            // 6  <- loop [n]
+  new JumpIfZero(19),     // 7  pop; if 0 goto 19
+  new Load(1),            // 8  [a]
+  new Load(2),            // 9  [a, b]
+  new Dup(),              // 10 [a, b, b]
+  new Store(1),           // 11 r1=b; [a, b]
+  new Add(),              // 12 [a+b]
+  new Store(2),           // 13 r2=a+b; []
+  new Load(0),            // 14 [n]
+  new Push(1),            // 15 [n, 1]
+  new Sub(),              // 16 [n-1]
+  new Store(0),           // 17 r0=n-1
+  new Jump(6),            // 18 goto 6
+  new PrintStr("fib(7) ="), // 19
+  new Load(1),            // 20 [13]
+  new Print(),            // 21
+  new Halt()              // 22
+])
+
+// Power: 2^10 = 1024  (r0 = base, r1 = exp, r2 = result)
+val powProg: Program = new Program("Power(2,10)", [
+  new Push(2),            // 0
+  new Store(0),           // 1  r0=2 (base)
+  new Push(10),           // 2
+  new Store(1),           // 3  r1=10 (exp)
+  new Push(1),            // 4
+  new Store(2),           // 5  r2=1 (result)
+  new Load(1),            // 6  <- loop [exp]
+  new JumpIfZero(17),     // 7
+  new Load(2),            // 8  [result]
+  new Load(0),            // 9  [result, base]
+  new Mul(),              // 10 [result*base]
+  new Store(2),           // 11 r2=result*base
+  new Load(1),            // 12 [exp]
+  new Push(1),            // 13 [exp, 1]
+  new Sub(),              // 14 [exp-1]
+  new Store(1),           // 15 r1=exp-1
+  new Jump(6),            // 16 goto 6
+  new PrintStr("2^10 ="), // 17
+  new Load(2),            // 18 [1024]
+  new Print(),            // 19
+  new Halt()              // 20
+])
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+IO::println("╔════════════════════════════════════════╗")
+IO::println("║   Onion Stack-Based Virtual Machine   ║")
+IO::println("╚════════════════════════════════════════╝")
+IO::println("")
+
+val programs: List[Program] = [sumProg, factProg, fibProg, powProg]
+val vm: VirtualMachine = new VirtualMachine()
+val allStats: List[ExecStats] = []
+
+foreach prog: Program in programs {
+  IO::println("── " + prog.name() + " ──")
+  disassemble(prog)
+  IO::println("")
+  IO::print("  Output: ")
+  val stats: ExecStats = vm.run(prog)
+  allStats << stats
+  IO::println("  Steps: " + stats.steps() + ", peak stack depth: " + stats.peakStack())
+  IO::println("")
+}
+
+// ── Execution statistics report ───────────────────────────────────────────────
+IO::println("═══ Execution Summary ═══")
+IO::println("  Program".ljustS(22) + "Steps".rjustS(7) + " Peak")
+IO::println("  " + "-".repeat(32))
+
+val sortedStats: List[ExecStats] = allStats.sortedBy { s => 0 - s.steps() }
+foreach s: ExecStats in sortedStats {
+  IO::println("  " + s.name().ljustS(20) + s.steps().rjust(7) + "  " + s.peakStack())
+}
+IO::println("")
+
+val totalSteps: Int = allStats.fold(0) { acc, s => (acc as Int) + (s as ExecStats).steps() } as Int
+val maxPeak: Int    = allStats.fold(0) { acc, s =>
+  val p = (s as ExecStats).peakStack()
+  if (acc as Int) < p { p } else { acc }
+} as Int
+val avgSteps: Int = totalSteps / allStats.size
+
+IO::println("  Total steps   : " + totalSteps)
+IO::println("  Average steps : " + avgSteps)
+IO::println("  Peak stack    : " + maxPeak)
+IO::println("  Programs run  : " + allStats.size)

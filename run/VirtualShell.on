@@ -1,0 +1,333 @@
+// VirtualShell.on — an in-memory virtual filesystem shell interpreter.
+// Exercises: ADT case-enums, records with methods, typed Map[String,X],
+// foreach (k,v) on Map, extension methods on String, nullable types,
+// select/type-pattern matching, collection pipelines (filter/map/sortedBy/fold),
+// string interpolation, while loops, try/catch, recursion.
+
+import { java.util.ArrayList }
+
+// ─── Node kind ────────────────────────────────────────────────────────────────
+enum NodeType { Dir, File }
+
+// ─── Filesystem node ─────────────────────────────────────────────────────────
+record FsNode(path: String, kind: NodeType, content: String) {
+public:
+  def name(): String {
+    val idx: Int = path.lastIndexOf("/")
+    if idx < 0 { return path }
+    if idx == 0 && path.length() == 1 { return "/" }
+    return path.substring(idx + 1)
+  }
+  def isDir(): Boolean = kind == NodeType::Dir
+  def isFile(): Boolean = kind == NodeType::File
+  def icon(): String = if isDir() { "[d]" } else { "[-]" }
+}
+
+// ─── Command ADT ─────────────────────────────────────────────────────────────
+enum Command {
+  case Ls(dir: String)
+  case Pwd
+  case Cd(target: String)
+  case Mkdir(path: String)
+  case Touch(path: String, text: String)
+  case Append(path: String, text: String)
+  case Cat(path: String)
+  case Rm(path: String)
+  case Cp(src: String, dst: String)
+  case Mv(src: String, dst: String)
+  case Find(name: String)
+  case GrepFile(path: String, pattern: String)
+  case Tree(root: String)
+  case Stats
+}
+
+// ─── String path helpers ─────────────────────────────────────────────────────
+extension String {
+  def joinPath(part: String): String {
+    if self == "/" { return "/" + part }
+    return self + "/" + part
+  }
+  def parentDir(): String {
+    val idx: Int = self.lastIndexOf("/")
+    if idx <= 0 { return "/" }
+    return self.substring(0, idx)
+  }
+  def pathName(): String {
+    val idx: Int = self.lastIndexOf("/")
+    if idx < 0 { return self }
+    return self.substring(idx + 1)
+  }
+}
+
+// ─── Virtual shell ────────────────────────────────────────────────────────────
+class VirtualShell {
+  val fs: Map[String, FsNode]
+  var cwd: String
+  var cmdCount: Int
+
+public:
+  def this() {
+    fs = [:]
+    cwd = "/"
+    cmdCount = 0
+    fs.put("/", new FsNode("/", NodeType::Dir, ""))
+  }
+
+  def exists(p: String): Boolean = fs.containsKey(p)
+
+  def resolve(p: String): String {
+    if p == "" || p == "." { return cwd }
+    if p == ".." { return cwd.parentDir() }
+    if p.startsWith("/") { return p }
+    return cwd.joinPath(p)
+  }
+
+  def listDir(dir: String): List[FsNode] {
+    val prefix: String = if dir == "/" { "/" } else { dir + "/" }
+    val children: List[FsNode] = []
+    foreach (k, v) in fs {
+      val key: String  = k as String
+      val node: FsNode = v as FsNode
+      if key != dir && key.startsWith(prefix) {
+        val rest: String = key.substring(prefix.length())
+        if !rest.contains("/") { children.add(node) }
+      }
+    }
+    return children.sortedBy { n => (n.isDir() as Object).toString() + n.name() }
+  }
+
+  def findByName(name: String): List[FsNode] {
+    val results: List[FsNode] = []
+    foreach (k, v) in fs {
+      val node: FsNode = v as FsNode
+      if node.name() == name { results.add(node) }
+    }
+    return results.sortedBy { n => n.path() }
+  }
+
+  def treeLines(dir: String, indent: String): List[String] {
+    val lines: List[String] = []
+    val kids = listDir(dir)
+    foreach kid: FsNode in kids {
+      lines.add("#{indent}#{kid.icon()} #{kid.name()}")
+      if kid.isDir() {
+        val sub: List[String] = treeLines(kid.path(), indent + "  ")
+        foreach l: Object in sub { lines.add(l as String) }
+      }
+    }
+    return lines
+  }
+
+  def exec(cmd: Command): void {
+    cmdCount = cmdCount + 1
+    val label: String = select cmd {
+      case c is Ls:       "ls #{c.dir()}"
+      case c is Pwd:      "pwd"
+      case c is Cd:       "cd #{c.target()}"
+      case c is Mkdir:    "mkdir #{c.path()}"
+      case c is Touch:    "touch #{c.path()}"
+      case c is Append:   "append #{c.path()}"
+      case c is Cat:      "cat #{c.path()}"
+      case c is Rm:       "rm #{c.path()}"
+      case c is Cp:       "cp #{c.src()} #{c.dst()}"
+      case c is Mv:       "mv #{c.src()} #{c.dst()}"
+      case c is Find:     "find #{c.name()}"
+      case c is GrepFile: "grep #{c.path()} #{c.pattern()}"
+      case c is Tree:     "tree #{c.root()}"
+      case c is Stats:    "stats"
+    }
+    IO::println("[#{cmdCount}] $ #{label}")
+    val output: String = run(cmd)
+    IO::println(output)
+    IO::println("")
+  }
+
+  def run(cmd: Command): String {
+    select cmd {
+      case c is Ls: {
+        val dir: String = resolve(c.dir())
+        if !exists(dir) { return "ls: #{dir}: no such directory" }
+        val raw: FsNode = fs.get(dir) as FsNode
+        if !raw.isDir() { return "ls: #{dir}: not a directory" }
+        val items = listDir(dir)
+        if items.size == 0 { return "(empty)" }
+        return items.map { n => "  #{n.icon()} #{n.name()}" }
+                    .fold("") { acc, s => if acc == "" { s } else { acc + "\n" + s } }
+      }
+      case c is Pwd:   return cwd
+      case c is Cd: {
+        val t: String = resolve(c.target())
+        if !exists(t) { return "cd: #{t}: no such directory" }
+        val node: FsNode = fs.get(t) as FsNode
+        if !node.isDir() { return "cd: #{t}: not a directory" }
+        cwd = t
+        return "→ #{cwd}"
+      }
+      case c is Mkdir: {
+        val p: String = resolve(c.path())
+        if exists(p) { return "mkdir: #{p}: already exists" }
+        fs.put(p, new FsNode(p, NodeType::Dir, ""))
+        return "created directory #{p}"
+      }
+      case c is Touch: {
+        val p: String = resolve(c.path())
+        fs.put(p, new FsNode(p, NodeType::File, c.text()))
+        return "#{p} (#{c.text().length()} chars)"
+      }
+      case c is Append: {
+        val p: String = resolve(c.path())
+        if !exists(p) { return "append: #{p}: no such file" }
+        val node: FsNode = fs.get(p) as FsNode
+        if node.isDir() { return "append: #{p}: is a directory" }
+        val newContent: String = node.content() + "\n" + c.text()
+        fs.put(p, new FsNode(p, NodeType::File, newContent))
+        return "#{p} now #{newContent.length()} chars"
+      }
+      case c is Cat: {
+        val p: String = resolve(c.path())
+        if !exists(p) { return "cat: #{p}: no such file" }
+        val node: FsNode = fs.get(p) as FsNode
+        if node.isDir() { return "cat: #{p}: is a directory" }
+        val content: String = node.content()
+        if content == "" { return "(empty file)" }
+        return content
+      }
+      case c is Rm: {
+        val p: String = resolve(c.path())
+        if !exists(p) { return "rm: #{p}: no such entry" }
+        fs.remove(p)
+        return "removed #{p}"
+      }
+      case c is Cp: {
+        val src: String = resolve(c.src())
+        val dst: String = resolve(c.dst())
+        if !exists(src) { return "cp: #{src}: no such file" }
+        val srcNode: FsNode = fs.get(src) as FsNode
+        if srcNode.isDir() { return "cp: #{src}: is a directory (recursive copy not supported)" }
+        fs.put(dst, new FsNode(dst, NodeType::File, srcNode.content()))
+        return "#{src} → #{dst} (#{srcNode.content().length()} chars)"
+      }
+      case c is Mv: {
+        val src: String = resolve(c.src())
+        val dst: String = resolve(c.dst())
+        if !exists(src) { return "mv: #{src}: no such entry" }
+        val srcNode: FsNode = fs.get(src) as FsNode
+        fs.remove(src)
+        fs.put(dst, new FsNode(dst, srcNode.kind(), srcNode.content()))
+        return "#{src} → #{dst}"
+      }
+      case c is GrepFile: {
+        val p: String = resolve(c.path())
+        if !exists(p) { return "grep: #{p}: no such file" }
+        val node: FsNode = fs.get(p) as FsNode
+        if node.isDir() { return "grep: #{p}: is a directory" }
+        val lines: List[String] = Strings::split(node.content(), "\n")
+        val matches: List[String] = lines.filter { l => l.contains(c.pattern()) }
+        if matches.size == 0 { return "no matches for '#{c.pattern()}' in #{p}" }
+        return matches.fold("") { acc, l => if acc == "" { l } else { acc + "\n" + l } }
+      }
+      case c is Find: {
+        val results = findByName(c.name())
+        if results.size == 0 { return "no entry named '#{c.name()}'" }
+        return results.map { n => "  #{n.icon()} #{n.path()}" }
+                      .fold("") { acc, s => if acc == "" { s } else { acc + "\n" + s } }
+      }
+      case c is Tree: {
+        val root: String = resolve(c.root())
+        if !exists(root) { return "tree: #{root}: no such directory" }
+        val header: String = if root == "/" { "/" } else { root + "/" }
+        val lines: List[String] = [header]
+        val sub: List[String] = treeLines(root, "  ")
+        foreach l: Object in sub { lines.add(l as String) }
+        return lines.fold("") { acc, s => if acc == "" { s } else { acc + "\n" + s } }
+      }
+      case c is Stats: {
+        var dirs: Int = 0
+        var files: Int = 0
+        var totalBytes: Int = 0
+        foreach (k, v) in fs {
+          val node: FsNode = v as FsNode
+          if node.isDir() { dirs = dirs + 1 }
+          else { files = files + 1; totalBytes = totalBytes + node.content().length() }
+        }
+        return "directories: #{dirs}  files: #{files}  bytes: #{totalBytes}"
+      }
+    }
+  }
+}
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+def main(args: String[]): void {
+  val sh = new VirtualShell()
+  IO::println("=== VirtualShell Demo ===")
+  IO::println("")
+
+  // Build a directory tree
+  sh.exec(new Mkdir("home"))
+  sh.exec(new Mkdir("home/alice"))
+  sh.exec(new Mkdir("home/alice/docs"))
+  sh.exec(new Mkdir("home/bob"))
+  sh.exec(new Mkdir("var"))
+  sh.exec(new Mkdir("var/log"))
+  sh.exec(new Mkdir("etc"))
+
+  // Create files
+  sh.exec(new Touch("home/alice/readme.txt", "Hello from Alice!\nThis is her home directory."))
+  sh.exec(new Touch("home/alice/docs/notes.txt", "Buy milk\nFeed cat\nWrite Onion programs"))
+  sh.exec(new Touch("home/alice/docs/plan.txt", "1. Learn Onion\n2. Write samples\n3. ???\n4. Profit"))
+  sh.exec(new Touch("home/bob/welcome.txt", "Bob was here."))
+  sh.exec(new Touch("var/log/system.log", "INFO: system started\nINFO: all services up"))
+  sh.exec(new Touch("etc/config.txt", "timeout=30\nretries=3\ndebug=false"))
+
+  // Navigation and listing
+  sh.exec(new Pwd())
+  sh.exec(new Ls(""))
+  sh.exec(new Cd("home/alice"))
+  sh.exec(new Pwd())
+  sh.exec(new Ls(""))
+  sh.exec(new Ls("docs"))
+
+  // Read files
+  sh.exec(new Cat("readme.txt"))
+  sh.exec(new Cat("docs/notes.txt"))
+
+  // Back to root, tree view
+  sh.exec(new Cd("/"))
+  sh.exec(new Tree(""))
+
+  // Search
+  sh.exec(new Find("notes.txt"))
+  sh.exec(new Find("config.txt"))
+
+  // Grep
+  sh.exec(new GrepFile("var/log/system.log", "INFO"))
+  sh.exec(new GrepFile("etc/config.txt", "debug"))
+
+  // Append content to a file
+  sh.exec(new Append("var/log/system.log", "WARN: high memory usage"))
+  sh.exec(new Append("var/log/system.log", "ERROR: disk almost full"))
+  sh.exec(new Cat("var/log/system.log"))
+  sh.exec(new GrepFile("var/log/system.log", "ERROR"))
+
+  // Copy and move
+  sh.exec(new Cp("etc/config.txt", "home/alice/config.bak"))
+  sh.exec(new Ls("home/alice"))
+  sh.exec(new Mv("home/alice/config.bak", "home/alice/docs/config.bak"))
+  sh.exec(new Ls("home/alice/docs"))
+
+  // Remove and verify
+  sh.exec(new Rm("home/alice/readme.txt"))
+  sh.exec(new Ls("home/alice"))
+
+  // Full tree after changes
+  sh.exec(new Tree(""))
+
+  // Error cases
+  sh.exec(new Cd("nonexistent"))
+  sh.exec(new Cat("home/alice/readme.txt"))
+  sh.exec(new Mkdir("etc"))
+  sh.exec(new GrepFile("home/alice/readme.txt", "anything"))
+
+  // Final stats
+  sh.exec(new Stats())
+}

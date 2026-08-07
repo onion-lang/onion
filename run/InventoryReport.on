@@ -1,0 +1,249 @@
+// InventoryReport — a large end-to-end sample exercising generic ADT enums,
+// multiple interfaces, extension methods on primitives, collection pipelines
+// (groupBy/sortedBy/filter/map/fold/zip/distinct/take/drop), do-notation list
+// comprehensions, the |> pipeline operator, select pattern matching, nullable
+// checks, try/catch, recursion, string interpolation, and data-carrying enums.
+
+// ---------- Data types ----------
+
+record Item(sku: String, name: String, unitPrice: Double, stock: Int, category: String)
+  example { new Item("E001", "Test", 9.99, 10, "ELEC").stock() == 10 }
+  example { new Item("E001", "Test", 9.99, 10, "ELEC").sku() == "E001" }
+
+// Data-carrying enum: each section has a title.
+enum ReportSection(title: String) {
+  SUMMARY("=== Inventory Summary ==="),
+  ALERTS("=== Stock Alerts ==="),
+  DETAIL("=== Top Items by Value ==="),
+  COMBOS("=== Restock Combos ===")
+}
+
+// ---------- Extension methods ----------
+
+extension Double {
+  def fmt2(): String {
+    val rounded = Math::round(self * 100.0)
+    val intPart = rounded / 100L
+    val decPart = rounded % 100L
+    val dec: String = if decPart < 10L { "0" + decPart } else { "" + decPart }
+    return intPart + "." + dec
+  }
+}
+
+extension Int {
+  def stockStatus(): String {
+    if self < 10 { return "LOW" }
+    if self < 100 { return "OK" }
+    return "HIGH"
+  }
+  def padLeft(width: Int): String {
+    var s = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def padLeft(width: Int): String {
+    var s = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ---------- Generic ADT enum for look-up results ----------
+
+enum Lookup[T] {
+  case Found(value: T)
+  case Missing(key: String)
+public:
+  def getOrElse(default: T): T = select this {
+    case f is Found: f.value()
+    case m is Missing: default
+  }
+  def isFound(): Boolean = select this {
+    case f is Found: true
+    case m is Missing: false
+  }
+  def describe(): String = select this {
+    case f is Found: "Found"
+    case m is Missing: "Missing(" + m.key() + ")"
+  }
+}
+
+// ---------- Interfaces ----------
+
+interface Displayable {
+  def display(): String
+}
+
+interface Summarizable {
+  def summary(): String
+}
+
+// ---------- Inventory class (implements two interfaces) ----------
+
+class Inventory conforms Displayable, Summarizable {
+  val items: List[Item]
+public:
+  def this(items: List[Item]) {
+    this.items = items
+  }
+  def size(): Int = items.size
+  def display(): String = "Inventory[#{items.size} items]"
+  def summary(): String {
+    val count = items.size
+    val total = totalValue()
+    return "#{count} items, total value $#{total.fmt2()}"
+  }
+  def totalValue(): Double {
+    var total: Double = 0.0
+    foreach item: Item in items {
+      total = total + item.unitPrice() * item.stock()
+    }
+    return total
+  }
+  def lowStock(): List[Item] {
+    return items.filter { item => (item as Item).stock() < 10 }
+  }
+  def topByValue(n: Int): List[Item] {
+    return items
+      .sortedBy { item => 0.0 - (item as Item).unitPrice() * (item as Item).stock() }
+      .take(n)
+  }
+  def skus(): List[String] {
+    return items.map { item => (item as Item).sku() }
+  }
+  def categories(): List[String] {
+    return items.map { item => (item as Item).category() }.distinct()
+  }
+  def findBySku(sku: String): Lookup[Item] {
+    val found = items.find { item => (item as Item).sku() == sku }
+    if found != null {
+      return new Found[Item](found as Item)
+    }
+    return new Missing[Item](sku)
+  }
+}
+
+// ---------- Validation with try/catch ----------
+
+def parseQuantity(s: String): Int {
+  try {
+    val n = Integer::parseInt(s)
+    if n < 0 { return 0 }
+    return n
+  } catch e: Exception {
+    return 0
+  }
+}
+
+// ---------- Recursive discount calculator ----------
+
+def compoundDiscount(price: Double, rounds: Int): Double {
+  if rounds <= 0 { return price }
+  return compoundDiscount(price * 0.9, rounds - 1)
+}
+
+// ---------- Main program ----------
+
+val items: List[Item] = [
+  new Item("E001", "Laptop",        1299.99, 15, "ELEC"),
+  new Item("E002", "Mouse",           29.99,  8, "ELEC"),
+  new Item("E003", "Keyboard",        79.99, 60, "ELEC"),
+  new Item("C001", "T-Shirt",         19.99,250, "CLTH"),
+  new Item("C002", "Jeans",           59.99, 40, "CLTH"),
+  new Item("F001", "Coffee Beans",    12.99, 45, "FOOD"),
+  new Item("F002", "Olive Oil",       18.99,  5, "FOOD"),
+  new Item("T001", "Hammer",          34.99,  3, "TOOL"),
+  new Item("T002", "Screwdriver Set", 49.99, 90, "TOOL"),
+  new Item("T003", "Drill",          179.99, 25, "TOOL")
+]
+
+val inv = new Inventory(items)
+
+// Summary section using data-carrying enum
+println(ReportSection::SUMMARY.title())
+println(inv.display())
+println(inv.summary())
+println("categories: " + inv.categories().toString())
+
+// Group by stock status with foreach (k, v) in map
+val byStatus = items.groupBy { item => item.stock().stockStatus() }
+foreach (status, group) in byStatus {
+  println("  #{status}: #{(group as List).size} items")
+}
+
+// Alerts section
+println("")
+println(ReportSection::ALERTS.title())
+foreach item: Item in inv.lowStock() {
+  val label = item.stock().stockStatus()
+  println("  [#{label}] #{item.sku()} #{item.name()} — only #{item.stock()} left")
+}
+
+// Detail section: top 4 items by total value using |> pipeline
+println("")
+println(ReportSection::DETAIL.title())
+def formatLine(item: Item): String {
+  val val_ = item.unitPrice() * item.stock()
+  return "  #{item.sku().padLeft(4)} #{item.name()} → $#{val_.fmt2()}"
+}
+foreach line: String in inv.topByValue(4).map { i => formatLine(i as Item) } {
+  println(line)
+}
+
+// Lookup by SKU with ADT pattern matching
+println("")
+val queries = ["E001", "C001", "XXXX"]
+foreach q: String in queries {
+  val result: Lookup[Item] = inv.findBySku(q)
+  val msg: String = select result {
+    case f is Found: "found: " + f.value().name() + " @ $" + f.value().unitPrice().fmt2()
+    case m is Missing: "not found: " + m.key()
+  }
+  println("lookup #{q} -> #{msg}")
+}
+
+// do[List] list comprehension: priority × SKU restock combos
+println("")
+println(ReportSection::COMBOS.title())
+val urgentSkus = ["E002", "F002", "T001"]
+val priorities = ["HIGH", "MED"]
+val restockCombos = do[List] { prio <- priorities; sku <- urgentSkus; ret prio + ":" + sku }
+println("  combos: " + restockCombos.toString())
+
+// zip items with restock recommendations and print
+val restockAmounts = [50, 20, 100, 500, 200, 100, 30, 200, 60, 50]
+val restocked = items.zip(restockAmounts)
+foreach pair: Object in restocked {
+  val p = pair as List
+  val item = p[0] as Item
+  val amount = p[1] as Int
+  val newStock = item.stock() + amount
+  println("  #{item.sku()} restock +#{amount} → #{newStock} total")
+}
+
+// Validate a quantity input with try/catch guard
+println("")
+val rawInput = ["10", "-5", "abc", "200"]
+foreach s: String in rawInput {
+  println("  parseQty(#{s}) = #{parseQuantity(s)}")
+}
+
+// Recursive compound discount (3 rounds of 10%)
+println("")
+val originalPrice = 199.99
+val finalPrice = compoundDiscount(originalPrice, 3)
+println("compoundDiscount(#{originalPrice}, 3) = $#{finalPrice.fmt2()}")
+
+// Distinct categories via |> pipeline to a formatter then to println
+def listToReport(xs: List[String]): String = "distinct categories: " + xs.toString()
+items.map { item => item.category() }.distinct().sortedBy { c => c as String } |> listToReport |> println
+
+// Foreach over an exclusive range with accumulator
+var rangeSum = 0
+foreach i: Int in 0..<10 {
+  rangeSum = rangeSum + i
+}
+println("sum(0..<10) = #{rangeSum}")

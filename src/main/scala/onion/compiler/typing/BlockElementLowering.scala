@@ -110,53 +110,54 @@ final class BlockElementLowering(
           val elementVar = context.lookupOnlyCurrentScope(arg.name)
           if (elementVar == null) {
             // The element type failed to resolve (already reported)
-            return new NOP(node.location)
-          }
-          val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
-
-          if (collection.isArrayType) {
-            val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT, isMutable = true)
-            val init =
-              new StatementBlock(
-                new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
-                new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
-              )
-
-            block =
-              new ConditionalLoop(
-                new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
-                new StatementBlock(
-                  assign(elementVar, indexref(collectionVar, ref(counterVariable))),
-                  block,
-                  assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
-                )
-              )
-            new StatementBlock(init, block)
-          } else if (isMapType(collection.`type`)) {
-            // `foreach x: T in aMap` otherwise failed with "method
-            // Map[K, V].iterator() is not found", which leaks the desugaring and
-            // names a method the user never wrote. The `(k, v)` form is
-            // desugared to an entrySet() walk by the parser, so only the bare
-            // form reaches here -- exactly the case worth guiding.
-            bodyContext.report(MAP_NOT_DIRECTLY_ITERABLE, node.collection, collection.`type`)
             new NOP(node.location)
           } else {
-            val iteratorType = bodyContext.load("java.util.Iterator")
-            val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
-            val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
-            val mNext = findMethod(node.collection, iteratorType, "next")
-            val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
-            val init =
-              new StatementBlock(
-                new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
-                assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0)))
-              )
-            var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-            if (elementVar.tp != bodyContext.rootClass) {
-              next = new AsInstanceOf(next, elementVar.tp)
+            val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
+
+            if (collection.isArrayType) {
+              val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT, isMutable = true)
+              val init =
+                new StatementBlock(
+                  new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
+                  new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
+                )
+
+              block =
+                new ConditionalLoop(
+                  new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
+                  new StatementBlock(
+                    assign(elementVar, indexref(collectionVar, ref(counterVariable))),
+                    block,
+                    assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
+                  )
+                )
+              new StatementBlock(init, block)
+            } else if (isMapType(collection.`type`)) {
+              // `foreach x: T in aMap` otherwise failed with "method
+              // Map[K, V].iterator() is not found", which leaks the desugaring and
+              // names a method the user never wrote. The `(k, v)` form is
+              // desugared to an entrySet() walk by the parser, so only the bare
+              // form reaches here -- exactly the case worth guiding.
+              bodyContext.report(MAP_NOT_DIRECTLY_ITERABLE, node.collection, collection.`type`)
+              new NOP(node.location)
+            } else {
+              val iteratorType = bodyContext.load("java.util.Iterator")
+              val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
+              val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
+              val mNext = findMethod(node.collection, iteratorType, "next")
+              val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
+              val init =
+                new StatementBlock(
+                  new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
+                  assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0)))
+                )
+              var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
+              if (elementVar.tp != bodyContext.rootClass) {
+                next = new AsInstanceOf(next, elementVar.tp)
+              }
+              block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
+              new StatementBlock(init, block)
             }
-            block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
-            new StatementBlock(init, block)
           }
         }
       }
@@ -717,7 +718,10 @@ final class BlockElementLowering(
         val statements = Buffer[ActionStatement]()
         val tmpIndex = context.add(context.newName, initType, isMutable = false)
         statements += new ExpressionActionStatement(new SetLocal(node.location, 0, tmpIndex, initType, initTerm))
-        for ((name, (method, compType)) <- node.names.zip(components)) {
+        val namedComponents = node.names.zip(components)
+        var i = 0
+        while (i < namedComponents.length) {
+          val (name, (method, compType)) = namedComponents(i)
           if (context.lookupOnlyCurrentScope(name) != null) {
             bodyContext.report(DUPLICATE_LOCAL_VARIABLE, node, name)
             return new NOP(node.location)
@@ -728,6 +732,7 @@ final class BlockElementLowering(
           val call = new Call(new RefLocal(0, tmpIndex, initType), method, Array.empty[Term])
           val value = TypeSubst.withCast(call, compType)
           statements += new ExpressionActionStatement(new SetLocal(node.location, 0, index, compType, value))
+          i += 1
         }
         new StatementBlock(statements.toIndexedSeq*)
     }

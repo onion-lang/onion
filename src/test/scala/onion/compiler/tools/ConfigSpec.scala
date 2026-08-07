@@ -42,6 +42,65 @@ class ConfigSpec extends AbstractShellSpec {
       }
     }
 
+    describe("raw get") {
+      it("returns the raw value at an existing path") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"database\": {\"host\": \"localhost\"}}";
+            |    val config = Config::parseJson(json);
+            |    val value = Config::get(config, "database.host");
+            |    return value.toString();
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("localhost") == result)
+      }
+
+      it("returns null for a missing path") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"a\": 1}";
+            |    val config = Config::parseJson(json);
+            |    val value = Config::get(config, "missing.path");
+            |    return "" + (value == null);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
+      }
+
+      it("indexes into an array by numeric path segment") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"items\": [\"first\", \"second\"]}";
+            |    val config = Config::parseJson(json);
+            |    val value = Config::get(config, "items.0");
+            |    return value.toString();
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("first") == result)
+      }
+    }
+
     describe("default values") {
       it("returns default value when path not found") {
         val result = shell.run(
@@ -175,6 +234,44 @@ class ConfigSpec extends AbstractShellSpec {
         assert(Shell.Success("3000") == result)
       }
 
+      it("gets long values with getLong") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"maxConnections\": 4294967296}";
+            |    val config = Config::parseJson(json);
+            |    val maxConnections = Config::getLong(config, "maxConnections", 10L);
+            |    return "" + maxConnections;
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("4294967296") == result)
+      }
+
+      it("returns default long for non-numeric value") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"maxConnections\": \"invalid\"}";
+            |    val config = Config::parseJson(json);
+            |    val maxConnections = Config::getLong(config, "maxConnections", 10L);
+            |    return "" + maxConnections;
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("10") == result)
+      }
+
       it("gets double values with getDouble") {
         val result = shell.run(
           """
@@ -251,6 +348,88 @@ class ConfigSpec extends AbstractShellSpec {
           Array()
         )
         assert(Shell.Success("has_path") == result)
+      }
+
+      it("prefers env var over config value with getWithEnvOverride") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"database\": {\"host\": \"localhost\"}}";
+            |    val config = Config::parseJson(json);
+            |    return Config::getWithEnvOverride(config, "database.host", "PATH", "fallback");
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(result.isInstanceOf[Shell.Success])
+        val Shell.Success(value) = result: @unchecked
+        assert(value != "localhost")
+      }
+
+      it("falls back to config value when env var not set with getWithEnvOverride") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val json = "{\"database\": {\"host\": \"localhost\"}}";
+            |    val config = Config::parseJson(json);
+            |    return Config::getWithEnvOverride(config, "database.host", "NONEXISTENT_VAR_12345", "fallback");
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("localhost") == result)
+      }
+    }
+
+    describe("loadJson") {
+      it("reads and parses a JSON file from disk") {
+        val path = System.getProperty("java.io.tmpdir") + "/onion-config-loadjson-test.json"
+        val result = shell.run(
+          s"""
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    Files::writeText("$path", "{\\"database\\": {\\"host\\": \\"localhost\\", \\"port\\": 5432}}");
+            |    val config = Config::loadJson("$path");
+            |    Files::delete("$path");
+            |    return Config::getString(config, "database.host", "default") + ":" + Config::getInt(config, "database.port", 0);
+            |  }
+            |}
+            |""".stripMargin,
+          "ConfigLoadJsonBasic.on",
+          Array()
+        )
+        assert(Shell.Success("localhost:5432") == result)
+      }
+
+      it("propagates an error for a missing file") {
+        val path = System.getProperty("java.io.tmpdir") + "/onion-config-loadjson-missing.json"
+        val result = shell.run(
+          s"""
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Config::loadJson("$path");
+            |      return "no_error";
+            |    } catch e: Exception {
+            |      return "error";
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "ConfigLoadJsonMissing.on",
+          Array()
+        )
+        assert(Shell.Success("error") == result)
       }
     }
 

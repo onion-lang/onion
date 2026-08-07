@@ -1,0 +1,255 @@
+// GradeBook.on — a student grade-book with per-subject statistics.
+// Exercises: ADT enums, records with example/law, extension methods on Int and
+// Double, collection pipelines (groupBy/sortedBy/fold/filter/partition/find),
+// foreach (k,v) on Map, select type patterns with exhaustiveness, |> pipeline,
+// string interpolation, do[Option], and closures.
+
+// ── Grade category ADT ────────────────────────────────────────────────────────
+enum GradeCategory {
+  case Excellent
+  case Good
+  case Average
+  case NeedsWork
+  case Failing
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record Student(name: String, subject: String, score: Int)
+  example { new Student("Test", "Math", 75).score() == 75 }
+  example { new Student("Test", "Math", 75).subject() == "Math" }
+
+record SubjectSummary(
+  subject: String,
+  count: Int,
+  highest: Int,
+  lowest: Int,
+  average: Double,
+  letter: String
+)
+
+// ── Extension methods on Int (exercises the previously-broken primitive-extension feature) ───
+extension Int {
+  def toCategory(): GradeCategory = select self {
+    case s when s >= 90: new Excellent()
+    case s when s >= 80: new Good()
+    case s when s >= 70: new Average()
+    case s when s >= 60: new NeedsWork()
+    else: new Failing()
+  }
+
+  def toLetter(): String = select self.toCategory() {
+    case g is Excellent: "A"
+    case g is Good:      "B"
+    case g is Average:   "C"
+    case g is NeedsWork: "D"
+    case g is Failing:   "F"
+  }
+
+  def toGPA(): Double = select self.toCategory() {
+    case g is Excellent: 4.0
+    case g is Good:      3.0
+    case g is Average:   2.0
+    case g is NeedsWork: 1.0
+    case g is Failing:   0.0
+  }
+}
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+extension Double {
+  def round2(): Double = (self * 100.0 + 0.5) as Long / 100.0
+  def fmt(): String = {
+    val r = self.round2()
+    return "" + r
+  }
+}
+
+// ── Helper: left-pad a string to a given width ────────────────────────────────
+def padLeft(s: String, w: Int): String {
+  var r = s
+  var n = s.length()
+  while n < w { r = " " + r; n++ }
+  return r
+}
+
+def padRight(s: String, w: Int): String {
+  var r = s
+  var n = s.length()
+  while n < w { r = r + " "; n++ }
+  return r
+}
+
+// ── Student data ──────────────────────────────────────────────────────────────
+val students = [
+  new Student("Alice",   "Math",    97),
+  new Student("Bob",     "Math",    82),
+  new Student("Carol",   "Math",    74),
+  new Student("Dave",    "Math",    58),
+  new Student("Eve",     "Math",    91),
+  new Student("Frank",   "Science", 88),
+  new Student("Grace",   "Science", 76),
+  new Student("Hank",    "Science", 63),
+  new Student("Ivy",     "Science", 95),
+  new Student("Jack",    "Science", 49),
+  new Student("Kate",    "English", 84),
+  new Student("Leo",     "English", 91),
+  new Student("Mia",     "English", 67),
+  new Student("Ned",     "English", 78),
+  new Student("Olivia",  "English", 55),
+  new Student("Pete",    "History", 72),
+  new Student("Quinn",   "History", 86),
+  new Student("Rosa",    "History", 93),
+  new Student("Sam",     "History", 61),
+  new Student("Tina",    "History", 80)
+]
+
+IO::println("=== Student Grade Book ===")
+IO::println("Total students: " + students.size)
+IO::println("")
+
+// ── Per-student roster ────────────────────────────────────────────────────────
+IO::println("── Roster ─────────────────────────────────────────")
+IO::println(padRight("Name", 10) + padRight("Subject", 10) + padLeft("Score", 6) + "  Grade  GPA")
+IO::println("-".repeat(42))
+foreach s: Student in students {
+  IO::println(
+    padRight(s.name(), 10) +
+    padRight(s.subject(), 10) +
+    padLeft("" + s.score(), 6) +
+    "     " + s.score().toLetter() +
+    "    " + s.score().toGPA()
+  )
+}
+IO::println("")
+
+// ── Group by subject, compute per-subject stats ───────────────────────────────
+IO::println("── Per-Subject Summary ─────────────────────────────")
+
+def computeSubjectSummary(subject: String, grp: List[Object]): SubjectSummary {
+  val count = grp.size
+  val scoreSum = grp.fold(0) { acc, s => (acc as Int) + (s as Student).score() } as Int
+  val highest  = grp.fold(0) { acc, s =>
+    val sc = (s as Student).score()
+    if (acc as Int) < sc { sc } else { acc }
+  } as Int
+  val lowest = grp.fold(999) { acc, s =>
+    val sc = (s as Student).score()
+    if (acc as Int) > sc { sc } else { acc }
+  } as Int
+  val average: Double = if count > 0 { (scoreSum as Double) / (count as Double) } else { 0.0 }
+  val letter = (scoreSum / count).toLetter()
+  return new SubjectSummary(subject, count, highest, lowest, average, letter)
+}
+
+val bySubject = students.groupBy { s => s.subject() }
+
+IO::println(padRight("Subject", 10) + padLeft("N", 4) + padLeft("High", 6) +
+            padLeft("Low", 6) + padLeft("Avg", 8) + "  Letter")
+IO::println("-".repeat(42))
+
+foreach (subj, grp) in bySubject {
+  val summary = computeSubjectSummary(subj as String, grp as List)
+  IO::println(
+    padRight(summary.subject(), 10) +
+    padLeft("" + summary.count(), 4) +
+    padLeft("" + summary.highest(), 6) +
+    padLeft("" + summary.lowest(), 6) +
+    padLeft(summary.average().fmt(), 8) +
+    "  " + summary.letter()
+  )
+}
+IO::println("")
+
+// ── Grade-letter distribution across all students ─────────────────────────────
+IO::println("── Grade Distribution ──────────────────────────────")
+val byLetter = students.groupBy { s => s.score().toLetter() }
+foreach (letter, grp) in byLetter {
+  val ltr = letter as String
+  val cnt = (grp as List[Object]).size
+  var bar = ""
+  foreach _: Int in 1..cnt { bar = bar + "*" }
+  IO::println(ltr + "  " + bar + " (" + cnt + ")")
+}
+IO::println("")
+
+// ── Top 3 and bottom 3 performers overall ────────────────────────────────────
+IO::println("── Top 3 Performers ────────────────────────────────")
+val sorted = students.sortedBy { s => 0 - s.score() }
+val topN: Int = if sorted.size >= 3 { 3 } else { sorted.size }
+foreach i: Int in 1..topN {
+  val s = sorted[i - 1] as Student
+  IO::println("  #{i}. #{s.name()} (#{s.subject()}) — #{s.score()} #{s.score().toLetter()}")
+}
+IO::println("")
+
+IO::println("── Bottom 3 Performers ─────────────────────────────")
+val sortedAsc = students.sortedBy { s => s.score() }
+foreach i: Int in 1..topN {
+  val s = sortedAsc[i - 1] as Student
+  IO::println("  #{i}. #{s.name()} (#{s.subject()}) — #{s.score()} #{s.score().toLetter()}")
+}
+IO::println("")
+
+// ── Passing vs failing (partition) ───────────────────────────────────────────
+// partition returns [matching, non-matching] as a List of two sublists
+val parts    = students.partition { s => s.score() >= 60 }
+val passing  = parts[0] as List[Object]
+val failing  = parts[1] as List[Object]
+IO::println("Passing: #{passing.size}  Failing: #{failing.size}")
+val passRate: Double = (passing.size as Double) / (students.size as Double) * 100.0
+IO::println("Pass rate: #{passRate.round2()}%")
+IO::println("")
+
+// ── Overall class average ─────────────────────────────────────────────────────
+val totalScore = students.fold(0) { acc, s => (acc as Int) + s.score() } as Int
+val classAvg: Double = (totalScore as Double) / (students.size as Double)
+val overallLetter = (totalScore / students.size).toLetter()
+IO::println("Overall class average: #{classAvg.fmt()}  (#{overallLetter})")
+IO::println("")
+
+// ── do[Option]: safely look up a student by name ─────────────────────────────
+def findStudent(name: String): Option[Student] {
+  val found = students.find { s => s.name() == name }
+  if found != null {
+    return Option::some(found as Student)
+  }
+  return Option::none()
+}
+
+def lookupGPA(name: String): Option[Double] {
+  return do[Option] {
+    s <- findStudent(name)
+    ret s.score().toGPA()
+  }
+}
+
+val queryNames = ["Alice", "Dave", "Zara"]
+foreach nm: String in queryNames {
+  val gpaOpt = lookupGPA(nm)
+  if gpaOpt.isEmpty() {
+    IO::println("#{nm}: not found")
+  } else {
+    IO::println("#{nm}: GPA = #{gpaOpt.get()}")
+  }
+}
+IO::println("")
+
+// ── GPA honours roll ──────────────────────────────────────────────────────────
+IO::println("── Honour Roll (GPA 3.0+) ──────────────────────────")
+val honours = students
+  .filter { s => s.score().toGPA() >= 3.0 }
+  .sortedBy { s => 0 - s.score() }
+foreach h: Student in honours {
+  IO::println("  #{h.name()} (#{h.subject()}) #{h.score()} → GPA #{h.score().toGPA()}")
+}
+IO::println("")
+IO::println("=== End of Report ===")
+
+// ── |> pipeline: build a summary string and pipe it to print ─────────────────
+val topStudent = sorted[0] as Student
+val botStudent = sortedAsc[0] as Student
+"Top scorer: #{topStudent.name()} (#{topStudent.score()} #{topStudent.score().toLetter()})" |> IO::println
+"Lowest scorer: #{botStudent.name()} (#{botStudent.score()} #{botStudent.score().toLetter()})" |> IO::println
+
+// Pipeline to compute and print a formatted score range string
+def scoreRange(hi: Int, lo: Int): String = "Range: #{hi} - #{lo} = #{hi - lo} pts"
+scoreRange(topStudent.score(), botStudent.score()) |> IO::println

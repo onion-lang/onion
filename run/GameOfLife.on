@@ -1,242 +1,422 @@
-// Conway's Game of Life
-// Demonstrates: classes, 2D array grids, nested loops, enums,
-// records, collection pipelines (map/filter/fold/reduce), select,
-// string interpolation, try/catch, and recursive helpers.
+// GameOfLife.on — Conway's Game of Life simulation.
+// Exercises: homogeneous enum (CellState), ADT case-enum (PatternKind),
+// record with methods (Generation, Cell), class with map-based sparse grid
+// (GameOfLife), Statistics class, extension methods on Int (wrap, abs),
+// collection pipelines (map/filter/sortedBy/groupBy/fold/find/distinct),
+// select with type/value patterns, string interpolation, foreach on map
+// (k,v), nullable map lookup, for-loop nesting, while loop, tail-recursive
+// generation runner, closures stored in vals.
 
-// ─── Cell state ──────────────────────────────────────────────────────────────
-enum Cell { ALIVE, DEAD }
+import { java.util.ArrayList }
 
-// ─── A named starting pattern (rows of '.' = dead, '#' = alive) ──────────────
-record Pattern(name: String, rows: List[String]) {
+// ─── enums ────────────────────────────────────────────────────────────────
+
+// Lifecycle state for display
+enum CellState { Dead, Alive }
+
+// Named starting patterns
+enum PatternKind {
+  Glider, Blinker, Beacon, RPentomino, Pulsar
 public:
-  def width(): Int  = (rows[0] as String).length()
-  def height(): Int = rows.size
+  def label(): String = select this {
+    case PatternKind::Glider:     "Glider (spaceship)"
+    case PatternKind::Blinker:    "Blinker (period-2 oscillator)"
+    case PatternKind::Beacon:     "Beacon (period-2 oscillator)"
+    case PatternKind::RPentomino: "R-Pentomino (chaotic)"
+    case PatternKind::Pulsar:     "Pulsar (period-3 oscillator)"
+  }
 }
 
-// ─── 2D grid stored as a flat Int array (1 = alive, 0 = dead) ────────────────
-class Grid {
-  val width:  Int
+// ─── records ──────────────────────────────────────────────────────────────
+
+record Cell(x: Int, y: Int) {
+public:
+  def distanceTo(other: Cell): Double {
+    val dx = (x() - other.x()) * (x() - other.x())
+    val dy = (y() - other.y()) * (y() - other.y())
+    return Math::sqrt(dx * 1.0 + dy)
+  }
+  def label(): String = "(#{x()},#{y()})"
+}
+
+record Generation(number: Int, population: Int, born: Int, died: Int) {
+public:
+  def summary(): String =
+    "Gen #{number()}: #{population()} alive  +#{born()} born  -#{died()} died"
+  def delta(): Int = born() - died()
+  def isStable(): Boolean = born() == 0 && died() == 0
+  def isEmpty(): Boolean = population() == 0
+}
+
+// ─── extension methods ────────────────────────────────────────────────────
+
+extension Int {
+  // Modular wrap for toroidal grid edges
+  def wrapIn(size: Int): Int = ((self % size) + size) % size
+  // Sign of an integer: -1, 0, or 1
+  def sign(): Int = if self > 0 { 1 } else if self < 0 { -1 } else { 0 }
+}
+
+extension String {
+  def padLeft(width: Int, ch: String): String {
+    var s: String = self
+    while s.length() < width { s = ch + s }
+    return s
+  }
+  def padRight(width: Int, ch: String): String {
+    var s: String = self
+    while s.length() < width { s = s + ch }
+    return s
+  }
+}
+
+// ─── game engine ──────────────────────────────────────────────────────────
+
+class GameOfLife {
+  var generation: Int
+  var cells: Map[String, Boolean]   // key "x:y" present => cell is alive
+  val width: Int
   val height: Int
-  var cells:  Int[]
+  val toroidal: Boolean
 
 public:
-  def this(w: Int, h: Int) {
-    self.width  = w
-    self.height = h
-    self.cells  = new Int[w * h]
+  def this(w: Int, h: Int, torus: Boolean) {
+    width    = w
+    height   = h
+    toroidal = torus
+    cells    = [:]
+    generation = 0
   }
 
-  def alive(r: Int, c: Int): Boolean {
-    if r < 0 || r >= height || c < 0 || c >= width { return false }
-    return cells[r * width + c] == 1
+  def key(x: Int, y: Int): String = "#{x}:#{y}"
+
+  def isAlive(x: Int, y: Int): Boolean {
+    val nx = if toroidal { x.wrapIn(width)  } else { x }
+    val ny = if toroidal { y.wrapIn(height) } else { y }
+    if !toroidal && (nx < 0 || nx >= width || ny < 0 || ny >= height) {
+      return false
+    }
+    return cells.get(key(nx, ny)) != null
   }
 
-  def setAlive(r: Int, c: Int, live: Boolean): void {
-    if r < 0 || r >= height || c < 0 || c >= width { return }
-    cells[r * width + c] = if live { 1 } else { 0 }
+  def setAlive(x: Int, y: Int): void {
+    cells.put(key(x, y), true)
   }
 
-  // Expose cell as enum (shows enum usage on top of the grid)
-  def cellAt(r: Int, c: Int): Cell =
-    if alive(r, c) { Cell::ALIVE } else { Cell::DEAD }
+  def population(): Int = cells.size
 
-  def countNeighbors(r: Int, c: Int): Int {
-    var n: Int = 0
-    for var dr: Int = -1; dr <= 1; dr++ {
-      for var dc: Int = -1; dc <= 1; dc++ {
-        if dr == 0 && dc == 0 { continue }
-        if alive(r + dr, c + dc) { n++ }
+  def neighborCount(x: Int, y: Int): Int {
+    var count: Int = 0
+    for var dx: Int = -1; dx <= 1; dx = dx + 1 {
+      for var dy: Int = -1; dy <= 1; dy = dy + 1 {
+        if dx != 0 || dy != 0 {
+          if isAlive(x + dx, y + dy) { count = count + 1 }
+        }
       }
     }
-    return n
+    return count
   }
 
-  // Stamp a Pattern at grid offset (startRow, startCol); silently clips to bounds.
-  def stamp(p: Pattern, startRow: Int, startCol: Int): void {
-    foreach r: Int in 0..<p.height() {
-      val row: String = p.rows[r] as String
-      foreach c: Int in 0..<p.width() {
-        setAlive(startRow + r, startCol + c, row.substring(c, c + 1) == "#")
+  def step(): Generation {
+    val next: Map[String, Boolean] = [:]
+    var born: Int = 0
+    var died: Int = 0
+
+    for var gy: Int = 0; gy < height; gy = gy + 1 {
+      for var gx: Int = 0; gx < width; gx = gx + 1 {
+        val alive = isAlive(gx, gy)
+        val n     = neighborCount(gx, gy)
+        val nextAlive = if alive { n == 2 || n == 3 } else { n == 3 }
+        if nextAlive  { next.put(key(gx, gy), true) }
+        if  alive && !nextAlive { died = died + 1 }
+        if !alive &&  nextAlive { born = born + 1 }
       }
     }
+
+    cells      = next
+    generation = generation + 1
+    return new Generation(generation, population(), born, died)
   }
 
-  // Apply one generation of Conway's rules and return the new grid.
-  def next(): Grid {
-    val ng: Grid = new Grid(width, height)
-    for var r: Int = 0; r < height; r++ {
-      for var c: Int = 0; c < width; c++ {
-        val n: Int = countNeighbors(r, c)
-        val cur: Boolean = alive(r, c)
-        ng.setAlive(r, c,
-          select n {
-            case 2: cur
-            case 3: true
-            else:   false
-          }
-        )
-      }
-    }
-    return ng
+  // Collect all alive cell positions as a sorted list of strings
+  def aliveCells(): List[String] {
+    val result: List[String] = []
+    foreach (k, alive) in cells { if alive { result << k } }
+    return result.sortedBy { s => s as Object }
   }
 
-  def countAlive(): Int {
-    var total: Int = 0
-    for var i: Int = 0; i < cells.length; i++ {
-      if cells[i] == 1 { total++ }
-    }
-    return total
-  }
-
-  // Build a text snapshot (# = alive, . = dead)
-  def render(): String {
+  def display(): String {
     var sb: String = ""
-    for var r: Int = 0; r < height; r++ {
-      for var c: Int = 0; c < width; c++ {
-        val ch: String = if alive(r, c) { "#" } else { "." }
-        sb = sb + ch
+    for var ry: Int = 0; ry < height; ry = ry + 1 {
+      for var rx: Int = 0; rx < width; rx = rx + 1 {
+        sb = sb + (if isAlive(rx, ry) { "O" } else { "." })
       }
       sb = sb + "\n"
     }
     return sb
   }
+
+  // ── seed patterns ──────────────────────────────────────────────────────
+
+  def seedPattern(kind: PatternKind, ox: Int, oy: Int): void { select kind {
+    case PatternKind::Glider:
+      setAlive(ox+1, oy)
+      setAlive(ox+2, oy+1)
+      setAlive(ox,   oy+2)
+      setAlive(ox+1, oy+2)
+      setAlive(ox+2, oy+2)
+    case PatternKind::Blinker:
+      setAlive(ox,   oy)
+      setAlive(ox+1, oy)
+      setAlive(ox+2, oy)
+    case PatternKind::Beacon:
+      setAlive(ox,   oy);   setAlive(ox+1, oy)
+      setAlive(ox,   oy+1)
+      setAlive(ox+3, oy+2)
+      setAlive(ox+2, oy+3); setAlive(ox+3, oy+3)
+    case PatternKind::RPentomino:
+      setAlive(ox+1, oy);   setAlive(ox+2, oy)
+      setAlive(ox,   oy+1); setAlive(ox+1, oy+1)
+      setAlive(ox+1, oy+2)
+    case PatternKind::Pulsar:
+      // Standard 48-cell period-3 Pulsar (15x15 bounding box, 1-cell border)
+      // Horizontal segments at rows 1,6,8,13; cols 3..5 and 9..11
+      foreach col: Int in [3, 4, 5, 9, 10, 11] {
+        setAlive(ox + col, oy + 1)
+        setAlive(ox + col, oy + 6)
+        setAlive(ox + col, oy + 8)
+        setAlive(ox + col, oy + 13)
+      }
+      // Vertical segments at cols 1,6,8,13; rows 3..5 and 9..11
+      foreach row: Int in [3, 4, 5, 9, 10, 11] {
+        setAlive(ox + 1,  oy + row)
+        setAlive(ox + 6,  oy + row)
+        setAlive(ox + 8,  oy + row)
+        setAlive(ox + 13, oy + row)
+      }
+  } }
 }
 
-// ─── Per-generation statistics ────────────────────────────────────────────────
-record GenStat(generation: Int, alive: Int) {
+// ─── statistics ────────────────────────────────────────────────────────────
+
+class RunStats {
+  val history: List[Generation]
+  var peakPop:  Int
+  var peakGen:  Int
+  var stableAt: Int   // generation where it first stabilised (-1 = never)
+
 public:
-  def describe(): String = "gen #{generation}: #{alive} alive"
-}
-
-// ─── Simulation driver ────────────────────────────────────────────────────────
-class Simulation {
-  var grid:       Grid
-  var generation: Int
-  var history:    List[GenStat]
-
-public:
-  def this(g: Grid) {
-    self.grid       = g
-    self.generation = 0
-    self.history    = []
-    self.recordStat()
+  def this {
+    history  = []
+    peakPop  = 0
+    peakGen  = 0
+    stableAt = -1
   }
 
-  def recordStat(): void {
-    history << new GenStat(generation, grid.countAlive())
-  }
+  // Public getters for private fields
+  def getHistory(): List[Generation] = history
+  def getPeakPop(): Int = peakPop
+  def getPeakGen(): Int = peakGen
 
-  def step(): void {
-    grid       = grid.next()
-    generation = generation + 1
-    self.recordStat()
-  }
-
-  def run(steps: Int): void {
-    foreach _: Int in 0..<steps { self.step() }
-  }
-
-  def printGrid(): void {
-    println("=== Generation #{generation} (#{grid.countAlive()} alive) ===")
-    print(grid.render())
-  }
-
-  def printHistory(): void {
-    println("Population history:")
-    foreach stat: GenStat in history {
-      println("  " + stat.describe())
+  def track(g: Generation): void {
+    history << g
+    if g.population() > peakPop {
+      peakPop = g.population()
+      peakGen = g.number()
     }
+    if stableAt < 0 && g.isStable() { stableAt = g.number() }
   }
 
-  // Generation with the highest live-cell count.
-  def peakGeneration(): GenStat {
-    var best: GenStat = history[0] as GenStat
-    foreach s: GenStat in history {
-      if s.alive() > best.alive() { best = s }
-    }
-    return best
+  def size(): Int = history.size
+
+  def avgPopulation(): Double {
+    if history.size == 0 { return 0.0 }
+    var total: Int = 0
+    foreach g: Generation in history { total = total + g.population() }
+    return total * 1.0 / history.size
   }
 
-  // Integer average of alive cells over all recorded generations.
-  def avgAlive(): Int {
-    val total: Int = (history.fold(0) { acc, s => (acc as Int) + (s as GenStat).alive() }) as Int
-    return total / history.size
+  def totalBorn(): Int {
+    var acc: Int = 0
+    foreach g: Generation in history { acc = acc + g.born() }
+    return acc
   }
 
-  def getHistory(): List[GenStat] = history
+  def totalDied(): Int {
+    var acc: Int = 0
+    foreach g: Generation in history { acc = acc + g.died() }
+    return acc
+  }
+
+  def lastPopulation(): Int {
+    if history.size == 0 { return 0 }
+    return (history.get(history.size - 1) as Generation).population()
+  }
+
+  def stableGens(): List[Generation] = history.filter { g => g.isStable() }
+
+  def bandCounts(): Map[String, List[Generation]] = history.groupBy { g =>
+    if g.population() == 0       { "extinct"  }
+    else if g.population() < 5   { "tiny"     }
+    else if g.population() < 15  { "small"    }
+    else if g.population() < 30  { "medium"   }
+    else                          { "large"    }
+  }
+
+  def report(): String {
+    val gens    = history.size
+    val lastPop = lastPopulation()
+    val stable  = if stableAt >= 0 { "gen #{stableAt}" } else { "never" }
+    return "#{gens} gen run: peak #{peakPop} at gen #{peakGen}, " +
+           "final #{lastPop}, stable #{stable}, " +
+           "avg pop #{avgPopulation()}, born #{totalBorn()}, died #{totalDied()}"
+  }
 }
 
-// ─── Classic named patterns ───────────────────────────────────────────────────
-def blinker(): Pattern  = new Pattern("Blinker",     ["###"])
-def block(): Pattern    = new Pattern("Block",       ["##", "##"])
-def glider(): Pattern   = new Pattern("Glider",      [".#.", "..#", "###"])
-def rPentomino(): Pattern = new Pattern("R-pentomino",[".##", "##.", ".#."])
-def toad(): Pattern     = new Pattern("Toad",        [".###", "###."])
+// ─── simulation runner ────────────────────────────────────────────────────
 
-// ─── Demo runner ─────────────────────────────────────────────────────────────
-def runDemo(p: Pattern, generations: Int): void {
-  val W: Int = 18
-  val H: Int = 14
-  val g: Grid = new Grid(W, H)
-  g.stamp(p, (H - p.height()) / 2, (W - p.width()) / 2)
-
-  val sim: Simulation = new Simulation(g)
-
-  println("\n### Pattern: #{p.name()} ###")
-  sim.printGrid()
-  sim.run(generations)
-  sim.printGrid()
-  sim.printHistory()
-
-  val peak: GenStat = sim.peakGeneration()
-  println("Peak: gen #{peak.generation()} with #{peak.alive()} alive")
-  println("Avg alive: #{sim.avgAlive()}")
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-def main(): void {
-  println("Conway's Game of Life\n")
-
-  // Blinker: period-2 oscillator — should return to initial state at gen 2
-  runDemo(blinker(), 4)
-
-  // Block: still life — count must stay constant every generation
-  runDemo(block(), 3)
-
-  // Glider: translates diagonally; population stays at 5 always
-  runDemo(glider(), 8)
-
-  // R-pentomino: methuselah — active for many generations
-  runDemo(rPentomino(), 10)
-
-  // Toad: period-2 oscillator
-  runDemo(toad(), 5)
-
-  // ─── Pipeline stats on an extra toad grid ──────────────────────────────────
-  println("\n--- Pipeline demo ---")
-  val toadGrid: Grid = new Grid(12, 12)
-  toadGrid.stamp(toad(), 4, 3)
-  val sim2: Simulation = new Simulation(toadGrid)
-  sim2.run(6)
-
-  val counts: List[Int] = sim2.getHistory().map { s => (s as GenStat).alive() }
-  println("Alive counts: #{counts}")
-
-  val maxAlive: Int = (counts.reduce { a, b => if (a as Int) > (b as Int) { a } else { b } }) as Int
-  val minAlive: Int = (counts.reduce { a, b => if (a as Int) < (b as Int) { a } else { b } }) as Int
-  println("Max alive: #{maxAlive}  Min alive: #{minAlive}")
-
-  val evens: List[Int] = counts.filter { c => (c as Int) % 2 == 0 }
-  println("Even-alive generations count: #{evens.size}")
-
-  // try/catch around a deliberate divide-by-zero
-  try {
-    val zero: Int = counts.size - counts.size
-    println("" + (1 / zero))
-    println("No exception (unexpected)")
-  } catch e: Exception {
-    println("Caught expected exception: #{e.getClass().getSimpleName()}")
+def runSimulation(game: GameOfLife, steps: Int, verbose: Boolean): RunStats {
+  val stats = new RunStats()
+  var i: Int = 0
+  while i < steps {
+    val g = game.step()
+    stats.track(g)
+    if verbose { println("  " + g.summary()) }
+    if g.isEmpty() { i = steps }   // early-exit on extinction
+    i = i + 1
   }
-
-  println("\nDone.")
+  return stats
 }
+
+// ─── report helpers ───────────────────────────────────────────────────────
+
+def printHeader(title: String): void {
+  val bar = "=".padRight(60, "=")
+  println(bar)
+  println(title)
+  println(bar)
+}
+
+def printBandTable(stats: RunStats): void {
+  val bands = stats.bandCounts()
+  println("  Population bands across #{stats.size()} generations:")
+  foreach (band, gens) in bands {
+    val pct: Int = gens.size * 100 / stats.size()
+    println("    #{band.padRight(9, " ")}: #{gens.size} gen(s)  (#{pct}%)")
+  }
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────
+
+val W = 25
+val H = 20
+
+// ── 1. Glider on a toroidal grid ──────────────────────────────────────────
+printHeader("1. Glider — " + W + "x" + H + " toroidal grid, 15 generations")
+val gGame = new GameOfLife(W, H, true)
+gGame.seedPattern(PatternKind::Glider, 2, 2)
+println("Initial state (O=alive, .=dead):")
+println(gGame.display())
+val gStats = runSimulation(gGame, 15, true)
+println("Initial alive: 5 cells")
+println(gStats.report())
+printBandTable(gStats)
+
+// ── 2. Blinker oscillator ─────────────────────────────────────────────────
+println("")
+printHeader("2. Blinker — period-2 oscillator, 4 generations shown")
+val bGame = new GameOfLife(12, 7, false)
+bGame.seedPattern(PatternKind::Blinker, 4, 3)
+println("Gen 0:")
+println(bGame.display())
+foreach i: Int in [1, 2, 3, 4] {
+  bGame.step()
+  println("Gen #{i}:")
+  println(bGame.display())
+}
+
+// ── 3. R-Pentomino — longer run with pipeline analysis ────────────────────
+println("")
+printHeader("3. R-Pentomino — " + W + "x" + H + " grid, 50 generations")
+val rGame = new GameOfLife(W, H, true)
+rGame.seedPattern(PatternKind::RPentomino, 11, 9)
+val rStats = runSimulation(rGame, 50, false)
+println(rStats.report())
+printBandTable(rStats)
+
+// Pipeline: generations with a population spike (> 1.5 × average)
+val rHistory: List[Generation] = rStats.getHistory()
+val threshold: Double = rStats.avgPopulation() * 1.5
+val spikes = rHistory.filter { g => g.population() * 1.0 > threshold }
+println("  Spike generations (>#{threshold} alive): #{spikes.size}")
+if spikes.size > 0 {
+  val topSpike = spikes.sortedBy { g => g.population() as Object }.get(spikes.size - 1) as Generation
+  println("  Highest spike: #{topSpike.summary()}")
+}
+
+// ── 4. Pulsar oscillator (period-3) ───────────────────────────────────────
+println("")
+printHeader("4. Pulsar — period-3 oscillator, 6 generations")
+val pGame = new GameOfLife(20, 20, false)
+pGame.seedPattern(PatternKind::Pulsar, 2, 2)
+println("Initial population: #{pGame.population()}")
+foreach i: Int in [1, 2, 3, 4, 5, 6] {
+  val g = pGame.step()
+  println("  " + g.summary() + (if g.isStable() { " [STABLE]" } else { "" }))
+}
+
+// ── 5. Cross-pattern analysis ─────────────────────────────────────────────
+println("")
+printHeader("5. Comparative analysis — all four patterns, 20 generations each")
+val patterns: List[PatternKind] = [
+  PatternKind::Glider,
+  PatternKind::Blinker,
+  PatternKind::Beacon,
+  PatternKind::RPentomino
+]
+val results: List[RunStats] = patterns.map { pk =>
+  val g = new GameOfLife(20, 15, true)
+  g.seedPattern(pk, 5, 5)
+  runSimulation(g, 20, false)
+}
+
+// Zip patterns with their stats to print a summary table
+val nameW = 30
+val numW  = 7
+println("Pattern".padRight(nameW, " ") + "Peak".padLeft(numW, " ") +
+        "Final".padLeft(numW, " ") + "Born".padLeft(numW, " ") +
+        "Died".padLeft(numW, " "))
+println("-".padRight(nameW + numW * 4, "-"))
+
+var pi: Int = 0
+while pi < patterns.size {
+  val pk = patterns.get(pi) as PatternKind
+  val st = results.get(pi) as RunStats
+  val row = pk.label().padRight(nameW, " ") +
+            ("" + st.getPeakPop()).padLeft(numW, " ") +
+            ("" + st.lastPopulation()).padLeft(numW, " ") +
+            ("" + st.totalBorn()).padLeft(numW, " ") +
+            ("" + st.totalDied()).padLeft(numW, " ")
+  println(row)
+  pi = pi + 1
+}
+
+// ── 6. Cell distance demo using the Cell record ───────────────────────────
+println("")
+printHeader("6. Cell record — distance calculations")
+val centre = new Cell(10, 10)
+val corners: List[Cell] = [new Cell(0,0), new Cell(20,0), new Cell(0,15), new Cell(20,15)]
+corners.map { c => c }.forEach { c =>
+  val dist = centre.distanceTo(c as Cell)
+  println("  #{centre.label()} -> #{(c as Cell).label()}  distance = #{dist}")
+}
+
+// ── 7. Distinct population values across R-Pentomino run ──────────────────
+println("")
+printHeader("7. Distinct population values in R-Pentomino run")
+val allPops = rHistory.map { g => g.population() }.distinct().sortedBy { p => p as Object }
+println("  Unique populations seen: #{allPops.size}")
+println("  Values: #{allPops}")
+
+println("")
+println("All simulations complete.")

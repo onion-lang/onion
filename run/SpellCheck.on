@@ -1,0 +1,312 @@
+// SpellCheck.on — edit-distance spell checker.
+//
+// Demonstrates:
+//   extension methods on String (lower, titleCase, padRight),
+//   iterative Levenshtein DP over Int arrays (dynamic sizes),
+//   records with method bodies (Suggestion, SearchResult),
+//   interface + class implementation (Dictionary / SimpleDictionary),
+//   collection pipelines: filter, map, sortedBy, groupBy, take, find, join,
+//   select / value-pattern on Int for distance bands,
+//   fold with cast accumulator,
+//   nullable String? in bestMatch,
+//   foreach on List[Object] and foreach (k, v) in Map,
+//   try/catch for robustness,
+//   and string interpolation throughout.
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+extension String {
+  def lower(): String = self.toLowerCase()
+  def titleCase(): String {
+    if self.length() == 0 { return self }
+    return self.substring(0, 1).toUpperCase() + self.substring(1).toLowerCase()
+  }
+  def padRight(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ── Core domain ───────────────────────────────────────────────────────────────
+
+// A candidate correction with its edit distance from the query.
+record Suggestion(word: String, distance: Int) {
+public:
+  def label(): String = select distance() {
+    case 0: "exact"
+    case 1: "close"
+    case 2: "near"
+    else:   "distant"
+  }
+  def display(): String = "#{word()} (#{label()})"
+}
+
+// The result of checking one word against a dictionary.
+record SearchResult(query: String, found: Boolean, suggestions: List[Object]) {
+public:
+  def hasClose(): Boolean {
+    return suggestions.find { s => (s as Suggestion).distance() <= 1 } != null
+  }
+  def bestMatch(): String? {
+    if suggestions.size == 0 { return null }
+    return (suggestions[0] as Suggestion).word()
+  }
+  def topSuggestions(n: Int): List[Object] = suggestions.take(n)
+}
+
+// ── Dictionary interface ──────────────────────────────────────────────────────
+interface Dictionary {
+  def contains(word: String): Boolean
+  def closest(query: String, maxDist: Int): List[Object]
+  def wordCount(): Int
+}
+
+// ── Levenshtein edit distance (iterative DP, space-optimised) ─────────────────
+def editDistance(s: String, t: String): Int {
+  val m = s.length()
+  val n = t.length()
+  if m == 0 { return n }
+  if n == 0 { return m }
+  var prev: Int[] = new Int[n + 1]
+  var curr: Int[] = new Int[n + 1]
+  foreach j: Int in 0..n { prev[j] = j }
+  foreach i: Int in 1..m {
+    curr[0] = i
+    foreach j: Int in 1..n {
+      if s.charAt(i - 1) == t.charAt(j - 1) {
+        curr[j] = prev[j - 1]
+      } else {
+        val ins = curr[j - 1] + 1
+        val del = prev[j] + 1
+        val sub = prev[j - 1] + 1
+        var minVal: Int = ins
+        if del < minVal { minVal = del }
+        if sub < minVal { minVal = sub }
+        curr[j] = minVal
+      }
+    }
+    val tmp: Int[] = prev
+    prev = curr
+    curr = tmp
+  }
+  return prev[n]
+}
+
+// ── Simple in-memory dictionary ───────────────────────────────────────────────
+class SimpleDictionary conforms Dictionary {
+  val words: List[String]
+public:
+  def this(wordList: List[String]) {
+    this.words = wordList
+  }
+
+  def contains(word: String): Boolean {
+    return words.find { w => (w as String).lower() == word.lower() } != null
+  }
+
+  def closest(query: String, maxDist: Int): List[Object] {
+    val q = query.lower()
+    val result: List[Object] = []
+    foreach w: String in words {
+      val d = editDistance(q, w.lower())
+      if d <= maxDist { result << new Suggestion(w.lower(), d) }
+    }
+    return result.sortedBy { s => (s as Suggestion).distance() }
+  }
+
+  def wordCount(): Int = words.size
+}
+
+// ── Checking and reporting ────────────────────────────────────────────────────
+def checkWord(dict: Dictionary, word: String): SearchResult {
+  val lower = word.lower()
+  if dict.contains(lower) {
+    return new SearchResult(word, true, [])
+  }
+  val sug: List[Object] = dict.closest(lower, 2)
+  return new SearchResult(word, false, sug)
+}
+
+def printResult(result: SearchResult): void {
+  val q = result.query().padRight(14)
+  if result.found() {
+    println("  #{q}✓")
+  } else {
+    val sug = result.topSuggestions(3)
+    if sug.size == 0 {
+      println("  #{q}✗  (no suggestions within distance 2)")
+    } else {
+      val labels: List[Object] = sug.map { s => (s as Suggestion).display() }
+      val joined = labels.join(", ")
+      println("  #{q}✗  → #{joined}")
+    }
+  }
+}
+
+def printSeparator(): void {
+  println("─────────────────────────────────────────")
+}
+
+// Recursive helper: count words with edit distance ≤ threshold.
+def countWithinDistance(words: List[String], query: String, threshold: Int, idx: Int): Int {
+  if idx >= words.size { return 0 }
+  val word = words[idx] as String
+  val rest = countWithinDistance(words, query, threshold, idx + 1)
+  val d = editDistance(query.lower(), word.lower())
+  return if d <= threshold { rest + 1 } else { rest }
+}
+
+def generateReport(results: List[Object], dictSize: Int): void {
+  val total     = results.size
+  val correct   = results.filter { r => (r as SearchResult).found() }.size
+  val incorrect = total - correct
+  val fixable   = results.filter { r =>
+    val sr = r as SearchResult
+    !sr.found() && sr.hasClose()
+  }.size
+  val pct = if total > 0 { (correct * 100) / total } else { 0 }
+
+  printSeparator()
+  println("Spell Check Report")
+  printSeparator()
+  println("Dictionary size  : #{dictSize}")
+  println("Words checked    : #{total}")
+  println("Correct          : #{correct}")
+  println("Misspelled       : #{incorrect}")
+  println("Auto-correctable : #{fixable}  (edit distance ≤ 1)")
+  println("Accuracy         : #{pct}%")
+
+  if incorrect > 0 {
+    println("\nMisspelled words by distance band:")
+    val misspelled = results.filter { r => !(r as SearchResult).found() }
+    val byBand = misspelled.groupBy { r =>
+      val sr = r as SearchResult
+      val sug = sr.suggestions()
+      if sug.size == 0 { "no match" }
+      else              { (sug[0] as Suggestion).label() }
+    }
+    foreach (band, items) in byBand {
+      val count = (items as List[Object]).size
+      println("  #{(band as String).padRight(10)}: #{count} word(s)")
+    }
+
+    println("\nBest auto-correction candidates:")
+    foreach r: Object in misspelled {
+      val sr = r as SearchResult
+      val best = sr.bestMatch()
+      if best != null {
+        println("  #{sr.query().padRight(12)} → #{best}")
+      }
+    }
+  }
+  printSeparator()
+}
+
+// ── Fold demo: total edit distance across all incorrect results ───────────────
+def totalEditDistance(results: List[Object]): Int {
+  return results
+    .filter { r => !(r as SearchResult).found() }
+    .fold(0) { acc, r =>
+      val sug = (r as SearchResult).suggestions()
+      if sug.size == 0 { (acc as Int) }
+      else              { (acc as Int) + (sug[0] as Suggestion).distance() }
+    } as Int
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+def main(): void {
+  val wordList: List[String] = [
+    "the", "of", "and", "to", "a", "in", "is", "it", "you", "that",
+    "he", "was", "for", "on", "are", "with", "as", "his", "they",
+    "be", "at", "one", "have", "this", "from", "or", "had", "by", "not",
+    "word", "but", "what", "some", "we", "can", "out", "other", "were", "all",
+    "there", "when", "up", "use", "your", "how", "said", "an", "each", "she",
+    "which", "do", "their", "time", "if", "will", "way", "about", "many", "then",
+    "them", "write", "would", "like", "so", "these", "her", "long", "make", "thing",
+    "see", "him", "two", "has", "look", "more", "day", "could", "go", "come",
+    "did", "number", "sound", "no", "most", "people", "my", "over", "know", "water",
+    "than", "call", "first", "who", "may", "down", "side", "been", "now", "find"
+  ]
+  val dict = new SimpleDictionary(wordList)
+
+  // ── Distance band demo (select on Int value) ────────────────────────────
+  println("=== Edit Distance Demo ===\n")
+  val pairs: List[Object] = [
+    ["writng",  "writing"],
+    ["tyme",    "time"],
+    ["peoplz",  "people"],
+    ["number",  "number"],
+    ["xyz",     "abc"]
+  ]
+  println("  #{"Word A".padRight(10)}  #{"Word B".padRight(10)}  Dist  Band")
+  printSeparator()
+  foreach pair: List[Object] in pairs {
+    val a = pair[0] as String
+    val b = pair[1] as String
+    val d = editDistance(a, b)
+    val band = select d {
+      case 0: "identical"
+      case 1: "one edit"
+      case 2: "two edits"
+      else:   "distant (#{d})"
+    }
+    println("  #{a.padRight(10)}  #{b.padRight(10)}  #{d.toString().padLeft(4)}  #{band}")
+  }
+
+  // ── Spell checking ──────────────────────────────────────────────────────
+  val testWords: List[String] = [
+    "the", "writng", "tyme", "people", "nubmer", "soud",
+    "now", "thier", "call", "frist", "doown", "sid",
+    "mak", "knwo", "watre", "comee", "coud", "lok",
+    "xyz", "qwerty"
+  ]
+
+  println("\n=== Spell Check Results ===\n")
+  println("  #{"Word".padRight(14)}Status")
+  printSeparator()
+
+  val results: List[Object] = testWords.map { w => checkWord(dict, w as String) }
+  foreach result: SearchResult in results {
+    printResult(result)
+  }
+
+  generateReport(results, dict.wordCount())
+
+  // ── Fold demo ───────────────────────────────────────────────────────────
+  val totalDist = totalEditDistance(results)
+  println("Sum of minimum edit distances (misspelled words): #{totalDist}")
+
+  // ── Extension methods demo ──────────────────────────────────────────────
+  println("\n=== String Extension Methods ===\n")
+  val samples: List[String] = ["hello", "WORLD", "onion", "SPELL"]
+  foreach s: String in samples {
+    println("  #{s.padRight(8)}→ titleCase: #{s.titleCase()}")
+  }
+
+  // ── Recursive count demo ────────────────────────────────────────────────
+  println("\n=== Recursive Near-Match Count ===\n")
+  val queries: List[String] = ["the", "writng", "pepl"]
+  foreach q: String in queries {
+    val cnt1 = countWithinDistance(wordList, q, 1, 0)
+    val cnt2 = countWithinDistance(wordList, q, 2, 0)
+    println("  '#{q.padRight(8)}' — within dist 1: #{cnt1}, within dist 2: #{cnt2}")
+  }
+
+  // ── Try/catch demo ─────────────────────────────────────────────────────
+  println("\n=== Error Handling ===\n")
+  try {
+    val d = editDistance("", "abc")
+    println("  editDistance(\"\", \"abc\") = #{d}  (empty string handled)")
+    val d2 = editDistance("abc", "")
+    println("  editDistance(\"abc\", \"\") = #{d2}  (empty string handled)")
+  } catch e: Exception {
+    println("  Unexpected error: #{e.getMessage()}")
+  }
+
+  println("\nDone.")
+}

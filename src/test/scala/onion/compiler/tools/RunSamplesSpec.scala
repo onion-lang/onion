@@ -357,5 +357,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs PerfReview.on") {
       assert(Shell.Success(null) == runSample("run/PerfReview.on"))
     }
+
+    it("runs PropertyManager.on") {
+      assert(Shell.Success(null) == runSample("run/PropertyManager.on"))
+    }
   }
 }

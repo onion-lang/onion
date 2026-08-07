@@ -1,0 +1,318 @@
+// HuffmanCoding.on — lossless data compression via Huffman coding
+// Exercises: ADT case-enum (HTree), records (CodeStats), extension methods
+// on Int/String, collection pipelines (filter/map/fold/sortedBy/groupBy),
+// recursive tree traversal, mutable Map updates, nullable handling,
+// foreach over map entries, string interpolation, nested select dispatch.
+
+// ── Huffman tree ADT ──────────────────────────────────────────────────────────
+enum HTree {
+  case HLeaf(symbol: String, freq: Int)
+  case HNode(left: HTree, right: HTree, freq: Int)
+public:
+  def freq(): Int = select this {
+    case l is HLeaf: l.freq()
+    case n is HNode: n.freq()
+  }
+  def isLeaf(): Boolean = select this {
+    case x is HLeaf: true
+    case x is HNode: false
+  }
+  def depth(): Int = select this {
+    case x is HLeaf: 0
+    case n is HNode: {
+      val ld = n.left().depth()
+      val rd = n.right().depth()
+      1 + (if ld > rd { ld } else { rd })
+    }
+  }
+  def leafCount(): Int = select this {
+    case x is HLeaf: 1
+    case n is HNode: n.left().leafCount() + n.right().leafCount()
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+record CodeEntry(symbol: String, freq: Int, code: String, bits: Int)
+  example { new CodeEntry("a", 3, "10", 2).bits() == 2 }
+
+record EncodeStats(
+  inputChars:    Int,
+  inputBits:     Int,
+  encodedBits:   Int,
+  uniqueSymbols: Int,
+  treeDepth:     Int,
+  ratio:         Double
+)
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+extension Int {
+  def rjust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def ljust(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def percent(of: Int): String {
+    if of == 0 { return "0.0%" }
+    val p = (self * 1000) / of
+    return "" + (p / 10) + "." + (p % 10) + "%"
+  }
+}
+
+extension Double {
+  def fmt2(): String {
+    val scaled = (self * 100.0) as Int
+    return "" + (scaled / 100) + "." + (scaled % 100).rjust(2)
+  }
+}
+
+extension String {
+  def times(n: Int): String {
+    var s: String = ""
+    for var i: Int = 0; i < n; i++ { s = s + self }
+    return s
+  }
+  def padLeft(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def padRight(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ── Frequency analysis ────────────────────────────────────────────────────────
+def frequency(text: String): Map[String, Int] {
+  val freq: Map[String, Int] = [:]
+  for var i: Int = 0; i < text.length(); i++ {
+    val ch = "" + text.charAt(i)
+    val cur = freq.get(ch)
+    if cur == null { freq.put(ch, 1) } else { freq.put(ch, (cur as Int) + 1) }
+  }
+  return freq
+}
+
+// ── Priority-queue insert (ascending by freq) ─────────────────────────────────
+def pqInsert(queue: List[HTree], node: HTree): List[HTree] {
+  val result: List[HTree] = []
+  var done: Boolean = false
+  foreach t: HTree in queue {
+    if !done && node.freq() <= t.freq() { result.add(node); done = true }
+    result.add(t)
+  }
+  if !done { result.add(node) }
+  return result
+}
+
+// ── Build Huffman tree ────────────────────────────────────────────────────────
+def buildTree(freqs: Map[String, Int]): HTree {
+  var queue: List[HTree] = []
+  foreach (sym, cnt) in freqs {
+    queue = pqInsert(queue, new HLeaf(sym, cnt as Int))
+  }
+  while queue.size > 1 {
+    val left  = queue.get(0)
+    val right = queue.get(1)
+    queue.remove(0)
+    queue.remove(0)
+    val combined = new HNode(left, right, left.freq() + right.freq())
+    queue = pqInsert(queue, combined)
+  }
+  return queue.get(0)
+}
+
+// ── Generate code table ───────────────────────────────────────────────────────
+def genCodes(node: HTree, prefix: String, table: Map[String, String]): void {
+  select node {
+    case l is HLeaf: table.put(l.symbol(), if prefix == "" { "0" } else { prefix })
+    case n is HNode: {
+      genCodes(n.left(),  prefix + "0", table)
+      genCodes(n.right(), prefix + "1", table)
+    }
+  }
+}
+
+// ── Encode text → bit string ──────────────────────────────────────────────────
+def encode(text: String, table: Map[String, String]): String {
+  var bits: String = ""
+  for var i: Int = 0; i < text.length(); i++ {
+    bits = bits + (table.get("" + text.charAt(i)) as String)
+  }
+  return bits
+}
+
+// ── Decode bit string → text ──────────────────────────────────────────────────
+def decode(bits: String, root: HTree): String {
+  if root.isLeaf() {
+    // single-symbol corpus: repeat the leaf symbol for each run of same bits
+    val leaf = root as HLeaf
+    var out: String = ""
+    var i: Int = 0
+    while i < bits.length() { out = out + leaf.symbol(); i++ }
+    return out
+  }
+  var result: String = ""
+  var cur: HTree = root
+  for var i: Int = 0; i < bits.length(); i++ {
+    val bit = bits.charAt(i)
+    val node = cur as HNode
+    cur = if bit == '0' { node.left() } else { node.right() }
+    select cur {
+      case l is HLeaf: { result = result + l.symbol(); cur = root }
+      case x is HNode: { }
+    }
+  }
+  return result
+}
+
+// ── Build CodeEntry list ──────────────────────────────────────────────────────
+def buildEntries(freqs: Map[String, Int], table: Map[String, String]): List[CodeEntry] {
+  val entries: List[CodeEntry] = []
+  foreach (sym, cnt) in freqs {
+    val code = table.get(sym) as String
+    entries.add(new CodeEntry(sym, cnt as Int, code, code.length()))
+  }
+  return entries
+}
+
+// ── Print code table ──────────────────────────────────────────────────────────
+def printCodeTable(entries: List[CodeEntry]): void {
+  IO::println("  Sym   Freq  Code               Bits  Contrib")
+  IO::println("  " + "-".times(54))
+  val sorted = entries.sortedBy { e => e.bits() }
+  foreach e: CodeEntry in sorted {
+    val contrib = e.freq() * e.bits()
+    val sym: String = if e.symbol() == " " { "SPC" } else if e.symbol() == "\n" { "LF" } else { e.symbol() }
+    IO::println("  " + sym.padRight(5) +
+      e.freq().rjust(5) + "  " +
+      e.code().padRight(18) +
+      e.bits().rjust(4) + "  " +
+      contrib.rjust(6) + " bits")
+  }
+}
+
+// ── Print statistics ──────────────────────────────────────────────────────────
+def printStats(stats: EncodeStats): void {
+  IO::println("  Input    : " + stats.inputChars() + " chars  (" + stats.inputBits() + " bits at 8bpc)")
+  IO::println("  Encoded  : " + stats.encodedBits() + " bits")
+  val saved = stats.inputBits() - stats.encodedBits()
+  IO::println("  Saved    : " + saved + " bits  (" + saved.percent(stats.inputBits()) + ")")
+  IO::println("  Ratio    : " + stats.ratio().fmt2() + ":1")
+  IO::println("  Symbols  : " + stats.uniqueSymbols() + " unique")
+  IO::println("  Tree depth: " + stats.treeDepth())
+}
+
+// ── Compute stats ─────────────────────────────────────────────────────────────
+def computeStats(text: String, encoded: String, tree: HTree, uniqCount: Int): EncodeStats {
+  val inBits   = text.length() * 8
+  val encBits  = encoded.length()
+  val ratio    = inBits as Double / encBits as Double
+  return new EncodeStats(text.length(), inBits, encBits, uniqCount, tree.depth(), ratio)
+}
+
+// ── Run a single encode/decode cycle ─────────────────────────────────────────
+def runCycle(label: String, text: String): EncodeStats {
+  IO::println("\n" + "─".times(60))
+  IO::println("  " + label)
+  IO::println("─".times(60))
+
+  val freqs   = frequency(text)
+  val tree    = buildTree(freqs)
+  val table: Map[String, String] = [:]
+  genCodes(tree, "", table)
+
+  val encoded = encode(text, table)
+  val decoded = decode(encoded, tree)
+  val roundTrip = decoded == text
+
+  val entries = buildEntries(freqs, table)
+  printCodeTable(entries)
+
+  val stats = computeStats(text, encoded, tree, freqs.size)
+  IO::println("")
+  printStats(stats)
+  IO::println("  Round-trip: " + (if roundTrip { "PASS ✓" } else { "FAIL ✗" }))
+
+  return stats
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Main
+// ═══════════════════════════════════════════════════════════════════════════════
+IO::println("=".times(60))
+IO::println("  Huffman Coding — lossless compression demo")
+IO::println("=".times(60))
+
+val corpus: List[String] = [
+  "hello world",
+  "abracadabra",
+  "the quick brown fox jumps over the lazy dog",
+  "aaaaaaaabbbbcccd",
+  "to be or not to be that is the question"
+]
+
+val labels: List[String] = [
+  "Short greeting",
+  "Abracadabra (repetitive)",
+  "Pangram (all 26 letters)",
+  "Skewed distribution",
+  "Shakespeare quote"
+]
+
+val allStats: List[EncodeStats] = []
+
+for var i: Int = 0; i < corpus.size; i++ {
+  val st = runCycle(labels.get(i), corpus.get(i))
+  allStats.add(st)
+}
+
+// ── Summary comparison ────────────────────────────────────────────────────────
+IO::println("\n" + "=".times(60))
+IO::println("  Summary — compression ratio comparison")
+IO::println("=".times(60))
+IO::println("  " + "Label".padRight(26) + " Chars  8-bit  Huff   Ratio")
+IO::println("  " + "-".times(56))
+for var i: Int = 0; i < allStats.size; i++ {
+  val s = allStats.get(i)
+  val lbl = labels.get(i)
+  IO::println("  " + lbl.padRight(26) +
+    s.inputChars().rjust(5) + "  " +
+    s.inputBits().rjust(5) + "  " +
+    s.encodedBits().rjust(5) + "  " +
+    s.ratio().fmt2() + ":1")
+}
+
+// ── Pipeline analysis on stats ────────────────────────────────────────────────
+val bestRatio   = allStats.sortedBy { s => (s.ratio() * -1.0) as Int }.get(0)
+val worstRatio  = allStats.sortedBy { s => (s.ratio() * 1.0) as Int }.get(0)
+val avgSaved    = allStats.fold(0) { acc, s => acc + (s.inputBits() - s.encodedBits()) } / allStats.size
+
+IO::println("\n  Best compression  : " + labels.get(allStats.indexOf(bestRatio)))
+IO::println("  Worst compression : " + labels.get(allStats.indexOf(worstRatio)))
+IO::println("  Avg bits saved    : " + avgSaved + " per corpus entry")
+
+// ── Correctness assertion ─────────────────────────────────────────────────────
+IO::println("\n  ── Invariant checks ──")
+var allPass: Boolean = true
+for var i: Int = 0; i < corpus.size; i++ {
+  val text  = corpus.get(i)
+  val freqs = frequency(text)
+  val tree  = buildTree(freqs)
+  val tbl: Map[String, String] = [:]
+  genCodes(tree, "", tbl)
+  val enc = encode(text, tbl)
+  val dec = decode(enc, tree)
+  val pass = dec == text
+  if !pass { allPass = false }
+  IO::println("  [" + (if pass { "OK" } else { "!!" }) + "] " + labels.get(i))
+}
+IO::println("\n  All round-trips: " + (if allPass { "PASS" } else { "FAIL" }))
+
+IO::println("\nDone.")

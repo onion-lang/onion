@@ -46,6 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
   `record example {}` build-time parse round-trip assertions.
   111 total corpus programs.
+- **`run/ClinicRecords.on`, a 523-line medical clinic patient and appointment
+  management sample.** Exercises homogeneous enums with `select` dispatch
+  (`BloodType`, `Severity`, `ApptStatus`), an ADT `case`-enum (`DiagnosisResult`:
+  `Clear`/`Condition`/`Referral`) matched with type patterns, records with method
+  bodies including a nullable field (`Appointment.notes: String?`), a class with
+  typed `List[T]` fields, `sortedBy`/`groupBy`/`fold` pipelines, and extension
+  methods on `String`/`Int`/`Double`.
+  112 total corpus programs.
 
 ### Documentation
 

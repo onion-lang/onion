@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
   BFS-style friend-of-friend recommendation engine, and nullable lookups
   (`User?`/`Post?`).
+- **`run/PetShelter.on`, a 269-line pet shelter management sample.** Exercises a
+  data-carrying enum (`PetType`), an ADT case-enum (`AdoptionStatus` with
+  `Available`/`Foster`/`Adopted`/`Quarantine` cases and shared methods via
+  `select this`), records (`Pet`, `Adopter`, `FosterRecord`), a class with
+  public/private sections and a replace-on-update mutation pattern, extension
+  methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
+  `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
+  for intake validation.
 
 ## [0.10.25] - 2026-08-07
 

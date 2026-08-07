@@ -1,0 +1,281 @@
+// MusicFestival.on — Summer music-festival schedule and ticket analytics.
+// Exercises: records (with nullable String? field), data-carrying enum,
+// homogeneous enum with select, extension methods on Int and String,
+// collection pipelines (filter, map, sortedBy, groupBy, find, fold, distinct,
+// partition), foreach over List[Object] and Map (k,v), nullable null checks,
+// string interpolation, while loop, try/catch, break in loop.
+
+import { java.util.ArrayList }
+
+// ── Extension helpers ──────────────────────────────────────────────────────────
+
+extension Int {
+  def pad2(): String = if self < 10 { "0" + self } else { "" + self }
+  def toHHMM(): String {
+    val h: Int = self / 60 + 9
+    val m: Int = self % 60
+    return h.pad2() + ":" + m.pad2()
+  }
+}
+
+extension String {
+  def padR(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def trunc(n: Int): String =
+    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum Genre { Rock, Jazz, Electronic, HipHop, Folk, Indie
+public:
+  def label(): String = select this {
+    case Genre::Rock:       "Rock"
+    case Genre::Jazz:       "Jazz"
+    case Genre::Electronic: "Electronic"
+    case Genre::HipHop:    "Hip-Hop"
+    case Genre::Folk:      "Folk"
+    case Genre::Indie:     "Indie"
+    else: "Unknown"
+  }
+}
+
+enum TicketTier(price: Double) {
+  GA(85.0), VIP(250.0), Backstage(500.0)
+public:
+  def label(): String = select this {
+    case TicketTier::GA:        "General Admission"
+    case TicketTier::VIP:       "VIP"
+    case TicketTier::Backstage: "Backstage Pass"
+    else: "Other"
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Artist(name: String, genre: Genre, followers: Int, headliner: Boolean)
+
+record Stage(name: String, capacity: Int, covered: Boolean)
+
+record Performance(
+  artist: Artist,
+  stage: Stage,
+  startMin: Int,        // minutes after 09:00  (0 = 09:00, 60 = 10:00)
+  durationMins: Int,
+  openerName: String?   // nullable opening-act credit
+)
+
+record Sale(id: Int, tier: TicketTier, sold: Boolean)
+
+// ── Stages ────────────────────────────────────────────────────────────────────
+
+val mainStage    = new Stage("Main Stage",    8000, false)
+val jazzPavilion = new Stage("Jazz Pavilion", 2000, true)
+val indieGarden  = new Stage("Indie Garden",  1500, true)
+val techZone     = new Stage("Tech Zone",     3000, false)
+
+// ── Artists ───────────────────────────────────────────────────────────────────
+
+val stormRiders  = new Artist("Storm Riders",  Genre::Rock,       2400000, true)
+val theGroove    = new Artist("The Groove",     Genre::Jazz,        780000, false)
+val neonPulse    = new Artist("Neon Pulse",     Genre::Electronic, 1100000, true)
+val riverflow    = new Artist("Riverflow",      Genre::Folk,        320000, false)
+val citySoul     = new Artist("City Soul",      Genre::HipHop,     1800000, true)
+val solarWind    = new Artist("Solar Wind",     Genre::Indie,       540000, false)
+val digitalDawn  = new Artist("Digital Dawn",   Genre::Electronic,  890000, false)
+val jazzCats     = new Artist("Jazz Cats",      Genre::Jazz,        410000, false)
+val earthTones   = new Artist("Earth Tones",    Genre::Folk,        260000, false)
+val midnightFreq = new Artist("Midnight Freq",  Genre::HipHop,      720000, false)
+
+// ── Festival schedule (List[Object] so closures can use the cast pattern) ─────
+
+val schedule: List[Object] = [
+  new Performance(riverflow,    indieGarden,    0,  60, null),
+  new Performance(neonPulse,    techZone,       0,  75, "Digital Dawn"),
+  new Performance(theGroove,    jazzPavilion,  60,  90, "Jazz Cats"),
+  new Performance(solarWind,    indieGarden,   90,  60, "Earth Tones"),
+  new Performance(digitalDawn,  techZone,      90,  60, null),
+  new Performance(midnightFreq, mainStage,    120,  75, null),
+  new Performance(jazzCats,     jazzPavilion, 180,  60, null),
+  new Performance(neonPulse,    techZone,     210,  90, null),
+  new Performance(stormRiders,  mainStage,    210, 120, "City Soul"),
+  new Performance(citySoul,     mainStage,    360,  90, "Midnight Freq")
+]
+
+// ── Ticket sales ──────────────────────────────────────────────────────────────
+
+val sales: List[Object] = [
+  new Sale(1,  TicketTier::GA,        true),
+  new Sale(2,  TicketTier::GA,        true),
+  new Sale(3,  TicketTier::GA,        false),
+  new Sale(4,  TicketTier::VIP,       true),
+  new Sale(5,  TicketTier::VIP,       true),
+  new Sale(6,  TicketTier::VIP,       false),
+  new Sale(7,  TicketTier::Backstage, true),
+  new Sale(8,  TicketTier::Backstage, false),
+  new Sale(9,  TicketTier::GA,        true),
+  new Sale(10, TicketTier::VIP,       true)
+]
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+IO::println("═══════════════════════════════════════════")
+IO::println("        SUMMER BLOOM MUSIC FESTIVAL        ")
+IO::println("═══════════════════════════════════════════")
+IO::println("")
+
+// ── 1. Full schedule sorted by start time ─────────────────────────────────────
+
+val sorted = schedule.sortedBy { x => (x as Performance).startMin() }
+IO::println("── Schedule (chronological) ──────────────")
+foreach x: Object in sorted {
+  val perf = x as Performance
+  val startHHMM: String = perf.startMin().toHHMM()
+  val endHHMM:   String = (perf.startMin() + perf.durationMins()).toHHMM()
+  val star:      String = if perf.artist().headliner() { "★ " } else { "  " }
+  val opener:    String? = perf.openerName()
+  val openerStr: String = if opener != null { " [+ " + opener + "]" } else { "" }
+  IO::println("  #{startHHMM}–#{endHHMM}  #{perf.stage().name().padR(16)}#{star}#{perf.artist().name()}#{openerStr}")
+}
+IO::println("")
+
+// ── 2. Headliners ─────────────────────────────────────────────────────────────
+
+val headliners = schedule.filter { x => (x as Performance).artist().headliner() }
+IO::println("── Headliners ────────────────────────────")
+foreach x: Object in headliners {
+  val perf = x as Performance
+  IO::println("  ★ #{perf.artist().name().padR(20)} on #{perf.stage().name()}")
+}
+IO::println("")
+
+// ── 3. Performances per stage (groupBy + foreach map) ─────────────────────────
+
+val byStage = schedule.groupBy { x => (x as Performance).stage().name() }
+IO::println("── Stage Utilisation ─────────────────────")
+foreach (stageName, perfs) in byStage {
+  val name: String = stageName as String
+  val cnt:  Int    = (perfs as List[Object]).size
+  IO::println("  #{name.padR(20)} #{cnt} set#{if cnt == 1 { "" } else { "s" }}")
+}
+IO::println("")
+
+// ── 4. Genre breakdown (map → distinct → inferred type) ───────────────────────
+
+val genreLabels = schedule.map { x => (x as Performance).artist().genre().label() }.distinct()
+IO::println("── Genre Breakdown ───────────────────────")
+foreach g: Object in genreLabels {
+  val label: String = g as String
+  val cnt: Int = schedule.filter { x => (x as Performance).artist().genre().label() == label }.size
+  IO::println("  #{label.padR(14)} #{cnt} act#{if cnt == 1 { "" } else { "s" }}")
+}
+IO::println("")
+
+// ── 5. Opening acts ───────────────────────────────────────────────────────────
+
+val withOpeners = schedule.filter { x => (x as Performance).openerName() != null }
+IO::println("── Opening Acts ──────────────────────────")
+foreach x: Object in withOpeners {
+  val perf = x as Performance
+  val op: String? = perf.openerName()
+  if op != null {
+    IO::println("  #{perf.artist().name().padR(18)} ← #{op}")
+  }
+}
+IO::println("")
+
+// ── 6. Ticket partition + revenue ─────────────────────────────────────────────
+
+val saleParts: List[List[Object]] = sales.partition { x => (x as Sale).sold() }
+val soldSales: List[Object]   = saleParts[0] as List[Object]
+val unsoldSales: List[Object] = saleParts[1] as List[Object]
+val totalRev: Double =
+  soldSales.fold(0.0) { acc, x => (acc as Double) + (x as Sale).tier().price() }
+
+IO::println("── Ticket Summary ────────────────────────")
+IO::println("  Sold:     #{soldSales.size} / #{sales.size}")
+IO::println("  Unsold:   #{unsoldSales.size}")
+IO::println("  Revenue:  $#{totalRev}")
+IO::println("")
+
+// ── Revenue by tier ───────────────────────────────────────────────────────────
+
+IO::println("── Revenue by Tier ───────────────────────")
+val tiers: List[Object] = [TicketTier::GA, TicketTier::VIP, TicketTier::Backstage]
+foreach t: Object in tiers {
+  val tier: TicketTier = t as TicketTier
+  val tierSold = soldSales.filter { x => (x as Sale).tier() == tier }
+  val tierRev: Double = tierSold.fold(0.0) { acc, x => (acc as Double) + (x as Sale).tier().price() }
+  IO::println("  #{tier.label().padR(22)} #{tierSold.size} sold   $#{tierRev}")
+}
+IO::println("")
+
+// ── 7. Artist popularity ranking (top 5 by followers) ─────────────────────────
+
+val artistSet = schedule.map { x => (x as Performance).artist() }.distinct()
+val byFollowers = artistSet.sortedBy { a => -(a as Artist).followers() }
+IO::println("── Artist Popularity (Top 5) ─────────────")
+var rank: Int = 1
+foreach a: Object in byFollowers {
+  val artist = a as Artist
+  val flag: String = if artist.headliner() { " ★" } else { "" }
+  IO::println("  #{rank}. #{artist.name().padR(20)} #{artist.followers()} followers#{flag}")
+  rank = rank + 1
+  if rank > 5 { break }
+}
+IO::println("")
+
+// ── 8. Fan-favourite headliner ────────────────────────────────────────────────
+
+val topHeadliner: Object? =
+  headliners.sortedBy { x => -(x as Performance).artist().followers() }.find { x => true }
+if topHeadliner != null {
+  val p = topHeadliner as Performance
+  IO::println("── Fan-Favourite Headliner ───────────────")
+  IO::println("  #{p.artist().name()} (#{p.artist().followers()} followers)")
+  IO::println("")
+}
+
+// ── 9. Longest and shortest sets ──────────────────────────────────────────────
+
+val longest: Object? =
+  schedule.sortedBy { x => -(x as Performance).durationMins() }.find { x => true }
+val shortest: Object? =
+  schedule.sortedBy { x => (x as Performance).durationMins() }.find { x => true }
+
+if longest != null && shortest != null {
+  IO::println("── Set Lengths ───────────────────────────")
+  IO::println("  Longest:  #{(longest as Performance).artist().name()} — #{(longest as Performance).durationMins()} min")
+  IO::println("  Shortest: #{(shortest as Performance).artist().name()} — #{(shortest as Performance).durationMins()} min")
+  IO::println("")
+}
+
+// ── 10. Covered-stage performances (rain contingency) ─────────────────────────
+
+val coveredPerfs = schedule.filter { x => (x as Performance).stage().covered() }
+IO::println("── Covered Stages (rain-safe) ────────────")
+foreach x: Object in coveredPerfs.sortedBy { y => (y as Performance).startMin() } {
+  val perf = x as Performance
+  IO::println("  #{perf.startMin().toHHMM()}  #{perf.stage().name().padR(16)} #{perf.artist().name()}")
+}
+IO::println("")
+
+// ── try/catch: validate a sale ID ─────────────────────────────────────────────
+
+try {
+  val badSale = new Sale(-1, TicketTier::GA, true)
+  if badSale.id() < 0 {
+    throw new IllegalArgumentException("Sale ID must be positive, got: " + badSale.id())
+  }
+} catch e: IllegalArgumentException {
+  IO::println("── Validation ────────────────────────────")
+  IO::println("  Caught: " + e.getMessage())
+  IO::println("")
+}
+
+IO::println("═══════════════════════════════════════════")
+IO::println("          End of Festival Report           ")
+IO::println("═══════════════════════════════════════════")

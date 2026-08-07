@@ -1,0 +1,451 @@
+// ConferenceSchedule — a realistic conference management sample exercising
+// records, data-carrying enums, classes, interfaces, generics, collection
+// pipelines (map/filter/fold/groupBy/sortedBy/partition/zip/flatten/any/count),
+// pattern matching, extension methods, nullable types, try/catch, recursion,
+// and while/foreach control flow.
+
+// --- Domain types ---
+
+enum Track {
+  KEYNOTE, TECH, WORKSHOP, LIGHTNING
+}
+
+// Data-carrying enum: a session review verdict
+enum Verdict {
+  case Approved(score: Int)
+  case Rejected(reason: String)
+  case Pending
+
+public:
+  def label(): String = select this {
+    case a is Approved: "Approved (score=#{a.score()})"
+    case r is Rejected: "Rejected: #{r.reason()}"
+    case p is Pending:  "Pending review"
+  }
+  def isApproved(): Boolean = select this {
+    case a is Approved: true
+    else: false
+  }
+}
+
+// Interface for anything that can produce a one-line summary
+interface Summarizable {
+  def summarize(): String
+}
+
+record Speaker(name: String, org: String, bio: String) conforms Summarizable {
+public:
+  def summarize(): String = "#{name()} (#{org()})"
+}
+
+record Session(
+  title: String,
+  speakerId: Int,
+  track: Track,
+  room: String,
+  startHour: Int,
+  endHour: Int,
+  capacity: Int
+) conforms Summarizable {
+public:
+  def summarize(): String = "#{title()} [#{startHour()}–#{endHour()}h, #{room()}]"
+}
+
+// A submitted session proposal before it becomes a confirmed session
+record Proposal(title: String, speakerName: String, preferredTrack: Track, verdict: Verdict)
+
+// --- Extension methods ---
+
+extension Int {
+  def hourStr(): String {
+    return if self < 10 { "0" + self + ":00" } else { self + ":00" }
+  }
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width {
+      s = s + " "
+    }
+    return s
+  }
+  def truncate(maxLen: Int): String {
+    return if self.length() <= maxLen { self } else { self.substring(0, maxLen - 2) + ".." }
+  }
+}
+
+// --- Generic Box (simple wrapper with map) ---
+
+class Box[T extends Object] {
+  val value: T
+public:
+  def this(v: T) { this.value = v }
+  def get: T = this.value
+  def map[U extends Object](f: T -> U): Box[U] = new Box[U](f(this.value))
+}
+
+// --- Conference day: groups sessions and speakers ---
+
+class ConferenceDay {
+  val dayLabel: String
+  val sessions: List[Session]
+  val speakers: List[Speaker]
+public:
+  def this(label: String, sess: List[Session], spk: List[Speaker]) {
+    this.dayLabel = label
+    this.sessions = sess
+    this.speakers = spk
+  }
+  def getSessions(): List[Session] = this.sessions
+
+  def speakerById(id: Int): Speaker? {
+    if id < 0 || id >= this.speakers.size { return null }
+    return this.speakers[id]
+  }
+
+  def sessionsInTrack(track: Track): List[Session] {
+    return this.sessions.filter { s => s.track() == track }
+  }
+
+  def sessionsInRoom(room: String): List[Session] {
+    return this.sessions.filter { s => s.room() == room }
+  }
+
+  def hasConflict(room: String, start: Int, end: Int): Boolean {
+    val roomSessions = this.sessionsInRoom(room)
+    val conflict = roomSessions.find { s =>
+      s.startHour() < end && s.endHour() > start
+    }
+    return conflict != null
+  }
+
+  def totalCapacity(): Int {
+    return this.sessions.fold(0) { acc, s => (acc as Int) + s.capacity() }
+  }
+
+  def printSchedule(): void {
+    IO::println("=== Schedule: " + this.dayLabel + " ===")
+    val byRoom: Map[String, List[Session]] = this.sessions.groupBy { s => s.room() }
+    foreach (room, roomSessions) in byRoom {
+      IO::println("  Room: " + room)
+      val sorted: List[Session] = roomSessions.sortedBy { s => s.startHour() }
+      foreach s: Session in sorted {
+        val start: String = s.startHour().hourStr()
+        val end: String = s.endHour().hourStr()
+        val trackLabel: String = trackBadge(s.track())
+        IO::println("    [#{start}-#{end}] #{trackLabel} #{s.title().truncate(40)}")
+      }
+    }
+  }
+}
+
+// --- Helper functions ---
+
+def trackBadge(t: Track): String {
+  select t {
+    case Track::KEYNOTE:  return "[KEY]"
+    case Track::TECH:     return "[TEC]"
+    case Track::WORKSHOP: return "[WKS]"
+    case Track::LIGHTNING: return "[LTN]"
+    else: return "[???]"
+  }
+}
+
+def trackFullName(t: Track): String {
+  select t {
+    case Track::KEYNOTE:  return "Keynote"
+    case Track::TECH:     return "Technical"
+    case Track::WORKSHOP: return "Workshop"
+    case Track::LIGHTNING: return "Lightning Talk"
+    else: return "Unknown"
+  }
+}
+
+def durationHours(sess: Session): Int = sess.endHour() - sess.startHour()
+
+def sessionsByDuration(sessions: List[Session]): List[Session] {
+  return sessions.sortedBy { s => 0 - durationHours(s) }
+}
+
+def countByTrack(sessions: List[Session]): Map[String, List[Session]] {
+  return sessions.groupBy { s => trackFullName(s.track()) }
+}
+
+def topCapacitySessions(sessions: List[Session], n: Int): List[Session] {
+  val sorted: List[Session] = sessions.sortedBy { s => 0 - s.capacity() }
+  val result: List[Session] = []
+  var count: Int = 0
+  foreach s: Session in sorted {
+    if count < n {
+      result.add(s)
+      count = count + 1
+    }
+  }
+  return result
+}
+
+def overlapping(a: Session, b: Session): Boolean {
+  return a.room() == b.room() && a.startHour() < b.endHour() && a.endHour() > b.startHour()
+}
+
+def findConflicts(sessions: List[Session]): List[String] {
+  val conflicts: List[String] = []
+  val n: Int = sessions.size
+  foreach i: Int in 0..<n {
+    foreach j: Int in (i + 1)..<n {
+      val a: Session = sessions[i]
+      val b: Session = sessions[j]
+      if overlapping(a, b) {
+        conflicts.add(a.title() + " vs " + b.title())
+      }
+    }
+  }
+  return conflicts
+}
+
+def avgDuration(sessions: List[Session]): Double {
+  if sessions.size == 0 { return 0.0 }
+  var total: Double = 0.0
+  foreach s: Session in sessions {
+    total = total + durationHours(s)
+  }
+  return total / (sessions.size as Double)
+}
+
+// --- Recursive session search by title prefix ---
+
+def findByPrefix(sessions: List[Session], prefix: String, idx: Int): Session? {
+  if idx >= sessions.size { return null }
+  val s: Session = sessions[idx]
+  if s.title().startsWith(prefix) { return s }
+  return findByPrefix(sessions, prefix, idx + 1)
+}
+
+// --- Report functions ---
+
+def printTrackSummary(sessions: List[Session]): void {
+  IO::println("\n=== Track Summary ===")
+  val byTrack: Map[String, List[Session]] = countByTrack(sessions)
+  foreach (trackName, trackSessions) in byTrack {
+    val count: Int = trackSessions.size
+    val avg: Double = avgDuration(trackSessions)
+    IO::println("  #{trackName.padRight(14)}: #{count} session(s), avg #{avg}h")
+  }
+}
+
+def printCapacityReport(sessions: List[Session]): void {
+  IO::println("\n=== Top 3 High-Capacity Sessions ===")
+  val top: List[Session] = topCapacitySessions(sessions, 3)
+  foreach s: Session in top {
+    IO::println("  #{s.title().truncate(35).padRight(37)} cap=#{s.capacity()}")
+  }
+}
+
+def printConflictReport(sessions: List[Session]): void {
+  IO::println("\n=== Room Conflict Check ===")
+  val conflicts: List[String] = findConflicts(sessions)
+  if conflicts.size == 0 {
+    IO::println("  No room conflicts detected.")
+  } else {
+    foreach c: String in conflicts {
+      IO::println("  CONFLICT: " + c)
+    }
+  }
+}
+
+def printRoomUtilisation(sessions: List[Session], rooms: List[String]): void {
+  IO::println("\n=== Room Utilisation ===")
+  foreach room: String in rooms {
+    val roomSessions: List[Session] = sessions.filter { s => s.room() == room }
+    var hours: Int = 0
+    foreach s: Session in roomSessions {
+      hours = hours + durationHours(s)
+    }
+    IO::println("  #{room.padRight(12)}: #{roomSessions.size} session(s), #{hours}h booked")
+  }
+}
+
+def printSpeakerSessions(day: ConferenceDay): void {
+  IO::println("\n=== Speaker Load ===")
+  val bySpkId: Map[Int, List[Session]] = day.getSessions().groupBy { s => s.speakerId() }
+  foreach (spkId, spkSessions) in bySpkId {
+    val spk: Speaker? = day.speakerById(spkId as Int)
+    val spkName: String = if spk != null { (spk as Speaker).name() } else { "Unknown ##{spkId}" }
+    var hours: Int = 0
+    foreach s: Session in spkSessions {
+      hours = hours + durationHours(s)
+    }
+    IO::println("  #{spkName.padRight(16)}: #{spkSessions.size} session(s), #{hours}h on stage")
+  }
+}
+
+// --- Main ---
+
+def main(): void {
+  // Speakers
+  val speakers: List[Speaker] = [
+    new Speaker("Alice Tran",    "OpenSoft",    "Compiler researcher"),
+    new Speaker("Ben Okoro",     "CloudBase",   "Distributed systems engineer"),
+    new Speaker("Chiara Russo",  "DataFlow",    "ML platform lead"),
+    new Speaker("Dan Yamamoto",  "StartupX",    "Founder and CTO"),
+    new Speaker("Erin Patel",    "UniLabs",     "PL theory professor"),
+    new Speaker("Femi Adebayo",  "NetStack",    "Security specialist"),
+    new Speaker("Grace Liu",     "BioTech Inc", "Bioinformatics researcher"),
+    new Speaker("Hiro Sato",     "GameDev Co",  "Rendering engineer")
+  ]
+
+  // Sessions (speakerId is index into speakers list above)
+  val sessions: List[Session] = [
+    new Session("Opening Keynote: Future of Dev",    0, Track::KEYNOTE,  "Hall A",  9,  10, 400),
+    new Session("Type-Safe DSLs in Modern Compilers",4, Track::TECH,     "Room 1", 10,  12, 120),
+    new Session("Distributed Tracing at Scale",      1, Track::TECH,     "Room 2", 10,  11,  80),
+    new Session("ML Model Deployment Patterns",      2, Track::WORKSHOP, "Lab 1",  10,  13,  40),
+    new Session("Zero-Trust Security Architecture",  5, Track::TECH,     "Room 1", 12,  13,  80),
+    new Session("From Zero to Funded in 90 Days",    3, Track::LIGHTNING,"Room 3", 12,  13,  60),
+    new Session("Genomics Pipeline Optimisation",    6, Track::TECH,     "Room 2", 11,  13,  80),
+    new Session("Closing Keynote: Developer Joy",    0, Track::KEYNOTE,  "Hall A", 16,  17, 400),
+    new Session("GPU Render Pipelines Workshop",     7, Track::WORKSHOP, "Lab 1",  13,  16,  40),
+    new Session("Panel: Open Source Sustainability", 1, Track::LIGHTNING,"Room 3", 13,  14,  60),
+    new Session("Functional Patterns in Production", 4, Track::TECH,     "Room 1", 14,  16,  80),
+    new Session("Incident Response Playbook",        5, Track::WORKSHOP, "Lab 2",  14,  16,  30),
+    new Session("Bioinformatics for Everyone",       6, Track::LIGHTNING,"Room 3", 14,  15,  60),
+    new Session("Onion Language: Live Demo",         4, Track::LIGHTNING,"Room 2", 15,  16,  80)
+  ]
+
+  val rooms: List[String] = ["Hall A", "Room 1", "Room 2", "Room 3", "Lab 1", "Lab 2"]
+
+  val day = new ConferenceDay("OnionConf 2026 — Day 1", sessions, speakers)
+
+  // Print full schedule
+  day.printSchedule()
+
+  // Track summary
+  printTrackSummary(sessions)
+
+  // Capacity report
+  printCapacityReport(sessions)
+
+  // Room conflict check
+  printConflictReport(sessions)
+
+  // Room utilisation
+  printRoomUtilisation(sessions, rooms)
+
+  // Speaker load
+  printSpeakerSessions(day)
+
+  // Nullable: find a keynote
+  IO::println("\n=== Keynote Finder ===")
+  val keynoteSessions: List[Session] = day.sessionsInTrack(Track::KEYNOTE)
+  val first: Session? = if keynoteSessions.size > 0 { keynoteSessions[0] } else { null }
+  if first != null {
+    IO::println("  First keynote: #{(first as Session).title()} (#{(first as Session).startHour().hourStr()})")
+  } else {
+    IO::println("  No keynote found.")
+  }
+
+  // Recursive prefix search
+  IO::println("\n=== Prefix Search: 'Func' ===")
+  val found: Session? = findByPrefix(sessions, "Func", 0)
+  if found != null {
+    IO::println("  Found: #{(found as Session).title()}")
+  } else {
+    IO::println("  Nothing found.")
+  }
+
+  // Box + closure chain
+  val totalBox = new Box[Int](day.totalCapacity())
+  val msg: Box[String] = totalBox.map[String]((n: Int) -> "Total venue capacity: #{n}")
+  IO::println("\n" + msg.get)
+
+  // Partition sessions by duration (partition returns List[List])
+  val parts = sessions.partition { s => durationHours(s) >= 2 }
+  val longSessions: List[Session] = parts[0] as List[Session]
+  val shortSessions: List[Session] = parts[1] as List[Session]
+  IO::println("Long sessions (>=2h): #{longSessions.size}, Short (<2h): #{shortSessions.size}")
+
+  // Longest sessions ordered by duration descending
+  val longestFirst: List[Session] = sessionsByDuration(sessions)
+  IO::println("\n=== Sessions by Duration (desc) ===")
+  foreach s: Session in longestFirst {
+    IO::println("  #{durationHours(s)}h — #{s.title().truncate(40)}")
+  }
+
+  // Proposals with data-carrying enum verdicts
+  IO::println("\n=== Proposal Review Board ===")
+  val proposals: List[Proposal] = [
+    new Proposal("Advanced Type Systems",      "Erin Patel",   Track::TECH,      new Approved(92)),
+    new Proposal("Rust for JVM Developers",    "Ben Okoro",    Track::TECH,      new Rejected("Topic out of scope")),
+    new Proposal("AI-Assisted Code Review",    "Chiara Russo", Track::WORKSHOP,  new Approved(88)),
+    new Proposal("Five-Minute Deploy",         "Dan Yamamoto", Track::LIGHTNING, new Pending()),
+    new Proposal("Quantum Computing Primer",   "Alice Tran",   Track::TECH,      new Rejected("Needs more depth")),
+    new Proposal("Green Software Practices",   "Grace Liu",    Track::TECH,      new Approved(75)),
+    new Proposal("Zero-Bug Release Process",   "Femi Adebayo", Track::WORKSHOP,  new Pending()),
+    new Proposal("Pixel Art in Shaders",       "Hiro Sato",    Track::LIGHTNING, new Approved(81))
+  ]
+
+  // any / count pipeline operations
+  val hasApproved: Boolean = proposals.any { p => p.verdict().isApproved() }
+  val approvedCount: Int = proposals.count { p => p.verdict().isApproved() }
+  val pendingCount: Int = proposals.count { p => p.verdict() == new Pending() }
+  IO::println("Has approved: #{hasApproved}, approved=#{approvedCount}, pending=#{pendingCount}")
+
+  // filter + map pipeline for accepted proposals
+  val accepted: List[String] = proposals
+    .filter { p => p.verdict().isApproved() }
+    .map { p => "#{p.title()} — #{p.verdict().label()}" }
+  IO::println("Accepted proposals:")
+  foreach line: String in accepted {
+    IO::println("  " + line)
+  }
+
+  // zip sessions with their speaker names (speakers list, padded)
+  IO::println("\n=== Session–Speaker Pairs (zip) ===")
+  val sessionTitles: List[String] = sessions.map { s => s.title().truncate(30) }
+  val speakerNames: List[String] = sessions.map { s =>
+    val spk: Speaker? = day.speakerById(s.speakerId())
+    if spk != null { (spk as Speaker).name() } else { "Unknown" }
+  }
+  val pairs = sessionTitles.zip(speakerNames)
+  foreach pair: Object in pairs {
+    val p = pair as List[Object]
+    IO::println("  #{(p[0] as String).padRight(32)} #{p[1]}")
+  }
+
+  // flatten: sessions grouped per track, then merged back into one flat list
+  val byTrackGroups: List[List[Session]] = [
+    day.sessionsInTrack(Track::KEYNOTE),
+    day.sessionsInTrack(Track::TECH),
+    day.sessionsInTrack(Track::WORKSHOP),
+    day.sessionsInTrack(Track::LIGHTNING)
+  ]
+  val flattened: List[Session] = byTrackGroups.flatten()
+  IO::println("\nFlatten check: #{flattened.size} == #{sessions.size} sessions")
+
+  // distinct session rooms
+  val allRooms: List[String] = sessions.map { s => s.room() }
+  val distinctRooms: List[String] = allRooms.distinct()
+  IO::println("Distinct rooms used: #{distinctRooms.size} of #{rooms.size}")
+
+  // Summarizable interface polymorphism
+  IO::println("\n=== Summarizable Dispatch ===")
+  val summaries: List[Summarizable] = [
+    sessions[0] as Summarizable,
+    speakers[0] as Summarizable,
+    sessions[sessions.size - 1] as Summarizable
+  ]
+  foreach item: Summarizable in summaries {
+    IO::println("  " + item.summarize())
+  }
+
+  // try/catch
+  try {
+    val idx: Int = 9999
+    if idx >= sessions.size { throw new Exception("Session index out of range: #{idx}") }
+  } catch e: Exception {
+    IO::println("\nCaught: " + e.message())
+  }
+
+  IO::println("\n[Done]")
+}

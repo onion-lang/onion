@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/RecipeBook.on`, a 620-line recipe management sample.** Exercises a
+  data-carrying enum (`Measurement` with `Grams`/`Milliliters`/`Pieces`/
+  `Tablespoons`/`Teaspoons`/`Cups`, dispatched via `select`/`case`
+  destructuring), plain enums (`Cuisine`, `MealType`, `Difficulty`), records
+  with methods and `static def of(...)` factories (`Ingredient`,
+  `NutritionInfo`, `Recipe`), extension methods on `Double`/`Int`/`String`,
+  collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`distinct`/`find`),
+  nullable types with safe calls and null coalescing, and a mutable
+  `RecipeBook` class with query and report-generation methods.
+
 - **`run/PerfReview.on`, a 284-line employee performance review dashboard.**
   Exercises ADT case-enum (`PerformanceBand` with `Exceptional`/`Strong`/`Meets`/
   `BelowTarget`/`Critical` and `select this` dispatch), a homogeneous enum

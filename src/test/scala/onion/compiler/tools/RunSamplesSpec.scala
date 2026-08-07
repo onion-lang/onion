@@ -345,5 +345,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs SocialNetwork.on") {
       assert(Shell.Success(null) == runSample("run/SocialNetwork.on"))
     }
+
+    it("runs TextAnalytics.on") {
+      assert(Shell.Success(null) == runSample("run/TextAnalytics.on"))
+    }
   }
 }

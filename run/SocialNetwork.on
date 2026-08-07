@@ -1,0 +1,568 @@
+// SocialNetwork.on — A social-network simulator with users, posts, friendships,
+// reactions, and a friend-recommendation engine.
+//
+// Exercises: records, ADT enum (PostContent / Notification), homogeneous enum
+// (ReactionKind), classes (Network), collection pipelines
+// (map/filter/fold/sortedBy/groupBy/partition/distinct), foreach (k,v) on Map,
+// select / type patterns, closures, string interpolation, nullable, while and
+// foreach (list iteration, map iteration).
+
+import {
+  java.util.ArrayList;
+  java.util.HashMap;
+  java.lang.Integer as JInteger;
+}
+
+// ─── Reaction kinds (homogeneous enum) ────────────────────────────────────────
+
+enum ReactionKind {
+  LIKE, LOVE, LAUGH, WOW, SAD, ANGRY
+public:
+  def label(): String = select this {
+    case ReactionKind::LIKE:  "Like"
+    case ReactionKind::LOVE:  "Love"
+    case ReactionKind::LAUGH: "Laugh"
+    case ReactionKind::WOW:   "Wow"
+    case ReactionKind::SAD:   "Sad"
+    case ReactionKind::ANGRY: "Angry"
+    else: "?"
+  }
+}
+
+// ─── Post content (ADT enum) ───────────────────────────────────────────────────
+
+enum PostContent {
+  case TextPost(text: String)
+  case PhotoPost(caption: String, url: String)
+  case LinkPost(title: String, url: String, snippet: String)
+public:
+  def summary(): String = select this {
+    case t is TextPost:  t.text()
+    case p is PhotoPost: "[Photo] #{p.caption()}"
+    case l is LinkPost:  "[Link] #{l.title()} — #{l.snippet()}"
+  }
+  def kind(): String = select this {
+    case t is TextPost:  "text"
+    case p is PhotoPost: "photo"
+    case l is LinkPost:  "link"
+  }
+}
+
+// ─── Notification (ADT enum) ───────────────────────────────────────────────────
+
+enum Notification {
+  case FriendRequest(fromId: Int)
+  case PostReaction(postId: Int, kind: ReactionKind)
+  case NewComment(postId: Int, commenterId: Int)
+  case FriendSuggestion(suggestedId: Int, mutualCount: Int)
+public:
+  def message(): String = select this {
+    case r is FriendRequest:    "Friend request from user ##{r.fromId()}"
+    case rx is PostReaction:    "#{rx.kind().label()} on your post ##{rx.postId()}"
+    case c is NewComment:       "User ##{c.commenterId()} commented on post ##{c.postId()}"
+    case s is FriendSuggestion: "You may know user ##{s.suggestedId()} (#{s.mutualCount()} mutual)"
+  }
+}
+
+// ─── Core records ──────────────────────────────────────────────────────────────
+
+record User(id: Int, name: String, location: String)
+
+record Post(id: Int, authorId: Int, content: PostContent, timestamp: Int) {
+public:
+  def excerpt(): String = "Post ##{id()} by u##{authorId()}: #{content().summary()}"
+}
+
+record Comment(id: Int, postId: Int, authorId: Int, text: String, timestamp: Int)
+
+record Reaction(postId: Int, userId: Int, kind: ReactionKind)
+
+// ─── Network ───────────────────────────────────────────────────────────────────
+
+class Network {
+  var users:     HashMap[String, User]
+  var posts:     HashMap[String, Post]
+  var comments:  ArrayList[Comment]
+  var reactions: ArrayList[Reaction]
+  var friends:   HashMap[String, ArrayList[Int]]
+  var notifs:    HashMap[String, ArrayList[Notification]]
+  var nextPost:  Int
+  var nextCmt:   Int
+
+public:
+  def this {
+    this.users     = new HashMap[String, User]()
+    this.posts     = new HashMap[String, Post]()
+    this.comments  = new ArrayList[Comment]()
+    this.reactions = new ArrayList[Reaction]()
+    this.friends   = new HashMap[String, ArrayList[Int]]()
+    this.notifs    = new HashMap[String, ArrayList[Notification]]()
+    this.nextPost  = 1
+    this.nextCmt   = 1
+  }
+
+  def key(id: Int): String = JInteger::toString(id)
+
+  def addUser(u: User): void {
+    users.put(key(u.id()), u)
+    friends.put(key(u.id()), new ArrayList[Int]())
+    notifs.put(key(u.id()), new ArrayList[Notification]())
+  }
+
+  def getUser(id: Int): User? {
+    return users.get(key(id)) as User?
+  }
+
+  def addFriend(a: Int, b: Int): void {
+    val la: ArrayList[Int] = friends.get(key(a)) as ArrayList[Int]
+    val lb: ArrayList[Int] = friends.get(key(b)) as ArrayList[Int]
+    if la != null && !la.contains(b as Object) { la.add(b) }
+    if lb != null && !lb.contains(a as Object) { lb.add(a) }
+    pushNotif(b, new FriendRequest(a))
+    pushNotif(a, new FriendRequest(b))
+  }
+
+  def friendsOf(uid: Int): ArrayList[Int] {
+    val raw = friends.get(key(uid)) as ArrayList[Int]
+    if raw == null { return new ArrayList[Int]() }
+    return raw
+  }
+
+  def isFriend(a: Int, b: Int): Boolean {
+    return friendsOf(a).contains(b as Object)
+  }
+
+  def createPost(authorId: Int, content: PostContent, ts: Int): Int {
+    val id = nextPost
+    nextPost = nextPost + 1
+    posts.put(key(id), new Post(id, authorId, content, ts))
+    return id
+  }
+
+  def getPost(id: Int): Post? {
+    return posts.get(key(id)) as Post?
+  }
+
+  def react(postId: Int, userId: Int, kind: ReactionKind): void {
+    val iter = reactions.iterator()
+    while iter.hasNext() {
+      val r = iter.next() as Reaction
+      if r.postId() == postId && r.userId() == userId { iter.remove() }
+    }
+    reactions.add(new Reaction(postId, userId, kind))
+    val p: Post? = getPost(postId)
+    if p != null { pushNotif((p as Post).authorId(), new PostReaction(postId, kind)) }
+  }
+
+  def addComment(postId: Int, authorId: Int, text: String, ts: Int): void {
+    val id = nextCmt
+    nextCmt = nextCmt + 1
+    comments.add(new Comment(id, postId, authorId, text, ts))
+    val p: Post? = getPost(postId)
+    if p != null { pushNotif((p as Post).authorId(), new NewComment(postId, authorId)) }
+  }
+
+  def pushNotif(uid: Int, n: Notification): void {
+    val list: ArrayList[Notification] = notifs.get(key(uid)) as ArrayList[Notification]
+    if list != null { list.add(n) }
+  }
+
+  def notificationsFor(uid: Int): ArrayList[Notification] {
+    val raw = notifs.get(key(uid)) as ArrayList[Notification]
+    if raw == null { return new ArrayList[Notification]() }
+    return raw
+  }
+
+  def reactionsOn(postId: Int): ArrayList[Reaction] {
+    val result: ArrayList[Reaction] = new ArrayList[Reaction]()
+    foreach r: Reaction in reactions { if r.postId() == postId { result.add(r) } }
+    return result
+  }
+
+  def reactionCount(postId: Int): Int {
+    var n: Int = 0
+    foreach r: Reaction in reactions { if r.postId() == postId { n++ } }
+    return n
+  }
+
+  def commentCount(postId: Int): Int {
+    var n: Int = 0
+    foreach c: Comment in comments { if c.postId() == postId { n++ } }
+    return n
+  }
+
+  def engagement(postId: Int): Int = reactionCount(postId) + commentCount(postId)
+
+  // Feed: posts from friends, newest first
+  def feed(uid: Int, limit: Int): ArrayList[Post] {
+    val fids: ArrayList[Int] = friendsOf(uid)
+    val buf: ArrayList[Post] = new ArrayList[Post]()
+    foreach e: Object in posts.entrySet() {
+      val entry = e as java.util.Map.Entry
+      val p = entry.getValue() as Post
+      if fids.contains(p.authorId() as Object) { buf.add(p) }
+    }
+    val sorted = buf.sortedBy { x => 0 - (x as Post).timestamp() }
+    val result: ArrayList[Post] = new ArrayList[Post]()
+    var i: Int = 0
+    foreach p: Object in sorted {
+      if i >= limit { break }
+      result.add(p as Post)
+      i++
+    }
+    return result
+  }
+
+  // Top posts by total engagement
+  def topPosts(n: Int): ArrayList[Post] {
+    val buf: ArrayList[Post] = new ArrayList[Post]()
+    foreach e: Object in posts.entrySet() {
+      val entry = e as java.util.Map.Entry
+      buf.add(entry.getValue() as Post)
+    }
+    val sorted = buf.sortedBy { x => 0 - engagement((x as Post).id()) }
+    val result: ArrayList[Post] = new ArrayList[Post]()
+    var i: Int = 0
+    foreach p: Object in sorted {
+      if i >= n { break }
+      result.add(p as Post)
+      i++
+    }
+    return result
+  }
+
+  // Friend-of-friend recommendations
+  def recommendFriends(uid: Int, limit: Int): ArrayList[Int] {
+    val myFriends: ArrayList[Int] = friendsOf(uid)
+    val mutuals: HashMap[String, Int] = new HashMap[String, Int]()
+    foreach fid: Object in myFriends {
+      val f = fid as Int
+      foreach gid: Object in friendsOf(f) {
+        val g = gid as Int
+        if g != uid && !myFriends.contains(g as Object) {
+          val k2 = key(g)
+          val cur: JInteger = mutuals.get(k2) as JInteger
+          mutuals.put(k2, (if cur == null { 0 } else { cur.intValue() }) + 1)
+        }
+      }
+    }
+    val candidates: ArrayList[Int] = new ArrayList[Int]()
+    foreach e: Object in mutuals.entrySet() {
+      val entry = e as java.util.Map.Entry
+      candidates.add(JInteger::parseInt(entry.getKey() as String))
+    }
+    val sorted = candidates.sortedBy { x =>
+      val cand = x as Int
+      val cnt: JInteger = mutuals.get(key(cand)) as JInteger
+      0 - (if cnt == null { 0 } else { cnt.intValue() })
+    }
+    foreach cid: Object in sorted {
+      val cand = cid as Int
+      val cnt: JInteger = mutuals.get(key(cand)) as JInteger
+      pushNotif(uid, new FriendSuggestion(cand, if cnt == null { 0 } else { cnt.intValue() }))
+    }
+    val result: ArrayList[Int] = new ArrayList[Int]()
+    var i: Int = 0
+    foreach cid: Object in sorted {
+      if i >= limit { break }
+      result.add(cid as Int)
+      i++
+    }
+    return result
+  }
+
+  def postCount(uid: Int): Int {
+    var n: Int = 0
+    foreach e: Object in posts.entrySet() {
+      val entry = e as java.util.Map.Entry
+      if (entry.getValue() as Post).authorId() == uid { n++ }
+    }
+    return n
+  }
+
+  def totalReactionsReceived(uid: Int): Int {
+    var total: Int = 0
+    foreach e: Object in posts.entrySet() {
+      val entry = e as java.util.Map.Entry
+      val p = entry.getValue() as Post
+      if p.authorId() == uid { total = total + reactionCount(p.id()) }
+    }
+    return total
+  }
+
+  def allUsers(): ArrayList[User] {
+    val result: ArrayList[User] = new ArrayList[User]()
+    foreach e: Object in users.entrySet() {
+      val entry = e as java.util.Map.Entry
+      result.add(entry.getValue() as User)
+    }
+    return result
+  }
+
+  def allPosts(): ArrayList[Post] {
+    val result: ArrayList[Post] = new ArrayList[Post]()
+    foreach e: Object in posts.entrySet() {
+      val entry = e as java.util.Map.Entry
+      result.add(entry.getValue() as Post)
+    }
+    return result
+  }
+}
+
+// ─── Display helpers ────────────────────────────────────────────────────────────
+
+def pad(s: String, width: Int): String {
+  val len = s.length()
+  if len >= width { return s }
+  val pad2 = width - len
+  val left  = pad2 / 2
+  val right = pad2 - left
+  var r: String = ""
+  var i: Int = 0
+  while i < left  { r = r + " "; i++ }
+  r = r + s
+  i = 0
+  while i < right { r = r + " "; i++ }
+  return r
+}
+
+def sep(n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + "-"; i++ }
+  return s
+}
+
+def rpad(s: String, width: Int): String {
+  val len = s.length()
+  if len >= width { return s }
+  var r: String = s
+  var i: Int = len
+  while i < width { r = r + " "; i++ }
+  return r
+}
+
+// ─── Build demo network ────────────────────────────────────────────────────────
+
+val net = new Network()
+
+net.addUser(new User(1, "Alice",   "New York"))
+net.addUser(new User(2, "Bob",     "London"))
+net.addUser(new User(3, "Carol",   "Tokyo"))
+net.addUser(new User(4, "Dave",    "Sydney"))
+net.addUser(new User(5, "Eve",     "Berlin"))
+net.addUser(new User(6, "Frank",   "Toronto"))
+net.addUser(new User(7, "Grace",   "Paris"))
+net.addUser(new User(8, "Heidi",   "Mumbai"))
+
+net.addFriend(1, 2)
+net.addFriend(1, 3)
+net.addFriend(1, 4)
+net.addFriend(2, 5)
+net.addFriend(2, 6)
+net.addFriend(3, 7)
+net.addFriend(4, 6)
+net.addFriend(5, 7)
+net.addFriend(6, 8)
+net.addFriend(7, 8)
+
+val p1  = net.createPost(1, new TextPost("Just landed in Tokyo! So excited!"),               100)
+val p2  = net.createPost(2, new LinkPost("Rust tutorial", "http://ex.co/rust", "Ownership"), 110)
+val p3  = net.createPost(3, new PhotoPost("Cherry blossoms", "http://img.ex.co/sakura"),    120)
+val p4  = net.createPost(4, new TextPost("Beat the final boss after 40 hours. Worth it!"),  130)
+val p5  = net.createPost(5, new TextPost("Saw an incredible jazz concert last night."),      140)
+val p6  = net.createPost(1, new TextPost("New project launched — stay tuned!"),              150)
+val p7  = net.createPost(6, new LinkPost("OSS tools", "http://ex.co/oss", "Great CLI"),     160)
+val p8  = net.createPost(7, new PhotoPost("Louvre at sunset", "http://img.ex.co/louvre"),   170)
+val p9  = net.createPost(3, new TextPost("Trying a new ramen recipe. Results soon!"),        180)
+val p10 = net.createPost(8, new TextPost("Mumbai monsoon vibes are unmatched."),             190)
+
+net.react(p1, 2, ReactionKind::LOVE)
+net.react(p1, 3, ReactionKind::WOW)
+net.react(p1, 4, ReactionKind::LIKE)
+net.react(p1, 5, ReactionKind::LIKE)
+net.react(p2, 1, ReactionKind::LIKE)
+net.react(p2, 4, ReactionKind::WOW)
+net.react(p3, 1, ReactionKind::LOVE)
+net.react(p3, 5, ReactionKind::LOVE)
+net.react(p3, 7, ReactionKind::WOW)
+net.react(p3, 8, ReactionKind::LOVE)
+net.react(p4, 2, ReactionKind::LAUGH)
+net.react(p4, 6, ReactionKind::LIKE)
+net.react(p5, 7, ReactionKind::LOVE)
+net.react(p5, 3, ReactionKind::LIKE)
+net.react(p6, 2, ReactionKind::LIKE)
+net.react(p6, 3, ReactionKind::WOW)
+net.react(p7, 1, ReactionKind::LIKE)
+net.react(p7, 4, ReactionKind::WOW)
+net.react(p8, 5, ReactionKind::LOVE)
+net.react(p8, 3, ReactionKind::LOVE)
+net.react(p8, 2, ReactionKind::WOW)
+net.react(p9, 8, ReactionKind::LAUGH)
+net.react(p10, 6, ReactionKind::LIKE)
+net.react(p10, 7, ReactionKind::LOVE)
+
+net.addComment(p1, 2, "Have the best time!",         102)
+net.addComment(p1, 4, "Bring back ramen noodles!",   105)
+net.addComment(p3, 1, "Those look stunning!",         122)
+net.addComment(p3, 8, "I need to visit Japan.",       125)
+net.addComment(p4, 3, "Which game was it?",           132)
+net.addComment(p4, 8, "Congrats! Sounds epic.",       135)
+net.addComment(p5, 1, "Who was playing?",             142)
+net.addComment(p8, 3, "Magical! My fav museum.",      172)
+net.addComment(p9, 7, "Share the recipe please!",     182)
+net.addComment(p10, 5, "Rain in Mumbai sounds great.", 192)
+
+// ─── Report 1: Overview ────────────────────────────────────────────────────────
+
+println("=" + sep(56))
+println(pad("SOCIAL NETWORK SIMULATOR", 58))
+println("=" + sep(56))
+println("")
+
+val allUsers = net.allUsers()
+val allPosts = net.allPosts()
+println("  Users    : " + allUsers.size)
+println("  Posts    : " + allPosts.size)
+
+var totalRxns: Int = 0
+var totalCmts: Int = 0
+foreach p: Post in allPosts {
+  totalRxns = totalRxns + net.reactionCount(p.id())
+  totalCmts = totalCmts + net.commentCount(p.id())
+}
+println("  Reactions: " + totalRxns)
+println("  Comments : " + totalCmts)
+
+// ─── Report 2: User stats table ────────────────────────────────────────────────
+
+println("")
+println("  " + sep(54))
+println("  " + rpad("Name", 9) + " | " + rpad("City", 10) + " | Posts | Friends | Rxns | Notifs")
+println("  " + sep(54))
+
+val sortedUsers = allUsers.sortedBy { u => (u as User).id() as Object }
+foreach u: Object in sortedUsers {
+  val user  = u as User
+  val uid   = user.id()
+  val pc    = net.postCount(uid)
+  val fc    = net.friendsOf(uid).size()
+  val rxns  = net.totalReactionsReceived(uid)
+  val notif = net.notificationsFor(uid).size()
+  val row = "  " + rpad(user.name(), 9) + " | " + rpad(user.location(), 10) +
+            " |   " + pc + "   |    " + fc + "    |  " + rxns + "   |   " + notif
+  println(row)
+}
+println("  " + sep(54))
+
+// ─── Report 3: Top 5 posts by engagement ──────────────────────────────────────
+
+println("")
+println("  -- Top 5 Posts by Engagement (reactions + comments) --")
+println("")
+foreach p: Post in net.topPosts(5) {
+  val rxns = net.reactionCount(p.id())
+  val cmts = net.commentCount(p.id())
+  val user: User? = net.getUser(p.authorId())
+  val name = if user == null { "?" } else { (user as User).name() }
+  val summary = p.content().summary()
+  println("  [#{rxns+cmts} pts] #{name}: #{summary}")
+  println("         #{rxns} reactions, #{cmts} comments  [#{p.content().kind()}]")
+}
+
+// ─── Report 4: Reaction breakdown by kind ─────────────────────────────────────
+
+println("")
+println("  -- Reaction Breakdown --")
+println("")
+
+val allRxns: ArrayList[Reaction] = new ArrayList[Reaction]()
+foreach p: Post in allPosts {
+  foreach r: Reaction in net.reactionsOn(p.id()) { allRxns.add(r) }
+}
+
+val byKind = allRxns.groupBy { x => (x as Reaction).kind().label() }
+foreach (label, group) in byKind {
+  println("  " + rpad(label as String, 8) + " : " + (group as List).size)
+}
+
+// ─── Report 5: Alice's friend feed ────────────────────────────────────────────
+
+println("")
+println("  -- Alice's Friend Feed (newest 4) --")
+println("")
+foreach p: Post in net.feed(1, 4) {
+  val user: User? = net.getUser(p.authorId())
+  val name = if user == null { "?" } else { (user as User).name() }
+  println("  [t=#{p.timestamp()}] #{name}: #{p.content().summary()}")
+}
+
+// ─── Report 6: Friend recommendations for Alice ────────────────────────────────
+
+println("")
+println("  -- Friend Recommendations for Alice (top 3 by mutual friends) --")
+println("")
+
+val recs = net.recommendFriends(1, 3)
+foreach rid: Object in recs {
+  val rid2 = rid as Int
+  val user: User? = net.getUser(rid2)
+  val name = if user == null { "user#" + JInteger::toString(rid2) } else { (user as User).name() }
+  println("  -> #{name}")
+}
+
+// ─── Report 7: Post kind distribution ─────────────────────────────────────────
+
+println("")
+println("  -- Post Kind Distribution --")
+println("")
+
+val byKindPost = allPosts.groupBy { x => (x as Post).content().kind() }
+foreach (kind, group) in byKindPost {
+  val pct = (group as List).size * 100 / allPosts.size
+  println("  " + rpad(kind as String, 8) + ": " + (group as List).size + " posts (" + pct + "%)")
+}
+
+// ─── Report 8: Notifications for Carol ────────────────────────────────────────
+
+println("")
+println("  -- Carol's Notifications --")
+println("")
+foreach n: Notification in net.notificationsFor(3) {
+  println("  * " + n.message())
+}
+
+// ─── Report 9: Mutual-friend counts across all pairs ──────────────────────────
+
+println("")
+println("  -- Friendship Network Summary --")
+println("")
+
+val users2 = net.allUsers()
+val totalEdges: ArrayList[String] = new ArrayList[String]()
+foreach ua: Object in users2 {
+  val a = ua as User
+  foreach ub: Object in users2 {
+    val b = ub as User
+    if a.id() < b.id() && net.isFriend(a.id(), b.id()) {
+      totalEdges.add("#{a.name()}-#{b.name()}")
+    }
+  }
+}
+println("  Total friendships: " + totalEdges.size)
+
+// Most connected user
+val mostConnected = users2.sortedBy { u => 0 - net.friendsOf((u as User).id()).size() }
+val top = (mostConnected.get(0) as User)
+println("  Most connected: " + top.name() + " (" + net.friendsOf(top.id()).size() + " friends)")
+
+// Average friends per user
+val totalF: ArrayList[Int] = new ArrayList[Int]()
+foreach u: Object in users2 {
+  totalF.add(net.friendsOf((u as User).id()).size())
+}
+val sumF = totalF.fold(0) { acc, x => acc + (x as Int) }
+println("  Average friends: " + (sumF / users2.size))
+
+println("")
+println("Done.")

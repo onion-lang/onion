@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/GradeReport.on`, a 255-line student gradebook sample.** Exercises an
+  ADT enum (`Standing`) dispatched via `select this { case x is T: }`, a
+  data-carrying enum (`LetterGrade`), records with `List` fields (`Student`,
+  `Enrollment`, `Course`), an interface implemented by a class
+  (`Reportable`/`StudentReport`), extension methods on `Double`/`Int`,
+  collection pipelines (`map`/`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`),
+  recursive and `while`-based iteration, `foreach` over an inclusive range and
+  over `Map` entries, and `try`/`catch`.
 - **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
   enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
   dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,

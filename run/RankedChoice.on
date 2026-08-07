@@ -1,0 +1,312 @@
+// RankedChoice.on — Instant-Runoff (Ranked-Choice) Voting simulation.
+//
+// Five candidates, 30 ballots with ranked preferences.  Each round the
+// candidate with the fewest first-choice votes is eliminated; their
+// supporters' votes transfer to whichever remaining candidate appears
+// next on each ballot.  The process repeats until one candidate exceeds
+// 50 % of active ballots or only one candidate remains.
+//
+// Demonstrates: records with body methods, class with mutable List/Map
+// state, foreach with map destructuring, break inside foreach, non-local
+// return inside foreach, collection pipelines (filter/sortedBy/find),
+// null-safety with inferred nullable types, String::format, string
+// interpolation with #{}, and multi-round while loops.
+
+record Candidate(id: Int, name: String, party: String) {
+public:
+  def label(): String = "#{name()} (#{party()})"
+}
+
+record ElectionSummary(winnerName: String, winnerParty: String, rounds: Int, winVotes: Int, totalBallots: Int) {
+public:
+  def announce(): String =
+    "WINNER: #{winnerName()} [#{winnerParty()}] — " +
+    "#{winVotes()} / #{totalBallots()} first-choice votes in round #{rounds()}"
+}
+
+class Election {
+  val candidates: List[Candidate]
+  val ballots: List[List[Int]]
+  var eliminated: List[Int]
+  var currentRound: Int
+
+public:
+  def this(candidates: List[Candidate], ballots: List[List[Int]]) {
+    self.candidates = candidates
+    self.ballots = ballots
+    self.eliminated = []
+    self.currentRound = 0
+  }
+
+  def nameOf(id: Int): String {
+    foreach c: Candidate in candidates {
+      if c.id() == id { return c.name() }
+    }
+    return "#" + id
+  }
+
+  def isActive(id: Int): Boolean = !eliminated.contains(id)
+
+  def active(): List[Candidate] = candidates.filter { c => isActive(c.id()) }
+
+  // Walk a ballot and return the first candidate ID still in the running.
+  // Returns -1 when all choices on the ballot have been eliminated.
+  def topChoice(ballot: List[Int]): Int {
+    foreach v: Int in ballot {
+      if isActive(v) { return v }
+    }
+    return -1
+  }
+
+  // Tally first-choice votes among surviving candidates.
+  def tally(): Map[Int, Int] {
+    var counts: Map[Int, Int] = [:]
+    foreach c: Candidate in active() { counts[c.id()] = 0 }
+    foreach ballot: List[Int] in ballots {
+      val pick: Int = topChoice(ballot)
+      if pick >= 0 { counts[pick] = (counts[pick] as Int) + 1 }
+    }
+    return counts
+  }
+
+  def sumMap(m: Map[Int, Int]): Int {
+    var s: Int = 0
+    foreach v: Int in m.values() { s = s + v }
+    return s
+  }
+
+  def printTable(counts: Map[Int, Int], activeBallots: Int): void {
+    val ranked: List[Candidate] = active().sortedBy { c => -(counts[c.id()] as Int) }
+    foreach c: Candidate in ranked {
+      val n: Int = counts[c.id()] as Int
+      val pct: Double = (n as Double) * 100.0 / (activeBallots as Double)
+      IO::println("  #{String::format("%-20s", c.label())} #{String::format("%3d", n)} (#{String::format("%.1f", pct)}%)")
+    }
+  }
+
+  // Run one round. Returns winner ID (>= 0) or -1 if an elimination happened.
+  def runRound(): Int {
+    currentRound++
+    val counts: Map[Int, Int] = tally()
+    val activeBallots: Int = sumMap(counts)
+    IO::println("--- Round #{currentRound}  [#{activeBallots} active ballots] ---")
+    printTable(counts, activeBallots)
+
+    // Majority check: any candidate with > 50% of active ballots wins
+    val majority: Int = activeBallots / 2 + 1
+    foreach c: Candidate in active() {
+      val n: Int = counts[c.id()] as Int
+      if n >= majority {
+        IO::println("  >> #{c.name()} reaches majority (#{n} >= #{majority})")
+        IO::println("")
+        return c.id()
+      }
+    }
+
+    // No majority: eliminate last-place candidate (tie broken by lowest ID)
+    var minVotes: Int = 999999
+    var minId: Int = 999999
+    foreach c: Candidate in active() {
+      val n: Int = counts[c.id()] as Int
+      if n < minVotes || (n == minVotes && c.id() < minId) {
+        minVotes = n
+        minId = c.id()
+      }
+    }
+    eliminated.add(minId)
+    IO::println("  >> #{nameOf(minId)} eliminated (#{minVotes} vote(s))")
+    IO::println("")
+    return -1
+  }
+
+  def run(): ElectionSummary? {
+    IO::println("=== RANKED-CHOICE ELECTION ===")
+    IO::println("")
+    IO::println("Candidates:")
+    foreach c: Candidate in candidates {
+      IO::println("  [#{c.id()}] #{c.label()}")
+    }
+    IO::println("Ballots cast: #{ballots.size()}")
+    IO::println("")
+
+    var winnerId: Int = -1
+    while winnerId < 0 && active().size() > 1 {
+      winnerId = runRound()
+    }
+
+    // Last candidate standing wins if no majority threshold was reached
+    if winnerId < 0 && active().size() == 1 {
+      val last = active().find { c => true }
+      if last != null { winnerId = (last as Candidate).id() }
+    }
+
+    if winnerId < 0 { return null }
+
+    var winner: Candidate? = null
+    foreach c: Candidate in candidates {
+      if c.id() == winnerId { winner = c }
+    }
+    if winner == null { return null }
+
+    val w: Candidate = winner as Candidate
+    val finalTally: Map[Int, Int] = tally()
+    val winVotes: Int = (finalTally[winnerId] as Int)
+    return new ElectionSummary(w.name(), w.party(), currentRound, winVotes, ballots.size())
+  }
+}
+
+// ── Ballot helpers ─────────────────────────────────────────────────────────
+// Numbers are candidate IDs (1=Alice, 2=Bob, 3=Carol, 4=Dave, 5=Eve).
+// Each list is a complete ranking from most- to least-preferred.
+
+def mainElectionBallots(): List[List[Int]] {
+  return [
+    [1, 3, 5, 2, 4],
+    [1, 3, 5, 2, 4],
+    [1, 3, 5, 2, 4],
+    [1, 5, 3, 2, 4],
+    [1, 5, 3, 2, 4],
+    [1, 2, 3, 5, 4],
+    [2, 3, 1, 5, 4],
+    [2, 3, 1, 5, 4],
+    [2, 3, 4, 1, 5],
+    [2, 4, 3, 1, 5],
+    [2, 1, 3, 5, 4],
+    [3, 1, 2, 5, 4],
+    [3, 1, 2, 5, 4],
+    [3, 1, 5, 2, 4],
+    [3, 2, 1, 5, 4],
+    [3, 5, 1, 2, 4],
+    [3, 1, 5, 2, 4],
+    [4, 3, 2, 1, 5],
+    [4, 3, 5, 2, 1],
+    [4, 5, 3, 1, 2],
+    [5, 3, 1, 2, 4],
+    [5, 3, 1, 2, 4],
+    [5, 1, 3, 2, 4],
+    [5, 1, 3, 2, 4],
+    [1, 3, 2, 5, 4],
+    [2, 3, 5, 1, 4],
+    [3, 2, 5, 1, 4],
+    [4, 2, 3, 5, 1],
+    [5, 2, 3, 1, 4],
+    [1, 3, 5, 4, 2]
+  ]
+}
+
+// A three-way contest where the plurality leader does NOT win RCV —
+// classic demonstration of how ranked-choice differs from first-past-the-post.
+// Alpha has the most first-choice votes (plurality), yet Beta wins the
+// runoff because Gamma's eliminated votes transfer to Beta.
+//   Round 1: Alpha=7, Beta=6, Gamma=5  →  Gamma eliminated
+//   Round 2: Beta=6+5=11, Alpha=7      →  Beta wins
+def runoffDemoBallots(): List[List[Int]] {
+  return [
+    [1, 2, 3],   // Alpha fans: prefer Beta over Gamma as backup
+    [1, 2, 3],
+    [1, 2, 3],
+    [1, 2, 3],
+    [1, 2, 3],
+    [1, 2, 3],
+    [1, 2, 3],
+    [2, 1, 3],   // Beta fans: prefer Alpha over Gamma
+    [2, 1, 3],
+    [2, 1, 3],
+    [2, 1, 3],
+    [2, 1, 3],
+    [2, 1, 3],
+    [3, 2, 1],   // Gamma fans: strongly prefer Beta over Alpha
+    [3, 2, 1],
+    [3, 2, 1],
+    [3, 2, 1],
+    [3, 2, 1]
+  ]
+}
+
+// Plurarity winner from a ballot set (first-past-the-post simulation)
+def pluralityWinner(candidates: List[Candidate], ballots: List[List[Int]]): String {
+  var counts: Map[Int, Int] = [:]
+  foreach c: Candidate in candidates { counts[c.id()] = 0 }
+  foreach ballot: List[Int] in ballots {
+    if ballot.size() > 0 {
+      val first: Int = ballot[0] as Int
+      counts[first] = (counts[first] as Int) + 1
+    }
+  }
+  var best: Int = -1
+  var bestVotes: Int = -1
+  foreach c: Candidate in candidates {
+    val n: Int = counts[c.id()] as Int
+    if n > bestVotes {
+      bestVotes = n
+      best = c.id()
+    }
+  }
+  foreach c: Candidate in candidates {
+    if c.id() == best { return c.name() + " (" + bestVotes + " first-choice votes)" }
+  }
+  return "none"
+}
+
+def main(args: String[]): void {
+  // ── Election 1: five-candidate race ──────────────────────────────────────
+  val candidates: List[Candidate] = [
+    new Candidate(1, "Alice Chen",   "Progressive"),
+    new Candidate(2, "Bob Martinez", "Conservative"),
+    new Candidate(3, "Carol Lee",    "Moderate"),
+    new Candidate(4, "Dave Patel",   "Independent"),
+    new Candidate(5, "Eve Kumar",    "Green")
+  ]
+  val ballots = mainElectionBallots()
+
+  val election = new Election(candidates, ballots)
+  val result = election.run()
+
+  IO::println("=== ELECTION COMPLETE ===")
+  if result != null {
+    IO::println((result as ElectionSummary).announce())
+  } else {
+    IO::println("No winner could be determined.")
+  }
+
+  IO::println("")
+  IO::println("Plurality winner would have been: " + pluralityWinner(candidates, ballots))
+
+  // ── Election 2: three-way demonstration ──────────────────────────────────
+  IO::println("")
+  IO::println("=".repeated(60))
+  IO::println("")
+
+  val triCandidates: List[Candidate] = [
+    new Candidate(1, "Alpha", "Left"),
+    new Candidate(2, "Beta",  "Center"),
+    new Candidate(3, "Gamma", "Right")
+  ]
+  val triBallots = runoffDemoBallots()
+
+  IO::println("Plurality winner: " + pluralityWinner(triCandidates, triBallots))
+  val triElection = new Election(triCandidates, triBallots)
+  val triResult = triElection.run()
+
+  IO::println("=== THREE-WAY RUNOFF COMPLETE ===")
+  if triResult != null {
+    IO::println((triResult as ElectionSummary).announce())
+  } else {
+    IO::println("No winner could be determined.")
+  }
+
+  // Result: Alpha leads in round 1 (plurality) but Gamma's votes all go to Beta,
+  // giving Beta an overall majority. Plurality and RCV produce different winners.
+  IO::println("")
+  IO::println("Note: Alpha wins under first-past-the-post (most first-choice votes),")
+  IO::println("but Beta wins ranked-choice because Gamma's supporters prefer Beta.")
+}
+
+extension String {
+  def repeated(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+}

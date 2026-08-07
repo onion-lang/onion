@@ -52,7 +52,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * every other line keeps its original line number. On any other line `#!` is
    * left for the lexer to reject rather than being silently skipped (issue #262).
    */
-  private def stripShebang(reader: Reader): Reader = {
+  private def stripShebang(reader: Reader): String = {
     val sb = new StringBuilder
     val buf = new Array[Char](4096)
     try {
@@ -60,12 +60,10 @@ class Parsing(config: CompilerConfig) extends AnyRef
       while (n != -1) { sb.appendAll(buf, 0, n); n = reader.read(buf) }
     } finally reader.close()
     val text = sb.toString
-    val stripped =
-      if (text.startsWith("#!")) {
-        val nl = text.indexOf('\n')
-        if (nl < 0) "" else text.substring(nl)
-      } else text
-    new StringReader(stripped)
+    if (text.startsWith("#!")) {
+      val nl = text.indexOf('\n')
+      if (nl < 0) "" else text.substring(nl)
+    } else text
   }
 
   private def parseFile(
@@ -74,7 +72,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
     problems: ArrayBuffer[CompileError]
   ): Unit = {
     try {
-      val reader = stripShebang(source.openReader())
+      val sourceText = stripShebang(source.openReader())
+      val reader = new StringReader(sourceText)
       val parser = new JJOnionParser(reader)
 
       // Enable error recovery mode to collect multiple errors
@@ -85,7 +84,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
 
         // Check for collected errors during parsing
         if (parser.hasErrors()) {
-          collectParseErrors(parser, source.name, problems)
+          collectParseErrors(parser, source.name, sourceText, problems)
         }
 
         // Only add the unit if we got a valid result
@@ -96,10 +95,10 @@ class Parsing(config: CompilerConfig) extends AnyRef
         case e: ParseException =>
           // First, add any collected errors
           if (parser.hasErrors()) {
-            collectParseErrors(parser, source.name, problems)
+            collectParseErrors(parser, source.name, sourceText, problems)
           }
           // Then add the final error that stopped parsing
-          addParseException(e, source.name, problems)
+          addParseException(e, source.name, sourceText, problems)
       } finally {
         reader.close()
       }
@@ -115,6 +114,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private def collectParseErrors(
     parser: JJOnionParser,
     fileName: String,
+    sourceText: String,
     problems: ArrayBuffer[CompileError]
   ): Unit = {
     val errors = parser.getCollectedErrors()
@@ -123,7 +123,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.line, error.column),
-        syntaxErrorMessage(error.found, error.expected)
+        syntaxErrorMessage(error.found, error.expected, contextAt(sourceText, error.line, error.column))
       )
     }
   }
@@ -134,6 +134,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
   private def addParseException(
     e: ParseException,
     fileName: String,
+    sourceText: String,
     problems: ArrayBuffer[CompileError]
   ): Unit = {
     // Message-only ParseExceptions (e.g. from string-interpolation splitting)
@@ -146,9 +147,25 @@ class Parsing(config: CompilerConfig) extends AnyRef
       problems += CompileError(
         fileName,
         new Location(error.beginLine, error.beginColumn),
-        syntaxErrorMessage(error.image, expected)
+        syntaxErrorMessage(error.image, expected, contextAt(sourceText, error.beginLine, error.beginColumn))
       )
     }
+  }
+
+  /**
+   * The source text starting at a 1-based (line, column), for hints that need
+   * to look past the offending token (bounded so a pathological file can't
+   * make the regex match slow).
+   */
+  private def contextAt(sourceText: String, line: Int, column: Int): String = {
+    var offset = 0
+    var currentLine = 1
+    while (currentLine < line && offset >= 0 && offset < sourceText.length) {
+      val nl = sourceText.indexOf('\n', offset)
+      if (nl < 0) offset = sourceText.length else { offset = nl + 1; currentLine += 1 }
+    }
+    val start = math.min(sourceText.length, offset + column - 1)
+    sourceText.substring(start, math.min(sourceText.length, start + 200))
   }
 
   /**
@@ -162,21 +179,28 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * (complete strings lex as a single STRING token); report it as such
    * instead of listing unrelated expected tokens.
    */
-  private def syntaxErrorMessage(found: String, expected: String): String = {
+  private def syntaxErrorMessage(found: String, expected: String, context: String = ""): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
     // problem (an unclosed block/paren) instead.
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
     val base =
       if (found == "\"") Message("error.parsing.unterminated_string")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
-    val hint = commonSyntaxHint(found, expected)
+    val hint = commonSyntaxHint(found, expected, context)
     if (hint.isEmpty) base else base + " " + hint
   }
 
   /**
+   * A trailing lambda's parameter list is never parenthesized (`{ k, v => ... }`,
+   * unlike the non-trailing `(k, v) -> ...` form), so `{ (k, v) => ... }` fails
+   * right at the `{` with an unhelpful expected-token dump.
+   */
+  private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*=>""".r
+
+  /**
    * Add friendly hints for common syntax mistakes.
    */
-  private def commonSyntaxHint(found: String, expected: String): String = found match {
+  private def commonSyntaxHint(found: String, expected: String, context: String): String = found match {
     // The symbolic spellings of inheritance, replaced by `extends` and `conforms`.
     // `<:` no longer appears in any production, so meeting one can only be old source.
     case "<:" =>
@@ -187,6 +211,9 @@ class Parsing(config: CompilerConfig) extends AnyRef
       "Hint: Onion does not support `for x in xs`. Use a C-style loop: `for var i = 0; i < xs.size(); i = i + 1 { ... }`."
     case "else" =>
       "Hint: `else` must follow an `if` block. Onion does not support `if` as an expression; use `if (cond) { ... } else { ... }`."
+    case "{" if ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
+      val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
+      Message("error.parsing.hint.trailing_lambda_parens", params)
     case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
       "Hint: a block `{ ... }` is expected here."
     case _ =>

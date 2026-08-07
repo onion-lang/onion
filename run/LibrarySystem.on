@@ -1,0 +1,374 @@
+// LibrarySystem.on — A library management system exercising records,
+// plain enums, classes with methods, collection operations, pattern
+// matching, extension methods, string interpolation, and closures.
+
+enum Genre { FICTION, NONFICTION, SCIENCE, MYSTERY, BIOGRAPHY, THRILLER }
+
+record Book(title: String, author: String, year: Int, pages: Int, genre: Genre)
+record Member(id: Int, name: String, email: String)
+record Loan(memberId: Int, bookTitle: String, dueDay: Int)
+record SearchResult(book: Book, score: Int)
+
+// ── Extension methods ──────────────────────────────────────────────────────
+
+extension String {
+  def truncate(maxLen: Int): String {
+    if this.length() <= maxLen { return this }
+    return this.substring(0, maxLen - 3) + "..."
+  }
+  def padRight(width: Int): String {
+    var s: String = this
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def containsIgnoreCase(sub: String): Boolean {
+    return this.toLowerCase().contains(sub.toLowerCase())
+  }
+}
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+  def toStars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "*"; i = i + 1 }
+    return s
+  }
+}
+
+// ── Genre utilities ────────────────────────────────────────────────────────
+
+def genreLabel(g: Genre): String {
+  select g {
+    case Genre::FICTION:    return "Fiction"
+    case Genre::NONFICTION: return "Non-Fiction"
+    case Genre::SCIENCE:    return "Science"
+    case Genre::MYSTERY:    return "Mystery"
+    case Genre::BIOGRAPHY:  return "Biography"
+    case Genre::THRILLER:   return "Thriller"
+    else:                   return "Other"
+  }
+}
+
+// ── Library class ──────────────────────────────────────────────────────────
+
+class Library {
+public:
+  val books: List[Book]
+  val members: List[Member]
+  val loans: List[Loan]
+  var nextId: Int
+
+  def this() {
+    this.books = []
+    this.members = []
+    this.loans = []
+    this.nextId = 1
+  }
+
+  def addBook(title: String, author: String, year: Int, pages: Int, genre: Genre): void {
+    this.books << new Book(title, author, year, pages, genre)
+  }
+
+  def registerMember(name: String, email: String): Member {
+    val m = new Member(this.nextId, name, email)
+    this.members << m
+    this.nextId = this.nextId + 1
+    return m
+  }
+
+  def checkout(memberId: Int, title: String, dueDay: Int): Boolean {
+    if !this.isAvailable(title) { return false }
+    this.loans << new Loan(memberId, title, dueDay)
+    return true
+  }
+
+  def isAvailable(title: String): Boolean {
+    foreach l: Object in this.loans {
+      if (l as Loan).bookTitle() == title { return false }
+    }
+    return true
+  }
+
+  def returnBook(memberId: Int, title: String): Boolean {
+    var idx: Int = -1
+    var i: Int = 0
+    foreach l: Object in this.loans {
+      val loan = l as Loan
+      if loan.memberId() == memberId && loan.bookTitle() == title { idx = i }
+      i = i + 1
+    }
+    if idx < 0 { return false }
+    this.loans.remove(idx)
+    return true
+  }
+
+  def findByAuthor(author: String): List[Book] {
+    val result: List[Book] = []
+    foreach b: Object in this.books {
+      val book = b as Book
+      if book.author().containsIgnoreCase(author) { result << book }
+    }
+    return result
+  }
+
+  def findByGenre(genre: Genre): List[Book] {
+    val result: List[Book] = []
+    foreach b: Object in this.books {
+      val book = b as Book
+      if book.genre() == genre { result << book }
+    }
+    return result
+  }
+
+  def findByYearRange(from: Int, to: Int): List[Book] {
+    val result: List[Book] = []
+    foreach b: Object in this.books {
+      val book = b as Book
+      if book.year() >= from && book.year() <= to { result << book }
+    }
+    return result
+  }
+
+  def countByAuthor(author: String): Int {
+    var count: Int = 0
+    foreach b: Object in this.books {
+      if (b as Book).author() == author { count = count + 1 }
+    }
+    return count
+  }
+
+  def topAuthors(n: Int): List[String] {
+    val names: List[String] = []
+    foreach b: Object in this.books {
+      val a = (b as Book).author()
+      if !names.contains(a) { names << a }
+    }
+    // Bubble sort descending by book count
+    var i: Int = 0
+    while i < names.size {
+      var j: Int = 0
+      while j < names.size - 1 {
+        if this.countByAuthor(names[j] as String) < this.countByAuthor(names[j + 1] as String) {
+          val tmp = names[j]
+          names[j] = names[j + 1]
+          names[j + 1] = tmp
+        }
+        j = j + 1
+      }
+      i = i + 1
+    }
+    val result: List[String] = []
+    var k: Int = 0
+    while k < n && k < names.size { result << names[k] as String; k = k + 1 }
+    return result
+  }
+
+  def computeStats(): void {
+    val total = this.books.size
+    if total == 0 { IO::println("  No books."); return }
+    var totalPages: Int = 0
+    var minYear: Int = 9999
+    var maxYear: Int = 0
+    var oldest: String = ""
+    var newest: String = ""
+    foreach b: Object in this.books {
+      val book = b as Book
+      totalPages = totalPages + book.pages()
+      if book.year() < minYear { minYear = book.year(); oldest = book.title() }
+      if book.year() > maxYear { maxYear = book.year(); newest = book.title() }
+    }
+    val avg = totalPages / total
+    IO::println("  Total books    : #{total}")
+    IO::println("  Total pages    : #{totalPages}")
+    IO::println("  Average pages  : #{avg}")
+    IO::println("  Oldest (#{minYear}): #{oldest}")
+    IO::println("  Newest (#{maxYear}): #{newest}")
+    IO::println("  On loan        : #{this.loans.size}")
+  }
+
+  def overdueSummary(today: Int): void {
+    var count: Int = 0
+    foreach l: Object in this.loans {
+      val loan = l as Loan
+      if loan.dueDay() < today {
+        IO::println("  OVERDUE: '#{loan.bookTitle().truncate(30)}' (member #{loan.memberId()}, was due day #{loan.dueDay()})")
+        count = count + 1
+      }
+    }
+    if count == 0 { IO::println("  No overdue loans.") }
+    else { IO::println("  Total overdue: #{count}") }
+  }
+}
+
+// ── Ranked search ──────────────────────────────────────────────────────────
+
+def scoreBook(book: Book, query: String): Int {
+  var score: Int = 0
+  if book.title().containsIgnoreCase(query) { score = score + 10 }
+  if book.author().containsIgnoreCase(query) { score = score + 5 }
+  if genreLabel(book.genre()).containsIgnoreCase(query) { score = score + 3 }
+  return score
+}
+
+def rankSearch(books: List[Book], query: String): List[SearchResult] {
+  val results: List[SearchResult] = []
+  foreach b: Object in books {
+    val book = b as Book
+    val s = scoreBook(book, query)
+    if s > 0 { results << new SearchResult(book, s) }
+  }
+  // Sort descending by score
+  var i: Int = 0
+  while i < results.size {
+    var j: Int = 0
+    while j < results.size - 1 {
+      val ra = results[j] as SearchResult
+      val rb = results[j + 1] as SearchResult
+      if ra.score() < rb.score() { results[j] = rb; results[j + 1] = ra }
+      j = j + 1
+    }
+    i = i + 1
+  }
+  return results
+}
+
+// ── Formatting helpers ─────────────────────────────────────────────────────
+
+def printBook(b: Book): void {
+  val avail = if b.pages() > 400 { "long" } else { "short" }
+  val title = b.title().truncate(32).padRight(34)
+  val auth = b.author().padRight(22)
+  IO::println("  #{title}#{auth}#{b.year()}  #{b.pages()}p (#{avail})  [#{genreLabel(b.genre())}]")
+}
+
+def printHeader(title: String): void {
+  IO::println("")
+  IO::println(title)
+  IO::println("-".repeat(title.length()))
+}
+
+// ── Sample data ────────────────────────────────────────────────────────────
+
+val lib = new Library()
+
+lib.addBook("The Great Gatsby",            "F. Scott Fitzgerald",  1925, 180, Genre::FICTION)
+lib.addBook("To Kill a Mockingbird",       "Harper Lee",           1960, 281, Genre::FICTION)
+lib.addBook("1984",                        "George Orwell",        1949, 328, Genre::FICTION)
+lib.addBook("Animal Farm",                 "George Orwell",        1945, 112, Genre::FICTION)
+lib.addBook("A Brief History of Time",     "Stephen Hawking",      1988, 212, Genre::SCIENCE)
+lib.addBook("The Selfish Gene",            "Richard Dawkins",      1976, 360, Genre::SCIENCE)
+lib.addBook("Cosmos",                      "Carl Sagan",           1980, 365, Genre::SCIENCE)
+lib.addBook("Sherlock Holmes",             "Arthur Conan Doyle",   1892, 307, Genre::MYSTERY)
+lib.addBook("And Then There Were None",    "Agatha Christie",      1939, 272, Genre::MYSTERY)
+lib.addBook("Murder on the Orient Express","Agatha Christie",      1934, 256, Genre::MYSTERY)
+lib.addBook("The Girl with the Dragon Tattoo","Stieg Larsson",     2005, 672, Genre::THRILLER)
+lib.addBook("Gone Girl",                   "Gillian Flynn",        2012, 422, Genre::THRILLER)
+lib.addBook("Steve Jobs",                  "Walter Isaacson",      2011, 630, Genre::BIOGRAPHY)
+lib.addBook("The Diary of a Young Girl",   "Anne Frank",           1947, 283, Genre::BIOGRAPHY)
+lib.addBook("Sapiens",                     "Yuval Noah Harari",    2011, 443, Genre::NONFICTION)
+lib.addBook("Thinking, Fast and Slow",     "Daniel Kahneman",      2011, 499, Genre::NONFICTION)
+
+val alice = lib.registerMember("Alice Smith",  "alice@example.com")
+val bob   = lib.registerMember("Bob Jones",   "bob@example.com")
+val carol = lib.registerMember("Carol White", "carol@example.com")
+
+lib.checkout(alice.id(), "1984",        30)
+lib.checkout(alice.id(), "Sapiens",     14)
+lib.checkout(bob.id(),   "Sherlock Holmes", 7)
+lib.checkout(carol.id(), "Gone Girl",   21)
+// Bob's loan is already overdue (today = day 20, due day 7)
+
+// ── Output ─────────────────────────────────────────────────────────────────
+
+printHeader("FULL CATALOG (#{lib.books.size} books)")
+foreach b: Object in lib.books { printBook(b as Book) }
+
+printHeader("LIBRARY STATISTICS")
+lib.computeStats()
+
+printHeader("TOP AUTHORS")
+foreach a: Object in lib.topAuthors(5) {
+  val author = a as String
+  IO::println("  #{author.padRight(24)} #{lib.countByAuthor(author)} book(s)  #{lib.countByAuthor(author).toStars()}")
+}
+
+printHeader("SCIENCE BOOKS")
+foreach b: Object in lib.findByGenre(Genre::SCIENCE) { printBook(b as Book) }
+
+printHeader("MYSTERY BOOKS")
+foreach b: Object in lib.findByGenre(Genre::MYSTERY) { printBook(b as Book) }
+
+printHeader("BOOKS BY GEORGE ORWELL")
+foreach b: Object in lib.findByAuthor("Orwell") { printBook(b as Book) }
+
+printHeader("BOOKS BY AGATHA CHRISTIE")
+foreach b: Object in lib.findByAuthor("Christie") { printBook(b as Book) }
+
+printHeader("BOOKS FROM 1980-2015")
+foreach b: Object in lib.findByYearRange(1980, 2015) { printBook(b as Book) }
+
+printHeader("ACTIVE LOANS (today = day 20)")
+foreach l: Object in lib.loans {
+  val loan = l as Loan
+  val days = loan.dueDay() - 20
+  val status = if days < 0 { "OVERDUE by #{0 - days} day(s)" } else { "due in #{days} day(s)" }
+  IO::println("  Member #{loan.memberId()} → '#{loan.bookTitle().truncate(28)}' [#{status}]")
+}
+
+printHeader("OVERDUE LOANS")
+lib.overdueSummary(20)
+
+// Return a book and check availability
+val returned = lib.returnBook(alice.id(), "1984")
+printHeader("AFTER ALICE RETURNS '1984'")
+IO::println("  Return success  : #{returned}")
+IO::println("  '1984' available: #{lib.isAvailable("1984")}")
+IO::println("  Active loans    : #{lib.loans.size}")
+
+// Try to checkout an already-borrowed book
+val canCheckout = lib.checkout(bob.id(), "Sapiens", 25)
+IO::println("  Bob checkout 'Sapiens' (still out): #{canCheckout}")
+
+// Ranked search
+printHeader("RANKED SEARCH: 'the'")
+foreach r: Object in rankSearch(lib.books, "the") {
+  val sr = r as SearchResult
+  IO::println("  score=#{sr.score()} '#{sr.book().title().truncate(35)}' by #{sr.book().author()}")
+}
+
+printHeader("RANKED SEARCH: 'science'")
+foreach r: Object in rankSearch(lib.books, "science") {
+  val sr = r as SearchResult
+  IO::println("  score=#{sr.score()} '#{sr.book().title().truncate(35)}' by #{sr.book().author()}")
+}
+
+// Extension method showcase
+printHeader("EXTENSION METHOD DEMOS")
+IO::println("  10.clamp(1, 5)          = #{10.clamp(1, 5)}")
+IO::println("  3.clamp(1, 5)           = #{3.clamp(1, 5)}")
+IO::println("  0.clamp(1, 5)           = #{0.clamp(1, 5)}")
+IO::println("  5.toStars()             = #{5.toStars()}")
+IO::println("  'Long Title Here'.truncate(10) = #{"Long Title Here".truncate(10)}")
+IO::println("  'hi'.padRight(8) + '|' = #{"hi".padRight(8)}|")
+IO::println("  'Hello'.containsIgnoreCase('ell') = #{"Hello".containsIgnoreCase("ell")}")
+
+// Recursive factorial using extension Int method
+def factorial(n: Int): Int {
+  if n <= 1 { return 1 }
+  return n * factorial(n - 1)
+}
+
+printHeader("BONUS: FACTORIAL (recursive)")
+var i: Int = 1
+while i <= 10 {
+  IO::println("  #{i}! = #{factorial(i)}")
+  i = i + 1
+}
+
+IO::println("")
+IO::println("Done. Library has #{lib.books.size} books and #{lib.members.size} members.")

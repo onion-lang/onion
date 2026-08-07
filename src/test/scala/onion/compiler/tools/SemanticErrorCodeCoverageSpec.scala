@@ -218,6 +218,35 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
   }
 
+  describe("member accessibility") {
+    it("E0013 private static method called from another class") {
+      failsWith("E0013",
+        """class C {
+          |private:
+          |  static def s(): Int = 1
+          |}
+          |def main(args: String[]): void { IO::println(C::s()) }
+          |""".stripMargin)
+    }
+    it("E0014 writing a non-public field from outside its class") {
+      failsWith("E0014",
+        """class Plain {
+          |  var value: String
+          |public:
+          |  def this(v: String) { value = v }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val p = new Plain("orig")
+          |    p.value = "changed"
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+  }
+
   describe("inheritance and interfaces") {
     it("E0018 illegal inheritance (extending a final class)") {
       failsWith("E0018",
@@ -362,6 +391,17 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
   }
 
   describe("generics") {
+    it("E0030 type is not generic") {
+      failsWith("E0030",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val x: String[Int] = null
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
     it("E0031 type argument arity mismatch") {
       failsWith("E0031",
         """class Box[T] { public: def this {} }
@@ -514,6 +554,38 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin)
+    }
+  }
+
+  describe("closures and destructuring") {
+    it("E0052 lambda parameter needs a type annotation when none can be inferred") {
+      failsWith("E0052",
+        """val f = (x) -> x + 1
+          |def main(): void { }
+          |""".stripMargin)
+    }
+    it("E0046 destructuring binding count must match the record's field count") {
+      failsWith("E0046",
+        """record Point(x: Int, y: Int)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val (a, b, c) = new Point(1, 2)
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+    it("E0047 destructuring a non-record value") {
+      failsWith("E0047",
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val (a, b) = "not a record"
+          |    return 0
+          |  }
           |}
           |""".stripMargin)
     }

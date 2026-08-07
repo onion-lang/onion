@@ -1,0 +1,186 @@
+import {
+  java.util.*
+}
+
+// Weighted directed graph with BFS, DFS, and Dijkstra's shortest path.
+// Demonstrates: ADT enums, explicit return in select branches, Map/List
+// operations, and formatted output.
+
+// A search result: either a found path with total cost, or unreachable.
+enum SearchResult {
+  case Found(path: List[String], cost: Int)
+  case Unreachable
+public:
+  def describe(): String = select this {
+    case f is Found: return "cost=" + f.cost() + " path=" + f.path()
+    case u is Unreachable: return "unreachable"
+  }
+  def isFound(): Boolean = select this {
+    case f is Found: return true
+    case u is Unreachable: return false
+  }
+}
+
+// A simple weighted graph backed by an adjacency list.
+// Each adjacency entry is stored as "neighbor:weight" strings.
+class WeightedGraph {
+  val adjacency: Map[String, List[String]]
+public:
+  def this {
+    adjacency = [:]
+  }
+
+  def addEdge(from: String, to: String, weight: Int): void {
+    if adjacency.get(from) == null { adjacency.put(from, []) }
+    if adjacency.get(to)   == null { adjacency.put(to, []) }
+    adjacency.get(from) << (to + ":" + weight)
+  }
+
+  def neighbors(node: String): List[String] {
+    val n: List[String] = adjacency.get(node)
+    if n == null { return [] }
+    return n
+  }
+
+  // Breadth-first search — returns shortest hop-count path (unweighted).
+  def bfs(start: String, goal: String): SearchResult {
+    if adjacency.get(start) == null { return new Unreachable() }
+    val visited: Map[String, Boolean] = [:]
+    val queue: LinkedList[String] = new LinkedList[String]()
+    val prev: Map[String, String] = [:]
+    queue.add(start)
+    visited.put(start, true)
+    while !queue.isEmpty() {
+      val cur: String = queue.poll()
+      if cur == goal { return new Found(buildPath(prev, start, goal), 0) }
+      foreach edge: String in neighbors(cur) {
+        val nb: String = edgeNode(edge)
+        if visited.get(nb) == null {
+          visited.put(nb, true)
+          prev.put(nb, cur)
+          queue.add(nb)
+        }
+      }
+    }
+    return new Unreachable()
+  }
+
+  // Depth-first search — returns any path to the goal.
+  def dfs(start: String, goal: String): SearchResult {
+    if adjacency.get(start) == null { return new Unreachable() }
+    val visited: Map[String, Boolean] = [:]
+    val path: List[String] = []
+    if dfsVisit(start, goal, visited, path) { return new Found(path, 0) }
+    return new Unreachable()
+  }
+
+  def dfsVisit(node: String, goal: String, visited: Map[String, Boolean], path: List[String]): Boolean {
+    if visited.get(node) != null { return false }
+    visited.put(node, true)
+    path << node
+    if node == goal { return true }
+    foreach edge: String in neighbors(node) {
+      val nb: String = edgeNode(edge)
+      if dfsVisit(nb, goal, visited, path) { return true }
+    }
+    path.remove(path.size - 1)
+    return false
+  }
+
+  // Dijkstra's algorithm — returns the least-cost path and its total weight.
+  // Uses a simple O(V^2) scan instead of a priority queue for clarity.
+  def dijkstra(start: String, goal: String): SearchResult {
+    if adjacency.get(start) == null { return new Unreachable() }
+    val dist: Map[String, Int] = [:]
+    val prev: Map[String, String] = [:]
+    val settled: Map[String, Boolean] = [:]
+    dist.put(start, 0)
+    // Collect all nodes we have distances for and find the minimum each round.
+    var found: Boolean = false
+    while !found {
+      // Pick the unsettled node with the smallest tentative distance.
+      var u: String? = null
+      var best: Int = Integer::MAX_VALUE
+      foreach entry: Map.Entry in dist.entrySet() {
+        val node: String = (entry.getKey() as String)
+        val d: Int = (entry.getValue() as Int)
+        if settled.get(node) == null && d < best {
+          best = d
+          u = node
+        }
+      }
+      if u == null { break }
+      val cur: String = u!!
+      settled.put(cur, true)
+      if cur == goal { found = true; break }
+      foreach edge: String in neighbors(cur) {
+        val nb: String = edgeNode(edge)
+        val wt: Int = edgeWeight(edge)
+        val alt: Int = (dist.get(cur) as Int) + wt
+        val dNb = dist.get(nb)
+        if dNb == null || alt < (dNb as Int) {
+          dist.put(nb, alt)
+          prev.put(nb, cur)
+        }
+      }
+    }
+    if !found { return new Unreachable() }
+    return new Found(buildPath(prev, start, goal), (dist.get(goal) as Int))
+  }
+
+  // Build a path list by following the prev-map backward from goal to start.
+  def buildPath(prev: Map[String, String], start: String, goal: String): List[String] {
+    val path: List[String] = []
+    var cur: String = goal
+    while cur != null {
+      path.add(0, cur)
+      if cur == start { break }
+      cur = prev.get(cur)
+    }
+    return path
+  }
+
+  // Extract the neighbor node from an "node:weight" edge string.
+  def edgeNode(edge: String): String {
+    return edge.substring(0, edge.lastIndexOf(":"))
+  }
+
+  // Extract the weight from an "node:weight" edge string.
+  def edgeWeight(edge: String): Int {
+    return Integer::parseInt(edge.substring(edge.lastIndexOf(":") + 1))
+  }
+}
+
+// Build a sample graph: A->B(4), A->C(2), C->B(1), B->D(5), C->D(8), B->E(6), D->E(2)
+val g: WeightedGraph = new WeightedGraph()
+g.addEdge("A", "B", 4)
+g.addEdge("A", "C", 2)
+g.addEdge("C", "B", 1)
+g.addEdge("B", "D", 5)
+g.addEdge("C", "D", 8)
+g.addEdge("B", "E", 6)
+g.addEdge("D", "E", 2)
+
+IO::println("=== BFS A -> E ===")
+IO::println(g.bfs("A", "E").describe())
+
+IO::println("=== DFS A -> E ===")
+IO::println(g.dfs("A", "E").describe())
+
+IO::println("=== Dijkstra A -> E ===")
+IO::println(g.dijkstra("A", "E").describe())
+
+IO::println("=== Dijkstra A -> D ===")
+IO::println(g.dijkstra("A", "D").describe())
+
+IO::println("=== Unreachable: E -> A ===")
+IO::println(g.dijkstra("E", "A").describe())
+
+IO::println("=== BFS: unknown start ===")
+IO::println(g.bfs("Z", "A").describe())
+
+// Verify SearchResult methods work
+val res1: SearchResult = g.dijkstra("A", "E")
+val res2: SearchResult = g.dijkstra("E", "A")
+IO::println("A->E isFound: " + res1.isFound())
+IO::println("E->A isFound: " + res2.isFound())

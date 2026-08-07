@@ -9,6 +9,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
+  a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
+  a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,
+  `Generation.summary`/`isStable`/`isEmpty`/`delta`), extension methods on `Int`
+  (`wrapIn`, `sign`) and `String` (`padLeft`, `padRight`), a sparse
+  `Map[String,Boolean]` grid with toroidal wrapping, `foreach (k, v) in map`,
+  collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/`distinct`), and
+  closures stored in `val`s. Verified oscillators: Glider (period-4), Blinker
+  (period-2), Pulsar (period-3), and a 50-generation R-Pentomino run.
+
+- **`run/RecipeBook.on`, a 620-line recipe management sample.** Exercises a
+  data-carrying enum (`Measurement` with `Grams`/`Milliliters`/`Pieces`/
+  `Tablespoons`/`Teaspoons`/`Cups`, dispatched via `select`/`case`
+  destructuring), plain enums (`Cuisine`, `MealType`, `Difficulty`), records
+  with methods and `static def of(...)` factories (`Ingredient`,
+  `NutritionInfo`, `Recipe`), extension methods on `Double`/`Int`/`String`,
+  collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`distinct`/`find`),
+  nullable types with safe calls and null coalescing, and a mutable
+  `RecipeBook` class with query and report-generation methods.
+
+- **`run/PerfReview.on`, a 284-line employee performance review dashboard.**
+  Exercises ADT case-enum (`PerformanceBand` with `Exceptional`/`Strong`/`Meets`/
+  `BelowTarget`/`Critical` and `select this` dispatch), a homogeneous enum
+  (`ReviewStatus` with `::` constant access), records with compile-time `example`
+  clauses (`ReviewMetrics`), extension methods on records, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`zip`/`distinct`),
+  nullable map lookups, `foreach (k, v) in map` destructuring, and `foreach :
+  Type in list` typed iteration.
+
+- **`run/GradeReport.on`, a 255-line student gradebook sample.** Exercises an
+  ADT enum (`Standing`) dispatched via `select this { case x is T: }`, a
+  data-carrying enum (`LetterGrade`), records with `List` fields (`Student`,
+  `Enrollment`, `Course`), an interface implemented by a class
+  (`Reportable`/`StudentReport`), extension methods on `Double`/`Int`,
+  collection pipelines (`map`/`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`),
+  recursive and `while`-based iteration, `foreach` over an inclusive range and
+  over `Map` entries, and `try`/`catch`.
+- **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
+  enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
+  dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,
+  `Comment`, `Reaction`), a `Network` class backed by `HashMap` stores,
+  collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
+  BFS-style friend-of-friend recommendation engine, and nullable lookups
+  (`User?`/`Post?`).
+- **`run/PetShelter.on`, a 269-line pet shelter management sample.** Exercises a
+  data-carrying enum (`PetType`), an ADT case-enum (`AdoptionStatus` with
+  `Available`/`Foster`/`Adopted`/`Quarantine` cases and shared methods via
+  `select this`), records (`Pet`, `Adopter`, `FosterRecord`), a class with
+  public/private sections and a replace-on-update mutation pattern, extension
+  methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
+  `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
+  for intake validation.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.**
+  Exercises a homogeneous enum (`CellState`), an enum with a `select`-based
+  method (`PatternKind.label()`), records with methods (`Cell.distanceTo()`,
+  `Generation.summary/isStable/isEmpty`), extension methods on `Int`
+  (`wrapIn`/`sign`) and `String` (`padLeft`/`padRight`), a `Map`-backed
+  sparse grid with toroidal wrapping, `foreach (k, v) in map`, nullable map
+  lookups, collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/
+  `distinct`/`forEach`), and closures stored in `val`s. Verified against
+  canonical Game of Life periods (glider, blinker, pulsar, R-pentomino).
+
+## [0.10.25] - 2026-08-07
+
+### Added
+
 - **`run/WeatherReport.on`, a 261-line weather data analysis sample.** A new
   domain not previously covered by the corpus. Exercises a data-carrying enum
   (`AlertLevel`: `NONE`/`ADVISORY`/`WARNING`/`EMERGENCY`), records with inline
@@ -46,6 +112,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
   `record example {}` build-time parse round-trip assertions.
   111 total corpus programs.
+- **`run/ClinicRecords.on`, a 523-line medical clinic patient and appointment
+  management sample.** Exercises homogeneous enums with `select` dispatch
+  (`BloodType`, `Severity`, `ApptStatus`), an ADT `case`-enum (`DiagnosisResult`:
+  `Clear`/`Condition`/`Referral`) matched with type patterns, records with method
+  bodies including a nullable field (`Appointment.notes: String?`), a class with
+  typed `List[T]` fields, `sortedBy`/`groupBy`/`fold` pipelines, and extension
+  methods on `String`/`Int`/`Double`.
+  112 total corpus programs.
 
 ### Documentation
 

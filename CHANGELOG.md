@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
+  enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
+  dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,
+  `Comment`, `Reaction`), a `Network` class backed by `HashMap` stores,
+  collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
+  BFS-style friend-of-friend recommendation engine, and nullable lookups
+  (`User?`/`Post?`).
+
 ## [0.10.25] - 2026-08-07
 
 ### Added

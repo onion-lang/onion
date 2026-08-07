@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
+  a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
+  a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,
+  `Generation.summary`/`isStable`/`isEmpty`/`delta`), extension methods on `Int`
+  (`wrapIn`, `sign`) and `String` (`padLeft`, `padRight`), a sparse
+  `Map[String,Boolean]` grid with toroidal wrapping, `foreach (k, v) in map`,
+  collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/`distinct`), and
+  closures stored in `val`s. Verified oscillators: Glider (period-4), Blinker
+  (period-2), Pulsar (period-3), and a 50-generation R-Pentomino run.
+
 - **`run/RecipeBook.on`, a 620-line recipe management sample.** Exercises a
   data-carrying enum (`Measurement` with `Grams`/`Milliliters`/`Pieces`/
   `Tablespoons`/`Teaspoons`/`Cups`, dispatched via `select`/`case`

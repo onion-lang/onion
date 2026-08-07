@@ -61,6 +61,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
   `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
   for intake validation.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.**
+  Exercises a homogeneous enum (`CellState`), an enum with a `select`-based
+  method (`PatternKind.label()`), records with methods (`Cell.distanceTo()`,
+  `Generation.summary/isStable/isEmpty`), extension methods on `Int`
+  (`wrapIn`/`sign`) and `String` (`padLeft`/`padRight`), a `Map`-backed
+  sparse grid with toroidal wrapping, `foreach (k, v) in map`, nullable map
+  lookups, collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/
+  `distinct`/`forEach`), and closures stored in `val`s. Verified against
+  canonical Game of Life periods (glider, blinker, pulsar, R-pentomino).
 
 ## [0.10.25] - 2026-08-07
 

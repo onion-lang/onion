@@ -385,5 +385,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs PharmacySystem.on") {
       assert(Shell.Success(null) == runSample("run/PharmacySystem.on"))
     }
+
+    it("runs PropertyManager.on") {
+      assert(Shell.Success(null) == runSample("run/PropertyManager.on"))
+    }
   }
 }

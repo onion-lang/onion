@@ -1,0 +1,374 @@
+// HRSystem.on — a human-resources management system demonstrating ADT enums,
+// plain enums, records with example clauses, extension methods on Int/Double/String,
+// collection pipelines (map/filter/fold/sortedBy/groupBy/find/partition/count/any/
+// all/distinct/take), select/type-pattern matching with exhaustiveness, nullable
+// types, closures, string interpolation, foreach over List and Map (k,v), while.
+
+import { java.util.ArrayList }
+
+// ─── Employment type ADT enum ─────────────────────────────────────────────────
+enum EmploymentType {
+  case FullTime(hoursPerWeek: Int)
+  case PartTime(hoursPerWeek: Int)
+  case Contractor(hourlyRate: Double)
+public:
+  def label(): String = select this {
+    case e is FullTime:   "Full-Time"
+    case e is PartTime:   "Part-Time"
+    case e is Contractor: "Contractor"
+  }
+  def weeklyHours(): Double = select this {
+    case e is FullTime:   e.hoursPerWeek() as Double
+    case e is PartTime:   e.hoursPerWeek() as Double
+    case e is Contractor: 40.0
+  }
+  def isFullTime(): Boolean = select this {
+    case e is FullTime: true
+    else:               false
+  }
+  def isContractor(): Boolean = select this {
+    case e is Contractor: true
+    else:                 false
+  }
+  def monthlyPayFrom(annualSalary: Double): Double = select this {
+    case e is FullTime:   annualSalary / 12.0
+    case e is PartTime:   annualSalary / 12.0 * (e.hoursPerWeek() as Double) / 40.0
+    case e is Contractor: e.hourlyRate() * 40.0 * 4.33
+  }
+}
+
+// ─── Performance rating plain enum ────────────────────────────────────────────
+enum Rating {
+  Excellent, Good, Satisfactory, Poor
+public:
+  def label(): String = select this {
+    case Rating::Excellent:    "Excellent"
+    case Rating::Good:         "Good"
+    case Rating::Satisfactory: "Satisfactory"
+    case Rating::Poor:         "Poor"
+    else:                      "?"
+  }
+  def raisePercent(): Double = select this {
+    case Rating::Excellent:    0.10
+    case Rating::Good:         0.05
+    case Rating::Satisfactory: 0.025
+    case Rating::Poor:         0.0
+    else:                      0.0
+  }
+  def stars(): String = select this {
+    case Rating::Excellent:    "****"
+    case Rating::Good:         "*** "
+    case Rating::Satisfactory: "**  "
+    case Rating::Poor:         "*   "
+    else:                      "    "
+  }
+  def order(): Int = select this {
+    case Rating::Excellent:    0
+    case Rating::Good:         1
+    case Rating::Satisfactory: 2
+    case Rating::Poor:         3
+    else:                      4
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+record Employee(
+  id: Int,
+  name: String,
+  deptName: String,
+  empType: EmploymentType,
+  annualSalary: Double,
+  yearsExp: Int,
+  rating: Rating
+)
+  example {
+    val e = new Employee(1, "Alice", "Eng", new FullTime(40), 120000.0, 5, Rating::Excellent)
+    e.yearsExp() == 5 && e.annualSalary() == 120000.0
+  }
+  example {
+    val e = new Employee(2, "Bob", "HR", new PartTime(20), 60000.0, 2, Rating::Good)
+    e.empType().isFullTime() == false
+  }
+
+record PayRaise(
+  employeeId: Int,
+  employeeName: String,
+  currentSalary: Double,
+  raisePercent: Double,
+  newSalary: Double
+)
+  example {
+    val r = new PayRaise(1, "Alice", 100000.0, 0.10, 110000.0)
+    r.newSalary() - r.currentSalary() == 10000.0
+  }
+
+record DeptStats(
+  deptName: String,
+  headCount: Int,
+  fullTimeCount: Int,
+  avgSalary: Double,
+  totalPayroll: Double,
+  avgYearsExp: Double,
+  topRating: String
+)
+
+// ─── Extension methods ─────────────────────────────────────────────────────────
+extension Int {
+  def plural(word: String): String {
+    if self == 1 { return "1 " + word }
+    return "" + self + " " + word + "s"
+  }
+}
+
+extension Double {
+  def fmtMoney(): String {
+    val whole = self as Long
+    val cents = ((self - (whole as Double)) * 100.0 + 0.5) as Long
+    val centsStr: String = if cents < 10L { "0" + cents } else { "" + cents }
+    return "$" + whole + "." + centsStr
+  }
+  def fmtPct(): String {
+    val p = (self * 100.0 + 0.5) as Long
+    return "" + p + "%"
+  }
+  def round2(): Double = ((self * 100.0 + 0.5) as Long as Double) / 100.0
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = this
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def padLeft(n: Int): String {
+    var s = this
+    while s.length() < n { s = " " + s }
+    return s
+  }
+  def truncate(n: Int): String {
+    if this.length() <= n { return this }
+    return this.substring(0, n - 2) + ".."
+  }
+}
+
+// ─── HR Database ──────────────────────────────────────────────────────────────
+class HRDatabase {
+  var employees: ArrayList[Employee] = new ArrayList[Employee]()
+
+public:
+  def this { employees = new ArrayList[Employee]() }
+
+  def hire(e: Employee): void { employees.add(e) }
+
+  def all(): List[Employee] {
+    val list: List[Employee] = []
+    foreach emp: Employee in employees { list << emp }
+    return list
+  }
+
+  def findById(id: Int): Employee? {
+    val found = all().find { e => e.id() == id }
+    if found == null { return null }
+    return found as Employee
+  }
+
+  def byDepartment(deptName: String): List[Employee] =
+    all().filter { e => e.deptName() == deptName }
+
+  def fullTimeEmployees(): List[Employee] =
+    all().filter { e => e.empType().isFullTime() }
+
+  def contractors(): List[Employee] =
+    all().filter { e => e.empType().isContractor() }
+
+  def topEarners(n: Int): List[Employee] {
+    val sorted = all().sortedBy { e => -e.annualSalary() }
+    return sorted.take(n) as List[Employee]
+  }
+
+  def computeRaises(): List[PayRaise] {
+    return all().map { e =>
+      val pct = e.rating().raisePercent()
+      val raise = e.annualSalary() * pct
+      new PayRaise(e.id(), e.name(), e.annualSalary(), pct, (e.annualSalary() + raise).round2())
+    }
+  }
+
+  def totalPayroll(): Double =
+    all().fold(0.0) { acc, e => (acc as Double) + e.annualSalary() } as Double
+
+  def avgSalary(): Double {
+    val emps = all()
+    if emps.size == 0 { return 0.0 }
+    return totalPayroll() / (emps.size as Double)
+  }
+
+  def departmentNames(): List[String] {
+    val names: List[String] = []
+    foreach e: Employee in all() {
+      if !names.any { n => n == e.deptName() } { names << e.deptName() }
+    }
+    return names
+  }
+
+  def deptStats(deptName: String): DeptStats {
+    val emps = byDepartment(deptName)
+    val count = emps.size
+    val ftCount = emps.filter { e => e.empType().isFullTime() }.size
+    val totalSal = emps.fold(0.0) { acc, e => (acc as Double) + e.annualSalary() } as Double
+    val totalExp = emps.fold(0) { acc, e => (acc as Int) + e.yearsExp() } as Int
+    val avgSal = if count == 0 { 0.0 } else { totalSal / (count as Double) }
+    val avgExp = if count == 0 { 0.0 } else { (totalExp as Double) / (count as Double) }
+    val best = emps.sortedBy { e => e.rating().order() }
+    val topRat = if best.size == 0 { "N/A" } else { (best.get(0) as Employee).rating().label() }
+    return new DeptStats(deptName, count, ftCount, avgSal.round2(), totalSal.round2(), avgExp.round2(), topRat)
+  }
+
+  def highPerformers(): List[Employee] =
+    all().filter { e =>
+      select e.rating() {
+        case Rating::Excellent: true
+        case Rating::Good:      true
+        else:                   false
+      }
+    }.sortedBy { e => -e.annualSalary() }
+
+  def tenureGroups(): Map[String, Int] {
+    val counts: Map[String, Int] = [:]
+    counts.put("0-1 yrs",  0)
+    counts.put("2-4 yrs",  0)
+    counts.put("5-9 yrs",  0)
+    counts.put("10+ yrs",  0)
+    foreach emp: Employee in all() {
+      var key = "10+ yrs"
+      if emp.yearsExp() <= 9 { key = "5-9 yrs" }
+      if emp.yearsExp() <= 4 { key = "2-4 yrs" }
+      if emp.yearsExp() <= 1 { key = "0-1 yrs" }
+      counts.put(key, (counts.get(key) as Int) + 1)
+    }
+    return counts
+  }
+}
+
+// ─── Formatting helpers ────────────────────────────────────────────────────────
+def hLine(c: String, n: Int): String {
+  var s = ""
+  var i = 0
+  while i < n { s = s + c; i++ }
+  return s
+}
+
+def printHeader(title: String): void {
+  val w = 62
+  IO::println("")
+  IO::println(hLine("=", w))
+  val pad = (w - title.length()) / 2
+  IO::println(hLine(" ", pad) + title)
+  IO::println(hLine("=", w))
+}
+
+// ─── Seed data ────────────────────────────────────────────────────────────────
+val db = new HRDatabase()
+
+db.hire(new Employee( 1, "Alice Chen",    "Engineering", new FullTime(40),  145000.0,  8, Rating::Excellent))
+db.hire(new Employee( 2, "Bob Torres",    "Engineering", new FullTime(40),  130000.0,  5, Rating::Good))
+db.hire(new Employee( 3, "Carol Singh",   "Engineering", new PartTime(20),   68000.0,  3, Rating::Good))
+db.hire(new Employee( 4, "David Kim",     "Engineering", new Contractor(80.0), 0.0,    2, Rating::Satisfactory))
+db.hire(new Employee( 5, "Eve Müller",    "Product",     new FullTime(40),  125000.0,  6, Rating::Excellent))
+db.hire(new Employee( 6, "Frank Okafor",  "Product",     new FullTime(40),  115000.0,  4, Rating::Good))
+db.hire(new Employee( 7, "Grace Tanaka",  "Product",     new PartTime(30),   58000.0,  2, Rating::Satisfactory))
+db.hire(new Employee( 8, "Hank Brown",    "Marketing",   new FullTime(40),  100000.0,  7, Rating::Good))
+db.hire(new Employee( 9, "Iris Patel",    "Marketing",   new FullTime(40),   95000.0,  4, Rating::Excellent))
+db.hire(new Employee(10, "Jake Wilson",   "Marketing",   new Contractor(55.0), 0.0,    1, Rating::Good))
+db.hire(new Employee(11, "Kim Lee",       "HR",          new FullTime(40),   90000.0,  9, Rating::Excellent))
+db.hire(new Employee(12, "Leo Garcia",    "HR",          new PartTime(20),   44000.0,  2, Rating::Satisfactory))
+db.hire(new Employee(13, "Maya Osei",     "Finance",     new FullTime(40),  110000.0, 11, Rating::Excellent))
+db.hire(new Employee(14, "Nora Johansson","Finance",     new FullTime(40),  105000.0,  6, Rating::Good))
+db.hire(new Employee(15, "Omar Reza",     "Finance",     new Contractor(70.0), 0.0,    3, Rating::Good))
+
+// ─── Report 1: Employee Directory ─────────────────────────────────────────────
+printHeader("EMPLOYEE DIRECTORY")
+IO::println("ID   Name               Dept         Type         Salary      Rating")
+IO::println(hLine("-", 72))
+foreach emp: Employee in db.all().sortedBy { e => e.id() } {
+  val idStr   = ("" + emp.id()).padLeft(2)
+  val nameStr = emp.name().padRight(18)
+  val deptStr = emp.deptName().padRight(12)
+  val typeStr = emp.empType().label().padRight(12)
+  val salStr  = if emp.annualSalary() > 0.0 { emp.annualSalary().fmtMoney() } else { "  (hourly)" }
+  val ratStr  = emp.rating().label()
+  IO::println("#{idStr}   #{nameStr} #{deptStr} #{typeStr} #{salStr.padLeft(11)}  #{ratStr}")
+}
+
+// ─── Report 2: Department Statistics ──────────────────────────────────────────
+printHeader("DEPARTMENT STATISTICS")
+IO::println("Department    Staff  FT  Avg Salary    Total Payroll  Avg Exp  Top Rating")
+IO::println(hLine("-", 76))
+foreach deptName: String in db.departmentNames() {
+  val st = db.deptStats(deptName)
+  val dn = st.deptName().padRight(13)
+  val hc = ("" + st.headCount()).padLeft(5)
+  val ft = ("" + st.fullTimeCount()).padLeft(4)
+  val av = st.avgSalary().fmtMoney().padLeft(13)
+  val tp = st.totalPayroll().fmtMoney().padLeft(15)
+  val ax = ("" + st.avgYearsExp()).padLeft(7)
+  val tr = st.topRating().padRight(13)
+  IO::println("#{dn} #{hc} #{ft}  #{av}  #{tp}  #{ax}  #{tr}")
+}
+
+// ─── Report 3: Workforce Summary ──────────────────────────────────────────────
+printHeader("WORKFORCE SUMMARY")
+val total   = db.all().size
+val ftCount = db.fullTimeEmployees().size
+val ctCount = db.contractors().size
+val ptCount = total - ftCount - ctCount
+IO::println("Total employees:    " + total.plural("employee"))
+IO::println("Full-time:          " + ftCount.plural("employee"))
+IO::println("Part-time:          " + ptCount.plural("employee"))
+IO::println("Contractors:        " + ctCount.plural("employee"))
+IO::println("Total payroll:      " + db.totalPayroll().fmtMoney())
+IO::println("Average salary:     " + db.avgSalary().round2().fmtMoney())
+val highP = db.highPerformers()
+IO::println("High performers:    " + highP.size.plural("employee") + " (Excellent or Good)")
+
+// ─── Report 4: Top Earners ────────────────────────────────────────────────────
+printHeader("TOP 5 EARNERS")
+IO::println("Rank  Name               Salary        Dept          Rating")
+IO::println(hLine("-", 60))
+val topFive = db.topEarners(5)
+var rank = 1
+foreach emp: Employee in topFive {
+  val rankStr = ("" + rank).padLeft(4)
+  val nameStr = emp.name().padRight(18)
+  val salStr  = emp.annualSalary().fmtMoney().padLeft(13)
+  val deptStr = emp.deptName().padRight(13)
+  val stars   = emp.rating().stars()
+  IO::println("#{rankStr}  #{nameStr} #{salStr}  #{deptStr} #{stars}")
+  rank++
+}
+
+// ─── Report 5: Proposed Pay Raises ────────────────────────────────────────────
+printHeader("PROPOSED ANNUAL RAISES")
+IO::println("Name               Current Salary  Raise   New Salary")
+IO::println(hLine("-", 55))
+var totalRaiseAmt = 0.0
+foreach raise: PayRaise in db.computeRaises() {
+  val nameStr = raise.employeeName().padRight(18)
+  val curStr  = raise.currentSalary().fmtMoney().padLeft(15)
+  val pctStr  = raise.raisePercent().fmtPct().padLeft(7)
+  val newStr  = raise.newSalary().fmtMoney().padLeft(11)
+  IO::println("#{nameStr} #{curStr} #{pctStr}  #{newStr}")
+  totalRaiseAmt = totalRaiseAmt + (raise.newSalary() - raise.currentSalary())
+}
+IO::println(hLine("-", 55))
+IO::println("Total raise budget: " + totalRaiseAmt.round2().fmtMoney())
+
+// ─── Report 6: Tenure Distribution ────────────────────────────────────────────
+printHeader("TENURE DISTRIBUTION")
+val groups = db.tenureGroups()
+val brackets = ["0-1 yrs", "2-4 yrs", "5-9 yrs", "10+ yrs"]
+foreach bracket: String in brackets {
+  val cnt = groups.get(bracket) as Int
+  val bar = hLine("█", cnt * 4)
+  IO::println("#{bracket}  #{("" + cnt).padLeft(2)}  #{bar}")
+}

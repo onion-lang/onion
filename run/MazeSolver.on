@@ -1,0 +1,295 @@
+// MazeSolver.on
+// Generates a perfect maze using recursive-backtracking DFS, then finds the
+// shortest path from S (top-left room) to E (bottom-right room) using BFS.
+// Exercises: ADT enums, records, classes, recursive DFS, iterative BFS,
+// flat-array grid (row-major), select/is pattern matching, for/while loops,
+// extension methods on String, string interpolation, nullable types.
+
+// ─── Cell: what each grid square contains ────────────────────────────────────
+
+enum Cell {
+  case Wall
+  case Open
+  case Start
+  case End
+  case Path
+}
+
+// ─── Point: a (row, col) coordinate (used for documentation / future use) ────
+
+record Point(row: Int, col: Int)
+
+// ─── String helpers ───────────────────────────────────────────────────────────
+
+extension String {
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def center(width: Int): String {
+    if self.length() >= width { return self }
+    val pad: Int = (width - self.length()) / 2
+    var s: String = " ".repeat(pad) + self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Cell helpers ─────────────────────────────────────────────────────────────
+
+def cellChar(c: Cell): String = select c {
+  case x is Wall:  "#"
+  case x is Open:  " "
+  case x is Start: "S"
+  case x is End:   "E"
+  case x is Path:  "."
+}
+
+def passable(c: Cell): Boolean = select c {
+  case x is Wall: false
+  else: true
+}
+
+// ─── Maze ─────────────────────────────────────────────────────────────────────
+
+class Maze {
+public:
+  var rows: Int
+  var cols: Int
+  var grid: List[Cell]    // flat row-major; size = rows * cols
+  var genVisited: Boolean[]
+
+  def this(r: Int, c: Int) {
+    rows = r
+    cols = c
+    grid = []
+    genVisited = new Boolean[r * c]
+    var i: Int = 0
+    while i < r * c {
+      grid << new Wall()
+      genVisited[i] = false
+      i = i + 1
+    }
+  }
+
+  def idx(r: Int, c: Int): Int = r * cols + c
+
+  def at(r: Int, c: Int): Cell = (grid[idx(r, c)] as Cell)
+
+  def setCell(r: Int, c: Int, cell: Cell): void {
+    grid[idx(r, c)] = cell
+  }
+
+  // Carve a perfect maze then mark Start/End corners.
+  def generate(): void {
+    carve(1, 1)
+    setCell(1, 1, new Start())
+    setCell(rows - 2, cols - 2, new End())
+  }
+
+  def print(): void {
+    var r: Int = 0
+    while r < rows {
+      var line: String = ""
+      var c: Int = 0
+      while c < cols {
+        line = line + cellChar(at(r, c))
+        c = c + 1
+      }
+      IO::println(line)
+      r = r + 1
+    }
+  }
+
+  // Count cells that are part of the solved path (including Start and End).
+  def pathLength(): Int {
+    var n: Int = 0
+    var i: Int = 0
+    while i < rows * cols {
+      val c: Cell = (grid[i] as Cell)
+      if c is Path || c is Start || c is End { n = n + 1 }
+      i = i + 1
+    }
+    return n
+  }
+
+  // Count all non-wall cells (passages carved during generation).
+  def openArea(): Int {
+    var n: Int = 0
+    var i: Int = 0
+    while i < rows * cols {
+      if passable(grid[i] as Cell) { n = n + 1 }
+      i = i + 1
+    }
+    return n
+  }
+
+private:
+  // Recursive backtracking DFS: carve passages from the room at (r, c).
+  // Rooms live at odd-indexed cells; walls between two rooms are at the midpoint.
+  def carve(r: Int, c: Int): void {
+    genVisited[idx(r, c)] = true
+    setCell(r, c, new Open())
+
+    // Direction offsets (×2 so we jump over wall cells)
+    val DRS: Int[] = new Int[4]; DRS[0] = -2; DRS[1] = 2; DRS[2] = 0; DRS[3] = 0
+    val DCS: Int[] = new Int[4]; DCS[0] = 0;  DCS[1] = 0; DCS[2] = -2; DCS[3] = 2
+
+    // Shuffle direction indices with Fisher-Yates for a unique maze each run
+    val dirs: Int[] = new Int[4]
+    dirs[0] = 0; dirs[1] = 1; dirs[2] = 2; dirs[3] = 3
+    var i: Int = 3
+    while i > 0 {
+      val j: Int = Rand::nextInt(i + 1)
+      val tmp: Int = dirs[i]; dirs[i] = dirs[j]; dirs[j] = tmp
+      i = i - 1
+    }
+
+    var d: Int = 0
+    while d < 4 {
+      val dd: Int  = dirs[d]
+      val nr: Int  = r + DRS[dd]
+      val nc: Int  = c + DCS[dd]
+      if nr > 0 && nr < rows - 1 && nc > 0 && nc < cols - 1 && !genVisited[idx(nr, nc)] {
+        setCell(r + DRS[dd] / 2, c + DCS[dd] / 2, new Open())
+        carve(nr, nc)
+      }
+      d = d + 1
+    }
+  }
+}
+
+// ─── BFS solver ───────────────────────────────────────────────────────────────
+
+class BfsSolver {
+  var maze: Maze
+
+public:
+  def this(m: Maze) { maze = m }
+
+  // Returns true when the shortest path exists; marks it as Path cells in maze.
+  def solve(): Boolean {
+    val R: Int = maze.rows
+    val C: Int = maze.cols
+    val N: Int = R * C
+
+    val startIdx: Int = maze.idx(1, 1)
+    val endIdx: Int   = maze.idx(R - 2, C - 2)
+
+    // BFS queue: ArrayList used as a queue with a head-index pointer
+    val queue: List[Int] = []
+    queue << startIdx
+    var qHead: Int = 0
+
+    // parent[i] = BFS predecessor index; -1 = not yet reached
+    val parent: Int[] = new Int[N]
+    var k: Int = 0
+    while k < N { parent[k] = -1; k = k + 1 }
+    parent[startIdx] = startIdx  // sentinel: start is its own parent
+
+    var found: Boolean = false
+
+    while qHead < queue.size && !found {
+      val curIdx: Int = (queue[qHead] as Int)
+      qHead = qHead + 1
+
+      if curIdx == endIdx {
+        found = true
+      } else {
+        val curR: Int = curIdx / C
+        val curC: Int = curIdx % C
+
+        val drs: Int[] = new Int[4]; drs[0] = -1; drs[1] = 1; drs[2] = 0; drs[3] = 0
+        val dcs: Int[] = new Int[4]; dcs[0] = 0; dcs[1] = 0; dcs[2] = -1; dcs[3] = 1
+
+        var d: Int = 0
+        while d < 4 {
+          val nr: Int = curR + drs[d]
+          val nc: Int = curC + dcs[d]
+          if nr >= 0 && nr < R && nc >= 0 && nc < C {
+            val ni: Int = maze.idx(nr, nc)
+            if parent[ni] == -1 && passable(maze.grid[ni] as Cell) {
+              parent[ni] = curIdx
+              queue << ni
+            }
+          }
+          d = d + 1
+        }
+      }
+    }
+
+    if found {
+      // Trace the shortest path back from end to start
+      var ci: Int = parent[endIdx]
+      while ci != startIdx {
+        val c: Cell = (maze.grid[ci] as Cell)
+        if !(c is Start) && !(c is End) {
+          maze.grid[ci] = new Path()
+        }
+        ci = parent[ci]
+      }
+    }
+
+    return found
+  }
+}
+
+// ─── Statistics summary ───────────────────────────────────────────────────────
+
+class MazeStats {
+  var label: String
+  var value: String
+
+public:
+  def this(l: String, v: String) { label = l; value = v }
+  def print(): void { IO::println("  #{label}: #{value}") }
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+def main(): void {
+  val rows: Int = 17
+  val cols: Int = 37
+
+  IO::println("+" + "=".repeat(cols) + "+")
+  IO::println("|" + " ONION MAZE GENERATOR + BFS SOLVER ".center(cols) + "|")
+  IO::println("+" + "=".repeat(cols) + "+")
+  IO::println("")
+
+  val maze: Maze = new Maze(rows, cols)
+  maze.generate()
+
+  IO::println("Generated maze (#{rows}x#{cols}):")
+  maze.print()
+  IO::println("")
+
+  val solver: BfsSolver = new BfsSolver(maze)
+  val solved: Boolean = solver.solve()
+
+  if solved {
+    IO::println("Shortest path (S=start, E=end, .=path):")
+    maze.print()
+    IO::println("")
+
+    val plen: Int = maze.pathLength()
+    val area: Int = maze.openArea()
+    val pct:  Int = if area > 0 { plen * 100 / area } else { 0 }
+
+    val stats: List[MazeStats] = [
+      new MazeStats("Grid size  ", "#{rows} x #{cols}"),
+      new MazeStats("Open cells ", "#{area}"),
+      new MazeStats("Path length", "#{plen} steps"),
+      new MazeStats("Coverage   ", "~#{pct}% of open area")
+    ]
+    IO::println("─── Statistics ───")
+    foreach s: MazeStats in stats {
+      s.print()
+    }
+    IO::println("")
+    IO::println("Path found: S → . → E")
+  } else {
+    IO::println("No path found — this should never happen in a perfect maze.")
+  }
+}

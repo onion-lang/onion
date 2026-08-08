@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/BookClub.on`, a 383-line book-club management sample.** Exercises a
+  homogeneous enum (`Genre`) with public methods, an ADT case-enum
+  (`ReadStatus`: `Unread`/`InProgress`/`Finished`/`Abandoned`), records
+  (`Book`, `MemberBook`, `Meeting`), classes backed by `List` state (`Member`,
+  `BookClub`), extension methods on `Int`, collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`reduce`),
+  `select`/type-pattern dispatch over `ReadStatus`, `foreach` over an
+  inclusive range and over `Map` entries, nullable return types, recursion,
+  and `try`/`catch`.
 - **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
   a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
   a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,

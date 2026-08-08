@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/SortingShowcase.on`, a 402-line sorting-algorithms showcase.** Implements
+  bubble, insertion, selection, merge (recursive), quick, and counting sort behind
+  a `SortKind` enum dispatched via `select`, with `TestCase`/`SortResult` records,
+  extension methods on `Int`, in-place `List[Int]` mutation, collection pipelines,
+  recursive algorithms, and `try`/`catch`.
 - **`run/BookClub.on`, a 383-line book-club management sample.** Exercises a
   homogeneous enum (`Genre`) with public methods, an ADT case-enum
   (`ReadStatus`: `Unread`/`InProgress`/`Finished`/`Abandoned`), records

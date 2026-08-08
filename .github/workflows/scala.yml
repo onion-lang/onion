@@ -6,6 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
     - name: Install sbt
       uses: sbt/setup-sbt@v1

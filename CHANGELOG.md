@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/TimesheetTracker.on`, a 329-line employee timesheet management sample.**
+  Exercises a homogeneous enum with `select this` dispatch, records with body
+  methods and compile-time `example` clauses, `Map[String, T]` registries and
+  accumulation, nullable `Double?` lookups, collection pipelines
+  (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map` and typed `foreach`,
+  overtime pay calculation, and input validation.
 - **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
   Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
   fields, a class with public-section fields, `foreach (k, v) in map` map-entry

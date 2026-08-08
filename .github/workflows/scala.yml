@@ -19,5 +19,5 @@ jobs:
         cache: 'sbt'
     - name: Build and Test
       env:
-        SBT_OPTS: "-Xmx6G -XX:+UseG1GC -Xss16m"
+        SBT_OPTS: "-Xmx10G -XX:+UseG1GC -Xss16m"
       run: sbt -v +test

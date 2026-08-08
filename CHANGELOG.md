@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
+  Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
+  fields, a class with public-section fields, `foreach (k, v) in map` map-entry
+  destructuring, string interpolation, and collection grouping.
+
 ## [0.10.26] - 2026-08-08
 
 ### Added

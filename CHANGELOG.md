@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
   fields, a class with public-section fields, `foreach (k, v) in map` map-entry
   destructuring, string interpolation, and collection grouping.
+- **`run/TimesheetTracker.on`, a 329-line employee timesheet management sample.**
+  Exercises a homogeneous enum (`Category`) with `select`-based methods, records
+  with body methods and `example` clauses, a class backed by `Map[String, Employee]`
+  and `Map[String, Double]` registries, nullable `Double?` lookups, collection
+  pipelines (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map`, extension
+  methods on `String` (`padRight`/`padLeft`), closures, and overtime-pay logic.
 
 ## [0.10.26] - 2026-08-08
 

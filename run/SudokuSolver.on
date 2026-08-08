@@ -1,0 +1,348 @@
+// SudokuSolver.on — a Sudoku solver that exercises records, enums, classes,
+// generics, collection pipelines, pattern matching, closures, recursion,
+// foreach/while loops, nullable checks, string interpolation, and try/catch.
+
+import {
+  java.util.*
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Difficulty { EASY, MEDIUM, HARD, EXPERT }
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Puzzle(name: String, difficulty: Difficulty, clues: List[Int])
+
+record SolveResult(solved: Boolean, steps: Int, emptyCells: Int) {
+public:
+  def efficiency(): Double {
+    if emptyCells == 0 { return 0.0 }
+    return (steps as Double) / (emptyCells as Double)
+  }
+}
+
+// ─── Grid helpers (flat Int array, index = row*9+col) ─────────────────────────
+
+def getCell(grid: Int[], row: Int, col: Int): Int = grid[row * 9 + col]
+def setCell(grid: Int[], row: Int, col: Int, n: Int): void { grid[row * 9 + col] = n }
+
+def copyGrid(src: Int[]): Int[] {
+  val dst = new Int[81]
+  foreach i: Int in 0..<81 { dst[i] = src[i] }
+  return dst
+}
+
+def gridFromList(clues: List[Int]): Int[] {
+  val grid = new Int[81]
+  foreach i: Int in 0..<81 { grid[i] = (clues[i] as Int) }
+  return grid
+}
+
+def countEmpty(grid: Int[]): Int {
+  var count: Int = 0
+  foreach i: Int in 0..<81 { if grid[i] == 0 { count++ } }
+  return count
+}
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+
+def validInRow(grid: Int[], row: Int, n: Int): Boolean {
+  foreach c: Int in 0..<9 { if getCell(grid, row, c) == n { return false } }
+  return true
+}
+
+def validInCol(grid: Int[], col: Int, n: Int): Boolean {
+  foreach r: Int in 0..<9 { if getCell(grid, r, col) == n { return false } }
+  return true
+}
+
+def validInBox(grid: Int[], row: Int, col: Int, n: Int): Boolean {
+  val br: Int = row - row % 3
+  val bc: Int = col - col % 3
+  foreach dr: Int in 0..<3 {
+    foreach dc: Int in 0..<3 {
+      if getCell(grid, br + dr, bc + dc) == n { return false }
+    }
+  }
+  return true
+}
+
+def canPlace(grid: Int[], row: Int, col: Int, n: Int): Boolean {
+  return validInRow(grid, row, n) && validInCol(grid, col, n) && validInBox(grid, row, col, n)
+}
+
+def findEmpty(grid: Int[]): Int {
+  foreach i: Int in 0..<81 { if grid[i] == 0 { return i } }
+  return -1
+}
+
+// ─── Solver (recursive backtracking) ─────────────────────────────────────────
+
+var solveSteps: Int = 0
+
+def solve(grid: Int[]): Boolean {
+  val pos: Int = findEmpty(grid)
+  if pos == -1 { return true }
+  val row: Int = pos / 9
+  val col: Int = pos % 9
+  foreach n: Int in 1..9 {
+    solveSteps++
+    if canPlace(grid, row, col, n) {
+      setCell(grid, row, col, n)
+      if solve(grid) { return true }
+      setCell(grid, row, col, 0)
+    }
+  }
+  return false
+}
+
+// ─── Display ─────────────────────────────────────────────────────────────────
+
+def printGrid(grid: Int[], original: Int[]?): void {
+  IO::println("+-------+-------+-------+")
+  foreach row: Int in 0..<9 {
+    if row > 0 && row % 3 == 0 { IO::println("+-------+-------+-------+") }
+    var line: String = "| "
+    foreach col: Int in 0..<9 {
+      if col > 0 && col % 3 == 0 { line = line + "| " }
+      val cell: Int = getCell(grid, row, col)
+      if cell == 0 {
+        line = line + ". "
+      } else if original != null && getCell(original, row, col) == 0 {
+        line = line + cell + " "
+      } else {
+        line = line + cell + " "
+      }
+    }
+    IO::println(line + "|")
+  }
+  IO::println("+-------+-------+-------+")
+}
+
+// ─── Grid validation: check a solved grid is fully valid ─────────────────────
+
+def isSolvedCorrectly(grid: Int[]): Boolean {
+  // Check all 9 rows
+  foreach row: Int in 0..<9 {
+    var seen: List[Int] = []
+    foreach col: Int in 0..<9 {
+      val c: Int = getCell(grid, row, col)
+      if c < 1 || c > 9 { return false }
+      if seen.contains(c) { return false }
+      seen.add(c)
+    }
+  }
+  // Check all 9 columns
+  foreach col: Int in 0..<9 {
+    var seen: List[Int] = []
+    foreach row: Int in 0..<9 {
+      val c: Int = getCell(grid, row, col)
+      if seen.contains(c) { return false }
+      seen.add(c)
+    }
+  }
+  // Check all 9 boxes
+  foreach boxRow: Int in 0..<3 {
+    foreach boxCol: Int in 0..<3 {
+      var seen: List[Int] = []
+      foreach dr: Int in 0..<3 {
+        foreach dc: Int in 0..<3 {
+          val c: Int = getCell(grid, boxRow * 3 + dr, boxCol * 3 + dc)
+          if seen.contains(c) { return false }
+          seen.add(c)
+        }
+      }
+    }
+  }
+  return true
+}
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+def difficultyLabel(d: Difficulty): String {
+  select d {
+    case Difficulty::EASY:   return "Easy"
+    case Difficulty::MEDIUM: return "Medium"
+    case Difficulty::HARD:   return "Hard"
+    case Difficulty::EXPERT: return "Expert"
+    else: return "?"
+  }
+}
+
+def printResult(puzzle: Puzzle, result: SolveResult): void {
+  val diff: String = difficultyLabel(puzzle.difficulty())
+  val name: String = puzzle.name()
+  val steps: Int = result.steps()
+  val empty: Int = result.emptyCells()
+  val eff: Double = result.efficiency()
+  IO::println("  Puzzle   : #{name} (#{diff})")
+  IO::println("  Empty    : #{empty} cells")
+  if result.solved() {
+    IO::println("  Status   : SOLVED in #{steps} steps  (#{eff} steps/cell)")
+  } else {
+    IO::println("  Status   : NO SOLUTION")
+  }
+}
+
+// ─── Puzzle definitions ───────────────────────────────────────────────────────
+
+// Standard easy puzzle (from Wikipedia)
+val easyClues: List[Int] = [
+  5, 3, 0,  0, 7, 0,  0, 0, 0,
+  6, 0, 0,  1, 9, 5,  0, 0, 0,
+  0, 9, 8,  0, 0, 0,  0, 6, 0,
+  8, 0, 0,  0, 6, 0,  0, 0, 3,
+  4, 0, 0,  8, 0, 3,  0, 0, 1,
+  7, 0, 0,  0, 2, 0,  0, 0, 6,
+  0, 6, 0,  0, 0, 0,  2, 8, 0,
+  0, 0, 0,  4, 1, 9,  0, 0, 5,
+  0, 0, 0,  0, 8, 0,  0, 7, 9
+]
+
+// Harder puzzle (more empty cells)
+val hardClues: List[Int] = [
+  0, 0, 0,  2, 6, 0,  7, 0, 1,
+  6, 8, 0,  0, 7, 0,  0, 9, 0,
+  1, 9, 0,  0, 0, 4,  5, 0, 0,
+  8, 2, 0,  1, 0, 0,  0, 4, 0,
+  0, 0, 4,  6, 0, 2,  9, 0, 0,
+  0, 5, 0,  0, 0, 3,  0, 2, 8,
+  0, 0, 9,  3, 0, 0,  0, 7, 4,
+  0, 4, 0,  0, 5, 0,  0, 3, 6,
+  7, 0, 3,  0, 1, 8,  0, 0, 0
+]
+
+// Medium puzzle
+val mediumClues: List[Int] = [
+  0, 2, 0,  0, 0, 0,  0, 0, 0,
+  0, 0, 0,  6, 0, 0,  0, 0, 3,
+  0, 7, 4,  0, 8, 0,  0, 0, 0,
+  0, 0, 0,  0, 0, 3,  0, 0, 2,
+  0, 8, 0,  0, 4, 0,  0, 1, 0,
+  6, 0, 0,  5, 0, 0,  0, 0, 0,
+  0, 0, 0,  0, 1, 0,  7, 8, 0,
+  5, 0, 0,  0, 0, 9,  0, 0, 0,
+  0, 0, 0,  0, 0, 0,  0, 4, 0
+]
+
+// Al Escargot — Arto Inkala's famous "world's hardest" puzzle (26 clues)
+val expertClues: List[Int] = [
+  1, 0, 0,  0, 0, 7,  0, 9, 0,
+  0, 3, 0,  0, 2, 0,  0, 0, 8,
+  0, 0, 9,  6, 0, 0,  5, 0, 0,
+  0, 0, 5,  3, 0, 0,  9, 0, 0,
+  0, 1, 0,  0, 8, 0,  0, 0, 2,
+  6, 0, 0,  0, 0, 4,  0, 0, 0,
+  3, 0, 0,  0, 0, 0,  0, 1, 0,
+  0, 4, 0,  0, 0, 0,  0, 0, 7,
+  0, 0, 7,  0, 0, 0,  3, 0, 0
+]
+
+val puzzles: List[Puzzle] = [
+  new Puzzle("Wikipedia Classic",  Difficulty::EASY,   easyClues),
+  new Puzzle("Medium Challenge",   Difficulty::MEDIUM, mediumClues),
+  new Puzzle("Hard Challenge",     Difficulty::HARD,   hardClues),
+  new Puzzle("Al Escargot",        Difficulty::EXPERT, expertClues)
+]
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+
+val results: List[SolveResult] = []
+
+foreach pObj: Object in puzzles {
+  val p: Puzzle = pObj as Puzzle
+  val grid: Int[] = gridFromList(p.clues())
+  val original: Int[] = copyGrid(grid)
+  val empty: Int = countEmpty(grid)
+  solveSteps = 0
+
+  IO::println("")
+  IO::println("══════════════════════════════════════════")
+  IO::println("Puzzle: " + p.name())
+  IO::println("Before:")
+  printGrid(grid, null)
+
+  val solved: Boolean = try {
+    solve(grid)
+  } catch e: Exception {
+    IO::println("Error: " + e.message())
+    false
+  }
+
+  val result: SolveResult = new SolveResult(solved, solveSteps, empty)
+  results.add(result)
+
+  IO::println("After:")
+  printGrid(grid, original)
+  printResult(p, result)
+
+  if solved {
+    val correct: Boolean = isSolvedCorrectly(grid)
+    IO::println("  Verified : " + correct)
+  }
+}
+
+// ─── Summary statistics using collection pipelines ────────────────────────────
+
+IO::println("")
+IO::println("══════════════════════════════════════════")
+IO::println("SUMMARY")
+IO::println("══════════════════════════════════════════")
+
+val totalSolved: Int = results.fold(0) { acc, r =>
+  (acc as Int) + (if (r as SolveResult).solved() { 1 } else { 0 })
+} as Int
+IO::println("Puzzles solved: #{totalSolved} / #{results.size}")
+
+val totalSteps: Int = results.fold(0) { acc, r =>
+  (acc as Int) + (r as SolveResult).steps()
+} as Int
+IO::println("Total steps   : " + totalSteps)
+
+var maxStepsCount: Int = 0
+foreach rObj: Object in results {
+  val r: SolveResult = rObj as SolveResult
+  if r.steps() > maxStepsCount { maxStepsCount = r.steps() }
+}
+IO::println("Hardest puzzle: " + maxStepsCount + " steps")
+
+val allSolved: Boolean = results.find { r => !(r as SolveResult).solved() } == null
+IO::println("All solved    : " + allSolved)
+
+// Distribution of empty cells
+val emptyCounts: List[Int] = results.map { r => (r as SolveResult).emptyCells() }
+IO::println("Empty cells   : " + emptyCounts.toString())
+
+// Group results by whether solved or not
+val byStatus = results.groupBy { r => if (r as SolveResult).solved() { "solved" } else { "failed" } }
+foreach (status, group) in byStatus {
+  IO::println("#{status}: #{(group as List[SolveResult]).size} puzzle(s)")
+}
+
+// Sort by step count ascending, show ranking
+val ranked: List[SolveResult] = results.sortedBy { r => (r as SolveResult).steps() }
+IO::println("")
+IO::println("Ranking by difficulty (fewest steps = easiest):")
+var rank: Int = 1
+foreach rObj: Object in ranked {
+  val r: SolveResult = rObj as SolveResult
+  IO::println("  #{rank}. #{r.steps()} steps, #{r.emptyCells()} empty cells")
+  rank++
+}
+
+// Partition into easy (< 10000 steps) vs hard
+val parts = results.partition { r => (r as SolveResult).steps() < 10000 }
+val easySet = parts[0] as List[Object]
+val hardSet = parts[1] as List[Object]
+IO::println("")
+IO::println("Under 10k steps : " + easySet.size)
+IO::println("Over  10k steps : " + hardSet.size)
+
+// Total empty cells across all puzzles
+val totalEmpty: Int = emptyCounts.fold(0) { a, b => (a as Int) + (b as Int) } as Int
+IO::println("Total cells filled by solver: " + totalEmpty)
+
+// Average steps per empty cell across all puzzles
+val avgSteps: Double = (totalSteps as Double) / (totalEmpty as Double)
+IO::println("Avg steps/cell  : " + avgSteps)

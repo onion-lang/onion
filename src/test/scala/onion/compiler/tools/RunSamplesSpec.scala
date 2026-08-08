@@ -381,5 +381,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs LibrarySystem.on") {
       assert(Shell.Success(null) == runSample("run/LibrarySystem.on"))
     }
+
+    it("runs SudokuSolver.on") {
+      assert(Shell.Success(null) == runSample("run/SudokuSolver.on"))
+    }
   }
 }

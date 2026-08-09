@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/TextAnalytics.on`, a 272-line multi-document text-analysis sample.**
+  Exercises records (`Document`, `WordFreq`, `SentenceInfo`, `AnalysisResult`),
+  a data-carrying enum (`ReadabilityLevel`) matched via `select this`, a class
+  with a constructor argument (`TextAnalyzer(topN)`), `Map[String, Int]`
+  frequency tables built with `Maps::countBy`/`Maps::toList`, nullable `Int?`
+  lookups, closures, `foreach` over lists, string interpolation, and
+  `Format::fixed` percentage/float formatting. Reports word-frequency
+  profiles, sentence-length breakdown, readability classification, pairwise
+  Jaccard similarity, and a complexity ranking across three sample documents.
 - **`run/SpaceMission.on`, a 324-line space mission planner sample.** Exercises
   records with body methods (`Planet`, `Spacecraft.wetMass`/`massRatio`,
   `MissionLog`), a plain enum (`MissionStatus`), a data-carrying enum

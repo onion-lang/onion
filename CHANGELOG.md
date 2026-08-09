@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/KingdomSim.on`, a 550-line medieval kingdom simulation sample.**
+  Exercises operator overloading (`plus`/`times`/`minus` on a `Resource`
+  record), `do[List]` comprehension for trade-pair generation, multiple
+  interface conformance, `foreach (k, v)` map iteration, extension methods
+  on `Int`/`Double`/`String`, the `|>` pipeline operator, an ADT case-enum
+  (`KingdomEvent`) with 5 data-carrying cases, `example`/`law` clauses on a
+  record, `try`/`catch`, nullable returns, exhaustive `select`, and a broad
+  set of collection pipelines (`groupBy`, `sortedBy`, `fold`, `partition`,
+  `zip`, `distinct`, `find`, `any`, `take`).
+
 ## [0.10.27] - 2026-08-09
 
 ### Added

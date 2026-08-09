@@ -11,9 +11,9 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 15/15 (`docs/guide/tools.md` shipped with #357), and 77 diagnostic codes against 80
 (`E0077`–`E0079` added by the capability boundary).
 
-| # | Dimension | How to measure | Current (2026-08-08) | Pass threshold |
+| # | Dimension | How to measure | Current (2026-08-09) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
-| 1 | Test suite | `sbt -batch -Duser.language=en test` | TBD | 0 failed, 0 skipped |
+| 1 | Test suite | `sbt -batch -Duser.language=en test` | 3282 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
 | 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 129 / 129 compile | all compile, no rot |
 | 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 72 (AirlineReservation, AuctionHouse, BankLedger, BankSystem, Blackjack, BookClub, BrokenLogDemo, BudgetTracker, BugTracker, CarRentalFleet, CensusAnalyzer, CinemaBooking, ClinicRecords, ConwayLife, CourseRegistration, DoctorScheduler, EspressoShop, EventTicketing, ExpenseAuditor, FitnessTracker, FleetManager, GameOfLife, GameStore, GradeBook, GradeReport, GraphAlgorithms, GraphSearch, HotelReservation, Inventory, InventoryManager, InventoryReport, JobScheduler, KingdomSim, LibraryCatalog, LibrarySystem, LogAnalytics, MathParser, MiniRpg, MusicFestival, MusicLibrary, OrderReport, ParkingGarage, PayrollReport, PerfReview, PetShelter, PlaylistManager, PokerHands, RankedChoice, RecipeBook, RecipeManager, ShapeProcessor, ShipmentTracker, ShoppingCart, SocialNetwork, SortingShowcase, SpaceMission, StatsApp, StockPortfolio, StudentGradeBook, Sudoku, TaskPlanner, TextAnalytics, TextAnalyzer, TicTacToe, TimesheetTracker, TodoManager, ToolDemo, TournamentStandings, TournamentTracker, VirtualMachine, VirtualShell, WeatherReport) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |

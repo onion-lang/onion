@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/Sudoku.on`, a 261-line Sudoku solver with backtracking search.** Exercises
+  a flat `List[Int]` as a 2D 9×9 grid (row-major `row*9+col` indexing), records
+  with methods (`Puzzle.label`, `SolveResult.summary`), a class with a mutable
+  field and a public getter (`Solver.numSteps`/`steps()`), extension methods on
+  `Int` (`cellChar`, `boxStart`), nested `foreach` over ranges (`0..<9`, `1..9`),
+  collection pipelines (`count`/`filter`/`sortedBy`), recursion (backtracking
+  solver), and explicit `return` statements in block-body methods. Solves an easy
+  puzzle (30 givens, 4208 steps), a medium (36 givens, 54 steps), and a hard (23
+  givens, 879417 steps) with full row/column/box validation confirming each
+  solution. `SampleProgramsSpec` passes (120/120) including `Sudoku.on`.
 - **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
   Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
   fields, a class with public-section fields, `foreach (k, v) in map` map-entry

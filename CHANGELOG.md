@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.27] - 2026-08-09
+
 ### Added
 
 - **`run/Sudoku.on`, a 261-line Sudoku solver with backtracking search.** Exercises

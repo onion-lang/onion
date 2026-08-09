@@ -9,6 +9,184 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`run/SudokuSolver.on`, a 348-line backtracking Sudoku solver sample.**
+  Solves four puzzles of increasing difficulty via recursive backtracking
+  over a flat `Int[]` grid, verifying each solution. Exercises a plain enum
+  (`Difficulty`), a record with a method body (`SolveResult.efficiency()`),
+  nested `foreach` over ranges, `try`/`catch`, a nullable array parameter,
+  collection pipelines (`groupBy`, `sortedBy`, `partition`, `fold`, `find`,
+  `map`), and `foreach (k, v) in map`.
+
+## [0.10.28] - 2026-08-09
+
+### Added
+
+- **`run/MazeSolver.on`, a 295-line maze generator + BFS solver sample.**
+  Generates a perfect maze via recursive-backtracking DFS with a Fisher-Yates
+  shuffle, then finds the shortest path with an iterative BFS using
+  array-based visited/parent trackers. Exercises an ADT enum (`Cell`) matched
+  with `select`/`is`, a `Point` record, classes with `public:`/`private:`
+  sections (`Maze`, `BfsSolver`, `MazeStats`), extension methods on `String`,
+  a flat row-major `List[Cell]` grid, `Boolean[]`/`Int[]` primitive arrays,
+  recursion, `while`/`foreach` loops, and string interpolation.
+- **`run/TextAnalytics.on`, a 272-line multi-document text-analysis sample.**
+  Exercises records (`Document`, `WordFreq`, `SentenceInfo`, `AnalysisResult`),
+  a data-carrying enum (`ReadabilityLevel`) matched via `select this`, a class
+  with a constructor argument (`TextAnalyzer(topN)`), `Map[String, Int]`
+  frequency tables built with `Maps::countBy`/`Maps::toList`, nullable `Int?`
+  lookups, closures, `foreach` over lists, string interpolation, and
+  `Format::fixed` percentage/float formatting. Reports word-frequency
+  profiles, sentence-length breakdown, readability classification, pairwise
+  Jaccard similarity, and a complexity ranking across three sample documents.
+- **`run/SpaceMission.on`, a 324-line space mission planner sample.** Exercises
+  records with body methods (`Planet`, `Spacecraft.wetMass`/`massRatio`,
+  `MissionLog`), a plain enum (`MissionStatus`), a data-carrying enum
+  (`MissionOutcome`), an ADT case-enum (`MissionEvent` with 4 cases), a class
+  with mutable state (`MissionController`), collection pipelines (`filter`,
+  `map`, `fold`, `groupBy`, `sortedBy`, `find`), exhaustive `select` over the
+  ADT cases, nullable lookups (`findPlanet(): Planet?`), closures, string
+  interpolation, recursion (Newton's method for orbital period), `foreach`
+  over a range, `while`, `try`/`catch`, and `foreach (k, v) in map`.
+- **`run/KingdomSim.on`, a 550-line medieval kingdom simulation sample.**
+  Exercises operator overloading (`plus`/`times`/`minus` on a `Resource`
+  record), `do[List]` comprehension for trade-pair generation, multiple
+  interface conformance, `foreach (k, v)` map iteration, extension methods
+  on `Int`/`Double`/`String`, the `|>` pipeline operator, an ADT case-enum
+  (`KingdomEvent`) with 5 data-carrying cases, `example`/`law` clauses on a
+  record, `try`/`catch`, nullable returns, exhaustive `select`, and a broad
+  set of collection pipelines (`groupBy`, `sortedBy`, `fold`, `partition`,
+  `zip`, `distinct`, `find`, `any`, `take`).
+
+## [0.10.27] - 2026-08-09
+
+### Added
+
+- **`run/Sudoku.on`, a 261-line Sudoku solver with backtracking search.** Exercises
+  a flat `List[Int]` as a 2D 9×9 grid (row-major `row*9+col` indexing), records
+  with methods (`Puzzle.label`, `SolveResult.summary`), a class with a mutable
+  field and a public getter (`Solver.numSteps`/`steps()`), extension methods on
+  `Int` (`cellChar`, `boxStart`), nested `foreach` over ranges (`0..<9`, `1..9`),
+  collection pipelines (`count`/`filter`/`sortedBy`), recursion (backtracking
+  solver), and explicit `return` statements in block-body methods. Solves an easy
+  puzzle (30 givens, 4208 steps), a medium (36 givens, 54 steps), and a hard (23
+  givens, 879417 steps) with full row/column/box validation confirming each
+  solution. `SampleProgramsSpec` passes (120/120) including `Sudoku.on`.
+- **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
+  Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
+  fields, a class with public-section fields, `foreach (k, v) in map` map-entry
+  destructuring, string interpolation, and collection grouping.
+- **`run/TimesheetTracker.on`, a 329-line employee timesheet management sample.**
+  Exercises a homogeneous enum (`Category`) with `select`-based methods, records
+  with body methods and `example` clauses, a class backed by `Map[String, Employee]`
+  and `Map[String, Double]` registries, nullable `Double?` lookups, collection
+  pipelines (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map`, extension
+  methods on `String` (`padRight`/`padLeft`), closures, and overtime-pay logic.
+- **`run/LibrarySystem.on` expanded from a 374-line stub to a 529-line library
+  management system.** Exercises extension methods on `String`/`Int`/`Double`,
+  homogeneous enums with `public:` methods (`Genre`, `MemberStatus`,
+  `LoanStatus`), records with inline `public:` methods, interface conformance
+  (`Reportable`), classes with mutable typed-list fields, in-place mutation via
+  `indexOf`/`List.set`, collection pipelines (`filter`/`map`/`fold`/`groupBy`/
+  `sortedBy`/`partition`/`zip`/`any`/`count`), `foreach (k, v) in map`, nullable
+  types with null guards, closures stored in `val`s, and a tail-recursive helper.
+
+## [0.10.26] - 2026-08-08
+
+### Added
+
+- **`run/SortingShowcase.on`, a 402-line sorting-algorithms showcase.** Implements
+  bubble, insertion, selection, merge (recursive), quick, and counting sort behind
+  a `SortKind` enum dispatched via `select`, with `TestCase`/`SortResult` records,
+  extension methods on `Int`, in-place `List[Int]` mutation, collection pipelines,
+  recursive algorithms, and `try`/`catch`.
+- **`run/BookClub.on`, a 383-line book-club management sample.** Exercises a
+  homogeneous enum (`Genre`) with public methods, an ADT case-enum
+  (`ReadStatus`: `Unread`/`InProgress`/`Finished`/`Abandoned`), records
+  (`Book`, `MemberBook`, `Meeting`), classes backed by `List` state (`Member`,
+  `BookClub`), extension methods on `Int`, collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`reduce`),
+  `select`/type-pattern dispatch over `ReadStatus`, `foreach` over an
+  inclusive range and over `Map` entries, nullable return types, recursion,
+  and `try`/`catch`.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
+  a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
+  a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,
+  `Generation.summary`/`isStable`/`isEmpty`/`delta`), extension methods on `Int`
+  (`wrapIn`, `sign`) and `String` (`padLeft`, `padRight`), a sparse
+  `Map[String,Boolean]` grid with toroidal wrapping, `foreach (k, v) in map`,
+  collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/`distinct`), and
+  closures stored in `val`s. Verified oscillators: Glider (period-4), Blinker
+  (period-2), Pulsar (period-3), and a 50-generation R-Pentomino run.
+
+- **`run/RecipeBook.on`, a 620-line recipe management sample.** Exercises a
+  data-carrying enum (`Measurement` with `Grams`/`Milliliters`/`Pieces`/
+  `Tablespoons`/`Teaspoons`/`Cups`, dispatched via `select`/`case`
+  destructuring), plain enums (`Cuisine`, `MealType`, `Difficulty`), records
+  with methods and `static def of(...)` factories (`Ingredient`,
+  `NutritionInfo`, `Recipe`), extension methods on `Double`/`Int`/`String`,
+  collection pipelines (`filter`/`map`/`fold`/`sortedBy`/`distinct`/`find`),
+  nullable types with safe calls and null coalescing, and a mutable
+  `RecipeBook` class with query and report-generation methods.
+
+- **`run/PerfReview.on`, a 284-line employee performance review dashboard.**
+  Exercises ADT case-enum (`PerformanceBand` with `Exceptional`/`Strong`/`Meets`/
+  `BelowTarget`/`Critical` and `select this` dispatch), a homogeneous enum
+  (`ReviewStatus` with `::` constant access), records with compile-time `example`
+  clauses (`ReviewMetrics`), extension methods on records, collection pipelines
+  (`filter`/`map`/`fold`/`groupBy`/`sortedBy`/`partition`/`zip`/`distinct`),
+  nullable map lookups, `foreach (k, v) in map` destructuring, and `foreach :
+  Type in list` typed iteration.
+
+- **`run/GradeReport.on`, a 255-line student gradebook sample.** Exercises an
+  ADT enum (`Standing`) dispatched via `select this { case x is T: }`, a
+  data-carrying enum (`LetterGrade`), records with `List` fields (`Student`,
+  `Enrollment`, `Course`), an interface implemented by a class
+  (`Reportable`/`StudentReport`), extension methods on `Double`/`Int`,
+  collection pipelines (`map`/`filter`/`fold`/`reduce`/`sortedBy`/`groupBy`),
+  recursive and `while`-based iteration, `foreach` over an inclusive range and
+  over `Map` entries, and `try`/`catch`.
+- **`run/SocialNetwork.on`, a 568-line social network simulator.** Exercises ADT
+  enums (`PostContent`, `Notification`) with exhaustive `select`/type-pattern
+  dispatch, a homogeneous enum (`ReactionKind`), records (`User`, `Post`,
+  `Comment`, `Reaction`), a `Network` class backed by `HashMap` stores,
+  collection pipelines (`sortedBy`/`groupBy`/`fold`/`foreach (k, v)`), a
+  BFS-style friend-of-friend recommendation engine, and nullable lookups
+  (`User?`/`Post?`).
+- **`run/PetShelter.on`, a 269-line pet shelter management sample.** Exercises a
+  data-carrying enum (`PetType`), an ADT case-enum (`AdoptionStatus` with
+  `Available`/`Foster`/`Adopted`/`Quarantine` cases and shared methods via
+  `select this`), records (`Pet`, `Adopter`, `FosterRecord`), a class with
+  public/private sections and a replace-on-update mutation pattern, extension
+  methods on `String`/`Int`, collection pipelines (`filter`/`sortedBy`/
+  `groupBy`/`find`/`partition`), `foreach (k, v) in map`, and `try`/`catch`
+  for intake validation.
+- **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.**
+  Exercises a homogeneous enum (`CellState`), an enum with a `select`-based
+  method (`PatternKind.label()`), records with methods (`Cell.distanceTo()`,
+  `Generation.summary/isStable/isEmpty`), extension methods on `Int`
+  (`wrapIn`/`sign`) and `String` (`padLeft`/`padRight`), a `Map`-backed
+  sparse grid with toroidal wrapping, `foreach (k, v) in map`, nullable map
+  lookups, collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/
+  `distinct`/`forEach`), and closures stored in `val`s. Verified against
+  canonical Game of Life periods (glider, blinker, pulsar, R-pentomino).
+
+### Fixed
+
+- **`sbt test` could hit a real JVM `OutOfMemoryError`** (in `SampleProgramsSpec`
+  and `MutationFuzzSpec`) as the `run/` corpus grew past 121 samples, wedging
+  CI on `develop` instead of failing cleanly — the same failure mode fixed at
+  0.10.17 (78 samples, `-Xmx6G`) recurring as the corpus kept growing. Raised
+  the heap headroom again, both locally (`.jvmopts`: 4g → 10g) and in CI
+  (`SBT_OPTS`: `-Xmx6G` → `-Xmx10G`); a clean run now completes in ~4 minutes
+  with room to spare. `docs/quality-bar.md` / `docs/ja/quality-bar.md` rows 2–3
+  (sample count 119→121, large-program count 62→64, adding `EspressoShop` and
+  `MusicFestival`) updated to match, fixing the two `QualityBarSpec` failures
+  those additions had left behind.
+
+## [0.10.25] - 2026-08-07
+
+### Added
+
 - **`run/WeatherReport.on`, a 261-line weather data analysis sample.** A new
   domain not previously covered by the corpus. Exercises a data-carrying enum
   (`AlertLevel`: `NONE`/`ADVISORY`/`WARNING`/`EMERGENCY`), records with inline
@@ -46,6 +224,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension methods on `Int`/`Double`, `foreach (k, v)` over `Map`, and
   `record example {}` build-time parse round-trip assertions.
   111 total corpus programs.
+- **`run/ClinicRecords.on`, a 523-line medical clinic patient and appointment
+  management sample.** Exercises homogeneous enums with `select` dispatch
+  (`BloodType`, `Severity`, `ApptStatus`), an ADT `case`-enum (`DiagnosisResult`:
+  `Clear`/`Condition`/`Referral`) matched with type patterns, records with method
+  bodies including a nullable field (`Appointment.notes: String?`), a class with
+  typed `List[T]` fields, `sortedBy`/`groupBy`/`fold` pipelines, and extension
+  methods on `String`/`Int`/`Double`.
+  112 total corpus programs.
 
 ### Documentation
 

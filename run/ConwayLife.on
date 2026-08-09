@@ -1,0 +1,333 @@
+// ConwayLife.on — Conway's Game of Life simulation (~280 lines)
+// Exercises: 2D arrays (Boolean[][]), nested while loops, mutable class
+// state, string interpolation, extension methods on Int/Boolean,
+// records, collection pipelines (map/filter/fold), named pattern presets,
+// foreach over ranges, try/catch, static helpers.
+
+// ── Extension methods ──────────────────────────────────────────────────────
+
+extension Int {
+  def clamp(lo: Int, hi: Int): Int {
+    if self < lo { return lo }
+    if self > hi { return hi }
+    return self
+  }
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+extension Boolean {
+  def toChar(): String = if self { "#" } else { "." }
+}
+
+// ── Grid class ─────────────────────────────────────────────────────────────
+
+class Grid {
+  val width: Int
+  val height: Int
+  var cells: Boolean[][]
+  var generation: Int
+
+public:
+  def this(w: Int, h: Int) {
+    width     = w
+    height    = h
+    cells     = new Boolean[h][w]
+    generation = 0
+  }
+
+  def set(r: Int, c: Int, v: Boolean): void {
+    if r >= 0 && r < height && c >= 0 && c < width {
+      cells[r][c] = v
+    }
+  }
+
+  def get(r: Int, c: Int): Boolean {
+    if r < 0 || r >= height || c < 0 || c >= width { return false }
+    return cells[r][c]
+  }
+
+  def liveCount(): Int {
+    var n: Int = 0
+    var r: Int = 0
+    while r < height {
+      var c: Int = 0
+      while c < width {
+        if cells[r][c] { n = n + 1 }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return n
+  }
+
+  def neighbours(r: Int, c: Int): Int {
+    var n: Int = 0
+    var dr: Int = -1
+    while dr <= 1 {
+      var dc: Int = -1
+      while dc <= 1 {
+        if !(dr == 0 && dc == 0) {
+          if get(r + dr, c + dc) { n = n + 1 }
+        }
+        dc = dc + 1
+      }
+      dr = dr + 1
+    }
+    return n
+  }
+
+  def step(): void {
+    val next: Boolean[][] = new Boolean[height][width]
+    var r: Int = 0
+    while r < height {
+      var c: Int = 0
+      while c < width {
+        val nb: Int = neighbours(r, c)
+        val alive: Boolean = cells[r][c]
+        next[r][c] = if alive {
+          nb == 2 || nb == 3
+        } else {
+          nb == 3
+        }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    cells = next
+    generation = generation + 1
+  }
+
+  def render(): String {
+    var sb: String = ""
+    var r: Int = 0
+    while r < height {
+      var line: String = ""
+      var c: Int = 0
+      while c < width {
+        line = line + cells[r][c].toChar()
+        c = c + 1
+      }
+      if r > 0 { sb = sb + "\n" }
+      sb = sb + line
+      r = r + 1
+    }
+    return sb
+  }
+
+  def genCount(): Int = generation
+
+  def rows(): Int = height
+
+  def cols(): Int = width
+
+  def renderLabelled(): String {
+    return "Gen #{generation}  live=#{liveCount()}\n" + render()
+  }
+
+  def clear(): void {
+    cells = new Boolean[height][width]
+    generation = 0
+  }
+}
+
+// ── Pattern loaders ────────────────────────────────────────────────────────
+
+def loadPattern(grid: Grid, pattern: List[String], rowOff: Int, colOff: Int): void {
+  var r: Int = 0
+  foreach row: Object in pattern {
+    val line: String = row as String
+    var c: Int = 0
+    while c < line.length() {
+      val ch: String = line.substring(c, c + 1)
+      grid.set(r + rowOff, c + colOff, ch == "#")
+      c = c + 1
+    }
+    r = r + 1
+  }
+}
+
+def patternBlock(): List[String] = ["##", "##"]
+
+def patternBlinker(): List[String] = ["###"]
+
+def patternGlider(): List[String] = [
+  ".#.",
+  "..#",
+  "###"
+]
+
+def patternLwss(): List[String] = [
+  "#..#.",
+  "....#",
+  "#...#",
+  ".####"
+]
+
+def patternRPentomino(): List[String] = [
+  ".##",
+  "##.",
+  ".#."
+]
+
+def patternDiehard(): List[String] = [
+  "......#.",
+  "##......",
+  ".#...###"
+]
+
+// ── Statistics helper ──────────────────────────────────────────────────────
+
+record Snapshot(generation: Int, liveCount: Int)
+
+def collectSnapshots(grid: Grid, steps: Int): List[Snapshot] {
+  val snaps: List[Snapshot] = []
+  var i: Int = 0
+  while i <= steps {
+    snaps.add(new Snapshot(grid.genCount(), grid.liveCount()))
+    if i < steps { grid.step() }
+    i = i + 1
+  }
+  return snaps
+}
+
+// ── Demo runner ────────────────────────────────────────────────────────────
+
+def runDemo(name: String, pattern: List[String], gridW: Int, gridH: Int,
+            rowOff: Int, colOff: Int, steps: Int, showEvery: Int): void {
+  IO::println("═══════════════════════════════════════")
+  IO::println("Pattern: #{name}")
+  IO::println("═══════════════════════════════════════")
+  val g: Grid = new Grid(gridW, gridH)
+  loadPattern(g, pattern, rowOff, colOff)
+  var i: Int = 0
+  while i <= steps {
+    if i % showEvery == 0 {
+      IO::println(g.renderLabelled())
+      IO::println("")
+    }
+    if i < steps { g.step() }
+    i = i + 1
+  }
+}
+
+// ── Statistics report ──────────────────────────────────────────────────────
+
+def statsReport(name: String, pattern: List[String], gridW: Int, gridH: Int,
+                rowOff: Int, colOff: Int, steps: Int): void {
+  IO::println("--- Stats: #{name} over #{steps} generations ---")
+  val g: Grid = new Grid(gridW, gridH)
+  loadPattern(g, pattern, rowOff, colOff)
+  val snaps: List[Snapshot] = collectSnapshots(g, steps)
+
+  val maxLive: Int = snaps.fold(0) { acc, s =>
+    val snap: Snapshot = s as Snapshot
+    val v: Int = acc as Int
+    if snap.liveCount() > v { snap.liveCount() } else { v }
+  }
+  val minLive: Int = snaps.fold(999999) { acc, s =>
+    val snap: Snapshot = s as Snapshot
+    val v: Int = acc as Int
+    if snap.liveCount() < v { snap.liveCount() } else { v }
+  }
+  val totalLive: Int = snaps.fold(0) { acc, s =>
+    (acc as Int) + (s as Snapshot).liveCount()
+  }
+  val avgLive: Int = totalLive / snaps.size
+
+  IO::println("  Peak live cells  : #{maxLive}")
+  IO::println("  Min  live cells  : #{minLive}")
+  IO::println("  Avg  live cells  : #{avgLive}")
+
+  // histogram (bar of #s, max 20 wide)
+  IO::println("  Live-cell histogram (first #{snaps.size} gens):")
+  foreach snap: Object in snaps {
+    val sn: Snapshot = snap as Snapshot
+    val bars: Int = if maxLive > 0 { sn.liveCount() * 20 / maxLive } else { 0 }
+    var bar: String = ""
+    var b: Int = 0
+    while b < bars { bar = bar + "#"; b = b + 1 }
+    IO::println("    Gen #{sn.generation().padLeft(3)}: #{bar} (#{sn.liveCount()})")
+  }
+  IO::println("")
+}
+
+// ── try/catch demo ─────────────────────────────────────────────────────────
+
+def safeGet(g: Grid, r: Int, c: Int): String {
+  try {
+    if r < 0 || c < 0 { throw new IllegalArgumentException("negative index") }
+    return g.get(r, c).toChar()
+  } catch e: Exception {
+    return "? (#{e.message()})"
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // 1. Block (still life — never changes)
+  runDemo("Block (still life)", patternBlock(), 8, 8, 3, 3, 4, 1)
+
+  // 2. Blinker (period-2 oscillator)
+  runDemo("Blinker (oscillator)", patternBlinker(), 10, 7, 3, 3, 6, 1)
+
+  // 3. Glider (travels across grid)
+  runDemo("Glider (spaceship)", patternGlider(), 18, 14, 1, 1, 12, 3)
+
+  // 4. Lightweight spaceship
+  runDemo("LWSS (spaceship)", patternLwss(), 24, 10, 3, 2, 8, 2)
+
+  // 5. Statistics over R-pentomino
+  statsReport("R-pentomino", patternRPentomino(), 30, 20, 8, 13, 10)
+
+  // 6. Diehard (dies after 130 generations — show summary)
+  IO::println("═══════════════════════════════════════")
+  IO::println("Pattern: Diehard (summary only)")
+  IO::println("═══════════════════════════════════════")
+  val dh: Grid = new Grid(30, 15)
+  loadPattern(dh, patternDiehard(), 5, 10)
+  var dhStep: Int = 0
+  while dhStep < 130 {
+    dh.step()
+    dhStep = dhStep + 1
+  }
+  IO::println("After 130 generations: #{dh.liveCount()} live cells (0 on infinite grid; bounded grid clips evolution)")
+  IO::println("")
+
+  // 7. safeGet edge cases
+  IO::println("═══════════════════════════════════════")
+  IO::println("Edge-case: out-of-bounds access via safeGet")
+  IO::println("═══════════════════════════════════════")
+  val eg: Grid = new Grid(5, 5)
+  loadPattern(eg, patternBlock(), 1, 1)
+  IO::println("  (1,1)=" + safeGet(eg, 1, 1))
+  IO::println("  (0,0)=" + safeGet(eg, 0, 0))
+  IO::println("  (-1,0)=" + safeGet(eg, -1, 0))
+  IO::println("  (4,4)=" + safeGet(eg, 4, 4))
+  IO::println("")
+
+  // 8. Neighbourhood count table for a glider at gen 0
+  IO::println("═══════════════════════════════════════")
+  IO::println("Neighbour-count table (glider, gen 0)")
+  IO::println("═══════════════════════════════════════")
+  val ng: Grid = new Grid(7, 6)
+  loadPattern(ng, patternGlider(), 1, 1)
+  var nr: Int = 0
+  while nr < ng.rows() {
+    var row: String = "  "
+    var nc: Int = 0
+    while nc < ng.cols() {
+      row = row + ng.neighbours(nr, nc).padLeft(2)
+      nc = nc + 1
+    }
+    IO::println(row)
+    nr = nr + 1
+  }
+  IO::println("")
+
+  IO::println("Done.")
+}

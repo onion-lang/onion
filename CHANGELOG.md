@@ -19,7 +19,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   puzzle (30 givens, 4208 steps), a medium (36 givens, 54 steps), and a hard (23
   givens, 879417 steps) with full row/column/box validation confirming each
   solution. `SampleProgramsSpec` passes (120/120) including `Sudoku.on`.
+- **`run/DoctorScheduler.on`, a 336-line medical appointment scheduling sample.**
+  Exercises plain enums with `select`/`when`-guard dispatch, records with nullable
+  fields, a class with public-section fields, `foreach (k, v) in map` map-entry
+  destructuring, string interpolation, and collection grouping.
+- **`run/TimesheetTracker.on`, a 329-line employee timesheet management sample.**
+  Exercises a homogeneous enum (`Category`) with `select`-based methods, records
+  with body methods and `example` clauses, a class backed by `Map[String, Employee]`
+  and `Map[String, Double]` registries, nullable `Double?` lookups, collection
+  pipelines (`filter`/`fold`/`sortedBy`), `foreach (k, v) in map`, extension
+  methods on `String` (`padRight`/`padLeft`), closures, and overtime-pay logic.
+- **`run/LibrarySystem.on` expanded from a 374-line stub to a 529-line library
+  management system.** Exercises extension methods on `String`/`Int`/`Double`,
+  homogeneous enums with `public:` methods (`Genre`, `MemberStatus`,
+  `LoanStatus`), records with inline `public:` methods, interface conformance
+  (`Reportable`), classes with mutable typed-list fields, in-place mutation via
+  `indexOf`/`List.set`, collection pipelines (`filter`/`map`/`fold`/`groupBy`/
+  `sortedBy`/`partition`/`zip`/`any`/`count`), `foreach (k, v) in map`, nullable
+  types with null guards, closures stored in `val`s, and a tail-recursive helper.
 
+## [0.10.26] - 2026-08-08
+
+### Added
+
+- **`run/SortingShowcase.on`, a 402-line sorting-algorithms showcase.** Implements
+  bubble, insertion, selection, merge (recursive), quick, and counting sort behind
+  a `SortKind` enum dispatched via `select`, with `TestCase`/`SortResult` records,
+  extension methods on `Int`, in-place `List[Int]` mutation, collection pipelines,
+  recursive algorithms, and `try`/`catch`.
+- **`run/BookClub.on`, a 383-line book-club management sample.** Exercises a
+  homogeneous enum (`Genre`) with public methods, an ADT case-enum
+  (`ReadStatus`: `Unread`/`InProgress`/`Finished`/`Abandoned`), records
+  (`Book`, `MemberBook`, `Meeting`), classes backed by `List` state (`Member`,
+  `BookClub`), extension methods on `Int`, collection pipelines
+  (`map`/`filter`/`fold`/`groupBy`/`sortedBy`/`find`/`partition`/`reduce`),
+  `select`/type-pattern dispatch over `ReadStatus`, `foreach` over an
+  inclusive range and over `Map` entries, nullable return types, recursion,
+  and `try`/`catch`.
 - **`run/GameOfLife.on`, a 422-line Conway's Game of Life simulation.** Exercises
   a homogeneous enum (`CellState`) and a data-carrying enum (`PatternKind`) with
   a `select`-based label method, records with methods (`Cell.distanceTo`/`label`,
@@ -81,6 +117,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lookups, collection pipelines (`filter`/`sortedBy`/`groupBy`/`map`/
   `distinct`/`forEach`), and closures stored in `val`s. Verified against
   canonical Game of Life periods (glider, blinker, pulsar, R-pentomino).
+
+### Fixed
+
+- **`sbt test` could hit a real JVM `OutOfMemoryError`** (in `SampleProgramsSpec`
+  and `MutationFuzzSpec`) as the `run/` corpus grew past 121 samples, wedging
+  CI on `develop` instead of failing cleanly — the same failure mode fixed at
+  0.10.17 (78 samples, `-Xmx6G`) recurring as the corpus kept growing. Raised
+  the heap headroom again, both locally (`.jvmopts`: 4g → 10g) and in CI
+  (`SBT_OPTS`: `-Xmx6G` → `-Xmx10G`); a clean run now completes in ~4 minutes
+  with room to spare. `docs/quality-bar.md` / `docs/ja/quality-bar.md` rows 2–3
+  (sample count 119→121, large-program count 62→64, adding `EspressoShop` and
+  `MusicFestival`) updated to match, fixing the two `QualityBarSpec` failures
+  those additions had left behind.
 
 ## [0.10.25] - 2026-08-07
 
